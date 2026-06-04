@@ -1,0 +1,228 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model User {
+  id            String         @id @default(cuid())
+  name          String?
+  username      String?        @unique
+  email         String?        @unique
+  emailVerified DateTime?
+  image         String?
+  password      String?
+  balance          Int            @default(10000)
+  total_profit     Int            @default(0)
+  role             String         @default("USER") // USER or ADMIN
+  createdAt        DateTime       @default(now())
+
+  // Rewards & Referrals
+  lastDailyReward  DateTime?
+  lastWeeklyReward DateTime?
+  referralCode     String?        @unique
+  referredById     String?
+  referredBy       User?          @relation("Referrals", fields: [referredById], references: [id])
+  referrals        User[]         @relation("Referrals")
+
+  accounts         Account[]
+  sessions         Session[]
+  holdings         Holding[]
+  transactions     Transaction[]
+  notifications    Notification[]
+
+  createdLeagues   League[]        @relation("LeagueCreator")
+  leagueMembers    LeagueMember[]
+  rewards          Reward[]
+}
+
+model Reward {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String   // "DAILY", "WEEKLY", "REFERRAL", "WELCOME"
+  amount    Int
+  claimedAt DateTime @default(now())
+}
+
+
+model League {
+  id          String   @id @default(cuid())
+  name        String
+  inviteCode  String   @unique
+  creatorId   String
+  creator     User     @relation("LeagueCreator", fields: [creatorId], references: [id])
+  createdAt   DateTime @default(now())
+
+  members     LeagueMember[]
+}
+
+model LeagueMember {
+  id        String   @id @default(cuid())
+  leagueId  String
+  league    League   @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  joinedAt  DateTime @default(now())
+
+  @@unique([leagueId, userId])
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  title     String
+  message   String
+  type      String   // INFO, SUCCESS, WARNING, ERROR
+  read      Boolean  @default(false)
+  timestamp DateTime @default(now())
+}
+
+model Account {
+  id                 String  @id @default(cuid())
+  userId             String
+  type               String
+  provider           String
+  providerAccountId  String
+  refresh_token      String?
+  access_token       String?
+  expires_at         Int?
+  token_type         String?
+  scope              String?
+  id_token           String?
+  session_state      String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model Asset {
+  id            String         @id // e.g. "team-ar", "player-messi"
+  type          String         // "TEAM" or "PLAYER"
+  name          String
+  code          String         // e.g. "AR", "LM10"
+  image         String         // flag or player face (emoji or url)
+  current_price Int
+  high_price    Int
+  low_price     Int
+  market_cap    String
+  volume        String
+  change        Float
+
+  // Group for World Cup (e.g. "A", "B", etc. - only for teams)
+  group         String?
+
+  // --- NEW SCORING & FILTERING FIELDS ---
+  continent     String? // e.g., "South America", "Europe", "Africa"
+  fifaRank      Int?    // e.g. 1 (for Argentina)
+  position      String? // e.g. "GK", "DEF", "MID", "FWD" (for players)
+  playerTier    Float?  // 1.0 (Star), 0.8 (Starter), 0.5 (Sub), etc.
+  roleImportance Float? // 1.0 to 0.1
+  score         Float?  // The dynamic or static score 0-100
+  isAvailable   Boolean @default(true) // For World Cup 26 roster
+  
+  // --- ADVANCED TRADING FIELDS ---
+  age               Int?
+  club              String?
+  coach             String?
+  participations    Int?
+  injuries          Int?    @default(0) // 0 means perfect health
+  harmony           Float?  @default(1.0)
+  riskIndex         Float?  @default(0.5) // 0.0 to 1.0
+  ownersCount       Int     @default(0)
+  globalMarketValue Float?  // in millions, e.g. 180 for Mbappe
+  popularity        Float?  @default(0.5) // 0.0 to 1.0
+  // -------------------------------------
+
+  // Relation: A player belongs to a team
+  teamId        String?
+  team          Asset?         @relation("TeamPlayers", fields: [teamId], references: [id])
+  players       Asset[]        @relation("TeamPlayers")
+
+  // Relation: Matches
+  homeMatches   Match[]        @relation("HomeTeam")
+  awayMatches   Match[]        @relation("AwayTeam")
+
+  holdings      Holding[]
+  transactions  Transaction[]
+  news          News[]
+  priceHistory  PriceHistory[]
+}
+
+model Match {
+  id          String   @id @default(cuid())
+  homeTeamId  String
+  homeTeam    Asset    @relation("HomeTeam", fields: [homeTeamId], references: [id])
+  awayTeamId  String
+  awayTeam    Asset    @relation("AwayTeam", fields: [awayTeamId], references: [id])
+  
+  matchDate   DateTime
+  status      String   @default("SCHEDULED") // SCHEDULED, LIVE, FINISHED
+  
+  homeScore   Int      @default(0)
+  awayScore   Int      @default(0)
+  
+  groupPhase  String?  // e.g. "Group A", "Round of 32"
+}
+
+model PriceHistory {
+  id        String   @id @default(cuid())
+  assetId   String
+  asset     Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  price     Int
+  timestamp DateTime @default(now())
+}
+
+model Holding {
+  id             String   @id @default(cuid())
+  user           User     @relation(fields: [userId], references: [id])
+  userId         String
+  asset          Asset    @relation(fields: [assetId], references: [id])
+  assetId        String
+  quantity       Int
+  avg_buy_price  Float
+
+  @@unique([userId, assetId])
+}
+
+model Transaction {
+  id             String   @id @default(cuid())
+  user           User     @relation(fields: [userId], references: [id])
+  userId         String
+  asset          Asset    @relation(fields: [assetId], references: [id])
+  assetId        String
+  type           String   // "BUY" or "SELL"
+  quantity       Int
+  price_at_time  Int
+  timestamp      DateTime @default(now())
+}
+
+model News {
+  id             String   @id @default(cuid())
+  title          String
+  impact         Float    // Percentage impact, e.g. 10.0 or -5.0
+  asset          Asset    @relation(fields: [assetId], references: [id])
+  assetId        String
+  timestamp      DateTime @default(now())
+}

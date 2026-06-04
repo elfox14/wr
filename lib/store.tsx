@@ -1,0 +1,182 @@
+import { create } from 'zustand';
+
+export interface Asset {
+  id: string;
+  type: string;
+  name: string;
+  code: string;
+  image: string;
+  current_price: number;
+  high_price: number;
+  low_price: number;
+  market_cap: string;
+  volume: string;
+  change: number;
+  priceHistory?: { price: number; timestamp: string }[];
+  group?: string | null;
+  continent?: string | null;
+  fifaRank?: number | null;
+  position?: string | null;
+  playerTier?: number | null;
+  roleImportance?: number | null;
+  score?: number | null;
+  isAvailable?: boolean;
+  age?: number | null;
+  club?: string | null;
+  coach?: string | null;
+  participations?: number | null;
+  injuries?: number | null;
+  harmony?: number | null;
+  riskIndex?: number | null;
+  ownersCount?: number;
+  globalMarketValue?: number | null;
+  popularity?: number | null;
+  teamId?: string | null;
+  team?: Asset | null;
+  players?: Asset[];
+}
+
+export interface Holding {
+  id: string;
+  assetId: string;
+  quantity: number;
+  avg_buy_price: number;
+  currentValue?: number;
+  profitLoss?: number;
+  profitLossPercent?: number;
+  asset?: Asset;
+}
+
+export interface UserStats {
+  id: string;
+  username: string;
+  balance: number;
+  total_profit: number;
+  total_holdings_value: number;
+  net_worth: number;
+  referralCode?: string;
+  referredById?: string;
+  lastDailyReward?: string;
+  lastWeeklyReward?: string;
+}
+
+export interface Match {
+  id: string;
+  homeTeam: Asset;
+  awayTeam: Asset;
+  matchDate: string;
+  status: string;
+  homeScore: number;
+  awayScore: number;
+  groupPhase: string;
+}
+
+interface AppState {
+  assets: Asset[];
+  matches: Match[];
+  holdings: Holding[];
+  userStats: UserStats | null;
+  loading: boolean;
+  notifications: string[];
+  
+  fetchAssets: () => Promise<void>;
+  fetchMatches: () => Promise<void>;
+  fetchPortfolio: () => Promise<void>;
+  buyAsset: (assetId: string, quantity: number) => Promise<void>;
+  sellAsset: (assetId: string, quantity: number) => Promise<void>;
+  addNotification: (msg: string) => void;
+  clearNotifications: () => void;
+}
+
+export const useStore = create<AppState>((set, get) => ({
+  assets: [],
+  matches: [],
+  holdings: [],
+  userStats: null,
+  loading: true,
+  notifications: [],
+
+  fetchAssets: async () => {
+    try {
+      const res = await fetch('/api/assets');
+      const data = await res.json();
+      set({ assets: data });
+    } catch (err) {
+      console.error(err);
+    }
+  },
+
+  fetchMatches: async () => {
+    try {
+      const res = await fetch('/api/matches');
+      const data = await res.json();
+      set({ matches: data });
+    } catch (err) {
+      console.error(err);
+    }
+  },
+
+  fetchPortfolio: async () => {
+    try {
+      const res = await fetch('/api/portfolio');
+      if (!res.ok) {
+        set({ holdings: [], userStats: null });
+        return;
+      }
+      const data = await res.json();
+      set({ holdings: data.holdings || [], userStats: data.user || null });
+    } catch (err) {
+      console.error(err);
+      set({ holdings: [], userStats: null });
+    }
+  },
+
+  buyAsset: async (assetId: string, quantity: number) => {
+    try {
+      const res = await fetch('/api/trade', {
+        method: 'POST',
+        body: JSON.stringify({ assetId, type: 'BUY', quantity }),
+        headers: { 'Content-Type': 'application/json' }
+      });
+      const data = await res.json();
+      
+      if (data.success) {
+        get().addNotification(data.message);
+        await get().fetchPortfolio();
+      } else {
+        get().addNotification(`Error: ${data.error}`);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  },
+
+  sellAsset: async (assetId: string, quantity: number) => {
+    try {
+      const res = await fetch('/api/trade', {
+        method: 'POST',
+        body: JSON.stringify({ assetId, type: 'SELL', quantity }),
+        headers: { 'Content-Type': 'application/json' }
+      });
+      const data = await res.json();
+      
+      if (data.success) {
+        get().addNotification(data.message);
+        await get().fetchPortfolio();
+      } else {
+        get().addNotification(`Error: ${data.error}`);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  },
+
+  addNotification: (msg: string) => {
+    set(state => ({ notifications: [...state.notifications, msg] }));
+    setTimeout(() => {
+      set(state => ({ notifications: state.notifications.slice(1) }));
+    }, 5000);
+  },
+
+  clearNotifications: () => set({ notifications: [] }),
+}));
