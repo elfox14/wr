@@ -142,8 +142,8 @@ async function main() {
         injuries: 0 
       };
       
-      const teamPrice = calculateTeamPrice(teamPartial, processedPlayers.map(p => ({ current_price: p.price })));
-      const teamScore = calculateTeamStrengthIndex(teamPartial, processedPlayers.map(p => ({ score: p.score })));
+      const teamPrice = calculateTeamPrice(teamPartial, processedPlayers.map((p: any) => ({ current_price: p.price })));
+      const teamScore = calculateTeamStrengthIndex(teamPartial, processedPlayers.map((p: any) => ({ score: p.score })));
 
       // 5. Save Team to Database
       const dbTeamId = `team-${teamCode.toLowerCase()}`;
