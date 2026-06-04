@@ -73,6 +73,12 @@ async function main() {
     try {
       // 1. Fetch Team ID (We search by name)
       const teamsRes = await fetchFromApi(`/teams?search=${countryName}`);
+      
+      if (!teamsRes || !Array.isArray(teamsRes)) {
+        console.log(`⚠️ Invalid response from API for ${countryName}. Check your RAPIDAPI_KEY and API subscription.`);
+        continue;
+      }
+
       // Filter to ensure it's a National Team
       const teamData = teamsRes.find((t: any) => t.team.national === true);
       
@@ -116,7 +122,6 @@ async function main() {
         return {
           apiId: rp.id,
           name: rp.name,
-          age: rp.age || 26,
           number: rp.number,
           pos: mapPosition(rp.position),
           photo: rp.photo,
