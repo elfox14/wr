@@ -26,16 +26,16 @@ export default function GroupLeaderboardPage() {
 
   const fetchLeague = async () => {
     try {
-      const res = await fetch(`/api/groups/${params.id}`);
+      const res = await fetch(`/api/leagues/${params.id}`);
       if (res.ok) {
         const data = await res.json();
         setLeague(data);
       } else {
-        router.push('/groups'); // Redirect if not member or not found
+        router.push('/leagues'); // Redirect if not member or not found
       }
     } catch (e) {
       console.error(e);
-      router.push('/groups');
+      router.push('/leagues');
     } finally {
       setLoading(false);
     }
@@ -60,8 +60,8 @@ export default function GroupLeaderboardPage() {
       <Navbar />
 
       <main className="max-w-4xl mx-auto px-4 py-12">
-        <Link href="/groups" className="inline-flex items-center gap-2 text-gray-400 hover:text-white mb-8 transition-colors">
-          <ArrowRight size={20} /> العودة للمجموعات
+        <Link href="/leagues" className="inline-flex items-center gap-2 text-gray-400 hover:text-white mb-8 transition-colors">
+          <ArrowRight size={20} /> العودة لدوريات التحدي
         </Link>
 
         <div className="bg-[#1A1A1A] border border-white/10 rounded-3xl p-8 mb-12 flex flex-col md:flex-row items-center justify-between gap-6 relative overflow-hidden">
@@ -71,7 +71,7 @@ export default function GroupLeaderboardPage() {
             <h1 className="text-4xl font-extrabold mb-2 text-transparent bg-clip-text bg-gradient-to-r from-[#0FF0FC] to-[#00B4DB]">
               {league.name}
             </h1>
-            <p className="text-gray-400">لوحة الصدارة الخاصة بأعضاء هذه المجموعة.</p>
+            <p className="text-gray-400">لوحة الصدارة الخاصة بأعضاء هذا الدوري.</p>
           </div>
 
           <div className="bg-black/50 border border-[#0FF0FC]/30 rounded-2xl p-4 flex items-center gap-4">

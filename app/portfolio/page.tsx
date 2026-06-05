@@ -4,7 +4,7 @@ import React, { useEffect } from 'react';
 import Link from 'next/link';
 import { useStore } from '@/lib/store';
 import { Navbar } from '@/components/ui/Navbar';
-import { Wallet, TrendingUp, TrendingDown, Briefcase } from 'lucide-react';
+import { Wallet, TrendingUp, TrendingDown, Briefcase, Trophy, ArrowLeft } from 'lucide-react';
 import { TradingCard } from '@/components/ui/TradingCard';
 
 export default function PortfolioPage() {
@@ -25,9 +25,14 @@ export default function PortfolioPage() {
       <Navbar />
       
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <h1 className="text-3xl font-bold text-[#FFD700] mb-8 flex items-center gap-3">
-          <Briefcase size={28} /> محفظتك الاستثمارية
-        </h1>
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
+          <h1 className="text-3xl font-bold text-[#FFD700] flex items-center gap-3">
+            <Briefcase size={28} /> محفظتك الاستثمارية
+          </h1>
+          <Link href="/leagues" className="bg-[#1A1A1A] border border-[#0FF0FC]/30 hover:bg-[#0FF0FC]/10 text-[#0FF0FC] px-6 py-2 rounded-xl flex items-center gap-2 font-bold transition-all">
+            <Trophy size={20} /> دوريات التحدي الخاصة بي <ArrowLeft size={16} />
+          </Link>
+        </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
           <div className="bg-[#1A1A1A] p-6 rounded-2xl border border-white/5 shadow-lg">
