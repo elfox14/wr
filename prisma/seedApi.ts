@@ -3,232 +3,323 @@ import { calculatePlayerPrice, calculateTeamPrice, calculateTeamStrengthIndex } 
 
 const prisma = new PrismaClient();
 
-const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY;
-const API_HOST = 'api-football-v1.p.rapidapi.com';
+const API_KEY = process.env.FOOTBALL_DATA_API_KEY || '';
+const BASE_URL = 'https://api.football-data.org/v4';
 
-const TOP_TEAMS = [
-  'Argentina', 'France', 'Brazil', 'England', 'Spain', 
-  'Germany', 'Portugal', 'Italy', 'Netherlands', 'Belgium', 
-  'Uruguay', 'Colombia', 'Croatia', 'Morocco', 'Senegal'
-];
-
-async function fetchFromApi(endpoint: string) {
-  if (!RAPIDAPI_KEY) {
-    throw new Error('RAPIDAPI_KEY is missing in .env');
-  }
-  
-  const response = await fetch(`https://${API_HOST}${endpoint}`, {
-    headers: {
-      'x-rapidapi-key': RAPIDAPI_KEY,
-      'x-rapidapi-host': API_HOST
-    }
-  });
-  
-  const data = await response.json();
-  if (data.errors && Object.keys(data.errors).length > 0) {
-    throw new Error(JSON.stringify(data.errors));
-  }
-  return data.response;
-}
-
-// Map real positions to our app positions
-function mapPosition(pos: string) {
+// Map position from API to our format
+function mapPosition(pos: string | null): string {
   switch (pos) {
     case 'Goalkeeper': return 'GK';
-    case 'Defender': return 'DEF';
-    case 'Midfielder': return 'MID';
-    case 'Attacker': return 'FWD';
+    case 'Defence': return 'DEF';
+    case 'Midfield': return 'MID';
+    case 'Offence': return 'FWD';
     default: return 'MID';
   }
 }
 
-// Generate a random market value to simulate real-world pricing
-function generateRandomMarketValue(age: number, tier: number, isStar: boolean) {
-  let baseValue = isStar ? 80 : 20;
-  if (age < 25) baseValue *= 1.2;
-  if (age > 32) baseValue *= 0.6;
-  baseValue *= tier;
-  return Math.round(baseValue);
+// Calculate player age from DOB
+function calcAge(dob: string | null): number {
+  if (!dob) return 26;
+  const birth = new Date(dob);
+  const now = new Date();
+  let age = now.getFullYear() - birth.getFullYear();
+  const m = now.getMonth() - birth.getMonth();
+  if (m < 0 || (m === 0 && now.getDate() < birth.getDate())) age--;
+  return age;
 }
 
-// Dummy FIFA ranks to avoid an extra API call just for ranks
+// Continents for each country (rough mapping)
+const continentMap: Record<string, string> = {
+  'URY': 'South America', 'ARG': 'South America', 'BRA': 'South America', 'COL': 'South America',
+  'ECU': 'South America', 'PAR': 'South America', 'VEN': 'South America', 'CHI': 'South America',
+  'PER': 'South America', 'BOL': 'South America',
+  'GER': 'Europe', 'ESP': 'Europe', 'FRA': 'Europe', 'ENG': 'Europe', 'POR': 'Europe',
+  'ITA': 'Europe', 'NED': 'Europe', 'BEL': 'Europe', 'CRO': 'Europe', 'DEN': 'Europe',
+  'SUI': 'Europe', 'SRB': 'Europe', 'POL': 'Europe', 'WAL': 'Europe', 'SCO': 'Europe',
+  'UKR': 'Europe', 'AUT': 'Europe', 'CZE': 'Europe', 'HUN': 'Europe', 'SVK': 'Europe',
+  'SVN': 'Europe', 'ALB': 'Europe', 'GEO': 'Europe', 'TUR': 'Europe', 'GRE': 'Europe',
+  'USA': 'North America', 'MEX': 'North America', 'CAN': 'North America', 'CRC': 'North America',
+  'HON': 'North America', 'JAM': 'North America', 'PAN': 'North America', 'TRI': 'North America',
+  'JPN': 'Asia', 'KOR': 'Asia', 'KSA': 'Asia', 'IRN': 'Asia', 'AUS': 'Asia',
+  'QAT': 'Asia', 'IRQ': 'Asia', 'UZB': 'Asia', 'BHR': 'Asia', 'IDN': 'Asia',
+  'CHN': 'Asia', 'OMA': 'Asia', 'UAE': 'Asia', 'IND': 'Asia',
+  'MAR': 'Africa', 'SEN': 'Africa', 'NGA': 'Africa', 'EGY': 'Africa', 'CMR': 'Africa',
+  'GHA': 'Africa', 'CIV': 'Africa', 'ALG': 'Africa', 'TUN': 'Africa', 'MLI': 'Africa',
+  'BFA': 'Africa', 'COD': 'Africa', 'ZAF': 'Africa', 'TAN': 'Africa',
+  'NZL': 'Oceania',
+};
+
+// Emoji flags for countries
+const flagEmojis: Record<string, string> = {
+  'URY': '🇺🇾', 'GER': '🇩🇪', 'ESP': '🇪🇸', 'PAR': '🇵🇾', 'ARG': '🇦🇷',
+  'FRA': '🇫🇷', 'BRA': '🇧🇷', 'ENG': '🏴󠁧󠁢󠁥󠁮󠁧󠁿', 'POR': '🇵🇹', 'ITA': '🇮🇹',
+  'NED': '🇳🇱', 'BEL': '🇧🇪', 'CRO': '🇭🇷', 'DEN': '🇩🇰', 'SUI': '🇨🇭',
+  'SRB': '🇷🇸', 'POL': '🇵🇱', 'WAL': '🏴󠁧󠁢󠁷󠁬󠁳󠁿', 'SCO': '🏴󠁧󠁢󠁳󠁣󠁴󠁿', 'UKR': '🇺🇦',
+  'AUT': '🇦🇹', 'CZE': '🇨🇿', 'HUN': '🇭🇺', 'SVK': '🇸🇰', 'SVN': '🇸🇮',
+  'ALB': '🇦🇱', 'GEO': '🇬🇪', 'TUR': '🇹🇷', 'GRE': '🇬🇷',
+  'USA': '🇺🇸', 'MEX': '🇲🇽', 'CAN': '🇨🇦', 'CRC': '🇨🇷', 'HON': '🇭🇳',
+  'JAM': '🇯🇲', 'PAN': '🇵🇦', 'TRI': '🇹🇹',
+  'COL': '🇨🇴', 'ECU': '🇪🇨', 'VEN': '🇻🇪', 'CHI': '🇨🇱', 'PER': '🇵🇪',
+  'BOL': '🇧🇴',
+  'JPN': '🇯🇵', 'KOR': '🇰🇷', 'KSA': '🇸🇦', 'IRN': '🇮🇷', 'AUS': '🇦🇺',
+  'QAT': '🇶🇦', 'IRQ': '🇮🇶', 'UZB': '🇺🇿', 'IDN': '🇮🇩', 'BHR': '🇧🇭',
+  'CHN': '🇨🇳', 'OMA': '🇴🇲', 'UAE': '🇦🇪',
+  'MAR': '🇲🇦', 'SEN': '🇸🇳', 'NGA': '🇳🇬', 'EGY': '🇪🇬', 'CMR': '🇨🇲',
+  'GHA': '🇬🇭', 'CIV': '🇨🇮', 'ALG': '🇩🇿', 'TUN': '🇹🇳', 'MLI': '🇲🇱',
+  'BFA': '🇧🇫', 'COD': '🇨🇩', 'ZAF': '🇿🇦', 'TAN': '🇹🇿',
+  'NZL': '🇳🇿',
+};
+
+// Rough FIFA ranking (June 2026 estimates)
 const fifaRanks: Record<string, number> = {
-  'Argentina': 1, 'France': 2, 'Brazil': 5, 'England': 3, 'Spain': 8,
-  'Germany': 16, 'Portugal': 6, 'Italy': 9, 'Netherlands': 7, 'Belgium': 4,
-  'Uruguay': 11, 'Colombia': 14, 'Croatia': 10, 'Morocco': 12, 'Senegal': 17
+  'ARG': 1, 'FRA': 2, 'ENG': 3, 'BRA': 5, 'BEL': 4, 'NED': 6, 'POR': 7,
+  'ESP': 8, 'ITA': 9, 'CRO': 10, 'URY': 11, 'COL': 12, 'MEX': 14, 'USA': 13,
+  'MAR': 15, 'GER': 16, 'SEN': 17, 'JPN': 18, 'SUI': 19, 'IRN': 20,
+  'DEN': 21, 'AUS': 24, 'KOR': 23, 'ECU': 31, 'CAN': 45,
+  'SRB': 32, 'POL': 30, 'TUN': 41, 'CMR': 51, 'GHA': 61,
+  'WAL': 29, 'QAT': 40, 'NGA': 28, 'KSA': 53, 'CRC': 52, 'PAR': 50,
+  'NZL': 94, 'CIV': 39, 'ALG': 43, 'EGY': 36, 'VEN': 54, 'CHI': 42,
+  'PER': 33, 'MLI': 47, 'BFA': 62, 'UZB': 66, 'JAM': 57, 'SCO': 35,
+  'UKR': 26, 'TUR': 27, 'BOL': 70, 'PAN': 55, 'IDN': 85, 'TRI': 80,
+  'IRQ': 65, 'BHR': 78, 'OMA': 80, 'UAE': 69,
 };
 
 async function main() {
-  console.log('⚽ Starting API Data Sync...');
+  console.log('🌍 Starting Full Data Sync from football-data.org...\n');
 
-  if (!RAPIDAPI_KEY) {
-    console.error('❌ Error: RAPIDAPI_KEY is not set. Please add it to your .env file or Render environment variables.');
+  if (!API_KEY) {
+    console.error('❌ FOOTBALL_DATA_API_KEY not set!');
     process.exit(1);
   }
 
-  for (let i = 0; i < TOP_TEAMS.length; i++) {
-    const countryName = TOP_TEAMS[i];
-    console.log(`\n--- Fetching Data for ${countryName} ---`);
-    
-    try {
-      // 1. Fetch Team ID (We search by name)
-      const teamsRes = await fetchFromApi(`/teams?search=${countryName}`);
-      
-      if (!teamsRes || !Array.isArray(teamsRes)) {
-        console.log(`⚠️ API Error for ${countryName}.`);
-        console.log(`Hint: Make sure you clicked 'Subscribe' on the API-Football page on RapidAPI, and that your RAPIDAPI_KEY is correct.`);
-        continue;
-      }
+  // 1. Fetch all teams from WC competition
+  console.log('📡 Fetching teams from API...');
+  const teamsRes = await fetch(`${BASE_URL}/competitions/WC/teams`, {
+    headers: { 'X-Auth-Token': API_KEY }
+  });
 
-      // Filter to ensure it's a National Team
-      const teamData = teamsRes.find((t: any) => t.team.national === true);
-      
-      if (!teamData) {
-        console.log(`⚠️ National team for ${countryName} not found. Skipping.`);
-        continue;
-      }
-      
-      const apiTeamId = teamData.team.id;
-      const teamLogo = teamData.team.logo;
-      const teamCode = teamData.team.code || countryName.substring(0, 3).toUpperCase();
-      
-      console.log(`✅ Team found: ${countryName} (ID: ${apiTeamId})`);
-      
-      // 2. Fetch Squad for this team
-      console.log(`Fetching squad for ${countryName}...`);
-      const squadRes = await fetchFromApi(`/players/squads?team=${apiTeamId}`);
-      
-      if (!squadRes || squadRes.length === 0 || !squadRes[0].players) {
-        console.log(`⚠️ No squad data for ${countryName}. Skipping.`);
-        continue;
-      }
+  if (!teamsRes.ok) {
+    console.error(`❌ API returned ${teamsRes.status}: ${await teamsRes.text()}`);
+    process.exit(1);
+  }
 
-      const rawPlayers = squadRes[0].players;
-      console.log(`✅ Found ${rawPlayers.length} players for ${countryName}.`);
+  const teamsData = await teamsRes.json();
+  const apiTeams = teamsData.teams || [];
+  console.log(`✅ Found ${apiTeams.length} teams\n`);
 
-      // 3. Process Players
-      const processedPlayers = rawPlayers.map((rp: any) => {
-        const isStar = rp.number === 10 || rp.number === 9 || rp.number === 7 || rp.number === 1;
-        const tier = isStar ? 0.9 : 0.7;
-        const assetObj = {
-          type: 'PLAYER' as const,
-          playerTier: tier,
-          globalMarketValue: generateRandomMarketValue(rp.age || 26, tier, isStar),
-          age: rp.age || 26,
-          popularity: isStar ? 0.9 : 0.5,
-        };
-        
-        const price = calculatePlayerPrice(assetObj);
-        
-        return {
-          apiId: rp.id,
-          name: rp.name,
-          number: rp.number,
-          pos: mapPosition(rp.position),
-          photo: rp.photo,
-          tier,
-          price,
-          score: Math.round(75 + (tier * 15)),
-          ...assetObj
-        };
-      });
+  // 2. Process each team
+  let teamCount = 0;
+  let playerCount = 0;
 
-      // 4. Calculate Team Price
-      const teamPartial = { 
-        type: 'TEAM' as const, 
-        fifaRank: fifaRanks[countryName] || 20, 
-        participations: 10, 
-        popularity: 0.8, 
-        harmony: 0.85, 
-        injuries: 0 
+  for (const apiTeam of apiTeams) {
+    const tla = apiTeam.tla; // 3-letter code
+    const teamName = apiTeam.name || apiTeam.shortName;
+    const shortName = apiTeam.shortName || teamName;
+    const crest = apiTeam.crest || ''; // SVG/PNG URL of team crest
+    const coachName = apiTeam.coach?.name || 'N/A';
+    const squad = apiTeam.squad || [];
+    const flag = flagEmojis[tla] || '🏳️';
+    const rank = fifaRanks[tla] || 50;
+    const continent = continentMap[tla] || 'Unknown';
+    const dbTeamId = `team-${tla.toLowerCase()}`;
+
+    console.log(`⚽ ${flag} ${teamName} (${tla}) — Coach: ${coachName} — ${squad.length} players`);
+
+    // Calculate team price based on rank
+    const teamPartial = {
+      type: 'TEAM' as const,
+      fifaRank: rank,
+      participations: 10,
+      popularity: rank <= 10 ? 0.9 : rank <= 20 ? 0.7 : 0.5,
+      harmony: 0.85,
+      injuries: 0,
+    };
+
+    const playerPrices: { current_price: number }[] = [];
+    const playerScores: { score: number }[] = [];
+
+    // Process players
+    const processedPlayers = squad.map((p: any) => {
+      const age = calcAge(p.dateOfBirth);
+      const pos = mapPosition(p.position);
+      const isStar = (p.position === 'Offence' || p.position === 'Midfield') && age >= 22 && age <= 32;
+      const tier = isStar ? 0.9 : 0.7;
+
+      const assetObj = {
+        type: 'PLAYER' as const,
+        playerTier: tier,
+        globalMarketValue: isStar ? 80 : 20,
+        age,
+        popularity: isStar ? 0.85 : 0.5,
       };
-      
-      const teamPrice = calculateTeamPrice(teamPartial, processedPlayers.map((p: any) => ({ current_price: p.price })));
-      const teamScore = calculateTeamStrengthIndex(teamPartial, processedPlayers.map((p: any) => ({ score: p.score })));
 
-      // 5. Save Team to Database
-      const dbTeamId = `team-${teamCode.toLowerCase()}`;
-      const savedTeam = await prisma.asset.upsert({
-        where: { id: dbTeamId },
+      const price = calculatePlayerPrice(assetObj);
+      const score = Math.round(65 + (tier * 25) + (rank <= 10 ? 10 : 0));
+
+      playerPrices.push({ current_price: price });
+      playerScores.push({ score });
+
+      return {
+        apiId: p.id,
+        name: p.name,
+        pos,
+        age,
+        tier,
+        price,
+        score,
+        nationality: p.nationality || '',
+      };
+    });
+
+    const teamPrice = calculateTeamPrice(teamPartial, playerPrices);
+    const teamScore = calculateTeamStrengthIndex(teamPartial, playerScores);
+
+    // Save team
+    await prisma.asset.upsert({
+      where: { id: dbTeamId },
+      update: {
+        name: shortName,
+        code: tla,
+        image: flag,
+        current_price: teamPrice,
+        score: teamScore,
+        fifaRank: rank,
+        continent,
+        coach: coachName,
+        participations: 10,
+        ownersCount: Math.floor(Math.random() * 5000 + 500),
+        riskIndex: rank <= 10 ? 0.3 : rank <= 20 ? 0.5 : 0.7,
+        harmony: 0.85,
+        popularity: rank <= 10 ? 0.9 : 0.7,
+      },
+      create: {
+        id: dbTeamId,
+        type: 'TEAM',
+        name: shortName,
+        code: tla,
+        image: flag,
+        current_price: teamPrice,
+        high_price: teamPrice,
+        low_price: teamPrice,
+        market_cap: `${Math.max(10, 110 - rank)}B`,
+        volume: `${Math.floor(Math.random() * 5 + 1)}M`,
+        change: 0,
+        fifaRank: rank,
+        score: teamScore,
+        continent,
+        coach: coachName,
+        group: 'A',
+        participations: 10,
+        ownersCount: Math.floor(Math.random() * 5000 + 500),
+        riskIndex: rank <= 10 ? 0.3 : rank <= 20 ? 0.5 : 0.7,
+        harmony: 0.85,
+        popularity: rank <= 10 ? 0.9 : 0.7,
+        priceHistory: { create: { price: teamPrice } },
+      },
+    });
+    teamCount++;
+
+    // Save players
+    for (const p of processedPlayers) {
+      const dbPlayerId = `player-${tla.toLowerCase()}-${p.apiId}`;
+      await prisma.asset.upsert({
+        where: { id: dbPlayerId },
         update: {
-          current_price: teamPrice,
-          score: teamScore,
-          fifaRank: fifaRanks[countryName] || 20,
+          name: p.name,
+          current_price: p.price,
+          age: p.age,
+          position: p.pos,
+          score: p.score,
+          playerTier: p.tier,
         },
         create: {
-          id: dbTeamId,
-          type: 'TEAM',
-          name: countryName,
-          code: teamCode,
-          image: teamLogo, // Now using real logo URL
-          current_price: teamPrice,
-          high_price: teamPrice,
-          low_price: teamPrice,
-          market_cap: '1B',
-          volume: '10M',
+          id: dbPlayerId,
+          type: 'PLAYER',
+          name: p.name,
+          code: `${tla}${p.apiId}`,
+          image: flag,
+          teamId: dbTeamId,
+          current_price: p.price,
+          high_price: p.price,
+          low_price: p.price,
+          market_cap: `${Math.floor(Math.random() * 800 + 100)}M`,
+          volume: `${Math.floor(Math.random() * 10 + 2)}M`,
           change: 0,
-          fifaRank: fifaRanks[countryName] || 20,
-          score: teamScore,
-          continent: 'Global',
-          group: 'A',
-          participations: 10,
-          ownersCount: Math.floor(Math.random() * 5000),
-          riskIndex: 0.5,
-          priceHistory: { create: { price: teamPrice } }
-        }
+          position: p.pos,
+          score: p.score,
+          playerTier: p.tier,
+          age: p.age,
+          globalMarketValue: p.tier > 0.8 ? 80 : 20,
+          popularity: p.tier > 0.8 ? 0.85 : 0.5,
+          priceHistory: { create: { price: p.price } },
+        },
       });
-
-      // 6. Save Players to Database
-      for (const p of processedPlayers) {
-        const dbPlayerId = `player-${apiTeamId}-${p.apiId}`;
-        await prisma.asset.upsert({
-          where: { id: dbPlayerId },
-          update: {
-            current_price: p.price,
-            age: p.age,
-            position: p.pos,
-          },
-          create: {
-            id: dbPlayerId,
-            type: 'PLAYER',
-            name: p.name,
-            code: `${countryName.substring(0,2).toUpperCase()}${p.number || ''}`,
-            image: p.photo, // Real player photo
-            teamId: savedTeam.id,
-            current_price: p.price,
-            high_price: p.price,
-            low_price: p.price,
-            market_cap: '10M',
-            volume: '100K',
-            change: 0,
-            position: p.pos,
-            score: p.score,
-            playerTier: p.tier,
-            age: p.age,
-            globalMarketValue: p.globalMarketValue,
-            priceHistory: { create: { price: p.price } }
-          }
-        });
-      }
-
-      console.log(`✅ Saved ${countryName} and ${processedPlayers.length} players to database.`);
-
-      // Sleep to respect API rate limits (avoid getting blocked)
-      if (i < TOP_TEAMS.length - 1) {
-        console.log('Sleeping for 2 seconds to avoid rate limits...');
-        await new Promise(resolve => setTimeout(resolve, 2000));
-      }
-
-    } catch (error) {
-      console.error(`❌ Failed to sync ${countryName}:`, error);
+      playerCount++;
     }
   }
 
-  console.log('\n🎉 API Sync Completed Successfully!');
+  // 3. Fetch matches and sync
+  console.log('\n📡 Fetching matches from API...');
+  const matchesRes = await fetch(`${BASE_URL}/competitions/WC/matches`, {
+    headers: { 'X-Auth-Token': API_KEY }
+  });
+
+  if (matchesRes.ok) {
+    const matchesData = await matchesRes.json();
+    const apiMatches = matchesData.matches || [];
+    let matchCount = 0;
+
+    for (const m of apiMatches) {
+      const homeTla = m.homeTeam?.tla;
+      const awayTla = m.awayTeam?.tla;
+      if (!homeTla || !awayTla) continue;
+
+      const homeId = `team-${homeTla.toLowerCase()}`;
+      const awayId = `team-${awayTla.toLowerCase()}`;
+
+      // Check both teams exist
+      const homeExists = await prisma.asset.findUnique({ where: { id: homeId } });
+      const awayExists = await prisma.asset.findUnique({ where: { id: awayId } });
+      if (!homeExists || !awayExists) continue;
+
+      const externalId = String(m.id);
+      const status = m.status === 'FINISHED' ? 'FINISHED' : m.status === 'IN_PLAY' ? 'IN_PLAY' : 'SCHEDULED';
+      const stage = (m.stage || 'GROUP_STAGE').toLowerCase().replace(/_/g, '_');
+      const groupPhase = m.group || stage;
+
+      await prisma.match.upsert({
+        where: { externalId },
+        update: {
+          homeScore: m.score?.fullTime?.home ?? 0,
+          awayScore: m.score?.fullTime?.away ?? 0,
+          status,
+          stage,
+          groupPhase,
+        },
+        create: {
+          externalId,
+          homeTeamId: homeId,
+          awayTeamId: awayId,
+          matchDate: m.utcDate ? new Date(m.utcDate) : new Date(),
+          homeScore: m.score?.fullTime?.home ?? 0,
+          awayScore: m.score?.fullTime?.away ?? 0,
+          status,
+          stage,
+          groupPhase,
+        },
+      });
+      matchCount++;
+    }
+    console.log(`✅ Synced ${matchCount} matches`);
+  }
+
+  console.log(`\n🏆 Sync Complete!`);
+  console.log(`   Teams: ${teamCount}`);
+  console.log(`   Players: ${playerCount}`);
 }
 
 main()
-  .catch(e => {
+  .catch((e) => {
     console.error('Fatal Error:', e);
     process.exit(1);
   })
