@@ -372,32 +372,43 @@ async function main() {
     console.log(`✅ Synced ${matchCount} matches`);
   }
 
-  // 4. Distribute Teams into 12 Groups (A to L) using Pot System
-  console.log('\n🎲 Distributing teams into 12 Groups (Pot System)...');
-  const allTeams = await prisma.asset.findMany({
-    where: { type: 'TEAM' },
-    orderBy: { fifaRank: 'asc' }
+  // 4. Fetch actual Groups from Standings API
+  console.log('\n🎲 Fetching official World Cup Groups from API...');
+  const standingsRes = await fetch(`${BASE_URL}/competitions/WC/standings`, {
+    headers: { 'X-Auth-Token': API_KEY }
   });
 
-  const pot1 = allTeams.slice(0, 12);
-  const pot2 = allTeams.slice(12, 24);
-  const pot3 = allTeams.slice(24, 36);
-  const pot4 = allTeams.slice(36, 48);
-
-  const groupNames = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L'];
-  
-  for (let i = 0; i < groupNames.length; i++) {
-    const groupName = groupNames[i];
-    const groupTeams = [pot1[i], pot2[i], pot3[i], pot4[i]].filter(Boolean);
-
-    for (const team of groupTeams) {
-      await prisma.asset.update({
-        where: { id: team.id },
-        data: { group: groupName }
-      });
+  if (standingsRes.ok) {
+    const standingsData = await standingsRes.json();
+    const standings = standingsData.standings || [];
+    
+    for (const groupData of standings) {
+      if (!groupData.group) continue;
+      // Extract group name e.g., "Group A" -> "A"
+      const groupName = groupData.group.replace('Group ', '').trim();
+      const table = groupData.table || [];
+      
+      for (const row of table) {
+        const tla = row.team?.tla;
+        if (!tla) continue;
+        
+        const dbTeamId = `team-${tla.toLowerCase()}`;
+        
+        try {
+          await prisma.asset.update({
+            where: { id: dbTeamId },
+            data: { group: groupName }
+          });
+          // console.log(`Assigned ${tla} to Group ${groupName}`);
+        } catch (e) {
+          // Team might not exist if API has mismatch, ignore
+        }
+      }
     }
+    console.log('✅ Official Groups assigned successfully');
+  } else {
+    console.warn('⚠️ Could not fetch standings. Groups will remain TBD.');
   }
-  console.log('✅ Teams distributed successfully');
 
   console.log(`\n🏆 Sync Complete!`);
   console.log(`   Teams: ${teamCount}`);
