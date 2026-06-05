@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useStore, Asset } from '@/lib/store';
 import { Navbar } from '@/components/ui/Navbar';
-import { TrendingUp, TrendingDown, ArrowRight, Search, Filter, LayoutGrid, List, ChevronRight, Globe, Users, Target, Activity } from 'lucide-react';
+import { TrendingUp, TrendingDown, ArrowRight, Search, Filter, LayoutGrid, List, ChevronRight, Globe, Users, Target, Activity, Zap, Info } from 'lucide-react';
 import { TeamRosterDrawer } from '@/components/ui/TeamRosterDrawer';
 
 export default function MarketPage() {
@@ -13,9 +13,17 @@ export default function MarketPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState<'GRID' | 'TABLE'>('GRID');
   const [selectedTeam, setSelectedTeam] = useState<Asset | null>(null);
+  const [marketNews, setMarketNews] = useState<any[]>([]);
 
   useEffect(() => {
     fetchAssets();
+    // Fetch Market News
+    fetch('/api/market-news?limit=5')
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data)) setMarketNews(data);
+      })
+      .catch(console.error);
   }, [fetchAssets]);
 
   // Derived Stats for Overview
@@ -56,9 +64,32 @@ export default function MarketPage() {
           <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight text-white mb-4">
             سوق كأس العالم <span className="text-[#0FF0FC]">2026</span>
           </h1>
-          <p className="text-xl text-gray-400 max-w-3xl">
+          <p className="text-xl text-gray-400 max-w-3xl mb-8">
             استكشف 48 منتخبًا مشاركًا وقوائمهم النهائية، وقارن بين قوة المنتخبات وجودة اللاعبين وحركة السوق في مكان واحد.
           </p>
+          
+          {/* Market News Ticker */}
+          {marketNews.length > 0 && (
+            <div className="bg-[#1A1A1A] border border-[#0FF0FC]/20 rounded-xl overflow-hidden flex shadow-[0_0_15px_rgba(15,240,252,0.1)]">
+              <div className="bg-[#0FF0FC]/10 text-[#0FF0FC] px-4 py-3 font-bold flex items-center gap-2 whitespace-nowrap shrink-0 border-l border-[#0FF0FC]/20">
+                <Zap size={18} className="animate-pulse" />
+                أخبار السوق
+              </div>
+              <div className="flex-1 overflow-hidden relative flex items-center">
+                <div className="animate-marquee whitespace-nowrap flex gap-10 px-4">
+                  {marketNews.map(news => (
+                    <div key={news.id} className="flex items-center gap-3 text-sm">
+                      <span className="text-xl">{news.asset.image}</span>
+                      <span className="font-bold text-white">{news.titleAr}</span>
+                      <span className={`font-mono text-xs px-2 py-0.5 rounded ${news.changePercent >= 0 ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
+                        {news.changePercent >= 0 ? '+' : ''}{news.changePercent}%
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Live Top Info Bar (Ticker style) */}

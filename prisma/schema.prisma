@@ -166,24 +166,26 @@ model Asset {
 
   holdings      Holding[]
   transactions  Transaction[]
-  news          News[]
+  marketNews    MarketNews[]
   priceHistory  PriceHistory[]
 }
 
 model Match {
   id          String   @id @default(cuid())
+  externalId  String?  @unique // Matches from openfootball
   homeTeamId  String
   homeTeam    Asset    @relation("HomeTeam", fields: [homeTeamId], references: [id])
   awayTeamId  String
   awayTeam    Asset    @relation("AwayTeam", fields: [awayTeamId], references: [id])
   
   matchDate   DateTime
-  status      String   @default("SCHEDULED") // SCHEDULED, LIVE, FINISHED
+  status      String   @default("SCHEDULED") // SCHEDULED, IN_PLAY, FINISHED
   
   homeScore   Int      @default(0)
   awayScore   Int      @default(0)
   
-  groupPhase  String?  // e.g. "Group A", "Round of 32"
+  groupPhase  String?  // e.g. "Group A"
+  stage       String   @default("group") // group, round_of_16, quarter_final, semi_final, final
 }
 
 model PriceHistory {
@@ -218,11 +220,18 @@ model Transaction {
   timestamp      DateTime @default(now())
 }
 
-model News {
+model MarketNews {
   id             String   @id @default(cuid())
-  title          String
-  impact         Float    // Percentage impact, e.g. 10.0 or -5.0
   asset          Asset    @relation(fields: [assetId], references: [id])
   assetId        String
-  timestamp      DateTime @default(now())
+  eventType      String   // price_spike, price_drop, win, loss, qualification, elimination
+  severity       String   @default("normal") // low, normal, high
+  priceBefore    Float?
+  priceAfter     Float?
+  changePercent  Float    @default(0)
+  titleAr        String
+  bodyAr         String
+  titleEn        String
+  bodyEn         String
+  publishedAt    DateTime @default(now())
 }
