@@ -47,11 +47,18 @@ export async function POST(request: Request) {
       }
     });
 
-    await prisma.news.create({
+    await prisma.marketNews.create({
       data: {
         assetId: asset.id,
-        title: title,
-        impact: percentChange
+        eventType: event,
+        severity: Math.abs(percentChange) > 8 ? 'high' : 'normal',
+        priceBefore: asset.current_price,
+        priceAfter: newPrice,
+        changePercent: percentChange,
+        titleAr: title,
+        titleEn: event,
+        bodyAr: `تم تحديث سعر الأصل بنسبة ${percentChange}% بناءً على هذا الحدث.`,
+        bodyEn: `Asset price updated by ${percentChange}% due to this event.`,
       }
     });
 

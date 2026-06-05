@@ -56,11 +56,18 @@ export async function POST(request: Request) {
     });
 
     // Record News
-    await prisma.news.create({
+    await prisma.marketNews.create({
       data: {
         assetId: asset.id,
-        title: newsTitle,
-        impact: percentChange
+        eventType: eventType,
+        severity: Math.abs(percentChange) > 10 ? 'high' : 'normal',
+        priceBefore: asset.current_price,
+        priceAfter: newPrice,
+        changePercent: percentChange,
+        titleAr: newsTitle,
+        titleEn: 'Admin Event',
+        bodyAr: `تم تحديث سعر الأصل بنسبة ${percentChange}% بناءً على حدث إداري.`,
+        bodyEn: `Asset price updated by ${percentChange}% due to an admin event.`,
       }
     });
 

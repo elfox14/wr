@@ -8,8 +8,8 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     const asset = await prisma.asset.findUnique({
       where: { id },
       include: {
-        news: {
-          orderBy: { timestamp: 'desc' }
+        marketNews: {
+          orderBy: { publishedAt: 'desc' }
         },
         priceHistory: {
           orderBy: { timestamp: 'asc' }

@@ -125,7 +125,7 @@ async function main() {
   // 2. Clear existing data
   await prisma.match.deleteMany({});
   await prisma.transaction.deleteMany({});
-  await prisma.news.deleteMany({});
+  await prisma.marketNews.deleteMany({});
   await prisma.holding.deleteMany({});
   await prisma.priceHistory.deleteMany({});
   await prisma.asset.deleteMany({});
