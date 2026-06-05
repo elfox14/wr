@@ -284,6 +284,7 @@ async function main() {
         where: { id: dbPlayerId },
         update: {
           name: p.name,
+          image: flag,
           current_price: p.price,
           age: p.age,
           position: p.pos,
