@@ -107,44 +107,44 @@ async function main() {
   const apiTeams = teamsData.teams || [];
   console.log(`✅ Found ${apiTeams.length} teams\n`);
 
-  // 2. CLEANUP: Remove old duplicate teams that have different IDs but same code
-  console.log('🧹 Cleaning up duplicate data...');
-  for (const apiTeam of apiTeams) {
-    const tla = apiTeam.tla;
-    const newId = `team-${tla.toLowerCase()}`;
+  // 2. CLEANUP: Build list of valid new IDs, then remove everything else
+  const validTeamIds = apiTeams.map((t: any) => `team-${t.tla.toLowerCase()}`);
+  console.log('🧹 Cleaning up old/duplicate data...');
 
-    // Find any existing assets with this code but DIFFERENT id
-    const duplicates = await prisma.asset.findMany({
-      where: {
-        code: tla,
-        type: 'TEAM',
-        id: { not: newId },
-      },
-    });
+  // Find ALL teams in DB that are NOT in the new valid list
+  const orphanTeams = await prisma.asset.findMany({
+    where: {
+      type: 'TEAM',
+      id: { notIn: validTeamIds },
+    },
+  });
 
-    for (const dup of duplicates) {
-      console.log(`  🗑️ Removing duplicate: ${dup.name} (old ID: ${dup.id}, new ID: ${newId})`);
-      // Delete related data first (cascade)
-      await prisma.marketNews.deleteMany({ where: { assetId: dup.id } });
-      await prisma.priceHistory.deleteMany({ where: { assetId: dup.id } });
-      await prisma.transaction.deleteMany({ where: { assetId: dup.id } });
-      await prisma.holding.deleteMany({ where: { assetId: dup.id } });
-      // Delete old players of this team
-      const oldPlayers = await prisma.asset.findMany({ where: { teamId: dup.id } });
-      for (const oldPlayer of oldPlayers) {
-        await prisma.marketNews.deleteMany({ where: { assetId: oldPlayer.id } });
-        await prisma.priceHistory.deleteMany({ where: { assetId: oldPlayer.id } });
-        await prisma.transaction.deleteMany({ where: { assetId: oldPlayer.id } });
-        await prisma.holding.deleteMany({ where: { assetId: oldPlayer.id } });
-        await prisma.asset.delete({ where: { id: oldPlayer.id } });
-      }
-      // Delete matches referencing old team
-      await prisma.match.deleteMany({ where: { OR: [{ homeTeamId: dup.id }, { awayTeamId: dup.id }] } });
-      // Delete the old team itself
-      await prisma.asset.delete({ where: { id: dup.id } });
+  for (const dup of orphanTeams) {
+    console.log(`  🗑️ Removing orphan team: ${dup.name} (ID: ${dup.id})`);
+    // Delete players of this team first
+    const oldPlayers = await prisma.asset.findMany({ where: { teamId: dup.id } });
+    for (const oldPlayer of oldPlayers) {
+      await prisma.marketNews.deleteMany({ where: { assetId: oldPlayer.id } });
+      await prisma.priceHistory.deleteMany({ where: { assetId: oldPlayer.id } });
+      await prisma.transaction.deleteMany({ where: { assetId: oldPlayer.id } });
+      await prisma.holding.deleteMany({ where: { assetId: oldPlayer.id } });
+      await prisma.asset.delete({ where: { id: oldPlayer.id } });
     }
+    // Delete team's related data
+    await prisma.marketNews.deleteMany({ where: { assetId: dup.id } });
+    await prisma.priceHistory.deleteMany({ where: { assetId: dup.id } });
+    await prisma.transaction.deleteMany({ where: { assetId: dup.id } });
+    await prisma.holding.deleteMany({ where: { assetId: dup.id } });
+    await prisma.match.deleteMany({ where: { OR: [{ homeTeamId: dup.id }, { awayTeamId: dup.id }] } });
+    await prisma.asset.delete({ where: { id: dup.id } });
   }
-  console.log('✅ Cleanup complete\n');
+
+  if (orphanTeams.length > 0) {
+    console.log(`  ✅ Removed ${orphanTeams.length} orphan teams`);
+  } else {
+    console.log('  ✅ No orphan data found');
+  }
+  console.log('');
 
   // 3. Process each team
   let teamCount = 0;
