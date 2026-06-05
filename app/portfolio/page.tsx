@@ -6,9 +6,12 @@ import { useStore } from '@/lib/store';
 import { Navbar } from '@/components/ui/Navbar';
 import { Wallet, TrendingUp, TrendingDown, Briefcase, Trophy, ArrowLeft } from 'lucide-react';
 import { TradingCard } from '@/components/ui/TradingCard';
+import { PortfolioCharts } from '@/components/portfolio/PortfolioCharts';
+import { TransactionHistory } from '@/components/portfolio/TransactionHistory';
+import { AchievementsList } from '@/components/portfolio/AchievementsList';
 
 export default function PortfolioPage() {
-  const { holdings, userStats, fetchPortfolio } = useStore();
+  const { holdings, userStats, captainId, achievements, fetchPortfolio, setCaptain } = useStore();
 
   useEffect(() => {
     fetchPortfolio();
@@ -57,8 +60,10 @@ export default function PortfolioPage() {
           </div>
         </div>
 
+        <PortfolioCharts holdings={holdings} />
+
         <h2 className="text-xl font-bold mb-4">الأصول المملوكة</h2>
-        <div className="bg-[#1A1A1A] p-6 border border-white/10 rounded-2xl shadow-2xl">
+        <div className="bg-[#1A1A1A] p-6 border border-white/10 rounded-3xl shadow-2xl mb-12">
           {holdings.length === 0 ? (
             <div className="text-center py-16 text-gray-500">
               <Briefcase size={48} className="mx-auto mb-4 opacity-20" />
@@ -80,10 +85,17 @@ export default function PortfolioPage() {
                     profitLoss: h.profitLoss,
                     profitLossPercent: h.profitLossPercent
                   }}
+                  isCaptain={captainId === h.asset!.id}
+                  onMakeCaptain={setCaptain}
                 />
               ))}
             </div>
           )}
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <TransactionHistory />
+          <AchievementsList achievements={achievements} />
         </div>
       </main>
     </div>

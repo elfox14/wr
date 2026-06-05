@@ -61,6 +61,12 @@ export interface UserStats {
   lastWeeklyReward?: string;
 }
 
+export interface Achievement {
+  id: string;
+  badgeId: string;
+  earnedAt: string;
+}
+
 export interface Match {
   id: string;
   homeTeam: Asset;
@@ -77,6 +83,8 @@ interface AppState {
   matches: Match[];
   holdings: Holding[];
   userStats: UserStats | null;
+  captainId: string | null;
+  achievements: Achievement[];
   loading: boolean;
   notifications: string[];
   
@@ -85,6 +93,7 @@ interface AppState {
   fetchPortfolio: () => Promise<void>;
   buyAsset: (assetId: string, quantity: number) => Promise<void>;
   sellAsset: (assetId: string, quantity: number) => Promise<void>;
+  setCaptain: (assetId: string) => Promise<void>;
   addNotification: (msg: string) => void;
   clearNotifications: () => void;
 }
@@ -94,6 +103,8 @@ export const useStore = create<AppState>((set, get) => ({
   matches: [],
   holdings: [],
   userStats: null,
+  captainId: null,
+  achievements: [],
   loading: true,
   notifications: [],
 
@@ -121,14 +132,19 @@ export const useStore = create<AppState>((set, get) => ({
     try {
       const res = await fetch('/api/portfolio');
       if (!res.ok) {
-        set({ holdings: [], userStats: null });
+        set({ holdings: [], userStats: null, captainId: null, achievements: [] });
         return;
       }
       const data = await res.json();
-      set({ holdings: data.holdings || [], userStats: data.user || null });
+      set({ 
+        holdings: data.holdings || [], 
+        userStats: data.user || null,
+        captainId: data.captain?.assetId || null,
+        achievements: data.achievements || []
+      });
     } catch (err) {
       console.error(err);
-      set({ holdings: [], userStats: null });
+      set({ holdings: [], userStats: null, captainId: null, achievements: [] });
     }
   },
 
@@ -164,6 +180,26 @@ export const useStore = create<AppState>((set, get) => ({
       if (data.success) {
         get().addNotification(data.message);
         await get().fetchPortfolio();
+      } else {
+        get().addNotification(`Error: ${data.error}`);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  },
+
+  setCaptain: async (assetId: string) => {
+    try {
+      const res = await fetch('/api/portfolio/captain', {
+        method: 'POST',
+        body: JSON.stringify({ assetId }),
+        headers: { 'Content-Type': 'application/json' }
+      });
+      const data = await res.json();
+      
+      if (data.success) {
+        get().addNotification(data.message);
+        await get().fetchPortfolio(); // Refresh state
       } else {
         get().addNotification(`Error: ${data.error}`);
       }

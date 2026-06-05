@@ -17,7 +17,9 @@ export async function GET(request: Request) {
           include: {
             asset: true
           }
-        }
+        },
+        captain: true,
+        achievements: true,
       }
     });
 
@@ -67,7 +69,9 @@ export async function GET(request: Request) {
         lastDailyReward: user.lastDailyReward,
         lastWeeklyReward: user.lastWeeklyReward,
       },
-      holdings: holdingsWithStats
+      holdings: holdingsWithStats,
+      captain: user.captain,
+      achievements: user.achievements,
     });
   } catch (error) {
     console.error('Error fetching portfolio:', error);
