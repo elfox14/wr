@@ -258,6 +258,25 @@ async function main() {
     });
     teamCount++;
 
+    // Clean up orphan players for this team
+    const validPlayerIds = processedPlayers.map((p: any) => `player-${tla.toLowerCase()}-${p.apiId}`);
+    const orphanPlayers = await prisma.asset.findMany({
+      where: {
+        teamId: dbTeamId,
+        type: 'PLAYER',
+        id: { notIn: validPlayerIds },
+      },
+    });
+
+    for (const op of orphanPlayers) {
+      console.log(`  🗑️ Removing orphan player: ${op.name} (ID: ${op.id})`);
+      await prisma.marketNews.deleteMany({ where: { assetId: op.id } });
+      await prisma.priceHistory.deleteMany({ where: { assetId: op.id } });
+      await prisma.transaction.deleteMany({ where: { assetId: op.id } });
+      await prisma.holding.deleteMany({ where: { assetId: op.id } });
+      await prisma.asset.delete({ where: { id: op.id } });
+    }
+
     // Save players
     for (const p of processedPlayers) {
       const dbPlayerId = `player-${tla.toLowerCase()}-${p.apiId}`;
