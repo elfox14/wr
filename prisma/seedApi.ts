@@ -107,7 +107,46 @@ async function main() {
   const apiTeams = teamsData.teams || [];
   console.log(`✅ Found ${apiTeams.length} teams\n`);
 
-  // 2. Process each team
+  // 2. CLEANUP: Remove old duplicate teams that have different IDs but same code
+  console.log('🧹 Cleaning up duplicate data...');
+  for (const apiTeam of apiTeams) {
+    const tla = apiTeam.tla;
+    const newId = `team-${tla.toLowerCase()}`;
+
+    // Find any existing assets with this code but DIFFERENT id
+    const duplicates = await prisma.asset.findMany({
+      where: {
+        code: tla,
+        type: 'TEAM',
+        id: { not: newId },
+      },
+    });
+
+    for (const dup of duplicates) {
+      console.log(`  🗑️ Removing duplicate: ${dup.name} (old ID: ${dup.id}, new ID: ${newId})`);
+      // Delete related data first (cascade)
+      await prisma.marketNews.deleteMany({ where: { assetId: dup.id } });
+      await prisma.priceHistory.deleteMany({ where: { assetId: dup.id } });
+      await prisma.transaction.deleteMany({ where: { assetId: dup.id } });
+      await prisma.holding.deleteMany({ where: { assetId: dup.id } });
+      // Delete old players of this team
+      const oldPlayers = await prisma.asset.findMany({ where: { teamId: dup.id } });
+      for (const oldPlayer of oldPlayers) {
+        await prisma.marketNews.deleteMany({ where: { assetId: oldPlayer.id } });
+        await prisma.priceHistory.deleteMany({ where: { assetId: oldPlayer.id } });
+        await prisma.transaction.deleteMany({ where: { assetId: oldPlayer.id } });
+        await prisma.holding.deleteMany({ where: { assetId: oldPlayer.id } });
+        await prisma.asset.delete({ where: { id: oldPlayer.id } });
+      }
+      // Delete matches referencing old team
+      await prisma.match.deleteMany({ where: { OR: [{ homeTeamId: dup.id }, { awayTeamId: dup.id }] } });
+      // Delete the old team itself
+      await prisma.asset.delete({ where: { id: dup.id } });
+    }
+  }
+  console.log('✅ Cleanup complete\n');
+
+  // 3. Process each team
   let teamCount = 0;
   let playerCount = 0;
 
