@@ -1,0 +1,40 @@
+{
+  "marketNews": {
+    "price_spike": {
+      "title": "منتخب {team} يرتفع بنسبة {change}٪",
+      "body": "سعر {team} صعد من {before} إلى {after} بعد {reason}."
+    },
+    "price_drop": {
+      "title": "منتخب {team} يتراجع بنسبة {change}٪",
+      "body": "سعر {team} انخفض من {before} إلى {after} بعد {reason}."
+    },
+    "qualification": {
+      "title": "{team} يضمن التأهل وترتفع الثقة في الأصل",
+      "body": "بعد ضمان التأهل من مرحلة {stage}، ارتفع تقييم {team} في السوق إلى {after}."
+    },
+    "elimination": {
+      "title": "{team} يودع البطولة ويتعرض لضغط بيعي",
+      "body": "خروج {team} من مرحلة {stage} دفع السعر إلى {after} مع تراجع المعنويات."
+    },
+    "upset_win": {
+      "title": "{team} يفاجئ السوق بعد فوز قوي",
+      "body": "الفوز على {opponent} دعم سعر {team} ليرتفع إلى {after}."
+    },
+    "strong_rally": {
+      "title": "{team} يواصل الصعود للمرة الثالثة على التوالي",
+      "body": "سلسلة ارتفاعات متتالية رفعت سعر {team} إلى {after} بزيادة {change}٪."
+    },
+    "sharp_selloff": {
+      "title": "موجة بيع حادة تضرب {team}",
+      "body": "ثلاث هبوطات متتالية أدت لانخفاض سعر {team} إلى {after} بتراجع {change}٪."
+    },
+    "win": {
+      "title": "{team} يحقق الفوز ويرتفع في السوق",
+      "body": "فوز {team} في مباراة {stage} رفع السعر من {before} إلى {after}."
+    },
+    "loss": {
+      "title": "{team} يخسر ويتراجع سعره",
+      "body": "خسارة {team} في مرحلة {stage} أدت لانخفاض السعر من {before} إلى {after}."
+    }
+  }
+}

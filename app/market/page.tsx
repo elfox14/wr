@@ -80,7 +80,7 @@ export default function MarketPage() {
                   {marketNews.map(news => (
                     <div key={news.id} className="flex items-center gap-3 text-sm">
                       <span className="text-xl">{news.asset.image}</span>
-                      <span className="font-bold text-white">{news.titleAr}</span>
+                      <span className="font-bold text-white">{news.title || news.titleAr}</span>
                       <span className={`font-mono text-xs px-2 py-0.5 rounded ${news.changePercent >= 0 ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
                         {news.changePercent >= 0 ? '+' : ''}{news.changePercent}%
                       </span>

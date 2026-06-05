@@ -221,17 +221,28 @@ model Transaction {
 }
 
 model MarketNews {
-  id             String   @id @default(cuid())
-  asset          Asset    @relation(fields: [assetId], references: [id])
-  assetId        String
-  eventType      String   // price_spike, price_drop, win, loss, qualification, elimination
-  severity       String   @default("normal") // low, normal, high
-  priceBefore    Float?
-  priceAfter     Float?
-  changePercent  Float    @default(0)
-  titleAr        String
-  bodyAr         String
-  titleEn        String
-  bodyEn         String
-  publishedAt    DateTime @default(now())
+  id              String   @id @default(cuid())
+  asset           Asset    @relation(fields: [assetId], references: [id])
+  assetId         String
+  eventType       String   // price_spike, price_drop, win, loss, qualification, elimination, upset_win, strong_rally, sharp_selloff
+  severity        String   @default("normal") // low, normal, high
+  localeGroupKey  String?  // For deduplication: "{assetId}:{eventType}"
+  priceBefore     Float?
+  priceAfter      Float?
+  changePercent   Float    @default(0)
+  // Static rendered text (backward compatible)
+  titleAr         String
+  bodyAr          String
+  titleEn         String
+  bodyEn          String
+  // Template-based i18n (new)
+  titleKey        String?  // e.g. "marketNews.price_spike.title"
+  bodyKey         String?  // e.g. "marketNews.price_spike.body"
+  titleParams     Json?    // e.g. {"team": "Argentina", "change": "3.50"}
+  bodyParams      Json?    // e.g. {"team": "Argentina", "before": "5000", "after": "5175", "reason": "..."}
+  context         Json?    // Extra context: {"stage": "group", "opponent": "France"}
+  publishedAt     DateTime @default(now())
+
+  @@index([assetId, publishedAt])
+  @@index([eventType, publishedAt])
 }

@@ -1,0 +1,40 @@
+{
+  "marketNews": {
+    "price_spike": {
+      "title": "{team} jumps by {change}%",
+      "body": "{team} moved from {before} to {after} after {reason}."
+    },
+    "price_drop": {
+      "title": "{team} falls by {change}%",
+      "body": "{team} slipped from {before} to {after} after {reason}."
+    },
+    "qualification": {
+      "title": "{team} secures qualification as sentiment improves",
+      "body": "After advancing from the {stage} stage, {team} rose to {after} in the market."
+    },
+    "elimination": {
+      "title": "{team} exits the tournament under selling pressure",
+      "body": "{team} dropped to {after} after elimination from the {stage} stage."
+    },
+    "upset_win": {
+      "title": "{team} surprises the market with a strong win",
+      "body": "A victory over {opponent} lifted {team} to {after}."
+    },
+    "strong_rally": {
+      "title": "{team} extends rally for a third straight gain",
+      "body": "A streak of consecutive gains pushed {team} to {after}, up {change}%."
+    },
+    "sharp_selloff": {
+      "title": "Sharp selloff hits {team}",
+      "body": "Three consecutive drops drove {team} down to {after}, falling {change}%."
+    },
+    "win": {
+      "title": "{team} wins and gains in the market",
+      "body": "{team}'s win in the {stage} stage lifted the price from {before} to {after}."
+    },
+    "loss": {
+      "title": "{team} loses and drops in value",
+      "body": "{team}'s loss in the {stage} stage pushed the price from {before} to {after}."
+    }
+  }
+}
