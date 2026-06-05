@@ -12,7 +12,6 @@ interface TradingCardProps {
     avg_buy_price: number;
     positionType?: string;
     profitLoss?: number;
-    profitLoss?: number;
     profitLossPercent?: number;
   };
   isCaptain?: boolean;
