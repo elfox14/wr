@@ -119,6 +119,7 @@ export async function GET(request: Request) {
       });
 
       let won = 0, drawn = 0, lost = 0, goalsFor = 0, goalsAgainst = 0;
+      let isEliminated = false;
 
       for (const match of teamMatches) {
         const isHome = match.homeTeamId === team.id;
@@ -128,12 +129,17 @@ export async function GET(request: Request) {
         goalsAgainst += ga;
         if (gf > ga) won++;
         else if (gf === ga) drawn++;
-        else lost++;
+        else {
+          lost++;
+          if (match.stage !== 'group') {
+            isEliminated = true;
+          }
+        }
       }
 
       if (teamMatches.length === 0) continue; // No finished matches yet
 
-      const newPrice = calculateNewPrice(team, { won, drawn, lost, goalsFor, goalsAgainst });
+      const newPrice = calculateNewPrice(team, { won, drawn, lost, goalsFor, goalsAgainst }, isEliminated);
 
       if (newPrice !== team.current_price) {
         const priceBefore = team.current_price;

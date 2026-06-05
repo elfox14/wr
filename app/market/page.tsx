@@ -6,6 +6,7 @@ import { useStore, Asset } from '@/lib/store';
 import { Navbar } from '@/components/ui/Navbar';
 import { TrendingUp, TrendingDown, ArrowRight, Search, Filter, LayoutGrid, List, ChevronRight, Globe, Users, Target, Activity, Zap, Info } from 'lucide-react';
 import { TeamRosterDrawer } from '@/components/ui/TeamRosterDrawer';
+import { TradingCard } from '@/components/ui/TradingCard';
 
 export default function MarketPage() {
   const { assets, fetchAssets } = useStore();
@@ -218,46 +219,11 @@ export default function MarketPage() {
         ) : viewMode === 'GRID' ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
             {filteredAssets.map(asset => (
-              <div key={asset.id} className="bg-[#1A1A1A] border border-white/5 rounded-2xl overflow-hidden group hover:border-[#0FF0FC]/50 transition-all shadow-lg hover:shadow-[0_0_20px_rgba(15,240,252,0.1)] flex flex-col">
-                <div className="p-6 relative flex-grow">
-                  <div className="absolute top-4 left-4 font-mono font-bold text-gray-500 text-sm">{asset.code}</div>
-                  
-                  <div className="text-5xl mb-4">{asset.image}</div>
-                  <h3 className="text-xl font-bold text-white mb-1">{asset.name}</h3>
-                  <div className="flex gap-2 text-xs mb-4">
-                    {asset.type === 'TEAM' && <span className="bg-white/10 px-2 py-1 rounded text-gray-300">FIFA Rank: #{asset.fifaRank || '-'}</span>}
-                    {asset.type === 'PLAYER' && <span className="bg-white/10 px-2 py-1 rounded text-gray-300">{asset.position || 'Unknown'}</span>}
-                    <span className="bg-[#FFD700]/10 text-[#FFD700] px-2 py-1 rounded">Score: {asset.score || 'N/A'}</span>
-                  </div>
-
-                  <div className="flex justify-between items-end mt-6">
-                    <div>
-                      <div className="text-sm text-gray-500 mb-1">السعر الحالي</div>
-                      <div className="text-2xl font-mono font-bold text-white">{asset.current_price}¢</div>
-                    </div>
-                    <div className={`flex items-center gap-1 font-bold text-sm ${asset.change >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                      {asset.change >= 0 ? <TrendingUp size={16} /> : <TrendingDown size={16} />}
-                      {Math.abs(asset.change)}%
-                    </div>
-                  </div>
-                </div>
-
-                {asset.type === 'TEAM' ? (
-                  <button 
-                    onClick={() => setSelectedTeam(asset)}
-                    className="w-full p-4 bg-black/40 border-t border-white/5 text-gray-300 font-bold flex items-center justify-center gap-2 group-hover:bg-[#0FF0FC]/10 group-hover:text-[#0FF0FC] transition-colors"
-                  >
-                    عرض القائمة <ChevronRight size={18} className="group-hover:translate-x-reverse group-hover:-translate-x-1 transition-transform" />
-                  </button>
-                ) : (
-                  <Link 
-                    href={`/asset/${asset.id}`}
-                    className="w-full p-4 bg-black/40 border-t border-white/5 text-gray-300 font-bold flex items-center justify-center gap-2 group-hover:bg-[#FFD700]/10 group-hover:text-[#FFD700] transition-colors"
-                  >
-                    تداول اللاعب <ArrowRight size={18} className="group-hover:translate-x-reverse group-hover:-translate-x-1 transition-transform" />
-                  </Link>
-                )}
-              </div>
+              <TradingCard 
+                key={asset.id} 
+                asset={asset} 
+                onViewRoster={asset.type === 'TEAM' ? setSelectedTeam : undefined} 
+              />
             ))}
           </div>
         ) : (

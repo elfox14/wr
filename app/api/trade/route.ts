@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
+import { checkAndAwardAchievements } from "@/lib/achievements";
 
 export async function POST(request: Request) {
   try {
@@ -10,7 +11,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { assetId, type, quantity } = await request.json();
+    const { assetId, type, quantity, positionType = 'LONG' } = await request.json();
     
     if (!assetId || !type || !quantity || quantity <= 0) {
       return NextResponse.json({ error: 'Invalid input' }, { status: 400 });
@@ -27,8 +28,17 @@ export async function POST(request: Request) {
     const totalValue = asset.current_price * qty;
 
     if (type === 'BUY') {
-      if (user.balance < totalValue) {
-        return NextResponse.json({ error: 'Insufficient balance' }, { status: 400 });
+      // Calculate trading fee
+      const buyTransactionsCount = await prisma.transaction.count({
+        where: { userId: user.id, type: 'BUY' }
+      });
+      
+      const isFreeBuy = buyTransactionsCount < 5;
+      const tradingFee = isFreeBuy ? 0 : Math.round(totalValue * 0.02);
+      const totalCost = totalValue + tradingFee;
+
+      if (user.balance < totalCost) {
+        return NextResponse.json({ error: 'الرصيد غير كافٍ لإتمام العملية (بما في ذلك رسوم التداول)' }, { status: 400 });
       }
 
       // --- Rule: 1 Distinct Player Per Position ---
@@ -53,8 +63,8 @@ export async function POST(request: Request) {
       }
 
       // Find existing holding
-      const existingHolding = await prisma.holding.findUnique({
-        where: { userId_assetId: { userId: user.id, assetId: asset.id } }
+      const existingHolding = await prisma.holding.findFirst({
+        where: { userId: user.id, assetId: asset.id, positionType }
       });
 
       let newAvgPrice = asset.current_price;
@@ -76,6 +86,7 @@ export async function POST(request: Request) {
           data: {
             userId: user.id,
             assetId: asset.id,
+            positionType,
             quantity: qty,
             avg_buy_price: asset.current_price
           }
@@ -85,7 +96,7 @@ export async function POST(request: Request) {
       // Deduct balance and record transaction
       await prisma.user.update({
         where: { id: user.id },
-        data: { balance: user.balance - totalValue }
+        data: { balance: user.balance - totalCost }
       });
 
       await prisma.transaction.create({
@@ -126,21 +137,45 @@ export async function POST(request: Request) {
         }
       });
 
-      return NextResponse.json({ success: true, message: `Bought ${qty} of ${asset.name}` });
+      return NextResponse.json({ 
+        success: true, 
+        message: `تم الشراء (${positionType}) ${qty} من ${asset.name}` + (tradingFee > 0 ? ` (رسوم التداول: ${tradingFee})` : ''),
+        fee: tradingFee,
+        totalCost: totalCost
+      });
     } 
     
     if (type === 'SELL') {
-      const existingHolding = await prisma.holding.findUnique({
-        where: { userId_assetId: { userId: user.id, assetId: asset.id } }
+      const existingHolding = await prisma.holding.findFirst({
+        where: { userId: user.id, assetId: asset.id, positionType }
       });
 
       if (!existingHolding || existingHolding.quantity < qty) {
         return NextResponse.json({ error: 'Insufficient holdings to sell' }, { status: 400 });
       }
 
-      // Calculate profit/loss
+      // Calculate profit/loss based on positionType
       const costBasis = existingHolding.avg_buy_price * qty;
-      const profit = totalValue - costBasis;
+      let profit = 0;
+      let grossPayout = 0;
+
+      if (existingHolding.positionType === 'LONG') {
+        profit = totalValue - costBasis;
+        grossPayout = totalValue;
+      } else {
+        // SHORT position: Profit if current price is lower than buy price
+        profit = costBasis - totalValue;
+        grossPayout = Math.max(0, costBasis + profit); // User loses margin if price goes too high, max loss = costBasis
+      }
+
+      // Capital Gains Tax: 10% tax if profit > 50% of cost basis
+      let tax = 0;
+      if (profit > costBasis * 0.5) {
+        tax = Math.round(profit * 0.10);
+      }
+
+      const finalPayout = grossPayout - tax;
+      const finalProfit = profit - tax;
 
       if (existingHolding.quantity === qty) {
         // Sell all
@@ -157,8 +192,8 @@ export async function POST(request: Request) {
       await prisma.user.update({
         where: { id: user.id },
         data: { 
-          balance: user.balance + totalValue,
-          total_profit: user.total_profit + profit
+          balance: user.balance + finalPayout,
+          total_profit: user.total_profit + finalProfit
         }
       });
 
@@ -200,7 +235,12 @@ export async function POST(request: Request) {
         }
       });
 
-      return NextResponse.json({ success: true, message: `Sold ${qty} of ${asset.name}`, profit });
+      return NextResponse.json({ 
+        success: true, 
+        message: `تم البيع (${existingHolding.positionType}) ${qty} من ${asset.name}` + (tax > 0 ? ` (ضريبة الأرباح: ${tax})` : ''),
+        profit: finalProfit,
+        tax
+      });
     }
 
     return NextResponse.json({ error: 'Invalid trade type' }, { status: 400 });

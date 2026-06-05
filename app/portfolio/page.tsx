@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useStore } from '@/lib/store';
 import { Navbar } from '@/components/ui/Navbar';
 import { Wallet, TrendingUp, TrendingDown, Briefcase } from 'lucide-react';
+import { TradingCard } from '@/components/ui/TradingCard';
 
 export default function PortfolioPage() {
   const { holdings, userStats, fetchPortfolio } = useStore();
@@ -52,59 +53,32 @@ export default function PortfolioPage() {
         </div>
 
         <h2 className="text-xl font-bold mb-4">الأصول المملوكة</h2>
-        <div className="bg-[#1A1A1A] border border-white/10 rounded-xl overflow-hidden shadow-2xl">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-black/40 border-b border-white/10 text-gray-400 text-sm tracking-wider uppercase">
-                  <th className="p-4 font-medium">الأصل</th>
-                  <th className="p-4 font-medium text-center">الكمية</th>
-                  <th className="p-4 font-medium">متوسط التكلفة</th>
-                  <th className="p-4 font-medium">السعر الحالي</th>
-                  <th className="p-4 font-medium">الربح/الخسارة</th>
-                </tr>
-              </thead>
-              <tbody>
-                {holdings.map(h => {
-                  const isUp = h.profitLoss && h.profitLoss >= 0;
-                  return (
-                    <tr key={h.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
-                      <td className="p-4 flex items-center gap-4">
-                        <span className="text-3xl">{h.asset?.image}</span>
-                        <div>
-                          <Link href={`/asset/${h.assetId}`} className="font-bold text-white text-lg hover:text-[#0FF0FC] transition-colors">{h.asset?.name}</Link>
-                          <p className="text-xs text-gray-500 font-mono">{h.asset?.code}</p>
-                        </div>
-                      </td>
-                      <td className="p-4 font-mono font-bold text-xl text-center">
-                        {h.quantity}
-                      </td>
-                      <td className="p-4 font-mono text-gray-400">
-                        {h.avg_buy_price.toFixed(0)} ¢
-                      </td>
-                      <td className="p-4 font-mono font-bold">
-                        {h.asset?.current_price} ¢
-                      </td>
-                      <td className="p-4">
-                        <div className={`font-mono font-bold ${isUp ? 'text-green-500' : 'text-red-500'}`}>
-                          <p>{isUp ? '+' : ''}{h.profitLoss?.toFixed(0)} ¢</p>
-                          <p className="text-xs flex items-center gap-1">
-                            {isUp ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
-                            {Math.abs(h.profitLossPercent || 0).toFixed(2)}%
-                          </p>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-                {holdings.length === 0 && (
-                  <tr>
-                    <td colSpan={5} className="p-8 text-center text-gray-500">لا تمتلك أي أصول حالياً. اذهب إلى <Link href="/market" className="text-[#0FF0FC] underline">السوق</Link> للبدء.</td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+        <div className="bg-[#1A1A1A] p-6 border border-white/10 rounded-2xl shadow-2xl">
+          {holdings.length === 0 ? (
+            <div className="text-center py-16 text-gray-500">
+              <Briefcase size={48} className="mx-auto mb-4 opacity-20" />
+              <p className="text-xl mb-4">لا تمتلك أي أصول حالياً.</p>
+              <Link href="/market" className="bg-[#0FF0FC]/10 text-[#0FF0FC] border border-[#0FF0FC]/30 px-6 py-3 rounded-xl font-bold hover:bg-[#0FF0FC]/20 transition-all">
+                اذهب إلى السوق للبدء
+              </Link>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              {holdings.map(h => (
+                <TradingCard 
+                  key={h.id} 
+                  asset={h.asset!} 
+                  holding={{
+                    quantity: h.quantity,
+                    avg_buy_price: h.avg_buy_price,
+                    positionType: h.positionType,
+                    profitLoss: h.profitLoss,
+                    profitLossPercent: h.profitLossPercent
+                  }}
+                />
+              ))}
+            </div>
+          )}
         </div>
       </main>
     </div>

@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Providers } from "@/components/Providers";
 import { NotificationProvider } from "@/components/ui/NotificationProvider";
+import { GlobalTicker } from "@/components/ui/GlobalTicker";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -33,7 +34,10 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col">
         <Providers>
           <NotificationProvider>
-            {children}
+            <div className="pb-10"> {/* Padding bottom for the fixed ticker */}
+              {children}
+            </div>
+            <GlobalTicker />
           </NotificationProvider>
         </Providers>
       </body>

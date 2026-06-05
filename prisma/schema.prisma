@@ -37,6 +37,12 @@ model User {
   createdLeagues   League[]        @relation("LeagueCreator")
   leagueMembers    LeagueMember[]
   rewards          Reward[]
+
+  // Phase 2 Relations
+  captain          CaptainSelection?
+  leagueMatchesA   LeagueMatch[]     @relation("MatchUserA")
+  leagueMatchesB   LeagueMatch[]     @relation("MatchUserB")
+  achievements     UserAchievement[]
 }
 
 model Reward {
@@ -58,6 +64,7 @@ model League {
   createdAt   DateTime @default(now())
 
   members     LeagueMember[]
+  matches     LeagueMatch[]
 }
 
 model LeagueMember {
@@ -168,6 +175,7 @@ model Asset {
   transactions  Transaction[]
   marketNews    MarketNews[]
   priceHistory  PriceHistory[]
+  captains      CaptainSelection[]
 }
 
 model Match {
@@ -202,10 +210,11 @@ model Holding {
   userId         String
   asset          Asset    @relation(fields: [assetId], references: [id])
   assetId        String
+  positionType   String   @default("LONG") // "LONG" or "SHORT"
   quantity       Int
   avg_buy_price  Float
 
-  @@unique([userId, assetId])
+  @@unique([userId, assetId, positionType])
 }
 
 model Transaction {
@@ -245,4 +254,38 @@ model MarketNews {
 
   @@index([assetId, publishedAt])
   @@index([eventType, publishedAt])
+}
+
+// --- PHASE 2 MODELS ---
+
+model CaptainSelection {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  assetId   String
+  asset     Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+}
+
+model LeagueMatch {
+  id         String   @id @default(cuid())
+  leagueId   String
+  league     League   @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+  userAId    String
+  userBId    String
+  userA      User     @relation("MatchUserA", fields: [userAId], references: [id])
+  userB      User     @relation("MatchUserB", fields: [userBId], references: [id])
+  winnerId   String?  // Null if draw
+  matchweek  Int
+  createdAt  DateTime @default(now())
+}
+
+model UserAchievement {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  badgeId     String   // E.g., 'DIAMOND_HANDS', 'WOLF_OF_WALL_STREET'
+  earnedAt    DateTime @default(now())
+
+  @@unique([userId, badgeId])
 }
