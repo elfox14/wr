@@ -31,6 +31,27 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'Insufficient balance' }, { status: 400 });
       }
 
+      // --- Rule: 1 Distinct Player Per Position ---
+      if (asset.type === 'PLAYER' && asset.position) {
+        const userHoldings = await prisma.holding.findMany({
+          where: { userId: user.id },
+          include: { asset: true }
+        });
+
+        const conflict = userHoldings.find(h => 
+          h.asset.type === 'PLAYER' && 
+          h.asset.position === asset.position && 
+          h.asset.id !== asset.id &&
+          h.quantity > 0
+        );
+
+        if (conflict) {
+          const positionNames: Record<string, string> = { 'GK': 'حارس مرمى', 'DEF': 'مدافع', 'MID': 'لاعب وسط', 'FWD': 'مهاجم' };
+          const posAr = positionNames[asset.position] || asset.position;
+          return NextResponse.json({ error: `لقد قمت بشراء لاعب في مركز ${posAr} مسبقاً. يجب شراء لاعب واحد فقط في كل مركز.` }, { status: 400 });
+        }
+      }
+
       // Find existing holding
       const existingHolding = await prisma.holding.findUnique({
         where: { userId_assetId: { userId: user.id, assetId: asset.id } }
