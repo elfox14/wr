@@ -48,7 +48,7 @@ export function PortfolioCharts({ holdings }: PortfolioChartsProps) {
                 ))}
               </Pie>
               <Tooltip 
-                formatter={(value: number) => [`${value} ¢`, 'القيمة']}
+                formatter={(value: any) => [`${value} ¢`, 'القيمة']}
                 contentStyle={{ backgroundColor: '#1A1A1A', borderColor: '#333', borderRadius: '12px', color: '#fff' }}
                 itemStyle={{ color: '#fff' }}
               />
@@ -79,7 +79,7 @@ export function PortfolioCharts({ holdings }: PortfolioChartsProps) {
                 ))}
               </Pie>
               <Tooltip 
-                formatter={(value: number) => [`${value} ¢`, 'القيمة']}
+                formatter={(value: any) => [`${value} ¢`, 'القيمة']}
                 contentStyle={{ backgroundColor: '#1A1A1A', borderColor: '#333', borderRadius: '12px', color: '#fff' }}
                 itemStyle={{ color: '#fff' }}
               />
