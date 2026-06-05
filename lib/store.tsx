@@ -41,6 +41,7 @@ export interface Holding {
   assetId: string;
   quantity: number;
   avg_buy_price: number;
+  positionType?: string;
   currentValue?: number;
   profitLoss?: number;
   profitLossPercent?: number;
