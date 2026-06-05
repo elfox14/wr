@@ -247,7 +247,7 @@ async function main() {
         score: teamScore,
         continent,
         coach: coachName,
-        group: 'A',
+        group: 'TBD', // Will be calculated at the end
         participations: 10,
         ownersCount: Math.floor(Math.random() * 5000 + 500),
         riskIndex: rank <= 10 ? 0.3 : rank <= 20 ? 0.5 : 0.7,
@@ -371,6 +371,33 @@ async function main() {
     }
     console.log(`✅ Synced ${matchCount} matches`);
   }
+
+  // 4. Distribute Teams into 12 Groups (A to L) using Pot System
+  console.log('\n🎲 Distributing teams into 12 Groups (Pot System)...');
+  const allTeams = await prisma.asset.findMany({
+    where: { type: 'TEAM' },
+    orderBy: { fifaRank: 'asc' }
+  });
+
+  const pot1 = allTeams.slice(0, 12);
+  const pot2 = allTeams.slice(12, 24);
+  const pot3 = allTeams.slice(24, 36);
+  const pot4 = allTeams.slice(36, 48);
+
+  const groupNames = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L'];
+  
+  for (let i = 0; i < groupNames.length; i++) {
+    const groupName = groupNames[i];
+    const groupTeams = [pot1[i], pot2[i], pot3[i], pot4[i]].filter(Boolean);
+
+    for (const team of groupTeams) {
+      await prisma.asset.update({
+        where: { id: team.id },
+        data: { group: groupName }
+      });
+    }
+  }
+  console.log('✅ Teams distributed successfully');
 
   console.log(`\n🏆 Sync Complete!`);
   console.log(`   Teams: ${teamCount}`);
