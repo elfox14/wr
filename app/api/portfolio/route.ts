@@ -32,7 +32,11 @@ export async function GET(request: Request) {
       user = await prisma.user.update({
         where: { id: user.id },
         data: { referralCode: newCode },
-        include: { holdings: { include: { asset: true } } }
+        include: { 
+          holdings: { include: { asset: true } },
+          captain: true,
+          achievements: true,
+        }
       });
     }
 
