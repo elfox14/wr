@@ -84,7 +84,14 @@ export function calculatePlayerPrice(asset: Partial<Asset>): number {
 
   // Convert Score to Price (Exponential Curve)
   const normalizedFactor = finalScore / 100;
-  const basePrice = 250 + (Math.pow(normalizedFactor, 3) * 5000);
+  let basePrice = 250 + (Math.pow(normalizedFactor, 3) * 5000);
+
+  // Position Multiplier: Attackers are more tradeable and attract higher demand
+  const position = (asset as any).position;
+  if (position === 'FWD') basePrice *= 1.15;
+  else if (position === 'MID') basePrice *= 1.05;
+  else if (position === 'DEF') basePrice *= 0.95;
+  else if (position === 'GK') basePrice *= 0.85;
 
   return Math.round(basePrice);
 }
@@ -100,10 +107,16 @@ export function calculateTeamPrice(team: Partial<Asset>, players: Partial<Asset>
   const rank = team.fifaRank || 48;
   const rankScore = Math.max(0, 100 - (rank * 1.5)); 
   
-  // Squad Score
-  const top11 = [...players].sort((a, b) => (b.playerTier || 0) - (a.playerTier || 0)).slice(0, 11);
+  // Squad Score (with Star Count)
+  const sorted = [...players].sort((a, b) => (b.playerTier || 0) - (a.playerTier || 0));
+  const top11 = sorted.slice(0, 11);
   const avgTier = top11.reduce((sum, p) => sum + (p.playerTier || 0.5), 0) / (top11.length || 1);
-  const squadScore = avgTier * 100;
+  const topStarTier = (sorted[0]?.playerTier || 0.5) * 100; // Best player's tier
+  const depthCount = players.filter(p => (p.playerTier || 0) > 0.7).length;
+  const depthScore = Math.min(100, depthCount * 8); // ~12 good players = 96
+
+  // Squad = 60% Average + 30% Best Star + 10% Depth
+  const squadScore = (avgTier * 100 * 0.60) + (topStarTier * 0.30) + (depthScore * 0.10);
 
   // History (Participations / Cups)
   const historyScore = Math.min(100, (team.participations || 0) / 20 * 100);
@@ -139,9 +152,13 @@ export function calculateAssetScore(asset: Partial<Asset>, players?: Partial<Ass
   if (asset.type === 'TEAM' && players) {
     const rank = asset.fifaRank || 48;
     const rankScore = Math.max(0, 100 - (rank * 1.5));
-    const top11 = [...players].sort((a, b) => (b.playerTier || 0) - (a.playerTier || 0)).slice(0, 11);
+    const sorted = [...players].sort((a, b) => (b.playerTier || 0) - (a.playerTier || 0));
+    const top11 = sorted.slice(0, 11);
     const avgTier = top11.reduce((sum, p) => sum + (p.playerTier || 0.5), 0) / (top11.length || 1);
-    const squadScore = avgTier * 100;
+    const topStarTier = (sorted[0]?.playerTier || 0.5) * 100;
+    const depthCount = players.filter(p => (p.playerTier || 0) > 0.7).length;
+    const depthScore = Math.min(100, depthCount * 8);
+    const squadScore = (avgTier * 100 * 0.60) + (topStarTier * 0.30) + (depthScore * 0.10);
     const historyScore = Math.min(100, (asset.participations || 0) / 20 * 100);
     const fundamental = (rankScore * 0.40) + (squadScore * 0.30) + (historyScore * 0.30);
     const popularity = (asset.popularity || 0.5) * 100;

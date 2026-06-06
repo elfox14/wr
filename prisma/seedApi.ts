@@ -147,6 +147,78 @@ async function main() {
   }
   console.log('');
 
+  // ── REAL WORLD CUP PARTICIPATION DATA ──
+  const worldCupHistory: Record<string, number> = {
+    'BRA': 22, 'GER': 20, 'ITA': 18, 'ARG': 18, 'MEX': 17,
+    'FRA': 16, 'ENG': 16, 'ESP': 16, 'URY': 14, 'BEL': 14,
+    'SRB': 13, 'SUI': 12, 'KOR': 11, 'USA': 11, 'NED': 11,
+    'POL': 9, 'POR': 8, 'CMR': 8, 'CRO': 7, 'JPN': 7,
+    'NGA': 7, 'KSA': 7, 'MAR': 7, 'COL': 7, 'AUS': 6,
+    'DEN': 6, 'CRC': 6, 'IRN': 6, 'TUN': 6, 'PAR': 5,
+    'GHA': 4, 'ECU': 4, 'SEN': 3, 'NZL': 3, 'CIV': 3,
+    'ALG': 4, 'EGY': 3, 'TUR': 2, 'WAL': 2, 'QAT': 2,
+    'CAN': 2, 'CHI': 9, 'PER': 5, 'VEN': 1, 'BOL': 3,
+    'MLI': 0, 'BFA': 0, 'UZB': 0, 'JAM': 1, 'SCO': 8,
+    'UKR': 1, 'PAN': 2, 'IDN': 0, 'TRI': 2, 'IRQ': 1,
+    'BHR': 0, 'OMA': 0, 'UAE': 1, 'GEO': 0, 'ALB': 0,
+    'HON': 3, 'GRE': 3, 'HUN': 9, 'AUT': 7, 'CZE': 2,
+    'SVK': 1, 'SVN': 2, 'COD': 1, 'ZAF': 3, 'TAN': 0,
+    'CHN': 1, 'IND': 0,
+  };
+
+  // ── GRADUATED TEAM POPULARITY (0.0 - 1.0) ──
+  function calcTeamPopularity(rank: number, tla: string): number {
+    // Big brands get a floor regardless of current rank
+    const brandBonus: Record<string, number> = {
+      'BRA': 0.15, 'ARG': 0.12, 'GER': 0.10, 'FRA': 0.10,
+      'ENG': 0.10, 'ESP': 0.08, 'ITA': 0.10, 'NED': 0.05,
+      'POR': 0.05, 'MEX': 0.05, 'USA': 0.05, 'JPN': 0.03,
+    };
+    const base = Math.max(0.15, 1.0 - (rank / 50)); // rank 1 → 0.98, rank 50 → 0.0
+    return Math.min(1.0, base + (brandBonus[tla] || 0));
+  }
+
+  // ── SMART PLAYER TIER SYSTEM ──
+  function calcPlayerTier(rank: number, pos: string, age: number, squadIndex: number, squadSize: number): number {
+    // rankFactor: how strong is the national team (0.0 to 1.0)
+    const maxRank = 100;
+    const rankFactor = Math.max(0, (maxRank - rank) / maxRank);
+
+    // Base tier from team strength
+    let tier = 0.40 + (rankFactor * 0.40); // rank 1 → 0.80, rank 50 → 0.60, rank 100 → 0.40
+
+    // Position bonus (attackers are more tradeable)
+    if (pos === 'FWD') tier += 0.06;
+    else if (pos === 'MID') tier += 0.03;
+    else if (pos === 'DEF') tier -= 0.02;
+    else if (pos === 'GK') tier -= 0.05;
+
+    // Age curve
+    if (age >= 24 && age <= 29) tier += 0.05;      // Peak
+    else if (age >= 21 && age <= 23) tier += 0.02;  // Rising
+    else if (age < 21) tier -= 0.03;                // Very young
+    else if (age > 33) tier -= 0.08;                // Declining
+    else if (age > 30) tier -= 0.03;                // Late prime
+
+    // Squad depth: first ~11 players get a starter bonus, rest get bench penalty
+    // API usually returns squad ordered by importance (starters first)
+    const relativePos = squadIndex / Math.max(1, squadSize);
+    if (relativePos <= 0.42) {
+      tier += 0.05; // Likely starter (top ~11 of 26)
+    } else if (relativePos > 0.75) {
+      tier -= 0.05; // Deep bench
+    }
+
+    return Math.min(1.0, Math.max(0.25, parseFloat(tier.toFixed(2))));
+  }
+
+  // ── PLAYER POPULARITY from team + tier ──
+  function calcPlayerPopularity(teamPop: number, tier: number): number {
+    // Player inherits 60% of team's fame, plus 40% from personal tier
+    const pop = (teamPop * 0.6) + (tier * 0.4);
+    return Math.min(1.0, Math.max(0.1, parseFloat(pop.toFixed(2))));
+  }
+
   // 3. Process each team
   let teamCount = 0;
   let playerCount = 0;
@@ -155,32 +227,20 @@ async function main() {
     const tla = apiTeam.tla; // 3-letter code
     const teamName = apiTeam.name || apiTeam.shortName;
     const shortName = apiTeam.shortName || teamName;
-    const crest = apiTeam.crest || ''; // SVG/PNG URL of team crest
+    const crest = apiTeam.crest || '';
     const coachName = apiTeam.coach?.name || 'N/A';
     const squad = apiTeam.squad || [];
     const flag = flagEmojis[tla] || '🏳️';
-    // Use FlagCDN for teams, save directly to DB
-    const dbImage = getFlagUrl(tla) || ''; 
+    const dbImage = getFlagUrl(tla) || '';
     const rank = fifaRanks[tla] || 50;
     const continent = continentMap[tla] || 'Unknown';
     const dbTeamId = `team-${tla.toLowerCase()}`;
+    const participations = worldCupHistory[tla] ?? 1;
+    const teamPopularity = calcTeamPopularity(rank, tla);
 
-    console.log(`⚽ ${flag} ${teamName} (${tla}) — Coach: ${coachName} — ${squad.length} players`);
+    console.log(`⚽ ${flag} ${teamName} (${tla}) — Rank: ${rank} | Pop: ${teamPopularity.toFixed(2)} | WC: ${participations} | Squad: ${squad.length}`);
 
-    // Calculate team price based on rank
-    const teamPartial = {
-      type: 'TEAM' as const,
-      fifaRank: rank,
-      participations: 10,
-      popularity: rank <= 10 ? 0.9 : rank <= 20 ? 0.7 : 0.5,
-      harmony: 0.85,
-      injuries: 0,
-    };
-
-    const playerPrices: { current_price: number }[] = [];
-    const playerScores: { score: number }[] = [];
-
-    // Calculate team score first based purely on FIFA rank
+    // Calculate team score based on FIFA rank (display-only)
     let teamScoreRaw = 100 - (rank * 0.9);
     if (rank > 10) teamScoreRaw = 91 - ((rank - 10) * 0.6);
     if (rank > 30) teamScoreRaw = 79 - ((rank - 30) * 0.4);
@@ -188,56 +248,67 @@ async function main() {
     if (rank === 1) teamScoreRaw = 99;
     if (rank === 2) teamScoreRaw = 98;
     if (rank === 3) teamScoreRaw = 97;
-    const teamScore = Math.max(60, Math.min(99, Math.round(teamScoreRaw)));
+    const teamScore = Math.max(55, Math.min(99, Math.round(teamScoreRaw)));
 
-    // Process players
-    const processedPlayers = squad.map((p: any) => {
+    // Process players with SMART TIER
+    const processedPlayers = squad.map((p: any, idx: number) => {
       const age = calcAge(p.dateOfBirth);
       const pos = mapPosition(p.position);
-      const isStar = (p.position === 'Offence' || p.position === 'Midfield') && age >= 22 && age <= 32;
-      const tier = isStar ? 0.9 : 0.7;
+      const tier = calcPlayerTier(rank, pos, age, idx, squad.length);
+      const pop = calcPlayerPopularity(teamPopularity, tier);
 
-      let playerOffset = 0;
-      if (tier >= 0.9) {
-        playerOffset = 2;
-      } else if (tier >= 0.7) {
-        playerOffset = 0;
-      } else {
-        playerOffset = -3;
-      }
+      // Player score derived from team + personal offset
+      const tierOffset = (tier - 0.6) * 15; // tier 0.8 → +3, tier 0.4 → -3
+      const score = Math.max(45, Math.min(99, Math.round(teamScore + tierOffset)));
 
-      const score = Math.max(50, Math.min(99, teamScore + playerOffset));
-      
-      const tempPlayerObj = { 
-        type: 'PLAYER' as const, 
-        playerTier: tier, 
-        age, 
+      const tempPlayerObj = {
+        type: 'PLAYER' as const,
+        playerTier: tier,
+        age,
         score,
-        popularity: tier >= 0.9 ? 0.9 : 0.5,
-        riskIndex: age > 33 ? 0.8 : 0.2
+        popularity: pop,
+        riskIndex: age > 33 ? 0.8 : age < 22 ? 0.6 : 0.3,
       };
       const price = calculatePlayerPrice(tempPlayerObj);
 
-      return {
-        apiId: p.id,
-        name: p.name,
-        pos,
-        age,
-        tier,
-        price,
-        score,
-        nationality: p.nationality || '',
-      };
+      return { apiId: p.id, name: p.name, pos, age, tier, price, score, pop, nationality: p.nationality || '' };
     });
 
-    // Team price and score calculation
-    // Calculate squad price using top 11
+    // ── STAR BOOST: top 5 players per team get +0.10 tier ──
+    const sortedByTier = [...processedPlayers].sort((a, b) => b.tier - a.tier);
+    const starIds = new Set(sortedByTier.slice(0, 5).map(p => p.apiId));
+    for (const p of processedPlayers) {
+      if (starIds.has(p.apiId)) {
+        p.tier = Math.min(1.0, p.tier + 0.10);
+        p.pop = Math.min(1.0, p.pop + 0.08);
+        // Recalculate price with boosted tier
+        const tempObj = { type: 'PLAYER' as const, playerTier: p.tier, age: p.age, score: p.score, popularity: p.pop, riskIndex: p.age > 33 ? 0.8 : 0.3 };
+        p.price = calculatePlayerPrice(tempObj);
+        const tierOffset = (p.tier - 0.6) * 15;
+        p.score = Math.max(45, Math.min(99, Math.round(teamScore + tierOffset)));
+      }
+    }
+
+    // Team pricing partial
+    const teamPartial = {
+      type: 'TEAM' as const,
+      fifaRank: rank,
+      participations,
+      popularity: teamPopularity,
+      harmony: 0.85,
+      injuries: 0,
+    };
+
     const squadForPricing = processedPlayers.map((p: any) => ({
       current_price: p.price,
-      score: p.score
+      score: p.score,
+      playerTier: p.tier,
     }));
-    
+
     const teamPrice = calculateTeamPrice(teamPartial, squadForPricing);
+
+    // ── RISK INDEX (graduated) ──
+    const teamRisk = rank <= 5 ? 0.2 : rank <= 10 ? 0.3 : rank <= 20 ? 0.45 : rank <= 35 ? 0.6 : 0.75;
 
     // Save team
     await prisma.asset.upsert({
@@ -251,11 +322,11 @@ async function main() {
         fifaRank: rank,
         continent,
         coach: coachName,
-        participations: 10,
+        participations,
         ownersCount: Math.floor(Math.random() * 5000 + 500),
-        riskIndex: rank <= 10 ? 0.3 : rank <= 20 ? 0.5 : 0.7,
+        riskIndex: teamRisk,
         harmony: 0.85,
-        popularity: rank <= 10 ? 0.9 : 0.7,
+        popularity: teamPopularity,
       },
       create: {
         id: dbTeamId,
@@ -273,12 +344,12 @@ async function main() {
         score: teamScore,
         continent,
         coach: coachName,
-        group: 'TBD', // Will be calculated at the end
-        participations: 10,
+        group: 'TBD',
+        participations,
         ownersCount: Math.floor(Math.random() * 5000 + 500),
-        riskIndex: rank <= 10 ? 0.3 : rank <= 20 ? 0.5 : 0.7,
+        riskIndex: teamRisk,
         harmony: 0.85,
-        popularity: rank <= 10 ? 0.9 : 0.7,
+        popularity: teamPopularity,
         priceHistory: { create: { price: teamPrice } },
       },
     });
@@ -316,6 +387,7 @@ async function main() {
           position: p.pos,
           score: p.score,
           playerTier: p.tier,
+          popularity: p.pop,
         },
         create: {
           id: dbPlayerId,
@@ -327,15 +399,15 @@ async function main() {
           current_price: p.price,
           high_price: p.price,
           low_price: p.price,
-          market_cap: `${Math.floor(Math.random() * 800 + 100)}M`,
+          market_cap: `${Math.floor(p.price * 10)}M`,
           volume: `${Math.floor(Math.random() * 10 + 2)}M`,
           change: 0,
           position: p.pos,
           score: p.score,
           playerTier: p.tier,
           age: p.age,
-          globalMarketValue: p.tier > 0.8 ? 80 : 20,
-          popularity: p.tier > 0.8 ? 0.85 : 0.5,
+          globalMarketValue: p.tier > 0.8 ? 80 : p.tier > 0.6 ? 40 : 15,
+          popularity: p.pop,
           priceHistory: { create: { price: p.price } },
         },
       });
