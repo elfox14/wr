@@ -394,7 +394,23 @@ async function main() {
     // Save players
     for (const p of processedPlayers) {
       const dbPlayerId = `player-${tla.toLowerCase()}-${p.apiId}`;
-      await prisma.asset.upsert({
+      async function upsertWithRetry(data: any, retries = 3) {
+        for (let i = 0; i < retries; i++) {
+          try {
+            await prisma.asset.upsert(data);
+            return;
+          } catch (e: any) {
+            if (e.code === 'P1017' || e.code === 'P1001') {
+              console.log(`Connection dropped. Retrying... (${i + 1}/${retries})`);
+              await new Promise(res => setTimeout(res, 2000 * (i + 1))); // exponential backoff
+            } else {
+              throw e;
+            }
+          }
+        }
+      }
+
+      await upsertWithRetry({
         where: { id: dbPlayerId },
         update: {
           name: p.name,

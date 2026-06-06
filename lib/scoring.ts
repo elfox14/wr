@@ -73,6 +73,14 @@ export function calculatePlayerPrice(asset: Partial<Asset> & { teamRank?: number
 // PART 2: TEAM PRICING (Market Cap & Shares System)
 // ============================================================
 
+export function getTeamTierLabel(score: number): string {
+  if (score >= 90) return 'الأسهم الذهبية (Tier A)';
+  if (score >= 80) return 'أسهم قيادية (Tier B)';
+  if (score >= 70) return 'أسهم النمو (Tier C)';
+  if (score >= 60) return 'أسهم الفرص (Tier D)';
+  return 'أسهم المخاطرة (Tier E)';
+}
+
 export function calculateTeamPrice(team: Partial<Asset>, players: Partial<Asset>[]): number {
   if (team.type !== 'TEAM') return 0;
 
@@ -106,14 +114,13 @@ export function calculateTeamPrice(team: Partial<Asset>, players: Partial<Asset>
   const pillars: PillarScores = { fundamental, popularity, marketDemand };
   const finalScore = calculateCompositeScore(pillars, true);
 
-  // Convert Score to MARKET CAP then to Share Price
-  const normalizedFactor = finalScore / 100;
-  const marketCap = Math.pow(normalizedFactor, 3) * 20000000;
-  
-  const SHARES_OUTSTANDING = 10000;
-  const sharePrice = marketCap / SHARES_OUTSTANDING;
-
-  return Math.max(150, Math.round(sharePrice));
+  // Categorical IPO Pricing mapped to Tiers (Final Score based)
+  if (finalScore >= 90) return 1000;      // Tier A: Gold
+  if (finalScore >= 85) return 800;       // Tier A-: Premium
+  if (finalScore >= 80) return 600;       // Tier B: Blue Chip
+  if (finalScore >= 70) return 400;       // Tier C: Growth
+  if (finalScore >= 60) return 250;       // Tier D: Opportunity
+  return 150;                             // Tier E: High Risk / Speculative
 }
 
 // ============================================================
