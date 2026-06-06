@@ -25,6 +25,7 @@ export function Navbar() {
             
             <div className="hidden md:flex space-x-8 space-x-reverse items-center">
               <Link href="/market" className="text-gray-300 hover:text-white transition-colors">السوق</Link>
+              <Link href="/articles" className="text-gray-300 hover:text-white transition-colors font-bold border-b-2 border-transparent hover:border-[#0FF0FC]">المقالات</Link>
               <Link href="/groups" className="text-gray-300 hover:text-white transition-colors">المجموعات</Link>
               <Link href="/matches" className="text-gray-300 hover:text-white transition-colors">المباريات</Link>
               {session && (

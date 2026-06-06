@@ -210,7 +210,7 @@ export default function Home() {
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {blogArticles.map((article) => (
+            {blogArticles.slice(0, 3).map((article) => (
               <Link href={`/article/${article.id}`} key={article.id} className="group flex flex-col h-full bg-[#1A1A1A] rounded-3xl border border-white/5 overflow-hidden hover:border-[#0FF0FC]/50 transition-all hover:-translate-y-2 shadow-lg">
                 <div className="h-48 w-full relative overflow-hidden">
                   <div className="absolute inset-0 bg-black/20 group-hover:bg-transparent transition-all z-10" />
@@ -244,6 +244,15 @@ export default function Home() {
                 </div>
               </Link>
             ))}
+          </div>
+          
+          <div className="mt-12 text-center">
+            <Link 
+              href="/articles"
+              className="inline-flex items-center gap-2 px-8 py-3 bg-white/5 hover:bg-white/10 text-white font-bold rounded-xl border border-white/10 transition-all"
+            >
+              عرض جميع المقالات
+            </Link>
           </div>
         </div>
       </section>
