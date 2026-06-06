@@ -257,9 +257,11 @@ async function main() {
       const tier = calcPlayerTier(rank, pos, age, idx, squad.length);
       const pop = calcPlayerPopularity(teamPopularity, tier);
 
-      // Player score derived from team + personal offset
-      const tierOffset = (tier - 0.6) * 15; // tier 0.8 → +3, tier 0.4 → -3
-      const score = Math.max(45, Math.min(99, Math.round(teamScore + tierOffset)));
+      // EA-Style Rating (60-95) acts as the player's core Score
+      let eaRating = Math.round(55 + (tier * 40));
+      if (rank <= 3) eaRating -= 3;
+      else if (rank <= 10) eaRating -= 2;
+      const score = Math.max(60, Math.min(95, eaRating));
 
       const tempPlayerObj = {
         type: 'PLAYER' as const,
@@ -268,6 +270,8 @@ async function main() {
         score,
         popularity: pop,
         riskIndex: age > 33 ? 0.8 : age < 22 ? 0.6 : 0.3,
+        teamRank: rank,
+        position: pos,
       };
       const price = calculatePlayerPrice(tempPlayerObj);
 
@@ -281,11 +285,24 @@ async function main() {
       if (starIds.has(p.apiId)) {
         p.tier = Math.min(1.0, p.tier + 0.10);
         p.pop = Math.min(1.0, p.pop + 0.08);
+        
+        let eaRating = Math.round(55 + (p.tier * 40));
+        if (rank <= 3) eaRating -= 3;
+        else if (rank <= 10) eaRating -= 2;
+        p.score = Math.max(60, Math.min(95, eaRating));
+
         // Recalculate price with boosted tier
-        const tempObj = { type: 'PLAYER' as const, playerTier: p.tier, age: p.age, score: p.score, popularity: p.pop, riskIndex: p.age > 33 ? 0.8 : 0.3 };
+        const tempObj = { 
+          type: 'PLAYER' as const, 
+          playerTier: p.tier, 
+          age: p.age, 
+          score: p.score, 
+          popularity: p.pop, 
+          riskIndex: p.age > 33 ? 0.8 : 0.3,
+          teamRank: rank,
+          position: p.pos
+        };
         p.price = calculatePlayerPrice(tempObj);
-        const tierOffset = (p.tier - 0.6) * 15;
-        p.score = Math.max(45, Math.min(99, Math.round(teamScore + tierOffset)));
       }
     }
 

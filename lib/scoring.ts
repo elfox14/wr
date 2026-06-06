@@ -32,62 +32,35 @@ export function calculateCompositeScore(pillars: PillarScores, isTeam = false): 
 // PART 1: PLAYER PRICING
 // ============================================================
 
-export function calculatePlayerPrice(asset: Partial<Asset>): number {
+export function getPlayerRatingLabel(rating: number): string {
+  if (rating >= 90) return 'World-class';
+  if (rating >= 85) return 'Top starter';
+  if (rating >= 80) return 'Key player';
+  if (rating >= 70) return 'Squad/rotation';
+  return 'Reserve';
+}
+
+export function calculatePlayerPrice(asset: Partial<Asset> & { teamRank?: number }): number {
   if (asset.type !== 'PLAYER') return 0;
 
-  const tier = asset.playerTier || 0.5;
-  const age = asset.age || 26;
-
-  // 1. Fundamental Score (Current Ability & Physical Peak)
-  let fundamental = 50 + (tier * 40); 
-  if (age >= 24 && age <= 29) {
-    fundamental += 5; // Peak age bonus
-  } else if (age > 33) {
-    fundamental -= 5; // Age penalty on physical fundamentals
-  }
-  fundamental = Math.min(100, Math.max(0, fundamental));
-
-  // 2. Popularity Score (Global Fame)
-  const popularity = (asset.popularity || 0.5) * 100;
-
-  // 3. World Cup Legacy
-  let legacy = 20; 
-  if (age > 32 && tier >= 0.9) legacy = 95;      // Legends: Messi, Modric
-  else if (age > 28 && tier >= 0.8) legacy = 75; // Veterans: De Bruyne
-  else if (age > 25 && tier >= 0.8) legacy = 60; // Established: Mbappe
-  else if (tier >= 0.6) legacy = 40; 
+  // Clamp tier between 0.25 and 1.00
+  const tier = Math.max(0.25, Math.min(1.0, asset.playerTier || 0.5));
   
-  // Legacy Floor for Rising Stars (e.g. Lamine Yamal, Bellingham)
-  // Ensures young superstars aren't undervalued just because they lack World Cup history.
-  if (age <= 23 && tier >= 0.8) {
-    legacy = Math.max(legacy, 40);
-  }
+  // 1. Calculate EA-Style Overall Rating
+  let eaRating = Math.round(55 + (tier * 40));
 
-  // 4. Market Demand
-  // At launch, Market Demand = Popularity. 
-  // Post-launch: 70% Real Trading Activity + 30% Popularity.
-  const marketDemand = popularity;
+  // 2. Team-level modifier for balance
+  // Give top favorites a slight reduction in IPO to allow market movement
+  const teamRank = asset.teamRank || 50;
+  if (teamRank <= 3) eaRating -= 3;
+  else if (teamRank <= 10) eaRating -= 2;
 
-  // 5. Volatility (Internal Indicator 0-100)
-  // Controls how fast a player's price reacts to news/trades.
-  // Not used directly in base price, but ready for the trading engine.
-  let volatility = 50;
-  if (age <= 21) volatility = 80;        // Young prodigy: High volatility
-  else if (age <= 24) volatility = 65;
-  else if (age >= 32) volatility = 20;   // Legend: Low volatility (stable)
-  else if (age >= 35) volatility = 10;
-  
-  if (tier >= 0.9) volatility = Math.max(10, volatility - 15); // Superstars are more stable
+  // 3. Clamp rating strictly between 60 and 95
+  eaRating = Math.max(60, Math.min(95, eaRating));
 
-  const pillars: PillarScores = { fundamental, popularity, legacy, marketDemand };
-  const finalScore = calculateCompositeScore(pillars, false);
-
-  // Convert Score to Price (Exponential Curve)
-  const normalizedFactor = finalScore / 100;
-  let basePrice = 250 + (Math.pow(normalizedFactor, 3) * 5000);
-
-  // Position Multiplier: Attackers are more tradeable and attract higher demand
-  const position = (asset as any).position;
+  // 4. Position Multiplier on Final Price
+  let basePrice = eaRating * 10;
+  const position = (asset as any).position || 'MID';
   if (position === 'FWD') basePrice *= 1.15;
   else if (position === 'MID') basePrice *= 1.05;
   else if (position === 'DEF') basePrice *= 0.95;
