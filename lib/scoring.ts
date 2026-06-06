@@ -43,23 +43,14 @@ export function getPlayerRatingLabel(rating: number): string {
 export function calculatePlayerPrice(asset: Partial<Asset> & { teamRank?: number }): number {
   if (asset.type !== 'PLAYER') return 0;
 
-  // Clamp tier between 0.25 and 1.00
-  const tier = Math.max(0.25, Math.min(1.0, asset.playerTier || 0.5));
-  
-  // 1. Calculate EA-Style Overall Rating
-  let eaRating = Math.round(55 + (tier * 40));
+  // 1. Calculate the 4-Pillar Composite Score
+  let score = asset.score;
+  if (!score) {
+    score = calculateAssetScore(asset);
+  }
 
-  // 2. Team-level modifier for balance
-  // Give top favorites a slight reduction in IPO to allow market movement
-  const teamRank = asset.teamRank || 50;
-  if (teamRank <= 3) eaRating -= 3;
-  else if (teamRank <= 10) eaRating -= 2;
-
-  // 3. Clamp rating strictly between 60 and 95
-  eaRating = Math.max(60, Math.min(95, eaRating));
-
-  // 4. Position Multiplier on Final Price
-  let basePrice = eaRating * 10;
+  // 2. Position Multiplier on Final Price
+  let basePrice = (score as number) * 10;
   const position = (asset as any).position || 'MID';
   if (position === 'FWD') basePrice *= 1.15;
   else if (position === 'MID') basePrice *= 1.05;
@@ -108,24 +99,36 @@ export function calculateTeamPrice(team: Partial<Asset>, players: Partial<Asset>
   // 2. Popularity Score
   const popularity = (team.popularity || 0.5) * 100;
 
-  // 3. Market Demand (Starts equal to popularity)
-  const marketDemand = popularity;
+  // 3. Market Demand (Starts equal to popularity, grows dynamically)
+  const marketDemand = getDynamicMarketDemand(team, popularity);
 
   const pillars: PillarScores = { fundamental, popularity, marketDemand };
   const finalScore = calculateCompositeScore(pillars, true);
 
-  // Categorical IPO Pricing mapped to Tiers (Final Score based)
-  if (finalScore >= 90) return 1000;      // Tier A: Gold
-  if (finalScore >= 85) return 800;       // Tier A-: Premium
-  if (finalScore >= 80) return 600;       // Tier B: Blue Chip
-  if (finalScore >= 70) return 400;       // Tier C: Growth
-  if (finalScore >= 60) return 250;       // Tier D: Opportunity
-  return 150;                             // Tier E: High Risk / Speculative
+  // Exponential Pricing Curve
+  // A score of 98 will be ~1230, 90 ~974, 80 ~714, 70 ~511, 60 ~359
+  const price = Math.round(Math.pow(finalScore / 100, 3) * 1200 + 100);
+  return price;
 }
 
 // ============================================================
 // PART 3: UTILITIES
 // ============================================================
+
+// Helper to calculate dynamic market demand based on volume and owners
+function getDynamicMarketDemand(asset: Partial<Asset>, basePopularity: number): number {
+  let volumeValue = 0;
+  if (asset.volume) {
+    if (asset.volume.includes('M')) volumeValue = parseFloat(asset.volume) * 1000000;
+    else if (asset.volume.includes('K')) volumeValue = parseFloat(asset.volume) * 1000;
+    else volumeValue = parseFloat(asset.volume) || 0;
+  }
+  
+  const ownersBonus = (asset.ownersCount || 0) * 0.1;
+  const volumeBonus = volumeValue / 1000; // e.g. 10k volume = +10 to demand
+  
+  return Math.min(100, basePopularity + ownersBonus + volumeBonus);
+}
 
 // Helper to calculate just the 0-100 composite score for display in UI
 export function calculateAssetScore(asset: Partial<Asset>, players?: Partial<Asset>[]): number {
@@ -142,8 +145,9 @@ export function calculateAssetScore(asset: Partial<Asset>, players?: Partial<Ass
     const historyScore = Math.min(100, (asset.participations || 0) / 20 * 100);
     const fundamental = (rankScore * 0.40) + (squadScore * 0.30) + (historyScore * 0.30);
     const popularity = (asset.popularity || 0.5) * 100;
+    const marketDemand = getDynamicMarketDemand(asset, popularity);
     
-    return calculateCompositeScore({ fundamental, popularity, marketDemand: popularity }, true);
+    return calculateCompositeScore({ fundamental, popularity, marketDemand }, true);
   } else if (asset.type === 'PLAYER') {
     const tier = asset.playerTier || 0.5;
     const age = asset.age || 26;
@@ -152,6 +156,7 @@ export function calculateAssetScore(asset: Partial<Asset>, players?: Partial<Ass
     else if (age > 33) fundamental -= 5;
     
     const popularity = (asset.popularity || 0.5) * 100;
+    const marketDemand = getDynamicMarketDemand(asset, popularity);
     
     let legacy = 20; 
     if (age > 32 && tier >= 0.9) legacy = 95;
@@ -163,7 +168,7 @@ export function calculateAssetScore(asset: Partial<Asset>, players?: Partial<Ass
       legacy = Math.max(legacy, 40);
     }
 
-    return calculateCompositeScore({ fundamental, popularity, legacy, marketDemand: popularity }, false);
+    return calculateCompositeScore({ fundamental, popularity, legacy, marketDemand }, false);
   }
   return 50;
 }

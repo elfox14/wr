@@ -1,5 +1,5 @@
 import { PrismaClient } from '@prisma/client';
-import { calculatePlayerPrice, calculateTeamPrice } from '../lib/scoring';
+import { calculatePlayerPrice, calculateTeamPrice, calculateAssetScore } from '../lib/scoring';
 import { getFlagUrl } from '../lib/images';
 
 const prisma = new PrismaClient();
@@ -257,22 +257,20 @@ async function main() {
       const tier = calcPlayerTier(rank, pos, age, idx, squad.length);
       const pop = calcPlayerPopularity(teamPopularity, tier);
 
-      // EA-Style Rating (60-95) acts as the player's core Score
-      let eaRating = Math.round(55 + (tier * 40));
-      if (rank <= 3) eaRating -= 3;
-      else if (rank <= 10) eaRating -= 2;
-      const score = Math.max(60, Math.min(95, eaRating));
-
       const tempPlayerObj = {
         type: 'PLAYER' as const,
         playerTier: tier,
         age,
-        score,
         popularity: pop,
         riskIndex: age > 33 ? 0.8 : age < 22 ? 0.6 : 0.3,
         teamRank: rank,
         position: pos,
+        ownersCount: 0,
+        volume: '0'
       };
+      
+      const score = calculateAssetScore(tempPlayerObj);
+      (tempPlayerObj as any).score = score;
       const price = calculatePlayerPrice(tempPlayerObj);
 
       return { apiId: p.id, name: p.name, pos, age, tier, price, score, pop, nationality: p.nationality || '' };
@@ -286,22 +284,17 @@ async function main() {
         p.tier = Math.min(1.0, p.tier + 0.10);
         p.pop = Math.min(1.0, p.pop + 0.08);
         
-        let eaRating = Math.round(55 + (p.tier * 40));
-        if (rank <= 3) eaRating -= 3;
-        else if (rank <= 10) eaRating -= 2;
-        p.score = Math.max(60, Math.min(95, eaRating));
-
-        // Recalculate price with boosted tier
         const tempObj = { 
           type: 'PLAYER' as const, 
           playerTier: p.tier, 
           age: p.age, 
-          score: p.score, 
           popularity: p.pop, 
-          riskIndex: p.age > 33 ? 0.8 : 0.3,
-          teamRank: rank,
-          position: p.pos
+          teamRank: rank, 
+          position: p.pos,
+          ownersCount: 0,
+          volume: '0'
         };
+        p.score = calculateAssetScore(tempObj);
         p.price = calculatePlayerPrice(tempObj);
       }
     }
