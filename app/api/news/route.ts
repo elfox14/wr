@@ -50,8 +50,9 @@ export async function GET() {
     let externalNews: any[] = [];
     try {
       const parser = new Parser();
-      // Using a standard Arabic sports news RSS feed (Google News as fallback if Kooora fails)
-      const feed = await parser.parseURL('https://news.google.com/rss/search?q=كرة+القدم+كأس+العالم&hl=ar&gl=EG&ceid=EG:ar');
+      // Using an encoded URL to prevent ERR_UNESCAPED_CHARACTERS
+      const feedUrl = 'https://news.google.com/rss/search?q=%D9%83%D8%B1%D8%A9+%D8%A7%D9%84%D9%82%D8%AF%D9%85+%D9%83%D8%A3%D8%B3+%D8%A7%D9%84%D8%B9%D8%A7%D9%84%D9%85&hl=ar&gl=EG&ceid=EG:ar';
+      const feed = await parser.parseURL(feedUrl);
       
       externalNews = feed.items.slice(0, 10).map((item, index) => ({
         id: `ext-${index}`,
