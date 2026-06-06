@@ -7,6 +7,7 @@ import { Navbar } from '@/components/ui/Navbar';
 import { LineChart, Line, ResponsiveContainer, YAxis, Tooltip, XAxis, Area, AreaChart } from 'recharts';
 import { TrendingUp, TrendingDown, Activity, AlertCircle, ShoppingCart, Globe, Shield, Zap, Target } from 'lucide-react';
 import Link from 'next/link';
+import { AssetImage } from '@/components/ui/AssetImage';
 
 export default function AssetClient() {
   const params = useParams();
@@ -73,7 +74,7 @@ export default function AssetClient() {
                 className={`flex items-center justify-between p-3 rounded-lg transition-colors ${t.id === asset.id ? 'bg-[#0FF0FC]/10 border border-[#0FF0FC]/30' : 'hover:bg-white/5 border border-transparent'}`}
               >
                 <div className="flex items-center gap-2">
-                  <span className="text-xl">{t.image}</span>
+                  <AssetImage image={t.image} name={t.name} className="text-xl w-6 h-6" width={24} height={24} />
                   <span className={`text-sm font-bold ${t.id === asset.id ? 'text-[#0FF0FC]' : 'text-gray-300'}`}>{t.name}</span>
                 </div>
                 <span className="text-xs font-mono text-gray-500">{t.current_price}¢</span>
@@ -90,7 +91,7 @@ export default function AssetClient() {
             <div className="absolute top-0 right-0 w-64 h-64 bg-[#0FF0FC]/5 rounded-full blur-3xl pointer-events-none"></div>
             
             <div className="flex items-center gap-6 relative z-10">
-              <span className="text-7xl drop-shadow-xl">{asset.image}</span>
+              <AssetImage image={asset.image} name={asset.name} className="text-7xl drop-shadow-xl w-32 h-32" width={128} height={128} />
               <div>
                 <h1 className="text-4xl font-black text-white tracking-tight">{asset.name} <span className="text-2xl text-gray-500 font-mono">({asset.code})</span></h1>
                 
@@ -276,7 +277,7 @@ export default function AssetClient() {
               {asset.players.map((p: any) => (
                 <Link href={`/asset/${p.id}`} key={p.id} className="bg-black/50 border border-white/5 rounded-xl p-4 hover:border-[#0FF0FC]/50 hover:bg-[#0FF0FC]/5 transition-colors group">
                   <div className="flex justify-between items-start mb-3">
-                    <span className="text-3xl">{p.image}</span>
+                    <AssetImage image={p.image} name={p.name} className="text-3xl w-16 h-16" width={64} height={64} />
                     <span className="bg-white/10 text-gray-400 text-[10px] px-2 py-1 rounded font-bold">{p.position}</span>
                   </div>
                   <div className="font-bold text-white text-sm group-hover:text-[#0FF0FC] transition-colors truncate">{p.name}</div>

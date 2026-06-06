@@ -11,7 +11,7 @@ export async function generateMetadata(
   parent: ResolvingMetadata
 ): Promise<Metadata> {
   // read route params
-  const id = params.id;
+  const { id } = await params;
 
   // fetch data
   const asset = await prisma.asset.findUnique({

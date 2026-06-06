@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { TrendingUp, TrendingDown, ArrowRight, ChevronRight } from 'lucide-react';
 import { Asset } from '@/lib/store';
+import { AssetImage } from './AssetImage';
 
 interface TradingCardProps {
   asset: Asset;
@@ -59,18 +60,17 @@ export function TradingCard({ asset, onViewRoster, holding, isCaptain, onMakeCap
           </div>
         </div>
         
-        {/* Icon/Image */}
-        <div className="text-6xl mb-4 text-center transform group-hover:scale-110 transition-transform duration-300">
-          {asset.image}
-        </div>
-        
         {/* Name */}
         <h3 className="text-xl font-bold text-white mb-2 text-center group-hover:text-glow transition-colors">
           {asset.name}
         </h3>
         
+        <div className="absolute top-4 right-4 z-10 w-16 h-16 bg-white/10 rounded-full flex items-center justify-center border border-white/20 shadow-lg backdrop-blur-md">
+          <AssetImage image={asset.image} name={asset.name} className="text-3xl" width={48} height={48} />
+        </div>
+        
         {/* Stats */}
-        <div className="flex justify-center gap-2 text-xs mb-6 flex-wrap">
+        <div className="flex justify-center gap-2 text-xs mb-6 flex-wrap mt-12">
           <span className="bg-white/5 border border-white/10 text-gray-300 px-3 py-1 rounded-full">
             تقييم: {asset.score || 'N/A'}
           </span>

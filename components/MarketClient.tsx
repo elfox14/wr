@@ -6,6 +6,8 @@ import { useStore, Asset } from '@/lib/store';
 import { Navbar } from '@/components/ui/Navbar';
 import { TrendingUp, TrendingDown, ArrowRight, Search, Filter, LayoutGrid, List, ChevronRight, Globe, Users, Target, Activity, Zap, Info } from 'lucide-react';
 import { TeamRosterDrawer } from '@/components/ui/TeamRosterDrawer';
+import { LineChart, Line, ResponsiveContainer, YAxis, Tooltip, XAxis, Area, AreaChart } from 'recharts';
+import { AssetImage } from '@/components/ui/AssetImage';
 import { TradingCard } from '@/components/ui/TradingCard';
 
 export default function MarketClient() {
@@ -117,7 +119,7 @@ export default function MarketClient() {
               <div className="flex flex-col gap-2">
                 {topTeams.map(t => (
                   <div key={t.id} className="flex justify-between text-sm font-bold">
-                    <span>{t.image} {t.name}</span>
+                    <span className="flex items-center gap-1"><AssetImage image={t.image} name={t.name} className="w-5 h-5" width={20} height={20} /> {t.name}</span>
                     <span className="text-accent tabular-nums">{t.score}</span>
                   </div>
                 ))}
@@ -222,7 +224,7 @@ export default function MarketClient() {
                 {filteredAssets.map(asset => (
                   <tr key={asset.id} className="border-b border-white/5 hover:bg-white/5 transition-colors group">
                     <td className="p-4 flex items-center gap-4">
-                      <span className="text-3xl bg-background/40 w-12 h-12 flex items-center justify-center rounded-xl">{asset.image}</span>
+                      <AssetImage image={asset.image} name={asset.name} className="w-12 h-12 bg-background/40 flex items-center justify-center rounded-xl overflow-hidden" width={48} height={48} />
                       <div>
                          {/* Here we use primary on hover */}
                         <p className="font-bold text-white text-lg group-hover:text-primary transition-colors">{asset.name}</p>
