@@ -186,7 +186,6 @@ async function main() {
     if (rank === 2) teamScoreRaw = 98;
     if (rank === 3) teamScoreRaw = 97;
     const teamScore = Math.max(60, Math.min(99, Math.round(teamScoreRaw)));
-    const teamPrice = teamScore * 10;
 
     // Process players
     const processedPlayers = squad.map((p: any) => {
@@ -197,15 +196,24 @@ async function main() {
 
       let playerOffset = 0;
       if (tier >= 0.9) {
-        playerOffset = Math.floor(Math.random() * 3) + 1;
+        playerOffset = 2;
       } else if (tier >= 0.7) {
-        playerOffset = Math.floor(Math.random() * 3) - 1;
+        playerOffset = 0;
       } else {
-        playerOffset = Math.floor(Math.random() * 4) - 4;
+        playerOffset = -3;
       }
 
       const score = Math.max(50, Math.min(99, teamScore + playerOffset));
-      const price = Math.floor(score * 5);
+      
+      const tempPlayerObj = { 
+        type: 'PLAYER' as const, 
+        playerTier: tier, 
+        age, 
+        score,
+        popularity: tier >= 0.9 ? 0.9 : 0.5,
+        riskIndex: age > 33 ? 0.8 : 0.2
+      };
+      const price = calculatePlayerPrice(tempPlayerObj);
 
       return {
         apiId: p.id,
@@ -219,7 +227,14 @@ async function main() {
       };
     });
 
-    // Team price and score already calculated
+    // Team price and score calculation
+    // Calculate squad price using top 11
+    const squadForPricing = processedPlayers.map(p => ({
+      current_price: p.price,
+      score: p.score
+    }));
+    
+    const teamPrice = calculateTeamPrice(teamPartial, squadForPricing);
 
     // Save team
     await prisma.asset.upsert({

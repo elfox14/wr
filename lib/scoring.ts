@@ -28,6 +28,11 @@ export function calculatePlayerPrice(asset: Partial<Asset>): number {
     basePrice *= (1 + (asset.popularity * 0.2));
   }
 
+  // Risk Index penalty (higher risk = lower price)
+  if (asset.riskIndex && asset.riskIndex > 0.7) {
+    basePrice *= 0.9;
+  }
+
   return Math.round(basePrice);
 }
 
@@ -68,11 +73,8 @@ export function calculateTeamPrice(team: Partial<Asset>, players: Partial<Asset>
 
   const finalPrice = (0.40 * rankScore) + (0.30 * squadScore) + (0.20 * historyScore) + (0.10 * popScore);
   
-  // Scale it up so a strong team is around 1000, avg 600, weak 300 (per user request)
-  // Let's multiply by a factor to fit the user's scale if needed.
-  // Actually, our max is 1000 with this formula, so it's perfect.
-  
-  return Math.max(100, Math.round(finalPrice));
+  // Scale it up so a strong team is around 3000 (3x scale) to ensure the team ceiling is higher than star players.
+  return Math.max(100, Math.round(finalPrice * 3));
 }
 
 export function calculateTeamStrengthIndex(team: Partial<Asset>, players: Partial<Asset>[]): number {

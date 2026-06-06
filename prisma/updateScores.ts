@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import { PrismaClient } from '@prisma/client';
+import { calculateTeamPrice, calculatePlayerPrice } from '../lib/scoring';
 
 const prisma = new PrismaClient();
 
@@ -32,8 +33,8 @@ async function main() {
     const fifaRank = team.fifaRank || 50;
     const newTeamScore = getTeamScoreByFifaRank(fifaRank);
     
-    // Optional: align price with score
-    const newTeamPrice = newTeamScore * 10;
+    // Calculate accurate price based on comprehensive formula
+    const newTeamPrice = calculateTeamPrice(team, team.players);
 
     await prisma.asset.update({
       where: { id: team.id },
@@ -46,22 +47,23 @@ async function main() {
     updatedTeams++;
 
     for (const player of team.players) {
-      // Calculate player score based on Team Score + tier bonus
+      // Calculate player score based on Team Score + tier bonus (deterministic)
       const tier = player.playerTier || 0.5;
       
       let playerOffset = 0;
       if (tier >= 0.9) {
-        playerOffset = Math.floor(Math.random() * 3) + 1; // +1 to +3 for stars
+        playerOffset = 2; // Fixed instead of random
       } else if (tier >= 0.7) {
-        playerOffset = Math.floor(Math.random() * 3) - 1; // -1 to +1 for starters
+        playerOffset = 0; // Fixed instead of random
       } else {
-        playerOffset = Math.floor(Math.random() * 4) - 4; // -4 to -1 for subs/others
+        playerOffset = -3; // Fixed instead of random
       }
 
       const newPlayerScore = Math.max(50, Math.min(99, newTeamScore + playerOffset));
       
-      // Align price with score
-      const newPlayerPrice = Math.floor(newPlayerScore * 5); // Players cost less than teams
+      // Calculate price based on robust formula
+      const tempPlayerObj = { ...player, score: newPlayerScore }; // simulate updated score if needed
+      const newPlayerPrice = calculatePlayerPrice(tempPlayerObj);
 
       await prisma.asset.update({
         where: { id: player.id },
