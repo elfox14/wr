@@ -192,7 +192,7 @@ export default function Home() {
             <div className="mt-4 flex items-end justify-between">
               <div>
                 <p className="text-gray-400 text-xs">السعر الحالي</p>
-                <p className="text-2xl font-mono font-bold text-white">{topGainer?.currentPrice || '0.00'} ¢</p>
+                <p className="text-2xl font-mono font-bold text-white">{topGainer?.current_price || '0.00'} ¢</p>
               </div>
               <div className="bg-green-500/20 text-green-400 px-3 py-1 rounded-full text-sm font-bold flex items-center gap-1">
                 +{topGainer?.change || '0'}%
@@ -218,7 +218,7 @@ export default function Home() {
             <div className="mt-4 flex items-end justify-between">
               <div>
                 <p className="text-gray-400 text-xs">السعر الحالي</p>
-                <p className="text-2xl font-mono font-bold text-white">{topLoser?.currentPrice || '0.00'} ¢</p>
+                <p className="text-2xl font-mono font-bold text-white">{topLoser?.current_price || '0.00'} ¢</p>
               </div>
               <div className="bg-red-500/20 text-red-400 px-3 py-1 rounded-full text-sm font-bold flex items-center gap-1">
                 {topLoser?.change || '0'}%
