@@ -29,7 +29,7 @@ export const metadata: Metadata = {
     siteName: "WorldCup Exchange",
     images: [
       {
-        url: "/og-image.png",
+        url: "/og-image.jpg",
         width: 1200,
         height: 630,
         alt: "WorldCup Exchange",
@@ -46,7 +46,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "WorldCup Exchange | منصة تداول كرة القدم الافتراضية",
     description: "تداول أسهم المنتخبات واللاعبين بناءً على أدائهم في كأس العالم.",
-    images: ["/og-image.png"],
+    images: ["/og-image.jpg"],
   },
   robots: {
     index: true,

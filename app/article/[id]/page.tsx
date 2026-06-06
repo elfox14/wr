@@ -20,7 +20,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
     openGraph: {
       title: article.title,
       description: article.excerpt,
-      images: [{ url: '/og-image.png' }],
+      images: [{ url: '/og-image.jpg' }],
       type: 'article',
       publishedTime: article.date,
       authors: [article.author],
@@ -29,7 +29,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
       card: 'summary_large_image',
       title: article.title,
       description: article.excerpt,
-      images: ['/og-image.png'],
+      images: ['/og-image.jpg'],
     }
   };
 }
@@ -60,7 +60,7 @@ export default async function ArticlePage({ params }: { params: Promise<{ id: st
       "name": "WorldCup Exchange",
       "logo": {
         "@type": "ImageObject",
-        "url": `${baseUrl}/og-image.png`
+        "url": `${baseUrl}/og-image.jpg`
       }
     }
   };
