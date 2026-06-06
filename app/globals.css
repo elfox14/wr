@@ -44,3 +44,63 @@ body {
   color: var(--foreground);
   font-family: var(--font-sans);
 }
+
+/* ─── Bento Grid Layout ─── */
+.home-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-rows: auto;
+  grid-template-areas:
+    "ticker         ticker         ticker         ticker"
+    "hero           hero           topMover       buyChance"
+    "marketStats    marketStats    howItWorks     howItWorks"
+    "featuredArticle featuredArticle whyUs         leaderboard"
+    "cta            cta            cta            cta"
+    "siteFooter     siteFooter     siteFooter     siteFooter";
+  gap: 16px;
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0 16px 40px;
+}
+
+.home-grid > * {
+  background: var(--color-surface);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 20px;
+  overflow: hidden;
+}
+
+.bento-ticker         { grid-area: ticker; background: transparent !important; border: none !important; border-radius: 0 !important; padding: 0 !important; }
+.bento-hero           { grid-area: hero; min-height: 320px; }
+.bento-top-mover      { grid-area: topMover; }
+.bento-buy-chance     { grid-area: buyChance; }
+.bento-market-stats   { grid-area: marketStats; }
+.bento-how-it-works   { grid-area: howItWorks; }
+.bento-featured-article { grid-area: featuredArticle; min-height: 220px; }
+.bento-why-us         { grid-area: whyUs; }
+.bento-leaderboard    { grid-area: leaderboard; }
+.bento-cta            { grid-area: cta; }
+.bento-footer         { grid-area: siteFooter; background: transparent !important; border: none !important; }
+
+/* ─── Mobile: single column stack ─── */
+@media (max-width: 900px) {
+  .home-grid {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "ticker"
+      "hero"
+      "topMover"
+      "buyChance"
+      "marketStats"
+      "howItWorks"
+      "featuredArticle"
+      "leaderboard"
+      "whyUs"
+      "cta"
+      "siteFooter";
+    gap: 12px;
+    padding: 0 12px 32px;
+  }
+  .bento-hero { min-height: 260px; }
+  .bento-featured-article { min-height: 180px; }
+}
