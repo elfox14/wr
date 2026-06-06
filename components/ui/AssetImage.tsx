@@ -1,33 +1,60 @@
-import React from 'react';
+'use client';
+
+import React, { useState } from 'react';
 import Image from 'next/image';
+import { getAvatarFallbackUrl } from '@/lib/images';
 
 interface AssetImageProps {
-  image: string;
+  image: string | null | undefined;
+  type?: 'TEAM' | 'PLAYER';
   name: string;
-  className?: string;
+  alt?: string;
   width?: number;
   height?: number;
+  className?: string;
+  sizes?: string;
+  fill?: boolean;
 }
 
-export function AssetImage({ image, name, className = '', width = 100, height = 100 }: AssetImageProps) {
-  if (!image) return null;
+export function AssetImage({
+  image,
+  type,
+  name,
+  alt,
+  width = 100,
+  height = 100,
+  className = '',
+  sizes,
+  fill = false
+}: AssetImageProps) {
+  const [imgSrc, setImgSrc] = useState<string>(() => {
+    // If it's an emoji (e.g. 🇧🇷) or totally empty, immediately use fallback
+    if (!image || image.length < 10 || !image.startsWith('http')) {
+      return getAvatarFallbackUrl(name);
+    }
+    return image;
+  });
 
-  const isUrl = image.startsWith('http');
+  const handleError = () => {
+    // If the original image errors, swap to ui-avatars
+    const fallback = getAvatarFallbackUrl(name);
+    if (imgSrc !== fallback) {
+      setImgSrc(fallback);
+    }
+  };
 
-  if (isUrl) {
-    return (
-      <div className={`relative flex items-center justify-center ${className}`} style={{ width: className.includes('w-') ? undefined : width, height: className.includes('h-') ? undefined : height }}>
-        <Image 
-          src={image} 
-          alt={name} 
-          fill
-          className="object-contain"
-          sizes="(max-width: 768px) 100vw, 33vw"
-        />
-      </div>
-    );
-  }
+  const imageProps = fill
+    ? { fill: true, sizes: sizes || "100vw" }
+    : { width, height };
 
-  // Fallback for emojis
-  return <span className={className}>{image}</span>;
+  return (
+    <Image
+      src={imgSrc}
+      alt={alt || name}
+      className={className}
+      onError={handleError}
+      unoptimized // Adding unoptimized to avoid weird remote pattern failures temporarily if Next.js blocks it before restart
+      {...imageProps}
+    />
+  );
 }

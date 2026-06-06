@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import { calculatePlayerPrice, calculateTeamPrice } from '../lib/scoring';
+import { getFlagUrl } from '../lib/images';
 
 const prisma = new PrismaClient();
 
@@ -158,6 +159,8 @@ async function main() {
     const coachName = apiTeam.coach?.name || 'N/A';
     const squad = apiTeam.squad || [];
     const flag = flagEmojis[tla] || '🏳️';
+    // Use FlagCDN for teams, save directly to DB
+    const dbImage = getFlagUrl(tla) || ''; 
     const rank = fifaRanks[tla] || 50;
     const continent = continentMap[tla] || 'Unknown';
     const dbTeamId = `team-${tla.toLowerCase()}`;
@@ -242,7 +245,7 @@ async function main() {
       update: {
         name: shortName,
         code: tla,
-        image: flag,
+        image: dbImage,
         current_price: teamPrice,
         score: teamScore,
         fifaRank: rank,
@@ -259,7 +262,7 @@ async function main() {
         type: 'TEAM',
         name: shortName,
         code: tla,
-        image: flag,
+        image: dbImage,
         current_price: teamPrice,
         high_price: teamPrice,
         low_price: teamPrice,
@@ -307,7 +310,7 @@ async function main() {
         where: { id: dbPlayerId },
         update: {
           name: p.name,
-          image: flag,
+          image: dbImage,
           current_price: p.price,
           age: p.age,
           position: p.pos,
@@ -319,7 +322,7 @@ async function main() {
           type: 'PLAYER',
           name: p.name,
           code: `${tla}${p.apiId}`,
-          image: flag,
+          image: dbImage,
           teamId: dbTeamId,
           current_price: p.price,
           high_price: p.price,
