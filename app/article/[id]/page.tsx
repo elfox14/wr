@@ -20,7 +20,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
     openGraph: {
       title: article.title,
       description: article.excerpt,
-      images: [{ url: article.imageUrl }],
+      images: [{ url: '/og-image.png' }],
       type: 'article',
       publishedTime: article.date,
       authors: [article.author],
@@ -29,7 +29,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
       card: 'summary_large_image',
       title: article.title,
       description: article.excerpt,
-      images: [article.imageUrl],
+      images: ['/og-image.png'],
     }
   };
 }
@@ -43,8 +43,34 @@ export default async function ArticlePage({ params }: { params: Promise<{ id: st
     notFound();
   }
 
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://worldcup.mcprim.com';
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    "headline": article.title,
+    "description": article.excerpt,
+    "image": article.imageUrl,
+    "author": {
+      "@type": "Person",
+      "name": article.author
+    },
+    "datePublished": article.date,
+    "publisher": {
+      "@type": "Organization",
+      "name": "WorldCup Exchange",
+      "logo": {
+        "@type": "ImageObject",
+        "url": `${baseUrl}/og-image.png`
+      }
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[#121212] text-white">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       <Navbar />
       
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">

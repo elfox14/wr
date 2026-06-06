@@ -11,7 +11,10 @@ const cairo = Cairo({
   weight: ["400", "500", "700", "800"],
 });
 
+const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://worldcup.mcprim.com';
+
 export const metadata: Metadata = {
+  metadataBase: new URL(baseUrl),
   title: {
     default: "WorldCup Exchange | منصة تداول كرة القدم الافتراضية",
     template: "%s | WorldCup Exchange",
@@ -22,24 +25,28 @@ export const metadata: Metadata = {
   openGraph: {
     title: "WorldCup Exchange | منصة تداول كرة القدم الافتراضية",
     description: "أول منصة لتداول أسهم منتخبات ولاعبي كأس العالم افتراضياً. استثمر في النجوم ونافس عالمياً.",
-    url: "https://worldcup-exchange.com", // Replace with real domain later
+    url: baseUrl, // Replace with real domain later
     siteName: "WorldCup Exchange",
     images: [
       {
-        url: "https://images.unsplash.com/photo-1579952363873-27f3bade9f55?auto=format&fit=crop&q=80&w=1200",
+        url: "/og-image.png",
         width: 1200,
         height: 630,
         alt: "WorldCup Exchange",
       },
     ],
-    locale: "ar_SA",
+    locale: "ar_EG",
+    alternateLocale: ["ar_SA", "ar_AE", "ar_MA", "ar_QA"],
     type: "website",
+  },
+  alternates: {
+    canonical: '/',
   },
   twitter: {
     card: "summary_large_image",
     title: "WorldCup Exchange | منصة تداول كرة القدم الافتراضية",
     description: "تداول أسهم المنتخبات واللاعبين بناءً على أدائهم في كأس العالم.",
-    images: ["https://images.unsplash.com/photo-1579952363873-27f3bade9f55?auto=format&fit=crop&q=80&w=1200"],
+    images: ["/og-image.png"],
   },
   robots: {
     index: true,

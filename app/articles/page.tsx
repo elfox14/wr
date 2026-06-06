@@ -3,9 +3,19 @@ import { Metadata } from 'next';
 export const metadata: Metadata = {
   title: 'جميع المقالات والتحليلات',
   description: 'المكتبة الشاملة لاستراتيجيات التداول، أخبار المونديال، وتحليل أداء المنتخبات واللاعبين في كأس العالم.',
+  alternates: {
+    canonical: '/articles',
+  },
   openGraph: {
     title: 'جميع المقالات والتحليلات | WorldCup Exchange',
     description: 'استراتيجيات تداول وتحليلات كأس العالم.',
+    images: ['/og-image.png'],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'جميع المقالات والتحليلات | WorldCup Exchange',
+    description: 'استراتيجيات تداول وتحليلات كأس العالم.',
+    images: ['/og-image.png'],
   }
 };
 
