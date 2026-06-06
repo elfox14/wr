@@ -48,22 +48,26 @@ export default function Home() {
     {
       title: "اكتشف السوق",
       desc: "تصفح قائمة واسعة من المنتخبات وأبرز اللاعبين المشاركين.",
-      num: "01"
+      num: "01",
+      icon: <Globe size={28} className="text-[#0FF0FC] mb-2" />
     },
     {
       title: "ابنِ محفظتك",
       desc: "اختر أصولك بعناية وقم بشرائها بالسعر الحالي للسوق.",
-      num: "02"
+      num: "02",
+      icon: <ShieldCheck size={28} className="text-[#0FF0FC] mb-2" />
     },
     {
       title: "راقب المباريات",
       desc: "شاهد كيف ترتفع أسهمك مع كل هدف أو تمريرة حاسمة.",
-      num: "03"
+      num: "03",
+      icon: <PlayCircle size={28} className="text-[#0FF0FC] mb-2" />
     },
     {
       title: "اجنِ الأرباح",
       desc: "بع أسهمك في الوقت المناسب ونافس على المركز الأول.",
-      num: "04"
+      num: "04",
+      icon: <Trophy size={28} className="text-[#0FF0FC] mb-2" />
     }
   ];
 
@@ -144,35 +148,7 @@ export default function Home() {
 
       {/* 2. Live Market Stats */}
       <section className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            className="bg-[#111] border border-white/5 p-6 rounded-3xl relative overflow-hidden group"
-          >
-            <div className="absolute top-0 right-0 p-6 opacity-10 group-hover:opacity-20 transition-opacity">
-              <Users size={80} className="text-[#0FF0FC]" />
-            </div>
-            <p className="text-gray-400 text-sm font-bold mb-2">المتداولون النشطون</p>
-            <h3 className="text-4xl font-extrabold text-white">124K+</h3>
-            <p className="text-[#0FF0FC] text-xs mt-2 flex items-center gap-1"><ArrowUpRight size={14}/> +12% هذا الأسبوع</p>
-          </motion.div>
-
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ delay: 0.1 }}
-            className="bg-[#111] border border-white/5 p-6 rounded-3xl relative overflow-hidden group"
-          >
-            <div className="absolute top-0 right-0 p-6 opacity-10 group-hover:opacity-20 transition-opacity">
-              <Activity size={80} className="text-[#FFD700]" />
-            </div>
-            <p className="text-gray-400 text-sm font-bold mb-2">حجم التداول اليومي</p>
-            <h3 className="text-4xl font-extrabold text-white">1.2M ¢</h3>
-            <p className="text-[#FFD700] text-xs mt-2 flex items-center gap-1"><Activity size={14}/> سيولة عالية</p>
-          </motion.div>
+        <div className="grid grid-cols-1 md:grid-cols-2 max-w-4xl mx-auto gap-6">
 
           {/* Top Gainer Card */}
           <motion.div 
@@ -194,9 +170,15 @@ export default function Home() {
                 <p className="text-gray-400 text-xs">السعر الحالي</p>
                 <p className="text-2xl font-mono font-bold text-white">{topGainer?.current_price || '0.00'} ¢</p>
               </div>
-              <div className="bg-green-500/20 text-green-400 px-3 py-1 rounded-full text-sm font-bold flex items-center gap-1">
-                +{topGainer?.change || '0'}%
-              </div>
+              {topGainer?.change === 0 ? (
+                <div className="bg-gray-500/20 text-gray-400 px-3 py-1 rounded-full text-sm font-bold flex items-center gap-1">
+                  سعر افتتاحي
+                </div>
+              ) : (
+                <div className="bg-green-500/20 text-green-400 px-3 py-1 rounded-full text-sm font-bold flex items-center gap-1">
+                  +{topGainer?.change}%
+                </div>
+              )}
             </div>
           </motion.div>
 
@@ -220,9 +202,15 @@ export default function Home() {
                 <p className="text-gray-400 text-xs">السعر الحالي</p>
                 <p className="text-2xl font-mono font-bold text-white">{topLoser?.current_price || '0.00'} ¢</p>
               </div>
-              <div className="bg-red-500/20 text-red-400 px-3 py-1 rounded-full text-sm font-bold flex items-center gap-1">
-                {topLoser?.change || '0'}%
-              </div>
+              {topLoser?.change === 0 ? (
+                <div className="bg-gray-500/20 text-gray-400 px-3 py-1 rounded-full text-sm font-bold flex items-center gap-1">
+                  سعر افتتاحي
+                </div>
+              ) : (
+                <div className="bg-red-500/20 text-red-400 px-3 py-1 rounded-full text-sm font-bold flex items-center gap-1">
+                  {topLoser?.change}%
+                </div>
+              )}
             </div>
           </motion.div>
         </div>
@@ -260,8 +248,9 @@ export default function Home() {
               transition={{ delay: i * 0.1 }}
               className="relative z-10 flex flex-col items-center text-center"
             >
-              <div className="w-24 h-24 rounded-full bg-[#111] border-4 border-[#0FF0FC]/20 flex items-center justify-center text-3xl font-black text-white mb-6 shadow-[0_0_30px_rgba(15,240,252,0.1)] group hover:border-[#0FF0FC] transition-colors duration-500">
-                <span className="text-transparent bg-clip-text bg-gradient-to-b from-white to-gray-500">{step.num}</span>
+              <div className="w-24 h-24 rounded-full bg-[#111] border-4 border-[#0FF0FC]/20 flex flex-col items-center justify-center text-3xl font-black text-white mb-6 shadow-[0_0_30px_rgba(15,240,252,0.1)] group hover:border-[#0FF0FC] hover:bg-[#0FF0FC]/10 transition-all duration-500 relative overflow-hidden">
+                {step.icon}
+                <span className="text-xs text-transparent bg-clip-text bg-gradient-to-b from-white to-gray-500 font-mono tracking-widest">{step.num}</span>
               </div>
               <h3 className="text-2xl font-bold mb-3">{step.title}</h3>
               <p className="text-gray-400 leading-relaxed">{step.desc}</p>
