@@ -229,7 +229,7 @@ async function main() {
 
     // Team price and score calculation
     // Calculate squad price using top 11
-    const squadForPricing = processedPlayers.map(p => ({
+    const squadForPricing = processedPlayers.map((p: any) => ({
       current_price: p.price,
       score: p.score
     }));
