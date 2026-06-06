@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { Navbar } from '@/components/ui/Navbar';
 import { Trophy, TrendingUp, Medal, Calendar, CalendarDays, CalendarCheck, Crown } from 'lucide-react';
 import { useSession } from 'next-auth/react';
+import { PageHeader } from '@/components/ui/PageHeader';
 
 type Timeframe = 'daily' | 'weekly' | 'monthly' | 'all-time';
 
@@ -37,15 +38,13 @@ export default function LeaderboardClient() {
       <Navbar />
 
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="text-center mb-12 relative">
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-accent/10 rounded-full blur-3xl -z-10"></div>
-          <h1 className="text-5xl font-extrabold mb-4 flex items-center justify-center gap-4 text-transparent bg-clip-text bg-gradient-to-r from-accent to-[#FFA500]">
-            <Trophy className="text-accent" size={48} />
-            ترتيب المستثمرين
-            <Trophy className="text-accent" size={48} />
-          </h1>
-          <p className="text-gray-400 text-lg">أفضل المتداولين في بورصة المونديال</p>
-        </div>
+        <PageHeader 
+          title="ترتيب المستثمرين"
+          description="أفضل المتداولين في بورصة المونديال"
+          icon={<Trophy size={48} />}
+          glowColor="bg-accent/10"
+          textColor="text-accent"
+        />
 
         {/* Timeframe Selector */}
         <div className="flex flex-wrap justify-center gap-4 mb-10">

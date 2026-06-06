@@ -9,6 +9,7 @@ import { TeamRosterDrawer } from '@/components/ui/TeamRosterDrawer';
 import { LineChart, Line, ResponsiveContainer, YAxis, Tooltip, XAxis, Area, AreaChart } from 'recharts';
 import { AssetImage } from '@/components/ui/AssetImage';
 import { StockCard } from '@/components/ui/StockCard';
+import { PageHeader } from '@/components/ui/PageHeader';
 
 export default function MarketClient() {
   const { assets, fetchAssets } = useStore();
@@ -53,17 +54,13 @@ export default function MarketClient() {
 
       <main className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
         
-        {/* Page Header */}
-        <div className="mb-10">
-          <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight text-white mb-4">
-            سوق كأس العالم <span className="text-primary">2026</span>
-          </h1>
-          <p className="text-xl text-gray-400 max-w-3xl mb-8 leading-loose">
-            استكشف 48 منتخبًا مشاركًا وقوائمهم النهائية، وقارن بين قوة المنتخبات وجودة اللاعبين وحركة السوق في مكان واحد.
-          </p>
-          
-
-        </div>
+        <PageHeader 
+          title="سوق كأس العالم 2026"
+          description="استكشف 48 منتخبًا مشاركًا وقوائمهم النهائية، وقارن بين قوة المنتخبات وجودة اللاعبين وحركة السوق في مكان واحد."
+          icon={<Globe size={48} />}
+          glowColor="bg-primary/10"
+          textColor="text-primary"
+        />
 
         {/* Live Top Info Bar (Ticker style) */}
         <div className="bg-surface border border-white/5 rounded-xl p-4 mb-8 flex flex-wrap gap-4 justify-between items-center text-sm shadow-card">

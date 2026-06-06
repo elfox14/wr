@@ -3,6 +3,8 @@
 import React, { useEffect } from 'react';
 import { useStore } from '@/lib/store';
 import { Navbar } from '@/components/ui/Navbar';
+import { PageHeader } from '@/components/ui/PageHeader';
+import { CalendarDays } from 'lucide-react';
 import Link from 'next/link';
 
 export default function MatchesPage() {
@@ -13,13 +15,17 @@ export default function MatchesPage() {
   }, [fetchMatches]);
 
   return (
-    <div className="min-h-screen bg-[#121212] text-white pb-20">
+    <div className="min-h-screen bg-background text-foreground pb-20 selection:bg-primary/30">
       <Navbar />
 
       <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <h1 className="text-4xl font-extrabold mb-10 text-center bg-clip-text text-transparent bg-gradient-to-r from-[#FFD700] to-[#0FF0FC]">
-          جدول المباريات
-        </h1>
+        <PageHeader 
+          title="جدول المباريات"
+          description="تابع توقيت المباريات ونتائجها وتأثيرها على حركة السوق."
+          icon={<CalendarDays size={48} />}
+          glowColor="bg-accent/10"
+          textColor="text-accent"
+        />
 
         <div className="space-y-6">
           {matches.length === 0 ? (
@@ -29,7 +35,7 @@ export default function MatchesPage() {
               const d = new Date(match.matchDate);
               const isLive = match.status === 'LIVE';
               return (
-                <div key={match.id} className={`bg-[#1A1A1A] border ${isLive ? 'border-red-500 shadow-[0_0_15px_rgba(239,68,68,0.3)]' : 'border-white/10'} rounded-2xl p-6 relative overflow-hidden`}>
+                <div key={match.id} className={`bg-surface shadow-card border ${isLive ? 'border-red-500 shadow-[0_0_15px_rgba(239,68,68,0.3)]' : 'border-white/5 hover:shadow-card-hover transition-shadow'} rounded-2xl p-6 relative overflow-hidden`}>
                   
                   {isLive && (
                     <div className="absolute top-0 right-0 bg-red-600 text-white text-xs font-bold px-3 py-1 rounded-bl-lg animate-pulse">

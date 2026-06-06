@@ -20,12 +20,23 @@ interface StockCardProps {
   fifaRank?: number;
   onClick?: () => void;
   variant?: 'default' | 'hot' | 'cold';
+  // Portfolio Specific Props
+  holding?: {
+    quantity: number;
+    avg_buy_price: number;
+    positionType?: string;
+    profitLoss?: number;
+    profitLossPercent?: number;
+  };
+  isCaptain?: boolean;
+  onMakeCaptain?: (assetId: string) => void;
 }
 
 export function StockCard({
   type, name, code, image, score, price, change,
   volume, marketCap, priceHistory = [], position, fifaRank,
-  onClick, variant = 'default'
+  onClick, variant = 'default',
+  holding, isCaptain, onMakeCaptain
 }: StockCardProps) {
   const isPositive = change >= 0;
   const isTeam = type === 'TEAM';
@@ -36,26 +47,41 @@ export function StockCard({
     ? '#3B82F6'
     : isTeam ? '#0FF0FC' : '#FFD700';
 
+  const isShort = holding?.positionType === 'SHORT';
+  const cardBorderColor = isShort ? 'border-red-500/30' : 'border-white/10';
+
   return (
     <motion.div
       whileHover={{ y: -6, boxShadow: `0 20px 40px ${accentColor}30` }}
       whileTap={{ scale: 0.98 }}
       onClick={onClick}
-      className="relative bg-[#111827] border border-white/10 rounded-2xl overflow-hidden cursor-pointer w-full transition-all duration-300"
+      className={`relative bg-[#111827] border ${cardBorderColor} rounded-2xl overflow-hidden cursor-pointer w-full transition-all duration-300`}
       style={{ boxShadow: `0 4px 20px rgba(0,0,0,0.4)` }}
     >
       {/* شريط علوي ملون */}
       <div className="h-1 w-full" style={{ backgroundColor: accentColor }} />
 
       {/* Badge نوع الأصل */}
-      <div className="absolute top-3 left-3 z-10">
+      <div className="absolute top-3 left-3 z-10 flex gap-2">
         <span
           className="text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider backdrop-blur-md"
           style={{ backgroundColor: `${accentColor}20`, color: accentColor, border: `1px solid ${accentColor}40` }}
         >
           {isTeam ? 'منتخب' : position || 'لاعب'}
         </span>
+        {holding && (
+          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider backdrop-blur-md ${isShort ? 'bg-red-500/20 text-red-400 border border-red-500/40' : 'bg-green-500/20 text-green-400 border border-green-500/40'}`}>
+            {holding.quantity} سهم ({holding.positionType || 'LONG'})
+          </span>
+        )}
       </div>
+
+      {/* Captain Badge */}
+      {isCaptain && (
+        <div className="absolute top-1 right-2 text-2xl drop-shadow-[0_0_8px_rgba(255,215,0,0.8)] z-10" title="كابتن المحفظة">
+          👑
+        </div>
+      )}
 
       {/* Trending badge */}
       {variant === 'hot' && (
@@ -101,25 +127,37 @@ export function StockCard({
           </div>
         )}
 
-        {/* السعر */}
+        {/* السعر والربح للمحفظة إن وجدت */}
         <div className="flex justify-between items-end mb-3 mt-auto">
           <div>
-            <div className="text-white/40 text-[10px] mb-0.5">السعر الحالي</div>
+            <div className="text-white/40 text-[10px] mb-0.5">{holding ? 'إجمالي القيمة' : 'السعر الحالي'}</div>
             <div className="text-white font-black text-xl flex items-baseline gap-1">
-              {price?.toLocaleString() || '0'}
+              {holding ? (price * holding.quantity).toLocaleString() : price?.toLocaleString() || '0'}
               <span className="text-white/40 text-xs font-normal"> ¢</span>
             </div>
           </div>
-          <div
-            className={`flex items-center gap-1 px-3 py-1.5 rounded-xl font-bold text-sm ${
-              isPositive
+          
+          {holding ? (
+            <div className={`flex items-center gap-1 px-3 py-1.5 rounded-xl font-bold text-sm ${
+              (holding.profitLoss || 0) >= 0
                 ? 'bg-green-500/15 text-green-400 border border-green-500/30'
                 : 'bg-red-500/15 text-red-400 border border-red-500/30'
-            }`}
-          >
-            {isPositive ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
-            {isPositive ? '+' : ''}{change || 0}%
-          </div>
+            }`}>
+              {(holding.profitLoss || 0) >= 0 ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
+              {(holding.profitLoss || 0) >= 0 ? '+' : ''}{Math.abs(holding.profitLossPercent || 0).toFixed(1)}%
+            </div>
+          ) : (
+            <div
+              className={`flex items-center gap-1 px-3 py-1.5 rounded-xl font-bold text-sm ${
+                isPositive
+                  ? 'bg-green-500/15 text-green-400 border border-green-500/30'
+                  : 'bg-red-500/15 text-red-400 border border-red-500/30'
+              }`}
+            >
+              {isPositive ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
+              {isPositive ? '+' : ''}{change || 0}%
+            </div>
+          )}
         </div>
 
         {/* Volume & Market Cap */}

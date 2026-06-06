@@ -5,7 +5,8 @@ import Link from 'next/link';
 import { useStore } from '@/lib/store';
 import { Navbar } from '@/components/ui/Navbar';
 import { Wallet, TrendingUp, TrendingDown, Briefcase, Trophy, ArrowLeft } from 'lucide-react';
-import { TradingCard } from '@/components/ui/TradingCard';
+import { StockCard } from '@/components/ui/StockCard';
+import { PageHeader } from '@/components/ui/PageHeader';
 import { PortfolioCharts } from '@/components/portfolio/PortfolioCharts';
 import { TransactionHistory } from '@/components/portfolio/TransactionHistory';
 import { AchievementsList } from '@/components/portfolio/AchievementsList';
@@ -28,14 +29,17 @@ export default function PortfolioPage() {
       <Navbar />
       
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
-          <h1 className="text-3xl font-bold text-accent flex items-center gap-3">
-            <Briefcase size={28} /> محفظتك الاستثمارية
-          </h1>
-          <Link href="/leagues" className="bg-surface border border-primary/30 hover:bg-primary/10 text-primary px-6 py-2 rounded-xl flex items-center gap-2 font-bold transition-all shadow-sm">
-            <Trophy size={20} /> دوريات التحدي الخاصة بي <ArrowLeft size={16} />
+        <PageHeader 
+          title="محفظتك الاستثمارية"
+          description="راقب أداء أصولك، وحلل أرباحك، وقم بإدارة استثماراتك في كأس العالم."
+          icon={<Briefcase size={48} />}
+          glowColor="bg-accent/10"
+          textColor="text-accent"
+        >
+          <Link href="/leagues" className="bg-surface border border-primary/30 hover:bg-primary/10 text-primary px-6 py-2.5 rounded-xl flex items-center gap-2 font-bold transition-all shadow-sm w-full md:w-auto justify-center">
+            <Trophy size={18} /> دوريات التحدي <ArrowLeft size={16} />
           </Link>
-        </div>
+        </PageHeader>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
           <div className="bg-surface p-6 rounded-2xl border border-white/5 shadow-card hover:shadow-card-hover transition-shadow">
@@ -75,19 +79,28 @@ export default function PortfolioPage() {
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
               {holdings.map(h => (
-                <TradingCard 
-                  key={h.id} 
-                  asset={h.asset!} 
-                  holding={{
-                    quantity: h.quantity,
-                    avg_buy_price: h.avg_buy_price,
-                    positionType: h.positionType,
-                    profitLoss: h.profitLoss,
-                    profitLossPercent: h.profitLossPercent
-                  }}
-                  isCaptain={captainId === h.asset!.id}
-                  onMakeCaptain={setCaptain}
-                />
+                <div key={h.id} className="relative">
+                  <StockCard 
+                    type={h.asset!.type as 'TEAM' | 'PLAYER'}
+                    name={h.asset!.name}
+                    code={h.asset!.code}
+                    image={h.asset!.image}
+                    score={h.asset!.score || 0}
+                    price={h.asset!.current_price}
+                    change={h.asset!.change}
+                    position={h.asset!.position || undefined}
+                    fifaRank={h.asset!.fifaRank || undefined}
+                    holding={{
+                      quantity: h.quantity,
+                      avg_buy_price: h.avg_buy_price,
+                      positionType: h.positionType,
+                      profitLoss: h.profitLoss,
+                      profitLossPercent: h.profitLossPercent
+                    }}
+                    isCaptain={captainId === h.asset!.id}
+                    onMakeCaptain={setCaptain}
+                  />
+                </div>
               ))}
             </div>
           )}

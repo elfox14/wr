@@ -5,6 +5,8 @@ import { useStore } from '@/lib/store';
 import { Gift, Video, Users, Calendar, AlertCircle, Copy, CheckCircle2 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
+import { Navbar } from '@/components/ui/Navbar';
+import { PageHeader } from '@/components/ui/PageHeader';
 
 export default function RewardsPage() {
   const { data: session, status } = useSession();
@@ -145,20 +147,24 @@ export default function RewardsPage() {
   const weeklyStatus = checkCooldown(userStats.lastWeeklyReward, 168);
 
   return (
-    <div className="max-w-5xl mx-auto p-4 sm:p-6 lg:p-8">
-      <div className="mb-8 text-center">
-        <h1 className="text-3xl font-bold text-white mb-2 flex items-center justify-center gap-2">
-          <Gift className="text-[#FFD700]" /> مركز المكافآت
-        </h1>
-        <p className="text-gray-400">احصل على كوينز مجانية لزيادة محفظتك الاستثمارية</p>
-      </div>
+    <div className="min-h-screen bg-background text-foreground pb-20 selection:bg-primary/30">
+      <Navbar />
+      
+      <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <PageHeader 
+          title="مركز المكافآت"
+          description="احصل على كوينز مجانية لزيادة محفظتك الاستثمارية"
+          icon={<Gift size={48} />}
+          glowColor="bg-[#FFD700]/10"
+          textColor="text-[#FFD700]"
+        />
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        
-        {/* Watch Ad */}
-        <div className="bg-[#1A1A1A] border border-white/10 p-6 rounded-2xl relative overflow-hidden group">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-[#0FF0FC]/10 rounded-full blur-3xl -mr-10 -mt-10 pointer-events-none"></div>
-          <div className="flex items-start justify-between mb-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          
+          {/* Watch Ad */}
+          <div className="bg-surface border border-white/5 shadow-card hover:shadow-card-hover p-6 rounded-2xl relative overflow-hidden group transition-shadow">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-[#0FF0FC]/10 rounded-full blur-3xl -mr-10 -mt-10 pointer-events-none"></div>
+            <div className="flex items-start justify-between mb-4">
             <div className="flex items-center gap-3">
               <div className="bg-[#0FF0FC]/20 p-3 rounded-lg text-[#0FF0FC]">
                 <Video size={24} />
@@ -179,10 +185,10 @@ export default function RewardsPage() {
           </button>
         </div>
 
-        {/* Daily Reward */}
-        <div className="bg-[#1A1A1A] border border-white/10 p-6 rounded-2xl relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-[#FFD700]/10 rounded-full blur-3xl -mr-10 -mt-10 pointer-events-none"></div>
-          <div className="flex items-start justify-between mb-4">
+          {/* Daily Reward */}
+          <div className="bg-surface border border-white/5 shadow-card hover:shadow-card-hover p-6 rounded-2xl relative overflow-hidden transition-shadow">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-[#FFD700]/10 rounded-full blur-3xl -mr-10 -mt-10 pointer-events-none"></div>
+            <div className="flex items-start justify-between mb-4">
             <div className="flex items-center gap-3">
               <div className="bg-[#FFD700]/20 p-3 rounded-lg text-[#FFD700]">
                 <Calendar size={24} />
@@ -209,10 +215,10 @@ export default function RewardsPage() {
           )}
         </div>
 
-        {/* Weekly Reward */}
-        <div className="bg-[#1A1A1A] border border-white/10 p-6 rounded-2xl relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-[#FF0055]/10 rounded-full blur-3xl -mr-10 -mt-10 pointer-events-none"></div>
-          <div className="flex items-start justify-between mb-4">
+          {/* Weekly Reward */}
+          <div className="bg-surface border border-white/5 shadow-card hover:shadow-card-hover p-6 rounded-2xl relative overflow-hidden transition-shadow">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-[#FF0055]/10 rounded-full blur-3xl -mr-10 -mt-10 pointer-events-none"></div>
+            <div className="flex items-start justify-between mb-4">
             <div className="flex items-center gap-3">
               <div className="bg-[#FF0055]/20 p-3 rounded-lg text-[#FF0055]">
                 <Gift size={24} />
@@ -239,10 +245,10 @@ export default function RewardsPage() {
           )}
         </div>
 
-        {/* Referrals */}
-        <div className="bg-[#1A1A1A] border border-white/10 p-6 rounded-2xl relative overflow-hidden md:col-span-2">
-          <div className="absolute top-0 left-0 w-48 h-48 bg-[#9D00FF]/10 rounded-full blur-3xl -ml-10 -mt-10 pointer-events-none"></div>
-          <div className="flex items-start justify-between mb-6">
+          {/* Referrals */}
+          <div className="bg-surface border border-white/5 shadow-card hover:shadow-card-hover p-6 rounded-2xl relative overflow-hidden md:col-span-2 transition-shadow">
+            <div className="absolute top-0 left-0 w-48 h-48 bg-[#9D00FF]/10 rounded-full blur-3xl -ml-10 -mt-10 pointer-events-none"></div>
+            <div className="flex items-start justify-between mb-6">
             <div className="flex items-center gap-3">
               <div className="bg-[#9D00FF]/20 p-3 rounded-lg text-[#9D00FF]">
                 <Users size={24} />
@@ -303,9 +309,11 @@ export default function RewardsPage() {
             </div>
           </div>
 
+          </div>
+
         </div>
 
-      </div>
+      </main>
     </div>
   );
 }

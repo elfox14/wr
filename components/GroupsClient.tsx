@@ -3,9 +3,10 @@
 import React, { useEffect, useState } from 'react';
 import { Navbar } from '@/components/ui/Navbar';
 import { useStore, Asset } from '@/lib/store';
-import { Layers } from 'lucide-react';
+import { Users, LayoutGrid } from 'lucide-react';
 import Link from 'next/link';
 import { StockCard } from '@/components/ui/StockCard';
+import { PageHeader } from '@/components/ui/PageHeader';
 
 export default function GroupsClient() {
   const { assets, fetchAssets } = useStore();
@@ -43,14 +44,13 @@ export default function GroupsClient() {
       <Navbar />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="text-center mb-12 relative">
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-[#0FF0FC]/10 rounded-full blur-3xl -z-10"></div>
-          <h1 className="text-5xl font-extrabold mb-4 flex items-center justify-center gap-4 text-transparent bg-clip-text bg-gradient-to-r from-[#0FF0FC] to-[#00B4DB]">
-            <Layers className="text-[#0FF0FC]" size={48} />
-            مجموعات البطولة
-          </h1>
-          <p className="text-gray-400 text-lg">استعرض المنتخبات المشاركة مقسمة حسب مجموعات كأس العالم</p>
-        </div>
+        <PageHeader 
+          title="المجموعات والتصفيات"
+          description="تتبع أداء المنتخبات في دور المجموعات، من سيتأهل ومن سيغادر مبكراً؟"
+          icon={<LayoutGrid size={48} />}
+          glowColor="bg-primary/10"
+          textColor="text-primary"
+        />
 
         {sortedGroupKeys.length === 0 ? (
           <div className="text-center py-12 bg-[#1A1A1A] rounded-2xl border border-white/5">
