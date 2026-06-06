@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { useStore } from '@/lib/store';
 import { TrendingUp, TrendingDown, Users, Activity, Trophy, PlayCircle, ShieldCheck, Zap, Globe, ChevronDown, ChevronUp } from 'lucide-react';
 import { Navbar } from '@/components/ui/Navbar';
+import { getAllArticles } from '@/lib/articles';
+import Image from 'next/image';
 
 export default function Home() {
   const { assets, fetchAssets } = useStore();
@@ -17,6 +19,8 @@ export default function Home() {
   const sortedAssets = [...assets].sort((a, b) => b.change - a.change);
   const topGainer = sortedAssets[0];
   const topLoser = sortedAssets[sortedAssets.length - 1];
+
+  const blogArticles = getAllArticles();
 
   const features = [
     {
@@ -191,6 +195,54 @@ export default function Home() {
                   </div>
                 )}
               </React.Fragment>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Market Insights (Blog) Section - AdSense Friendly */}
+      <section className="py-24 relative z-10 bg-black/20 border-y border-white/5">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl md:text-5xl font-bold mb-4">تحليلات وخبراء السوق</h2>
+            <div className="w-24 h-1 bg-[#0FF0FC] mx-auto rounded-full mb-4"></div>
+            <p className="text-gray-400 max-w-2xl mx-auto">مقالات حصرية ونظرة تحليلية معمقة لمساعدتك في اتخاذ أفضل قرارات التداول في كأس العالم.</p>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {blogArticles.map((article) => (
+              <Link href={`/article/${article.id}`} key={article.id} className="group flex flex-col h-full bg-[#1A1A1A] rounded-3xl border border-white/5 overflow-hidden hover:border-[#0FF0FC]/50 transition-all hover:-translate-y-2 shadow-lg">
+                <div className="h-48 w-full relative overflow-hidden">
+                  <div className="absolute inset-0 bg-black/20 group-hover:bg-transparent transition-all z-10" />
+                  {/* Using standard img for external URL simplicity */}
+                  <img 
+                    src={article.imageUrl} 
+                    alt={article.title} 
+                    className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-700"
+                  />
+                  <div className="absolute top-4 right-4 z-20">
+                    <span className="bg-black/70 backdrop-blur-md text-[#0FF0FC] text-xs px-3 py-1 rounded-full font-bold border border-white/10">
+                      {article.category}
+                    </span>
+                  </div>
+                </div>
+                
+                <div className="p-6 flex flex-col flex-1">
+                  <h3 className="text-xl font-bold mb-3 text-white group-hover:text-[#0FF0FC] transition-colors line-clamp-2">
+                    {article.title}
+                  </h3>
+                  <p className="text-gray-400 text-sm mb-6 line-clamp-3 leading-relaxed flex-1">
+                    {article.excerpt}
+                  </p>
+                  
+                  <div className="flex items-center justify-between text-xs text-gray-500 mt-auto pt-4 border-t border-white/5">
+                    <span className="flex items-center gap-1">
+                      بقلم: <span className="text-gray-300 font-bold">{article.author}</span>
+                    </span>
+                    <span>{new Date(article.date).toLocaleDateString('ar-SA')}</span>
+                  </div>
+                </div>
+              </Link>
             ))}
           </div>
         </div>
