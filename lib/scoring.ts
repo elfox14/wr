@@ -105,10 +105,11 @@ export function calculateTeamPrice(team: Partial<Asset>, players: Partial<Asset>
   const pillars: PillarScores = { fundamental, popularity, marketDemand };
   const finalScore = calculateCompositeScore(pillars, true);
 
-  // Exponential Pricing Curve
-  // A score of 98 will be ~1230, 90 ~974, 80 ~714, 70 ~511, 60 ~359
-  const price = Math.round(Math.pow(finalScore / 100, 3) * 1200 + 100);
-  return price;
+  // Smooth curve: min 150 (score=0) -> max 2000 (score=100)
+  const normalized = finalScore / 100;
+  const sharePrice = 150 + Math.pow(normalized, 2.5) * 1850;
+  
+  return Math.max(150, Math.round(sharePrice));
 }
 
 // ============================================================
