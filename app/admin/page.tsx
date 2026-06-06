@@ -70,6 +70,44 @@ export default function AdminPage() {
     setTimeout(() => setNotification(''), 4000);
   };
 
+  const handleDistributeDividends = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const formData = new FormData(e.target as HTMLFormElement);
+    const assetId = formData.get('dividendAssetId');
+    const amountPerShare = formData.get('amountPerShare');
+    const reason = formData.get('reason');
+
+    if (!assetId || !amountPerShare) {
+      showNotification('الرجاء تعبئة الحقول المطلوبة', 'error');
+      return;
+    }
+
+    setLoadingAction(true);
+    try {
+      const res = await fetch('/api/admin/dividends', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          assetId,
+          amountPerShare: parseFloat(amountPerShare as string),
+          reason
+        })
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        showNotification(data.message || 'تم التوزيع بنجاح!', 'success');
+        (e.target as HTMLFormElement).reset();
+      } else {
+        showNotification(`خطأ: ${data.error}`, 'error');
+      }
+    } catch (err) {
+      showNotification('حدث خطأ أثناء التوزيع', 'error');
+    } finally {
+      setLoadingAction(false);
+    }
+  };
+
   if (status === 'loading' || !assets.length) {
     return <div className="min-h-screen bg-[#121212] text-white p-10 text-center">جاري التحميل...</div>;
   }
@@ -269,6 +307,45 @@ export default function AdminPage() {
             <div className="flex items-end">
               <button type="submit" disabled={loadingAction} className="w-full bg-[#0FF0FC] hover:bg-[#0FF0FC]/80 text-black font-bold py-3 px-4 rounded-lg transition-colors">
                 إضافة الأصل ➕
+              </button>
+            </div>
+
+          </form>
+        </div>
+
+        {/* Dividend Distribution Form */}
+        <div className="mt-8 bg-[#1A1A1A] border border-[#FFD700]/30 p-6 rounded-2xl relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-[#FFD700]/10 rounded-full blur-3xl pointer-events-none"></div>
+          <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
+            <span className="text-2xl">💰</span> توزيع أرباح نقدية (Dividends)
+          </h2>
+          <p className="text-sm text-gray-400 mb-6">سيتم دفع الأرباح لجميع المُلّاك حسب عدد أسهمهم. (سيتم مضاعفة الربح x2 لمن اختار الأصل ككابتن)</p>
+
+          <form onSubmit={handleDistributeDividends} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            
+            <div className="lg:col-span-2">
+              <label className="block text-sm text-gray-400 mb-2">الأصل الموزع للأرباح</label>
+              <select name="dividendAssetId" required className="w-full bg-black/50 border border-white/10 rounded-lg p-3 text-white outline-none focus:border-[#FFD700]">
+                <option value="" disabled selected>اختر الأصل...</option>
+                {assets.map(a => (
+                  <option key={a.id} value={a.id}>{a.image} {a.name} (السعر الحالي: {a.current_price} ¢)</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm text-gray-400 mb-2">العائد للسهم الواحد (¢)</label>
+              <input name="amountPerShare" type="number" step="0.1" placeholder="مثال: 50" required className="w-full bg-black/50 border border-white/10 rounded-lg p-3 text-white outline-none focus:border-[#FFD700]" />
+            </div>
+
+            <div className="lg:col-span-3">
+              <label className="block text-sm text-gray-400 mb-2">سبب التوزيع (سيظهر في الإشعار)</label>
+              <input name="reason" type="text" placeholder="مثال: الفوز بجائزة رجل المباراة" required className="w-full bg-black/50 border border-white/10 rounded-lg p-3 text-white outline-none focus:border-[#FFD700]" />
+            </div>
+
+            <div className="flex items-end lg:col-span-1">
+              <button type="submit" disabled={loadingAction} className="w-full bg-gradient-to-r from-[#FFD700] to-[#CD7F32] hover:opacity-90 text-black font-bold py-3 px-4 rounded-lg transition-colors shadow-[0_0_15px_rgba(255,215,0,0.3)]">
+                توزيع الأرباح 💸
               </button>
             </div>
 

@@ -21,27 +21,39 @@ export async function GET(request: Request) {
     const timeframe = searchParams.get('timeframe') || 'all-time'; // daily, weekly, monthly, all-time
 
     // Fetch real users from DB
+    // Fetch real users from DB with holdings to calculate true Net Worth
     const realUsers = await prisma.user.findMany({
       select: {
         id: true,
         name: true,
         username: true,
         total_profit: true,
+        balance: true,
         image: true,
-      },
-      orderBy: {
-        total_profit: 'desc'
-      },
-      take: 50
+        holdings: {
+          where: { quantity: { gt: 0 } },
+          select: {
+            quantity: true,
+            asset: {
+              select: { current_price: true }
+            }
+          }
+        }
+      }
     });
 
     // Map real users
     let leaderboard = realUsers.map(u => {
+      const holdingsValue = u.holdings.reduce((sum, h) => sum + (h.quantity * h.asset.current_price), 0);
+      const netWorth = u.balance + holdingsValue;
+
       // Calculate realistic fractions for smaller timeframes if they don't exist in schema
       let profit = u.total_profit;
-      if (timeframe === 'daily') profit = Math.round(profit * 0.05);
-      if (timeframe === 'weekly') profit = Math.round(profit * 0.2);
-      if (timeframe === 'monthly') profit = Math.round(profit * 0.6);
+      let displayNetWorth = netWorth;
+      
+      if (timeframe === 'daily') { profit = Math.round(profit * 0.05); displayNetWorth = Math.round(netWorth * 0.05); }
+      if (timeframe === 'weekly') { profit = Math.round(profit * 0.2); displayNetWorth = Math.round(netWorth * 0.2); }
+      if (timeframe === 'monthly') { profit = Math.round(profit * 0.6); displayNetWorth = Math.round(netWorth * 0.6); }
 
       return {
         id: u.id,
@@ -49,6 +61,7 @@ export async function GET(request: Request) {
         username: u.username || 'user',
         avatar: u.image || '👤',
         profit: profit,
+        netWorth: displayNetWorth,
         isReal: true
       };
     });
@@ -67,14 +80,15 @@ export async function GET(request: Request) {
         username: f.username,
         avatar: f.avatar,
         profit: baseProfit,
+        netWorth: baseProfit + 10000, // Simulated net worth
         isReal: false
       };
     });
 
     leaderboard = [...leaderboard, ...fakes];
 
-    // Sort by profit descending
-    leaderboard.sort((a, b) => b.profit - a.profit);
+    // Sort by Net Worth descending
+    leaderboard.sort((a, b) => b.netWorth - a.netWorth);
 
     // Limit to top 50
     leaderboard = leaderboard.slice(0, 50);

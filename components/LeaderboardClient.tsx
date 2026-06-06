@@ -14,6 +14,7 @@ interface LeaderboardUser {
   username: string;
   avatar: string;
   profit: number;
+  netWorth: number;
   isReal: boolean;
 }
 
@@ -45,6 +46,21 @@ export default function LeaderboardClient() {
           glowColor="bg-accent/10"
           textColor="text-accent"
         />
+
+        {/* Real Prizes Banner */}
+        <div className="bg-gradient-to-r from-[#FFD700]/20 to-transparent border border-[#FFD700]/30 rounded-2xl p-6 mb-8 flex items-center justify-between shadow-[0_0_20px_rgba(212,160,23,0.15)] relative overflow-hidden">
+          <div className="absolute -right-10 -top-10 text-[#FFD700] opacity-20 blur-sm pointer-events-none">
+            <Trophy size={150} />
+          </div>
+          <div className="relative z-10">
+            <h2 className="text-2xl font-bold text-[#FFD700] mb-2 flex items-center gap-2">
+              🏆 جوائز المونديال الكبرى
+            </h2>
+            <p className="text-gray-300">
+              تنافس للحصول على أعلى قيمة للمحفظة (صافي الثروة) بنهاية البطولة. أصحاب المراكز الثلاثة الأولى سيحصلون على جوائز واقعية قيمة!
+            </p>
+          </div>
+        </div>
 
         {/* Timeframe Selector */}
         <div className="flex flex-wrap justify-center gap-4 mb-10">
@@ -121,10 +137,10 @@ export default function LeaderboardClient() {
                   </div>
 
                   <div className="text-right">
-                    <p className="text-sm text-gray-400 mb-1">صافي الأرباح</p>
+                    <p className="text-sm text-gray-400 mb-1">صافي الثروة</p>
                     <p className="text-2xl font-bold text-success flex items-center justify-end gap-1 tabular-nums">
                       <TrendingUp size={20} />
-                      +{user.profit.toLocaleString()} ¢
+                      {user.netWorth?.toLocaleString() || user.profit.toLocaleString()} ¢
                     </p>
                   </div>
                 </div>
