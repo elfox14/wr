@@ -177,6 +177,17 @@ async function main() {
     const playerPrices: { current_price: number }[] = [];
     const playerScores: { score: number }[] = [];
 
+    // Calculate team score first based purely on FIFA rank
+    let teamScoreRaw = 100 - (rank * 0.9);
+    if (rank > 10) teamScoreRaw = 91 - ((rank - 10) * 0.6);
+    if (rank > 30) teamScoreRaw = 79 - ((rank - 30) * 0.4);
+    if (rank > 50) teamScoreRaw = 71 - ((rank - 50) * 0.2);
+    if (rank === 1) teamScoreRaw = 99;
+    if (rank === 2) teamScoreRaw = 98;
+    if (rank === 3) teamScoreRaw = 97;
+    const teamScore = Math.max(60, Math.min(99, Math.round(teamScoreRaw)));
+    const teamPrice = teamScore * 10;
+
     // Process players
     const processedPlayers = squad.map((p: any) => {
       const age = calcAge(p.dateOfBirth);
@@ -184,19 +195,17 @@ async function main() {
       const isStar = (p.position === 'Offence' || p.position === 'Midfield') && age >= 22 && age <= 32;
       const tier = isStar ? 0.9 : 0.7;
 
-      const assetObj = {
-        type: 'PLAYER' as const,
-        playerTier: tier,
-        globalMarketValue: isStar ? 80 : 20,
-        age,
-        popularity: isStar ? 0.85 : 0.5,
-      };
+      let playerOffset = 0;
+      if (tier >= 0.9) {
+        playerOffset = Math.floor(Math.random() * 3) + 1;
+      } else if (tier >= 0.7) {
+        playerOffset = Math.floor(Math.random() * 3) - 1;
+      } else {
+        playerOffset = Math.floor(Math.random() * 4) - 4;
+      }
 
-      const price = calculatePlayerPrice(assetObj);
-      const score = Math.round(65 + (tier * 25) + (rank <= 10 ? 10 : 0));
-
-      playerPrices.push({ current_price: price });
-      playerScores.push({ score });
+      const score = Math.max(50, Math.min(99, teamScore + playerOffset));
+      const price = Math.floor(score * 5);
 
       return {
         apiId: p.id,
@@ -210,8 +219,7 @@ async function main() {
       };
     });
 
-    const teamPrice = calculateTeamPrice(teamPartial, playerPrices);
-    const teamScore = calculateTeamStrengthIndex(teamPartial, playerScores);
+    // Team price and score already calculated
 
     // Save team
     await prisma.asset.upsert({
