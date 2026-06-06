@@ -214,7 +214,7 @@ export default function MarketClient() {
                     price={asset.current_price}
                     change={asset.change}
                     volume={asset.volume}
-                    marketCap={asset.marketCap}
+                    marketCap={asset.market_cap}
                     priceHistory={asset.priceHistory?.map((h: any) => h.price) || [asset.current_price, asset.current_price]}
                     position={asset.position || undefined}
                     fifaRank={asset.fifaRank || undefined}

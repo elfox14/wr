@@ -5,10 +5,10 @@ import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { PlusCircle } from 'lucide-react';
 import { StockCard } from '@/components/ui/StockCard';
-import { HoldingWithAsset } from '@/lib/store';
+import { Holding } from '@/lib/store';
 
 interface PitchPortfolioProps {
-  playerHoldings: HoldingWithAsset[];
+  playerHoldings: Holding[];
   captainId: string | null;
   setCaptain: (id: string) => void;
 }
