@@ -110,22 +110,27 @@ export async function POST(request: Request) {
       });
 
       // Supply & Demand Engine: Increase price by 0.05% per unit bought
-      const priceIncreaseRatio = 1 + (qty * 0.0005);
-      const newPriceBuy = Math.round(asset.current_price * priceIncreaseRatio);
+      // During IPO phase, price remains fixed.
+      const isIPOPhase = process.env.NEXT_PUBLIC_MARKET_STATE === 'IPO';
       
-      await prisma.asset.update({
-        where: { id: asset.id },
-        data: {
-          current_price: newPriceBuy,
-          high_price: Math.max(asset.high_price, newPriceBuy),
-          low_price: Math.min(asset.low_price, newPriceBuy),
-          priceHistory: {
-            create: {
-              price: newPriceBuy
+      if (!isIPOPhase) {
+        const priceIncreaseRatio = 1 + (qty * 0.0005);
+        const newPriceBuy = Math.round(asset.current_price * priceIncreaseRatio);
+        
+        await prisma.asset.update({
+          where: { id: asset.id },
+          data: {
+            current_price: newPriceBuy,
+            high_price: Math.max(asset.high_price, newPriceBuy),
+            low_price: Math.min(asset.low_price, newPriceBuy),
+            priceHistory: {
+              create: {
+                price: newPriceBuy
+              }
             }
           }
-        }
-      });
+        });
+      }
 
       // Create notification
       await prisma.notification.create({
@@ -208,22 +213,26 @@ export async function POST(request: Request) {
       });
 
       // Supply & Demand Engine: Decrease price by 0.05% per unit sold
-      const priceDecreaseRatio = 1 - (qty * 0.0005);
-      const newPriceSell = Math.max(1, Math.round(asset.current_price * priceDecreaseRatio)); // Prevent price from dropping below 1
-      
-      await prisma.asset.update({
-        where: { id: asset.id },
-        data: {
-          current_price: newPriceSell,
-          high_price: Math.max(asset.high_price, newPriceSell),
-          low_price: Math.min(asset.low_price, newPriceSell),
-          priceHistory: {
-            create: {
-              price: newPriceSell
+      const isIPOPhase = process.env.NEXT_PUBLIC_MARKET_STATE === 'IPO';
+
+      if (!isIPOPhase) {
+        const priceDecreaseRatio = 1 - (qty * 0.0005);
+        const newPriceSell = Math.max(1, Math.round(asset.current_price * priceDecreaseRatio)); // Prevent price from dropping below 1
+        
+        await prisma.asset.update({
+          where: { id: asset.id },
+          data: {
+            current_price: newPriceSell,
+            high_price: Math.max(asset.high_price, newPriceSell),
+            low_price: Math.min(asset.low_price, newPriceSell),
+            priceHistory: {
+              create: {
+                price: newPriceSell
+              }
             }
           }
-        }
-      });
+        });
+      }
 
       // Create notification
       await prisma.notification.create({
