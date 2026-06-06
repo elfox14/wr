@@ -4,6 +4,7 @@ import React from 'react';
 import { Asset } from '@/lib/store';
 import { X, TrendingUp, TrendingDown, Users, Shield, Zap, Target } from 'lucide-react';
 import Link from 'next/link';
+import { AssetImage } from './AssetImage';
 
 interface TeamRosterDrawerProps {
   team: Asset | null;
@@ -37,7 +38,7 @@ export function TeamRosterDrawer({ team, onClose }: TeamRosterDrawerProps) {
               className="bg-black/40 border border-white/5 rounded-xl p-4 flex justify-between items-center hover:border-[#0FF0FC]/50 hover:bg-[#0FF0FC]/5 transition-colors group"
             >
               <div className="flex items-center gap-3">
-                <span className="text-2xl">{player.image}</span>
+                <AssetImage image={player.image} name={player.name} type="PLAYER" width={32} height={32} className="w-8 h-8 rounded-full bg-surface object-cover" />
                 <div>
                   <div className="font-bold text-white group-hover:text-[#0FF0FC] transition-colors">{player.name}</div>
                   <div className="text-xs text-gray-500">Score: <span className="text-gray-300">{player.score || 'N/A'}</span></div>
@@ -67,7 +68,7 @@ export function TeamRosterDrawer({ team, onClose }: TeamRosterDrawerProps) {
           <div className="absolute top-0 right-0 w-32 h-32 bg-[#0FF0FC]/10 rounded-full blur-3xl pointer-events-none"></div>
           
           <div className="flex items-center gap-4 relative z-10">
-            <span className="text-5xl drop-shadow-lg">{team.image}</span>
+            <AssetImage image={team.image} name={team.name} type="TEAM" width={64} height={64} className="w-16 h-16 drop-shadow-lg" />
             <div>
               <h2 className="text-3xl font-bold text-white">{team.name} <span className="text-gray-500 text-lg">({team.code})</span></h2>
               <div className="flex gap-4 mt-2 text-sm text-gray-400">

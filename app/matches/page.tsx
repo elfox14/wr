@@ -6,6 +6,7 @@ import { Navbar } from '@/components/ui/Navbar';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { CalendarDays } from 'lucide-react';
 import Link from 'next/link';
+import { AssetImage } from '@/components/ui/AssetImage';
 
 export default function MatchesPage() {
   const { matches, fetchMatches } = useStore();
@@ -50,7 +51,7 @@ export default function MatchesPage() {
                   <div className="flex items-center justify-between max-w-2xl mx-auto">
                     {/* Home Team */}
                     <Link href={`/asset/${match.homeTeam.id}`} className="flex-1 flex flex-col items-center group">
-                      <span className="text-5xl mb-2">{match.homeTeam.image}</span>
+                      <AssetImage image={match.homeTeam.image} name={match.homeTeam.name} type="TEAM" width={64} height={64} className="w-16 h-16 mb-2 drop-shadow-md" />
                       <span className="font-bold text-lg group-hover:text-[#0FF0FC] transition-colors">{match.homeTeam.name}</span>
                       <span className="font-mono text-sm text-gray-400 mt-1">{match.homeTeam.current_price} ¢</span>
                     </Link>
@@ -71,7 +72,7 @@ export default function MatchesPage() {
 
                     {/* Away Team */}
                     <Link href={`/asset/${match.awayTeam.id}`} className="flex-1 flex flex-col items-center group">
-                      <span className="text-5xl mb-2">{match.awayTeam.image}</span>
+                      <AssetImage image={match.awayTeam.image} name={match.awayTeam.name} type="TEAM" width={64} height={64} className="w-16 h-16 mb-2 drop-shadow-md" />
                       <span className="font-bold text-lg group-hover:text-[#0FF0FC] transition-colors">{match.awayTeam.name}</span>
                       <span className="font-mono text-sm text-gray-400 mt-1">{match.awayTeam.current_price} ¢</span>
                     </Link>

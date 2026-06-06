@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { Navbar } from '@/components/ui/Navbar';
 import { getAllArticles } from '@/lib/articles';
+import { AssetImage } from '@/components/ui/AssetImage';
 
 export default function HomeClient({ initialAssets }: { initialAssets: any[] }) {
   // Sync the server-fetched assets into our global store silently if needed,
@@ -31,13 +32,8 @@ export default function HomeClient({ initialAssets }: { initialAssets: any[] }) 
   ];
 
   const renderAvatar = (asset: any) => {
-    if (asset?.image && asset.image.trim() !== '') return <span className="text-2xl">{asset.image}</span>;
-    if (asset?.name) return (
-      <div className="w-10 h-10 rounded-full bg-primary/20 text-primary flex items-center justify-center font-bold text-lg border border-primary/30 shrink-0">
-        {asset.name.charAt(0)}
-      </div>
-    );
-    return <span className="text-2xl">⚽</span>;
+    if (!asset) return <span className="text-2xl">⚽</span>;
+    return <AssetImage image={asset.image} name={asset.name} type={asset.type} width={40} height={40} className="w-10 h-10 rounded-full bg-surface object-cover shrink-0" />;
   };
 
   return (
