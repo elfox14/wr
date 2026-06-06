@@ -1,5 +1,5 @@
 import { PrismaClient } from '@prisma/client';
-import { calculatePlayerPrice, calculateTeamPrice, calculateTeamStrengthIndex } from '../lib/scoring';
+import { calculatePlayerPrice, calculateTeamPrice } from '../lib/scoring';
 
 const prisma = new PrismaClient();
 
@@ -33,7 +33,7 @@ async function main() {
 
   const arTeamPartial = { type: 'TEAM', fifaRank: 1, participations: 18, popularity: 0.9, harmony: 0.95, injuries: 0 };
   const arTeamPrice = calculateTeamPrice(arTeamPartial, arPlayers.map(p => ({ current_price: p.price })));
-  const arTeamIndex = calculateTeamStrengthIndex(arTeamPartial, arPlayers.map(p => ({ score: p.score })));
+  const arTeamIndex = 85;
 
   // 1. Argentina Team
   const argentina = await prisma.asset.upsert({
@@ -137,7 +137,7 @@ async function main() {
 
   const frTeamPartial = { type: 'TEAM', fifaRank: 2, participations: 16, popularity: 0.85, harmony: 0.8, injuries: 1 };
   const frTeamPrice = calculateTeamPrice(frTeamPartial, frPlayers.map(p => ({ current_price: p.price })));
-  const frTeamIndex = calculateTeamStrengthIndex(frTeamPartial, frPlayers.map(p => ({ score: p.score })));
+  const frTeamIndex = 95;
 
   const france = await prisma.asset.upsert({
     where: { id: 'team-fr' },

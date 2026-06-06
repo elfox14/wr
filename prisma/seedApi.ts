@@ -1,5 +1,5 @@
 import { PrismaClient } from '@prisma/client';
-import { calculatePlayerPrice, calculateTeamPrice, calculateTeamStrengthIndex } from '../lib/scoring';
+import { calculatePlayerPrice, calculateTeamPrice } from '../lib/scoring';
 
 const prisma = new PrismaClient();
 
