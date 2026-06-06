@@ -8,7 +8,7 @@ import { TrendingUp, TrendingDown, ArrowRight, Search, Filter, LayoutGrid, List,
 import { TeamRosterDrawer } from '@/components/ui/TeamRosterDrawer';
 import { LineChart, Line, ResponsiveContainer, YAxis, Tooltip, XAxis, Area, AreaChart } from 'recharts';
 import { AssetImage } from '@/components/ui/AssetImage';
-import { TradingCard } from '@/components/ui/TradingCard';
+import { StockCard } from '@/components/ui/StockCard';
 
 export default function MarketClient() {
   const { assets, fetchAssets } = useStore();
@@ -190,13 +190,37 @@ export default function MarketClient() {
           </div>
         ) : viewMode === 'GRID' ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-            {filteredAssets.map(asset => (
-              <TradingCard 
-                key={asset.id} 
-                asset={asset} 
-                onViewRoster={asset.type === 'TEAM' ? setSelectedTeam : undefined} 
-              />
-            ))}
+            {filteredAssets.map(asset => {
+              // Determine variant based on change
+              let variant: 'default' | 'hot' | 'cold' = 'default';
+              if (asset.change >= 5) variant = 'hot';
+              else if (asset.change <= -5) variant = 'cold';
+
+              return (
+                <div key={asset.id} className="flex justify-center">
+                  <StockCard 
+                    type={asset.type as 'TEAM' | 'PLAYER'}
+                    name={asset.name}
+                    code={asset.code}
+                    image={asset.image}
+                    score={asset.score || 0}
+                    price={asset.current_price}
+                    change={asset.change}
+                    position={asset.position || undefined}
+                    fifaRank={asset.fifaRank || undefined}
+                    priceHistory={asset.priceHistory?.map((h: any) => h.price) || [asset.current_price, asset.current_price]}
+                    onClick={() => {
+                      if (asset.type === 'TEAM') {
+                        setSelectedTeam(asset);
+                      } else {
+                        window.location.href = `/asset/${asset.id}`;
+                      }
+                    }}
+                    variant={variant}
+                  />
+                </div>
+              );
+            })}
           </div>
         ) : (
           <div className="bg-surface border border-white/10 rounded-2xl overflow-x-auto shadow-card">

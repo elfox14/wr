@@ -5,7 +5,7 @@ import { Navbar } from '@/components/ui/Navbar';
 import { useStore, Asset } from '@/lib/store';
 import { Layers } from 'lucide-react';
 import Link from 'next/link';
-import { TradingCard } from '@/components/ui/TradingCard';
+import { StockCard } from '@/components/ui/StockCard';
 
 export default function GroupsClient() {
   const { assets, fetchAssets } = useStore();
@@ -70,9 +70,31 @@ export default function GroupsClient() {
                   </h2>
                   
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                    {groupTeams.map(team => (
-                      <TradingCard key={team.id} asset={team} />
-                    ))}
+                    {groupTeams.map(team => {
+                      let variant: 'default' | 'hot' | 'cold' = 'default';
+                      if (team.change >= 5) variant = 'hot';
+                      else if (team.change <= -5) variant = 'cold';
+                      
+                      return (
+                        <div key={team.id} className="flex justify-center">
+                          <StockCard 
+                            type={team.type as 'TEAM' | 'PLAYER'}
+                            name={team.name}
+                            code={team.code}
+                            image={team.image}
+                            score={team.score || 0}
+                            price={team.current_price}
+                            change={team.change}
+                            fifaRank={team.fifaRank || undefined}
+                            priceHistory={team.priceHistory?.map((h: any) => h.price) || [team.current_price, team.current_price]}
+                            onClick={() => {
+                              window.location.href = `/asset/${team.id}`;
+                            }}
+                            variant={variant}
+                          />
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               );
