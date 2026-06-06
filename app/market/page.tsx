@@ -14,17 +14,8 @@ export default function MarketPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState<'GRID' | 'TABLE'>('GRID');
   const [selectedTeam, setSelectedTeam] = useState<Asset | null>(null);
-  const [marketNews, setMarketNews] = useState<any[]>([]);
-
   useEffect(() => {
     fetchAssets();
-    // Fetch Market News
-    fetch('/api/market-news?limit=5')
-      .then(res => res.json())
-      .then(data => {
-        if (Array.isArray(data)) setMarketNews(data);
-      })
-      .catch(console.error);
   }, [fetchAssets]);
 
   // Derived Stats for Overview
@@ -69,28 +60,7 @@ export default function MarketPage() {
             استكشف 48 منتخبًا مشاركًا وقوائمهم النهائية، وقارن بين قوة المنتخبات وجودة اللاعبين وحركة السوق في مكان واحد.
           </p>
           
-          {/* Market News Ticker */}
-          {marketNews.length > 0 && (
-            <div className="bg-surface border border-primary/20 rounded-xl overflow-hidden flex shadow-card">
-              <div className="bg-primary/10 text-primary px-4 py-3 font-bold flex items-center gap-2 whitespace-nowrap shrink-0 border-l border-primary/20">
-                <Zap size={18} className="animate-pulse" />
-                أخبار السوق
-              </div>
-              <div className="flex-1 overflow-hidden relative flex items-center">
-                <div className="animate-marquee whitespace-nowrap flex gap-10 px-4">
-                  {marketNews.map(news => (
-                    <div key={news.id} className="flex items-center gap-3 text-sm">
-                      <span className="text-xl">{news.asset.image}</span>
-                      <span className="font-bold text-white">{news.title || news.titleAr}</span>
-                      <span className={`font-mono text-xs px-2 py-0.5 rounded font-bold tabular-nums ${news.changePercent >= 0 ? 'bg-success/20 text-success' : 'bg-danger/20 text-danger'}`}>
-                        {news.changePercent >= 0 ? '+' : ''}{news.changePercent}%
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
+
         </div>
 
         {/* Live Top Info Bar (Ticker style) */}
