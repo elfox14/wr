@@ -52,7 +52,7 @@ export default function MarketPage() {
   });
 
   return (
-    <div className="min-h-screen bg-[#121212] text-white selection:bg-[#0FF0FC]/30">
+    <div className="min-h-screen bg-background text-foreground selection:bg-primary/30">
       <Navbar />
       
       {/* Drawer */}
@@ -63,16 +63,16 @@ export default function MarketPage() {
         {/* Page Header */}
         <div className="mb-10">
           <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight text-white mb-4">
-            سوق كأس العالم <span className="text-[#0FF0FC]">2026</span>
+            سوق كأس العالم <span className="text-primary">2026</span>
           </h1>
-          <p className="text-xl text-gray-400 max-w-3xl mb-8">
+          <p className="text-xl text-gray-400 max-w-3xl mb-8 leading-loose">
             استكشف 48 منتخبًا مشاركًا وقوائمهم النهائية، وقارن بين قوة المنتخبات وجودة اللاعبين وحركة السوق في مكان واحد.
           </p>
           
           {/* Market News Ticker */}
           {marketNews.length > 0 && (
-            <div className="bg-[#1A1A1A] border border-[#0FF0FC]/20 rounded-xl overflow-hidden flex shadow-[0_0_15px_rgba(15,240,252,0.1)]">
-              <div className="bg-[#0FF0FC]/10 text-[#0FF0FC] px-4 py-3 font-bold flex items-center gap-2 whitespace-nowrap shrink-0 border-l border-[#0FF0FC]/20">
+            <div className="bg-surface border border-primary/20 rounded-xl overflow-hidden flex shadow-card">
+              <div className="bg-primary/10 text-primary px-4 py-3 font-bold flex items-center gap-2 whitespace-nowrap shrink-0 border-l border-primary/20">
                 <Zap size={18} className="animate-pulse" />
                 أخبار السوق
               </div>
@@ -82,7 +82,7 @@ export default function MarketPage() {
                     <div key={news.id} className="flex items-center gap-3 text-sm">
                       <span className="text-xl">{news.asset.image}</span>
                       <span className="font-bold text-white">{news.title || news.titleAr}</span>
-                      <span className={`font-mono text-xs px-2 py-0.5 rounded ${news.changePercent >= 0 ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
+                      <span className={`font-mono text-xs px-2 py-0.5 rounded font-bold tabular-nums ${news.changePercent >= 0 ? 'bg-success/20 text-success' : 'bg-danger/20 text-danger'}`}>
                         {news.changePercent >= 0 ? '+' : ''}{news.changePercent}%
                       </span>
                     </div>
@@ -94,72 +94,72 @@ export default function MarketPage() {
         </div>
 
         {/* Live Top Info Bar (Ticker style) */}
-        <div className="bg-[#1A1A1A] border border-white/5 rounded-xl p-4 mb-8 flex flex-wrap gap-4 justify-between items-center text-sm shadow-md">
+        <div className="bg-surface border border-white/5 rounded-xl p-4 mb-8 flex flex-wrap gap-4 justify-between items-center text-sm shadow-card">
           <div className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+            <div className="w-2 h-2 rounded-full bg-success animate-pulse"></div>
             <span className="text-gray-400">متداول نشط:</span>
-            <span className="font-bold text-white font-mono">15,234</span>
+            <span className="font-bold text-white tabular-nums">15,234</span>
           </div>
           <div className="flex items-center gap-2 border-l border-white/10 pl-4">
-            <Activity size={16} className="text-[#0FF0FC]" />
+            <Activity size={16} className="text-primary" />
             <span className="text-gray-400">حجم التداول اليوم:</span>
-            <span className="font-bold text-white font-mono">2.5M ¢</span>
+            <span className="font-bold text-white tabular-nums">2.5M ¢</span>
           </div>
           <div className="flex items-center gap-2 border-l border-white/10 pl-4">
-            <TrendingUp size={16} className="text-green-500" />
+            <TrendingUp size={16} className="text-success" />
             <span className="text-gray-400">أكثر صعوداً:</span>
-            <span className="font-bold text-green-500">{topPlayers[0]?.name || 'N/A'}</span>
+            <span className="font-bold text-success">{topPlayers[0]?.name || 'N/A'}</span>
           </div>
           <div className="flex items-center gap-2 border-l border-white/10 pl-4">
-            <TrendingDown size={16} className="text-red-500" />
+            <TrendingDown size={16} className="text-danger" />
             <span className="text-gray-400">أكثر هبوطاً:</span>
-            <span className="font-bold text-red-500">البرازيل</span>
+            <span className="font-bold text-danger">البرازيل</span>
           </div>
-          <div className="flex items-center gap-2 border-l border-white/10 pl-4 bg-[#FFD700]/10 px-3 py-1 rounded-lg border border-[#FFD700]/20">
+          <div className="flex items-center gap-2 border-l border-white/10 pl-4 bg-accent/10 px-3 py-1 rounded-lg border border-accent/20">
             <span className="text-gray-400">المباراة القادمة:</span>
-            <span className="font-bold text-[#FFD700] font-mono">12d : 14h : 22m</span>
+            <span className="font-bold text-accent tabular-nums">12d : 14h : 22m</span>
           </div>
         </div>
 
         {/* Market Overview Section */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
-          <div className="bg-[#1A1A1A] border border-white/5 p-6 rounded-2xl flex flex-col justify-center">
+          <div className="bg-surface border border-white/5 p-6 rounded-2xl flex flex-col justify-center shadow-card">
             <div className="flex items-center gap-3 text-gray-400 mb-2">
-              <Globe size={20} className="text-[#0FF0FC]" /> 
+              <Globe size={20} className="text-primary" /> 
               <span>إجمالي المنتخبات</span>
             </div>
-            <div className="text-4xl font-mono font-bold text-white">48</div>
+            <div className="text-4xl font-bold text-white tabular-nums">48</div>
             <div className="text-sm text-gray-500 mt-2">مشارك في مونديال 2026</div>
           </div>
           
-          <div className="bg-[#1A1A1A] border border-white/5 p-6 rounded-2xl flex flex-col justify-center">
+          <div className="bg-surface border border-white/5 p-6 rounded-2xl flex flex-col justify-center shadow-card">
             <div className="flex items-center gap-3 text-gray-400 mb-2">
-              <Users size={20} className="text-[#FFD700]" /> 
+              <Users size={20} className="text-accent" /> 
               <span>اللاعبين المتاحين</span>
             </div>
-            <div className="text-4xl font-mono font-bold text-white">{players.length}</div>
+            <div className="text-4xl font-bold text-white tabular-nums">{players.length}</div>
             <div className="text-sm text-gray-500 mt-2">حتى 1,248 لاعباً متاحاً</div>
           </div>
 
-          <div className="bg-[#1A1A1A] border border-white/5 p-6 rounded-2xl col-span-1 md:col-span-2 flex items-center justify-between">
+          <div className="bg-surface border border-white/5 p-6 rounded-2xl col-span-1 md:col-span-2 flex items-center justify-between shadow-card">
             <div className="w-1/2 pr-4 border-r border-white/10 hidden md:block">
-              <div className="text-sm text-gray-400 mb-3 flex items-center gap-2"><Target size={16} className="text-green-400" /> أعلى المنتخبات تقييماً</div>
+              <div className="text-sm text-gray-400 mb-3 flex items-center gap-2"><Target size={16} className="text-success" /> أعلى المنتخبات تقييماً</div>
               <div className="flex flex-col gap-2">
                 {topTeams.map(t => (
                   <div key={t.id} className="flex justify-between text-sm font-bold">
                     <span>{t.image} {t.name}</span>
-                    <span className="text-[#FFD700]">{t.score}</span>
+                    <span className="text-accent tabular-nums">{t.score}</span>
                   </div>
                 ))}
               </div>
             </div>
             <div className="w-full md:w-1/2 md:pl-4">
-              <div className="text-sm text-gray-400 mb-3 flex items-center gap-2"><Activity size={16} className="text-[#0FF0FC]" /> أغلى النجوم في السوق</div>
+              <div className="text-sm text-gray-400 mb-3 flex items-center gap-2"><Activity size={16} className="text-primary" /> أغلى النجوم في السوق</div>
               <div className="flex flex-col gap-2">
                 {topPlayers.map(p => (
                   <div key={p.id} className="flex justify-between text-sm font-bold">
                     <span className="truncate max-w-[150px]">{p.name}</span>
-                    <span className="font-mono">{p.current_price}¢</span>
+                    <span className="tabular-nums text-white">{p.current_price}¢</span>
                   </div>
                 ))}
               </div>
@@ -168,7 +168,7 @@ export default function MarketPage() {
         </div>
 
         {/* Filters & Controls */}
-        <div className="sticky top-20 z-40 bg-[#121212]/90 backdrop-blur-md py-4 mb-8 border-b border-white/5 flex flex-col lg:flex-row justify-between items-center gap-4">
+        <div className="sticky top-16 z-40 bg-background/90 backdrop-blur-md py-4 mb-8 border-b border-white/5 flex flex-col lg:flex-row justify-between items-center gap-4">
           <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">
             <div className="relative flex-grow lg:flex-grow-0">
               <Search className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500" size={20} />
@@ -177,29 +177,29 @@ export default function MarketPage() {
                 placeholder="ابحث عن لاعب أو منتخب..." 
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full lg:w-64 bg-black/50 border border-white/10 rounded-xl py-2.5 pr-10 pl-4 focus:outline-none focus:border-[#0FF0FC] transition-colors"
+                className="w-full lg:w-64 bg-surface/50 border border-white/10 rounded-xl py-2.5 pr-10 pl-4 focus:outline-none focus:border-primary transition-colors"
               />
             </div>
             
-            <div className="flex bg-black/50 border border-white/10 rounded-xl p-1">
-              <button onClick={() => setFilterType('TEAM')} className={`px-4 py-1.5 rounded-lg text-sm font-bold transition-colors ${filterType === 'TEAM' ? 'bg-[#0FF0FC] text-black' : 'text-gray-400 hover:text-white'}`}>المنتخبات</button>
-              <button onClick={() => setFilterType('PLAYER')} className={`px-4 py-1.5 rounded-lg text-sm font-bold transition-colors ${filterType === 'PLAYER' ? 'bg-[#0FF0FC] text-black' : 'text-gray-400 hover:text-white'}`}>اللاعبين</button>
-              <button onClick={() => setFilterType('ALL')} className={`px-4 py-1.5 rounded-lg text-sm font-bold transition-colors ${filterType === 'ALL' ? 'bg-[#0FF0FC] text-black' : 'text-gray-400 hover:text-white'}`}>الكل</button>
+            <div className="flex bg-surface/50 border border-white/10 rounded-xl p-1">
+              <button onClick={() => setFilterType('TEAM')} className={`px-4 py-1.5 rounded-lg text-sm font-bold transition-colors ${filterType === 'TEAM' ? 'bg-primary text-white' : 'text-gray-400 hover:text-white'}`}>المنتخبات</button>
+              <button onClick={() => setFilterType('PLAYER')} className={`px-4 py-1.5 rounded-lg text-sm font-bold transition-colors ${filterType === 'PLAYER' ? 'bg-primary text-white' : 'text-gray-400 hover:text-white'}`}>اللاعبين</button>
+              <button onClick={() => setFilterType('ALL')} className={`px-4 py-1.5 rounded-lg text-sm font-bold transition-colors ${filterType === 'ALL' ? 'bg-primary text-white' : 'text-gray-400 hover:text-white'}`}>الكل</button>
             </div>
           </div>
 
           <div className="flex items-center gap-4 w-full lg:w-auto justify-between lg:justify-end">
             <div className="flex gap-2">
               {/* Smart Chips (Mocked functionality for UI) */}
-              <button className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-white/5 border border-white/10 rounded-lg text-xs font-bold hover:bg-white/10 transition-colors text-green-400">
+              <button className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-surface border border-white/5 rounded-lg text-xs font-bold hover:bg-white/10 transition-colors text-success">
                 فرص صاعدة
               </button>
-              <button className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-white/5 border border-white/10 rounded-lg text-xs font-bold hover:bg-white/10 transition-colors text-[#FFD700]">
+              <button className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-surface border border-white/5 rounded-lg text-xs font-bold hover:bg-white/10 transition-colors text-accent">
                 نجوم الصف الأول
               </button>
             </div>
 
-            <div className="flex bg-black/50 border border-white/10 rounded-xl p-1">
+            <div className="flex bg-surface/50 border border-white/10 rounded-xl p-1">
               <button onClick={() => setViewMode('GRID')} className={`p-2 rounded-lg transition-colors ${viewMode === 'GRID' ? 'bg-white/10 text-white' : 'text-gray-500 hover:text-white'}`}>
                 <LayoutGrid size={18} />
               </button>
@@ -227,10 +227,10 @@ export default function MarketPage() {
             ))}
           </div>
         ) : (
-          <div className="bg-[#1A1A1A] border border-white/10 rounded-2xl overflow-x-auto shadow-2xl">
+          <div className="bg-surface border border-white/10 rounded-2xl overflow-x-auto shadow-card">
             <table className="w-full text-right border-collapse">
               <thead>
-                <tr className="bg-black/60 border-b border-white/10 text-gray-400 text-sm tracking-wider">
+                <tr className="bg-background/60 border-b border-white/10 text-gray-400 text-sm tracking-wider">
                   <th className="p-4 font-bold text-right">الأصل (Asset)</th>
                   {filterType === 'TEAM' && <th className="p-4 font-bold text-center">FIFA Rank</th>}
                   {filterType === 'TEAM' && <th className="p-4 font-bold text-center">المخاطرة</th>}
@@ -252,36 +252,37 @@ export default function MarketPage() {
                 {filteredAssets.map(asset => (
                   <tr key={asset.id} className="border-b border-white/5 hover:bg-white/5 transition-colors group">
                     <td className="p-4 flex items-center gap-4">
-                      <span className="text-3xl bg-black/40 w-12 h-12 flex items-center justify-center rounded-lg">{asset.image}</span>
+                      <span className="text-3xl bg-background/40 w-12 h-12 flex items-center justify-center rounded-xl">{asset.image}</span>
                       <div>
-                        <p className="font-bold text-white text-lg group-hover:text-[#0FF0FC] transition-colors">{asset.name}</p>
-                        <p className="text-xs text-gray-500 font-mono">{asset.code}</p>
+                         {/* Here we use primary on hover */}
+                        <p className="font-bold text-white text-lg group-hover:text-primary transition-colors">{asset.name}</p>
+                        <p className="text-xs text-gray-500">{asset.code}</p>
                       </div>
                     </td>
                     
                     {filterType === 'TEAM' && (
-                      <td className="p-4 text-center text-gray-300">
+                      <td className="p-4 text-center text-gray-300 tabular-nums font-bold">
                         {asset.type === 'TEAM' ? `#${asset.fifaRank || '-'}` : '-'}
                       </td>
                     )}
                     {filterType === 'TEAM' && (
-                      <td className="p-4 text-center text-gray-400">
+                      <td className="p-4 text-center text-gray-400 tabular-nums">
                         {asset.riskIndex ? `${(asset.riskIndex * 10).toFixed(1)}/10` : '-'}
                       </td>
                     )}
                     {filterType === 'TEAM' && (
-                      <td className="p-4 text-center text-gray-400 font-mono">
+                      <td className="p-4 text-center text-gray-400 tabular-nums">
                         {asset.ownersCount ? asset.ownersCount.toLocaleString() : '0'}
                       </td>
                     )}
                     
                     {filterType === 'PLAYER' && (
                       <td className="p-4 text-center">
-                        <span className="bg-white/10 px-2 py-1 rounded text-xs text-gray-300">{asset.position || '-'}</span>
+                        <span className="bg-white/5 border border-white/10 px-2 py-1 rounded-md text-xs text-gray-300 font-bold">{asset.position || '-'}</span>
                       </td>
                     )}
                     {filterType === 'PLAYER' && (
-                      <td className="p-4 text-center text-gray-300">
+                      <td className="p-4 text-center text-gray-300 tabular-nums">
                         {asset.age || '-'}
                       </td>
                     )}
@@ -293,22 +294,22 @@ export default function MarketPage() {
 
                     {filterType === 'ALL' && (
                       <td className="p-4 text-center">
-                        <span className="bg-white/10 px-2 py-1 rounded text-xs text-gray-300">
+                        <span className="bg-white/5 border border-white/10 px-2 py-1 rounded-md text-xs text-gray-300 font-bold">
                           {asset.type === 'TEAM' ? 'منتخب' : 'لاعب'}
                         </span>
                       </td>
                     )}
 
-                    <td className="p-4 text-center font-bold text-[#FFD700]">
+                    <td className="p-4 text-center font-bold text-accent tabular-nums">
                       {asset.score || 'N/A'}
                     </td>
                     
-                    <td className="p-4 text-center font-mono font-bold text-white">
+                    <td className="p-4 text-center font-bold text-white tabular-nums">
                       {asset.current_price} ¢
                     </td>
                     
                     <td className="p-4 text-center">
-                      <span className={`inline-flex items-center justify-center gap-1 font-bold ${asset.change >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                      <span className={`inline-flex items-center justify-center gap-1 font-bold tabular-nums ${asset.change >= 0 ? 'text-success' : 'text-danger'}`}>
                         {asset.change >= 0 ? <TrendingUp size={16} /> : <TrendingDown size={16} />}
                         {Math.abs(asset.change)}%
                       </span>
@@ -319,13 +320,13 @@ export default function MarketPage() {
                         <div className="flex gap-2 justify-end">
                           <button 
                             onClick={() => setSelectedTeam(asset)}
-                            className="inline-flex items-center gap-2 bg-white/5 hover:bg-white/20 text-gray-300 hover:text-white px-3 py-2 rounded-lg font-bold transition-all text-xs"
+                            className="inline-flex items-center gap-2 bg-surface hover:bg-white/10 text-gray-300 hover:text-white border border-white/10 px-3 py-2 rounded-lg font-bold transition-all text-xs"
                           >
                             التشكيلة
                           </button>
                           <Link 
                             href={`/asset/${asset.id}`}
-                            className="inline-flex items-center gap-2 bg-[#0FF0FC]/10 hover:bg-[#0FF0FC]/20 text-[#0FF0FC] border border-[#0FF0FC]/50 px-3 py-2 rounded-lg font-bold transition-all text-xs"
+                            className="inline-flex items-center gap-2 bg-primary/10 hover:bg-primary/20 text-primary border border-primary/50 px-3 py-2 rounded-lg font-bold transition-all text-xs"
                           >
                             تداول
                           </Link>
@@ -333,7 +334,7 @@ export default function MarketPage() {
                       ) : (
                         <Link 
                           href={`/asset/${asset.id}`}
-                          className="inline-flex items-center gap-2 bg-[#FFD700]/10 hover:bg-[#FFD700]/20 text-[#FFD700] border border-[#FFD700]/50 px-4 py-2 rounded-lg font-bold transition-all"
+                          className="inline-flex items-center gap-2 bg-accent/10 hover:bg-accent/20 text-accent border border-accent/50 px-4 py-2 rounded-lg font-bold transition-all"
                         >
                           تداول <ArrowRight size={16} />
                         </Link>
