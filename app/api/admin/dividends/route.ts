@@ -29,7 +29,7 @@ export async function POST(request: Request) {
 
     // Find all users holding this asset (LONG positions only)
     const holdings = await prisma.holding.findMany({
-      where: { assetId, positionType: 'LONG', quantity: { gt: 0 } },
+      where: { assetId, quantity: { gt: 0 } },
       include: { user: { include: { captain: true } } }
     });
 
