@@ -115,21 +115,36 @@ export async function POST(request: Request) {
       
       if (!isIPOPhase) {
         const priceIncreaseRatio = 1 + (qty * 0.0005);
-        const newPriceBuy = Math.round(asset.current_price * priceIncreaseRatio);
+        const calculatedNewPriceBuy = Math.round(asset.current_price * priceIncreaseRatio);
         
-        await prisma.asset.update({
-          where: { id: asset.id },
-          data: {
-            current_price: newPriceBuy,
-            high_price: Math.max(asset.high_price, newPriceBuy),
-            low_price: Math.min(asset.low_price, newPriceBuy),
-            priceHistory: {
-              create: {
-                price: newPriceBuy
+        // Find start of day price to apply correct volatility cap
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const firstPriceToday = await prisma.priceHistory.findFirst({
+          where: { assetId: asset.id, timestamp: { gte: today } },
+          orderBy: { timestamp: 'asc' }
+        });
+        const startOfDayPrice = firstPriceToday ? firstPriceToday.price : asset.current_price;
+        
+        // Dynamically import to avoid circular dep issues in some setups
+        const { applyVolatilityCap } = await import('@/lib/liveEngine');
+        const finalNewPriceBuy = applyVolatilityCap(startOfDayPrice, calculatedNewPriceBuy, asset.riskIndex || 0.5);
+        
+        if (finalNewPriceBuy !== asset.current_price) {
+          await prisma.asset.update({
+            where: { id: asset.id },
+            data: {
+              current_price: finalNewPriceBuy,
+              high_price: Math.max(asset.high_price, finalNewPriceBuy),
+              low_price: Math.min(asset.low_price, finalNewPriceBuy),
+              priceHistory: {
+                create: {
+                  price: finalNewPriceBuy
+                }
               }
             }
-          }
-        });
+          });
+        }
       }
 
       // Create notification
@@ -217,21 +232,35 @@ export async function POST(request: Request) {
 
       if (!isIPOPhase) {
         const priceDecreaseRatio = 1 - (qty * 0.0005);
-        const newPriceSell = Math.max(1, Math.round(asset.current_price * priceDecreaseRatio)); // Prevent price from dropping below 1
+        const calculatedNewPriceSell = Math.max(1, Math.round(asset.current_price * priceDecreaseRatio));
         
-        await prisma.asset.update({
-          where: { id: asset.id },
-          data: {
-            current_price: newPriceSell,
-            high_price: Math.max(asset.high_price, newPriceSell),
-            low_price: Math.min(asset.low_price, newPriceSell),
-            priceHistory: {
-              create: {
-                price: newPriceSell
+        // Find start of day price to apply correct volatility cap
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const firstPriceToday = await prisma.priceHistory.findFirst({
+          where: { assetId: asset.id, timestamp: { gte: today } },
+          orderBy: { timestamp: 'asc' }
+        });
+        const startOfDayPrice = firstPriceToday ? firstPriceToday.price : asset.current_price;
+        
+        const { applyVolatilityCap } = await import('@/lib/liveEngine');
+        const finalNewPriceSell = applyVolatilityCap(startOfDayPrice, calculatedNewPriceSell, asset.riskIndex || 0.5);
+        
+        if (finalNewPriceSell !== asset.current_price) {
+          await prisma.asset.update({
+            where: { id: asset.id },
+            data: {
+              current_price: finalNewPriceSell,
+              high_price: Math.max(asset.high_price, finalNewPriceSell),
+              low_price: Math.min(asset.low_price, finalNewPriceSell),
+              priceHistory: {
+                create: {
+                  price: finalNewPriceSell
+                }
               }
             }
-          }
-        });
+          });
+        }
       }
 
       // Create notification
