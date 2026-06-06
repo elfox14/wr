@@ -10,6 +10,7 @@ import { motion } from 'framer-motion';
 
 export default function Home() {
   const { assets, fetchAssets } = useStore();
+  const [openFaq, setOpenFaq] = useState<number | null>(0);
 
   useEffect(() => {
     fetchAssets();
@@ -74,19 +75,19 @@ export default function Home() {
   const faqs = [
     {
       question: "هل هذه المنصة للاستثمار الحقيقي والمراهنات؟",
-      answer: "لا، WorldCup Exchange هي منصة افتراضية تماماً مخصصة للمتعة والمنافسة فقط. جميع العملات والأسهم داخل المنصة افتراضية ولا تحمل أي قيمة نقدية حقيقية."
+      answer: <>لا، WorldCup Exchange هي منصة <span className="text-[#0FF0FC] font-bold">افتراضية تماماً</span> مخصصة للمتعة والمنافسة فقط. جميع العملات والأسهم داخل المنصة افتراضية و<span className="text-[#FFD700] font-bold">لا تحمل أي قيمة نقدية حقيقية</span>.</>
     },
     {
       question: "كيف تتغير أسعار اللاعبين والمنتخبات؟",
-      answer: "تعتمد خوارزمية تسعير الأسهم على عاملين: الأداء الحقيقي في المباريات (أهداف، صناعة لعب، شباك نظيفة) وقانون العرض والطلب داخل المنصة (حركة البيع والشراء من قبل المستخدمين)."
+      answer: <>تعتمد <span className="text-[#0FF0FC] font-bold">خوارزمية تسعير الأسهم</span> على عاملين: الأداء الحقيقي في المباريات (أهداف، صناعة لعب، شباك نظيفة) وقانون العرض والطلب داخل المنصة (حركة البيع والشراء من قبل المستخدمين).</>
     },
     {
       question: "هل أستطيع إنشاء دوريات خاصة مع أصدقائي؟",
-      answer: "نعم! يمكنك التوجه إلى قسم 'المجموعات' لإنشاء مجموعة خاصة ودعوة أصدقائك عبر رابط مباشر للتنافس بينكم بشكل حصري."
+      answer: <>نعم! يمكنك التوجه إلى قسم 'المجموعات' لإنشاء <span className="text-white font-bold">مجموعة خاصة</span> ودعوة أصدقائك عبر رابط مباشر للتنافس بينكم بشكل حصري.</>
     },
     {
       question: "متى يتم تصفير الحسابات وإعلان الفائز؟",
-      answer: "تستمر المنافسة طوال فترة بطولة كأس العالم، ومع إطلاق صافرة نهاية المباراة النهائية، يتم تجميد السوق وإعلان قائمة أفضل المتداولين بناءً على صافي قيمة محافظهم."
+      answer: <>تستمر المنافسة طوال فترة بطولة كأس العالم، ومع إطلاق صافرة نهاية المباراة النهائية، <span className="text-white font-bold">يتم تجميد السوق وإعلان قائمة أفضل المتداولين</span> بناءً على صافي قيمة محافظهم.</>
     }
   ];
 
@@ -159,7 +160,11 @@ export default function Home() {
             className="bg-gradient-to-br from-[#111] to-[#1a2f1c] border border-green-500/20 p-6 rounded-3xl relative overflow-hidden flex flex-col justify-between"
           >
             <div>
-              <p className="text-green-400 text-sm font-bold mb-2 flex items-center gap-1"><TrendingUp size={16}/> سهم محلق</p>
+              <div className="flex items-center gap-2 mb-4">
+                <span className="bg-green-500 text-black px-2 py-1 rounded-md text-xs font-bold flex items-center gap-1 shadow-[0_0_10px_rgba(34,197,94,0.4)]">
+                  <TrendingUp size={14}/> سهم محلق
+                </span>
+              </div>
               <div className="flex items-center gap-3">
                 <span className="text-3xl">{topGainer?.image || '⚽'}</span>
                 <h3 className="text-xl font-bold text-white truncate">{topGainer?.name || '---'}</h3>
@@ -191,7 +196,11 @@ export default function Home() {
             className="bg-gradient-to-br from-[#111] to-[#3a1a1a] border border-red-500/20 p-6 rounded-3xl relative overflow-hidden flex flex-col justify-between"
           >
             <div>
-              <p className="text-red-400 text-sm font-bold mb-2 flex items-center gap-1"><TrendingDown size={16}/> فرصة شراء؟</p>
+              <div className="flex items-center gap-2 mb-4">
+                <span className="bg-red-500 text-white px-2 py-1 rounded-md text-xs font-bold flex items-center gap-1 shadow-[0_0_10px_rgba(239,68,68,0.4)]">
+                  <TrendingDown size={14}/> فرصة شراء؟
+                </span>
+              </div>
               <div className="flex items-center gap-3">
                 <span className="text-3xl">{topLoser?.image || '⚽'}</span>
                 <h3 className="text-xl font-bold text-white truncate">{topLoser?.name || '---'}</h3>
@@ -264,6 +273,9 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-6">
             <div>
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#0FF0FC]/10 border border-[#0FF0FC]/20 text-[#0FF0FC] text-xs font-bold mb-4">
+                <Newspaper size={14} /> أحدث المقالات
+              </div>
               <motion.h2 
                 initial={{ opacity: 0, x: 20 }}
                 whileInView={{ opacity: 1, x: 0 }}
@@ -320,7 +332,7 @@ export default function Home() {
                     <h3 className="text-xl font-bold mb-3 text-white group-hover:text-[#0FF0FC] transition-colors line-clamp-2 leading-snug">
                       {article.title}
                     </h3>
-                    <p className="text-gray-400 text-sm mb-6 line-clamp-2 leading-relaxed flex-1">
+                    <p className="text-gray-400 text-sm mb-6 line-clamp-2 leading-loose flex-1">
                       {article.excerpt}
                     </p>
                     <div className="flex items-center justify-between text-xs text-gray-500 mt-auto border-t border-white/5 pt-4">
@@ -336,7 +348,7 @@ export default function Home() {
       </section>
 
       {/* 5. Features Grid */}
-      <section className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24">
+      <section className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24 bg-gradient-to-b from-transparent via-[#111]/30 to-transparent">
         <div className="text-center mb-16">
           <motion.h2 
             initial={{ opacity: 0, y: 20 }}
@@ -363,7 +375,7 @@ export default function Home() {
               </div>
               <div>
                 <h3 className="text-2xl font-bold mb-2">{feat.title}</h3>
-                <p className="text-gray-400 leading-relaxed">{feat.description}</p>
+                <p className="text-gray-400 leading-loose text-sm">{feat.description}</p>
               </div>
             </motion.div>
           ))}
@@ -391,10 +403,24 @@ export default function Home() {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ delay: i * 0.1 }}
-                className="bg-black border border-white/5 p-6 rounded-2xl"
+                className="bg-black border border-white/5 p-6 rounded-2xl cursor-pointer hover:border-white/20 transition-colors select-none"
+                onClick={() => setOpenFaq(openFaq === i ? null : i)}
               >
-                <h3 className="text-lg font-bold text-white mb-2">{faq.question}</h3>
-                <p className="text-gray-400">{faq.answer}</p>
+                <div className="flex justify-between items-center">
+                  <h3 className="text-lg font-bold text-white pr-4">{faq.question}</h3>
+                  <div className="shrink-0 bg-white/5 p-2 rounded-full">
+                    {openFaq === i ? <ChevronUp size={20} className="text-[#0FF0FC]" /> : <ChevronDown size={20} className="text-gray-500" />}
+                  </div>
+                </div>
+                {openFaq === i && (
+                  <motion.div 
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    className="text-gray-400 leading-loose mt-4 text-sm"
+                  >
+                    {faq.answer}
+                  </motion.div>
+                )}
               </motion.div>
             ))}
           </div>
@@ -424,7 +450,7 @@ export default function Home() {
           >
             <Link 
               href="/register"
-              className="inline-flex items-center gap-3 px-10 py-5 bg-white text-black font-extrabold rounded-2xl text-xl hover:scale-105 transition-all shadow-[0_0_40px_rgba(255,255,255,0.2)]"
+              className="inline-flex items-center gap-3 px-12 py-6 bg-gradient-to-r from-[#0FF0FC] to-[#098086] text-black font-extrabold rounded-2xl text-2xl hover:scale-105 transition-all shadow-[0_0_50px_rgba(15,240,252,0.5)]"
             >
               أنشئ حسابك مجاناً <ArrowLeftIcon />
             </Link>
