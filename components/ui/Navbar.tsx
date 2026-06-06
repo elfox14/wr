@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { useSession, signOut } from 'next-auth/react';
 import { Wallet, TrendingUp, LogOut, User as UserIcon, Bell } from 'lucide-react';
 import { useStore } from '@/lib/store';
-import { NewsTicker } from './NewsTicker';
 
 export function Navbar() {
   const { data: session, status } = useSession();
@@ -80,10 +79,6 @@ export function Navbar() {
             )}
           </div>
         </div>
-      </div>
-      {/* Wrapper to distinctly separate Ticker from header */}
-      <div className="w-full bg-surface/80 border-t border-b border-white/10 mt-1 shadow-lg">
-        <NewsTicker />
       </div>
     </nav>
   );
