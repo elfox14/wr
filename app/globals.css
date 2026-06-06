@@ -6,18 +6,18 @@
   --font-sans: var(--font-cairo), ui-sans-serif, system-ui, sans-serif;
 
   /* Design System Tokens */
-  --color-surface: #111827;
-  --color-primary: #0D7A6F;
-  --color-primary-light: #14A394;
+  --color-surface: #1A1A1A; /* Matte Black Surface */
+  --color-primary: #0FF0FC; /* Electric Blue */
+  --color-primary-light: #4AFAFF; /* Lighter Electric Blue */
   --color-success: #16A34A;
   --color-danger: #DC2626;
-  --color-accent: #D4A017;
+  --color-accent: #FFD700; /* Royal Gold */
 
   --shadow-card: 0 4px 6px -1px rgba(0, 0, 0, 0.2), 0 2px 4px -2px rgba(0, 0, 0, 0.2);
   --shadow-card-hover: 0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -4px rgba(0, 0, 0, 0.2);
   
-  --shadow-anti-gravity: 0 15px 35px -5px rgba(13, 122, 111, 0.15), 0 5px 15px rgba(0,0,0,0.5);
-  --shadow-anti-gravity-hover: 0 25px 45px -5px rgba(13, 122, 111, 0.25), 0 10px 20px rgba(0,0,0,0.6);
+  --shadow-anti-gravity: 0 15px 35px -5px rgba(15, 240, 252, 0.15), 0 5px 15px rgba(0,0,0,0.5);
+  --shadow-anti-gravity-hover: 0 25px 45px -5px rgba(15, 240, 252, 0.3), 0 10px 20px rgba(0,0,0,0.7);
 
   --animate-marquee: marquee 25s linear infinite;
 
@@ -28,12 +28,12 @@
 }
 
 :root {
-  --background: #0F172A; /* Dark Navy Base */
+  --background: #121212; /* Matte Black Base */
   --foreground: #F8FAFC; /* Slate 50 */
 }
 
 @utility bg-glass {
-  background-color: rgba(17, 24, 39, 0.6); /* Surface transparent */
+  background-color: rgba(26, 26, 26, 0.6); /* Surface transparent Matte Black */
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border: 1px solid rgba(255, 255, 255, 0.05);

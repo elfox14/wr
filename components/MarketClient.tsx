@@ -16,6 +16,7 @@ export default function MarketClient() {
   const [filterType, setFilterType] = useState<'ALL' | 'TEAM' | 'PLAYER'>('TEAM');
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState<'GRID' | 'TABLE'>('GRID');
+  const [isProMode, setIsProMode] = useState(false);
   const [selectedTeam, setSelectedTeam] = useState<Asset | null>(null);
   useEffect(() => {
     fetchAssets();
@@ -168,6 +169,15 @@ export default function MarketClient() {
               </button>
             </div>
 
+            <div className="flex bg-surface/50 border border-white/10 rounded-xl p-1 items-center">
+              <button onClick={() => setIsProMode(false)} className={`px-3 py-1.5 rounded-lg text-sm font-bold transition-colors ${!isProMode ? 'bg-primary text-white' : 'text-gray-400 hover:text-white'}`}>
+                بسيط
+              </button>
+              <button onClick={() => setIsProMode(true)} className={`px-3 py-1.5 rounded-lg text-sm font-bold transition-colors ${isProMode ? 'bg-primary text-white shadow-[0_0_10px_rgba(15,240,252,0.5)]' : 'text-gray-400 hover:text-white'}`}>
+                المحترفين (Pro)
+              </button>
+            </div>
+            
             <div className="flex bg-surface/50 border border-white/10 rounded-xl p-1">
               <button onClick={() => setViewMode('GRID')} className={`p-2 rounded-lg transition-colors ${viewMode === 'GRID' ? 'bg-white/10 text-white' : 'text-gray-500 hover:text-white'}`}>
                 <LayoutGrid size={18} />
@@ -203,9 +213,11 @@ export default function MarketClient() {
                     score={asset.score || 0}
                     price={asset.current_price}
                     change={asset.change}
+                    volume={asset.volume}
+                    marketCap={asset.marketCap}
+                    priceHistory={asset.priceHistory?.map((h: any) => h.price) || [asset.current_price, asset.current_price]}
                     position={asset.position || undefined}
                     fifaRank={asset.fifaRank || undefined}
-                    priceHistory={asset.priceHistory?.map((h: any) => h.price) || [asset.current_price, asset.current_price]}
                     onClick={() => {
                       if (asset.type === 'TEAM') {
                         setSelectedTeam(asset);
@@ -214,6 +226,7 @@ export default function MarketClient() {
                       }
                     }}
                     variant={variant}
+                    isProMode={isProMode}
                   />
                 </div>
               );

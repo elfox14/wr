@@ -10,6 +10,7 @@ import { PageHeader } from '@/components/ui/PageHeader';
 import { PortfolioCharts } from '@/components/portfolio/PortfolioCharts';
 import { TransactionHistory } from '@/components/portfolio/TransactionHistory';
 import { AchievementsList } from '@/components/portfolio/AchievementsList';
+import { PitchPortfolio } from '@/components/portfolio/PitchPortfolio';
 
 export default function PortfolioPage() {
   const { holdings, userStats, captainId, achievements, fetchPortfolio, setCaptain } = useStore();
@@ -66,29 +67,35 @@ export default function PortfolioPage() {
 
         <PortfolioCharts holdings={holdings} />
 
-        <h2 className="text-xl font-bold mb-4">الأصول المملوكة</h2>
+        {/* The 4-Slot Pitch */}
+        <PitchPortfolio 
+          playerHoldings={holdings.filter(h => h.asset?.type === 'PLAYER')}
+          captainId={captainId}
+          setCaptain={setCaptain}
+        />
+
+        <h2 className="text-xl font-bold mb-4">أسهم المنتخبات</h2>
         <div className="bg-surface p-6 border border-white/5 rounded-2xl shadow-card mb-12">
-          {holdings.length === 0 ? (
+          {holdings.filter(h => h.asset?.type === 'TEAM').length === 0 ? (
             <div className="text-center py-16 text-gray-500">
               <Briefcase size={48} className="mx-auto mb-4 opacity-20" />
-              <p className="text-xl mb-4">لا تمتلك أي أصول حالياً.</p>
+              <p className="text-xl mb-4">لا تمتلك أي أسهم منتخبات حالياً.</p>
               <Link href="/market" className="bg-primary/10 text-primary border border-primary/30 px-6 py-3 rounded-xl font-bold hover:bg-primary/20 transition-all">
-                اذهب إلى السوق للبدء
+                اذهب إلى السوق للشراء
               </Link>
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              {holdings.map(h => (
+              {holdings.filter(h => h.asset?.type === 'TEAM').map(h => (
                 <div key={h.id} className="relative">
                   <StockCard 
-                    type={h.asset!.type as 'TEAM' | 'PLAYER'}
+                    type="TEAM"
                     name={h.asset!.name}
                     code={h.asset!.code}
                     image={h.asset!.image}
                     score={h.asset!.score || 0}
                     price={h.asset!.current_price}
                     change={h.asset!.change}
-                    position={h.asset!.position || undefined}
                     fifaRank={h.asset!.fifaRank || undefined}
                     holding={{
                       quantity: h.quantity,
@@ -97,8 +104,6 @@ export default function PortfolioPage() {
                       profitLoss: h.profitLoss,
                       profitLossPercent: h.profitLossPercent
                     }}
-                    isCaptain={captainId === h.asset!.id}
-                    onMakeCaptain={setCaptain}
                   />
                 </div>
               ))}

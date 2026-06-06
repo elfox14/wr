@@ -1,14 +1,16 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import { useSession, signOut } from 'next-auth/react';
-import { Wallet, TrendingUp, LogOut, User as UserIcon, Bell } from 'lucide-react';
+import { Wallet, TrendingUp, LogOut, User as UserIcon, Bell, PlayCircle } from 'lucide-react';
 import { useStore } from '@/lib/store';
+import { RewardedAdModal } from './RewardedAdModal';
 
 export function Navbar() {
   const { data: session, status } = useSession();
   const { userStats } = useStore(); // We use the store to get the real balance if logged in
+  const [isAdOpen, setIsAdOpen] = useState(false);
 
   return (
     <nav className="w-full border-b border-white/10 bg-background/80 backdrop-blur-md sticky top-0 z-50">
@@ -47,6 +49,12 @@ export function Navbar() {
               <span className="text-gray-500">...</span>
             ) : session ? (
               <div className="flex items-center gap-4">
+                <button 
+                  onClick={() => setIsAdOpen(true)}
+                  className="bg-accent text-black font-bold px-3 py-1.5 rounded-lg flex items-center gap-2 hover:bg-[#FFE55C] transition-all shadow-[0_0_15px_rgba(255,215,0,0.4)] animate-[pulse_2s_ease-in-out_infinite]"
+                >
+                  <PlayCircle size={16} /> شحن مجاني
+                </button>
                 <button className="text-gray-400 hover:text-primary transition-colors relative">
                   <Bell size={20} />
                   <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full animate-ping"></span>
@@ -81,6 +89,7 @@ export function Navbar() {
           </div>
         </div>
       </div>
+      <RewardedAdModal isOpen={isAdOpen} onClose={() => setIsAdOpen(false)} />
     </nav>
   );
 }

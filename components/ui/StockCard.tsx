@@ -20,6 +20,7 @@ interface StockCardProps {
   fifaRank?: number;
   onClick?: () => void;
   variant?: 'default' | 'hot' | 'cold';
+  isProMode?: boolean;
   // Portfolio Specific Props
   holding?: {
     quantity: number;
@@ -35,7 +36,7 @@ interface StockCardProps {
 export function StockCard({
   type, name, code, image, score, price, change,
   volume, marketCap, priceHistory = [], position, fifaRank,
-  onClick, variant = 'default',
+  onClick, variant = 'default', isProMode = false,
   holding, isCaptain, onMakeCaptain
 }: StockCardProps) {
   const isPositive = change >= 0;
@@ -52,11 +53,11 @@ export function StockCard({
 
   return (
     <motion.div
-      whileHover={{ y: -6, boxShadow: `0 20px 40px ${accentColor}30` }}
+      whileHover={{ y: -8, boxShadow: `0 25px 45px -5px ${accentColor}50, 0 10px 20px rgba(0,0,0,0.8)` }}
       whileTap={{ scale: 0.98 }}
       onClick={onClick}
-      className={`relative bg-[#111827] border ${cardBorderColor} rounded-2xl overflow-hidden cursor-pointer w-full transition-all duration-300`}
-      style={{ boxShadow: `0 4px 20px rgba(0,0,0,0.4)` }}
+      className={`relative bg-glass border ${cardBorderColor} rounded-2xl overflow-hidden cursor-pointer w-full transition-all duration-300`}
+      style={{ boxShadow: `0 15px 35px -5px ${accentColor}20, 0 5px 15px rgba(0,0,0,0.6)` }}
     >
       {/* شريط علوي ملون */}
       <div className="h-1 w-full" style={{ backgroundColor: accentColor }} />
@@ -116,7 +117,7 @@ export function StockCard({
         </div>
 
         {/* Sparkline chart */}
-        {priceHistory.length > 0 && (
+        {isProMode && priceHistory.length > 0 && (
           <div className="mb-3 -mx-1 opacity-70">
             <Sparklines data={priceHistory} height={40}>
               <SparklinesLine
