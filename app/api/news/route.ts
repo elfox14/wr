@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import Parser from 'rss-parser';
 
 export async function GET() {
   try {
@@ -46,40 +45,7 @@ export async function GET() {
       });
     }
 
-    // 2. Fetch External News via RSS (e.g., from Kooora or Google News Arabic)
-    let externalNews: any[] = [];
-    try {
-      const parser = new Parser();
-      // Using an encoded URL to prevent ERR_UNESCAPED_CHARACTERS
-      const feedUrl = 'https://news.google.com/rss/search?q=%D9%83%D8%B1%D8%A9+%D8%A7%D9%84%D9%82%D8%AF%D9%85+%D9%83%D8%A3%D8%B3+%D8%A7%D9%84%D8%B9%D8%A7%D9%84%D9%85&hl=ar&gl=EG&ceid=EG:ar';
-      const feed = await parser.parseURL(feedUrl);
-      
-      externalNews = feed.items.slice(0, 10).map((item, index) => ({
-        id: `ext-${index}`,
-        title: item.title?.replace(/ - .*/, ''), // Remove publisher name from end if exists
-        source: item.source || 'أخبار الرياضة',
-        link: item.link,
-        date: item.pubDate ? new Date(item.pubDate).toISOString() : new Date().toISOString(),
-        type: 'external'
-      }));
-    } catch (rssError) {
-      console.error('Error fetching RSS:', rssError);
-      // Fallback external news if RSS fails
-      externalNews = [
-        {
-          id: 'ext-fallback-1',
-          title: 'الفيفا تعلن عن تحديثات جديدة في قرعة كأس العالم 2026',
-          source: 'وكالات',
-          date: new Date().toISOString(),
-          type: 'external'
-        }
-      ];
-    }
-
-    // Combine and return
-    const allNews = [...marketNews, ...externalNews];
-
-    return NextResponse.json({ news: allNews });
+    return NextResponse.json({ news: marketNews });
 
   } catch (error) {
     console.error('Error in news API:', error);
