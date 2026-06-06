@@ -50,36 +50,36 @@ export default function Home() {
       title: "اكتشف السوق",
       desc: "تصفح قائمة واسعة من المنتخبات وأبرز اللاعبين المشاركين.",
       num: "01",
-      icon: <Globe size={28} className="text-[#0FF0FC] mb-2" />
+      icon: <Globe size={28} className="text-primary mb-2" />
     },
     {
       title: "ابنِ محفظتك",
       desc: "اختر أصولك بعناية وقم بشرائها بالسعر الحالي للسوق.",
       num: "02",
-      icon: <ShieldCheck size={28} className="text-[#0FF0FC] mb-2" />
+      icon: <ShieldCheck size={28} className="text-primary mb-2" />
     },
     {
       title: "راقب المباريات",
       desc: "شاهد كيف ترتفع أسهمك مع كل هدف أو تمريرة حاسمة.",
       num: "03",
-      icon: <PlayCircle size={28} className="text-[#0FF0FC] mb-2" />
+      icon: <PlayCircle size={28} className="text-primary mb-2" />
     },
     {
       title: "اجنِ الأرباح",
       desc: "بع أسهمك في الوقت المناسب ونافس على المركز الأول.",
       num: "04",
-      icon: <Trophy size={28} className="text-[#0FF0FC] mb-2" />
+      icon: <Trophy size={28} className="text-primary mb-2" />
     }
   ];
 
   const faqs = [
     {
       question: "هل هذه المنصة للاستثمار الحقيقي والمراهنات؟",
-      answer: <>لا، WorldCup Exchange هي منصة <span className="text-[#0FF0FC] font-bold">افتراضية تماماً</span> مخصصة للمتعة والمنافسة فقط. جميع العملات والأسهم داخل المنصة افتراضية و<span className="text-[#FFD700] font-bold">لا تحمل أي قيمة نقدية حقيقية</span>.</>
+      answer: <>لا، WorldCup Exchange هي منصة <span className="text-primary font-bold">افتراضية تماماً</span> مخصصة للمتعة والمنافسة فقط. جميع العملات والأسهم داخل المنصة افتراضية و<span className="text-accent font-bold">لا تحمل أي قيمة نقدية حقيقية</span>.</>
     },
     {
       question: "كيف تتغير أسعار اللاعبين والمنتخبات؟",
-      answer: <>تعتمد <span className="text-[#0FF0FC] font-bold">خوارزمية تسعير الأسهم</span> على عاملين: الأداء الحقيقي في المباريات (أهداف، صناعة لعب، شباك نظيفة) وقانون العرض والطلب داخل المنصة (حركة البيع والشراء من قبل المستخدمين).</>
+      answer: <>تعتمد <span className="text-primary font-bold">خوارزمية تسعير الأسهم</span> على عاملين: الأداء الحقيقي في المباريات (أهداف، صناعة لعب، شباك نظيفة) وقانون العرض والطلب داخل المنصة (حركة البيع والشراء من قبل المستخدمين).</>
     },
     {
       question: "هل أستطيع إنشاء دوريات خاصة مع أصدقائي؟",
@@ -92,11 +92,11 @@ export default function Home() {
   ];
 
   return (
-    <main className="min-h-screen bg-[#0A0A0A] text-white overflow-hidden relative selection:bg-[#0FF0FC]/30 font-sans">
+    <main className="min-h-screen bg-background text-foreground overflow-hidden relative selection:bg-primary/30">
       {/* Cinematic Background */}
-      <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] opacity-10 pointer-events-none" />
-      <div className="absolute top-[-20%] left-[-10%] w-[70vw] h-[70vw] rounded-full bg-[#0FF0FC]/5 blur-[150px] pointer-events-none" />
-      <div className="absolute bottom-[-20%] right-[-10%] w-[70vw] h-[70vw] rounded-full bg-[#1e3a8a]/10 blur-[150px] pointer-events-none" />
+      <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] opacity-5 pointer-events-none" />
+      <div className="absolute top-[-20%] left-[-10%] w-[70vw] h-[70vw] rounded-full bg-primary/5 blur-[150px] pointer-events-none" />
+      <div className="absolute bottom-[-20%] right-[-10%] w-[70vw] h-[70vw] rounded-full bg-surface/50 blur-[150px] pointer-events-none" />
 
       <Navbar />
 
@@ -106,9 +106,9 @@ export default function Home() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
-          className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/5 border border-white/10 text-sm text-gray-300 mb-8 backdrop-blur-md"
+          className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-surface border border-white/5 text-sm text-gray-300 mb-8 shadow-sm"
         >
-          <span className="flex h-2 w-2 rounded-full bg-[#0FF0FC] animate-pulse" />
+          <span className="flex h-2 w-2 rounded-full bg-primary animate-pulse" />
           موسم المونديال قد بدأ. هل أنت مستعد للعبة؟
         </motion.div>
         
@@ -116,7 +116,7 @@ export default function Home() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.1 }}
-          className="text-5xl md:text-7xl lg:text-8xl font-extrabold tracking-tight mb-8 leading-[1.1] text-transparent bg-clip-text bg-gradient-to-b from-white to-gray-500"
+          className="text-5xl md:text-7xl lg:text-8xl font-extrabold tracking-tight mb-8 leading-[1.1] text-transparent bg-clip-text bg-gradient-to-b from-white to-gray-400"
         >
           بورصة كأس العالم
           <br />
@@ -138,11 +138,11 @@ export default function Home() {
           transition={{ duration: 0.6, delay: 0.3 }}
           className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto"
         >
-          <Link href="/market" className="px-8 py-4 bg-[#0FF0FC] text-black font-bold rounded-2xl text-lg hover:bg-white hover:scale-105 transition-all shadow-[0_0_20px_rgba(15,240,252,0.3)] flex items-center justify-center gap-2">
+          <Link href="/market" className="px-8 py-4 bg-primary text-white font-bold rounded-xl text-lg hover:bg-primary-light hover:-translate-y-1 transition-all shadow-anti-gravity flex items-center justify-center gap-2">
             <TrendingUp size={22} /> دخول السوق
           </Link>
-          <Link href="/leaderboard" className="px-8 py-4 bg-white/5 border border-white/10 text-white font-bold rounded-2xl text-lg hover:bg-white/10 hover:scale-105 transition-all backdrop-blur-sm flex items-center justify-center gap-2">
-            <Trophy size={22} className="text-[#FFD700]" /> لوحة الصدارة
+          <Link href="/leaderboard" className="px-8 py-4 bg-surface border border-white/10 text-white font-bold rounded-xl text-lg hover:bg-white/5 hover:-translate-y-1 transition-all shadow-sm flex items-center justify-center gap-2">
+            <Trophy size={22} className="text-accent" /> لوحة الصدارة
           </Link>
         </motion.div>
       </section>
@@ -157,11 +157,11 @@ export default function Home() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ delay: 0.2 }}
-            className="bg-gradient-to-br from-[#111] to-[#1a2f1c] border border-green-500/20 p-6 rounded-3xl relative overflow-hidden flex flex-col justify-between"
+            className="bg-surface border border-success/20 p-6 rounded-2xl relative overflow-hidden flex flex-col justify-between shadow-card hover:shadow-card-hover transition-shadow"
           >
             <div>
               <div className="flex items-center gap-2 mb-4">
-                <span className="bg-green-500 text-black px-2 py-1 rounded-md text-xs font-bold flex items-center gap-1 shadow-[0_0_10px_rgba(34,197,94,0.4)]">
+                <span className="bg-success text-white px-2 py-1 rounded-md text-xs font-bold flex items-center gap-1 shadow-sm">
                   <TrendingUp size={14}/> سهم محلق
                 </span>
               </div>
@@ -173,14 +173,14 @@ export default function Home() {
             <div className="mt-4 flex items-end justify-between">
               <div>
                 <p className="text-gray-400 text-xs">السعر الحالي</p>
-                <p className="text-2xl font-mono font-bold text-white">{topGainer?.current_price || '0.00'} ¢</p>
+                <p className="text-2xl font-bold text-white tabular-nums">{topGainer?.current_price || '0.00'} ¢</p>
               </div>
               {topGainer?.change === 0 ? (
-                <div className="bg-gray-500/20 text-gray-400 px-3 py-1 rounded-full text-sm font-bold flex items-center gap-1">
+                <div className="bg-white/5 text-gray-400 px-3 py-1 rounded-md text-sm font-bold flex items-center gap-1">
                   سعر افتتاحي
                 </div>
               ) : (
-                <div className="bg-green-500/20 text-green-400 px-3 py-1 rounded-full text-sm font-bold flex items-center gap-1">
+                <div className="bg-success/10 text-success px-3 py-1 rounded-md text-sm font-bold flex items-center gap-1">
                   +{topGainer?.change}%
                 </div>
               )}
@@ -193,11 +193,11 @@ export default function Home() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ delay: 0.3 }}
-            className="bg-gradient-to-br from-[#111] to-[#3a1a1a] border border-red-500/20 p-6 rounded-3xl relative overflow-hidden flex flex-col justify-between"
+            className="bg-surface border border-danger/20 p-6 rounded-2xl relative overflow-hidden flex flex-col justify-between shadow-card hover:shadow-card-hover transition-shadow"
           >
             <div>
               <div className="flex items-center gap-2 mb-4">
-                <span className="bg-red-500 text-white px-2 py-1 rounded-md text-xs font-bold flex items-center gap-1 shadow-[0_0_10px_rgba(239,68,68,0.4)]">
+                <span className="bg-danger text-white px-2 py-1 rounded-md text-xs font-bold flex items-center gap-1 shadow-sm">
                   <TrendingDown size={14}/> فرصة شراء؟
                 </span>
               </div>
@@ -209,14 +209,14 @@ export default function Home() {
             <div className="mt-4 flex items-end justify-between">
               <div>
                 <p className="text-gray-400 text-xs">السعر الحالي</p>
-                <p className="text-2xl font-mono font-bold text-white">{topLoser?.current_price || '0.00'} ¢</p>
+                <p className="text-2xl font-bold text-white tabular-nums">{topLoser?.current_price || '0.00'} ¢</p>
               </div>
               {topLoser?.change === 0 ? (
-                <div className="bg-gray-500/20 text-gray-400 px-3 py-1 rounded-full text-sm font-bold flex items-center gap-1">
+                <div className="bg-white/5 text-gray-400 px-3 py-1 rounded-md text-sm font-bold flex items-center gap-1">
                   سعر افتتاحي
                 </div>
               ) : (
-                <div className="bg-red-500/20 text-red-400 px-3 py-1 rounded-full text-sm font-bold flex items-center gap-1">
+                <div className="bg-danger/10 text-danger px-3 py-1 rounded-md text-sm font-bold flex items-center gap-1">
                   {topLoser?.change}%
                 </div>
               )}
@@ -232,7 +232,7 @@ export default function Home() {
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            className="text-3xl md:text-5xl font-extrabold mb-4"
+            className="text-3xl md:text-4xl font-extrabold mb-4"
           >
             كيف تلعب وتكسب؟
           </motion.h2>
@@ -240,11 +240,11 @@ export default function Home() {
             initial={{ opacity: 0, scale: 0 }}
             whileInView={{ opacity: 1, scale: 1 }}
             viewport={{ once: true }}
-            className="w-16 h-1 bg-[#0FF0FC] mx-auto rounded-full"
+            className="w-16 h-1 bg-primary mx-auto rounded-full"
           />
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8 relative">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-12 relative">
           {/* Connector Line (Desktop) */}
           <div className="hidden md:block absolute top-12 left-10 right-10 h-[2px] bg-white/5 z-0" />
           
@@ -255,32 +255,32 @@ export default function Home() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ delay: i * 0.1 }}
-              className="relative z-10 flex flex-col items-center text-center"
+              className="relative z-10 flex flex-col items-center text-center px-4"
             >
-              <div className="w-24 h-24 rounded-full bg-[#111] border-4 border-[#0FF0FC]/20 flex flex-col items-center justify-center text-3xl font-black text-white mb-6 shadow-[0_0_30px_rgba(15,240,252,0.1)] group hover:border-[#0FF0FC] hover:bg-[#0FF0FC]/10 transition-all duration-500 relative overflow-hidden">
+              <div className="w-24 h-24 rounded-full bg-surface border-4 border-surface flex flex-col items-center justify-center text-white mb-6 shadow-card group hover:border-primary/50 transition-all duration-300">
                 {step.icon}
-                <span className="text-xs text-transparent bg-clip-text bg-gradient-to-b from-white to-gray-500 font-mono tracking-widest">{step.num}</span>
+                <span className="text-xs text-gray-500 font-bold tracking-widest">{step.num}</span>
               </div>
-              <h3 className="text-2xl font-bold mb-3">{step.title}</h3>
-              <p className="text-gray-400 leading-relaxed">{step.desc}</p>
+              <h3 className="text-xl font-bold mb-3">{step.title}</h3>
+              <p className="text-gray-400 text-sm leading-relaxed">{step.desc}</p>
             </motion.div>
           ))}
         </div>
       </section>
 
       {/* 4. Market Insights (Articles) */}
-      <section className="relative z-10 bg-[#0A0A0A] border-y border-white/5 py-24">
+      <section className="relative z-10 bg-surface/50 border-y border-white/5 py-24">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-6">
             <div>
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#0FF0FC]/10 border border-[#0FF0FC]/20 text-[#0FF0FC] text-xs font-bold mb-4">
-                <Newspaper size={14} /> أحدث المقالات
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-primary/10 border border-primary/20 text-primary text-xs font-bold mb-4">
+                <Newspaper size={14} /> أهم التحليلات
               </div>
               <motion.h2 
                 initial={{ opacity: 0, x: 20 }}
                 whileInView={{ opacity: 1, x: 0 }}
                 viewport={{ once: true }}
-                className="text-3xl md:text-5xl font-extrabold mb-4"
+                className="text-3xl md:text-4xl font-extrabold mb-4"
               >
                 تحليلات وخبراء السوق
               </motion.h2>
@@ -289,7 +289,7 @@ export default function Home() {
                 whileInView={{ opacity: 1, x: 0 }}
                 viewport={{ once: true }}
                 transition={{ delay: 0.1 }}
-                className="text-gray-400 max-w-2xl"
+                className="text-gray-400 max-w-2xl text-sm"
               >
                 مقالات حصرية ونظرة تحليلية لمعرفة أسرار بناء المحافظ الاستثمارية الرابحة.
               </motion.p>
@@ -299,7 +299,7 @@ export default function Home() {
               whileInView={{ opacity: 1, scale: 1 }}
               viewport={{ once: true }}
             >
-              <Link href="/articles" className="inline-flex items-center gap-2 px-6 py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl font-bold transition-all text-sm">
+              <Link href="/articles" className="inline-flex items-center gap-2 px-6 py-3 bg-surface hover:bg-white/5 border border-white/10 rounded-xl font-bold transition-all text-sm">
                 عرض جميع المقالات <ArrowLeftIcon />
               </Link>
             </motion.div>
@@ -314,22 +314,22 @@ export default function Home() {
                 viewport={{ once: true }}
                 transition={{ delay: i * 0.1 }}
               >
-                <Link href={`/article/${article.id}`} className="group flex flex-col h-full bg-[#111] rounded-3xl border border-white/5 overflow-hidden hover:border-[#0FF0FC]/40 transition-all hover:-translate-y-2">
-                  <div className="h-56 w-full relative overflow-hidden">
-                    <div className="absolute inset-0 bg-gradient-to-t from-[#111] to-transparent z-10 opacity-80" />
+                <Link href={`/article/${article.id}`} className="group flex flex-col h-full bg-surface rounded-2xl border border-white/5 overflow-hidden hover:border-primary/40 transition-all shadow-card hover:shadow-card-hover hover:-translate-y-1">
+                  <div className="h-48 w-full relative overflow-hidden">
+                    <div className="absolute inset-0 bg-gradient-to-t from-surface to-transparent z-10 opacity-90" />
                     <img 
                       src={article.imageUrl} 
                       alt={article.title} 
-                      className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-700"
+                      className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-500"
                     />
                     <div className="absolute top-4 right-4 z-20">
-                      <span className="bg-black/50 backdrop-blur-md text-[#0FF0FC] text-xs px-3 py-1 rounded-full font-bold border border-white/10">
+                      <span className="bg-background/80 backdrop-blur-md text-white text-xs px-2 py-1 rounded-md font-bold border border-white/10">
                         {article.category}
                       </span>
                     </div>
                   </div>
-                  <div className="p-6 flex flex-col flex-1 relative z-20 -mt-10">
-                    <h3 className="text-xl font-bold mb-3 text-white group-hover:text-[#0FF0FC] transition-colors line-clamp-2 leading-snug">
+                  <div className="p-6 flex flex-col flex-1 relative z-20 -mt-8">
+                    <h3 className="text-lg font-bold mb-3 text-white group-hover:text-primary transition-colors line-clamp-2 leading-snug">
                       {article.title}
                     </h3>
                     <p className="text-gray-400 text-sm mb-6 line-clamp-2 leading-loose flex-1">
@@ -348,13 +348,13 @@ export default function Home() {
       </section>
 
       {/* 5. Features Grid */}
-      <section className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24 bg-gradient-to-b from-transparent via-[#111]/30 to-transparent">
+      <section className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24">
         <div className="text-center mb-16">
           <motion.h2 
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            className="text-3xl md:text-5xl font-extrabold mb-4"
+            className="text-3xl md:text-4xl font-extrabold mb-4"
           >
             لماذا WorldCup Exchange؟
           </motion.h2>
@@ -368,13 +368,13 @@ export default function Home() {
               whileInView={{ opacity: 1, scale: 1 }}
               viewport={{ once: true }}
               transition={{ delay: i * 0.1 }}
-              className="bg-[#111] p-8 rounded-3xl border border-white/5 hover:border-white/10 transition-all flex gap-6 items-start group"
+              className="bg-surface p-8 rounded-2xl border border-white/5 hover:border-white/10 transition-all flex gap-6 items-start group shadow-card"
             >
-              <div className="w-16 h-16 rounded-2xl bg-[#1A1A1A] flex items-center justify-center shrink-0 text-white group-hover:bg-[#0FF0FC] group-hover:text-black transition-colors">
+              <div className="w-14 h-14 rounded-xl bg-background flex items-center justify-center shrink-0 text-primary group-hover:bg-primary group-hover:text-white transition-colors">
                 {feat.icon}
               </div>
               <div>
-                <h3 className="text-2xl font-bold mb-2">{feat.title}</h3>
+                <h3 className="text-xl font-bold mb-2">{feat.title}</h3>
                 <p className="text-gray-400 leading-loose text-sm">{feat.description}</p>
               </div>
             </motion.div>
@@ -383,9 +383,9 @@ export default function Home() {
       </section>
 
       {/* 6. FAQ */}
-      <section className="relative z-10 bg-[#111] border-t border-white/5 py-24">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
+      <section className="relative z-10 py-24">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-12">
             <motion.h2 
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
@@ -403,13 +403,13 @@ export default function Home() {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ delay: i * 0.1 }}
-                className="bg-black border border-white/5 p-6 rounded-2xl cursor-pointer hover:border-white/20 transition-colors select-none"
+                className={`bg-surface border p-6 rounded-2xl cursor-pointer transition-colors select-none ${openFaq === i ? 'border-primary/30' : 'border-white/5 hover:border-white/20'}`}
                 onClick={() => setOpenFaq(openFaq === i ? null : i)}
               >
                 <div className="flex justify-between items-center">
-                  <h3 className="text-lg font-bold text-white pr-4">{faq.question}</h3>
-                  <div className="shrink-0 bg-white/5 p-2 rounded-full">
-                    {openFaq === i ? <ChevronUp size={20} className="text-[#0FF0FC]" /> : <ChevronDown size={20} className="text-gray-500" />}
+                  <h3 className="text-base font-bold text-white pr-4">{faq.question}</h3>
+                  <div className="shrink-0 bg-background p-2 rounded-lg">
+                    {openFaq === i ? <ChevronUp size={18} className="text-primary" /> : <ChevronDown size={18} className="text-gray-500" />}
                   </div>
                 </div>
                 {openFaq === i && (
@@ -428,19 +428,16 @@ export default function Home() {
       </section>
 
       {/* 7. Final CTA */}
-      <section className="relative z-10 py-24 border-t border-white/5 overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-b from-[#0A0A0A] to-[#0A0A0A]" />
-        <div className="absolute top-1/2 left-1/2 w-[800px] h-[800px] bg-[#0FF0FC]/10 rounded-full blur-[120px] pointer-events-none -translate-x-1/2 -translate-y-1/2" />
-        
+      <section className="relative z-10 py-24 border-t border-white/5 bg-surface/30">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative z-20">
           <motion.h2 
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            className="text-5xl md:text-7xl font-black mb-8 leading-tight"
+            className="text-4xl md:text-6xl font-black mb-8 leading-tight"
           >
             لا تكتفِ بالمشاهدة.<br/>
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#0FF0FC] to-[#FFD700]">كن جزءاً من اللعبة.</span>
+            <span className="text-primary">كن جزءاً من اللعبة.</span>
           </motion.h2>
           <motion.div 
             initial={{ opacity: 0, y: 20 }}
@@ -450,7 +447,7 @@ export default function Home() {
           >
             <Link 
               href="/register"
-              className="inline-flex items-center gap-3 px-12 py-6 bg-gradient-to-r from-[#0FF0FC] to-[#098086] text-black font-extrabold rounded-2xl text-2xl hover:scale-105 transition-all shadow-[0_0_50px_rgba(15,240,252,0.5)]"
+              className="inline-flex items-center gap-3 px-10 py-5 bg-primary text-white font-extrabold rounded-xl text-xl hover:bg-primary-light hover:-translate-y-1 transition-all shadow-anti-gravity"
             >
               أنشئ حسابك مجاناً <ArrowLeftIcon />
             </Link>
@@ -459,7 +456,7 @@ export default function Home() {
       </section>
 
       {/* Footer */}
-      <footer className="relative z-10 border-t border-white/5 bg-black py-8 text-center text-gray-600 text-sm">
+      <footer className="relative z-10 border-t border-white/5 bg-background py-8 text-center text-gray-600 text-sm">
         <div className="max-w-7xl mx-auto px-4">
           <p className="font-bold text-gray-500 mb-2">WorldCup Exchange © 2026</p>
           <p className="max-w-2xl mx-auto">منصة ترفيهية تفاعلية. جميع الأرقام والأصول افتراضية ولا تمثل تداولاً حقيقياً بأموال واقعية.</p>
@@ -469,7 +466,6 @@ export default function Home() {
   );
 }
 
-// Simple internal component to avoid missing imports for ArrowLeft
 function ArrowLeftIcon() {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
