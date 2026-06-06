@@ -1,16 +1,41 @@
-"use client";
-
-import React, { use } from 'react';
+import React from 'react';
 import { notFound } from 'next/navigation';
 import { getArticleById } from '@/lib/articles';
 import { Navbar } from '@/components/ui/Navbar';
 import Link from 'next/link';
 import { ArrowRight, Calendar, User, Tag } from 'lucide-react';
-import Image from 'next/image';
+import { Metadata } from 'next';
 
-export default function ArticlePage({ params }: { params: Promise<{ id: string }> }) {
-  // Unwrap the promise for params
-  const { id } = use(params);
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  const { id } = await params;
+  const article = getArticleById(id);
+  
+  if (!article) {
+    return { title: 'مقال غير موجود' };
+  }
+
+  return {
+    title: article.title,
+    description: article.excerpt,
+    openGraph: {
+      title: article.title,
+      description: article.excerpt,
+      images: [{ url: article.imageUrl }],
+      type: 'article',
+      publishedTime: article.date,
+      authors: [article.author],
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: article.title,
+      description: article.excerpt,
+      images: [article.imageUrl],
+    }
+  };
+}
+
+export default async function ArticlePage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   
   const article = getArticleById(id);
 

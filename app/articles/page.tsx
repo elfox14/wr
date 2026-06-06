@@ -1,4 +1,13 @@
-"use client";
+import { Metadata } from 'next';
+
+export const metadata: Metadata = {
+  title: 'جميع المقالات والتحليلات',
+  description: 'المكتبة الشاملة لاستراتيجيات التداول، أخبار المونديال، وتحليل أداء المنتخبات واللاعبين في كأس العالم.',
+  openGraph: {
+    title: 'جميع المقالات والتحليلات | WorldCup Exchange',
+    description: 'استراتيجيات تداول وتحليلات كأس العالم.',
+  }
+};
 
 import React from 'react';
 import { Navbar } from '@/components/ui/Navbar';
