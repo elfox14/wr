@@ -32,9 +32,9 @@ export function Navbar() {
                 <>
                   <Link href="/portfolio" className="text-gray-300 hover:text-white transition-colors">المحفظة</Link>
                   <Link href="/leaderboard" className="text-gray-300 hover:text-white transition-colors">الترتيب</Link>
-                  <Link href="/rewards" className="text-accent font-bold hover:text-white transition-colors">المكافآت</Link>
+                  <Link href="/rewards" className="text-gray-300 hover:text-white transition-colors font-bold border-b-2 border-transparent hover:border-accent">المكافآت</Link>
                   {/* Mock admin access check based on role, for demo just showing link */}
-                  <Link href="/admin" className="text-red-400 hover:text-red-300 font-medium transition-colors">
+                  <Link href="/admin" className="text-gray-300 hover:text-white transition-colors font-bold border-b-2 border-transparent hover:border-danger">
                     الإدارة
                   </Link>
                 </>

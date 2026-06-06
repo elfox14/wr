@@ -22,8 +22,8 @@ export function NewsTicker() {
   if (news.length === 0) return null;
 
   return (
-    <div className="w-full bg-[#0F0F0F] border-b border-white/5 overflow-hidden flex items-center h-12 text-sm sticky top-16 z-40">
-      <div className="bg-[#0FF0FC] text-black font-bold px-4 h-full flex items-center z-10 whitespace-nowrap shadow-[5px_0_15px_rgba(0,0,0,0.5)]">
+    <div className="w-full bg-surface border-b border-white/5 overflow-hidden flex items-center h-12 text-sm">
+      <div className="bg-primary text-black font-bold px-4 h-full flex items-center z-10 whitespace-nowrap shadow-[5px_0_15px_rgba(0,0,0,0.5)]">
         أخبار السوق
       </div>
       
@@ -46,8 +46,8 @@ export function NewsTicker() {
         <div className="animate-ticker w-full">
           {news.map((item, i) => (
             <div key={item.id + i} className="inline-flex items-center gap-2 mx-8 text-gray-300 hover:text-white transition-colors">
-              {item.type === 'market_up' && <TrendingUp size={16} className="text-green-500" />}
-              {item.type === 'market_down' && <TrendingDown size={16} className="text-red-500" />}
+              {item.type === 'market_up' && <TrendingUp size={16} className="text-success" />}
+              {item.type === 'market_down' && <TrendingDown size={16} className="text-danger" />}
               {item.type === 'external' && <Globe size={16} className="text-blue-400" />}
               
               {item.link ? (
