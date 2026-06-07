@@ -117,8 +117,8 @@ export default function AssetClient() {
                   const pct = (diff / asset.fairValue) * 100;
                   const isPremium = diff > 0;
                   return (
-                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${isPremium ? 'bg-danger/10 text-danger' : 'bg-success/10 text-success'}`}>
-                      {isPremium ? 'علاوة ' : 'خصم '}
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${isPremium ? 'bg-red-500/10 text-red-500' : 'bg-green-500/10 text-green-500'}`}>
+                      {isPremium ? 'علاوة (Premium) ' : 'خصم (Discount) '}
                       {isPremium ? '+' : ''}{pct.toFixed(1)}%
                     </span>
                   );
@@ -145,22 +145,30 @@ export default function AssetClient() {
             </div>
             
             {/* Meta tags for pricing context */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6 pt-6 border-t border-white/5">
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 mt-6 pt-6 border-t border-white/5">
               <div>
-                <p className="text-xs text-gray-500">مؤشر المخاطرة</p>
-                <p className="font-mono font-bold text-white">{asset.riskIndex ? `${(asset.riskIndex * 10).toFixed(1)}/10` : '-'}</p>
+                <p className="text-xs text-gray-500">الزخم (Momentum)</p>
+                <p className="font-mono font-bold text-white">{asset.momentum ?? '-'}</p>
               </div>
               <div>
-                <p className="text-xs text-gray-500">حجم المتداولين</p>
-                <p className="font-mono font-bold text-white">{asset.ownersCount?.toLocaleString() || '0'}</p>
+                <p className="text-xs text-gray-500">الطلب (Demand)</p>
+                <p className="font-mono font-bold text-white">{asset.marketDemand ?? '-'}</p>
               </div>
               <div>
-                <p className="text-xs text-gray-500">مؤشر الانسجام</p>
-                <p className="font-mono font-bold text-green-400">{asset.harmony ? `${(asset.harmony * 100).toFixed(0)}%` : '-'}</p>
+                <p className="text-xs text-gray-500">الإرث (Legacy)</p>
+                <p className="font-mono font-bold text-white">{asset.worldCupLegacy ?? '-'}</p>
               </div>
               <div>
-                <p className="text-xs text-gray-500">{asset.type === 'TEAM' ? 'المدرب' : 'النادي'}</p>
-                <p className="font-bold text-white truncate">{asset.coach || asset.club || '-'}</p>
+                <p className="text-xs text-gray-500">الأساسيات (Fundamental)</p>
+                <p className="font-mono font-bold text-white">{asset.fundamental ?? '-'}</p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500">الشعبية (Popularity)</p>
+                <p className="font-mono font-bold text-white">{asset.popularity ?? '-'}</p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500">مؤشر التقلب</p>
+                <p className="font-mono font-bold text-white">{asset.volatilityScore ?? '-'}</p>
               </div>
             </div>
           </div>
