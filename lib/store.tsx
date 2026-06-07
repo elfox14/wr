@@ -52,7 +52,32 @@ export interface Holding {
   currentValue?: number;
   profitLoss?: number;
   profitLossPercent?: number;
+  tradePrice?: number;
+  fairValue?: number;
+  costBasis?: number;
+  pnl?: number;
+  pnlPercent?: number;
+  premiumDiscountPercent?: number;
+  volatilityScore?: number;
+  momentum?: number;
+  marketDemand?: number;
   asset?: Asset;
+}
+
+export interface PortfolioAnalytics {
+  balance: number;
+  holdingsValue: number;
+  netWorth: number;
+  totalCostBasis: number;
+  unrealizedPnL: number;
+  unrealizedPnLPercent: number;
+  bestPerformer: Holding | null;
+  worstPerformer: Holding | null;
+  allocationByType: { teams: number; players: number };
+  allocationByPosition: { GK: number; DEF: number; MID: number; FWD: number };
+  allocationByRisk: { low: number; medium: number; high: number };
+  portfolioRisk: number;
+  holdings: Holding[];
 }
 
 export interface UserStats {
@@ -92,12 +117,14 @@ interface AppState {
   userStats: UserStats | null;
   captainId: string | null;
   achievements: Achievement[];
+  portfolioAnalytics: PortfolioAnalytics | null;
   loading: boolean;
   notifications: string[];
   
   fetchAssets: () => Promise<void>;
   fetchMatches: () => Promise<void>;
   fetchPortfolio: () => Promise<void>;
+  fetchPortfolioAnalytics: () => Promise<void>;
   buyAsset: (assetId: string, quantity: number) => Promise<void>;
   sellAsset: (assetId: string, quantity: number) => Promise<void>;
   setCaptain: (assetId: string) => Promise<void>;
@@ -112,6 +139,7 @@ export const useStore = create<AppState>((set, get) => ({
   userStats: null,
   captainId: null,
   achievements: [],
+  portfolioAnalytics: null,
   loading: true,
   notifications: [],
 
@@ -152,6 +180,21 @@ export const useStore = create<AppState>((set, get) => ({
     } catch (err) {
       console.error(err);
       set({ holdings: [], userStats: null, captainId: null, achievements: [] });
+    }
+  },
+
+  fetchPortfolioAnalytics: async () => {
+    try {
+      const res = await fetch('/api/portfolio/analytics');
+      if (!res.ok) {
+        set({ portfolioAnalytics: null });
+        return;
+      }
+      const data = await res.json();
+      set({ portfolioAnalytics: data });
+    } catch (err) {
+      console.error(err);
+      set({ portfolioAnalytics: null });
     }
   },
 

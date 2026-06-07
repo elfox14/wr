@@ -10,6 +10,7 @@ import { PortfolioCharts } from '@/components/portfolio/PortfolioCharts';
 import { TransactionHistory } from '@/components/portfolio/TransactionHistory';
 import { AchievementsList } from '@/components/portfolio/AchievementsList';
 import { PitchPortfolio } from '@/components/portfolio/PitchPortfolio';
+import { PortfolioAnalyticsDashboard } from '@/components/portfolio/PortfolioAnalyticsDashboard';
 
 export default function PortfolioPage() {
   const { holdings, userStats, captainId, achievements, fetchPortfolio, setCaptain } = useStore();
@@ -40,73 +41,20 @@ export default function PortfolioPage() {
           </Link>
         </PageHeader>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-          <div className="bg-surface p-6 rounded-2xl border border-white/5 shadow-card hover:shadow-card-hover transition-shadow">
-            <p className="text-gray-400 text-sm mb-2 uppercase tracking-widest flex items-center gap-2"><Wallet size={16}/> الرصيد النقدي</p>
-            <p className="text-3xl font-bold text-white tabular-nums">{userStats.balance} ¢</p>
-          </div>
-          <div className="bg-surface p-6 rounded-2xl border border-white/5 shadow-card hover:shadow-card-hover transition-shadow">
-            <p className="text-gray-400 text-sm mb-2 uppercase tracking-widest">إجمالي الأصول</p>
-            <p className="text-3xl font-bold text-white tabular-nums">{userStats.total_holdings_value} ¢</p>
-          </div>
-          <div className={`p-6 rounded-2xl border shadow-card hover:shadow-card-hover transition-shadow ${userStats.total_profit >= 0 ? 'bg-success/10 border-success/30' : 'bg-danger/10 border-danger/30'}`}>
-            <p className="text-gray-400 text-sm mb-2 uppercase tracking-widest">صافي الأرباح</p>
-            <div className="flex items-end gap-3">
-              <p className={`text-3xl font-bold tabular-nums ${userStats.total_profit >= 0 ? 'text-success' : 'text-danger'}`}>
-                {userStats.total_profit >= 0 ? '+' : ''}{userStats.total_profit} ¢
-              </p>
-              <p className={`text-lg font-bold mb-1 flex items-center tabular-nums ${userStats.total_profit >= 0 ? 'text-success' : 'text-danger'}`}>
-                {userStats.total_profit >= 0 ? <TrendingUp size={20}/> : <TrendingDown size={20}/>}
-                {Math.abs(totalProfitPercent).toFixed(2)}%
-              </p>
-            </div>
-          </div>
+        {/* The new professional analytics dashboard */}
+        <PortfolioAnalyticsDashboard />
+
+        <div className="mt-12 mb-12">
+          <PortfolioCharts holdings={holdings} />
         </div>
 
-        <PortfolioCharts holdings={holdings} />
-
         {/* The 4-Slot Pitch */}
-        <PitchPortfolio 
-          playerHoldings={holdings.filter(h => h.asset?.type === 'PLAYER')}
-          captainId={captainId}
-          setCaptain={setCaptain}
-        />
-
-        <h2 className="text-xl font-bold mb-4">أسهم المنتخبات</h2>
-        <div className="bg-surface p-6 border border-white/5 rounded-2xl shadow-card mb-12">
-          {holdings.filter(h => h.asset?.type === 'TEAM').length === 0 ? (
-            <div className="text-center py-16 text-gray-500">
-              <Briefcase size={48} className="mx-auto mb-4 opacity-20" />
-              <p className="text-xl mb-4">لا تمتلك أي أسهم منتخبات حالياً.</p>
-              <Link href="/market" className="bg-primary/10 text-primary border border-primary/30 px-6 py-3 rounded-xl font-bold hover:bg-primary/20 transition-all">
-                اذهب إلى السوق للشراء
-              </Link>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              {holdings.filter(h => h.asset?.type === 'TEAM').map(h => (
-                <div key={h.id} className="relative">
-                  <StockCard 
-                    type="TEAM"
-                    name={h.asset!.name}
-                    code={h.asset!.code}
-                    image={h.asset!.image}
-                    score={h.asset!.score || 0}
-                    price={h.asset!.current_price}
-                    change={h.asset!.change}
-                    fifaRank={h.asset!.fifaRank || undefined}
-                    holding={{
-                      quantity: h.quantity,
-                      avg_buy_price: h.avg_buy_price,
-                      positionType: h.positionType,
-                      profitLoss: h.profitLoss,
-                      profitLossPercent: h.profitLossPercent
-                    }}
-                  />
-                </div>
-              ))}
-            </div>
-          )}
+        <div className="mb-12">
+          <PitchPortfolio 
+            playerHoldings={holdings.filter(h => h.asset?.type === 'PLAYER')}
+            captainId={captainId}
+            setCaptain={setCaptain}
+          />
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
