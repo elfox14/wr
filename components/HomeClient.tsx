@@ -272,12 +272,6 @@ export default function HomeClient({ initialAssets }: { initialAssets: any[] }) 
           </Link>
         </section>
 
-        {/* ── FOOTER ── */}
-        <footer className="bento-footer py-6 text-center text-gray-600 text-sm">
-          <p className="font-bold text-gray-500 mb-1">WorldCup Exchange © 2026</p>
-          <p className="text-xs max-w-xl mx-auto">منصة ترفيهية تفاعلية. جميع الأرقام والأصول افتراضية ولا تمثل تداولاً حقيقياً بأموال واقعية.</p>
-        </footer>
-
       </main>
     </>
   );

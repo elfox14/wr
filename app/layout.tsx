@@ -5,6 +5,7 @@ import { Providers } from "@/components/Providers";
 import { NotificationProvider } from "@/components/ui/NotificationProvider";
 import { GlobalTicker } from "@/components/ui/GlobalTicker";
 import { Navbar } from "@/components/ui/Navbar";
+import { Footer } from "@/components/ui/Footer";
 
 const cairo = Cairo({
   variable: "--font-cairo",
@@ -77,9 +78,10 @@ export default function RootLayout({
         <Providers>
           <NotificationProvider>
             <Navbar />
-            <div className="pb-10"> {/* Padding bottom for the fixed ticker */}
+            <div className="pb-10 min-h-[calc(100vh-100px)]"> {/* Padding bottom for the fixed ticker */}
               {children}
             </div>
+            <Footer />
             <GlobalTicker />
           </NotificationProvider>
         </Providers>
