@@ -14,36 +14,52 @@ export async function POST(request: Request) {
     const asset = await prisma.asset.findUnique({ where: { id: assetId } });
     if (!asset) return NextResponse.json({ error: 'Asset not found' }, { status: 404 });
 
-    // Determine impact
-    let percentChange = 0;
+    // Economy Refactor: News Impact Engine
+    let momentumChange = 0;
+    let demandChange = 0;
     let newsTitle = customNews;
 
     if (impactPercentage) {
-      percentChange = parseFloat(impactPercentage);
+      momentumChange = parseFloat(impactPercentage);
     } else {
-      // Equations from PRD
       switch (eventType) {
-        case 'WIN': percentChange = 10; newsTitle = `فوز ${asset.name}!`; break;
-        case 'QUALIFY': percentChange = 15; newsTitle = `تأهل ${asset.name} للدور القادم!`; break;
-        case 'LOSS': percentChange = -10; newsTitle = `خسارة ${asset.name}`; break;
-        case 'ELIMINATED': percentChange = -20; newsTitle = `خروج ${asset.name} من البطولة`; break;
-        case 'GOAL': percentChange = 5; newsTitle = `هدف لصالح ${asset.name}`; break;
-        case 'INJURY': percentChange = -5; newsTitle = `إصابة ${asset.name}`; break;
-        case 'RED_CARD': percentChange = -8; newsTitle = `طرد ${asset.name}`; break;
-        default: percentChange = 0;
+        case 'WIN': momentumChange = 20; demandChange = 15; newsTitle = `فوز ${asset.name}!`; break;
+        case 'QUALIFY': momentumChange = 30; demandChange = 20; newsTitle = `تأهل ${asset.name} للدور القادم!`; break;
+        case 'LOSS': momentumChange = -20; demandChange = -15; newsTitle = `خسارة ${asset.name}`; break;
+        case 'ELIMINATED': momentumChange = -40; demandChange = -30; newsTitle = `خروج ${asset.name} من البطولة`; break;
+        case 'GOAL': momentumChange = 10; demandChange = 5; newsTitle = `هدف لصالح ${asset.name}`; break;
+        case 'ASSIST': momentumChange = 6; demandChange = 2; newsTitle = `صناعة هدف بواسطة ${asset.name}`; break;
+        case 'INJURY': momentumChange = -15; demandChange = -10; newsTitle = `إصابة ${asset.name}`; break;
+        case 'RED_CARD': momentumChange = -12; demandChange = -8; newsTitle = `طرد ${asset.name}`; break;
+        default: momentumChange = 0; demandChange = 0;
       }
     }
 
     if (!newsTitle) newsTitle = 'تحديث مهم';
 
-    // Calculate new price
-    const changeAmount = Math.round(asset.current_price * (percentChange / 100));
-    const newPrice = asset.current_price + changeAmount;
+    // Update momentum and demand (clamp between 0-100)
+    const newMomentum = Math.min(Math.max((asset.momentum || 50) + momentumChange, 0), 100);
+    const newDemand = Math.min(Math.max((asset.marketDemand || 50) + demandChange, 0), 100);
+
+    // Calculate percentChange based on volatilityScore
+    const volatility = asset.volatilityScore || 10;
+    // Base change is momentumChange, scaled by volatility. 
+    // E.g. Yamal (vol=70) with goal (mom=+10) -> (10 * 70/100) = +7%
+    // Messi (vol=15) with goal (mom=+10) -> (10 * 15/100) = +1.5%
+    const percentChange = momentumChange * (volatility / 100);
+
+    // Calculate new price (Using marketPrice if available, fallback to current_price)
+    const basePrice = asset.marketPrice || asset.current_price;
+    const changeAmount = Math.round(basePrice * (percentChange / 100));
+    const newPrice = basePrice + changeAmount;
     
     await prisma.asset.update({
       where: { id: asset.id },
       data: {
-        current_price: newPrice,
+        momentum: newMomentum,
+        marketDemand: newDemand,
+        marketPrice: newPrice,
+        current_price: newPrice, // Kept for backwards compatibility
         change: percentChange, 
         high_price: Math.max(asset.high_price, newPrice),
         low_price: Math.min(asset.low_price, newPrice),

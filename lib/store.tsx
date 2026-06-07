@@ -7,6 +7,8 @@ export interface Asset {
   code: string;
   image: string;
   current_price: number;
+  fairValue?: number;
+  marketPrice?: number;
   high_price: number;
   low_price: number;
   market_cap: string;

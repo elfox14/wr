@@ -20,6 +20,11 @@ model User {
   role             String         @default("USER") // USER or ADMIN
   createdAt        DateTime       @default(now())
 
+  // Ad Rewards
+  adsWatchedToday     Int         @default(0)
+  adsWatchedLifetime  Int         @default(0)
+  rewardCreditsEarned Int         @default(0)
+
   // Rewards & Referrals
   lastDailyReward  DateTime?
   lastWeeklyReward DateTime?
@@ -159,7 +164,16 @@ model Asset {
   riskIndex         Float?  @default(0.5) // 0.0 to 1.0
   ownersCount       Int     @default(0)
   globalMarketValue Float?  // in millions, e.g. 180 for Mbappe
-  popularity        Float?  @default(0.5) // 0.0 to 1.0
+  
+  // --- ECONOMY REFACTOR FIELDS ---
+  popularity        Float?  @default(50) // Global fan popularity (0-100)
+  fundamental       Float?  @default(50) // Football quality (0-100)
+  worldCupLegacy    Float?  @default(50) // Historical legacy (0-100)
+  marketDemand      Float?  @default(50) // Calculated from trading activity
+  momentum          Float?  @default(50) // Short term performance
+  volatilityScore   Float?  @default(10) // e.g. Yamal=70, Messi=15
+  fairValue         Float?  @default(0)  // Calculated from 5 pillars
+  marketPrice       Float?  @default(0)  // Affected by real supply/demand
   // -------------------------------------
 
   // Relation: A player belongs to a team

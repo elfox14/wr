@@ -286,7 +286,9 @@ export default function MarketClient({
                   {filterType === 'ALL' && <th className="p-4 font-bold text-center">النوع</th>}
 
                   <th className="p-4 font-bold text-center">التقييم (Score)</th>
-                  <th className="p-4 font-bold text-center">السعر الحالي</th>
+                  <th className="p-4 font-bold text-center">القيمة العادلة</th>
+                  <th className="p-4 font-bold text-center">سعر السوق</th>
+                  <th className="p-4 font-bold text-center">العلاوة/الخصم</th>
                   <th className="p-4 font-bold text-center">التغير (24h)</th>
                   <th className="p-4 font-bold text-left">إجراء</th>
                 </tr>
@@ -347,8 +349,28 @@ export default function MarketClient({
                       {asset.score || 'N/A'}
                     </td>
                     
+                    <td className="p-4 text-center text-gray-300 tabular-nums font-mono">
+                      {asset.fairValue ? `${asset.fairValue} ¢` : '-'}
+                    </td>
+
                     <td className="p-4 text-center font-bold text-white tabular-nums">
-                      {asset.current_price} ¢
+                      {(asset.marketPrice || asset.current_price)} ¢
+                    </td>
+
+                    <td className="p-4 text-center tabular-nums">
+                      {(() => {
+                        const mv = asset.marketPrice || asset.current_price;
+                        const fv = asset.fairValue;
+                        if (!fv) return '-';
+                        const diff = mv - fv;
+                        const pct = (diff / fv) * 100;
+                        const isPremium = diff > 0;
+                        return (
+                          <span className={`px-2 py-1 rounded-md text-xs font-bold ${isPremium ? 'bg-danger/10 text-danger' : 'bg-success/10 text-success'}`}>
+                            {isPremium ? '+' : ''}{pct.toFixed(1)}%
+                          </span>
+                        );
+                      })()}
                     </td>
                     
                     <td className="p-4 text-center">

@@ -17,15 +17,32 @@ export default function RewardsPage() {
   const [copied, setCopied] = useState(false);
   const [adTimer, setAdTimer] = useState<number | null>(null);
 
+  const [rewardStatus, setRewardStatus] = useState<any>(null);
+
   useEffect(() => {
     if (status === 'unauthenticated') {
       router.push('/login');
     }
   }, [status, router]);
 
+  const fetchRewardStatus = async () => {
+    try {
+      const res = await fetch('/api/rewards');
+      if (res.ok) {
+        const data = await res.json();
+        setRewardStatus(data);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   useEffect(() => {
     if (session && !userStats) {
       fetchPortfolio();
+    }
+    if (session) {
+      fetchRewardStatus();
     }
   }, [session, userStats, fetchPortfolio]);
 
@@ -40,6 +57,7 @@ export default function RewardsPage() {
       } else {
         addNotification(data.message);
         await fetchPortfolio();
+        await fetchRewardStatus();
       }
     } catch (err) {
       addNotification('حدث خطأ في الخادم');
@@ -49,6 +67,11 @@ export default function RewardsPage() {
   };
 
   const handleWatchAd = () => {
+    if (rewardStatus?.ads?.watchedToday >= 20) {
+      addNotification('لقد وصلت للحد الأقصى للإعلانات اليوم (20/20)');
+      return;
+    }
+
     setLoadingAction('ad');
     setAdTimer(15);
     
@@ -74,6 +97,7 @@ export default function RewardsPage() {
       } else {
         addNotification(data.message);
         await fetchPortfolio();
+        await fetchRewardStatus();
       }
     } catch (err) {
       addNotification('حدث خطأ في الخادم');
@@ -101,6 +125,7 @@ export default function RewardsPage() {
         addNotification(data.message);
         setReferralInput('');
         await fetchPortfolio();
+        await fetchRewardStatus();
       }
     } catch (err) {
       addNotification('حدث خطأ في الخادم');
@@ -110,40 +135,16 @@ export default function RewardsPage() {
   };
 
   const copyReferralCode = () => {
-    if (userStats?.referralCode) {
-      navigator.clipboard.writeText(userStats.referralCode);
+    if (rewardStatus?.referral?.code) {
+      navigator.clipboard.writeText(rewardStatus.referral.code);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     }
   };
 
-  const checkCooldown = (lastRewardDate?: string, hoursRequired: number = 24) => {
-    if (!lastRewardDate) return { canClaim: true, timeLeft: '' };
-    
-    const lastDate = new Date(lastRewardDate);
-    const now = new Date();
-    const diffHours = (now.getTime() - lastDate.getTime()) / (1000 * 60 * 60);
-    
-    if (diffHours >= hoursRequired) {
-      return { canClaim: true, timeLeft: '' };
-    }
-    
-    const remainingHours = hoursRequired - diffHours;
-    const h = Math.floor(remainingHours);
-    const m = Math.floor((remainingHours - h) * 60);
-    
-    return { 
-      canClaim: false, 
-      timeLeft: `${h} ساعة و ${m} دقيقة` 
-    };
-  };
-
-  if (!userStats) {
+  if (!userStats || !rewardStatus) {
     return <div className="p-8 text-center text-white">جاري التحميل...</div>;
   }
-
-  const dailyStatus = checkCooldown(userStats.lastDailyReward, 24);
-  const weeklyStatus = checkCooldown(userStats.lastWeeklyReward, 168);
 
   return (
     <div className="min-h-screen bg-background text-foreground pb-20 selection:bg-primary/30">
@@ -169,17 +170,18 @@ export default function RewardsPage() {
               </div>
               <div>
                 <h2 className="text-xl font-bold text-white">مشاهدة إعلان</h2>
-                <p className="text-sm text-gray-400">+500 كوين لكل إعلان</p>
+                <p className="text-sm text-gray-400">+150 كوين لكل إعلان</p>
+                <p className="text-xs text-[#0FF0FC] mt-1">شاهدت {rewardStatus.ads.watchedToday} من {rewardStatus.ads.maxPerDay} إعلانات اليوم</p>
               </div>
             </div>
           </div>
           
           <button 
             onClick={handleWatchAd}
-            disabled={loadingAction === 'ad'}
+            disabled={loadingAction === 'ad' || rewardStatus.ads.watchedToday >= rewardStatus.ads.maxPerDay}
             className="w-full mt-4 bg-white/5 border border-white/10 hover:bg-[#0FF0FC]/20 hover:text-[#0FF0FC] hover:border-[#0FF0FC]/50 text-white font-bold py-3 px-4 rounded-xl transition-all disabled:opacity-50"
           >
-            {adTimer !== null ? `جاري المشاهدة... (${adTimer}ث)` : 'شاهد الآن'}
+            {adTimer !== null ? `جاري المشاهدة... (${adTimer}ث)` : (rewardStatus.ads.watchedToday >= rewardStatus.ads.maxPerDay ? 'الحد الأقصى اليومي' : 'شاهد الآن')}
           </button>
         </div>
 
@@ -193,12 +195,12 @@ export default function RewardsPage() {
               </div>
               <div>
                 <h2 className="text-xl font-bold text-white">المكافأة اليومية</h2>
-                <p className="text-sm text-gray-400">+1000 كوين يومياً</p>
+                <p className="text-sm text-gray-400">+500 كوين يومياً</p>
               </div>
             </div>
           </div>
           
-          {dailyStatus.canClaim ? (
+          {rewardStatus.daily.available ? (
             <button 
               onClick={() => handleClaim('daily')}
               disabled={loadingAction === 'daily'}
@@ -208,7 +210,7 @@ export default function RewardsPage() {
             </button>
           ) : (
             <button disabled className="w-full mt-4 bg-white/5 border border-white/10 text-gray-500 font-bold py-3 px-4 rounded-xl cursor-not-allowed flex items-center justify-center gap-2">
-              <AlertCircle size={18} /> متاحة بعد {dailyStatus.timeLeft}
+              <AlertCircle size={18} /> متاحة غداً
             </button>
           )}
         </div>
@@ -228,7 +230,7 @@ export default function RewardsPage() {
             </div>
           </div>
           
-          {weeklyStatus.canClaim ? (
+          {rewardStatus.weekly.available ? (
             <button 
               onClick={() => handleClaim('weekly')}
               disabled={loadingAction === 'weekly'}
@@ -238,7 +240,7 @@ export default function RewardsPage() {
             </button>
           ) : (
             <button disabled className="w-full mt-4 bg-white/5 border border-white/10 text-gray-500 font-bold py-3 px-4 rounded-xl cursor-not-allowed flex items-center justify-center gap-2">
-              <AlertCircle size={18} /> متاحة بعد {weeklyStatus.timeLeft}
+              <AlertCircle size={18} /> غير متاحة بعد
             </button>
           )}
         </div>
@@ -264,7 +266,7 @@ export default function RewardsPage() {
               <p className="text-sm text-gray-400 mb-2">كود الدعوة الخاص بك (انشره لأصدقائك)</p>
               <div className="flex items-center gap-2">
                 <div className="bg-black/50 border border-white/10 p-3 rounded-xl flex-1 text-center font-mono text-xl text-white tracking-widest">
-                  {userStats.referralCode || 'جاري التوليد...'}
+                  {rewardStatus.referral.code || 'جاري التوليد...'}
                 </div>
                 <button 
                   onClick={copyReferralCode}

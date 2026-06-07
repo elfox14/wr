@@ -107,7 +107,22 @@ export default function AssetClient() {
             <div className="mt-6 md:mt-0 text-right relative z-10 flex flex-col items-end">
               <p className="text-gray-500 text-xs mb-1 uppercase tracking-widest font-bold">السعر السوقي المباشر</p>
               <div className="flex items-center gap-4">
-                <p className="text-5xl font-mono font-black text-[#0FF0FC]">{asset.current_price} ¢</p>
+                <p className="text-5xl font-mono font-black text-[#0FF0FC]">{(asset.marketPrice || asset.current_price)} ¢</p>
+              </div>
+              <div className="flex items-center gap-2 mt-2">
+                <p className="text-sm text-gray-400 font-mono">القيمة العادلة: {asset.fairValue || '-'} ¢</p>
+                {asset.fairValue && (() => {
+                  const mv = asset.marketPrice || asset.current_price;
+                  const diff = mv - asset.fairValue;
+                  const pct = (diff / asset.fairValue) * 100;
+                  const isPremium = diff > 0;
+                  return (
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${isPremium ? 'bg-danger/10 text-danger' : 'bg-success/10 text-success'}`}>
+                      {isPremium ? 'علاوة ' : 'خصم '}
+                      {isPremium ? '+' : ''}{pct.toFixed(1)}%
+                    </span>
+                  );
+                })()}
               </div>
               <div className={`mt-2 flex items-center gap-1 font-bold text-lg px-3 py-1 rounded-full ${isUp ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
                 {isUp ? <TrendingUp size={20} /> : <TrendingDown size={20} />}

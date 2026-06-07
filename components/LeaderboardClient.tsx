@@ -14,6 +14,7 @@ interface LeaderboardUser {
   avatar: string;
   profit: number;
   netWorth: number;
+  roi?: number;
   isReal: boolean;
 }
 
@@ -135,11 +136,16 @@ export default function LeaderboardClient() {
                   </div>
 
                   <div className="text-right">
-                    <p className="text-sm text-gray-400 mb-1">صافي الثروة</p>
+                    <p className="text-sm text-gray-400 mb-1">صافي الثروة / ROI</p>
                     <p className="text-2xl font-bold text-success flex items-center justify-end gap-1 tabular-nums">
                       <TrendingUp size={20} />
                       {user.netWorth?.toLocaleString() || user.profit.toLocaleString()} ¢
                     </p>
+                    {user.roi !== undefined && (
+                      <p className={`text-sm font-mono mt-1 ${user.roi >= 0 ? 'text-success' : 'text-danger'}`}>
+                        {user.roi >= 0 ? '+' : ''}{user.roi}%
+                      </p>
+                    )}
                   </div>
                 </div>
               );

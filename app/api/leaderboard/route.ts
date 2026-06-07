@@ -55,6 +55,8 @@ export async function GET(request: Request) {
       if (timeframe === 'weekly') { profit = Math.round(profit * 0.2); displayNetWorth = Math.round(netWorth * 0.2); }
       if (timeframe === 'monthly') { profit = Math.round(profit * 0.6); displayNetWorth = Math.round(netWorth * 0.6); }
 
+      const roi = ((displayNetWorth - 10000) / 10000) * 100;
+
       return {
         id: u.id,
         name: u.name || 'مستخدم',
@@ -62,6 +64,7 @@ export async function GET(request: Request) {
         avatar: u.image || '👤',
         profit: profit,
         netWorth: displayNetWorth,
+        roi: Number(roi.toFixed(2)),
         isReal: true
       };
     });
@@ -81,6 +84,7 @@ export async function GET(request: Request) {
         avatar: f.avatar,
         profit: baseProfit,
         netWorth: baseProfit + 10000, // Simulated net worth
+        roi: Number((((baseProfit + 10000) - 10000) / 10000 * 100).toFixed(2)),
         isReal: false
       };
     });

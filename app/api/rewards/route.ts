@@ -80,6 +80,11 @@ export async function GET(req: Request) {
         code: referralCode,
         totalReferred: successfulReferrals,
         amountPerReferral: 2000
+      },
+      ads: {
+        watchedToday: user.adsWatchedToday,
+        maxPerDay: 20,
+        amountPerAd: 150
       }
     });
   } catch (error) {
