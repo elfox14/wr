@@ -135,6 +135,7 @@ export async function POST(request: Request) {
             where: { id: asset.id },
             data: {
               current_price: finalNewPriceBuy,
+              marketPrice: finalNewPriceBuy,
               high_price: Math.max(asset.high_price, finalNewPriceBuy),
               low_price: Math.min(asset.low_price, finalNewPriceBuy),
               priceHistory: {
@@ -251,6 +252,7 @@ export async function POST(request: Request) {
             where: { id: asset.id },
             data: {
               current_price: finalNewPriceSell,
+              marketPrice: finalNewPriceSell,
               high_price: Math.max(asset.high_price, finalNewPriceSell),
               low_price: Math.min(asset.low_price, finalNewPriceSell),
               priceHistory: {

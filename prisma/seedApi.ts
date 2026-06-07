@@ -1,5 +1,5 @@
 import { PrismaClient } from '@prisma/client';
-import { calculatePlayerPrice, calculateTeamPrice, calculateAssetScore } from '../lib/scoring';
+import { calculateFairValue, calculateAssetScore } from '../lib/scoring';
 import { getFlagUrl } from '../lib/images';
 
 const prisma = new PrismaClient();
@@ -240,15 +240,7 @@ async function main() {
 
     console.log(`⚽ ${flag} ${teamName} (${tla}) — Rank: ${rank} | Pop: ${teamPopularity.toFixed(2)} | WC: ${participations} | Squad: ${squad.length}`);
 
-    // Calculate team score based on FIFA rank (display-only)
-    let teamScoreRaw = 100 - (rank * 0.9);
-    if (rank > 10) teamScoreRaw = 91 - ((rank - 10) * 0.6);
-    if (rank > 30) teamScoreRaw = 79 - ((rank - 30) * 0.4);
-    if (rank > 50) teamScoreRaw = 71 - ((rank - 50) * 0.2);
-    if (rank === 1) teamScoreRaw = 99;
-    if (rank === 2) teamScoreRaw = 98;
-    if (rank === 3) teamScoreRaw = 97;
-    const teamScore = Math.max(55, Math.min(99, Math.round(teamScoreRaw)));
+    // Team score is now calculated via calculateAssetScore later.
 
     // Process players with SMART TIER
     const processedPlayers = squad.map((p: any, idx: number) => {
@@ -271,7 +263,8 @@ async function main() {
       
       const score = calculateAssetScore(tempPlayerObj);
       (tempPlayerObj as any).score = score;
-      const price = calculatePlayerPrice(tempPlayerObj);
+      const fairValue = calculateFairValue(score, 'PLAYER');
+      const price = fairValue;
 
       return { apiId: p.id, name: p.name, pos, age, tier, price, score, pop, nationality: p.nationality || '' };
     });
@@ -295,7 +288,8 @@ async function main() {
           volume: '0'
         };
         p.score = calculateAssetScore(tempObj);
-        p.price = calculatePlayerPrice(tempObj);
+        p.fairValue = calculateFairValue(p.score, 'PLAYER');
+        p.price = p.fairValue;
       }
     }
 
@@ -315,10 +309,12 @@ async function main() {
       playerTier: p.tier,
     }));
 
-    const teamPrice = calculateTeamPrice(teamPartial, squadForPricing);
+    const teamScore = calculateAssetScore(teamPartial, squadForPricing);
+    const teamFairValue = calculateFairValue(teamScore, 'TEAM');
+    const teamPrice = teamFairValue;
 
-    // ── RISK INDEX (graduated) ──
-    const teamRisk = rank <= 5 ? 0.2 : rank <= 10 ? 0.3 : rank <= 20 ? 0.45 : rank <= 35 ? 0.6 : 0.75;
+    // ── VOLATILITY SCORE (formerly Risk Index) ──
+    const volatilityScore = rank <= 5 ? 20 : rank <= 10 ? 30 : rank <= 20 ? 45 : rank <= 35 ? 60 : 75;
 
     // Save team
     await prisma.asset.upsert({
@@ -334,9 +330,16 @@ async function main() {
         coach: coachName,
         participations,
         ownersCount: Math.floor(Math.random() * 5000 + 500),
-        riskIndex: teamRisk,
+        riskIndex: volatilityScore / 100,
+        volatilityScore: volatilityScore,
         harmony: 0.85,
-        popularity: teamPopularity,
+        popularity: teamPopularity * 100,
+        fundamental: teamScore, // approximated
+        worldCupLegacy: Math.min(100, participations * 5),
+        marketDemand: 50,
+        momentum: 50,
+        marketPrice: teamPrice,
+        fairValue: teamPrice,
       },
       create: {
         id: dbTeamId,
@@ -357,9 +360,16 @@ async function main() {
         group: 'TBD',
         participations,
         ownersCount: Math.floor(Math.random() * 5000 + 500),
-        riskIndex: teamRisk,
+        riskIndex: volatilityScore / 100,
+        volatilityScore: volatilityScore,
         harmony: 0.85,
-        popularity: teamPopularity,
+        popularity: teamPopularity * 100,
+        fundamental: teamScore, // approximated
+        worldCupLegacy: Math.min(100, participations * 5),
+        marketDemand: 50,
+        momentum: 50,
+        marketPrice: teamPrice,
+        fairValue: teamPrice,
         priceHistory: { create: { price: teamPrice } },
       },
     });
@@ -413,7 +423,15 @@ async function main() {
           position: p.pos,
           score: p.score,
           playerTier: p.tier,
-          popularity: p.pop,
+          popularity: p.pop * 100,
+          fundamental: p.tier * 100,
+          worldCupLegacy: p.age > 30 ? 60 : 30, // approximate
+          marketDemand: 50,
+          momentum: 50,
+          marketPrice: p.price,
+          fairValue: p.price,
+          volatilityScore: 50,
+          riskIndex: 0.5
         },
         create: {
           id: dbPlayerId,
@@ -433,7 +451,15 @@ async function main() {
           playerTier: p.tier,
           age: p.age,
           globalMarketValue: p.tier > 0.8 ? 80 : p.tier > 0.6 ? 40 : 15,
-          popularity: p.pop,
+          popularity: p.pop * 100,
+          fundamental: p.tier * 100,
+          worldCupLegacy: p.age > 30 ? 60 : 30, // approximate
+          marketDemand: 50,
+          momentum: 50,
+          marketPrice: p.price,
+          fairValue: p.price,
+          volatilityScore: 50,
+          riskIndex: 0.5,
           priceHistory: { create: { price: p.price } },
         },
       });

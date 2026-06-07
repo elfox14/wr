@@ -41,33 +41,32 @@ export async function POST(request: Request) {
     const newMomentum = Math.min(Math.max((asset.momentum || 50) + momentumChange, 0), 100);
     const newDemand = Math.min(Math.max((asset.marketDemand || 50) + demandChange, 0), 100);
 
-    // Calculate percentChange based on volatilityScore
-    const volatility = asset.volatilityScore || 10;
-    // Base change is momentumChange, scaled by volatility. 
-    // E.g. Yamal (vol=70) with goal (mom=+10) -> (10 * 70/100) = +7%
-    // Messi (vol=15) with goal (mom=+10) -> (10 * 15/100) = +1.5%
-    const percentChange = momentumChange * (volatility / 100);
+    // Recalculate fairValue
+    // Dynamically import to prevent circular dependencies if needed, or static import
+    const { calculateAssetScore, calculateFairValue } = await import('@/lib/scoring');
 
-    // Calculate new price (Using marketPrice if available, fallback to current_price)
-    const basePrice = asset.marketPrice || asset.current_price;
-    const changeAmount = Math.round(basePrice * (percentChange / 100));
-    const newPrice = basePrice + changeAmount;
+    // Create a temporary object to calculate the new score
+    const tempAsset = {
+      ...asset,
+      momentum: newMomentum,
+      marketDemand: newDemand,
+    };
+    
+    const newScore = calculateAssetScore(tempAsset);
+    const newFairValue = calculateFairValue(newScore, asset.type as 'PLAYER' | 'TEAM');
+    
+    // We update fairValue, momentum, and demand. MarketPrice remains unchanged.
+    // However, we record the percentage change in fairValue for notification purposes.
+    const oldFairValue = asset.fairValue || asset.current_price;
+    const percentChange = ((newFairValue - oldFairValue) / oldFairValue) * 100;
     
     await prisma.asset.update({
       where: { id: asset.id },
       data: {
         momentum: newMomentum,
         marketDemand: newDemand,
-        marketPrice: newPrice,
-        current_price: newPrice, // Kept for backwards compatibility
-        change: percentChange, 
-        high_price: Math.max(asset.high_price, newPrice),
-        low_price: Math.min(asset.low_price, newPrice),
-        priceHistory: {
-          create: {
-            price: newPrice
-          }
-        }
+        score: newScore,
+        fairValue: newFairValue,
       }
     });
 
@@ -77,13 +76,13 @@ export async function POST(request: Request) {
         assetId: asset.id,
         eventType: eventType,
         severity: Math.abs(percentChange) > 10 ? 'high' : 'normal',
-        priceBefore: asset.current_price,
-        priceAfter: newPrice,
+        priceBefore: oldFairValue,
+        priceAfter: newFairValue,
         changePercent: percentChange,
         titleAr: newsTitle,
         titleEn: 'Admin Event',
-        bodyAr: `تم تحديث سعر الأصل بنسبة ${percentChange}% بناءً على حدث إداري.`,
-        bodyEn: `Asset price updated by ${percentChange}% due to an admin event.`,
+        bodyAr: `تم تحديث القيمة العادلة للأصل بنسبة ${percentChange.toFixed(1)}% بناءً على حدث إداري.`,
+        bodyEn: `Asset fair value updated by ${percentChange.toFixed(1)}% due to an admin event.`,
       }
     });
 
@@ -106,7 +105,7 @@ export async function POST(request: Request) {
       });
     }
 
-    return NextResponse.json({ success: true, message: 'Event applied successfully', newPrice });
+    return NextResponse.json({ success: true, message: 'Event applied successfully', newFairValue });
   } catch (error) {
     console.error('Admin Event Error:', error);
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
