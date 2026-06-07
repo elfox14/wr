@@ -11,7 +11,17 @@ import {
 import { getAllArticles } from '@/lib/articles';
 import { AssetImage } from '@/components/ui/AssetImage';
 
-export default function HomeClient({ initialAssets }: { initialAssets: any[] }) {
+export default function HomeClient({ 
+  initialAssets, 
+  usersCount = 0, 
+  tradeVolume = 0, 
+  topUsersData = [] 
+}: { 
+  initialAssets: any[],
+  usersCount?: number,
+  tradeVolume?: number,
+  topUsersData?: any[]
+}) {
   // Sync the server-fetched assets into our global store silently if needed,
   // but we use initialAssets directly for rendering to avoid hydration mismatch.
   useEffect(() => {
@@ -23,12 +33,25 @@ export default function HomeClient({ initialAssets }: { initialAssets: any[] }) 
   const topLoser  = sortedAssets[sortedAssets.length - 1];
   const topArticle = getAllArticles()[0];
 
-  // Mock leaderboard top 3 — replace with real data later
-  const top3 = [
-    { rank: 1, name: 'أبو خالد', profit: '+42.3%', icon: <Crown size={16} className="text-accent" /> },
-    { rank: 2, name: 'سارة م.', profit: '+38.1%', icon: <Medal size={16} className="text-gray-300" /> },
-    { rank: 3, name: 'محمد ع.', profit: '+31.7%', icon: <Award size={16} className="text-amber-600" /> },
-  ];
+  // Map real leaderboard data, falling back to empty if none
+  const top3 = topUsersData.map((user, index) => {
+    const icons = [
+      <Crown key="1" size={16} className="text-accent" />,
+      <Medal key="2" size={16} className="text-gray-300" />,
+      <Award key="3" size={16} className="text-amber-600" />
+    ];
+    return {
+      rank: index + 1,
+      name: user.name || 'مستخدم',
+      profit: `+${user.total_profit} ¢`,
+      icon: icons[index]
+    };
+  });
+
+  // If no users have profit yet, show a placeholder
+  if (top3.length === 0) {
+    top3.push({ rank: 1, name: 'بانتظار المتصدر الأول', profit: '0 ¢', icon: <Crown key="empty" size={16} className="text-accent" /> });
+  }
 
   const renderAvatar = (asset: any) => {
     if (!asset) return <span className="text-2xl">⚽</span>;
@@ -125,14 +148,14 @@ export default function HomeClient({ initialAssets }: { initialAssets: any[] }) 
             <div className="flex items-center justify-center gap-1.5 mb-1.5 text-gray-400 text-xs">
               <Users size={14} /> المتداولين
             </div>
-            <div className="text-2xl font-black tabular-nums">250K<span className="text-sm text-gray-500">+</span></div>
+            <div className="text-2xl font-black tabular-nums">{usersCount}<span className="text-sm text-gray-500 hidden">+</span></div>
           </div>
           <div className="w-px h-10 bg-white/10" />
           <div className="text-center">
             <div className="flex items-center justify-center gap-1.5 mb-1.5 text-gray-400 text-xs">
               <Activity size={14} className="text-primary" /> حجم التداول
             </div>
-            <div className="text-2xl font-black tabular-nums">15.2M</div>
+            <div className="text-2xl font-black tabular-nums">{tradeVolume.toLocaleString()}</div>
           </div>
           <div className="w-px h-10 bg-white/10" />
           <div className="text-center">
