@@ -25,6 +25,30 @@ interface IpoClientProps {
 
 export default function IpoClient({ teams, players }: IpoClientProps) {
   const [activeTab, setActiveTab] = useState<'teams' | 'players'>('teams');
+  const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
+
+  useEffect(() => {
+    const targetDate = new Date('2026-06-11T00:00:00Z').getTime();
+
+    const interval = setInterval(() => {
+      const now = new Date().getTime();
+      const distance = targetDate - now;
+
+      if (distance < 0) {
+        clearInterval(interval);
+        setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0 });
+      } else {
+        setTimeLeft({
+          days: Math.floor(distance / (1000 * 60 * 60 * 24)),
+          hours: Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)),
+          minutes: Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60)),
+          seconds: Math.floor((distance % (1000 * 60)) / 1000)
+        });
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, []);
 
   // Helper to group array by property
   const groupBy = (array: any[], key: string) => {
@@ -55,13 +79,23 @@ export default function IpoClient({ teams, players }: IpoClientProps) {
           </div>
         </div>
         
-        <div className="flex gap-4 text-center">
-          {['DAYS', 'HOURS', 'MINUTES', 'SECONDS'].map((label, i) => (
-            <div key={label} className="flex flex-col">
-              <span className="text-3xl md:text-4xl font-black font-mono text-emerald-400">{i === 0 ? '734' : i === 1 ? '12' : i === 2 ? '45' : '10'}</span>
-              <span className="text-xs text-neutral-500 font-bold tracking-wider">{label}</span>
-            </div>
-          ))}
+        <div className="flex gap-4 text-center" dir="ltr">
+          <div className="flex flex-col">
+            <span className="text-3xl md:text-4xl font-black font-mono text-emerald-400">{timeLeft.days}</span>
+            <span className="text-xs text-neutral-500 font-bold tracking-wider">DAYS</span>
+          </div>
+          <div className="flex flex-col">
+            <span className="text-3xl md:text-4xl font-black font-mono text-emerald-400">{timeLeft.hours.toString().padStart(2, '0')}</span>
+            <span className="text-xs text-neutral-500 font-bold tracking-wider">HOURS</span>
+          </div>
+          <div className="flex flex-col">
+            <span className="text-3xl md:text-4xl font-black font-mono text-emerald-400">{timeLeft.minutes.toString().padStart(2, '0')}</span>
+            <span className="text-xs text-neutral-500 font-bold tracking-wider">MINUTES</span>
+          </div>
+          <div className="flex flex-col">
+            <span className="text-3xl md:text-4xl font-black font-mono text-emerald-400">{timeLeft.seconds.toString().padStart(2, '0')}</span>
+            <span className="text-xs text-neutral-500 font-bold tracking-wider">SECONDS</span>
+          </div>
         </div>
       </div>
 
