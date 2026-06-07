@@ -16,7 +16,13 @@ export function GlobalTicker() {
       .catch(console.error);
   }, []);
 
-  if (marketNews.length === 0) return null;
+  if (marketNews.length === 0) {
+    marketNews.push(
+      { id: 'fallback-1', titleAr: 'مرحباً بكم في منصة WorldCup Exchange! ابدأ بناء محفظتك الآن.', changePercent: null, asset: { image: '🌟' } },
+      { id: 'fallback-2', titleAr: 'الأسعار الحالية هي الأسعار الافتتاحية.. ترقبوا انطلاق المونديال!', changePercent: null, asset: { image: '📈' } },
+      { id: 'fallback-3', titleAr: 'تابع قسم المقالات للحصول على تحليلات دقيقة لأفضل الاستثمارات.', changePercent: null, asset: { image: '🗞️' } }
+    );
+  }
 
   return (
     <div className="fixed bottom-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-t border-white/10 shadow-[0_-8px_30px_rgba(0,0,0,0.4)] flex h-10 sm:h-12 overflow-hidden group">
