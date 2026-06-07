@@ -106,6 +106,20 @@ export async function GET(request: Request) {
     
     const portfolioRisk = holdingsValue > 0 ? Math.round(totalRiskWeight / holdingsValue) : 0;
 
+    const riskLabel =
+      portfolioRisk <= 30
+        ? 'Conservative'
+        : portfolioRisk <= 60
+          ? 'Balanced'
+          : 'Aggressive';
+
+    const riskLabelAr =
+      portfolioRisk <= 30
+        ? 'محافظ'
+        : portfolioRisk <= 60
+          ? 'متوازن'
+          : 'هجومي';
+
     const allocationByType = {
       teams: holdingsValue > 0 ? Math.round((teamsValue / holdingsValue) * 100) : 0,
       players: holdingsValue > 0 ? Math.round((playersValue / holdingsValue) * 100) : 0
@@ -130,6 +144,28 @@ export async function GET(request: Request) {
       worstPerformer = null;
     }
 
+    const insights: string[] = [];
+
+    if (portfolioRisk > 70) {
+      insights.push('محفظتك عالية المخاطر بسبب الاعتماد على أصول متقلبة.');
+    }
+
+    if (allocationByType.teams > 70) {
+      insights.push('محفظتك تميل إلى المنتخبات أكثر من اللاعبين.');
+    }
+
+    if (allocationByType.players > 70) {
+      insights.push('محفظتك تعتمد بشكل كبير على اللاعبين.');
+    }
+
+    if (unrealizedPnLPercent > 20) {
+      insights.push('أداء محفظتك ممتاز حتى الآن.');
+    }
+
+    if (unrealizedPnLPercent < -15) {
+      insights.push('محفظتك متراجعة، راجع الأصول ذات الزخم الضعيف.');
+    }
+
     return NextResponse.json({
       balance: user.balance,
       holdingsValue,
@@ -143,6 +179,9 @@ export async function GET(request: Request) {
       allocationByPosition,
       allocationByRisk,
       portfolioRisk,
+      riskLabel,
+      riskLabelAr,
+      insights,
       holdings: enhancedHoldings
     });
   } catch (error) {

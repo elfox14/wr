@@ -77,6 +77,9 @@ export interface PortfolioAnalytics {
   allocationByPosition: { GK: number; DEF: number; MID: number; FWD: number };
   allocationByRisk: { low: number; medium: number; high: number };
   portfolioRisk: number;
+  riskLabel: string;
+  riskLabelAr: string;
+  insights: string[];
   holdings: Holding[];
 }
 

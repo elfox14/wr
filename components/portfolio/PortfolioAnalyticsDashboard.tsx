@@ -30,39 +30,51 @@ export function PortfolioAnalyticsDashboard() {
     allocationByPosition,
     allocationByRisk,
     portfolioRisk,
+    riskLabel,
+    riskLabelAr,
+    insights,
     holdings
   } = portfolioAnalytics;
 
   // Render Insight Messages
   const renderInsights = () => {
-    const insights = [];
-    if (portfolioRisk > 70) insights.push({ msg: "محفظتك عالية المخاطر بسبب الاعتماد على أصول متقلبة.", icon: <AlertTriangle className="text-orange-500" size={18}/>, color: "border-orange-500/30 bg-orange-500/10 text-orange-400" });
-    if (allocationByType.teams > 70) insights.push({ msg: "محفظتك تميل إلى المنتخبات أكثر من اللاعبين.", icon: <Activity className="text-blue-500" size={18}/>, color: "border-blue-500/30 bg-blue-500/10 text-blue-400" });
-    if (allocationByType.players > 70) insights.push({ msg: "محفظتك تعتمد بشكل كبير على اللاعبين.", icon: <Activity className="text-purple-500" size={18}/>, color: "border-purple-500/30 bg-purple-500/10 text-purple-400" });
-    if (unrealizedPnLPercent > 20) insights.push({ msg: "أداء محفظتك ممتاز حتى الآن.", icon: <CheckCircle className="text-green-500" size={18}/>, color: "border-green-500/30 bg-green-500/10 text-green-400" });
-    if (unrealizedPnLPercent < -15) insights.push({ msg: "محفظتك متراجعة، راجع الأصول ذات الزخم الضعيف.", icon: <AlertCircle className="text-red-500" size={18}/>, color: "border-red-500/30 bg-red-500/10 text-red-400" });
-
-    if (insights.length === 0) return null;
+    if (!insights || insights.length === 0) return null;
 
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-        {insights.map((insight, idx) => (
-          <div key={idx} className={`p-4 rounded-xl border flex items-center gap-3 ${insight.color}`}>
-            {insight.icon}
-            <span className="font-bold text-sm">{insight.msg}</span>
-          </div>
-        ))}
+        {insights.map((msg, idx) => {
+          let color = "border-blue-500/30 bg-blue-500/10 text-blue-400";
+          let icon = <Activity className="text-blue-500" size={18}/>;
+          
+          if (msg.includes("مخاطر") || msg.includes("متراجعة")) {
+            color = "border-red-500/30 bg-red-500/10 text-red-400";
+            icon = <AlertCircle className="text-red-500" size={18}/>;
+          } else if (msg.includes("ممتاز")) {
+            color = "border-green-500/30 bg-green-500/10 text-green-400";
+            icon = <CheckCircle className="text-green-500" size={18}/>;
+          } else if (msg.includes("اللاعبين")) {
+            color = "border-purple-500/30 bg-purple-500/10 text-purple-400";
+            icon = <Activity className="text-purple-500" size={18}/>;
+          }
+
+          return (
+            <div key={idx} className={`p-4 rounded-xl border flex items-center gap-3 ${color}`}>
+              {icon}
+              <span className="font-bold text-sm">{msg}</span>
+            </div>
+          );
+        })}
       </div>
     );
   };
 
-  const getRiskLabel = (risk: number) => {
-    if (risk <= 30) return { label: 'محافظ (Conservative)', color: 'text-green-500', bar: 'bg-green-500' };
-    if (risk <= 60) return { label: 'متوازن (Balanced)', color: 'text-blue-500', bar: 'bg-blue-500' };
-    return { label: 'هجومي (Aggressive)', color: 'text-orange-500', bar: 'bg-orange-500' };
+  const getRiskColor = (risk: number) => {
+    if (risk <= 30) return { color: 'text-green-500', bar: 'bg-green-500' };
+    if (risk <= 60) return { color: 'text-blue-500', bar: 'bg-blue-500' };
+    return { color: 'text-orange-500', bar: 'bg-orange-500' };
   };
 
-  const riskInfo = getRiskLabel(portfolioRisk);
+  const riskInfo = getRiskColor(portfolioRisk);
 
   return (
     <div className="space-y-8">
@@ -155,7 +167,7 @@ export function PortfolioAnalyticsDashboard() {
           </div>
           <div>
             <div className="flex justify-between items-end mb-2">
-              <span className={`text-xl font-black ${riskInfo.color}`}>{riskInfo.label}</span>
+              <span className={`text-xl font-black ${riskInfo.color}`}>{riskLabelAr} ({riskLabel})</span>
               <span className="text-2xl font-mono text-white">{portfolioRisk}<span className="text-sm text-gray-500">/100</span></span>
             </div>
             <div className="w-full bg-black/50 rounded-full h-3 border border-white/5">
