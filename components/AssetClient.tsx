@@ -131,44 +131,81 @@ export default function AssetClient() {
             </div>
           </div>
 
-          {/* Strength Bar */}
+          {/* Strength Bar & Asset Analysis */}
           <div className="bg-[#121212] border border-white/5 rounded-xl p-6 shadow-lg">
             <div className="flex justify-between items-center mb-2">
-              <h3 className="font-bold text-gray-300 flex items-center gap-2"><Zap className="text-[#FFD700]" size={18} /> مؤشر القوة الشامل</h3>
+              <h3 className="font-bold text-gray-300 flex items-center gap-2"><Zap className="text-[#FFD700]" size={18} /> مؤشر القوة الشامل (Fundamental)</h3>
               <span className="font-mono text-2xl font-black text-white">{asset.score || 0}<span className="text-gray-500 text-lg">/100</span></span>
             </div>
-            <div className="w-full bg-black/50 rounded-full h-4 overflow-hidden border border-white/10">
+            <div className="w-full bg-black/50 rounded-full h-4 overflow-hidden border border-white/10 mb-8">
               <div 
                 className="h-full bg-gradient-to-r from-yellow-600 via-[#FFD700] to-yellow-300 transition-all duration-1000 ease-out"
                 style={{ width: `${Math.min(100, Math.max(0, asset.score || 0))}%` }}
               ></div>
             </div>
             
-            {/* Meta tags for pricing context */}
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 mt-6 pt-6 border-t border-white/5">
-              <div>
-                <p className="text-xs text-gray-500">الزخم (Momentum)</p>
-                <p className="font-mono font-bold text-white">{asset.momentum ?? '-'}</p>
-              </div>
-              <div>
-                <p className="text-xs text-gray-500">الطلب (Demand)</p>
-                <p className="font-mono font-bold text-white">{asset.marketDemand ?? '-'}</p>
-              </div>
-              <div>
-                <p className="text-xs text-gray-500">الإرث (Legacy)</p>
-                <p className="font-mono font-bold text-white">{asset.worldCupLegacy ?? '-'}</p>
-              </div>
-              <div>
-                <p className="text-xs text-gray-500">الأساسيات (Fundamental)</p>
-                <p className="font-mono font-bold text-white">{asset.fundamental ?? '-'}</p>
-              </div>
-              <div>
-                <p className="text-xs text-gray-500">الشعبية (Popularity)</p>
-                <p className="font-mono font-bold text-white">{asset.popularity ?? '-'}</p>
-              </div>
-              <div>
-                <p className="text-xs text-gray-500">مؤشر التقلب</p>
-                <p className="font-mono font-bold text-white">{asset.volatilityScore ?? '-'}</p>
+            <div className="border-t border-white/10 pt-6">
+              <h3 className="font-bold text-gray-300 mb-4 flex items-center gap-2"><Target className="text-[#0FF0FC]" size={18} /> تحليل السهم (Asset Analysis)</h3>
+              
+              {(() => {
+                const fairValue = asset.fairValue || asset.current_price;
+                const marketPrice = asset.marketPrice || asset.current_price;
+                const premiumDiscountPercent = fairValue > 0 ? ((marketPrice - fairValue) / fairValue) * 100 : 0;
+                
+                let statusText = "السهم قريب من قيمته العادلة";
+                let statusColor = "text-gray-400 bg-gray-500/10 border-gray-500/20";
+                
+                if (premiumDiscountPercent > 10) {
+                  statusText = "السهم أعلى من قيمته العادلة (Overvalued)";
+                  statusColor = "text-red-500 bg-red-500/10 border-red-500/20";
+                } else if (premiumDiscountPercent < -10) {
+                  statusText = "السهم أقل من قيمته العادلة (Undervalued)";
+                  statusColor = "text-green-500 bg-green-500/10 border-green-500/20";
+                }
+
+                return (
+                  <div className="bg-black/40 border border-white/5 rounded-lg p-4 mb-6">
+                    <div className="flex flex-wrap justify-between items-center mb-4 gap-4">
+                      <div>
+                        <p className="text-xs text-gray-500 mb-1">السعر السوقي</p>
+                        <p className="font-mono text-xl font-bold text-white">{marketPrice} ¢</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-500 mb-1">القيمة العادلة</p>
+                        <p className="font-mono text-xl font-bold text-gray-300">{fairValue} ¢</p>
+                      </div>
+                      <div className={`px-4 py-2 rounded-lg border font-bold text-sm ${statusColor}`}>
+                        {statusText} ({premiumDiscountPercent > 0 ? '+' : ''}{premiumDiscountPercent.toFixed(1)}%)
+                      </div>
+                    </div>
+                    <p className="text-xs text-gray-500 italic">
+                      القيمة العادلة تعتمد على تقييم اللاعب/المنتخب، بينما سعر السوق يتحرك حسب تداولات المستخدمين.
+                    </p>
+                  </div>
+                );
+              })()}
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {[
+                  { label: 'الزخم (Momentum)', value: asset.momentum || 0, color: 'bg-blue-500' },
+                  { label: 'الطلب في السوق (Market Demand)', value: asset.marketDemand || 0, color: 'bg-[#0FF0FC]' },
+                  { label: 'إرث المونديال (World Cup Legacy)', value: asset.worldCupLegacy || 0, color: 'bg-purple-500' },
+                  { label: 'مؤشر التقلب (Volatility Score)', value: asset.volatilityScore || 0, color: 'bg-orange-500' },
+                  { label: 'الشعبية (Popularity)', value: asset.popularity || 0, color: 'bg-pink-500' },
+                ].map((stat, idx) => (
+                  <div key={idx}>
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-xs text-gray-400">{stat.label}</span>
+                      <span className="text-xs font-mono font-bold text-white">{stat.value}/100</span>
+                    </div>
+                    <div className="w-full bg-black/50 rounded-full h-2 border border-white/5">
+                      <div 
+                        className={`h-full rounded-full ${stat.color} transition-all duration-1000 ease-out`}
+                        style={{ width: `${Math.min(100, Math.max(0, stat.value))}%` }}
+                      ></div>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
