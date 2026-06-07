@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { PageHeader } from '@/components/ui/PageHeader';
-import { Users, Plus, LogIn, Trophy, ArrowLeft } from 'lucide-react';
+import { Users, Plus, LogIn, Trophy, ArrowLeft, Crown, TrendingUp, BarChart3, Copy, CheckCircle2 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'react-hot-toast';
@@ -14,6 +14,9 @@ interface League {
   inviteCode: string;
   memberCount: number;
   isCreator: boolean;
+  myRank?: number;
+  myNetWorth?: number;
+  topMemberName?: string;
 }
 
 export default function GroupsPage() {
@@ -28,6 +31,8 @@ export default function GroupsPage() {
 
   const [joinCode, setJoinCode] = useState('');
   const [isJoining, setIsJoining] = useState(false);
+
+  const [copiedCode, setCopiedCode] = useState<string | null>(null);
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -107,21 +112,68 @@ export default function GroupsPage() {
     }
   };
 
+  const copyToClipboard = (code: string, e: React.MouseEvent) => {
+    e.preventDefault(); // Prevent link navigation
+    navigator.clipboard.writeText(code);
+    setCopiedCode(code);
+    toast.success('تم نسخ رمز الدعوة');
+    setTimeout(() => setCopiedCode(null), 2000);
+  };
+
   if (status === 'loading' || loading) {
     return <div className="min-h-screen bg-background flex items-center justify-center"><div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin"></div></div>;
   }
+
+  // Calculate Summary Stats
+  const totalMembers = leagues.reduce((acc, l) => acc + l.memberCount, 0);
+  const bestRank = leagues.length > 0 ? Math.min(...leagues.map(l => l.myRank || 99999)) : 0;
+  const bestNetWorth = leagues.length > 0 ? Math.max(...leagues.map(l => l.myNetWorth || 0)) : 0;
 
   return (
     <div className="min-h-screen bg-background text-foreground pb-20 selection:bg-primary/30">
       
       <main className="max-w-6xl mx-auto px-4 py-12">
         <PageHeader 
-          title="دوريات التحدي"
-          description="أنشئ دوري خاص بك ونافس أصدقاءك على المراكز الأولى"
+          title="دوريات التداول الاجتماعي"
+          description="تداول ونافس أصدقائك في دوريات خاصة. المتداول ذو المحفظة الأكبر يفوز بالتحدي."
           icon={<Users size={48} />}
           glowColor="bg-primary/10"
           textColor="text-primary"
         />
+
+        {/* SUMMARY CARDS */}
+        {leagues.length > 0 && (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-12">
+            <div className="bg-surface border border-white/5 shadow-card rounded-2xl p-6">
+              <p className="text-xs text-gray-500 uppercase tracking-widest mb-1">دورياتي</p>
+              <div className="flex items-end gap-3">
+                <span className="text-3xl font-black text-white">{leagues.length}</span>
+                <Trophy className="text-[#CD7F32] mb-1" size={24} />
+              </div>
+            </div>
+            <div className="bg-surface border border-white/5 shadow-card rounded-2xl p-6">
+              <p className="text-xs text-gray-500 uppercase tracking-widest mb-1">إجمالي الأعضاء</p>
+              <div className="flex items-end gap-3">
+                <span className="text-3xl font-black text-white">{totalMembers}</span>
+                <Users className="text-primary mb-1" size={24} />
+              </div>
+            </div>
+            <div className="bg-surface border border-white/5 shadow-card rounded-2xl p-6">
+              <p className="text-xs text-gray-500 uppercase tracking-widest mb-1">أفضل مركز حالي</p>
+              <div className="flex items-end gap-3">
+                <span className="text-3xl font-black text-white">#{bestRank === 99999 ? '-' : bestRank}</span>
+                <Crown className="text-[#FFD700] mb-1" size={24} />
+              </div>
+            </div>
+            <div className="bg-surface border border-white/5 shadow-card rounded-2xl p-6">
+              <p className="text-xs text-gray-500 uppercase tracking-widest mb-1">أفضل أداء لمحفظتك</p>
+              <div className="flex items-end gap-3">
+                <span className="text-3xl font-mono font-black text-white">{bestNetWorth} ¢</span>
+                <TrendingUp className="text-success mb-1" size={24} />
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-16">
           {/* Create League */}
@@ -130,7 +182,7 @@ export default function GroupsPage() {
               <Plus className="text-[#0FF0FC]" size={28} />
             </div>
             <h2 className="text-2xl font-bold mb-2">إنشاء دوري جديد</h2>
-            <p className="text-gray-400 mb-6">احصل على رمز دعوة خاص وشارك الرابط مع أصدقائك لبدء التحدي.</p>
+            <p className="text-gray-400 mb-6 text-sm">احصل على رمز دعوة خاص وشارك الرابط مع أصدقائك لبدء التحدي.</p>
             
             <form onSubmit={handleCreate} className="space-y-4">
               <input
@@ -157,7 +209,7 @@ export default function GroupsPage() {
               <LogIn className="text-[#CD7F32]" size={28} />
             </div>
             <h2 className="text-2xl font-bold mb-2">الانضمام إلى دوري</h2>
-            <p className="text-gray-400 mb-6">لديك رمز دعوة من صديق؟ أدخله هنا للانضمام إلى دوريه الخاص.</p>
+            <p className="text-gray-400 mb-6 text-sm">لديك رمز دعوة من صديق؟ أدخله هنا للانضمام إلى دوريه الخاص.</p>
             
             <form onSubmit={handleJoin} className="space-y-4">
               <input
@@ -189,26 +241,57 @@ export default function GroupsPage() {
               <p className="text-gray-400 text-lg">لم تنضم لأي دوري بعد.</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {leagues.map(league => (
-                <Link href={`/leagues/${league.id}`} key={league.id}>
-                  <div className="bg-surface shadow-card border border-white/5 rounded-2xl p-6 hover:border-primary/50 hover:shadow-card-hover transition-all group">
-                    <div className="flex justify-between items-start mb-4">
-                      <h3 className="font-bold text-xl text-white group-hover:text-[#0FF0FC] transition-colors">
-                        {league.name}
-                      </h3>
-                      {league.isCreator && (
-                        <span className="bg-[#FFD700]/20 text-[#FFD700] text-xs px-2 py-1 rounded">المنشئ</span>
-                      )}
+                <div key={league.id} className="bg-surface shadow-card border border-white/5 rounded-3xl p-6 hover:border-primary/50 hover:shadow-card-hover transition-all flex flex-col relative overflow-hidden group">
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full blur-3xl pointer-events-none group-hover:bg-primary/10 transition-colors"></div>
+                  
+                  <div className="flex justify-between items-start mb-6 relative z-10">
+                    <div>
+                      <h3 className="font-bold text-2xl text-white mb-2">{league.name}</h3>
+                      <div className="flex items-center gap-3">
+                        <span className="flex items-center gap-1 text-xs text-gray-400 bg-white/5 px-2 py-1 rounded"><Users size={14} /> {league.memberCount} عضو</span>
+                        {league.isCreator && (
+                          <span className="bg-[#FFD700]/20 text-[#FFD700] text-[10px] px-2 py-1 rounded font-bold uppercase tracking-widest">المنشئ</span>
+                        )}
+                      </div>
                     </div>
-                    <div className="flex justify-between items-center text-sm text-gray-400">
-                      <span className="flex items-center gap-1"><Users size={16} /> {league.memberCount} عضو</span>
-                      <span className="flex items-center gap-1 text-[#0FF0FC] opacity-0 group-hover:opacity-100 transition-opacity">
-                        عرض الترتيب <ArrowLeft size={16} />
-                      </span>
+                    
+                    {/* Invite Code Block */}
+                    <div className="flex flex-col items-end gap-2">
+                      <p className="text-[10px] text-gray-500 uppercase tracking-widest">رمز الدعوة</p>
+                      <button 
+                        onClick={(e) => copyToClipboard(league.inviteCode, e)}
+                        className="flex items-center gap-2 bg-black/40 border border-white/10 px-3 py-1.5 rounded-lg hover:bg-white/5 hover:border-white/20 transition cursor-copy"
+                        title="انسخ الرمز"
+                      >
+                        <span className="font-mono text-sm text-gray-300 font-bold">{league.inviteCode}</span>
+                        {copiedCode === league.inviteCode ? <CheckCircle2 size={14} className="text-success" /> : <Copy size={14} className="text-gray-400" />}
+                      </button>
                     </div>
                   </div>
-                </Link>
+
+                  <div className="grid grid-cols-3 gap-4 mb-6 relative z-10">
+                    <div className="bg-black/30 border border-white/5 rounded-xl p-4 text-center flex flex-col justify-center">
+                      <p className="text-[10px] text-gray-500 uppercase tracking-widest mb-1">مركزي الحالي</p>
+                      <p className="text-2xl font-black text-[#FFD700]">#{league.myRank || '-'}</p>
+                    </div>
+                    <div className="bg-black/30 border border-white/5 rounded-xl p-4 text-center flex flex-col justify-center">
+                      <p className="text-[10px] text-gray-500 uppercase tracking-widest mb-1">قيمة محفظتي</p>
+                      <p className="text-xl font-mono font-bold text-primary">{league.myNetWorth || 0} ¢</p>
+                    </div>
+                    <div className="bg-black/30 border border-white/5 rounded-xl p-4 text-center flex flex-col justify-center">
+                      <p className="text-[10px] text-gray-500 uppercase tracking-widest mb-1">المتصدر</p>
+                      <p className="text-sm font-bold text-white truncate px-1">{league.topMemberName || '-'}</p>
+                    </div>
+                  </div>
+
+                  <Link href={`/leagues/${league.id}`} className="mt-auto relative z-10">
+                    <button className="w-full bg-primary/10 text-primary hover:bg-primary hover:text-black font-bold py-3 rounded-xl transition-all flex justify-center items-center gap-2">
+                      <BarChart3 size={18} /> فتح لوحة الدوري
+                    </button>
+                  </Link>
+                </div>
               ))}
             </div>
           )}

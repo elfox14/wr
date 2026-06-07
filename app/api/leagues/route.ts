@@ -17,27 +17,70 @@ export async function GET(request: Request) {
 
     const userId = (session.user as any).id;
 
-    // Get leagues user is a member of
+    // Get leagues user is a member of, along with all members' holdings to calculate ranks
     const userLeagues = await prisma.leagueMember.findMany({
       where: { userId },
       include: {
         league: {
           include: {
-            _count: {
-              select: { members: true }
+            members: {
+              include: {
+                user: {
+                  include: {
+                    holdings: {
+                      include: {
+                        asset: true
+                      }
+                    }
+                  }
+                }
+              }
             }
           }
         }
       }
     });
 
-    const leagues = userLeagues.map(lm => ({
-      id: lm.league.id,
-      name: lm.league.name,
-      inviteCode: lm.league.inviteCode,
-      memberCount: lm.league._count.members,
-      isCreator: lm.league.creatorId === userId
-    }));
+    const leagues = userLeagues.map(lm => {
+      const league = lm.league;
+      
+      // Compute net worth for all members
+      const membersData = league.members.map(m => {
+        const u = m.user;
+        let holdingsValue = 0;
+        for (const h of u.holdings) {
+          const marketPrice = Math.round(h.asset.marketPrice ?? h.asset.current_price);
+          holdingsValue += h.quantity * marketPrice;
+        }
+        return {
+          id: u.id,
+          name: u.name || u.username,
+          netWorth: u.balance + holdingsValue
+        };
+      });
+
+      // Sort by net worth descending
+      membersData.sort((a, b) => b.netWorth - a.netWorth);
+
+      // Find current user's rank
+      const myIndex = membersData.findIndex(m => m.id === userId);
+      const myRank = myIndex !== -1 ? myIndex + 1 : null;
+      const myNetWorth = myIndex !== -1 ? membersData[myIndex].netWorth : 0;
+      
+      // Top member
+      const topMemberName = membersData.length > 0 ? membersData[0].name : null;
+
+      return {
+        id: league.id,
+        name: league.name,
+        inviteCode: league.inviteCode,
+        memberCount: membersData.length,
+        isCreator: league.creatorId === userId,
+        myRank,
+        myNetWorth,
+        topMemberName
+      };
+    });
 
     return NextResponse.json(leagues);
   } catch (error) {
