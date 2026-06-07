@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Navbar } from '@/components/ui/Navbar';
 import { useStore, Asset } from '@/lib/store';
 import { Users, LayoutGrid } from 'lucide-react';
 import Link from 'next/link';
@@ -41,8 +40,7 @@ export default function GroupsClient() {
 
   return (
     <div className="min-h-screen bg-[#121212] text-white pb-20">
-      <Navbar />
-
+      
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <PageHeader 
           title="المجموعات والتصفيات"

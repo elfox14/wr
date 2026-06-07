@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Navbar } from '@/components/ui/Navbar';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Users, Plus, LogIn, Trophy, ArrowLeft } from 'lucide-react';
 import { useSession } from 'next-auth/react';
@@ -114,8 +113,7 @@ export default function GroupsPage() {
 
   return (
     <div className="min-h-screen bg-background text-foreground pb-20 selection:bg-primary/30">
-      <Navbar />
-
+      
       <main className="max-w-6xl mx-auto px-4 py-12">
         <PageHeader 
           title="دوريات التحدي"

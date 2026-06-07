@@ -3,7 +3,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { useStore, Asset } from '@/lib/store';
-import { Navbar } from '@/components/ui/Navbar';
 import { LineChart, Line, ResponsiveContainer, YAxis, Tooltip, XAxis, Area, AreaChart } from 'recharts';
 import { TrendingUp, TrendingDown, Activity, AlertCircle, ShoppingCart, Globe, Shield, Zap, Target } from 'lucide-react';
 import Link from 'next/link';
@@ -57,8 +56,7 @@ export default function AssetClient() {
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-white selection:bg-[#0FF0FC]/30 flex flex-col">
-      <Navbar />
-      
+            
       <main className="flex-1 flex flex-col lg:flex-row max-w-[1600px] w-full mx-auto p-4 gap-4">
         
         {/* LEFT COLUMN: Market Navigator (قائمة المنتخبات/الأصول) */}

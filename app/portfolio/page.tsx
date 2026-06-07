@@ -3,7 +3,6 @@
 import React, { useEffect } from 'react';
 import Link from 'next/link';
 import { useStore } from '@/lib/store';
-import { Navbar } from '@/components/ui/Navbar';
 import { Wallet, TrendingUp, TrendingDown, Briefcase, Trophy, ArrowLeft } from 'lucide-react';
 import { StockCard } from '@/components/ui/StockCard';
 import { PageHeader } from '@/components/ui/PageHeader';
@@ -27,8 +26,7 @@ export default function PortfolioPage() {
 
   return (
     <div className="min-h-screen bg-background text-foreground selection:bg-primary/30">
-      <Navbar />
-      
+            
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <PageHeader 
           title="محفظتك الاستثمارية"

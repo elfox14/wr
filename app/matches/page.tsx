@@ -2,7 +2,6 @@
 
 import React, { useEffect } from 'react';
 import { useStore } from '@/lib/store';
-import { Navbar } from '@/components/ui/Navbar';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { CalendarDays } from 'lucide-react';
 import Link from 'next/link';
@@ -17,8 +16,7 @@ export default function MatchesPage() {
 
   return (
     <div className="min-h-screen bg-background text-foreground pb-20 selection:bg-primary/30">
-      <Navbar />
-
+      
       <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <PageHeader 
           title="جدول المباريات"

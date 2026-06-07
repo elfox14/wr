@@ -5,7 +5,6 @@ import { useStore } from '@/lib/store';
 import { Gift, Video, Users, Calendar, AlertCircle, Copy, CheckCircle2 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
-import { Navbar } from '@/components/ui/Navbar';
 import { PageHeader } from '@/components/ui/PageHeader';
 
 export default function RewardsPage() {
@@ -148,8 +147,7 @@ export default function RewardsPage() {
 
   return (
     <div className="min-h-screen bg-background text-foreground pb-20 selection:bg-primary/30">
-      <Navbar />
-      
+            
       <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <PageHeader 
           title="مركز المكافآت"

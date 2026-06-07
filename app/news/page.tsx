@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useEffect, useState } from 'react';
-import { Navbar } from '@/components/ui/Navbar';
 import { TrendingUp, TrendingDown, Globe, Newspaper, ArrowUpRight, Flame } from 'lucide-react';
 
 interface NewsItem {
@@ -34,8 +33,7 @@ export default function NewsPage() {
 
   return (
     <div className="min-h-screen bg-[#121212] text-white">
-      <Navbar />
-      
+            
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="flex items-center gap-3 mb-10 border-b border-white/10 pb-6">
           <div className="p-3 bg-[#0FF0FC]/10 rounded-xl">

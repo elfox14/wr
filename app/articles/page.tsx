@@ -20,7 +20,6 @@ export const metadata: Metadata = {
 };
 
 import React from 'react';
-import { Navbar } from '@/components/ui/Navbar';
 import { getAllArticles } from '@/lib/articles';
 import Link from 'next/link';
 import { Newspaper, ArrowRight } from 'lucide-react';
@@ -31,8 +30,7 @@ export default function ArticlesPage() {
 
   return (
     <div className="min-h-screen bg-background text-foreground selection:bg-primary/30">
-      <Navbar />
-      
+            
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <Link href="/" className="inline-flex items-center gap-2 text-gray-400 hover:text-primary transition-colors mb-8">
           <ArrowRight size={20} /> العودة للصفحة الرئيسية

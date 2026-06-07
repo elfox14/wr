@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Navbar } from '@/components/ui/Navbar';
 import { Trophy, TrendingUp, Medal, Calendar, CalendarDays, CalendarCheck, Crown } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { PageHeader } from '@/components/ui/PageHeader';
@@ -36,8 +35,7 @@ export default function LeaderboardClient() {
 
   return (
     <div className="min-h-screen bg-background text-foreground pb-20 selection:bg-primary/30">
-      <Navbar />
-
+      
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <PageHeader 
           title="ترتيب المستثمرين"

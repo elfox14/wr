@@ -5,7 +5,6 @@ import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { useStore } from '@/lib/store';
 import { Settings, ShieldAlert, TrendingUp, TrendingDown, Users, Activity } from 'lucide-react';
-import { Navbar } from '@/components/ui/Navbar';
 
 export default function AdminPage() {
   const { data: session, status } = useSession();
@@ -114,8 +113,7 @@ export default function AdminPage() {
 
   return (
     <div className="min-h-screen bg-[#121212] text-white">
-      <Navbar />
-
+      
       <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="flex items-center gap-3 mb-8">
           <ShieldAlert className="text-red-500" size={32} />

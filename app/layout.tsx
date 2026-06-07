@@ -4,6 +4,7 @@ import "./globals.css";
 import { Providers } from "@/components/Providers";
 import { NotificationProvider } from "@/components/ui/NotificationProvider";
 import { GlobalTicker } from "@/components/ui/GlobalTicker";
+import { Navbar } from "@/components/ui/Navbar";
 
 const cairo = Cairo({
   variable: "--font-cairo",
@@ -75,6 +76,7 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col">
         <Providers>
           <NotificationProvider>
+            <Navbar />
             <div className="pb-10"> {/* Padding bottom for the fixed ticker */}
               {children}
             </div>

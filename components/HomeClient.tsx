@@ -8,7 +8,6 @@ import {
   PlayCircle, ShieldCheck, Zap, Globe, Newspaper,
   ChevronRight, Crown, Medal, Award
 } from 'lucide-react';
-import { Navbar } from '@/components/ui/Navbar';
 import { getAllArticles } from '@/lib/articles';
 import { AssetImage } from '@/components/ui/AssetImage';
 
@@ -38,8 +37,7 @@ export default function HomeClient({ initialAssets }: { initialAssets: any[] }) 
 
   return (
     <>
-      <Navbar />
-
+      
       <main className="home-grid">
 
         {/* ── TICKER ── */}

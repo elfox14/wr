@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Navbar } from '@/components/ui/Navbar';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Trophy, TrendingUp, Copy, CheckCircle, ArrowRight, Users } from 'lucide-react';
 import { useSession } from 'next-auth/react';
@@ -58,8 +57,7 @@ export default function GroupLeaderboardPage() {
 
   return (
     <div className="min-h-screen bg-background text-foreground pb-20 selection:bg-primary/30">
-      <Navbar />
-
+      
       <main className="max-w-4xl mx-auto px-4 py-12">
         <Link href="/leagues" className="inline-flex items-center gap-2 text-gray-400 hover:text-white mb-8 transition-colors">
           <ArrowRight size={20} /> العودة لدوريات التحدي

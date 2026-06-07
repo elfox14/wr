@@ -3,7 +3,6 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useStore, Asset } from '@/lib/store';
-import { Navbar } from '@/components/ui/Navbar';
 import { TrendingUp, TrendingDown, ArrowRight, Search, Filter, LayoutGrid, List, ChevronRight, Globe, Users, Target, Activity, Zap, Info } from 'lucide-react';
 import { TeamRosterDrawer } from '@/components/ui/TeamRosterDrawer';
 import { LineChart, Line, ResponsiveContainer, YAxis, Tooltip, XAxis, Area, AreaChart } from 'recharts';
@@ -48,8 +47,7 @@ export default function MarketClient() {
 
   return (
     <div className="min-h-screen bg-background text-foreground selection:bg-primary/30">
-      <Navbar />
-      
+            
       {/* Drawer */}
       <TeamRosterDrawer team={selectedTeam} onClose={() => setSelectedTeam(null)} />
 

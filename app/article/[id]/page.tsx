@@ -1,7 +1,6 @@
 import React from 'react';
 import { notFound } from 'next/navigation';
 import { getArticleById } from '@/lib/articles';
-import { Navbar } from '@/components/ui/Navbar';
 import Link from 'next/link';
 import { ArrowRight, Calendar, User, Tag } from 'lucide-react';
 import { Metadata } from 'next';
@@ -71,8 +70,7 @@ export default async function ArticlePage({ params }: { params: Promise<{ id: st
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
-      <Navbar />
-      
+            
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <Link href="/" className="inline-flex items-center gap-2 text-gray-400 hover:text-[#0FF0FC] transition-colors mb-8">
           <ArrowRight size={20} /> العودة للصفحة الرئيسية
