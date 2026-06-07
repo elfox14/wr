@@ -41,6 +41,7 @@ export interface Asset {
   teamId?: string | null;
   team?: Asset | null;
   players?: Asset[];
+  news?: any[];
 }
 
 export interface Holding {

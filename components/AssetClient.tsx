@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { useStore, Asset } from '@/lib/store';
 import { LineChart, Line, ResponsiveContainer, YAxis, Tooltip, XAxis, Area, AreaChart } from 'recharts';
-import { TrendingUp, TrendingDown, Activity, AlertCircle, ShoppingCart, Globe, Shield, Zap, Target } from 'lucide-react';
+import { TrendingUp, TrendingDown, Activity, AlertCircle, ShoppingCart, Globe, Shield, Zap, Target, Users, BarChart3, Star, ArrowRight, User, Info, Trophy } from 'lucide-react';
 import Link from 'next/link';
 import { AssetImage } from '@/components/ui/AssetImage';
 
@@ -33,16 +33,16 @@ export default function AssetClient() {
 
   if (loading || !asset) return <div className="min-h-screen bg-[#121212] text-white p-10 flex items-center justify-center">جاري تحميل منصة التداول...</div>;
 
+  const tradePrice = Math.round(asset.marketPrice ?? asset.current_price);
   const isUp = asset.change >= 0;
   
-  // Dummy high-resolution history for the chart
   const historyData = asset.priceHistory && asset.priceHistory.length > 0
     ? asset.priceHistory.map((h: any) => ({
         price: h.price, 
         time: new Date(h.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) 
       }))
     : Array.from({length: 24}).map((_, i) => ({
-        price: asset.current_price * (1 + (Math.random() * 0.1 - 0.05)),
+        price: tradePrice * (1 + (Math.random() * 0.1 - 0.05)),
         time: `${i}:00`
       }));
 
@@ -54,12 +54,13 @@ export default function AssetClient() {
     else await sellAsset(asset.id, quantity);
   };
 
+  const hasNews = asset.news && asset.news.length > 0;
+
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-white selection:bg-[#0FF0FC]/30 flex flex-col">
-            
       <main className="flex-1 flex flex-col lg:flex-row max-w-[1600px] w-full mx-auto p-4 gap-4">
         
-        {/* LEFT COLUMN: Market Navigator (قائمة المنتخبات/الأصول) */}
+        {/* LEFT COLUMN: Market Navigator */}
         <div className="hidden lg:flex flex-col w-64 bg-[#121212] border border-white/5 rounded-xl overflow-hidden shadow-lg">
           <div className="p-4 border-b border-white/10 bg-black/40">
             <h3 className="font-bold text-gray-300 flex items-center gap-2"><Globe size={18} className="text-[#0FF0FC]" /> تصفح السوق</h3>
@@ -75,14 +76,14 @@ export default function AssetClient() {
                   <AssetImage image={t.image} name={t.name} className="text-xl w-6 h-6" width={24} height={24} />
                   <span className={`text-sm font-bold ${t.id === asset.id ? 'text-[#0FF0FC]' : 'text-gray-300'}`}>{t.name}</span>
                 </div>
-                <span className="text-xs font-mono text-gray-500">{t.current_price}¢</span>
+                <span className="text-xs font-mono text-gray-500">{Math.round(t.marketPrice ?? t.current_price)}¢</span>
               </Link>
             ))}
           </div>
         </div>
 
-        {/* CENTER COLUMN: Chart & Pricing & Indicators */}
-        <div className="flex-1 flex flex-col gap-4">
+        {/* CENTER COLUMN: Header, Chart, Detail View */}
+        <div className="flex-1 flex flex-col gap-4 overflow-hidden">
           
           {/* Header Info */}
           <div className="bg-[#121212] border border-white/5 rounded-xl p-6 shadow-lg flex flex-col md:flex-row justify-between items-start md:items-center relative overflow-hidden">
@@ -107,13 +108,12 @@ export default function AssetClient() {
             <div className="mt-6 md:mt-0 text-right relative z-10 flex flex-col items-end">
               <p className="text-gray-500 text-xs mb-1 uppercase tracking-widest font-bold">السعر السوقي المباشر</p>
               <div className="flex items-center gap-4">
-                <p className="text-5xl font-mono font-black text-[#0FF0FC]">{(asset.marketPrice || asset.current_price)} ¢</p>
+                <p className="text-5xl font-mono font-black text-[#0FF0FC]">{tradePrice} ¢</p>
               </div>
               <div className="flex items-center gap-2 mt-2">
                 <p className="text-sm text-gray-400 font-mono">القيمة العادلة: {asset.fairValue || '-'} ¢</p>
                 {asset.fairValue && (() => {
-                  const mv = asset.marketPrice || asset.current_price;
-                  const diff = mv - asset.fairValue;
+                  const diff = tradePrice - asset.fairValue;
                   const pct = (diff / asset.fairValue) * 100;
                   const isPremium = diff > 0;
                   return (
@@ -127,85 +127,6 @@ export default function AssetClient() {
               <div className={`mt-2 flex items-center gap-1 font-bold text-lg px-3 py-1 rounded-full ${isUp ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
                 {isUp ? <TrendingUp size={20} /> : <TrendingDown size={20} />}
                 {Math.abs(asset.change)}% (24h)
-              </div>
-            </div>
-          </div>
-
-          {/* Strength Bar & Asset Analysis */}
-          <div className="bg-[#121212] border border-white/5 rounded-xl p-6 shadow-lg">
-            <div className="flex justify-between items-center mb-2">
-              <h3 className="font-bold text-gray-300 flex items-center gap-2"><Zap className="text-[#FFD700]" size={18} /> مؤشر القوة الشامل (Fundamental)</h3>
-              <span className="font-mono text-2xl font-black text-white">{asset.score || 0}<span className="text-gray-500 text-lg">/100</span></span>
-            </div>
-            <div className="w-full bg-black/50 rounded-full h-4 overflow-hidden border border-white/10 mb-8">
-              <div 
-                className="h-full bg-gradient-to-r from-yellow-600 via-[#FFD700] to-yellow-300 transition-all duration-1000 ease-out"
-                style={{ width: `${Math.min(100, Math.max(0, asset.score || 0))}%` }}
-              ></div>
-            </div>
-            
-            <div className="border-t border-white/10 pt-6">
-              <h3 className="font-bold text-gray-300 mb-4 flex items-center gap-2"><Target className="text-[#0FF0FC]" size={18} /> تحليل السهم (Asset Analysis)</h3>
-              
-              {(() => {
-                const fairValue = asset.fairValue || asset.current_price;
-                const marketPrice = asset.marketPrice || asset.current_price;
-                const premiumDiscountPercent = fairValue > 0 ? ((marketPrice - fairValue) / fairValue) * 100 : 0;
-                
-                let statusText = "السهم قريب من قيمته العادلة";
-                let statusColor = "text-gray-400 bg-gray-500/10 border-gray-500/20";
-                
-                if (premiumDiscountPercent > 10) {
-                  statusText = "السهم أعلى من قيمته العادلة (Overvalued)";
-                  statusColor = "text-red-500 bg-red-500/10 border-red-500/20";
-                } else if (premiumDiscountPercent < -10) {
-                  statusText = "السهم أقل من قيمته العادلة (Undervalued)";
-                  statusColor = "text-green-500 bg-green-500/10 border-green-500/20";
-                }
-
-                return (
-                  <div className="bg-black/40 border border-white/5 rounded-lg p-4 mb-6">
-                    <div className="flex flex-wrap justify-between items-center mb-4 gap-4">
-                      <div>
-                        <p className="text-xs text-gray-500 mb-1">السعر السوقي</p>
-                        <p className="font-mono text-xl font-bold text-white">{marketPrice} ¢</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-gray-500 mb-1">القيمة العادلة</p>
-                        <p className="font-mono text-xl font-bold text-gray-300">{fairValue} ¢</p>
-                      </div>
-                      <div className={`px-4 py-2 rounded-lg border font-bold text-sm ${statusColor}`}>
-                        {statusText} ({premiumDiscountPercent > 0 ? '+' : ''}{premiumDiscountPercent.toFixed(1)}%)
-                      </div>
-                    </div>
-                    <p className="text-xs text-gray-500 italic">
-                      القيمة العادلة تعتمد على تقييم اللاعب/المنتخب، بينما سعر السوق يتحرك حسب تداولات المستخدمين.
-                    </p>
-                  </div>
-                );
-              })()}
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {[
-                  { label: 'الزخم (Momentum)', value: asset.momentum || 0, color: 'bg-blue-500' },
-                  { label: 'الطلب في السوق (Market Demand)', value: asset.marketDemand || 0, color: 'bg-[#0FF0FC]' },
-                  { label: 'إرث المونديال (World Cup Legacy)', value: asset.worldCupLegacy || 0, color: 'bg-purple-500' },
-                  { label: 'مؤشر التقلب (Volatility Score)', value: asset.volatilityScore || 0, color: 'bg-orange-500' },
-                  { label: 'الشعبية (Popularity)', value: asset.popularity || 0, color: 'bg-pink-500' },
-                ].map((stat, idx) => (
-                  <div key={idx}>
-                    <div className="flex justify-between items-center mb-1">
-                      <span className="text-xs text-gray-400">{stat.label}</span>
-                      <span className="text-xs font-mono font-bold text-white">{stat.value}/100</span>
-                    </div>
-                    <div className="w-full bg-black/50 rounded-full h-2 border border-white/5">
-                      <div 
-                        className={`h-full rounded-full ${stat.color} transition-all duration-1000 ease-out`}
-                        style={{ width: `${Math.min(100, Math.max(0, stat.value))}%` }}
-                      ></div>
-                    </div>
-                  </div>
-                ))}
               </div>
             </div>
           </div>
@@ -240,6 +161,9 @@ export default function AssetClient() {
               </ResponsiveContainer>
             </div>
           </div>
+
+          {/* Type-based view rendering */}
+          {asset.type === 'TEAM' ? <TeamDetailView asset={asset} /> : <PlayerDetailView asset={asset} assets={assets} />}
 
         </div>
 
@@ -281,7 +205,7 @@ export default function AssetClient() {
 
             <div className="flex justify-between items-center mb-6 py-3 border-y border-white/5">
               <span className="text-sm text-gray-400">القيمة الإجمالية:</span>
-              <span className="font-mono text-2xl font-bold text-white">{asset.current_price * quantity} ¢</span>
+              <span className="font-mono text-2xl font-bold text-white">{tradePrice * quantity} ¢</span>
             </div>
 
             <div className="flex flex-col gap-3">
@@ -304,51 +228,416 @@ export default function AssetClient() {
           {/* News Feed */}
           <div className="bg-[#121212] border border-white/5 rounded-xl p-6 shadow-lg flex-1">
             <h3 className="font-bold text-gray-300 mb-4 flex items-center gap-2 pb-4 border-b border-white/10">
-              <AlertCircle className="text-yellow-400" size={18} /> شريط الأخبار
+              <AlertCircle className="text-yellow-400" size={18} /> الأخبار المؤثرة
             </h3>
             <div className="space-y-4">
-              <div className="bg-black/40 border border-white/5 p-3 rounded-lg border-r-2 border-r-green-500">
-                <p className="text-sm text-gray-200 font-bold mb-1">تحديث القيمة الفنية</p>
-                <p className="text-xs text-gray-400 leading-relaxed">تحسن ملحوظ في مؤشر الجاهزية البدنية للاعبين الأساسيين. توقعات بزيادة الطلب.</p>
-                <div className="text-[10px] text-gray-500 mt-2 font-mono">منذ 15 دقيقة</div>
-              </div>
-              <div className="bg-black/40 border border-white/5 p-3 rounded-lg border-r-2 border-r-gray-500">
-                <p className="text-sm text-gray-200 font-bold mb-1">استقرار تكتيكي</p>
-                <p className="text-xs text-gray-400 leading-relaxed">ثبات في التشكيلة المتوقعة للمباراة القادمة دون غيابات مؤثرة حتى الآن.</p>
-                <div className="text-[10px] text-gray-500 mt-2 font-mono">منذ ساعتين</div>
-              </div>
+              {hasNews ? (
+                asset.news?.map((n: any, i: number) => (
+                  <div key={i} className={`bg-black/40 border border-white/5 p-3 rounded-lg border-r-2 ${n.impact > 0 ? 'border-r-green-500' : n.impact < 0 ? 'border-r-red-500' : 'border-r-gray-500'}`}>
+                    <p className="text-sm text-gray-200 font-bold mb-1">{n.title}</p>
+                    <p className="text-xs text-gray-400 leading-relaxed">{n.content}</p>
+                  </div>
+                ))
+              ) : (
+                <div className="text-center py-6">
+                  <p className="text-sm text-gray-500 italic">لا توجد أخبار مؤثرة لهذا الأصل حالياً.</p>
+                </div>
+              )}
             </div>
           </div>
 
         </div>
-
       </main>
+    </div>
+  );
+}
 
-      {/* Roster Section (Full width at bottom if it's a team) */}
-      {asset.type === 'TEAM' && asset.players && asset.players.length > 0 && (
-        <div className="max-w-[1600px] w-full mx-auto p-4 mb-12">
-          <div className="bg-[#121212] border border-white/5 rounded-xl p-6 shadow-lg">
-            <h2 className="text-2xl font-black text-white mb-6 flex items-center gap-2 border-b border-white/10 pb-4">
-              <Shield className="text-[#0FF0FC]" /> الأصول المرتبطة (قائمة اللاعبين)
-            </h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-              {asset.players.map((p: any) => (
-                <Link href={`/asset/${p.id}`} key={p.id} className="bg-black/50 border border-white/5 rounded-xl p-4 hover:border-[#0FF0FC]/50 hover:bg-[#0FF0FC]/5 transition-colors group">
-                  <div className="flex justify-between items-start mb-3">
-                    <AssetImage image={p.image} name={p.name} className="text-3xl w-16 h-16" width={64} height={64} />
-                    <span className="bg-white/10 text-gray-400 text-[10px] px-2 py-1 rounded font-bold">{p.position}</span>
-                  </div>
-                  <div className="font-bold text-white text-sm group-hover:text-[#0FF0FC] transition-colors truncate">{p.name}</div>
-                  <div className="flex justify-between items-end mt-2">
-                    <span className="text-[#FFD700] text-xs font-bold">Score: {p.score}</span>
-                    <span className="font-mono text-gray-300 text-sm font-bold">{p.current_price}¢</span>
-                  </div>
-                </Link>
-              ))}
-            </div>
+// -------------------------------------------------------------
+// TEAM DETAIL VIEW
+// -------------------------------------------------------------
+function TeamDetailView({ asset }: { asset: any }) {
+  const players = asset.players || [];
+  
+  // Squad breakdown calculations
+  const groupBy = (arr: any[], key: string) => arr.reduce((acc, obj) => { const k = obj[key] || 'N/A'; acc[k] = acc[k] || []; acc[k].push(obj); return acc; }, {} as Record<string, any[]>);
+  const groups = groupBy(players, 'position');
+  
+  const getGroupStats = (pos: string) => {
+    const group = groups[pos] || [];
+    const count = group.length;
+    const avgScore = count ? group.reduce((a: number, b: any) => a + (b.score || 0), 0) / count : 0;
+    const avgPrice = count ? group.reduce((a: number, b: any) => a + (b.marketPrice ?? b.current_price), 0) / count : 0;
+    const topScore = count ? group.reduce((p: any, c: any) => (p.score || 0) > (c.score || 0) ? p : c, group[0]) : null;
+    const topMomentum = count ? group.reduce((p: any, c: any) => (p.momentum || 0) > (c.momentum || 0) ? p : c, group[0]) : null;
+    return { count, avgScore, avgPrice, topScore, topMomentum };
+  };
+
+  // Key Players
+  const keyPlayers = players.length > 0 ? {
+    highestScore: players.reduce((p: any, c: any) => (p.score || 0) > (c.score || 0) ? p : c, players[0]),
+    highestPrice: players.reduce((p: any, c: any) => (p.marketPrice ?? p.current_price) > (c.marketPrice ?? c.current_price) ? p : c, players[0]),
+    highestMomentum: players.reduce((p: any, c: any) => (p.momentum || 0) > (c.momentum || 0) ? p : c, players[0]),
+    highestDemand: players.reduce((p: any, c: any) => (p.marketDemand || 0) > (c.marketDemand || 0) ? p : c, players[0]),
+    mostUndervalued: players.reduce((p: any, c: any) => {
+      const getPD = (a: any) => a.fairValue > 0 ? (((a.marketPrice ?? a.current_price) - a.fairValue) / a.fairValue) * 100 : 0;
+      return getPD(c) < getPD(p) ? c : p;
+    }, players[0]),
+  } : null;
+
+  return (
+    <div className="flex flex-col gap-6 w-full">
+      
+      {/* Team Power Card */}
+      <div className="bg-[#121212] border border-white/5 rounded-xl p-6 shadow-lg">
+        <h3 className="font-bold text-gray-300 mb-4 flex items-center gap-2"><Target size={18} className="text-success" /> قوة المنتخب</h3>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="bg-black/40 p-4 rounded-lg border border-white/5 text-center">
+            <p className="text-[10px] text-gray-500 uppercase">الزخم (Momentum)</p>
+            <p className="text-2xl font-bold text-white">{asset.momentum || 50}</p>
+          </div>
+          <div className="bg-black/40 p-4 rounded-lg border border-white/5 text-center">
+            <p className="text-[10px] text-gray-500 uppercase">الطلب (Demand)</p>
+            <p className="text-2xl font-bold text-white">{asset.marketDemand || 50}</p>
+          </div>
+          <div className="bg-black/40 p-4 rounded-lg border border-white/5 text-center">
+            <p className="text-[10px] text-gray-500 uppercase">التقلب (Volatility)</p>
+            <p className="text-2xl font-bold text-white">{asset.volatilityScore || 50}</p>
+          </div>
+          <div className="bg-black/40 p-4 rounded-lg border border-white/5 text-center">
+            <p className="text-[10px] text-gray-500 uppercase">المُلاّك</p>
+            <p className="text-2xl font-bold text-white">{asset.ownersCount || 0}</p>
+          </div>
+          <div className="bg-black/40 p-4 rounded-lg border border-white/5 text-center">
+            <p className="text-[10px] text-gray-500 uppercase">الجودة (Squad Quality)</p>
+            <p className="text-2xl font-bold text-white">{asset.score || 0}</p>
+          </div>
+          <div className="bg-black/40 p-4 rounded-lg border border-white/5 text-center">
+            <p className="text-[10px] text-gray-500 uppercase">تصنيف الفيفا</p>
+            <p className="text-2xl font-bold text-white">#{asset.fifaRank || '-'}</p>
+          </div>
+          <div className="bg-black/40 p-4 rounded-lg border border-white/5 text-center">
+            <p className="text-[10px] text-gray-500 uppercase">الشعبية (Popularity)</p>
+            <p className="text-2xl font-bold text-white">{asset.popularity || 50}</p>
+          </div>
+          <div className="bg-black/40 p-4 rounded-lg border border-white/5 text-center">
+            <p className="text-[10px] text-gray-500 uppercase">إرث المونديال</p>
+            <p className="text-2xl font-bold text-white">{asset.worldCupLegacy || 50}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Squad Breakdown */}
+      <div className="bg-[#121212] border border-white/5 rounded-xl p-6 shadow-lg">
+        <h3 className="font-bold text-gray-300 mb-4 flex items-center gap-2"><Users size={18} className="text-primary" /> تفصيل التشكيلة (Squad Breakdown)</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+          {['FWD', 'MID', 'DEF', 'GK'].map(pos => {
+            const stats = getGroupStats(pos);
+            if (!stats.count) return null;
+            return (
+              <div key={pos} className="bg-black/40 border border-white/5 rounded-xl p-4">
+                <div className="flex justify-between items-center mb-3 pb-2 border-b border-white/5">
+                  <span className="font-bold text-white">{pos}</span>
+                  <span className="text-[10px] text-gray-400 bg-white/5 border border-white/10 px-2 py-0.5 rounded">{stats.count} لاعبين</span>
+                </div>
+                <div className="flex justify-between text-xs mb-1">
+                  <span className="text-gray-500">متوسط التقييم:</span>
+                  <span className="font-bold text-accent">{stats.avgScore.toFixed(1)}</span>
+                </div>
+                <div className="flex justify-between text-xs mb-4">
+                  <span className="text-gray-500">متوسط السعر:</span>
+                  <span className="font-bold text-white">{stats.avgPrice.toFixed(0)} ¢</span>
+                </div>
+                <div className="text-[10px] text-gray-400 mb-1 flex justify-between">
+                  <span>الأعلى تقييماً:</span> <span className="text-gray-200 truncate max-w-[80px] text-left">{stats.topScore?.name}</span>
+                </div>
+                <div className="text-[10px] text-gray-400 flex justify-between">
+                  <span>الأعلى زخماً:</span> <span className="text-gray-200 truncate max-w-[80px] text-left">{stats.topMomentum?.name}</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Key Players */}
+      {keyPlayers && (
+        <div className="bg-[#121212] border border-white/5 rounded-xl p-6 shadow-lg">
+          <h3 className="font-bold text-gray-300 mb-4 flex items-center gap-2"><Star size={18} className="text-yellow-400" /> نجوم الفريق</h3>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
+            {[
+              { label: 'الأعلى تقييماً', player: keyPlayers.highestScore, val: keyPlayers.highestScore?.score?.toFixed(1) },
+              { label: 'الأغلى سعراً', player: keyPlayers.highestPrice, val: `${Math.round(keyPlayers.highestPrice?.marketPrice ?? keyPlayers.highestPrice?.current_price ?? 0)}¢` },
+              { label: 'الأعلى زخماً', player: keyPlayers.highestMomentum, val: keyPlayers.highestMomentum?.momentum },
+              { label: 'الأعلى طلباً', player: keyPlayers.highestDemand, val: keyPlayers.highestDemand?.marketDemand },
+              { label: 'أكثر فرصة', player: keyPlayers.mostUndervalued, val: 'فرصة (Undervalued)' }
+            ].map((item, idx) => (
+              <Link href={`/asset/${item.player?.id}`} key={idx} className="bg-black/40 p-3 rounded-lg border border-white/5 hover:border-primary/50 transition-colors text-center group">
+                <p className="text-[10px] text-gray-500 uppercase mb-3">{item.label}</p>
+                <div className="flex justify-center mb-2">
+                  <AssetImage image={item.player?.image} name={item.player?.name || ''} className="w-12 h-12" width={48} height={48} />
+                </div>
+                <p className="text-xs font-bold text-white group-hover:text-primary truncate">{item.player?.name}</p>
+                <p className="text-[10px] text-accent mt-1">{item.val}</p>
+              </Link>
+            ))}
           </div>
         </div>
       )}
+
+      {/* Upcoming Match Placeholder */}
+      <div className="bg-[#121212] border border-white/5 rounded-xl p-6 shadow-lg">
+         <h3 className="font-bold text-gray-300 mb-4 flex items-center gap-2"><Target size={18} className="text-orange-500" /> المباراة القادمة</h3>
+         <div className="bg-black/40 border border-orange-500/20 p-6 rounded-lg text-center">
+           <p className="text-sm text-gray-500 italic">لا توجد مباراة قادمة مرتبطة حالياً.</p>
+         </div>
+      </div>
+
+      {/* Players Market Table */}
+      <div className="bg-[#121212] border border-white/5 rounded-xl shadow-lg overflow-hidden">
+        <div className="p-4 border-b border-white/10">
+          <h3 className="font-bold text-gray-300 flex items-center gap-2"><BarChart3 size={18} className="text-blue-400" /> سوق لاعبي المنتخب</h3>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-right text-sm whitespace-nowrap">
+            <thead className="bg-black/60 text-gray-400">
+              <tr>
+                <th className="p-4">اللاعب</th>
+                <th className="p-4 text-center">المركز</th>
+                <th className="p-4 text-center">العمر</th>
+                <th className="p-4 text-center">النادي</th>
+                <th className="p-4 text-center">التقييم</th>
+                <th className="p-4 text-center">السعر</th>
+                <th className="p-4 text-center">العادلة</th>
+                <th className="p-4 text-center">الخصم/العلاوة</th>
+                <th className="p-4 text-center">الزخم</th>
+                <th className="p-4 text-center">الطلب</th>
+                <th className="p-4 text-center">التقلب</th>
+                <th className="p-4 text-left"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {players.map((p: any) => {
+                const mp = Math.round(p.marketPrice ?? p.current_price);
+                const pd = p.fairValue > 0 ? ((mp - p.fairValue) / p.fairValue) * 100 : 0;
+                return (
+                  <tr key={p.id} className="border-b border-white/5 hover:bg-white/5">
+                    <td className="p-4 font-bold text-white flex items-center gap-2">
+                      <AssetImage image={p.image} name={p.name} className="w-8 h-8 rounded" width={32} height={32} />
+                      {p.name}
+                    </td>
+                    <td className="p-4 text-center text-gray-400">{p.position}</td>
+                    <td className="p-4 text-center text-gray-400">{p.age || '-'}</td>
+                    <td className="p-4 text-center text-gray-400 truncate max-w-[100px]">{p.club || '-'}</td>
+                    <td className="p-4 text-center font-bold text-accent">{p.score?.toFixed(1)}</td>
+                    <td className="p-4 text-center font-bold text-white">{mp}¢</td>
+                    <td className="p-4 text-center text-gray-400">{p.fairValue?.toFixed(0)}¢</td>
+                    <td className="p-4 text-center">
+                      <span className={`px-2 py-1 rounded-md text-[10px] font-bold ${pd > 0 ? 'bg-red-500/10 text-red-500' : 'bg-green-500/10 text-green-500'}`}>
+                        {pd > 0 ? '+' : ''}{pd.toFixed(1)}%
+                      </span>
+                    </td>
+                    <td className="p-4 text-center text-gray-400">{p.momentum || 50}</td>
+                    <td className="p-4 text-center text-gray-400">{p.marketDemand || 50}</td>
+                    <td className="p-4 text-center text-gray-400">{p.volatilityScore || 50}</td>
+                    <td className="p-4 text-left">
+                      <Link href={`/asset/${p.id}`} className="text-[10px] font-bold bg-primary/10 text-primary px-3 py-2 rounded-lg hover:bg-primary/20 transition">تداول</Link>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  );
+}
+
+// -------------------------------------------------------------
+// PLAYER DETAIL VIEW
+// -------------------------------------------------------------
+function PlayerDetailView({ asset, assets }: { asset: any, assets: any[] }) {
+  
+  const teammates = assets.filter((a: any) => a.type === 'PLAYER' && a.id !== asset.id && ((a.teamId && a.teamId === asset.teamId) || (a.team && a.team === asset.team)));
+
+  return (
+    <div className="flex flex-col gap-6 w-full">
+      
+      {/* Player Profile Card & Valuation Pillars */}
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+        
+        {/* Profile */}
+        <div className="bg-[#121212] border border-white/5 rounded-xl p-6 shadow-lg h-full">
+          <h3 className="font-bold text-gray-300 mb-4 flex items-center gap-2"><User size={18} className="text-primary" /> البطاقة الشخصية</h3>
+          <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-2 gap-4">
+            <div className="bg-black/40 p-3 rounded-lg border border-white/5">
+              <p className="text-[10px] text-gray-500 uppercase">المركز</p>
+              <p className="font-bold text-white mt-1">{asset.position || '-'}</p>
+            </div>
+            <div className="bg-black/40 p-3 rounded-lg border border-white/5">
+              <p className="text-[10px] text-gray-500 uppercase">العمر</p>
+              <p className="font-bold text-white mt-1">{asset.age || '-'}</p>
+            </div>
+            <div className="bg-black/40 p-3 rounded-lg border border-white/5">
+              <p className="text-[10px] text-gray-500 uppercase">النادي</p>
+              <p className="font-bold text-white mt-1 truncate">{asset.club || '-'}</p>
+            </div>
+            <div className="bg-black/40 p-3 rounded-lg border border-white/5">
+              <p className="text-[10px] text-gray-500 uppercase">المنتخب</p>
+              <p className="font-bold text-white mt-1 truncate">{asset.team || '-'}</p>
+            </div>
+            <div className="bg-black/40 p-3 rounded-lg border border-white/5">
+              <p className="text-[10px] text-gray-500 uppercase">مستوى اللاعب (Tier)</p>
+              <p className="font-bold text-white mt-1">{asset.tier || '-'}</p>
+            </div>
+            <div className="bg-black/40 p-3 rounded-lg border border-white/5">
+              <p className="text-[10px] text-gray-500 uppercase">إرث المونديال</p>
+              <p className="font-bold text-white mt-1">{asset.worldCupLegacy || 50}</p>
+            </div>
+            <div className="bg-black/40 p-3 rounded-lg border border-white/5">
+              <p className="text-[10px] text-gray-500 uppercase">الشعبية</p>
+              <p className="font-bold text-white mt-1">{asset.popularity || 50}</p>
+            </div>
+            <div className="bg-black/40 p-3 rounded-lg border border-white/5">
+              <p className="text-[10px] text-gray-500 uppercase">التقلب (المخاطرة)</p>
+              <p className="font-bold text-white mt-1">{asset.volatilityScore || 50}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Valuation Pillars */}
+        <div className="bg-[#121212] border border-white/5 rounded-xl p-6 shadow-lg h-full flex flex-col">
+          <h3 className="font-bold text-gray-300 mb-6 flex items-center gap-2"><BarChart3 size={18} className="text-accent" /> أعمدة التقييم (Valuation Pillars)</h3>
+          <div className="space-y-5 flex-1 flex flex-col justify-center">
+            {[
+              { label: 'الأداء الفني (Fundamental)', value: asset.score || 0, weight: '35%' },
+              { label: 'الطلب السوقي (Demand)', value: asset.marketDemand || 0, weight: '20%' },
+              { label: 'الشعبية (Popularity)', value: asset.popularity || 0, weight: '20%' },
+              { label: 'إرث المونديال (Legacy)', value: asset.worldCupLegacy || 0, weight: '15%' },
+              { label: 'الزخم (Momentum)', value: asset.momentum || 0, weight: '10%' },
+            ].map((pillar, idx) => (
+              <div key={idx}>
+                <div className="flex justify-between items-end mb-1.5">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-bold text-white">{pillar.label}</span>
+                    <span className="text-[9px] font-mono text-gray-500 bg-white/5 px-1.5 py-0.5 rounded border border-white/10">وزن: {pillar.weight}</span>
+                  </div>
+                  <span className="text-xs font-mono font-bold text-accent">{pillar.value}/100</span>
+                </div>
+                <div className="w-full bg-black/50 rounded-full h-2.5 border border-white/5 overflow-hidden">
+                  <div 
+                    className="h-full rounded-full bg-gradient-to-r from-accent/50 to-accent transition-all duration-1000 ease-out"
+                    style={{ width: `${Math.min(100, Math.max(0, pillar.value))}%` }}
+                  ></div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+      </div>
+
+      {/* Performance Impact Matrix & Position Intelligence */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        
+        {/* Performance Impact */}
+        <div className="bg-[#121212] border border-white/5 rounded-xl p-6 shadow-lg">
+          <h3 className="font-bold text-gray-300 mb-4 flex items-center gap-2"><Zap size={18} className="text-yellow-400" /> مصفوفة تأثير الأداء (Impact Matrix)</h3>
+          <div className="grid grid-cols-1 gap-2">
+            {[
+              { event: 'هدف (Goal)', m: '+10', d: '+5', color: 'text-green-400', border: 'border-green-400/20', bg: 'bg-green-400/5' },
+              { event: 'صناعة (Assist)', m: '+6', d: '+3', color: 'text-green-400', border: 'border-green-400/20', bg: 'bg-green-400/5' },
+              { event: 'رجل المباراة (MOTM)', m: '+15', d: '+8', color: 'text-yellow-400', border: 'border-yellow-400/20', bg: 'bg-yellow-400/5' },
+              { event: 'بطاقة حمراء (Red Card)', m: '-12', d: '-8', color: 'text-red-400', border: 'border-red-400/20', bg: 'bg-red-400/5' },
+              { event: 'إصابة (Injury)', m: '-15', d: '-10', color: 'text-red-500', border: 'border-red-500/20', bg: 'bg-red-500/5' },
+            ].map((imp, idx) => (
+              <div key={idx} className={`flex justify-between items-center ${imp.bg} p-3 rounded-lg border ${imp.border}`}>
+                <span className="text-sm font-bold text-white">{imp.event}</span>
+                <div className="flex gap-6">
+                  <span className={`text-xs font-bold font-mono ${imp.color}`}>زخم: {imp.m}</span>
+                  <span className={`text-xs font-bold font-mono ${imp.color}`}>طلب: {imp.d}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Position Intelligence */}
+        <div className="bg-[#121212] border border-white/5 rounded-xl p-6 shadow-lg flex flex-col">
+          <h3 className="font-bold text-gray-300 mb-4 flex items-center gap-2"><Info size={18} className="text-[#0FF0FC]" /> الذكاء المالي للمركز ({asset.position})</h3>
+          <div className="bg-[#0FF0FC]/5 border border-[#0FF0FC]/20 p-6 rounded-xl flex-1 flex flex-col justify-center">
+            <p className="text-gray-300 leading-relaxed text-sm md:text-base font-medium">
+              {asset.position === 'FWD' && 'باعتباره مهاجماً، فإن تسجيل الأهداف وصناعتها هما المحركان الأساسيان لرفع تقييمه وسعره السوقي. يتمتع المهاجمون بطلب عالي وزخم سريع التأثر.'}
+              {asset.position === 'MID' && 'لاعبو الوسط يحصلون على الزخم من خلال الصناعة، دقة التمرير، والتحكم باللعب. تتأثر أسعارهم بشكل كبير بجوائز رجل المباراة.'}
+              {asset.position === 'DEF' && 'المدافعون يستمدون قوتهم من الشباك النظيفة (Clean Sheets) والتدخلات الناجحة. التقلب لديهم أقل عادةً من المهاجمين، مما يجعلهم أصولاً أكثر أماناً للمحفظة.'}
+              {asset.position === 'GK' && 'حراس المرمى أصول مستقرة جداً. ترتفع أسعارهم بشكل جنوني في حال التصدي لركلات الجزاء أو الحفاظ على شباك نظيفة في أدوار خروج المغلوب.'}
+              {!['FWD', 'MID', 'DEF', 'GK'].includes(asset.position) && 'أداء اللاعب العام وتأثيره على نتائج فريقه يحدد مسار سعره في منصة التداول.'}
+            </p>
+          </div>
+        </div>
+
+      </div>
+
+      {/* Compare With Teammates */}
+      <div className="bg-[#121212] border border-white/5 rounded-xl shadow-lg overflow-hidden">
+        <div className="p-4 border-b border-white/10">
+          <h3 className="font-bold text-gray-300 flex items-center gap-2"><Users size={18} className="text-gray-400" /> مقارنة مع الزملاء في المنتخب</h3>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-right text-sm whitespace-nowrap">
+            <thead className="bg-black/60 text-gray-400">
+              <tr>
+                <th className="p-4">الزميل</th>
+                <th className="p-4 text-center">المركز</th>
+                <th className="p-4 text-center">التقييم</th>
+                <th className="p-4 text-center">السعر</th>
+                <th className="p-4 text-center">العادلة</th>
+                <th className="p-4 text-center">الخصم/العلاوة</th>
+                <th className="p-4 text-center">الزخم</th>
+                <th className="p-4 text-center">الطلب</th>
+                <th className="p-4 text-center">التقلب</th>
+                <th className="p-4 text-left"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {teammates.slice(0, 10).map((p: any) => {
+                const mp = Math.round(p.marketPrice ?? p.current_price);
+                const pd = p.fairValue > 0 ? ((mp - p.fairValue) / p.fairValue) * 100 : 0;
+                return (
+                  <tr key={p.id} className="border-b border-white/5 hover:bg-white/5">
+                    <td className="p-4 font-bold text-white flex items-center gap-2">
+                      <AssetImage image={p.image} name={p.name} className="w-8 h-8 rounded" width={32} height={32} />
+                      {p.name}
+                    </td>
+                    <td className="p-4 text-center text-gray-400">{p.position}</td>
+                    <td className="p-4 text-center font-bold text-accent">{p.score?.toFixed(1)}</td>
+                    <td className="p-4 text-center font-bold text-white">{mp}¢</td>
+                    <td className="p-4 text-center text-gray-400">{p.fairValue?.toFixed(0)}¢</td>
+                    <td className="p-4 text-center">
+                      <span className={`px-2 py-1 rounded-md text-[10px] font-bold ${pd > 0 ? 'bg-red-500/10 text-red-500' : 'bg-green-500/10 text-green-500'}`}>
+                        {pd > 0 ? '+' : ''}{pd.toFixed(1)}%
+                      </span>
+                    </td>
+                    <td className="p-4 text-center text-gray-400">{p.momentum || 50}</td>
+                    <td className="p-4 text-center text-gray-400">{p.marketDemand || 50}</td>
+                    <td className="p-4 text-center text-gray-400">{p.volatilityScore || 50}</td>
+                    <td className="p-4 text-left">
+                      <Link href={`/asset/${p.id}`} className="text-[10px] font-bold bg-primary/10 text-primary px-3 py-2 rounded-lg hover:bg-primary/20 transition">عرض</Link>
+                    </td>
+                  </tr>
+                );
+              })}
+              {teammates.length === 0 && (
+                <tr>
+                  <td colSpan={10} className="p-8 text-center text-gray-500 italic">لا يوجد زملاء متاحين حالياً في قاعدة البيانات.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
     </div>
   );
 }
