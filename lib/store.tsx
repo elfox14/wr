@@ -33,6 +33,11 @@ export interface Asset {
   ownersCount?: number;
   globalMarketValue?: number | null;
   popularity?: number | null;
+  momentum?: number | null;
+  marketDemand?: number | null;
+  worldCupLegacy?: number | null;
+  fundamental?: number | null;
+  volatilityScore?: number | null;
   teamId?: string | null;
   team?: Asset | null;
   players?: Asset[];
