@@ -10,16 +10,51 @@ import { AssetImage } from '@/components/ui/AssetImage';
 import { StockCard } from '@/components/ui/StockCard';
 import { PageHeader } from '@/components/ui/PageHeader';
 
-export default function MarketClient() {
+export default function MarketClient({
+  usersCount = 0,
+  todayVolume = 0,
+  nextMatchDate = null
+}: {
+  usersCount?: number;
+  todayVolume?: number;
+  nextMatchDate?: string | null;
+}) {
   const { assets, fetchAssets } = useStore();
   const [filterType, setFilterType] = useState<'ALL' | 'TEAM' | 'PLAYER'>('TEAM');
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState<'GRID' | 'TABLE'>('GRID');
   const [isProMode, setIsProMode] = useState(false);
   const [selectedTeam, setSelectedTeam] = useState<Asset | null>(null);
+  const [countdown, setCountdown] = useState<string>('لا توجد مباريات مجدولة');
+
   useEffect(() => {
     fetchAssets();
   }, [fetchAssets]);
+
+  // Countdown timer logic
+  useEffect(() => {
+    if (!nextMatchDate) return;
+    const matchTime = new Date(nextMatchDate).getTime();
+    
+    const updateCountdown = () => {
+      const now = new Date().getTime();
+      const distance = matchTime - now;
+
+      if (distance < 0) {
+        setCountdown('جارية الآن أو انتهت');
+        return;
+      }
+
+      const days = Math.floor(distance / (1000 * 60 * 60 * 24));
+      const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+      const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+      setCountdown(`${days}d : ${hours}h : ${minutes}m`);
+    };
+
+    updateCountdown();
+    const interval = setInterval(updateCountdown, 60000); // update every minute
+    return () => clearInterval(interval);
+  }, [nextMatchDate]);
 
   // Derived Stats for Overview
   const teams = assets.filter(a => a.type === 'TEAM');
@@ -27,6 +62,10 @@ export default function MarketClient() {
   
   const topTeams = [...teams].sort((a, b) => (b.score || 0) - (a.score || 0)).slice(0, 3);
   const topPlayers = [...players].sort((a, b) => b.current_price - a.current_price).slice(0, 3);
+
+  const sortedByChange = [...assets].sort((a, b) => (b.change || 0) - (a.change || 0));
+  const topGainer = sortedByChange.length > 0 ? sortedByChange[0] : null;
+  const topLoser = sortedByChange.length > 0 ? sortedByChange[sortedByChange.length - 1] : null;
 
   // Filtering Logic
   const filteredAssets = assets.filter(asset => {
@@ -66,26 +105,26 @@ export default function MarketClient() {
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 rounded-full bg-success animate-pulse"></div>
             <span className="text-gray-400">متداول نشط:</span>
-            <span className="font-bold text-white tabular-nums">15,234</span>
+            <span className="font-bold text-white tabular-nums">{usersCount.toLocaleString()}</span>
           </div>
           <div className="flex items-center gap-2 border-l border-white/10 pl-4">
             <Activity size={16} className="text-primary" />
             <span className="text-gray-400">حجم التداول اليوم:</span>
-            <span className="font-bold text-white tabular-nums">2.5M ¢</span>
+            <span className="font-bold text-white tabular-nums">{todayVolume.toLocaleString()} ¢</span>
           </div>
           <div className="flex items-center gap-2 border-l border-white/10 pl-4">
             <TrendingUp size={16} className="text-success" />
             <span className="text-gray-400">أكثر صعوداً:</span>
-            <span className="font-bold text-success">{topPlayers[0]?.name || 'N/A'}</span>
+            <span className="font-bold text-success truncate max-w-[100px] sm:max-w-none">{topGainer?.name || 'N/A'}</span>
           </div>
           <div className="flex items-center gap-2 border-l border-white/10 pl-4">
             <TrendingDown size={16} className="text-danger" />
             <span className="text-gray-400">أكثر هبوطاً:</span>
-            <span className="font-bold text-danger">البرازيل</span>
+            <span className="font-bold text-danger truncate max-w-[100px] sm:max-w-none">{topLoser?.name || 'N/A'}</span>
           </div>
           <div className="flex items-center gap-2 border-l border-white/10 pl-4 bg-accent/10 px-3 py-1 rounded-lg border border-accent/20">
             <span className="text-gray-400">المباراة القادمة:</span>
-            <span className="font-bold text-accent tabular-nums">12d : 14h : 22m</span>
+            <span className="font-bold text-accent tabular-nums" dir="ltr">{countdown}</span>
           </div>
         </div>
 
