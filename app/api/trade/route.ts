@@ -13,6 +13,13 @@ export async function POST(request: Request) {
 
     const { assetId, type, quantity, positionType = 'LONG' } = await request.json();
     
+    if (positionType !== 'LONG') {
+      return NextResponse.json(
+        { error: 'Short selling is currently disabled' },
+        { status: 400 }
+      );
+    }
+    
     if (!assetId || !type || !quantity || quantity <= 0) {
       return NextResponse.json({ error: 'Invalid input' }, { status: 400 });
     }

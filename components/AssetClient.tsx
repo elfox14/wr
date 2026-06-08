@@ -82,7 +82,7 @@ export default function AssetClient() {
     else await sellAsset(asset.id, quantity);
   };
 
-  const news = (asset as any).marketNews || asset.news || [];
+  const news = asset.marketNews || asset.news || [];
   const hasNews = news.length > 0;
 
   return (

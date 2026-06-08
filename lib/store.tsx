@@ -42,6 +42,7 @@ export interface Asset {
   team?: Asset | null;
   players?: Asset[];
   news?: any[];
+  marketNews?: any[];
 }
 
 export interface Holding {

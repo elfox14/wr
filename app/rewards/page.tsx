@@ -23,6 +23,7 @@ export default function RewardsPage() {
   const [adType, setAdType] = useState<'REGULAR' | 'BOOSTED'>('REGULAR');
   const [adTimer, setAdTimer] = useState<number>(15);
   const [adFinished, setAdFinished] = useState(false);
+  const [adSessionToken, setAdSessionToken] = useState<string | null>(null);
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -69,26 +70,49 @@ export default function RewardsPage() {
     return () => clearInterval(interval);
   }, [adModalOpen, adFinished]);
 
-  const openAdModal = (type: 'REGULAR' | 'BOOSTED') => {
-    setAdType(type);
-    setAdTimer(15);
-    setAdFinished(false);
-    setAdModalOpen(true);
+  const openAdModal = async (type: 'REGULAR' | 'BOOSTED') => {
+    setLoadingAction('ad_start');
+    try {
+      const res = await fetch('/api/rewards/ad/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        addNotification(data.error);
+      } else {
+        setAdSessionToken(data.token);
+        setAdType(type);
+        setAdTimer(15);
+        setAdFinished(false);
+        setAdModalOpen(true);
+      }
+    } catch (err) {
+      addNotification('حدث خطأ أثناء بدء الإعلان');
+    } finally {
+      setLoadingAction(null);
+    }
   };
 
   const closeAdModal = () => {
     setAdModalOpen(false);
     setAdFinished(false);
     setAdTimer(15);
+    setAdSessionToken(null);
   };
 
   const handleClaimAd = async () => {
+    if (!adSessionToken) {
+      addNotification('رمز الجلسة غير صالح');
+      return;
+    }
     setLoadingAction('ad');
     try {
-      const res = await fetch(`/api/rewards/ad`, { 
+      const res = await fetch(`/api/rewards/ad/claim`, { 
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: adType })
+        body: JSON.stringify({ token: adSessionToken })
       });
       const data = await res.json();
       

@@ -43,7 +43,9 @@ export async function GET(request: Request) {
     // Calculate portfolio stats
     let totalHoldingsValue = 0;
     const holdingsWithStats = user.holdings.map(holding => {
-      const currentPrice = holding.asset.current_price;
+      const currentPrice = Math.round(
+        holding.asset.marketPrice ?? holding.asset.current_price
+      );
       const value = holding.quantity * currentPrice;
       const costBasis = holding.quantity * holding.avg_buy_price;
       const profitLoss = value - costBasis;

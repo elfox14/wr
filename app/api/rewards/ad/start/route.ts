@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/prisma';
+import crypto from 'crypto';
 
 export async function POST(req: Request) {
   const session = await getServerSession(authOptions);
@@ -18,11 +19,11 @@ export async function POST(req: Request) {
         requestType = 'BOOSTED';
       }
     } catch(e) {
-      // ignore JSON parse error if body is empty
+      // ignore JSON parse error
     }
 
     const user = await prisma.user.findUnique({
-      where: { email: session.user.email! },
+      where: { id: session.user.id },
       include: { rewards: true }
     });
 
@@ -39,17 +40,21 @@ export async function POST(req: Request) {
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
     if (requestType === 'BOOSTED') {
-      const claimedBoostedToday = user.rewards.some(r => r.type === 'AD_WATCH_BOOSTED' && r.claimedAt >= todayStart);
+      const claimedBoostedToday = user.rewards.some(
+        r => r.type === 'AD_WATCH_BOOSTED' && r.claimedAt >= todayStart
+      );
       if (claimedBoostedToday) {
         return NextResponse.json({ error: 'لقد شاهدت الإعلان المعزز اليوم مسبقاً.' }, { status: 400 });
       }
     }
 
     const adRewardAmount = requestType === 'BOOSTED' ? 100 : 50;
-    const rewardTypeDb = requestType === 'BOOSTED' ? 'AD_WATCH_BOOSTED' : 'AD_WATCH';
 
     // Check Daily Cap (1500)
-    const dailyCappedTypes = ['DAILY', 'AD_WATCH', 'AD_WATCH_BOOSTED', 'TASK_FIRST_TRADE', 'TASK_UNDERVALUED', 'TASK_PROFIT_SELL', 'TASK_WATCHLIST', 'TASK_DIVERSIFY'];
+    const dailyCappedTypes = [
+      'DAILY', 'AD_WATCH', 'AD_WATCH_BOOSTED', 'TASK_FIRST_TRADE',
+      'TASK_UNDERVALUED', 'TASK_PROFIT_SELL', 'TASK_WATCHLIST', 'TASK_DIVERSIFY'
+    ];
     
     let earnedToday = 0;
     user.rewards.forEach(r => {
@@ -62,36 +67,24 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Daily reward cap reached (1500/1500)' }, { status: 400 });
     }
 
-    // Transaction to update user and add reward history
-    await prisma.$transaction([
-      prisma.user.update({
-        where: { id: user.id },
-        data: {
-          balance: { increment: adRewardAmount },
-          adsWatchedToday: { increment: 1 },
-          adsWatchedLifetime: { increment: 1 },
-          rewardCreditsEarned: { increment: adRewardAmount }
-        }
-      }),
-      prisma.reward.create({
-        data: {
-          userId: user.id,
-          type: rewardTypeDb,
-          amount: adRewardAmount
-        }
-      })
-    ]);
+    // Create a new AdSession token
+    const token = crypto.randomUUID();
+    await prisma.adSession.create({
+      data: {
+        token,
+        userId: user.id,
+        type: requestType,
+        claimed: false
+      }
+    });
 
-    return NextResponse.json({ 
-      success: true, 
-      message: 'Ad reward claimed successfully',
-      reward: adRewardAmount,
-      newBalance: user.balance + adRewardAmount,
-      adsWatchedToday: user.adsWatchedToday + 1
+    return NextResponse.json({
+      success: true,
+      token
     });
 
   } catch (error) {
-    console.error('Error claiming ad reward:', error);
+    console.error('Error starting ad session:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

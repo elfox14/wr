@@ -50,6 +50,7 @@ model User {
   leagueMatchesA   LeagueMatch[]     @relation("MatchUserA")
   leagueMatchesB   LeagueMatch[]     @relation("MatchUserB")
   achievements     UserAchievement[]
+  adSessions       AdSession[]
 }
 
 model Reward {
@@ -304,4 +305,14 @@ model UserAchievement {
   earnedAt    DateTime @default(now())
 
   @@unique([userId, badgeId])
+}
+
+model AdSession {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String   @default("REGULAR") // REGULAR or BOOSTED
+  claimed   Boolean  @default(false)
+  createdAt DateTime @default(now())
 }
