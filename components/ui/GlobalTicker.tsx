@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { useStore } from '@/lib/store';
 import { Zap, TrendingUp, TrendingDown, Radio, Flame, Users, AlertTriangle } from 'lucide-react';
 
@@ -111,10 +112,7 @@ export function GlobalTicker() {
     return items.sort(() => Math.random() - 0.5);
   }, [assets, marketNews]);
 
-  const handleItemClick = (item: TickerData) => {
-    if (item.assetId) router.push(`/market/${item.assetId}`);
-    else if (item.matchId) router.push(`/matches/${item.matchId}`);
-  };
+  // handleItemClick removed since we will use Link
 
   return (
     <div className="fixed bottom-0 left-0 right-0 z-50 bg-[#050505]/90 backdrop-blur-xl border-t border-white/5 shadow-[0_-8px_30px_rgba(0,0,0,0.4)] flex h-9 sm:h-11 overflow-hidden group">
@@ -135,11 +133,11 @@ export function GlobalTicker() {
 
         <div className="animate-marquee hover:[animation-play-state:paused] whitespace-nowrap flex gap-8 sm:gap-12 px-4 items-center h-full">
           {tickerItems.map((item, i) => (
-            <TickerItemRenderer key={`${item.id}-${i}`} item={item} onClick={() => handleItemClick(item)} />
+            <TickerItemRenderer key={`${item.id}-${i}`} item={item} />
           ))}
           {/* Duplicate for infinite seamless scroll */}
           {tickerItems.map((item, i) => (
-            <TickerItemRenderer key={`dup-${item.id}-${i}`} item={item} onClick={() => handleItemClick(item)} />
+            <TickerItemRenderer key={`dup-${item.id}-${i}`} item={item} />
           ))}
         </div>
       </div>
@@ -147,7 +145,7 @@ export function GlobalTicker() {
   );
 }
 
-function TickerItemRenderer({ item, onClick }: { item: TickerData, onClick: () => void }) {
+function TickerItemRenderer({ item }: { item: TickerData }) {
   let icon = null;
   let colorClass = 'text-gray-300';
   let badgeClass = '';
@@ -190,11 +188,8 @@ function TickerItemRenderer({ item, onClick }: { item: TickerData, onClick: () =
       break;
   }
 
-  return (
-    <div 
-      onClick={onClick}
-      className={`flex items-center gap-2 sm:gap-3 text-xs sm:text-sm cursor-pointer hover:bg-white/5 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg transition-colors ${item.assetId || item.matchId ? 'hover:scale-105' : ''}`}
-    >
+  const innerContent = (
+    <>
       <div className="flex items-center gap-1.5">
         {icon}
         {item.assetImage && (
@@ -224,6 +219,21 @@ function TickerItemRenderer({ item, onClick }: { item: TickerData, onClick: () =
       </span>
 
       <span className="text-white/10 mx-1 sm:mx-2">•</span>
+    </>
+  );
+
+  const className = `flex items-center gap-2 sm:gap-3 text-xs sm:text-sm cursor-pointer hover:bg-white/5 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg transition-colors ${item.assetId || item.matchId ? 'hover:scale-105' : ''}`;
+
+  if (item.assetId) {
+    return <Link href={`/asset/${item.assetId}`} className={className}>{innerContent}</Link>;
+  }
+  if (item.matchId) {
+    return <Link href={`/matches/${item.matchId}`} className={className}>{innerContent}</Link>;
+  }
+
+  return (
+    <div className={className}>
+      {innerContent}
     </div>
   );
 }

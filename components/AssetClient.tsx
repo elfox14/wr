@@ -511,7 +511,7 @@ function PlayerDetailView({ asset, assets }: { asset: any, assets: any[] }) {
           <h3 className="font-bold text-gray-300 mb-6 flex items-center gap-2"><BarChart3 size={18} className="text-accent" /> أعمدة التقييم (Valuation Pillars)</h3>
           <div className="space-y-5 flex-1 flex flex-col justify-center">
             {[
-              { label: 'الأداء الفني (Fundamental)', value: asset.score || 0, weight: '35%' },
+              { label: 'الأداء الفني (Fundamental)', value: asset.fundamental || 0, weight: '35%' },
               { label: 'الطلب السوقي (Demand)', value: asset.marketDemand || 0, weight: '20%' },
               { label: 'الشعبية (Popularity)', value: asset.popularity || 0, weight: '20%' },
               { label: 'إرث المونديال (Legacy)', value: asset.worldCupLegacy || 0, weight: '15%' },
