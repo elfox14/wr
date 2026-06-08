@@ -19,15 +19,15 @@ const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://worldcup.mcprim.com
 export const metadata: Metadata = {
   metadataBase: new URL(baseUrl),
   title: {
-    default: "MC PRIME Exchange | منصة تداول كرة القدم الافتراضية",
+    default: "MC PRIME Exchange | بورصة المونديال الافتراضية",
     template: "%s | MC PRIME Exchange",
   },
-  description: "أول منصة لتداول أسهم منتخبات ولاعبي كأس العالم افتراضياً. حلل الأداء، قم بالتداول الافتراضي للنجوم، ونافس على صدارة السوق العالمي.",
-  keywords: ["كأس العالم", "تداول كرة القدم", "أسهم اللاعبين", "تداول رياضي افتراضي", "فانتازي كأس العالم", "MC PRIME Exchange", "تحليلات رياضية", "بورصة كرة القدم"],
+  description: "منصة تداول رياضي افتراضية تتيح لك شراء وبيع أسهم المنتخبات واللاعبين باستخدام كوينز افتراضية، والتنافس مع أصدقائك في بورصة المونديال.",
+  keywords: ["MC PRIME Exchange", "بورصة المونديال", "تداول رياضي افتراضي", "كأس العالم", "fantasy exchange", "football trading game"],
   authors: [{ name: "MC PRIME Exchange Team" }],
   openGraph: {
-    title: "MC PRIME Exchange | منصة تداول كرة القدم الافتراضية",
-    description: "أول منصة لتداول أسهم منتخبات ولاعبي كأس العالم افتراضياً. استثمر في النجوم ونافس عالمياً.",
+    title: "MC PRIME Exchange",
+    description: "بورصة المونديال الافتراضية من MC PRIME — تداول المنتخبات واللاعبين بعملات افتراضية فقط. استثمر في النجوم ونافس عالمياً.",
     url: baseUrl, // Replace with real domain later
     siteName: "MC PRIME Exchange",
     images: [

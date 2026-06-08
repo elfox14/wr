@@ -17,11 +17,11 @@ export function Footer() {
             <Link href="/" className="flex items-center gap-2">
               <TrendingUp className="text-primary" size={28} />
               <span className="font-black text-xl tracking-wide text-white">
-                WorldCup <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-emerald-400">Exchange</span>
+                MC PRIME <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-emerald-400">Exchange</span>
               </span>
             </Link>
             <p className="text-gray-400 text-sm leading-relaxed max-w-xs">
-              أول منصة لتداول أسهم منتخبات ولاعبي كأس العالم افتراضياً. حلل الأداء، استثمر في النجوم، ونافس على صدارة السوق العالمي.
+              منصة تداول رياضي افتراضية للمتعة والمنافسة. جميع الكوينز افتراضية ولا تمثل أموالًا حقيقية.
             </p>
             <div className="flex gap-4 pt-2">
               {/* Twitter SVG */}
@@ -46,9 +46,10 @@ export function Footer() {
             </h3>
             <ul className="space-y-3">
               <li><Link href="/market" className="text-gray-400 hover:text-primary transition-colors text-sm flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-white/20"></span> السوق</Link></li>
-              <li><Link href="/ipo" className="text-gray-400 hover:text-primary transition-colors text-sm flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-white/20"></span> الاكتتاب (IPO)</Link></li>
-              <li><Link href="/articles" className="text-gray-400 hover:text-primary transition-colors text-sm flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-white/20"></span> المقالات والتحليلات</Link></li>
-              <li><Link href="/leaderboard" className="text-gray-400 hover:text-primary transition-colors text-sm flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-white/20"></span> الترتيب العالمي</Link></li>
+              <li><Link href="/matches" className="text-gray-400 hover:text-primary transition-colors text-sm flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-white/20"></span> المباريات</Link></li>
+              <li><Link href="/groups" className="text-gray-400 hover:text-primary transition-colors text-sm flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-white/20"></span> المجموعات</Link></li>
+              <li><Link href="/leaderboard" className="text-gray-400 hover:text-primary transition-colors text-sm flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-white/20"></span> الترتيب</Link></li>
+              <li><Link href="/rewards" className="text-gray-400 hover:text-primary transition-colors text-sm flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-white/20"></span> المكافآت</Link></li>
             </ul>
           </div>
 

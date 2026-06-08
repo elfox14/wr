@@ -78,7 +78,7 @@ export default function HomeClient({
               السوق مفتوح الآن
             </div>
             <h1 className="text-4xl lg:text-5xl font-black leading-[1.1] mb-4">
-              <span className="text-transparent bg-clip-text bg-gradient-to-b from-white to-gray-400">بورصة المونديال الافتراضية</span>
+              <span className="text-transparent bg-clip-text bg-gradient-to-b from-white to-gray-400">بورصة المونديال</span>
               <br />
               <span className="text-white">من MC PRIME</span>
             </h1>
@@ -88,10 +88,10 @@ export default function HomeClient({
           </div>
           <div className="relative z-10 flex flex-wrap gap-3">
             <Link href="/market" className="px-6 py-3 bg-primary text-white font-bold rounded-xl text-sm hover:bg-primary-light transition-colors shadow-anti-gravity inline-flex items-center gap-2">
-              <TrendingUp size={18} /> ادخل السوق
+              <TrendingUp size={18} /> ابدأ التداول الآن
             </Link>
-            <Link href="/register" className="px-6 py-3 bg-white/5 border border-white/10 text-white font-bold rounded-xl text-sm hover:bg-white/10 transition-colors inline-flex items-center gap-2">
-              أنشئ حسابك مجاناً
+            <Link href="/rewards" className="px-6 py-3 bg-white/5 border border-white/10 text-white font-bold rounded-xl text-sm hover:bg-white/10 transition-colors inline-flex items-center gap-2">
+              اكسب كوينز مجانية
             </Link>
           </div>
         </section>

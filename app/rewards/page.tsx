@@ -191,14 +191,14 @@ export default function RewardsPage() {
       {/* VIRTUAL COINS BANNER */}
       <div className="bg-gradient-to-r from-red-600 to-red-500 text-white text-center py-2 px-4 shadow-[0_0_20px_rgba(220,38,38,0.3)]">
         <p className="font-bold text-xs md:text-sm flex items-center justify-center gap-2">
-          <AlertCircle size={16} /> الكوينز افتراضية بالكامل وتُستخدم داخل اللعبة فقط ولا يمكن سحبها أو تحويلها إلى أموال حقيقية.
+          <AlertCircle size={16} /> الكوينز افتراضية بالكامل وتُستخدم داخل المنصة فقط، ولا يمكن سحبها أو تحويلها إلى أموال حقيقية.
         </p>
       </div>
 
       <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <PageHeader 
           title="مركز الكوينز المجانية"
-          description="أكمل المهام اليومية، الإنجازات، والإعلانات لاكتساب كوينز مجانية لدعم محفظتك."
+          description="احصل على كوينز افتراضية من خلال المكافآت اليومية، مشاهدة الإعلانات الاختيارية، الإحالات، والإنجازات داخل المنصة."
           icon={<Gift size={40} />}
           glowColor="bg-primary/10"
           textColor="text-primary"

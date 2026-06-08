@@ -6,12 +6,14 @@
   --font-sans: var(--font-cairo), ui-sans-serif, system-ui, sans-serif;
 
   /* Design System Tokens */
-  --color-surface: #1A1A1A; /* Matte Black Surface */
+  --color-surface: #101214;
+  --color-surface-elevated: #15181B;
   --color-primary: #0FF0FC; /* Electric Blue */
   --color-primary-light: #4AFAFF; /* Lighter Electric Blue */
-  --color-success: #16A34A;
-  --color-danger: #DC2626;
+  --color-success: #00FF88; /* Profit Green */
+  --color-danger: #FF3B5C; /* Loss Red */
   --color-accent: #FFD700; /* Royal Gold */
+  --color-warning: #FFB020;
 
   --shadow-card: 0 4px 6px -1px rgba(0, 0, 0, 0.2), 0 2px 4px -2px rgba(0, 0, 0, 0.2);
   --shadow-card-hover: 0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -4px rgba(0, 0, 0, 0.2);
@@ -27,8 +29,8 @@
 }
 
 :root {
-  --background: #121212; /* Matte Black Base */
-  --foreground: #F8FAFC; /* Slate 50 */
+  --background: #050505; /* MC PRIME Base */
+  --foreground: #FFFFFF; /* White */
 }
 
 @utility bg-glass {

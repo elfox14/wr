@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { useSession, signOut } from 'next-auth/react';
 import { 
@@ -21,7 +22,6 @@ import {
 } from 'lucide-react';
 import { useStore } from '@/lib/store';
 import { InsufficientFundsModal } from './InsufficientFundsModal';
-import { BrandLogo } from './BrandLogo';
 
 export function Navbar() {
   const { data: session, status } = useSession();
@@ -73,15 +73,14 @@ export function Navbar() {
             {/* RIGHT: Logo Section */}
             <div className="flex items-center">
               <Link href="/" className="flex items-center gap-3 group">
-                <div className="w-10 h-10 lg:w-12 lg:h-12 flex items-center justify-center transition-transform duration-300 group-hover:scale-105">
-                  <BrandLogo width={48} height={48} />
-                </div>
-                <div className="flex flex-col">
-                  <span className="font-black text-lg lg:text-xl tracking-wide text-white flex items-center gap-1 group-hover:text-[#0FF0FC] transition-colors">
-                    MC PRIME <span className="text-[#FFD700]">Exchange</span>
-                  </span>
-                  <span className="text-[10px] lg:text-xs text-gray-400 font-bold tracking-widest uppercase">بورصة المونديال</span>
-                </div>
+                <Image 
+                  src="/brand/logo-horizontal.png" 
+                  alt="MC PRIME Exchange" 
+                  width={220} 
+                  height={48} 
+                  className="object-contain transition-transform duration-300 group-hover:scale-105 h-10 lg:h-12 w-auto" 
+                  priority 
+                />
               </Link>
             </div>
             
