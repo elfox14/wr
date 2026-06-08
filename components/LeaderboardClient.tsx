@@ -57,7 +57,7 @@ export default function LeaderboardClient() {
             <Trophy className="text-[#FFD700]" size={48} /> لوحة الصدارة
           </h1>
           <p className="text-gray-400 text-lg md:text-xl">
-            أفضل المتداولين في منصة WorldCup Exchange. من سيحقق أعلى ثروة افتراضية؟
+            أفضل المتداولين في منصة MC PRIME Exchange. من سيحقق أعلى ثروة افتراضية؟
           </p>
         </div>
 

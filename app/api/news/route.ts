@@ -52,7 +52,7 @@ export async function GET() {
       marketNews.push(
         {
           id: 'pre-1',
-          title: 'مرحباً بكم في منصة WorldCup Exchange! ابدأ بناء محفظتك الآن قبل انطلاق المباريات.',
+          title: 'مرحباً بكم في منصة MC PRIME Exchange! ابدأ بناء محفظتك الآن قبل انطلاق المباريات.',
           source: 'إدارة المنصة',
           date: new Date().toISOString(),
           type: 'info'

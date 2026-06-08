@@ -34,8 +34,8 @@ export default function HomeClient({
     fetch('/api/leaderboard')
       .then(res => res.json())
       .then(data => {
-        if (data.users) {
-          setTopUsers(data.users.slice(0, 3));
+        if (data.leaderboard) {
+          setTopUsers(data.leaderboard.slice(0, 3));
         }
       })
       .catch(err => console.error("Error fetching leaderboard", err));
@@ -55,9 +55,16 @@ export default function HomeClient({
   const sortedByDemand = [...safeAssets].sort((a, b) => ((b.marketDemand || 0) - (a.marketDemand || 0)));
   const topDemand = sortedByDemand[0];
 
+  const getPremiumDiscount = (asset: any) => {
+    const marketPrice = asset.marketPrice ?? asset.current_price ?? 0;
+    const fairValue = asset.fairValue ?? asset.current_price ?? 0;
+    if (fairValue === 0) return 0;
+    return ((marketPrice - fairValue) / fairValue) * 100;
+  };
+
   // Smart Opportunities
   const smartOpportunities = safeAssets.filter(a => 
-    (a.premiumDiscountPercent || 0) <= -10 &&
+    getPremiumDiscount(a) <= -10 &&
     (a.momentum || 0) >= 70 &&
     (a.marketDemand || 0) >= 70 &&
     (a.volatilityScore || 0) <= 30
@@ -66,7 +73,7 @@ export default function HomeClient({
   // If we don't have enough exact matches, fallback to undervalued assets
   const displayOpportunities = smartOpportunities.length > 0 
     ? smartOpportunities 
-    : safeAssets.filter(a => (a.premiumDiscountPercent || 0) <= -5).slice(0, 3);
+    : safeAssets.filter(a => getPremiumDiscount(a) <= -5).slice(0, 3);
 
   // Articles
   const topArticle = getAllArticles()[0];
@@ -172,7 +179,7 @@ export default function HomeClient({
                 <span className="text-xs text-gray-500">¢</span>
                 <span className="text-success text-xs font-bold tabular-nums mr-auto">+{topGainer?.change || 0}%</span>
               </div>
-              <Link href={`/market`} className="w-full py-2 bg-white/5 hover:bg-success/10 text-success rounded-lg text-sm font-bold flex justify-center items-center transition-colors">
+              <Link href={`/asset/${topGainer?.id}`} className="w-full py-2 bg-white/5 hover:bg-success/10 text-success rounded-lg text-sm font-bold flex justify-center items-center transition-colors">
                 تداول
               </Link>
             </div>
@@ -191,7 +198,7 @@ export default function HomeClient({
                 <span className="text-xs text-gray-500">¢</span>
                 <span className="text-danger text-xs font-bold tabular-nums mr-auto">{topLoser?.change || 0}%</span>
               </div>
-              <Link href={`/market`} className="w-full py-2 bg-white/5 hover:bg-danger/10 text-danger rounded-lg text-sm font-bold flex justify-center items-center transition-colors">
+              <Link href={`/asset/${topLoser?.id}`} className="w-full py-2 bg-white/5 hover:bg-danger/10 text-danger rounded-lg text-sm font-bold flex justify-center items-center transition-colors">
                 تداول
               </Link>
             </div>
@@ -210,7 +217,7 @@ export default function HomeClient({
                 <span className="text-xs text-gray-500">¢</span>
                 <span className="text-primary text-xs font-bold tabular-nums mr-auto">زخم {topMomentum?.momentum || 0}</span>
               </div>
-              <Link href={`/market`} className="w-full py-2 bg-white/5 hover:bg-primary/10 text-primary rounded-lg text-sm font-bold flex justify-center items-center transition-colors">
+              <Link href={`/asset/${topMomentum?.id}`} className="w-full py-2 bg-white/5 hover:bg-primary/10 text-primary rounded-lg text-sm font-bold flex justify-center items-center transition-colors">
                 تداول
               </Link>
             </div>
@@ -229,7 +236,7 @@ export default function HomeClient({
                 <span className="text-xs text-gray-500">¢</span>
                 <span className="text-accent text-xs font-bold tabular-nums mr-auto">طلب {topDemand?.marketDemand || 0}</span>
               </div>
-              <Link href={`/market`} className="w-full py-2 bg-white/5 hover:bg-accent/10 text-accent rounded-lg text-sm font-bold flex justify-center items-center transition-colors">
+              <Link href={`/asset/${topDemand?.id}`} className="w-full py-2 bg-white/5 hover:bg-accent/10 text-accent rounded-lg text-sm font-bold flex justify-center items-center transition-colors">
                 تداول
               </Link>
             </div>
@@ -269,9 +276,9 @@ export default function HomeClient({
                   </div>
 
                   <div className="flex flex-wrap gap-1.5 mb-5">
-                    {(asset.premiumDiscountPercent || 0) < 0 && (
+                    {getPremiumDiscount(asset) < 0 && (
                       <span className="text-[10px] font-bold px-2 py-1 rounded bg-success/10 text-success border border-success/20">
-                        خصم {Math.abs(asset.premiumDiscountPercent || 0)}%
+                        خصم {Math.abs(Math.round(getPremiumDiscount(asset)))}%
                       </span>
                     )}
                     {(asset.momentum || 0) >= 70 && (
@@ -286,7 +293,7 @@ export default function HomeClient({
                     )}
                   </div>
 
-                  <Link href={`/market`} className="w-full py-2.5 bg-yellow-400 text-black rounded-xl text-sm font-bold flex justify-center items-center hover:bg-yellow-500 transition-colors">
+                  <Link href={`/asset/${asset.id}`} className="w-full py-2.5 bg-yellow-400 text-black rounded-xl text-sm font-bold flex justify-center items-center hover:bg-yellow-500 transition-colors">
                     تداول الآن
                   </Link>
                 </div>
