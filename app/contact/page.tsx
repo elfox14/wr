@@ -31,7 +31,7 @@ export default function ContactPage() {
                 <div>
                   <h3 className="font-bold text-white text-lg">البريد الإلكتروني</h3>
                   <p className="text-gray-400 text-sm mb-1">للاستفسارات العامة والدعم الفني</p>
-                  <a href="mailto:support@worldcup-exchange.com" className="text-primary hover:underline font-mono">support@worldcup-exchange.com</a>
+                  <a href="mailto:support@mcprime-exchange.com" className="text-primary hover:underline font-mono">support@mcprime-exchange.com</a>
                 </div>
               </div>
 
@@ -57,7 +57,7 @@ export default function ContactPage() {
                 <div>
                   <h3 className="font-bold text-white text-lg">الاستفسارات التجارية</h3>
                   <p className="text-gray-400 text-sm mb-1">للشراكات والإعلانات (Google AdSense وما شابه)</p>
-                  <a href="mailto:business@worldcup-exchange.com" className="text-emerald-400 hover:underline font-mono">business@worldcup-exchange.com</a>
+                  <a href="mailto:business@mcprime-exchange.com" className="text-emerald-400 hover:underline font-mono">business@mcprime-exchange.com</a>
                 </div>
               </div>
 

@@ -57,18 +57,25 @@ export function GlobalTicker() {
         assetId: a.id, assetName: a.name, assetImage: a.image, marketPrice: a.marketPrice ?? a.current_price, changePercent: a.change
       }));
 
+      // Helper to calculate premium/discount locally
+      const getPremiumDiscount = (asset: any) => {
+        const marketPrice = asset.marketPrice ?? asset.current_price ?? 0;
+        const fairValue = asset.fairValue ?? asset.current_price ?? 0;
+        return fairValue > 0 ? ((marketPrice - fairValue) / fairValue) * 100 : 0;
+      };
+
       // Undervalued
-      const undervalued = [...assets].filter(a => (a.premiumDiscountPercent || 0) <= -10).slice(0, 2);
+      const undervalued = [...assets].filter(a => getPremiumDiscount(a) <= -10).slice(0, 2);
       undervalued.forEach(a => items.push({
-        id: `under-${a.id}`, type: 'UNDERVALUED', title: `أقل من قيمته العادلة بـ ${Math.abs(a.premiumDiscountPercent || 0)}%`,
-        assetId: a.id, assetName: a.name, assetImage: a.image, premiumDiscountPercent: a.premiumDiscountPercent
+        id: `under-${a.id}`, type: 'UNDERVALUED', title: `أقل من قيمته العادلة بـ ${Math.abs(Math.round(getPremiumDiscount(a)))}%`,
+        assetId: a.id, assetName: a.name, assetImage: a.image, premiumDiscountPercent: getPremiumDiscount(a)
       }));
 
       // Overvalued
-      const overvalued = [...assets].filter(a => (a.premiumDiscountPercent || 0) >= 15).slice(0, 1);
+      const overvalued = [...assets].filter(a => getPremiumDiscount(a) >= 15).slice(0, 1);
       overvalued.forEach(a => items.push({
-        id: `over-${a.id}`, type: 'OVERVALUED', title: `أعلى من قيمته العادلة بـ ${Math.abs(a.premiumDiscountPercent || 0)}%`,
-        assetId: a.id, assetName: a.name, assetImage: a.image, premiumDiscountPercent: a.premiumDiscountPercent
+        id: `over-${a.id}`, type: 'OVERVALUED', title: `أعلى من قيمته العادلة بـ ${Math.abs(Math.round(getPremiumDiscount(a)))}%`,
+        assetId: a.id, assetName: a.name, assetImage: a.image, premiumDiscountPercent: getPremiumDiscount(a)
       }));
 
       // High Momentum

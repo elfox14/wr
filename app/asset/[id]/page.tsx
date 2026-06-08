@@ -38,7 +38,7 @@ export default async function AssetPage({ params }: Props) {
   const asset = await prisma.asset.findUnique({ where: { id } });
 
   const isTeam = asset?.type === 'TEAM';
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://worldcup.mcprim.com';
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://mcprime-exchange.com';
 
   const jsonLd = asset ? {
     "@context": "https://schema.org",

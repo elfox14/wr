@@ -12,17 +12,9 @@ export default async function Home() {
   const volumeResult: any = await prisma.$queryRaw`SELECT COALESCE(SUM(quantity * price_at_time), 0) as volume FROM "Transaction"`;
   const tradeVolume = Number(volumeResult[0]?.volume || 0);
 
-  // Fetch top 3 users by profit
-  const topUsersData = await prisma.user.findMany({
-    where: { total_profit: { gt: 0 } },
-    orderBy: { total_profit: 'desc' },
-    take: 3,
-    select: { name: true, total_profit: true }
-  });
-
   // Fetch upcoming matches
   const upcomingMatches = await prisma.match.findMany({
-    where: { status: { in: ['SCHEDULED', 'LIVE'] } },
+    where: { status: { in: ['SCHEDULED', 'IN_PLAY', 'LIVE'] } },
     orderBy: { matchDate: 'asc' },
     take: 3,
     include: { homeTeam: true, awayTeam: true }

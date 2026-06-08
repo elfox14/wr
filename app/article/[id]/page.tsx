@@ -42,7 +42,7 @@ export default async function ArticlePage({ params }: { params: Promise<{ id: st
     notFound();
   }
 
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://worldcup.mcprim.com';
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://mcprime-exchange.com';
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "Article",
