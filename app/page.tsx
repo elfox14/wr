@@ -20,6 +20,17 @@ export default async function Home() {
     select: { name: true, total_profit: true }
   });
 
+  // Fetch upcoming matches
+  const upcomingMatches = await prisma.match.findMany({
+    where: { status: { in: ['SCHEDULED', 'LIVE'] } },
+    orderBy: { matchDate: 'asc' },
+    take: 3,
+    include: { homeTeam: true, awayTeam: true }
+  });
+
+  // Calculate executed trades
+  const executedTradesResult = await prisma.transaction.count();
+
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://worldcup.mcprim.com';
 
   const jsonLd = {
@@ -27,7 +38,7 @@ export default async function Home() {
     "@type": "WebSite",
     "name": "MC PRIME Exchange",
     "url": baseUrl,
-    "description": "أول منصة لتداول أسهم منتخبات ولاعبي كأس العالم افتراضياً. حلل الأداء، استثمر في النجوم، ونافس على صدارة السوق العالمي."
+    "description": "منصة تداول رياضي افتراضية. تداول أسهم منتخبات ولاعبي كأس العالم افتراضياً، ونافس على صدارة السوق."
   };
 
   return (
@@ -40,7 +51,8 @@ export default async function Home() {
         initialAssets={assets} 
         usersCount={usersCount}
         tradeVolume={tradeVolume}
-        topUsersData={topUsersData}
+        executedTrades={executedTradesResult}
+        upcomingMatches={upcomingMatches}
       />
     </>
   );
