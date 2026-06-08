@@ -10,6 +10,9 @@ type SyncResult = {
   matched?: number;
   notFound?: number;
   errors?: number;
+  teamFallbackImages?: number;
+  realPlayerImages?: number;
+  lookupErrorsRecovered?: number;
   results?: Array<{
     assetId: string;
     name: string;
@@ -19,6 +22,7 @@ type SyncResult = {
     providerId?: string;
     imageBefore?: string | null;
     imageAfter?: string | null;
+    imageSource?: string;
     error?: string;
   }>;
   error?: string;
@@ -28,7 +32,7 @@ type SyncResult = {
 export default function TheSportsDbAdminPage() {
   const [adminSecret, setAdminSecret] = useState("");
   const [type, setType] = useState<"PLAYER" | "TEAM">("PLAYER");
-  const [limit, setLimit] = useState(50);
+  const [limit, setLimit] = useState(1244);
   const [assetId, setAssetId] = useState("");
   const [overwriteImages, setOverwriteImages] = useState(true);
   const [loading, setLoading] = useState(false);
@@ -50,6 +54,7 @@ export default function TheSportsDbAdminPage() {
           limit,
           dryRun,
           overwriteImages,
+          fallbackToTeamImage: true,
           ...(assetId.trim() ? { assetId: assetId.trim() } : {}),
         }),
       });
@@ -77,7 +82,7 @@ export default function TheSportsDbAdminPage() {
               </div>
               <h1 className="mt-3 text-3xl font-black md:text-4xl">تحديث صور اللاعبين والمنتخبات</h1>
               <p className="mt-2 max-w-3xl text-sm text-slate-300">
-                استخدم هذه الصفحة لجلب الصور الحقيقية من TheSportsDB واستبدال الصور القديمة داخل قاعدة البيانات.
+                استخدم هذه الصفحة لجلب الصور الحقيقية من TheSportsDB واستبدال الصور القديمة داخل قاعدة البيانات. إذا لم توجد صورة لاعب، سيتم استخدام صورة منتخب اللاعب تلقائيًا.
               </p>
             </div>
           </div>
@@ -101,7 +106,7 @@ export default function TheSportsDbAdminPage() {
             <input
               type="number"
               min={1}
-              max={200}
+              max={5000}
               value={limit}
               onChange={(e) => setLimit(Number(e.target.value))}
               className="w-full rounded-2xl border border-white/10 bg-[#0b1020] px-4 py-3 text-white outline-none focus:border-cyan-400"
@@ -176,16 +181,31 @@ export default function TheSportsDbAdminPage() {
                     <div className="mt-1 text-2xl font-black">{result.total ?? 0}</div>
                   </div>
                   <div className="rounded-2xl bg-[#0b1020] p-4">
-                    <div className="text-xs text-slate-400">تم العثور</div>
+                    <div className="text-xs text-slate-400">تم التحديث/المطابقة</div>
                     <div className="mt-1 text-2xl font-black text-emerald-300">{result.matched ?? 0}</div>
                   </div>
                   <div className="rounded-2xl bg-[#0b1020] p-4">
+                    <div className="text-xs text-slate-400">صور لاعبين حقيقية</div>
+                    <div className="mt-1 text-2xl font-black text-cyan-300">{result.realPlayerImages ?? 0}</div>
+                  </div>
+                  <div className="rounded-2xl bg-[#0b1020] p-4">
+                    <div className="text-xs text-slate-400">صور منتخب بديلة</div>
+                    <div className="mt-1 text-2xl font-black text-yellow-300">{result.teamFallbackImages ?? 0}</div>
+                  </div>
+                </div>
+
+                <div className="mt-3 grid gap-3 md:grid-cols-3">
+                  <div className="rounded-2xl bg-[#0b1020] p-4">
                     <div className="text-xs text-slate-400">غير موجود</div>
-                    <div className="mt-1 text-2xl font-black text-yellow-300">{result.notFound ?? 0}</div>
+                    <div className="mt-1 text-xl font-black text-yellow-300">{result.notFound ?? 0}</div>
                   </div>
                   <div className="rounded-2xl bg-[#0b1020] p-4">
                     <div className="text-xs text-slate-400">أخطاء</div>
-                    <div className="mt-1 text-2xl font-black text-red-300">{result.errors ?? 0}</div>
+                    <div className="mt-1 text-xl font-black text-red-300">{result.errors ?? 0}</div>
+                  </div>
+                  <div className="rounded-2xl bg-[#0b1020] p-4">
+                    <div className="text-xs text-slate-400">أخطاء تم تعويضها بصورة المنتخب</div>
+                    <div className="mt-1 text-xl font-black text-emerald-300">{result.lookupErrorsRecovered ?? 0}</div>
                   </div>
                 </div>
 
@@ -196,6 +216,7 @@ export default function TheSportsDbAdminPage() {
                         <th className="px-4 py-3 text-right">الأصل</th>
                         <th className="px-4 py-3 text-right">الحالة</th>
                         <th className="px-4 py-3 text-right">المطابقة</th>
+                        <th className="px-4 py-3 text-right">مصدر الصورة</th>
                         <th className="px-4 py-3 text-right">الصورة الجديدة</th>
                       </tr>
                     </thead>
@@ -208,6 +229,7 @@ export default function TheSportsDbAdminPage() {
                           </td>
                           <td className="px-4 py-3">{row.status}</td>
                           <td className="px-4 py-3">{row.providerName || row.error || "-"}</td>
+                          <td className="px-4 py-3">{row.imageSource || "-"}</td>
                           <td className="px-4 py-3">
                             {row.imageAfter ? (
                               <a href={row.imageAfter} target="_blank" className="text-cyan-300 underline">
@@ -231,8 +253,7 @@ export default function TheSportsDbAdminPage() {
           <div className="flex items-start gap-3">
             <Users className="mt-1 h-5 w-5" />
             <p className="text-sm leading-7">
-              ابدأ دائمًا بزر <b>تجربة بدون حفظ</b> لأول 20 أو 50 لاعب. إذا كانت المطابقات صحيحة، اضغط <b>تنفيذ التحديث الفعلي</b>.
-              لو بعض اللاعبين لم تظهر لهم صور، فهذا يعني أن TheSportsDB لا يملك صورة لهم أو الاسم مختلف.
+              لتحديث كل اللاعبين ضع العدد <b>1244</b>. الأفضل تشغيل المنتخبات أولًا حتى تكون صور المنتخبات متاحة كبديل للاعبين الذين لا يملك لهم TheSportsDB صورة حقيقية.
             </p>
           </div>
         </section>
