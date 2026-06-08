@@ -488,7 +488,13 @@ function TeamDetailView({ asset }: { asset: any }) {
 // -------------------------------------------------------------
 function PlayerDetailView({ asset, assets }: { asset: any, assets: any[] }) {
   
-  const teammates = assets.filter((a: any) => a.type === 'PLAYER' && a.id !== asset.id && ((a.teamId && a.teamId === asset.teamId) || (a.team && a.team === asset.team)));
+  const teammates = assets.filter((a: any) =>
+    a.type === 'PLAYER' &&
+    a.id !== asset.id &&
+    a.teamId &&
+    asset.teamId &&
+    a.teamId === asset.teamId
+  );
 
   return (
     <div className="flex flex-col gap-6 w-full">
@@ -514,11 +520,13 @@ function PlayerDetailView({ asset, assets }: { asset: any, assets: any[] }) {
             </div>
             <div className="bg-black/40 p-3 rounded-lg border border-white/5">
               <p className="text-[10px] text-gray-500 uppercase">المنتخب</p>
-              <p className="font-bold text-white mt-1 truncate">{asset.team || '-'}</p>
+              <p className="font-bold text-white mt-1 truncate">
+                {asset.team?.name || asset.teamName || '-'}
+              </p>
             </div>
             <div className="bg-black/40 p-3 rounded-lg border border-white/5">
               <p className="text-[10px] text-gray-500 uppercase">مستوى اللاعب (Tier)</p>
-              <p className="font-bold text-white mt-1">{asset.tier || '-'}</p>
+              <p className="font-bold text-white mt-1">{asset.playerTier ?? '-'}</p>
             </div>
             <div className="bg-black/40 p-3 rounded-lg border border-white/5">
               <p className="text-[10px] text-gray-500 uppercase">إرث المونديال</p>
