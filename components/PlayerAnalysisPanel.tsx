@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { Activity, AlertCircle, BarChart3, Flame, ShieldAlert, Sparkles, Target, TrendingUp, Zap } from 'lucide-react';
 
@@ -55,7 +56,7 @@ function MetricCard({ label, value, hint, icon, accent = 'text-primary' }: {
   label: string;
   value: string | number;
   hint?: string;
-  icon: React.ReactNode;
+  icon: ReactNode;
   accent?: string;
 }) {
   return (
