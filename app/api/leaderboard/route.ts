@@ -48,7 +48,7 @@ export async function GET(request: Request) {
           }
         },
         transactions: {
-          select: { id: true, createdAt: true }
+          select: { id: true, timestamp: true }
         }
       }
     });
@@ -58,11 +58,11 @@ export async function GET(request: Request) {
     let highestUnrealizedPnL = -Infinity;
     let totalNetWorth = 0;
 
-    let leaderboard = realUsers.map(u => {
+    let leaderboard: any[] = realUsers.map(u => {
       let holdingsValue = 0;
       let totalCostBasis = 0;
       let riskSum = 0;
-      let bestHolding = null;
+      let bestHolding: { name: string; pnlPercent: number } | null = null;
       let bestHoldingPercent = -Infinity;
 
       u.holdings.forEach(h => {
@@ -175,7 +175,7 @@ export async function GET(request: Request) {
     today.setHours(0, 0, 0, 0);
 
     const todayTransactions = await prisma.transaction.findMany({
-      where: { createdAt: { gte: today } },
+      where: { timestamp: { gte: today } },
       select: { quantity: true, price_at_time: true, userId: true }
     });
 
@@ -186,7 +186,7 @@ export async function GET(request: Request) {
     if (todayTransactions.length > 0) {
       const userTxCount: Record<string, number> = {};
       let maxTx = 0;
-      let maxUser = null;
+      let maxUser: string | null = null;
       todayTransactions.forEach(tx => {
         userTxCount[tx.userId] = (userTxCount[tx.userId] || 0) + 1;
         if (userTxCount[tx.userId] > maxTx) {
