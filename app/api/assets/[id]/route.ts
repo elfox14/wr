@@ -14,8 +14,19 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
         priceHistory: {
           orderBy: { timestamp: 'asc' }
         },
+        performances: {
+          orderBy: { createdAt: 'desc' },
+          take: 8,
+        },
         team: true,
-        players: true
+        players: {
+          include: {
+            performances: {
+              orderBy: { createdAt: 'desc' },
+              take: 1,
+            },
+          },
+        }
       }
     });
 
