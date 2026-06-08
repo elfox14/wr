@@ -93,20 +93,20 @@ export default function HomeClient({
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-12">
         
         {/* A) HERO SECTION */}
-        <section className="relative rounded-3xl overflow-hidden bg-surface border border-white/5 p-8 md:p-12 min-h-[400px] flex flex-col justify-center">
+        <section className="relative rounded-3xl overflow-hidden bg-surface border border-white/5 px-6 py-6 md:px-9 md:py-8 min-h-[280px] md:min-h-[300px] flex flex-col justify-center">
           <div className="absolute inset-0 bg-gradient-to-r from-primary/10 to-transparent pointer-events-none" />
           <div className="absolute top-0 right-0 w-1/2 h-full bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-primary/20 via-transparent to-transparent opacity-50" />
           
           <div className="relative z-10 max-w-2xl">
-            <div className="mb-6">
-              <Image src="/brand/logo-horizontal.png" alt="MC PRIME Exchange" width={240} height={60} className="h-12 w-auto" />
+            <div className="mb-4">
+              <Image src="/brand/logo-horizontal.png" alt="MC PRIME Exchange" width={240} height={60} className="h-9 md:h-10 w-auto" />
             </div>
             
-            <h1 className="text-4xl md:text-5xl lg:text-6xl font-black text-white leading-[1.1] mb-6">
+            <h1 className="text-3xl md:text-4xl lg:text-5xl font-black text-white leading-[1.1] mb-4">
               بورصة المونديال الافتراضية
             </h1>
             
-            <p className="text-gray-400 text-base md:text-lg leading-relaxed mb-8">
+            <p className="text-gray-400 text-base md:text-lg leading-relaxed mb-6">
               اشترِ وبيع أسهم المنتخبات واللاعبين بعملات افتراضية، تابع حركة السوق مع كل مباراة، ونافس أصدقاءك على صدارة الترتيب.
             </p>
             
@@ -122,7 +122,7 @@ export default function HomeClient({
               </Link>
             </div>
             
-            <div className="mt-8 flex items-center gap-2 text-xs text-gray-500 bg-white/5 w-fit px-3 py-1.5 rounded-lg border border-white/5">
+            <div className="mt-6 flex items-center gap-2 text-xs text-gray-500 bg-white/5 w-fit px-3 py-1.5 rounded-lg border border-white/5">
               <AlertCircle size={14} className="text-primary" />
               جميع الكوينز افتراضية بالكامل وتُستخدم داخل المنصة فقط، ولا يمكن سحبها أو تحويلها إلى أموال حقيقية.
             </div>
