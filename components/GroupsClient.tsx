@@ -1,390 +1,472 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
-import { useStore, Asset } from '@/lib/store';
-import { LayoutGrid, ListOrdered, CalendarDays, Sword, TrendingUp, Trophy, AlertTriangle, ShieldCheck, XCircle, ChevronRight, BarChart3, Info } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useStore, Asset, Match } from '@/lib/store';
+import { AssetImage } from '@/components/ui/AssetImage';
+import {
+  Activity,
+  AlertCircle,
+  BarChart3,
+  CalendarDays,
+  ChevronRight,
+  Flame,
+  LayoutGrid,
+  LineChart,
+  ListOrdered,
+  ShieldCheck,
+  Star,
+  Target,
+  Trophy,
+  Users,
+  Zap,
+} from 'lucide-react';
+
+type GroupStanding = {
+  team: Asset;
+  played: number;
+  won: number;
+  drawn: number;
+  lost: number;
+  goalsFor: number;
+  goalsAgainst: number;
+  goalDifference: number;
+  points: number;
+};
+
+type GroupKey = string;
+
+function normalizeGroupKey(value?: string | null): string {
+  if (!value) return 'غير محددة';
+  return value
+    .replace('Group', '')
+    .replace('المجموعة', '')
+    .trim()
+    .toUpperCase();
+}
+
+function groupDisplayName(groupKey: string) {
+  return groupKey === 'غير محددة' ? 'مجموعات غير محددة' : `المجموعة ${groupKey}`;
+}
+
+function formatPrice(asset?: Asset | null) {
+  if (!asset) return '0¢';
+  const price = Math.round(asset.marketPrice ?? asset.current_price ?? 0);
+  return `${price.toLocaleString()}¢`;
+}
+
+function getPremiumDiscount(asset: Asset) {
+  const marketPrice = Number(asset.marketPrice ?? asset.current_price ?? 0);
+  const fairValue = Number(asset.fairValue ?? asset.current_price ?? marketPrice);
+  return fairValue > 0 ? ((marketPrice - fairValue) / fairValue) * 100 : 0;
+}
+
+function getTeamPower(team: Asset) {
+  return Math.round(
+    ((team.score ?? 50) * 0.35) +
+    ((team.momentum ?? 50) * 0.25) +
+    ((team.marketDemand ?? 50) * 0.2) +
+    ((team.worldCupLegacy ?? 50) * 0.2)
+  );
+}
+
+function StatusBadge({ rank }: { rank: number }) {
+  if (rank <= 2) return <span className="rounded-lg border border-success/20 bg-success/10 px-2 py-1 text-xs font-black text-success">منطقة تأهل</span>;
+  if (rank === 3) return <span className="rounded-lg border border-orange-400/20 bg-orange-400/10 px-2 py-1 text-xs font-black text-orange-300">ينافس</span>;
+  return <span className="rounded-lg border border-danger/20 bg-danger/10 px-2 py-1 text-xs font-black text-danger">مهدد</span>;
+}
+
+function EmptyState({ title, text }: { title: string; text: string }) {
+  return (
+    <div className="rounded-3xl border border-dashed border-white/10 bg-surface/40 p-10 text-center">
+      <AlertCircle size={36} className="mx-auto mb-4 text-gray-500" />
+      <h3 className="mb-2 text-xl font-black text-white">{title}</h3>
+      <p className="text-sm text-gray-500">{text}</p>
+    </div>
+  );
+}
 
 export default function GroupsClient() {
-  const { assets, fetchAssets } = useStore();
+  const { assets, matches, fetchAssets, fetchMatches } = useStore();
   const [loading, setLoading] = useState(true);
-  const router = useRouter();
-
-  const [activeTab, setActiveTab] = useState<'groups' | 'standings' | 'matches' | 'knockout' | 'predictions'>('groups');
+  const [selectedGroup, setSelectedGroup] = useState<GroupKey | null>(null);
+  const [view, setView] = useState<'overview' | 'standings' | 'matches' | 'teams' | 'players'>('overview');
 
   useEffect(() => {
-    if (assets.length === 0) {
-      fetchAssets().then(() => setLoading(false));
-    } else {
-      setLoading(false);
-    }
-  }, [assets.length, fetchAssets]);
+    Promise.all([
+      assets.length === 0 ? fetchAssets() : Promise.resolve(),
+      matches.length === 0 ? fetchMatches() : Promise.resolve(),
+    ]).finally(() => setLoading(false));
+  }, [assets.length, matches.length, fetchAssets, fetchMatches]);
+
+  const teams = useMemo(() => assets.filter((asset) => asset.type === 'TEAM'), [assets]);
+
+  const groups = useMemo(() => {
+    const map = teams.reduce((acc, team) => {
+      const key = normalizeGroupKey(team.group);
+      if (!acc[key]) acc[key] = [];
+      acc[key].push(team);
+      return acc;
+    }, {} as Record<string, Asset[]>);
+
+    Object.keys(map).forEach((key) => {
+      map[key].sort((a, b) => (a.fifaRank || 999) - (b.fifaRank || 999));
+    });
+
+    return map;
+  }, [teams]);
+
+  const groupKeys = useMemo(() => Object.keys(groups).sort((a, b) => a.localeCompare(b)), [groups]);
+
+  useEffect(() => {
+    if (!selectedGroup && groupKeys.length > 0) setSelectedGroup(groupKeys[0]);
+  }, [groupKeys, selectedGroup]);
+
+  const selectedTeams = selectedGroup ? groups[selectedGroup] || [] : [];
+  const selectedTeamIds = new Set(selectedTeams.map((team) => team.id));
+
+  const groupMatches = useMemo(() => matches.filter((match) => {
+    const matchGroup = normalizeGroupKey(match.groupPhase);
+    const sameGroupPhase = selectedGroup && matchGroup === selectedGroup;
+    const sameTeams = selectedTeamIds.has(match.homeTeam?.id) || selectedTeamIds.has(match.awayTeam?.id);
+    return sameGroupPhase || sameTeams;
+  }).sort((a, b) => new Date(a.matchDate).getTime() - new Date(b.matchDate).getTime()), [matches, selectedGroup, selectedTeamIds]);
+
+  const standings = useMemo<GroupStanding[]>(() => {
+    const table = selectedTeams.map((team) => ({
+      team,
+      played: 0,
+      won: 0,
+      drawn: 0,
+      lost: 0,
+      goalsFor: 0,
+      goalsAgainst: 0,
+      goalDifference: 0,
+      points: 0,
+    }));
+
+    const byId = new Map(table.map((row) => [row.team.id, row]));
+
+    groupMatches.filter((match) => match.status === 'FINISHED').forEach((match) => {
+      const home = byId.get(match.homeTeam.id);
+      const away = byId.get(match.awayTeam.id);
+      if (!home || !away) return;
+
+      const homeScore = Number(match.homeScore || 0);
+      const awayScore = Number(match.awayScore || 0);
+
+      home.played += 1;
+      away.played += 1;
+      home.goalsFor += homeScore;
+      home.goalsAgainst += awayScore;
+      away.goalsFor += awayScore;
+      away.goalsAgainst += homeScore;
+
+      if (homeScore > awayScore) {
+        home.won += 1;
+        away.lost += 1;
+        home.points += 3;
+      } else if (homeScore < awayScore) {
+        away.won += 1;
+        home.lost += 1;
+        away.points += 3;
+      } else {
+        home.drawn += 1;
+        away.drawn += 1;
+        home.points += 1;
+        away.points += 1;
+      }
+    });
+
+    table.forEach((row) => {
+      row.goalDifference = row.goalsFor - row.goalsAgainst;
+    });
+
+    return table.sort((a, b) => {
+      if (b.points !== a.points) return b.points - a.points;
+      if (b.goalDifference !== a.goalDifference) return b.goalDifference - a.goalDifference;
+      if (b.goalsFor !== a.goalsFor) return b.goalsFor - a.goalsFor;
+      return getTeamPower(b.team) - getTeamPower(a.team);
+    });
+  }, [selectedTeams, groupMatches]);
+
+  const finishedMatchesCount = groupMatches.filter((match) => match.status === 'FINISHED').length;
+  const scheduledMatchesCount = groupMatches.filter((match) => match.status === 'SCHEDULED').length;
+  const liveMatchesCount = groupMatches.filter((match) => ['IN_PLAY', 'LIVE'].includes(match.status)).length;
+
+  const groupPlayers = useMemo(() => selectedTeams
+    .flatMap((team) => (team.players || []).map((player) => ({ ...player, team })))
+    .sort((a, b) => Number(b.marketPrice ?? b.current_price ?? 0) - Number(a.marketPrice ?? a.current_price ?? 0)), [selectedTeams]);
+
+  const topPlayers = groupPlayers.slice(0, 8);
+  const avgTeamScore = selectedTeams.length ? Math.round(selectedTeams.reduce((sum, team) => sum + (team.score || 0), 0) / selectedTeams.length) : 0;
+  const avgMomentum = selectedTeams.length ? Math.round(selectedTeams.reduce((sum, team) => sum + (team.momentum || 50), 0) / selectedTeams.length) : 0;
+  const highestDemandTeam = [...selectedTeams].sort((a, b) => (b.marketDemand || 0) - (a.marketDemand || 0))[0];
+  const mostValuableTeam = [...selectedTeams].sort((a, b) => Number(b.marketPrice ?? b.current_price ?? 0) - Number(a.marketPrice ?? a.current_price ?? 0))[0];
 
   if (loading) {
-    return <div className="min-h-screen bg-background flex items-center justify-center"><div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin"></div></div>;
+    return <div className="flex min-h-screen items-center justify-center bg-background"><div className="h-10 w-10 animate-spin rounded-full border-4 border-primary border-t-transparent" /></div>;
   }
 
-  // Filter only teams
-  const teams = assets.filter(a => a.type === 'TEAM');
-
-  // Group by 'group' property
-  const groupedTeams = teams.reduce((acc, team) => {
-    const groupName = team.group ? (team.group.includes('Group') ? team.group : `المجموعة ${team.group}`) : 'مجموعات غير محددة';
-    if (!acc[groupName]) acc[groupName] = [];
-    acc[groupName].push(team);
-    return acc;
-  }, {} as Record<string, Asset[]>);
-
-  // Sort groups alphabetically
-  const sortedGroupKeys = Object.keys(groupedTeams).sort((a, b) => a.localeCompare(b));
-
-  // Helper to generate deterministic mock standings based on score
-  const getTeamStats = (team: Asset) => {
-    const score = team.score || 50;
-    const points = Math.max(0, Math.min(9, Math.round((score - 40) / 6)));
-    const played = 3;
-    const won = Math.floor(points / 3);
-    const drawn = points % 3;
-    const lost = played - won - drawn;
-    const goalDifference = Math.round((score - 50) / 10);
-    const goalsFor = Math.max(0, goalDifference + Math.floor(score / 20));
-    const goalsAgainst = Math.max(0, goalsFor - goalDifference);
-    
-    // Predictions
-    const qualificationChance = Math.min(99, Math.max(1, score));
-    const winnerChance = Math.max(0, qualificationChance - 30);
-    const eliminationRisk = 100 - qualificationChance;
-    
-    const fairValueImpactQualify = Math.round(team.current_price * 0.15);
-    const fairValueImpactEliminate = Math.round(team.current_price * -0.25);
-
-    return { points, played, won, drawn, lost, goalDifference, goalsFor, goalsAgainst, qualificationChance, winnerChance, eliminationRisk, fairValueImpactQualify, fairValueImpactEliminate };
-  };
-
-  const getStatusColor = (status: string) => {
-    if (status === 'QUALIFIED') return 'text-green-500 bg-green-500/10 border-green-500/20';
-    if (status === 'COMPETING') return 'text-[#0FF0FC] bg-[#0FF0FC]/10 border-[#0FF0FC]/20';
-    if (status === 'AT_RISK') return 'text-orange-500 bg-orange-500/10 border-orange-500/20';
-    return 'text-gray-400 bg-gray-500/10 border-gray-500/20';
-  };
-
-  const getStatusLabel = (status: string) => {
-    if (status === 'QUALIFIED') return 'متأهل';
-    if (status === 'COMPETING') return 'ينافس';
-    if (status === 'AT_RISK') return 'مهدد';
-    return 'خارج';
-  };
-
   return (
-    <div className="min-h-screen bg-background text-foreground pb-20 selection:bg-primary/30">
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        
-        {/* NEW RESPONSIVE HEADER */}
-        <div className="text-center mb-12 max-w-4xl mx-auto">
-          <h1 className="text-3xl md:text-5xl lg:text-6xl font-black text-white mb-4 tracking-tight drop-shadow-[0_0_15px_rgba(15,240,252,0.3)]">
-            المجموعات والتصفيات
-          </h1>
-          <p className="text-gray-400 text-lg md:text-xl">
-            تابع أداء المنتخبات في دور المجموعات، من سيتأهل ومن سيغادر مبكرًا؟
-          </p>
-        </div>
+    <div className="min-h-screen bg-background pb-24 text-foreground selection:bg-primary/30">
+      <main className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
+        <section className="mb-10 text-center">
+          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-3xl border border-primary/20 bg-primary/10 text-primary shadow-[0_0_30px_rgba(15,240,252,0.12)]">
+            <LayoutGrid size={32} />
+          </div>
+          <h1 className="text-3xl font-black text-white md:text-5xl">المجموعات والتصفيات</h1>
+          <p className="mx-auto mt-3 max-w-3xl text-gray-400 md:text-lg">اضغط على رقم المجموعة لعرض جدولها، مبارياتها، وإحصائيات منتخباتها ولاعبيها داخل MC PRIME Exchange.</p>
+        </section>
 
-        {/* TABS */}
-        <div className="flex overflow-x-auto no-scrollbar gap-2 mb-10 border-b border-white/10 pb-4">
-          <button onClick={() => setActiveTab('groups')} className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold whitespace-nowrap transition-all ${activeTab === 'groups' ? 'bg-primary text-black shadow-[0_0_15px_rgba(15,240,252,0.4)]' : 'bg-surface text-gray-400 hover:text-white border border-white/5'}`}>
-            <LayoutGrid size={18} /> المجموعات
-          </button>
-          <button onClick={() => setActiveTab('standings')} className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold whitespace-nowrap transition-all ${activeTab === 'standings' ? 'bg-primary text-black shadow-[0_0_15px_rgba(15,240,252,0.4)]' : 'bg-surface text-gray-400 hover:text-white border border-white/5'}`}>
-            <ListOrdered size={18} /> جدول الترتيب
-          </button>
-          <button onClick={() => setActiveTab('matches')} className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold whitespace-nowrap transition-all ${activeTab === 'matches' ? 'bg-primary text-black shadow-[0_0_15px_rgba(15,240,252,0.4)]' : 'bg-surface text-gray-400 hover:text-white border border-white/5'}`}>
-            <CalendarDays size={18} /> مباريات اليوم
-          </button>
-          <button onClick={() => setActiveTab('knockout')} className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold whitespace-nowrap transition-all ${activeTab === 'knockout' ? 'bg-orange-500 text-white shadow-[0_0_15px_rgba(249,115,22,0.4)]' : 'bg-surface text-gray-400 hover:text-white border border-white/5'}`}>
-            <Sword size={18} /> التصفيات
-          </button>
-          <button onClick={() => setActiveTab('predictions')} className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold whitespace-nowrap transition-all ${activeTab === 'predictions' ? 'bg-primary text-black shadow-[0_0_15px_rgba(15,240,252,0.4)]' : 'bg-surface text-gray-400 hover:text-white border border-white/5'}`}>
-            <TrendingUp size={18} /> توقعات التأهل
-          </button>
-        </div>
+        <section className="sticky top-16 z-40 mb-8 rounded-3xl border border-white/5 bg-background/90 p-4 backdrop-blur-xl">
+          <div className="mb-4 flex items-center justify-between gap-4">
+            <div>
+              <h2 className="text-xl font-black text-white">اختر المجموعة</h2>
+              <p className="text-xs text-gray-500">البيانات تظهر للمجموعة المحددة فقط.</p>
+            </div>
+            <div className="rounded-2xl border border-primary/20 bg-primary/10 px-4 py-2 text-xs font-black text-primary">{selectedGroup ? groupDisplayName(selectedGroup) : '—'}</div>
+          </div>
+          <div className="flex gap-2 overflow-x-auto pb-2">
+            {groupKeys.map((groupKey) => (
+              <button
+                key={groupKey}
+                type="button"
+                onClick={() => { setSelectedGroup(groupKey); setView('overview'); }}
+                className={`min-w-14 rounded-2xl border px-5 py-3 text-lg font-black transition-all ${selectedGroup === groupKey ? 'border-primary bg-primary text-black shadow-[0_0_18px_rgba(15,240,252,0.35)]' : 'border-white/5 bg-surface text-gray-400 hover:text-white'}`}
+              >
+                {groupKey}
+              </button>
+            ))}
+          </div>
+          <div className="mt-4 flex flex-wrap gap-2">
+            {[
+              { id: 'overview', label: 'نظرة عامة', icon: <BarChart3 size={16} /> },
+              { id: 'standings', label: 'الجدول', icon: <ListOrdered size={16} /> },
+              { id: 'matches', label: 'المباريات', icon: <CalendarDays size={16} /> },
+              { id: 'teams', label: 'إحصائيات المنتخبات', icon: <ShieldCheck size={16} /> },
+              { id: 'players', label: 'إحصائيات اللاعبين', icon: <Users size={16} /> },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setView(tab.id as typeof view)}
+                className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-black transition-colors ${view === tab.id ? 'bg-white text-black' : 'bg-surface text-gray-400 hover:text-white'}`}
+              >
+                {tab.icon} {tab.label}
+              </button>
+            ))}
+          </div>
+        </section>
 
-        {/* TAB: GROUPS */}
-        {activeTab === 'groups' && (
-          <div className="space-y-12 animate-fade-in">
-            {sortedGroupKeys.map(groupName => {
-              const groupTeams = groupedTeams[groupName]
-                .map(t => ({ team: t, stats: getTeamStats(t) }))
-                .sort((a, b) => b.stats.points !== a.stats.points ? b.stats.points - a.stats.points : b.stats.goalDifference - a.stats.goalDifference);
-              
-              return (
-                <div key={groupName} className="bg-surface/50 rounded-3xl p-6 border border-white/5 relative overflow-hidden">
-                  <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-bl-full -z-10 blur-xl"></div>
-                  <h2 className="text-2xl font-bold mb-6 text-primary border-b border-white/10 pb-4 inline-flex items-center gap-3">
-                    <Trophy size={24} className="text-[#FFD700]" /> {groupName}
-                  </h2>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                    {groupTeams.map(({ team, stats }, index) => {
-                      let status = 'COMPETING';
-                      if (index < 2) status = 'QUALIFIED';
-                      else if (index === 2) status = 'AT_RISK';
-                      else status = 'ELIMINATED';
-
-                      const marketPrice = Math.round(team.marketPrice ?? team.current_price);
-                      
-                      return (
-                        <div key={team.id} className="bg-black/60 border border-white/5 rounded-2xl p-5 hover:border-primary/30 transition-all flex flex-col h-full group relative overflow-hidden">
-                          {/* Gradient Glow */}
-                          <div className={`absolute -top-10 -right-10 w-24 h-24 rounded-full blur-3xl opacity-20 pointer-events-none ${status === 'QUALIFIED' ? 'bg-green-500' : status === 'ELIMINATED' ? 'bg-red-500' : 'bg-primary'}`}></div>
-
-                          <div className="flex justify-between items-start mb-4 relative z-10">
-                            <div className="w-14 h-14 bg-surface rounded-full flex items-center justify-center overflow-hidden border border-white/10 shadow-[0_0_10px_rgba(0,0,0,0.5)]">
-                              {team.image.startsWith('http') ? <img src={team.image} alt={team.name} className="w-full h-full object-cover" /> : <span className="text-3xl">{team.image}</span>}
-                            </div>
-                            <div className={`px-2 py-1 rounded text-[10px] font-bold border ${getStatusColor(status)}`}>
-                              {getStatusLabel(status)}
-                            </div>
-                          </div>
-
-                          <div className="mb-4 flex-1 relative z-10">
-                            <h3 className="font-bold text-xl text-white group-hover:text-primary transition-colors flex items-center gap-2">
-                              {team.name} <span className="text-gray-500 text-xs font-mono font-normal">#{team.fifaRank || '-'}</span>
-                            </h3>
-                            <div className="grid grid-cols-3 gap-2 mt-4 bg-white/5 p-3 rounded-xl text-center">
-                              <div>
-                                <p className="text-[10px] text-gray-500">النقاط</p>
-                                <p className="font-mono font-bold text-white text-lg">{stats.points}</p>
-                              </div>
-                              <div>
-                                <p className="text-[10px] text-gray-500">فارق أهداف</p>
-                                <p className="font-mono font-bold text-white text-lg">{stats.goalDifference > 0 ? `+${stats.goalDifference}` : stats.goalDifference}</p>
-                              </div>
-                              <div>
-                                <p className="text-[10px] text-gray-500">السعر</p>
-                                <p className="font-mono font-bold text-primary text-lg">{marketPrice}</p>
-                              </div>
-                            </div>
-                          </div>
-
-                          <div className="grid grid-cols-2 gap-2 mt-auto relative z-10">
-                            <button 
-                              onClick={() => router.push(`/asset/${team.id}`)}
-                              className="bg-white/5 hover:bg-white/10 border border-white/10 text-white font-bold py-2 rounded-lg text-sm transition-colors"
-                            >
-                              عرض المنتخب
-                            </button>
-                            <button 
-                              onClick={() => router.push(`/asset/${team.id}`)}
-                              className="bg-primary/20 hover:bg-primary border border-primary/30 hover:text-black text-primary font-bold py-2 rounded-lg text-sm transition-all"
-                            >
-                              تداول الآن
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
+        {selectedTeams.length === 0 ? (
+          <EmptyState title="لا توجد منتخبات في هذه المجموعة" text="تأكد من ربط المنتخبات بحقل المجموعة داخل قاعدة البيانات." />
+        ) : (
+          <div className="space-y-8">
+            {(view === 'overview') && (
+              <>
+                <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                  <div className="rounded-3xl border border-white/5 bg-surface p-5 shadow-card">
+                    <div className="mb-3 flex items-center gap-2 text-sm font-bold text-primary"><Trophy size={18} /> عدد المنتخبات</div>
+                    <div className="text-3xl font-black text-white tabular-nums">{selectedTeams.length}</div>
+                    <p className="mt-1 text-xs text-gray-500">داخل {selectedGroup && groupDisplayName(selectedGroup)}</p>
                   </div>
+                  <div className="rounded-3xl border border-white/5 bg-surface p-5 shadow-card">
+                    <div className="mb-3 flex items-center gap-2 text-sm font-bold text-accent"><Target size={18} /> متوسط القوة</div>
+                    <div className="text-3xl font-black text-white tabular-nums">{avgTeamScore}</div>
+                    <p className="mt-1 text-xs text-gray-500">حسب تقييم المنتخبات الحالي</p>
+                  </div>
+                  <div className="rounded-3xl border border-white/5 bg-surface p-5 shadow-card">
+                    <div className="mb-3 flex items-center gap-2 text-sm font-bold text-success"><Flame size={18} /> متوسط الزخم</div>
+                    <div className="text-3xl font-black text-white tabular-nums">{avgMomentum}</div>
+                    <p className="mt-1 text-xs text-gray-500">من بيانات السوق الحالية</p>
+                  </div>
+                  <div className="rounded-3xl border border-white/5 bg-surface p-5 shadow-card">
+                    <div className="mb-3 flex items-center gap-2 text-sm font-bold text-yellow-300"><Users size={18} /> اللاعبون</div>
+                    <div className="text-3xl font-black text-white tabular-nums">{groupPlayers.length}</div>
+                    <p className="mt-1 text-xs text-gray-500">لاعبون مرتبطون بمنتخبات المجموعة</p>
+                  </div>
+                </section>
+
+                <section className="grid gap-6 lg:grid-cols-2">
+                  <div className="rounded-3xl border border-white/5 bg-surface p-6 shadow-card">
+                    <div className="mb-5 flex items-center justify-between">
+                      <h2 className="text-xl font-black text-white">ملخص المجموعة</h2>
+                      <button onClick={() => setView('standings')} className="text-sm font-bold text-primary hover:text-primary/80">عرض الجدول</button>
+                    </div>
+                    <StandingsTable standings={standings} finishedMatchesCount={finishedMatchesCount} compact />
+                  </div>
+                  <div className="rounded-3xl border border-white/5 bg-surface p-6 shadow-card">
+                    <div className="mb-5 flex items-center justify-between">
+                      <h2 className="text-xl font-black text-white">حالة المباريات</h2>
+                      <button onClick={() => setView('matches')} className="text-sm font-bold text-primary hover:text-primary/80">عرض المباريات</button>
+                    </div>
+                    <div className="mb-5 grid grid-cols-3 gap-3 text-center">
+                      <div className="rounded-2xl bg-white/5 p-4"><div className="text-xs text-gray-500">قادمة</div><div className="text-2xl font-black text-white">{scheduledMatchesCount}</div></div>
+                      <div className="rounded-2xl bg-white/5 p-4"><div className="text-xs text-gray-500">مباشرة</div><div className="text-2xl font-black text-primary">{liveMatchesCount}</div></div>
+                      <div className="rounded-2xl bg-white/5 p-4"><div className="text-xs text-gray-500">منتهية</div><div className="text-2xl font-black text-success">{finishedMatchesCount}</div></div>
+                    </div>
+                    {groupMatches.slice(0, 3).map((match) => <MatchCard key={match.id} match={match} />)}
+                    {groupMatches.length === 0 && <EmptyState title="لا توجد مباريات" text="لم يتم ربط مباريات بهذه المجموعة حتى الآن." />}
+                  </div>
+                </section>
+
+                <section className="grid gap-6 lg:grid-cols-2">
+                  <HighlightCard title="أعلى طلب سوقي" asset={highestDemandTeam} metric={highestDemandTeam ? `${Math.round(highestDemandTeam.marketDemand || 0)}/100` : '—'} icon={<Zap size={18} />} />
+                  <HighlightCard title="أعلى سعر سوقي" asset={mostValuableTeam} metric={mostValuableTeam ? formatPrice(mostValuableTeam) : '—'} icon={<LineChart size={18} />} />
+                </section>
+              </>
+            )}
+
+            {view === 'standings' && (
+              <section className="rounded-3xl border border-white/5 bg-surface p-6 shadow-card">
+                <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <h2 className="text-2xl font-black text-white">جدول {selectedGroup && groupDisplayName(selectedGroup)}</h2>
+                    <p className="mt-1 text-sm text-gray-500">الجدول يعتمد على نتائج المباريات المنتهية. عند عدم وجود نتائج، تظهر المنتخبات مرتبة بالقوة السوقية فقط.</p>
+                  </div>
+                  {finishedMatchesCount === 0 && <span className="rounded-xl border border-yellow-400/20 bg-yellow-400/10 px-3 py-2 text-xs font-bold text-yellow-300">لا توجد نتائج فعلية بعد</span>}
                 </div>
-              );
-            })}
-          </div>
-        )}
+                <StandingsTable standings={standings} finishedMatchesCount={finishedMatchesCount} />
+              </section>
+            )}
 
-        {/* TAB: STANDINGS */}
-        {activeTab === 'standings' && (
-          <div className="space-y-8 animate-fade-in">
-            {sortedGroupKeys.map(groupName => {
-              const groupTeams = groupedTeams[groupName]
-                .map(t => ({ team: t, stats: getTeamStats(t) }))
-                .sort((a, b) => b.stats.points !== a.stats.points ? b.stats.points - a.stats.points : b.stats.goalDifference - a.stats.goalDifference);
-              
-              return (
-                <div key={groupName} className="bg-surface border border-white/5 rounded-2xl shadow-card overflow-hidden">
-                  <div className="bg-black/50 p-4 border-b border-white/10 flex items-center justify-between">
-                    <h3 className="font-bold text-white flex items-center gap-2"><LayoutGrid className="text-primary" size={18} /> {groupName}</h3>
-                  </div>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-right text-sm">
-                      <thead className="bg-white/5 text-gray-400">
-                        <tr>
-                          <th className="p-4 w-16 text-center">المركز</th>
-                          <th className="p-4">المنتخب</th>
-                          <th className="p-4 text-center">لعب</th>
-                          <th className="p-4 text-center">فاز</th>
-                          <th className="p-4 text-center">تعادل</th>
-                          <th className="p-4 text-center">خسر</th>
-                          <th className="p-4 text-center">له</th>
-                          <th className="p-4 text-center">عليه</th>
-                          <th className="p-4 text-center">فارق</th>
-                          <th className="p-4 text-center text-primary font-bold">نقاط</th>
-                          <th className="p-4 text-center">الحالة</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {groupTeams.map(({ team, stats }, index) => {
-                          const rank = index + 1;
-                          let status = 'COMPETING';
-                          if (rank <= 2) status = 'QUALIFIED';
-                          else if (rank === 3) status = 'AT_RISK';
-                          else status = 'ELIMINATED';
+            {view === 'matches' && (
+              <section className="rounded-3xl border border-white/5 bg-surface p-6 shadow-card">
+                <h2 className="mb-5 text-2xl font-black text-white">مباريات {selectedGroup && groupDisplayName(selectedGroup)}</h2>
+                {groupMatches.length === 0 ? <EmptyState title="لا توجد مباريات للمجموعة" text="أضف مباريات المجموعة في قاعدة البيانات لتظهر هنا." /> : <div className="grid gap-4 lg:grid-cols-2">{groupMatches.map((match) => <MatchCard key={match.id} match={match} expanded />)}</div>}
+              </section>
+            )}
 
-                          return (
-                            <tr key={team.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
-                              <td className="p-4 text-center font-mono font-bold text-gray-500">{rank}</td>
-                              <td className="p-4 font-bold text-white flex items-center gap-3">
-                                {team.image.startsWith('http') ? <img src={team.image} className="w-6 h-6 rounded-full" /> : <span className="text-xl">{team.image}</span>}
-                                {team.name}
-                              </td>
-                              <td className="p-4 text-center font-mono text-gray-400">{stats.played}</td>
-                              <td className="p-4 text-center font-mono text-gray-400">{stats.won}</td>
-                              <td className="p-4 text-center font-mono text-gray-400">{stats.drawn}</td>
-                              <td className="p-4 text-center font-mono text-gray-400">{stats.lost}</td>
-                              <td className="p-4 text-center font-mono text-gray-400">{stats.goalsFor}</td>
-                              <td className="p-4 text-center font-mono text-gray-400">{stats.goalsAgainst}</td>
-                              <td className="p-4 text-center font-mono text-white">{stats.goalDifference > 0 ? `+${stats.goalDifference}` : stats.goalDifference}</td>
-                              <td className="p-4 text-center font-mono font-black text-primary text-lg">{stats.points}</td>
-                              <td className="p-4 text-center">
-                                <span className={`px-2 py-1 rounded text-[10px] font-bold border ${getStatusColor(status)}`}>
-                                  {getStatusLabel(status)}
-                                </span>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
+            {view === 'teams' && (
+              <section className="rounded-3xl border border-white/5 bg-surface p-6 shadow-card">
+                <h2 className="mb-5 text-2xl font-black text-white">إحصائيات منتخبات {selectedGroup && groupDisplayName(selectedGroup)}</h2>
+                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                  {selectedTeams.map((team) => <TeamStatsCard key={team.id} team={team} />)}
                 </div>
-              );
-            })}
-          </div>
-        )}
+              </section>
+            )}
 
-        {/* TAB: MATCHES */}
-        {activeTab === 'matches' && (
-          <div className="animate-fade-in">
-            <div className="bg-surface border border-white/5 rounded-3xl p-12 text-center shadow-card">
-              <CalendarDays size={64} className="mx-auto text-gray-500 mb-6" />
-              <h2 className="text-2xl font-bold text-white mb-2">مباريات اليوم</h2>
-              <p className="text-gray-400 max-w-md mx-auto">سيتم تفعيل جدول المباريات المباشرة والنتائج فور بدء بطولة كأس العالم 2026. ابق مستعداً للتداول أثناء المباريات!</p>
-            </div>
-          </div>
-        )}
-
-        {/* TAB: KNOCKOUT */}
-        {activeTab === 'knockout' && (
-          <div className="animate-fade-in space-y-8">
-            <div className="bg-orange-500/10 border border-orange-500/30 rounded-2xl p-8 text-center shadow-[0_0_30px_rgba(249,115,22,0.1)]">
-              <Sword size={48} className="mx-auto text-orange-500 mb-4" />
-              <h2 className="text-2xl font-black text-white mb-4">الأدوار الإقصائية (Knockout Stage)</h2>
-              <p className="text-orange-400 max-w-lg mx-auto bg-black/40 p-4 rounded-xl border border-orange-500/20">
-                لم تبدأ التصفيات بعد. سيتم تحديد المتأهلين تلقائيًا وبناء شجرة التصفيات بعد نهاية دور المجموعات.
-              </p>
-            </div>
-
-            {/* Bracket Placeholder */}
-            <div className="bg-surface border border-white/5 rounded-2xl p-6 overflow-x-auto">
-              <div className="min-w-[800px] flex justify-between relative">
-                {/* Lines background mock */}
-                <div className="absolute top-1/2 left-0 right-0 h-px bg-white/5 -z-10"></div>
-                
-                {['دور الـ 32', 'دور الـ 16', 'ربع النهائي', 'نصف النهائي', 'النهائي'].map((round, idx) => (
-                  <div key={idx} className="flex flex-col items-center gap-8 z-10 w-48">
-                    <div className="bg-black/80 border border-white/10 px-4 py-2 rounded-lg text-sm font-bold text-gray-400 w-full text-center mb-4 shadow-lg">
-                      {round}
-                    </div>
-                    {/* Mock Match Blocks */}
-                    {Array.from({ length: idx === 4 ? 1 : 2 }).map((_, i) => (
-                      <div key={i} className="w-full bg-black/50 border border-white/5 rounded-xl p-3 space-y-2 relative">
-                        <div className="flex items-center justify-between text-xs text-gray-500 bg-white/5 p-2 rounded"><span>يتحدد لاحقاً</span> <span className="font-mono">-</span></div>
-                        <div className="flex items-center justify-between text-xs text-gray-500 bg-white/5 p-2 rounded"><span>يتحدد لاحقاً</span> <span className="font-mono">-</span></div>
-                        {idx < 4 && <div className="absolute top-1/2 -left-4 w-4 h-px bg-white/10"></div>}
-                        {idx > 0 && <div className="absolute top-1/2 -right-4 w-4 h-px bg-white/10"></div>}
-                      </div>
-                    ))}
+            {view === 'players' && (
+              <section className="rounded-3xl border border-white/5 bg-surface p-6 shadow-card">
+                <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <h2 className="text-2xl font-black text-white">إحصائيات لاعبي {selectedGroup && groupDisplayName(selectedGroup)}</h2>
+                    <p className="mt-1 text-sm text-gray-500">أعلى اللاعبين سعرًا وزخمًا داخل منتخبات المجموعة.</p>
                   </div>
-                ))}
-              </div>
-            </div>
+                  <span className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-bold text-gray-300">{groupPlayers.length} لاعب</span>
+                </div>
+                {groupPlayers.length === 0 ? <EmptyState title="لا توجد بيانات لاعبين" text="تأكد من ربط اللاعبين بمنتخباتهم داخل قاعدة البيانات." /> : <PlayersTable players={topPlayers} />}
+              </section>
+            )}
           </div>
         )}
-
-        {/* TAB: PREDICTIONS */}
-        {activeTab === 'predictions' && (
-          <div className="animate-fade-in space-y-6">
-            <div className="bg-primary/10 border border-primary/30 p-6 rounded-2xl flex items-start gap-4">
-              <Info className="text-primary shrink-0" size={24} />
-              <div>
-                <h3 className="font-bold text-white text-lg mb-1">خوارزميات التوقع</h3>
-                <p className="text-gray-400 text-sm leading-relaxed">
-                  هذه التوقعات مبنية على نموذج الذكاء الاصطناعي الذي يحلل أداء المنتخب، تصنيف الفيفا، ونقاط القوة في المجموعة لتوقع نسب التأهل وفرص الفوز بالصدارة. يمكنك استخدام هذه البيانات لتوجيه قرارات التداول الخاصة بك.
-                </p>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {teams.sort((a, b) => (b.score || 0) - (a.score || 0)).slice(0, 18).map((team) => {
-                const stats = getTeamStats(team);
-                return (
-                  <div key={team.id} className="bg-surface border border-white/5 rounded-2xl p-5 shadow-card hover:border-white/10 transition-colors">
-                    <div className="flex items-center gap-3 mb-6">
-                      <div className="w-10 h-10 bg-black/50 rounded-full flex items-center justify-center overflow-hidden border border-white/10">
-                        {team.image.startsWith('http') ? <img src={team.image} className="w-full h-full object-cover" /> : <span className="text-xl">{team.image}</span>}
-                      </div>
-                      <h3 className="font-bold text-white text-lg">{team.name}</h3>
-                    </div>
-
-                    <div className="space-y-4">
-                      <div>
-                        <div className="flex justify-between text-xs mb-1">
-                          <span className="text-gray-400">فرصة التأهل</span>
-                          <span className="font-bold text-green-400 font-mono">{stats.qualificationChance}%</span>
-                        </div>
-                        <div className="w-full bg-black/50 rounded-full h-1.5">
-                          <div className="bg-green-500 h-1.5 rounded-full" style={{ width: `${stats.qualificationChance}%` }}></div>
-                        </div>
-                      </div>
-
-                      <div>
-                        <div className="flex justify-between text-xs mb-1">
-                          <span className="text-gray-400">فرصة صدارة المجموعة</span>
-                          <span className="font-bold text-primary font-mono">{stats.winnerChance}%</span>
-                        </div>
-                        <div className="w-full bg-black/50 rounded-full h-1.5">
-                          <div className="bg-primary h-1.5 rounded-full" style={{ width: `${stats.winnerChance}%` }}></div>
-                        </div>
-                      </div>
-
-                      <div>
-                        <div className="flex justify-between text-xs mb-1">
-                          <span className="text-gray-400">خطر الخروج المبكر</span>
-                          <span className="font-bold text-red-500 font-mono">{stats.eliminationRisk}%</span>
-                        </div>
-                        <div className="w-full bg-black/50 rounded-full h-1.5">
-                          <div className="bg-red-500 h-1.5 rounded-full" style={{ width: `${stats.eliminationRisk}%` }}></div>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="mt-6 pt-4 border-t border-white/5 grid grid-cols-2 gap-2 text-center">
-                      <div className="bg-green-500/5 rounded-lg p-2 border border-green-500/10">
-                        <p className="text-[9px] text-gray-500 uppercase">تأثير السعر (تأهل)</p>
-                        <p className="font-mono text-green-400 font-bold mt-1">+{stats.fairValueImpactQualify} ¢</p>
-                      </div>
-                      <div className="bg-red-500/5 rounded-lg p-2 border border-red-500/10">
-                        <p className="text-[9px] text-gray-500 uppercase">تأثير السعر (إقصاء)</p>
-                        <p className="font-mono text-red-500 font-bold mt-1">{stats.fairValueImpactEliminate} ¢</p>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
       </main>
+    </div>
+  );
+}
+
+function StandingsTable({ standings, finishedMatchesCount, compact = false }: { standings: GroupStanding[]; finishedMatchesCount: number; compact?: boolean }) {
+  return (
+    <div className="overflow-x-auto rounded-2xl border border-white/5">
+      <table className="w-full whitespace-nowrap text-right text-sm">
+        <thead className="bg-white/5 text-gray-400">
+          <tr>
+            <th className="p-3 text-center">#</th>
+            <th className="p-3">المنتخب</th>
+            {!compact && <><th className="p-3 text-center">لعب</th><th className="p-3 text-center">فاز</th><th className="p-3 text-center">تعادل</th><th className="p-3 text-center">خسر</th><th className="p-3 text-center">له</th><th className="p-3 text-center">عليه</th></>}
+            <th className="p-3 text-center">فارق</th>
+            <th className="p-3 text-center text-primary">نقاط</th>
+            {!compact && <th className="p-3 text-center">الحالة</th>}
+          </tr>
+        </thead>
+        <tbody>
+          {standings.map((row, index) => (
+            <tr key={row.team.id} className="border-t border-white/5 hover:bg-white/5">
+              <td className="p-3 text-center font-black text-gray-400">{index + 1}</td>
+              <td className="p-3">
+                <Link href={`/asset/${row.team.id}`} className="flex items-center gap-3 font-black text-white hover:text-primary">
+                  <AssetImage image={row.team.image} type="TEAM" name={row.team.name} width={36} height={36} className="h-10 w-10 rounded-xl border border-white/10 object-cover" />
+                  <div><div>{row.team.name}</div><div className="text-xs font-normal text-gray-500">FIFA #{row.team.fifaRank || '-'}</div></div>
+                </Link>
+              </td>
+              {!compact && <><td className="p-3 text-center">{row.played}</td><td className="p-3 text-center">{row.won}</td><td className="p-3 text-center">{row.drawn}</td><td className="p-3 text-center">{row.lost}</td><td className="p-3 text-center">{row.goalsFor}</td><td className="p-3 text-center">{row.goalsAgainst}</td></>}
+              <td className="p-3 text-center font-bold">{row.goalDifference > 0 ? `+${row.goalDifference}` : row.goalDifference}</td>
+              <td className="p-3 text-center text-lg font-black text-primary">{finishedMatchesCount === 0 ? '—' : row.points}</td>
+              {!compact && <td className="p-3 text-center"><StatusBadge rank={index + 1} /></td>}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function MatchCard({ match, expanded = false }: { match: Match; expanded?: boolean }) {
+  const date = new Date(match.matchDate);
+  const isLive = ['IN_PLAY', 'LIVE'].includes(match.status);
+  const isFinished = match.status === 'FINISHED';
+  return (
+    <Link href={`/matches/${match.id}`} className="mb-3 block rounded-2xl border border-white/5 bg-background/40 p-4 transition-colors hover:border-primary/30">
+      <div className="mb-3 flex items-center justify-between text-xs text-gray-500">
+        <span>{date.toLocaleDateString('ar-EG')} · {date.toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}</span>
+        <span className={`rounded-lg px-2 py-1 font-bold ${isLive ? 'bg-primary/10 text-primary' : isFinished ? 'bg-success/10 text-success' : 'bg-white/5 text-gray-400'}`}>{isLive ? 'مباشرة' : isFinished ? 'انتهت' : 'قادمة'}</span>
+      </div>
+      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4">
+        <TeamMini team={match.homeTeam} score={isFinished || isLive ? match.homeScore : undefined} />
+        <div className="text-center text-xs font-black text-gray-500">VS</div>
+        <TeamMini team={match.awayTeam} score={isFinished || isLive ? match.awayScore : undefined} align="left" />
+      </div>
+      {expanded && <div className="mt-4 grid grid-cols-2 gap-3 text-xs"><div className="rounded-xl bg-white/5 p-3"><div className="text-gray-500">سعر {match.homeTeam.name}</div><div className="font-black text-white">{formatPrice(match.homeTeam)}</div></div><div className="rounded-xl bg-white/5 p-3"><div className="text-gray-500">سعر {match.awayTeam.name}</div><div className="font-black text-white">{formatPrice(match.awayTeam)}</div></div></div>}
+    </Link>
+  );
+}
+
+function TeamMini({ team, score, align = 'right' }: { team: Asset; score?: number; align?: 'right' | 'left' }) {
+  return (
+    <div className={`flex items-center gap-3 ${align === 'left' ? 'justify-end text-left' : ''}`}>
+      <AssetImage image={team.image} type="TEAM" name={team.name} width={34} height={34} className="h-10 w-10 rounded-xl border border-white/10 object-cover" />
+      <div className="min-w-0">
+        <div className="truncate font-black text-white">{team.name}</div>
+        <div className="text-xs text-gray-500">{formatPrice(team)}</div>
+      </div>
+      {score !== undefined && <div className="text-2xl font-black text-primary">{score}</div>}
+    </div>
+  );
+}
+
+function HighlightCard({ title, asset, metric, icon }: { title: string; asset?: Asset; metric: string; icon: React.ReactNode }) {
+  return (
+    <div className="rounded-3xl border border-white/5 bg-surface p-6 shadow-card">
+      <div className="mb-4 flex items-center gap-2 text-sm font-bold text-primary">{icon}{title}</div>
+      {asset ? <Link href={`/asset/${asset.id}`} className="flex items-center justify-between rounded-2xl bg-background/40 p-4 hover:bg-white/5"><div className="flex items-center gap-3"><AssetImage image={asset.image} type="TEAM" name={asset.name} width={46} height={46} className="h-12 w-12 rounded-xl object-cover" /><div><div className="font-black text-white">{asset.name}</div><div className="text-xs text-gray-500">{formatPrice(asset)}</div></div></div><div className="text-2xl font-black text-primary">{metric}</div></Link> : <p className="text-gray-500">لا توجد بيانات.</p>}
+    </div>
+  );
+}
+
+function TeamStatsCard({ team }: { team: Asset }) {
+  const premiumDiscount = getPremiumDiscount(team);
+  return (
+    <Link href={`/asset/${team.id}`} className="rounded-3xl border border-white/5 bg-background/40 p-5 transition-colors hover:border-primary/30">
+      <div className="mb-4 flex items-start justify-between gap-3"><AssetImage image={team.image} type="TEAM" name={team.name} width={54} height={54} className="h-14 w-14 rounded-2xl object-cover" /><span className="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-xs font-bold text-gray-300">FIFA #{team.fifaRank || '-'}</span></div>
+      <h3 className="mb-4 text-xl font-black text-white">{team.name}</h3>
+      <div className="grid grid-cols-2 gap-2 text-xs">
+        <div className="rounded-xl bg-white/5 p-3"><div className="text-gray-500">السعر</div><div className="font-black text-white">{formatPrice(team)}</div></div>
+        <div className="rounded-xl bg-white/5 p-3"><div className="text-gray-500">القوة</div><div className="font-black text-primary">{getTeamPower(team)}</div></div>
+        <div className="rounded-xl bg-white/5 p-3"><div className="text-gray-500">الزخم</div><div className="font-black text-success">{Math.round(team.momentum || 50)}</div></div>
+        <div className="rounded-xl bg-white/5 p-3"><div className="text-gray-500">خصم/علاوة</div><div className={premiumDiscount <= 0 ? 'font-black text-success' : 'font-black text-danger'}>{premiumDiscount > 0 ? '+' : ''}{premiumDiscount.toFixed(1)}%</div></div>
+      </div>
+    </Link>
+  );
+}
+
+function PlayersTable({ players }: { players: (Asset & { team?: Asset })[] }) {
+  return (
+    <div className="overflow-x-auto rounded-2xl border border-white/5">
+      <table className="w-full whitespace-nowrap text-right text-sm">
+        <thead className="bg-white/5 text-gray-400"><tr><th className="p-4">اللاعب</th><th className="p-4 text-center">المنتخب</th><th className="p-4 text-center">المركز</th><th className="p-4 text-center">السعر</th><th className="p-4 text-center">التقييم</th><th className="p-4 text-center">الزخم</th><th className="p-4 text-center">الطلب</th><th className="p-4 text-left">إجراء</th></tr></thead>
+        <tbody>{players.map((player) => <tr key={player.id} className="border-t border-white/5 hover:bg-white/5"><td className="p-4"><div className="flex items-center gap-3"><AssetImage image={player.image} type="PLAYER" name={player.name} width={40} height={40} className="h-11 w-11 rounded-xl border border-white/10 object-cover" /><div><div className="font-black text-white">{player.name}</div><div className="text-xs text-gray-500">{player.code}</div></div></div></td><td className="p-4 text-center text-gray-300">{player.team?.name || '-'}</td><td className="p-4 text-center"><span className="rounded-lg bg-white/5 px-2 py-1 text-xs font-bold text-gray-300">{player.position || '-'}</span></td><td className="p-4 text-center font-black text-white">{formatPrice(player)}</td><td className="p-4 text-center font-bold text-accent">{Math.round(player.score || 0)}</td><td className="p-4 text-center font-bold text-success">{Math.round(player.momentum || 50)}</td><td className="p-4 text-center font-bold text-primary">{Math.round(player.marketDemand || 50)}</td><td className="p-4 text-left"><Link href={`/asset/${player.id}`} className="inline-flex items-center gap-2 rounded-xl border border-primary/40 bg-primary/10 px-3 py-2 text-xs font-black text-primary hover:bg-primary/20">تحليل <ChevronRight size={14} /></Link></td></tr>)}</tbody>
+      </table>
     </div>
   );
 }
