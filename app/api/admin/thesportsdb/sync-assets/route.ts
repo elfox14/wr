@@ -67,6 +67,36 @@ function isRealImage(image?: string | null) {
   return !!image && (image.startsWith('http://') || image.startsWith('https://'));
 }
 
+function getTeamFallbackImage(asset: any) {
+  return isRealImage(asset.team?.image) ? asset.team.image : null;
+}
+
+async function updatePlayerImageFromFallback(asset: any, dryRun: boolean, overwriteImages: boolean) {
+  const teamImage = getTeamFallbackImage(asset);
+  const shouldUpdateImage = overwriteImages || shouldReplaceImage(asset.image);
+
+  if (!teamImage) {
+    return {
+      updated: false,
+      imageAfter: asset.image,
+      imageSource: 'unchanged',
+    };
+  }
+
+  if (!dryRun && shouldUpdateImage) {
+    await prisma.asset.update({
+      where: { id: asset.id },
+      data: { image: teamImage },
+    });
+  }
+
+  return {
+    updated: true,
+    imageAfter: shouldUpdateImage ? teamImage : asset.image,
+    imageSource: 'team_fallback',
+  };
+}
+
 export async function POST(req: Request) {
   const admin = await requireAdmin(req);
   if (admin.error) return admin.error;
@@ -147,17 +177,32 @@ export async function POST(req: Request) {
           profile,
         });
       } else {
-        const players = await searchPlayers(asset.name);
+        let players: any[] = [];
+        let playerLookupError: any = null;
+
+        try {
+          players = await searchPlayers(asset.name);
+        } catch (error: any) {
+          playerLookupError = error;
+          players = [];
+        }
+
         const match = bestPlayerMatch(asset.name, players);
         const playerImage = match ? pickPlayerImage(match) : null;
         const profile = match ? extractPlayerProfile(match) : null;
-        const teamImage = fallbackToTeamImage ? asset.team?.image || null : null;
-        const finalImage = playerImage || (isRealImage(teamImage) ? teamImage : null);
-        const imageSource = playerImage ? 'thesportsdb_player' : finalImage ? 'team_fallback' : 'unchanged';
+        const teamImage = fallbackToTeamImage ? getTeamFallbackImage(asset) : null;
+        const finalImage = playerImage || teamImage || null;
+        const imageSource = playerImage ? 'thesportsdb_player' : teamImage ? 'team_fallback' : 'unchanged';
         const shouldUpdateImage = overwriteImages || shouldReplaceImage(asset.image);
 
         if (!match && !finalImage) {
-          results.push({ assetId: asset.id, name: asset.name, type: asset.type, status: 'not_found' });
+          results.push({
+            assetId: asset.id,
+            name: asset.name,
+            type: asset.type,
+            status: 'not_found',
+            lookupError: playerLookupError?.message || null,
+          });
           continue;
         }
 
@@ -185,10 +230,30 @@ export async function POST(req: Request) {
           imageBefore: asset.image,
           imageAfter: shouldUpdateImage && finalImage ? finalImage : asset.image,
           imageSource,
+          lookupError: playerLookupError?.message || null,
           profile,
         });
       }
     } catch (error: any) {
+      if (asset.type === 'PLAYER' && fallbackToTeamImage) {
+        const fallback = await updatePlayerImageFromFallback(asset, dryRun, overwriteImages).catch(() => null);
+        if (fallback?.updated) {
+          results.push({
+            assetId: asset.id,
+            name: asset.name,
+            type: asset.type,
+            status: dryRun ? 'matched_dry_run' : 'updated',
+            providerName: asset.team?.name || null,
+            providerId: null,
+            imageBefore: asset.image,
+            imageAfter: fallback.imageAfter,
+            imageSource: fallback.imageSource,
+            lookupError: error.message,
+          });
+          continue;
+        }
+      }
+
       results.push({
         assetId: asset.id,
         name: asset.name,
@@ -209,6 +274,7 @@ export async function POST(req: Request) {
     errors: results.filter((r) => r.status === 'error').length,
     teamFallbackImages: results.filter((r) => r.imageSource === 'team_fallback').length,
     realPlayerImages: results.filter((r) => r.imageSource === 'thesportsdb_player').length,
+    lookupErrorsRecovered: results.filter((r) => r.lookupError && r.status !== 'error').length,
     results,
   });
 }
