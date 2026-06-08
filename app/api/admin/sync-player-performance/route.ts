@@ -22,6 +22,15 @@ type AdminSession = {
   };
 } | null;
 
+const DAILY_PROVIDER_REQUEST_BUDGET = Number(process.env.API_FOOTBALL_DAILY_BUDGET || 90);
+const DAILY_PROVIDER_REQUEST_RESERVE = Number(process.env.API_FOOTBALL_DAILY_RESERVE || 10);
+
+function getTodayStart() {
+  const date = new Date();
+  date.setHours(0, 0, 0, 0);
+  return date;
+}
+
 function toNumber(value: any, fallback = 0) {
   const n = Number(value);
   return Number.isFinite(n) ? n : fallback;
@@ -115,6 +124,21 @@ async function findLocalAsset(apiPlayer: ApiFootballPlayerStats) {
     null;
 }
 
+async function getDailyProviderUsage() {
+  const todayStart = getTodayStart();
+  const syncedFixtures = await prisma.playerPerformance.findMany({
+    where: {
+      provider: 'API_FOOTBALL',
+      createdAt: { gte: todayStart },
+      providerFixtureId: { not: null },
+    },
+    distinct: ['providerFixtureId'],
+    select: { providerFixtureId: true },
+  });
+
+  return syncedFixtures.length;
+}
+
 export async function POST(req: Request) {
   const session = await getServerSession(authOptions as any) as AdminSession;
 
@@ -129,10 +153,41 @@ export async function POST(req: Request) {
   const body = await req.json().catch(() => ({}));
   const fixtureId = Number(body.fixtureId);
   const dryRun = body.dryRun === true;
+  const force = body.force === true;
   const limit = Math.min(100, Math.max(1, Number(body.limit || 50)));
 
   if (!fixtureId || Number.isNaN(fixtureId)) {
     return NextResponse.json({ error: 'fixtureId is required' }, { status: 400 });
+  }
+
+  const existingRecords = await prisma.playerPerformance.count({
+    where: { providerFixtureId: fixtureId },
+  });
+
+  if (existingRecords > 0 && !force) {
+    return NextResponse.json({
+      success: true,
+      skipped: true,
+      reason: 'fixture already synced',
+      fixtureId,
+      existingRecords,
+      externalRequestsUsed: 0,
+      message: 'تم تخطي المزامنة لحماية حد 100 طلب يوميًا. استخدم force=true فقط عند الحاجة.',
+    });
+  }
+
+  const usedToday = await getDailyProviderUsage();
+  const safeLimit = Math.max(0, DAILY_PROVIDER_REQUEST_BUDGET - DAILY_PROVIDER_REQUEST_RESERVE);
+
+  if (!force && !dryRun && usedToday >= safeLimit) {
+    return NextResponse.json({
+      error: 'Daily API-Football safe budget reached',
+      usedToday,
+      budget: DAILY_PROVIDER_REQUEST_BUDGET,
+      reserve: DAILY_PROVIDER_REQUEST_RESERVE,
+      safeLimit,
+      message: 'تم إيقاف المزامنة لحماية حد 100 طلب يوميًا. يمكن استخدام force=true يدويًا في الحالات الضرورية فقط.',
+    }, { status: 429 });
   }
 
   try {
@@ -253,6 +308,12 @@ export async function POST(req: Request) {
       success: true,
       fixtureId,
       dryRun,
+      force,
+      externalRequestsUsed: 1,
+      dailyUsageBefore: usedToday,
+      dailyUsageAfterEstimate: dryRun ? usedToday : usedToday + 1,
+      dailyBudget: DAILY_PROVIDER_REQUEST_BUDGET,
+      dailyReserve: DAILY_PROVIDER_REQUEST_RESERVE,
       totalProviderPlayers: apiPlayers.length,
       matched: results.filter((r) => r.status === 'updated' || r.status === 'matched_dry_run').length,
       updated: results.filter((r) => r.status === 'updated').length,
