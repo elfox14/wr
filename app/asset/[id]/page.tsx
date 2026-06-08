@@ -3,7 +3,7 @@ import AssetClient from '@/components/AssetClient';
 import prisma from '@/lib/prisma';
 
 type Props = {
-  params: { id: string }
+  params: Promise<{ id: string }>
 };
 
 export async function generateMetadata(

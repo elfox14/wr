@@ -1,8 +1,8 @@
 import React from 'react';
 import { notFound } from 'next/navigation';
-import { getArticleById } from '@/lib/articles';
+import { getArticleById, getAllArticles } from '@/lib/articles';
 import Link from 'next/link';
-import { ArrowRight, Calendar, User, Tag } from 'lucide-react';
+import { ArrowRight, Calendar, User, Tag, Clock, BookOpen, Coins, TrendingUp } from 'lucide-react';
 import { Metadata } from 'next';
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
@@ -13,13 +13,20 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
     return { title: 'مقال غير موجود' };
   }
 
+  const imageUrl = article.imageUrl && (article.imageUrl.startsWith('http://') || article.imageUrl.startsWith('https://'))
+    ? article.imageUrl
+    : '/og-image.jpg';
+
   return {
     title: article.title,
     description: article.excerpt,
+    alternates: {
+      canonical: `/article/${id}`,
+    },
     openGraph: {
       title: article.title,
       description: article.excerpt,
-      images: [{ url: '/og-image.jpg' }],
+      images: [{ url: imageUrl }],
       type: 'article',
       publishedTime: article.date,
       authors: [article.author],
@@ -28,7 +35,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
       card: 'summary_large_image',
       title: article.title,
       description: article.excerpt,
-      images: ['/og-image.jpg'],
+      images: [imageUrl],
     }
   };
 }
@@ -41,6 +48,41 @@ export default async function ArticlePage({ params }: { params: Promise<{ id: st
   if (!article) {
     notFound();
   }
+
+  const levelLabels = {
+    beginner: 'مبتدئ',
+    intermediate: 'متوسط',
+    advanced: 'متقدم'
+  };
+
+  const levelColors = {
+    beginner: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+    intermediate: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
+    advanced: 'bg-rose-500/10 text-rose-400 border-rose-500/20'
+  };
+
+  // Get related articles (up to 3)
+  const allArticles = getAllArticles();
+  const currentTags = article.tags || [];
+  
+  const relatedArticles = allArticles
+    .filter(a => a.id !== article.id)
+    .map(a => {
+      let score = 0;
+      if (a.category === article.category) score += 5;
+      const sharedTags = (a.tags || []).filter(t => currentTags.includes(t));
+      score += sharedTags.length * 2;
+      return { article: a, score };
+    })
+    .filter(item => item.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .map(item => item.article)
+    .slice(0, 3);
+
+  // Fallback to first 3 articles if no related score
+  const displayRelated = relatedArticles.length > 0 
+    ? relatedArticles 
+    : allArticles.filter(a => a.id !== article.id).slice(0, 3);
 
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://mcprime-exchange.com';
   const jsonLd = {
@@ -72,13 +114,12 @@ export default async function ArticlePage({ params }: { params: Promise<{ id: st
       />
             
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <Link href="/" className="inline-flex items-center gap-2 text-gray-400 hover:text-[#0FF0FC] transition-colors mb-8">
-          <ArrowRight size={20} /> العودة للصفحة الرئيسية
+        <Link href="/articles" className="inline-flex items-center gap-2 text-gray-400 hover:text-[#0FF0FC] transition-colors mb-8">
+          <ArrowRight size={20} /> العودة للأكاديمية
         </Link>
         
         <article className="bg-[#1A1A1A] border border-white/5 rounded-3xl overflow-hidden shadow-2xl">
           <div className="relative w-full h-[400px]">
-            {/* We use standard img to avoid Next.js external domain image configuration errors */}
             <img 
               src={article.imageUrl} 
               alt={article.title} 
@@ -86,11 +127,22 @@ export default async function ArticlePage({ params }: { params: Promise<{ id: st
             />
             <div className="absolute inset-0 bg-gradient-to-t from-[#1A1A1A] via-[#1A1A1A]/60 to-transparent" />
             <div className="absolute bottom-0 left-0 right-0 p-8">
-              <div className="flex items-center gap-2 mb-4">
+              <div className="flex flex-wrap items-center gap-2 mb-4">
                 <span className="bg-[#0FF0FC]/20 text-[#0FF0FC] border border-[#0FF0FC]/30 px-3 py-1 rounded-full text-sm font-bold flex items-center gap-1">
                   <Tag size={14} /> {article.category}
                 </span>
+                {article.level && (
+                  <span className={`border text-xs px-2.5 py-1 rounded-full font-bold ${levelColors[article.level]}`}>
+                    {levelLabels[article.level]}
+                  </span>
+                )}
+                {article.readingTime && (
+                  <span className="bg-white/5 border border-white/10 text-xs px-2.5 py-1 rounded-full text-gray-300 flex items-center gap-1">
+                    <Clock size={12} className="text-[#0FF0FC]" /> {article.readingTime}
+                  </span>
+                )}
               </div>
+              
               <h1 className="text-3xl md:text-5xl font-extrabold leading-tight mb-4 text-white">
                 {article.title}
               </h1>
@@ -122,9 +174,91 @@ export default async function ArticlePage({ params }: { params: Promise<{ id: st
                 prose-strong:text-white"
               dangerouslySetInnerHTML={{ __html: article.content }}
             />
+
+            {article.tags && article.tags.length > 0 && (
+              <div className="flex flex-wrap gap-2 pt-6 mt-8 border-t border-white/5">
+                {article.tags.map((tag) => (
+                  <span key={tag} className="text-xs text-gray-400 bg-white/5 px-3 py-1 rounded-lg border border-white/5">
+                    #{tag}
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
         </article>
+
+        {/* CTA Box */}
+        <div className="mt-8 bg-gradient-to-r from-[#1A1A1A] to-black border border-[#0FF0FC]/20 rounded-3xl p-8 relative overflow-hidden shadow-2xl">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-[#0FF0FC]/5 blur-3xl rounded-full pointer-events-none" />
+          <div className="relative z-10 flex flex-col md:flex-row justify-between items-center gap-6">
+            <div className="space-y-2 text-right">
+              <h3 className="text-2xl font-black text-white">طبّق ما تعلمته الآن</h3>
+              <p className="text-gray-400 text-sm max-w-lg leading-relaxed">
+                افتح السوق وابدأ اختبار استراتيجيتك بعملات افتراضية داخل MC PRIME Exchange.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-4 shrink-0">
+              <Link 
+                href="/market" 
+                className="px-6 py-3 bg-[#0FF0FC] text-black font-bold rounded-xl text-sm hover:bg-[#0FF0FC]/90 transition-all shadow-[0_0_15px_rgba(15,240,252,0.2)] inline-flex items-center gap-2"
+              >
+                <TrendingUp size={16} /> افتح السوق
+              </Link>
+              <Link 
+                href="/rewards" 
+                className="px-6 py-3 bg-[#FFD700]/10 border border-[#FFD700]/30 text-[#FFD700] font-bold rounded-xl text-sm hover:bg-[#FFD700] hover:text-black transition-all inline-flex items-center gap-2"
+              >
+                <Coins size={16} /> اكسب كوينز
+              </Link>
+            </div>
+          </div>
+        </div>
+
+        {/* Related Articles */}
+        {displayRelated.length > 0 && (
+          <div className="mt-12 space-y-6">
+            <h3 className="text-xl font-black text-white flex items-center gap-2 pb-3 border-b border-white/5">
+              <BookOpen size={20} className="text-[#0FF0FC]" /> مقالات ذات صلة
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {displayRelated.map((related) => (
+                <Link 
+                  href={`/article/${related.id}`} 
+                  key={related.id} 
+                  className="group bg-[#1A1A1A] border border-white/5 rounded-2xl overflow-hidden hover:border-[#0FF0FC]/30 transition-all hover:-translate-y-1"
+                >
+                  <div className="h-32 relative overflow-hidden">
+                    <img 
+                      src={related.imageUrl} 
+                      alt={related.title} 
+                      className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-500" 
+                    />
+                    <div className="absolute top-2 right-2 z-10">
+                      <span className="bg-black/80 backdrop-blur-sm text-[#0FF0FC] text-[9px] px-2 py-0.5 rounded border border-white/10 font-bold">
+                        {related.category}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="p-4 space-y-2">
+                    <h4 className="font-bold text-sm text-white group-hover:text-[#0FF0FC] transition-colors line-clamp-2 leading-snug">
+                      {related.title}
+                    </h4>
+                    <p className="text-xs text-gray-500 line-clamp-2 leading-relaxed">
+                      {related.excerpt}
+                    </p>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Safety Disclaimer */}
+        <div className="mt-12 p-4 bg-black/45 border border-white/5 rounded-2xl text-center text-xs text-gray-500 leading-relaxed">
+          جميع الكوينز والأصول داخل المنصة افتراضية بالكامل، ولا تمثل تداولاً حقيقياً أو نصيحة مالية.
+        </div>
       </main>
     </div>
   );
 }
+

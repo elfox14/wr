@@ -18,7 +18,8 @@ import {
   X, 
   ChevronDown,
   Coins,
-  ShieldAlert
+  ShieldAlert,
+  BookOpen
 } from 'lucide-react';
 import { useStore } from '@/lib/store';
 import { InsufficientFundsModal } from './InsufficientFundsModal';
@@ -61,6 +62,7 @@ export function Navbar() {
     { name: 'المجموعات', href: '/groups', icon: <Grid3X3 size={16} /> },
     { name: 'الترتيب', href: '/leaderboard', icon: <Trophy size={16} /> },
     { name: 'المكافآت', href: '/rewards', icon: <Gift size={16} /> },
+    { name: 'الأكاديمية', href: '/articles', icon: <BookOpen size={16} /> },
     { name: 'المحفظة', href: '/portfolio', icon: <Briefcase size={16} /> },
   ];
 
