@@ -1,6 +1,7 @@
 import { Metadata, ResolvingMetadata } from 'next';
 import AssetClient from '@/components/AssetClient';
 import { PlayerAnalysisPanel } from '@/components/PlayerAnalysisPanel';
+import { TeamAnalysisPanel } from '@/components/TeamAnalysisPanel';
 import prisma from '@/lib/prisma';
 
 type Props = {
@@ -54,11 +55,45 @@ export default async function AssetPage({ params }: Props) {
         orderBy: { createdAt: 'desc' },
         take: 8,
       },
+      players: {
+        orderBy: [
+          { score: 'desc' },
+          { marketPrice: 'desc' },
+        ],
+        include: {
+          performances: {
+            orderBy: { createdAt: 'desc' },
+            take: 1,
+          },
+        },
+      },
+      marketNews: {
+        orderBy: { publishedAt: 'desc' },
+        take: 8,
+      },
+      homeMatches: {
+        orderBy: { matchDate: 'asc' },
+        take: 8,
+        include: { homeTeam: true, awayTeam: true },
+      },
+      awayMatches: {
+        orderBy: { matchDate: 'asc' },
+        take: 8,
+        include: { homeTeam: true, awayTeam: true },
+      },
     },
   });
 
   const isTeam = asset?.type === 'TEAM';
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://mcprime-exchange.com';
+
+  const normalizedAsset = asset ? {
+    ...asset,
+    players: asset.players?.map((player: any) => ({
+      ...player,
+      lastPerformanceRating: player.lastPerformanceRating ?? player.performances?.[0]?.internalRating ?? null,
+    })) || [],
+  } : null;
 
   const jsonLd = asset ? {
     "@context": "https://schema.org",
@@ -76,7 +111,8 @@ export default async function AssetPage({ params }: Props) {
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
       )}
-      {!isTeam && asset && <PlayerAnalysisPanel asset={asset} />}
+      {isTeam && normalizedAsset && <TeamAnalysisPanel team={normalizedAsset} />}
+      {!isTeam && normalizedAsset && <PlayerAnalysisPanel asset={normalizedAsset} />}
       <AssetClient />
     </>
   );
