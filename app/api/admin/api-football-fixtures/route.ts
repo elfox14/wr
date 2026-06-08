@@ -23,7 +23,22 @@ function isValidDate(date: string | null) {
   return Boolean(date && /^\d{4}-\d{2}-\d{2}$/.test(date));
 }
 
-async function requireAdmin() {
+function hasValidAdminSecret(req: Request) {
+  const expectedSecret = process.env.ADMIN_API_SECRET;
+  if (!expectedSecret) return false;
+
+  const auth = req.headers.get('authorization') || '';
+  const bearer = auth.startsWith('Bearer ') ? auth.slice(7).trim() : '';
+  const headerSecret = req.headers.get('x-admin-secret') || '';
+  const { searchParams } = new URL(req.url);
+  const querySecret = searchParams.get('adminSecret') || '';
+
+  return [bearer, headerSecret, querySecret].some((value) => value && value === expectedSecret);
+}
+
+async function requireAdmin(req: Request) {
+  if (hasValidAdminSecret(req)) return { secret: true };
+
   const session = await getServerSession(authOptions as any) as AdminSession;
   if (!session?.user) return { error: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) };
   if (session.user.role !== 'ADMIN') return { error: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) };
@@ -46,7 +61,7 @@ async function getDailyProviderUsage() {
 }
 
 export async function GET(req: Request) {
-  const admin = await requireAdmin();
+  const admin = await requireAdmin(req);
   if (admin.error) return admin.error;
 
   const { searchParams } = new URL(req.url);
@@ -104,6 +119,7 @@ export async function GET(req: Request) {
 
     return NextResponse.json({
       success: true,
+      authMode: admin.secret ? 'secret' : 'session',
       externalRequestsUsed: 1,
       dailyUsage: {
         usedToday,
