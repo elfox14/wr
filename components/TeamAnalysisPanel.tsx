@@ -1,5 +1,6 @@
+import type { ReactNode } from 'react';
 import Link from 'next/link';
-import { Activity, AlertCircle, ArrowRight, BarChart3, CalendarDays, Flame, Goal, Newspaper, Shield, Sparkles, Target, Trophy, Users, Zap } from 'lucide-react';
+import { Activity, AlertCircle, ArrowRight, BarChart3, CalendarDays, Flame, Goal, History, Newspaper, Shield, Sparkles, Target, Trophy, Users, Zap } from 'lucide-react';
 import { AssetImage } from '@/components/ui/AssetImage';
 
 type TeamAnalysisPanelProps = {
@@ -47,9 +48,15 @@ function getTeamPower(team: any) {
   );
 }
 
+function getVolatility(team: any) {
+  if (team.volatilityScore !== null && team.volatilityScore !== undefined) return Number(team.volatilityScore);
+  if (team.riskIndex !== null && team.riskIndex !== undefined) return Number(team.riskIndex) * 100;
+  return 50;
+}
+
 function getTeamStyle(team: any) {
   const momentum = Number(team.momentum ?? 50);
-  const volatility = Number(team.volatilityScore ?? team.riskIndex ? Number(team.riskIndex) * 100 : 50);
+  const volatility = getVolatility(team);
   const legacy = Number(team.worldCupLegacy ?? 50);
 
   if (momentum >= 70 && legacy >= 75) return 'منتخب هجومي بثقة عالية وخبرة مونديالية واضحة.';
@@ -59,16 +66,46 @@ function getTeamStyle(team: any) {
   return 'منتخب متوازن، يحتاج مراقبة الزخم والطلب قبل اتخاذ قرار التداول.';
 }
 
-function getTeamInsights(team: any, players: any[], premiumDiscount: number) {
-  const insights: string[] = [];
-  const avgPlayerScore = players.length ? players.reduce((sum, p) => sum + Number(p.score || 0), 0) / players.length : 0;
+function getAvgPlayerScore(players: any[]) {
+  if (!players.length) return 0;
+  return Math.round(players.reduce((sum, player) => sum + Number(player.score || 0), 0) / players.length);
+}
 
-  if ((team.fifaRank || 999) <= 10) insights.push('تصنيف FIFA قوي، وهذا يدعم ثقة السوق في المنتخب كأصل قيادي.');
-  if (avgPlayerScore >= 80) insights.push('جودة اللاعبين عالية، ما يعطي المنتخب عمقًا فنيًا جيدًا في البطولة.');
-  if ((team.momentum || 50) >= 70) insights.push('الزخم الحالي مرتفع، وقد يزيد الطلب قبل المباريات القريبة.');
-  if (premiumDiscount <= -5) insights.push('السعر أقل من القيمة العادلة، ما يجعله مرشحًا للمراقبة كفرصة محتملة.');
-  if (premiumDiscount >= 10) insights.push('السعر يتداول بعلاوة واضحة، لذلك يحتاج المستخدم لمراقبة الأخبار والمباريات القادمة.');
-  if (insights.length === 0) insights.push('تحليل المنتخب يعتمد حاليًا على التقييم الفني، الطلب، الزخم، والقيمة العادلة المتاحة في قاعدة البيانات.');
+function getSquadLineStrength(players: any[], position: string) {
+  const filtered = players.filter((player) => player.position === position);
+  if (!filtered.length) return 0;
+  return Math.round(filtered.reduce((sum, player) => sum + Number(player.score || 0), 0) / filtered.length);
+}
+
+function getTechnicalInsights(team: any, players: any[]) {
+  const insights: string[] = [];
+  const avgPlayerScore = getAvgPlayerScore(players);
+  const attack = getSquadLineStrength(players, 'FWD');
+  const midfield = getSquadLineStrength(players, 'MID');
+  const defense = getSquadLineStrength(players, 'DEF');
+
+  if ((team.fifaRank || 999) <= 10) insights.push('تصنيف FIFA قوي، ما يمنح المنتخب أساسًا فنيًا جيدًا قبل البطولة.');
+  if (avgPlayerScore >= 80) insights.push('جودة اللاعبين مرتفعة، والتشكيلة تملك عمقًا يسمح بتغيير شكل المباراة.');
+  if (attack >= 80) insights.push('الخط الأمامي قوي، وقد يكون مصدر الزخم الأكبر في السوق عند تسجيل الأهداف.');
+  if (midfield >= 80) insights.push('وسط الملعب هو نقطة قوة واضحة، ما يدعم السيطرة وصناعة الفرص.');
+  if (defense >= 80) insights.push('الدفاع مستقر نسبيًا، وهذا يرفع ثقة المستخدمين في مباريات خروج المغلوب.');
+  if ((team.worldCupLegacy || 50) >= 80) insights.push('الإرث المونديالي مرتفع، ويؤثر على ثقة الجمهور حتى قبل بداية النتائج.');
+  if (insights.length === 0) insights.push('التحليل الفني يعتمد على جودة اللاعبين، تصنيف FIFA، الإرث، والزخم الحالي المتاح في قاعدة البيانات.');
+
+  return insights.slice(0, 4);
+}
+
+function getMarketInsights(team: any, premiumDiscount: number) {
+  const insights: string[] = [];
+
+  if (premiumDiscount <= -5) insights.push('السعر أقل من القيمة العادلة، ما يجعله مرشحًا للمراقبة كأصل منتخب.');
+  else if (premiumDiscount >= 10) insights.push('المنتخب يتداول بعلاوة واضحة، لذلك يجب متابعة الأخبار والمباريات القادمة.');
+  else insights.push('السعر قريب من القيمة العادلة، والزخم أو نتائج المباريات قد تحدد الاتجاه القادم.');
+
+  if ((team.marketDemand || 50) >= 70) insights.push('الطلب السوقي مرتفع، ويعكس اهتمامًا واضحًا من المستخدمين بهذا المنتخب.');
+  if ((team.momentum || 50) >= 70) insights.push('زخم المنتخب مرتفع، وقد يتفاعل السعر بقوة مع أي فوز أو خبر إيجابي.');
+  if (getVolatility(team) >= 70) insights.push('التقلب مرتفع؛ نتائج المنتخب قد تصنع حركة سعرية كبيرة.');
+  if ((team.ownersCount || 0) > 0) insights.push(`يمتلك هذا الأصل ${team.ownersCount} مستخدمًا داخل المنصة، ما يعطيه نشاطًا سوقيًا أوضح.`);
 
   return insights.slice(0, 4);
 }
@@ -89,8 +126,7 @@ function groupPlayersByPosition(players: PitchPlayer[]) {
   const fwd = sortBest(byPosition.FWD).slice(0, 3);
 
   const selectedIds = new Set([...gk, ...def, ...mid, ...fwd].map((p) => p.id));
-  const rest = sortBest(players.filter((p) => !selectedIds.has(p.id))).slice(0, 11 - selectedIds.size);
-
+  const rest = sortBest(players.filter((p) => !selectedIds.has(p.id))).slice(0, Math.max(0, 11 - selectedIds.size));
   const all = [...gk, ...def, ...mid, ...fwd, ...rest];
 
   return {
@@ -106,7 +142,7 @@ function MetricCard({ label, value, hint, icon, accent = 'text-primary' }: {
   label: string;
   value: string | number;
   hint?: string;
-  icon: React.ReactNode;
+  icon: ReactNode;
   accent?: string;
 }) {
   return (
@@ -129,6 +165,15 @@ function PillarBar({ label, value, color = 'bg-primary' }: { label: string; valu
       <div className="h-2.5 overflow-hidden rounded-full border border-white/5 bg-black/50">
         <div className={`h-full rounded-full ${color}`} style={{ width: `${safeValue}%` }} />
       </div>
+    </div>
+  );
+}
+
+function EmptyNotice({ text }: { text: string }) {
+  return (
+    <div className="rounded-2xl border border-dashed border-white/10 bg-white/5 p-5 text-sm leading-relaxed text-gray-400">
+      <AlertCircle className="mb-2 text-gray-500" size={18} />
+      {text}
     </div>
   );
 }
@@ -163,11 +208,7 @@ function TeamPitch({ players }: { players: PitchPlayer[] }) {
   const lines = groupPlayersByPosition(players);
 
   if (players.length === 0) {
-    return (
-      <div className="rounded-3xl border border-dashed border-white/10 bg-white/5 p-8 text-center text-sm text-gray-400">
-        لا توجد تشكيلة لاعبين مرتبطة بهذا المنتخب بعد.
-      </div>
-    );
+    return <EmptyNotice text="لا توجد تشكيلة لاعبين مرتبطة بهذا المنتخب بعد." />;
   }
 
   return (
@@ -224,13 +265,20 @@ export function TeamAnalysisPanel({ team }: TeamAnalysisPanelProps) {
 
   const players = [...(team.players || [])].sort((a: any, b: any) => Number(b.score || b.marketPrice || b.current_price || 0) - Number(a.score || a.marketPrice || a.current_price || 0));
   const marketPrice = Number(team.marketPrice ?? team.current_price ?? 0);
+  const fairValue = Number(team.fairValue ?? team.current_price ?? marketPrice);
   const premiumDiscount = getPremiumDiscount(team);
   const teamPower = getTeamPower(team);
-  const insights = getTeamInsights(team, players, premiumDiscount);
+  const technicalInsights = getTechnicalInsights(team, players);
+  const marketInsights = getMarketInsights(team, premiumDiscount);
   const matches = [...(team.homeMatches || []), ...(team.awayMatches || [])].sort((a: any, b: any) => new Date(a.matchDate).getTime() - new Date(b.matchDate).getTime());
   const upcomingMatches = matches.filter((m: any) => m.status !== 'FINISHED').slice(0, 4);
   const latestMatches = matches.filter((m: any) => m.status === 'FINISHED').slice(-3).reverse();
   const news = team.marketNews || [];
+  const avgPlayerScore = getAvgPlayerScore(players);
+  const attackScore = getSquadLineStrength(players, 'FWD') || Math.round(team.fundamental || team.score || 50);
+  const midfieldScore = getSquadLineStrength(players, 'MID') || Math.round(team.fundamental || team.score || 50);
+  const defenseScore = getSquadLineStrength(players, 'DEF') || Math.round(team.fundamental || team.score || 50);
+  const goalkeeperScore = getSquadLineStrength(players, 'GK') || Math.round(team.fundamental || team.score || 50);
 
   return (
     <section className="mx-auto mb-4 w-full max-w-[1600px] px-4 pt-4">
@@ -245,7 +293,9 @@ export function TeamAnalysisPanel({ team }: TeamAnalysisPanelProps) {
                 {team.group && <span className="rounded-xl border border-white/10 bg-white/5 px-3 py-1 text-xs font-black text-gray-300">المجموعة {team.group}</span>}
               </div>
               <h2 className="text-2xl font-black text-white md:text-3xl">تحليل المنتخب: {team.name}</h2>
-              <p className="mt-1 max-w-3xl text-sm leading-relaxed text-gray-400">{getTeamStyle(team)}</p>
+              <p className="mt-1 max-w-4xl text-sm leading-relaxed text-gray-400">
+                {getTeamStyle(team)} الصفحة مقسومة إلى تحليل فني رياضي وتحليل سوقي لسهم المنتخب الافتراضي.
+              </p>
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -254,30 +304,86 @@ export function TeamAnalysisPanel({ team }: TeamAnalysisPanelProps) {
           </div>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-          <MetricCard label="قوة المنتخب" value={`${teamPower}/100`} hint="مزيج فني وسوقي" icon={<Trophy size={16} />} />
-          <MetricCard label="السعر الحالي" value={formatPrice(marketPrice)} hint={`القيمة العادلة: ${formatPrice(team.fairValue ?? marketPrice)}`} icon={<BarChart3 size={16} />} accent="text-accent" />
-          <MetricCard label="خصم / علاوة" value={`${premiumDiscount > 0 ? '+' : ''}${premiumDiscount.toFixed(1)}%`} hint={premiumDiscount <= 0 ? 'أقل أو قريب من العادلة' : 'يتداول بعلاوة'} icon={<Target size={16} />} accent={premiumDiscount <= 0 ? 'text-success' : 'text-danger'} />
-          <MetricCard label="زخم المنتخب" value={`${Math.round(team.momentum || 50)}/100`} hint="يتأثر بالأخبار والمباريات" icon={<Flame size={16} />} accent="text-success" />
-          <MetricCard label="عدد اللاعبين" value={players.length} hint="مرتبطون بالمنتخب" icon={<Users size={16} />} accent="text-yellow-300" />
-        </div>
+        <div className="grid gap-5 xl:grid-cols-2">
+          <div className="rounded-3xl border border-white/5 bg-black/25 p-5">
+            <div className="mb-5 flex items-center justify-between gap-3">
+              <div>
+                <h3 className="flex items-center gap-2 text-xl font-black text-white"><Trophy size={20} className="text-primary" /> التحليل الفني للمنتخب</h3>
+                <p className="mt-1 text-xs text-gray-500">تصنيف، جودة لاعبين، قوة الخطوط، تشكيل، مباريات ونتائج.</p>
+              </div>
+              <span className="rounded-xl border border-white/10 bg-white/5 px-3 py-1 text-xs font-black text-gray-300">SPORT</span>
+            </div>
 
-        <div className="mt-5 grid gap-5 xl:grid-cols-[0.95fr_1.05fr]">
-          <div className="space-y-5">
-            <div className="rounded-3xl border border-white/5 bg-black/25 p-5">
-              <h3 className="mb-4 flex items-center gap-2 text-lg font-black text-white"><Sparkles size={18} className="text-primary" /> تحليل فني سريع</h3>
+            <div className="mb-4 grid gap-3 md:grid-cols-2">
+              <MetricCard label="قوة المنتخب" value={`${teamPower}/100`} hint="مزيج فني وسوقي" icon={<Trophy size={16} />} />
+              <MetricCard label="متوسط اللاعبين" value={avgPlayerScore ? `${avgPlayerScore}/100` : '—'} hint="حسب لاعبي القائمة" icon={<Users size={16} />} accent="text-accent" />
+              <MetricCard label="تصنيف FIFA" value={team.fifaRank ? `#${team.fifaRank}` : '—'} hint={team.continent || 'غير متاح'} icon={<Target size={16} />} accent="text-yellow-300" />
+              <MetricCard label="إرث كأس العالم" value={`${Math.round(team.worldCupLegacy || 50)}/100`} hint={`${team.participations || 0} مشاركات`} icon={<History size={16} />} accent="text-success" />
+            </div>
+
+            <div className="mb-4 rounded-3xl border border-white/5 bg-white/5 p-4">
+              <h4 className="mb-4 flex items-center gap-2 font-black text-white"><Activity size={16} className="text-primary" /> قوة الخطوط</h4>
+              <div className="space-y-4">
+                <PillarBar label="الهجوم" value={attackScore} color="bg-danger" />
+                <PillarBar label="الوسط" value={midfieldScore} color="bg-primary" />
+                <PillarBar label="الدفاع" value={defenseScore} color="bg-success" />
+                <PillarBar label="حراسة المرمى" value={goalkeeperScore} color="bg-yellow-300" />
+              </div>
+            </div>
+
+            <div className="mb-4 rounded-3xl border border-white/5 bg-white/5 p-4">
+              <h4 className="mb-3 flex items-center gap-2 font-black text-white"><Sparkles size={16} className="text-primary" /> قراءة فنية</h4>
               <div className="space-y-3">
-                {insights.map((insight, index) => (
-                  <div key={index} className="flex gap-3 rounded-2xl border border-white/5 bg-white/5 p-3 text-sm leading-relaxed text-gray-300">
-                    <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-primary" />
+                {technicalInsights.map((insight, index) => (
+                  <div key={index} className="flex gap-3 text-sm leading-relaxed text-gray-300">
+                    <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-primary" />
                     <p>{insight}</p>
                   </div>
                 ))}
               </div>
             </div>
 
-            <div className="rounded-3xl border border-white/5 bg-black/25 p-5">
-              <h3 className="mb-4 flex items-center gap-2 text-lg font-black text-white"><Activity size={18} className="text-accent" /> مؤشرات المنتخب</h3>
+            <div className="rounded-3xl border border-white/5 bg-white/5 p-4">
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                <h4 className="flex items-center gap-2 font-black text-white"><Goal size={16} className="text-emerald-300" /> التشكيلة على الملعب</h4>
+                <span className="rounded-xl border border-white/10 bg-black/30 px-3 py-1 text-xs font-black text-gray-300">أفضل 11 حسب البيانات</span>
+              </div>
+              <TeamPitch players={players} />
+            </div>
+          </div>
+
+          <div className="rounded-3xl border border-white/5 bg-black/25 p-5">
+            <div className="mb-5 flex items-center justify-between gap-3">
+              <div>
+                <h3 className="flex items-center gap-2 text-xl font-black text-white"><BarChart3 size={20} className="text-accent" /> تحليل سهم المنتخب</h3>
+                <p className="mt-1 text-xs text-gray-500">القيمة العادلة، الزخم، الطلب، الأخبار، والمخاطر السوقية.</p>
+              </div>
+              <span className="rounded-xl border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-black text-primary">MARKET</span>
+            </div>
+
+            <div className="mb-4 grid gap-3 md:grid-cols-2">
+              <MetricCard label="السعر الحالي" value={formatPrice(marketPrice)} hint="Market Price" icon={<BarChart3 size={16} />} accent="text-primary" />
+              <MetricCard label="القيمة العادلة" value={formatPrice(fairValue)} hint="Fair Value" icon={<Target size={16} />} accent="text-accent" />
+              <MetricCard label="خصم / علاوة" value={`${premiumDiscount > 0 ? '+' : ''}${premiumDiscount.toFixed(1)}%`} hint={premiumDiscount <= 0 ? 'أقل أو قريب من العادلة' : 'يتداول بعلاوة'} icon={<Zap size={16} />} accent={premiumDiscount <= 0 ? 'text-success' : 'text-danger'} />
+              <MetricCard label="الملاك" value={team.ownersCount || 0} hint="عدد المالكين" icon={<Users size={16} />} accent="text-yellow-300" />
+              <MetricCard label="زخم المنتخب" value={`${Math.round(team.momentum || 50)}/100`} hint="يتأثر بالأخبار والمباريات" icon={<Flame size={16} />} accent="text-success" />
+              <MetricCard label="التقلب" value={`${Math.round(getVolatility(team))}/100`} hint="حساسية السعر للأحداث" icon={<Shield size={16} />} accent={getVolatility(team) >= 70 ? 'text-danger' : 'text-yellow-300'} />
+            </div>
+
+            <div className="mb-4 rounded-3xl border border-white/5 bg-white/5 p-4">
+              <h4 className="mb-3 flex items-center gap-2 font-black text-white"><Sparkles size={16} className="text-primary" /> قراءة سوقية</h4>
+              <div className="space-y-3">
+                {marketInsights.map((insight, index) => (
+                  <div key={index} className="flex gap-3 text-sm leading-relaxed text-gray-300">
+                    <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-accent" />
+                    <p>{insight}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="mb-4 rounded-3xl border border-white/5 bg-white/5 p-4">
+              <h4 className="mb-4 flex items-center gap-2 font-black text-white"><Activity size={16} className="text-accent" /> أعمدة السهم</h4>
               <div className="space-y-4">
                 <PillarBar label="القوة الفنية" value={team.fundamental || team.score || 50} color="bg-primary" />
                 <PillarBar label="إرث كأس العالم" value={team.worldCupLegacy || 50} color="bg-accent" />
@@ -287,16 +393,16 @@ export function TeamAnalysisPanel({ team }: TeamAnalysisPanelProps) {
               </div>
             </div>
 
-            <div className="rounded-3xl border border-white/5 bg-black/25 p-5">
-              <h3 className="mb-4 flex items-center gap-2 text-lg font-black text-white"><Newspaper size={18} className="text-primary" /> أخبار المنتخب</h3>
+            <div className="rounded-3xl border border-white/5 bg-white/5 p-4">
+              <h4 className="mb-4 flex items-center gap-2 font-black text-white"><Newspaper size={16} className="text-primary" /> أخبار مؤثرة</h4>
               {news.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-white/10 bg-white/5 p-5 text-sm text-gray-400">لا توجد أخبار مؤثرة مرتبطة بهذا المنتخب حاليًا.</div>
+                <EmptyNotice text="لا توجد أخبار مؤثرة مرتبطة بهذا المنتخب حاليًا." />
               ) : (
                 <div className="space-y-3">
                   {news.slice(0, 4).map((item: any) => (
-                    <div key={item.id} className="rounded-2xl border border-white/5 bg-white/5 p-4">
+                    <div key={item.id} className="rounded-2xl border border-white/5 bg-black/25 p-4">
                       <div className="mb-1 flex items-center justify-between gap-3">
-                        <h4 className="font-black text-white">{item.titleAr}</h4>
+                        <h5 className="font-black text-white">{item.titleAr}</h5>
                         <span className={Number(item.changePercent || 0) >= 0 ? 'text-xs font-black text-success' : 'text-xs font-black text-danger'}>{Number(item.changePercent || 0) > 0 ? '+' : ''}{Number(item.changePercent || 0).toFixed(1)}%</span>
                       </div>
                       <p className="line-clamp-2 text-sm text-gray-500">{item.bodyAr}</p>
@@ -306,33 +412,17 @@ export function TeamAnalysisPanel({ team }: TeamAnalysisPanelProps) {
               )}
             </div>
           </div>
-
-          <div className="rounded-3xl border border-white/5 bg-black/25 p-5">
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-              <h3 className="flex items-center gap-2 text-lg font-black text-white"><Goal size={18} className="text-emerald-300" /> التشكيلة على الملعب</h3>
-              <span className="rounded-xl border border-white/10 bg-white/5 px-3 py-1 text-xs font-black text-gray-300">أفضل 11 حسب البيانات</span>
-            </div>
-            <TeamPitch players={players} />
-          </div>
         </div>
 
         <div className="mt-5 grid gap-5 lg:grid-cols-2">
           <div className="rounded-3xl border border-white/5 bg-black/25 p-5">
             <h3 className="mb-4 flex items-center gap-2 text-lg font-black text-white"><CalendarDays size={18} className="text-primary" /> المباريات القادمة</h3>
-            {upcomingMatches.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-white/10 bg-white/5 p-5 text-sm text-gray-400">لا توجد مباريات قادمة مرتبطة بهذا المنتخب.</div>
-            ) : (
-              <div className="space-y-3">{upcomingMatches.map((match: any) => <MatchCard key={match.id} match={match} teamId={team.id} />)}</div>
-            )}
+            {upcomingMatches.length === 0 ? <EmptyNotice text="لا توجد مباريات قادمة مرتبطة بهذا المنتخب." /> : <div className="space-y-3">{upcomingMatches.map((match: any) => <MatchCard key={match.id} match={match} teamId={team.id} />)}</div>}
           </div>
 
           <div className="rounded-3xl border border-white/5 bg-black/25 p-5">
             <h3 className="mb-4 flex items-center gap-2 text-lg font-black text-white"><Shield size={18} className="text-success" /> آخر النتائج</h3>
-            {latestMatches.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-white/10 bg-white/5 p-5 text-sm text-gray-400">لا توجد نتائج فعلية بعد. النتائج تظهر فقط بعد انتهاء المباريات.</div>
-            ) : (
-              <div className="space-y-3">{latestMatches.map((match: any) => <MatchCard key={match.id} match={match} teamId={team.id} />)}</div>
-            )}
+            {latestMatches.length === 0 ? <EmptyNotice text="لا توجد نتائج فعلية بعد. النتائج تظهر فقط بعد انتهاء المباريات." /> : <div className="space-y-3">{latestMatches.map((match: any) => <MatchCard key={match.id} match={match} teamId={team.id} />)}</div>}
           </div>
         </div>
 
@@ -342,7 +432,7 @@ export function TeamAnalysisPanel({ team }: TeamAnalysisPanelProps) {
             <span className="text-xs text-gray-500">اضغط على أي لاعب لفتح تحليله الكامل</span>
           </div>
           {players.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-white/10 bg-white/5 p-5 text-sm text-gray-400">لا توجد قائمة لاعبين مرتبطة بهذا المنتخب.</div>
+            <EmptyNotice text="لا توجد قائمة لاعبين مرتبطة بهذا المنتخب." />
           ) : (
             <div className="overflow-x-auto rounded-2xl border border-white/5">
               <table className="w-full whitespace-nowrap text-right text-sm">
