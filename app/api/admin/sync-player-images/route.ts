@@ -8,7 +8,9 @@ function isLocalImage(image?: string | null) {
 }
 
 function isExternalImage(image?: string | null) {
-  return !!image && (image.startsWith("http://") || image.startsWith("https://"));
+  return !!image && 
+         (image.startsWith("http://") || image.startsWith("https://")) &&
+         !image.includes("flagcdn.com");
 }
 
 function getBestSportsDbImage(p: any) {
