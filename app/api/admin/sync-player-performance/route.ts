@@ -4,6 +4,8 @@ import prisma from '@/lib/prisma';
 import { authOptions } from '@/lib/auth';
 import { apiFootballFetch, normalizeName } from '@/lib/apiFootball';
 import { blendRecentFundamental, calculatePlayerPerformanceRating } from '@/lib/playerPerformance';
+import { blendTeamFundamental, calculateTeamMatchPerformanceRating } from '@/lib/teamPerformance';
+import { calculateAssetScore, calculateFairValue } from '@/lib/scoring';
 
 type ApiFootballPlayerStats = {
   player?: {
@@ -21,6 +23,16 @@ type AdminSession = {
     role?: string | null;
   };
 } | null;
+
+type TeamBucket = {
+  teamId?: string | null;
+  teamName?: string | null;
+  playerRatings: number[];
+  goalsFor: number;
+  goalsAgainst: number;
+  yellowCards: number;
+  redCards: number;
+};
 
 const DAILY_PROVIDER_REQUEST_BUDGET = Number(process.env.API_FOOTBALL_DAILY_BUDGET || 90);
 const DAILY_PROVIDER_REQUEST_RESERVE = Number(process.env.API_FOOTBALL_DAILY_RESERVE || 10);
@@ -52,6 +64,28 @@ function mapPosition(position?: string | null) {
   if (p.includes('midfielder')) return 'MID';
   if (p.includes('attacker') || p.includes('forward')) return 'FWD';
   return String(position || '').toUpperCase();
+}
+
+function hasValidAdminSecret(req: Request) {
+  const expectedSecret = process.env.ADMIN_API_SECRET;
+  if (!expectedSecret) return false;
+
+  const auth = req.headers.get('authorization') || '';
+  const bearer = auth.startsWith('Bearer ') ? auth.slice(7).trim() : '';
+  const headerSecret = req.headers.get('x-admin-secret') || '';
+  const { searchParams } = new URL(req.url);
+  const querySecret = searchParams.get('adminSecret') || '';
+
+  return [bearer, headerSecret, querySecret].some((value) => value && value === expectedSecret);
+}
+
+async function requireAdmin(req: Request) {
+  if (hasValidAdminSecret(req)) return { secret: true };
+
+  const session = await getServerSession(authOptions as any) as AdminSession;
+  if (!session?.user) return { error: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) };
+  if (session.user.role !== 'ADMIN') return { error: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) };
+  return { session };
 }
 
 function getTeamNameFromStats(stats: any) {
@@ -124,6 +158,51 @@ async function findLocalAsset(apiPlayer: ApiFootballPlayerStats) {
     null;
 }
 
+async function findLocalTeam(teamId?: string | null, teamName?: string | null) {
+  if (teamId) {
+    const byId = await prisma.asset.findFirst({ where: { id: teamId, type: 'TEAM' } });
+    if (byId) return byId;
+  }
+
+  const normalizedTeamName = normalizeName(teamName || '');
+  if (!normalizedTeamName) return null;
+
+  const teams = await prisma.asset.findMany({ where: { type: 'TEAM' }, take: 500 });
+  return teams.find((asset) => normalizeName(asset.name) === normalizedTeamName) ||
+    teams.find((asset) => normalizeName(asset.name).includes(normalizedTeamName) || normalizedTeamName.includes(normalizeName(asset.name))) ||
+    null;
+}
+
+function addToTeamBucket(buckets: Map<string, TeamBucket>, item: {
+  teamId?: string | null;
+  teamName?: string | null;
+  internalRating: number;
+  goals: number;
+  goalsConceded: number;
+  yellowCards: number;
+  redCards: number;
+}) {
+  const key = item.teamId || `name:${normalizeName(item.teamName || '')}`;
+  if (!key || key === 'name:') return;
+
+  const bucket = buckets.get(key) || {
+    teamId: item.teamId,
+    teamName: item.teamName,
+    playerRatings: [],
+    goalsFor: 0,
+    goalsAgainst: 0,
+    yellowCards: 0,
+    redCards: 0,
+  };
+
+  bucket.playerRatings.push(item.internalRating);
+  bucket.goalsFor += item.goals;
+  bucket.goalsAgainst = Math.max(bucket.goalsAgainst, item.goalsConceded);
+  bucket.yellowCards += item.yellowCards;
+  bucket.redCards += item.redCards;
+  buckets.set(key, bucket);
+}
+
 async function getDailyProviderUsage() {
   const todayStart = getTodayStart();
   const syncedFixtures = await prisma.playerPerformance.findMany({
@@ -139,16 +218,113 @@ async function getDailyProviderUsage() {
   return syncedFixtures.length;
 }
 
+async function updateTeamsFromBuckets(buckets: Map<string, TeamBucket>, fixtureId: number, dryRun: boolean) {
+  const teamResults: any[] = [];
+
+  for (const bucket of buckets.values()) {
+    const team = await findLocalTeam(bucket.teamId, bucket.teamName);
+
+    if (!team) {
+      teamResults.push({ teamName: bucket.teamName, status: 'team_not_matched' });
+      continue;
+    }
+
+    const averagePlayerRating = bucket.playerRatings.length
+      ? bucket.playerRatings.reduce((sum, rating) => sum + rating, 0) / bucket.playerRatings.length
+      : 50;
+
+    const calculated = calculateTeamMatchPerformanceRating({
+      averagePlayerRating,
+      playerCount: bucket.playerRatings.length,
+      goalsFor: bucket.goalsFor,
+      goalsAgainst: bucket.goalsAgainst,
+      yellowCards: bucket.yellowCards,
+      redCards: bucket.redCards,
+    });
+
+    const newMomentum = clamp(Number(team.momentum ?? 50) + calculated.momentumImpact);
+    const newMarketDemand = clamp(Number(team.marketDemand ?? 50) + calculated.marketImpact);
+    const newFundamental = blendTeamFundamental(team.fundamental, calculated.teamRating);
+
+    const players = await prisma.asset.findMany({ where: { type: 'PLAYER', teamId: team.id } });
+    const score = calculateAssetScore({
+      ...team,
+      fundamental: newFundamental,
+      momentum: newMomentum,
+      marketDemand: newMarketDemand,
+    }, players);
+    const fairValue = calculateFairValue(score, 'TEAM');
+    const oldFairValue = Number(team.fairValue || team.current_price || fairValue);
+    const changePercent = oldFairValue > 0 ? ((fairValue - oldFairValue) / oldFairValue) * 100 : 0;
+
+    if (!dryRun) {
+      await prisma.asset.update({
+        where: { id: team.id },
+        data: {
+          lastPerformanceRating: calculated.teamRating,
+          lastPerformanceSyncAt: new Date(),
+          fundamental: newFundamental,
+          momentum: newMomentum,
+          marketDemand: newMarketDemand,
+          score,
+          fairValue,
+        },
+      });
+
+      const localeGroupKey = `${team.id}:team_performance:${fixtureId}`;
+      const existingNews = await prisma.marketNews.findFirst({ where: { localeGroupKey } });
+      if (!existingNews) {
+        await prisma.marketNews.create({
+          data: {
+            assetId: team.id,
+            eventType: 'team_performance',
+            severity: Math.abs(changePercent) >= 8 ? 'high' : 'normal',
+            localeGroupKey,
+            priceBefore: oldFairValue,
+            priceAfter: fairValue,
+            changePercent,
+            titleAr: `تحديث أداء ${team.name}`,
+            bodyAr: `تم تحديث تقييم المنتخب بعد المباراة. تقييم الأداء: ${calculated.teamRating.toFixed(1)}/100، ومتوسط أداء اللاعبين: ${averagePlayerRating.toFixed(1)}/100.`,
+            titleEn: `${team.name} performance update`,
+            bodyEn: `Team valuation updated after match performance. Rating: ${calculated.teamRating.toFixed(1)}/100, average player rating: ${averagePlayerRating.toFixed(1)}/100.`,
+            context: {
+              fixtureId,
+              averagePlayerRating,
+              goalsFor: bucket.goalsFor,
+              goalsAgainst: bucket.goalsAgainst,
+              yellowCards: bucket.yellowCards,
+              redCards: bucket.redCards,
+              momentumImpact: calculated.momentumImpact,
+              marketImpact: calculated.marketImpact,
+            } as any,
+          },
+        });
+      }
+    }
+
+    teamResults.push({
+      assetId: team.id,
+      name: team.name,
+      status: dryRun ? 'team_matched_dry_run' : 'team_updated',
+      playerCount: bucket.playerRatings.length,
+      averagePlayerRating: Math.round(averagePlayerRating * 10) / 10,
+      goalsFor: bucket.goalsFor,
+      goalsAgainst: bucket.goalsAgainst,
+      teamRating: calculated.teamRating,
+      momentumImpact: calculated.momentumImpact,
+      marketImpact: calculated.marketImpact,
+      fairValueBefore: oldFairValue,
+      fairValueAfter: fairValue,
+      changePercent: Math.round(changePercent * 10) / 10,
+    });
+  }
+
+  return teamResults;
+}
+
 export async function POST(req: Request) {
-  const session = await getServerSession(authOptions as any) as AdminSession;
-
-  if (!session?.user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
-  if (session.user.role !== 'ADMIN') {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
+  const admin = await requireAdmin(req);
+  if (admin.error) return admin.error;
 
   const body = await req.json().catch(() => ({}));
   const fixtureId = Number(body.fixtureId);
@@ -197,6 +373,7 @@ export async function POST(req: Request) {
 
     const apiPlayers = (payload.response || []).slice(0, limit);
     const results: any[] = [];
+    const teamBuckets = new Map<string, TeamBucket>();
 
     for (const apiPlayer of apiPlayers) {
       const localAsset = await findLocalAsset(apiPlayer);
@@ -217,6 +394,23 @@ export async function POST(req: Request) {
       const momentum = clamp(Number(localAsset.momentum ?? 50) + calculated.momentumImpact);
       const marketDemand = clamp(Number(localAsset.marketDemand ?? 50) + calculated.marketImpact);
       const fundamental = blendRecentFundamental(localAsset.fundamental, internalRating);
+      const playerScore = calculateAssetScore({
+        ...localAsset,
+        fundamental,
+        momentum,
+        marketDemand,
+      });
+      const playerFairValue = calculateFairValue(playerScore, 'PLAYER');
+
+      addToTeamBucket(teamBuckets, {
+        teamId: localAsset.teamId,
+        teamName,
+        internalRating,
+        goals: performanceInput.goals,
+        goalsConceded: performanceInput.goalsConceded,
+        yellowCards: performanceInput.yellowCards,
+        redCards: performanceInput.redCards,
+      });
 
       if (!dryRun) {
         await prisma.$transaction([
@@ -287,6 +481,8 @@ export async function POST(req: Request) {
               fundamental,
               momentum,
               marketDemand,
+              score: playerScore,
+              fairValue: playerFairValue,
             },
           }),
         ]);
@@ -301,8 +497,11 @@ export async function POST(req: Request) {
         internalRating,
         momentumImpact: calculated.momentumImpact,
         marketImpact: calculated.marketImpact,
+        fairValueAfter: playerFairValue,
       });
     }
+
+    const teamResults = await updateTeamsFromBuckets(teamBuckets, fixtureId, dryRun);
 
     return NextResponse.json({
       success: true,
@@ -318,6 +517,9 @@ export async function POST(req: Request) {
       matched: results.filter((r) => r.status === 'updated' || r.status === 'matched_dry_run').length,
       updated: results.filter((r) => r.status === 'updated').length,
       notMatched: results.filter((r) => r.status === 'not_matched').length,
+      teamUpdated: teamResults.filter((r) => r.status === 'team_updated').length,
+      teamMatched: teamResults.filter((r) => r.status === 'team_updated' || r.status === 'team_matched_dry_run').length,
+      teamResults,
       results,
     });
   } catch (error: any) {
