@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Activity, AlertCircle, CalendarDays, CheckCircle2, Database, RefreshCw, Search, ShieldAlert, Zap } from 'lucide-react';
+import { Activity, AlertCircle, CalendarDays, CheckCircle2, Database, RefreshCw, Search, ShieldAlert } from 'lucide-react';
 
 type Fixture = {
   fixtureId: number;
@@ -49,6 +49,27 @@ function statusLabel(status?: string) {
   return status;
 }
 
+function extractProviderMessage(data: any) {
+  return data?.details?.plan || data?.details?.requests || data?.message || data?.error || 'حدث خطأ أثناء الاتصال بـ API-Football';
+}
+
+function extractDateRange(message: string) {
+  const match = message.match(/from\s+(\d{4}-\d{2}-\d{2})\s+to\s+(\d{4}-\d{2}-\d{2})/i);
+  if (!match) return null;
+  return { from: match[1], to: match[2] };
+}
+
+function datesBetween(from: string, to: string) {
+  const result: string[] = [];
+  const cursor = new Date(`${from}T00:00:00`);
+  const end = new Date(`${to}T00:00:00`);
+  while (cursor <= end && result.length < 10) {
+    result.push(cursor.toISOString().slice(0, 10));
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return result;
+}
+
 export default function ApiFootballAdminPage() {
   const [date, setDate] = useState(todayIsoDate());
   const [league, setLeague] = useState('');
@@ -59,6 +80,8 @@ export default function ApiFootballAdminPage() {
   const [syncingFixture, setSyncingFixture] = useState<number | null>(null);
   const [message, setMessage] = useState<string>('');
   const [error, setError] = useState<string>('');
+  const [providerHint, setProviderHint] = useState<string>('');
+  const [allowedDates, setAllowedDates] = useState<string[]>([]);
   const [syncResults, setSyncResults] = useState<Record<number, any>>({});
 
   const fetchUsage = async () => {
@@ -74,6 +97,8 @@ export default function ApiFootballAdminPage() {
   const fetchFixtures = async () => {
     setLoadingFixtures(true);
     setError('');
+    setProviderHint('');
+    setAllowedDates([]);
     setMessage('');
     try {
       const params = new URLSearchParams();
@@ -85,7 +110,13 @@ export default function ApiFootballAdminPage() {
       const data = await res.json();
 
       if (!res.ok) {
-        setError(data.message || data.error || 'فشل جلب المباريات');
+        const providerMessage = extractProviderMessage(data);
+        setError(providerMessage);
+        const range = extractDateRange(providerMessage);
+        if (range) {
+          setProviderHint(`الخطة المجانية تسمح حاليًا بالتواريخ من ${range.from} إلى ${range.to}. اختر أحد هذه الأيام.`);
+          setAllowedDates(datesBetween(range.from, range.to));
+        }
         return;
       }
 
@@ -102,6 +133,7 @@ export default function ApiFootballAdminPage() {
   const syncPerformance = async (fixtureId: number, dryRun = false, force = false) => {
     setSyncingFixture(fixtureId);
     setError('');
+    setProviderHint('');
     setMessage('');
     try {
       const res = await fetch('/api/admin/sync-player-performance', {
@@ -114,7 +146,7 @@ export default function ApiFootballAdminPage() {
       setSyncResults((prev) => ({ ...prev, [fixtureId]: data }));
 
       if (!res.ok) {
-        setError(data.message || data.error || 'فشل مزامنة الأداء');
+        setError(extractProviderMessage(data) || 'فشل مزامنة الأداء');
         return;
       }
 
@@ -188,10 +220,32 @@ export default function ApiFootballAdminPage() {
               {loadingFixtures ? 'جاري الجلب...' : 'جلب المباريات'} <CalendarDays size={18} />
             </button>
           </div>
+
+          <div className="mt-4 rounded-2xl border border-yellow-300/10 bg-yellow-300/5 p-4 text-sm leading-relaxed text-yellow-100">
+            الخطة المجانية في API-Football قد تقيد التواريخ المتاحة. لو ظهرت رسالة تحدد نطاق تواريخ، اختر أحد الأيام المقترحة بالأسفل ثم اضغط جلب المباريات.
+          </div>
         </section>
 
         {message && <div className="mb-4 rounded-2xl border border-success/20 bg-success/10 p-4 text-sm font-bold text-success"><CheckCircle2 className="ml-2 inline" size={16} />{message}</div>}
-        {error && <div className="mb-4 rounded-2xl border border-danger/20 bg-danger/10 p-4 text-sm font-bold text-danger"><ShieldAlert className="ml-2 inline" size={16} />{error}</div>}
+        {error && (
+          <div className="mb-4 rounded-2xl border border-danger/20 bg-danger/10 p-4 text-sm font-bold text-danger">
+            <ShieldAlert className="ml-2 inline" size={16} />{error}
+            {providerHint && <div className="mt-2 text-sm font-bold text-yellow-100">{providerHint}</div>}
+            {allowedDates.length > 0 && (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {allowedDates.map((allowedDate) => (
+                  <button
+                    key={allowedDate}
+                    onClick={() => setDate(allowedDate)}
+                    className="rounded-xl border border-yellow-300/30 bg-yellow-300/10 px-3 py-2 text-xs font-black text-yellow-100 hover:bg-yellow-300 hover:text-black"
+                  >
+                    استخدم {allowedDate}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         <section className="rounded-3xl border border-white/5 bg-surface p-5 shadow-card md:p-6">
           <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
