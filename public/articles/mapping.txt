@@ -1,0 +1,13 @@
+Article cover files mapping:
+
+top-3-teams-analysis-2026 -> /articles/top-teams-2026.png
+best-players-to-buy -> /articles/best-players.png
+dark-horses-2026 -> /articles/dark-horses.png
+how-to-manage-risk -> /articles/risk-management.png
+top-young-talents -> /articles/young-talents.png
+goalkeepers-investment -> /articles/goalkeepers-defense.png
+advanced-trading-strategies -> /articles/advanced-strategies.png
+beginners-guide -> /articles/beginners-guide.png
+injuries-impact-on-stocks -> /articles/injury-impact.png
+africa-asia-world-cup-2026 -> /articles/africa-asia.png
+knockout-stage-strategy -> /articles/knockout-stage.png
