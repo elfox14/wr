@@ -12,7 +12,8 @@ export async function POST(req: Request) {
 
   try {
     const user = await prisma.user.findUnique({
-      where: { id: session.user.id }
+      where: { id: session.user.id },
+      include: { rewards: true, transactions: true }
     });
 
     if (!user) {
@@ -20,16 +21,32 @@ export async function POST(req: Request) {
     }
 
     const now = new Date();
-    
-    // Check cooldown
-    if (user.lastWeeklyReward) {
-      const hoursSinceLast = (now.getTime() - user.lastWeeklyReward.getTime()) / (1000 * 60 * 60);
-      if (hoursSinceLast < 168) { // 7 days
-        return NextResponse.json({ error: 'لم يمر أسبوع منذ آخر مكافأة أسبوعية.' }, { status: 400 });
-      }
+    const weekStart = new Date(now);
+    weekStart.setDate(now.getDate() - now.getDay()); // Sunday start
+    weekStart.setHours(0, 0, 0, 0);
+
+    // Check cooldown (if already claimed this week)
+    const lastWeekly = user.rewards.filter(r => r.type === 'WEEKLY').sort((a, b) => b.claimedAt.getTime() - a.claimedAt.getTime())[0];
+    if (lastWeekly && lastWeekly.claimedAt >= weekStart) {
+      return NextResponse.json({ error: 'لقد قمت بالمطالبة بمكافأة هذا الأسبوع مسبقاً.' }, { status: 400 });
     }
 
-    const amount = 5000; // As agreed
+    // Determine login days this week
+    const loginRewardsThisWeek = user.rewards.filter(r => r.type === 'DAILY' && r.claimedAt >= weekStart);
+    const loginDaysThisWeek = new Set(loginRewardsThisWeek.map(r => r.claimedAt.toDateString())).size;
+
+    if (loginDaysThisWeek < 5) {
+      return NextResponse.json({ error: `تحتاج لتسجيل الدخول 5 أيام على الأقل هذا الأسبوع. (الحالي: ${loginDaysThisWeek})` }, { status: 400 });
+    }
+
+    let amount = 1500;
+    if (loginDaysThisWeek >= 7) amount = 2500;
+
+    // Check 3 trades bonus
+    const tradesThisWeek = user.transactions.filter(t => t.timestamp >= weekStart).length;
+    if (tradesThisWeek >= 3) {
+      amount += 500;
+    }
 
     await prisma.$transaction([
       prisma.reward.create({
@@ -43,7 +60,8 @@ export async function POST(req: Request) {
         where: { id: user.id },
         data: {
           balance: { increment: amount },
-          lastWeeklyReward: now
+          lastWeeklyReward: now,
+          rewardCreditsEarned: { increment: amount }
         }
       }),
       prisma.notification.create({

@@ -28,6 +28,8 @@ model User {
   // Rewards & Referrals
   lastDailyReward  DateTime?
   lastWeeklyReward DateTime?
+  dailyStreak      Int            @default(0)
+  watchList        String[]       @default([])
   referralCode     String?        @unique
   referredById     String?
   referredBy       User?          @relation("Referrals", fields: [referredById], references: [id])

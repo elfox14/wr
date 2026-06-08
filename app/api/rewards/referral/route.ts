@@ -42,50 +42,81 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'كود الدعوة غير صحيح' }, { status: 404 });
     }
 
-    const amount = 2000; // As agreed
+    // Check Referrer's monthly limit (Max 10 paid referrals per month)
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    
+    const referrerPaidReferralsThisMonth = await prisma.reward.count({
+      where: {
+        userId: referrer.id,
+        type: 'REFERRAL_REGISTER',
+        claimedAt: { gte: monthStart }
+      }
+    });
 
-    await prisma.$transaction([
-      // Update the current user
+    const amount = 500; // Stage 1 (Register)
+
+    // Build transaction
+    const transactionSteps: any[] = [];
+
+    // 1. Update current user with referrer ID and give them 500
+    transactionSteps.push(
       prisma.user.update({
         where: { id: user.id },
         data: {
           referredById: referrer.id,
-          balance: { increment: amount }
+          balance: { increment: amount },
+          rewardCreditsEarned: { increment: amount }
         }
-      }),
-      // Reward record for current user
+      })
+    );
+
+    transactionSteps.push(
       prisma.reward.create({
         data: {
           userId: user.id,
-          type: 'REFERRAL_APPLIED',
+          type: 'REFERRAL_APPLIED_REGISTER',
           amount
-        }
-      }),
-      // Reward the referrer
-      prisma.reward.create({
-        data: {
-          userId: referrer.id,
-          type: 'REFERRAL',
-          amount
-        }
-      }),
-      prisma.user.update({
-        where: { id: referrer.id },
-        data: { balance: { increment: amount } }
-      }),
-      // Notify the referrer
-      prisma.notification.create({
-        data: {
-          userId: referrer.id,
-          title: "مكافأة دعوة صديق! 🎉",
-          message: `استخدم ${user.name || user.email} كود الدعوة الخاص بك! تم إضافة ${amount}¢ إلى رصيدك.`,
-          type: "SUCCESS"
         }
       })
-    ]);
+    );
+
+    // 2. Give referrer 500 if under monthly cap
+    if (referrerPaidReferralsThisMonth < 10) {
+      transactionSteps.push(
+        prisma.reward.create({
+          data: {
+            userId: referrer.id,
+            type: 'REFERRAL_REGISTER',
+            amount
+          }
+        })
+      );
+      transactionSteps.push(
+        prisma.user.update({
+          where: { id: referrer.id },
+          data: { 
+            balance: { increment: amount },
+            rewardCreditsEarned: { increment: amount }
+          }
+        })
+      );
+      transactionSteps.push(
+        prisma.notification.create({
+          data: {
+            userId: referrer.id,
+            title: "إحالة ناجحة! 🎉",
+            message: `سجل ${user.name || user.username || 'مستخدم جديد'} بكودك! تمت إضافة ${amount}¢ لرصيدك (المرحلة 1).`,
+            type: "SUCCESS"
+          }
+        })
+      );
+    }
+
+    await prisma.$transaction(transactionSteps);
 
     return NextResponse.json({ 
-      message: `تم تفعيل الكود بنجاح! حصلت على ${amount}¢`, 
+      message: `تم تفعيل الكود بنجاح! حصلت على ${amount}¢ كمكافأة تسجيل. ستحصل على المزيد عند التداول.`, 
     });
 
   } catch (error) {
