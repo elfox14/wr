@@ -134,6 +134,8 @@ interface AppState {
   setCaptain: (assetId: string) => Promise<void>;
   addNotification: (msg: string) => void;
   clearNotifications: () => void;
+  showInsufficientFundsModal: boolean;
+  setShowInsufficientFundsModal: (show: boolean) => void;
 }
 
 export const useStore = create<AppState>((set, get) => ({
@@ -146,6 +148,8 @@ export const useStore = create<AppState>((set, get) => ({
   portfolioAnalytics: null,
   loading: true,
   notifications: [],
+  showInsufficientFundsModal: false,
+  setShowInsufficientFundsModal: (show) => set({ showInsufficientFundsModal: show }),
 
   fetchAssets: async () => {
     try {
@@ -215,7 +219,11 @@ export const useStore = create<AppState>((set, get) => ({
         get().addNotification(data.message);
         await get().fetchPortfolio();
       } else {
-        get().addNotification(`Error: ${data.error}`);
+        if (data.error && data.error.includes('رصيد')) {
+          get().setShowInsufficientFundsModal(true);
+        } else {
+          get().addNotification(`Error: ${data.error}`);
+        }
       }
     } catch (err) {
       console.error(err);

@@ -6,12 +6,11 @@ import { usePathname } from 'next/navigation';
 import { useSession, signOut } from 'next-auth/react';
 import { Wallet, TrendingUp, LogOut, User as UserIcon, Bell, PlayCircle, Menu, X, ChevronDown } from 'lucide-react';
 import { useStore } from '@/lib/store';
-import { RewardedAdModal } from './RewardedAdModal';
+import { InsufficientFundsModal } from './InsufficientFundsModal';
 
 export function Navbar() {
   const { data: session, status } = useSession();
-  const { userStats } = useStore();
-  const [isAdOpen, setIsAdOpen] = useState(false);
+  const { userStats, showInsufficientFundsModal, setShowInsufficientFundsModal } = useStore();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const pathname = usePathname();
@@ -123,14 +122,14 @@ export function Navbar() {
                   
                   {/* Action Buttons */}
                   <div className="hidden sm:flex items-center gap-3">
-                    <button 
-                      onClick={() => setIsAdOpen(true)}
+                    <Link 
+                      href="/rewards"
                       className="group relative overflow-hidden bg-accent/10 hover:bg-accent/20 border border-accent/20 text-accent font-bold px-3 py-1.5 rounded-lg flex items-center gap-2 transition-all duration-300"
                     >
                       <div className="absolute inset-0 w-1/4 h-full bg-gradient-to-r from-transparent via-white/30 to-transparent -skew-x-12 -translate-x-full group-hover:animate-shine" />
                       <PlayCircle size={16} className="group-hover:scale-110 transition-transform" />
-                      <span className="text-xs">شحن مجاني</span>
-                    </button>
+                      <span className="text-xs">اكسب كوينز</span>
+                    </Link>
 
                     <button className="relative p-2 text-gray-400 hover:text-white hover:bg-white/5 rounded-lg transition-all">
                       <Bell size={20} />
@@ -239,12 +238,12 @@ export function Navbar() {
                 
                 {/* Mobile User Actions */}
                 <div className="grid grid-cols-2 gap-2 mt-4 px-2">
-                  <button 
-                    onClick={() => setIsAdOpen(true)}
+                  <Link 
+                    href="/rewards"
                     className="flex items-center justify-center gap-2 bg-accent/10 text-accent py-2.5 rounded-xl font-bold text-sm"
                   >
-                    <PlayCircle size={16} /> شحن
-                  </button>
+                    <PlayCircle size={16} /> اكسب كوينز
+                  </Link>
                   <button 
                     onClick={() => signOut({ callbackUrl: '/' })}
                     className="flex items-center justify-center gap-2 bg-white/5 text-gray-400 hover:text-danger py-2.5 rounded-xl font-bold text-sm transition-colors"
@@ -261,7 +260,10 @@ export function Navbar() {
       {/* Spacer to prevent content from going under fixed navbar */}
       <div className="h-20" />
       
-      <RewardedAdModal isOpen={isAdOpen} onClose={() => setIsAdOpen(false)} />
+      <InsufficientFundsModal 
+        isOpen={showInsufficientFundsModal} 
+        onClose={() => setShowInsufficientFundsModal(false)} 
+      />
     </>
   );
 }

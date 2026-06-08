@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useStore } from '@/lib/store';
-import { Gift, Video, Users, Calendar, AlertCircle, Copy, CheckCircle2, Trophy, Target, Medal, Star, Flame, LayoutGrid, Clock } from 'lucide-react';
+import { Gift, Video, Users, Calendar, AlertCircle, Copy, CheckCircle2, Trophy, Target, Medal, Star, Flame, Clock, Zap, X } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { PageHeader } from '@/components/ui/PageHeader';
@@ -15,9 +15,14 @@ export default function RewardsPage() {
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
   const [referralInput, setReferralInput] = useState('');
   const [copied, setCopied] = useState(false);
-  const [adTimer, setAdTimer] = useState<number | null>(null);
-  const [activeTab, setActiveTab] = useState('daily');
+  const [activeTab, setActiveTab] = useState('ads');
   const [rewardStatus, setRewardStatus] = useState<any>(null);
+
+  // Modal State
+  const [adModalOpen, setAdModalOpen] = useState(false);
+  const [adType, setAdType] = useState<'REGULAR' | 'BOOSTED'>('REGULAR');
+  const [adTimer, setAdTimer] = useState<number>(15);
+  const [adFinished, setAdFinished] = useState(false);
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -46,14 +51,44 @@ export default function RewardsPage() {
     }
   }, [session, userStats, fetchPortfolio]);
 
-  const handleClaim = async (type: string, endpoint: string = '/api/rewards/claim') => {
-    setLoadingAction(type);
+  // Handle ad countdown
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (adModalOpen && !adFinished) {
+      interval = setInterval(() => {
+        setAdTimer(prev => {
+          if (prev <= 1) {
+            clearInterval(interval);
+            setAdFinished(true);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [adModalOpen, adFinished]);
+
+  const openAdModal = (type: 'REGULAR' | 'BOOSTED') => {
+    setAdType(type);
+    setAdTimer(15);
+    setAdFinished(false);
+    setAdModalOpen(true);
+  };
+
+  const closeAdModal = () => {
+    setAdModalOpen(false);
+    setAdFinished(false);
+    setAdTimer(15);
+  };
+
+  const handleClaimAd = async () => {
+    setLoadingAction('ad');
     try {
-      const payload = endpoint === '/api/rewards/claim' ? { taskId: type } : undefined;
-      const res = await fetch(endpoint, { 
+      const res = await fetch(`/api/rewards/ad`, { 
         method: 'POST',
-        headers: payload ? { 'Content-Type': 'application/json' } : undefined,
-        body: payload ? JSON.stringify(payload) : undefined
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: adType })
       });
       const data = await res.json();
       
@@ -68,37 +103,19 @@ export default function RewardsPage() {
       addNotification('حدث خطأ في الخادم');
     } finally {
       setLoadingAction(null);
+      closeAdModal();
     }
   };
 
-  const handleWatchAd = () => {
-    if (rewardStatus?.ads?.watchedToday >= rewardStatus?.ads?.maxPerDay) {
-      addNotification(`لقد وصلت للحد الأقصى للإعلانات اليوم (${rewardStatus.ads.maxPerDay})`);
-      return;
-    }
-    if (rewardStatus?.remainingToday < rewardStatus?.ads?.amountPerAd) {
-      addNotification('لقد وصلت للحد الأقصى للمكافآت اليومية (1500)');
-      return;
-    }
-
-    setLoadingAction('ad');
-    setAdTimer(15);
-    
-    const interval = setInterval(() => {
-      setAdTimer((prev) => {
-        if (prev === null || prev <= 1) {
-          clearInterval(interval);
-          finishAdWatch();
-          return null;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-  };
-
-  const finishAdWatch = async () => {
+  const handleClaim = async (type: string, endpoint: string = '/api/rewards/claim') => {
+    setLoadingAction(type);
     try {
-      const res = await fetch(`/api/rewards/ad`, { method: 'POST' });
+      const payload = endpoint === '/api/rewards/claim' ? { taskId: type } : undefined;
+      const res = await fetch(endpoint, { 
+        method: 'POST',
+        headers: payload ? { 'Content-Type': 'application/json' } : undefined,
+        body: payload ? JSON.stringify(payload) : undefined
+      });
       const data = await res.json();
       
       if (!res.ok) {
@@ -160,11 +177,11 @@ export default function RewardsPage() {
   }
 
   const tabs = [
-    { id: 'daily', label: 'يومي', icon: <Calendar size={18} /> },
-    { id: 'ads', label: 'إعلانات', icon: <Video size={18} /> },
-    { id: 'tasks', label: 'مهام', icon: <Target size={18} /> },
-    { id: 'referrals', label: 'إحالات', icon: <Users size={18} /> },
-    { id: 'achievements', label: 'إنجازات', icon: <Medal size={18} /> },
+    { id: 'ads', label: 'الإعلانات', icon: <Video size={18} /> },
+    { id: 'daily', label: 'الدخول اليومي', icon: <Calendar size={18} /> },
+    { id: 'tasks', label: 'مهام التداول', icon: <Target size={18} /> },
+    { id: 'referrals', label: 'الإحالات', icon: <Users size={18} /> },
+    { id: 'achievements', label: 'الإنجازات', icon: <Medal size={18} /> },
     { id: 'season', label: 'الموسم', icon: <Trophy size={18} /> },
   ];
 
@@ -174,14 +191,14 @@ export default function RewardsPage() {
       {/* VIRTUAL COINS BANNER */}
       <div className="bg-gradient-to-r from-red-600 to-red-500 text-white text-center py-2 px-4 shadow-[0_0_20px_rgba(220,38,38,0.3)]">
         <p className="font-bold text-xs md:text-sm flex items-center justify-center gap-2">
-          <AlertCircle size={16} /> الكوينز افتراضية بالكامل ولا يمكن سحبها أو تحويلها إلى أموال حقيقية.
+          <AlertCircle size={16} /> الكوينز افتراضية بالكامل وتُستخدم داخل اللعبة فقط ولا يمكن سحبها أو تحويلها إلى أموال حقيقية.
         </p>
       </div>
 
       <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <PageHeader 
-          title="مركز المكافآت"
-          description="أكمل المهام والإنجازات لزيادة رصيدك الافتراضي وبناء محفظتك"
+          title="مركز الكوينز المجانية"
+          description="أكمل المهام اليومية، الإنجازات، والإعلانات لاكتساب كوينز مجانية لدعم محفظتك."
           icon={<Gift size={40} />}
           glowColor="bg-primary/10"
           textColor="text-primary"
@@ -195,8 +212,8 @@ export default function RewardsPage() {
           </div>
           
           <div className="bg-surface border border-white/5 rounded-2xl p-4 shadow-card text-center relative overflow-hidden">
-            <div className="absolute bottom-0 left-0 h-1 bg-primary" style={{ width: `${(rewardStatus.earnedToday / rewardStatus.dailyCap) * 100}%` }}></div>
-            <p className="text-gray-400 text-xs mb-1">المكافآت اليومية</p>
+            <div className="absolute bottom-0 left-0 h-1 bg-primary transition-all duration-500" style={{ width: `${(rewardStatus.earnedToday / rewardStatus.dailyCap) * 100}%` }}></div>
+            <p className="text-gray-400 text-xs mb-1">مكافآت اليوم</p>
             <p className="text-xl md:text-2xl font-black text-primary font-mono">{rewardStatus.earnedToday} <span className="text-sm text-gray-500">/ {rewardStatus.dailyCap}</span></p>
           </div>
           
@@ -208,7 +225,7 @@ export default function RewardsPage() {
           </div>
 
           <div className="bg-surface border border-white/5 rounded-2xl p-4 shadow-card text-center">
-            <p className="text-gray-400 text-xs mb-1">الإعلانات المتبقية</p>
+            <p className="text-gray-400 text-xs mb-1">إعلانات اليوم المتبقية</p>
             <p className="text-xl md:text-2xl font-black text-blue-400">
               {rewardStatus.ads.maxPerDay - rewardStatus.ads.watchedToday} <span className="text-sm text-gray-500">/ {rewardStatus.ads.maxPerDay}</span>
             </p>
@@ -234,6 +251,55 @@ export default function RewardsPage() {
 
         {/* TAB CONTENTS */}
         <div className="animate-fade-in">
+
+          {/* ADS TAB */}
+          {activeTab === 'ads' && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              
+              {/* Regular Ad */}
+              <div className="bg-surface border border-white/5 p-6 rounded-3xl shadow-card text-center flex flex-col items-center">
+                <div className="w-20 h-20 bg-blue-500/20 rounded-full flex items-center justify-center text-blue-500 mb-6">
+                  <Video size={40} />
+                </div>
+                <h2 className="text-2xl font-black text-white mb-2">شاهد إعلانًا قصيرًا</h2>
+                <p className="text-gray-400 mb-6">
+                  احصل على {rewardStatus.ads.amountPerAd} كوين افتراضي.
+                </p>
+                <div className="mt-auto w-full">
+                  <button 
+                    onClick={() => openAdModal('REGULAR')}
+                    disabled={!rewardStatus.ads.available}
+                    className="w-full bg-blue-600 hover:bg-blue-500 text-white font-black py-4 rounded-2xl transition-all disabled:opacity-50"
+                  >
+                    {!rewardStatus.ads.available ? 'غير متاح حالياً' : 'شاهد الآن'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Boosted Ad */}
+              <div className="bg-surface border border-white/5 p-6 rounded-3xl shadow-card text-center flex flex-col items-center relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-yellow-500/10 rounded-full blur-3xl -mr-10 -mt-10 pointer-events-none"></div>
+                <div className="w-20 h-20 bg-yellow-500/20 rounded-full flex items-center justify-center text-yellow-500 mb-6 relative">
+                  <Zap size={40} />
+                  <div className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full animate-pulse">مضاعف!</div>
+                </div>
+                <h2 className="text-2xl font-black text-white mb-2">إعلان مُعزز (مرة يومياً)</h2>
+                <p className="text-gray-400 mb-6">
+                  احصل على {rewardStatus.ads.boostedAmount} كوين افتراضي لمشاهدتك الإعلان المعزز.
+                </p>
+                <div className="mt-auto w-full">
+                  <button 
+                    onClick={() => openAdModal('BOOSTED')}
+                    disabled={!rewardStatus.ads.boostedAdAvailable}
+                    className="w-full bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-400 hover:to-orange-400 text-black font-black py-4 rounded-2xl transition-all disabled:opacity-50"
+                  >
+                    {!rewardStatus.ads.boostedAdAvailable ? 'تم الاستلام اليوم' : 'شاهد الإعلان المعزز'}
+                  </button>
+                </div>
+              </div>
+
+            </div>
+          )}
 
           {/* DAILY TAB */}
           {activeTab === 'daily' && (
@@ -282,57 +348,6 @@ export default function RewardsPage() {
                    `استلم مكافأة اليوم (${rewardStatus.daily.amount} ¢)`}
                 </button>
               </div>
-
-              {/* Weekly Bonus inside Daily Tab */}
-              <div className="bg-surface border border-white/5 p-6 rounded-3xl shadow-card flex items-center justify-between">
-                <div>
-                  <h3 className="text-xl font-bold text-white mb-1">المكافأة الأسبوعية</h3>
-                  <p className="text-sm text-gray-400 mb-3">سجل دخولك 5 أيام في الأسبوع لتحصل على 1500، و7 أيام لـ 2500.</p>
-                  <p className="text-xs text-primary font-bold">أيام الدخول هذا الأسبوع: {rewardStatus.weekly.loginDaysThisWeek}</p>
-                </div>
-                <button 
-                  onClick={() => handleClaim('weekly', '/api/rewards/weekly')}
-                  disabled={loadingAction === 'weekly' || !rewardStatus.weekly.available || rewardStatus.weekly.loginDaysThisWeek < 5}
-                  className="bg-blue-600 text-white font-bold py-3 px-6 rounded-xl transition-all disabled:opacity-50"
-                >
-                  استلم (أسبوعي)
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* ADS TAB */}
-          {activeTab === 'ads' && (
-            <div className="bg-surface border border-white/5 p-6 md:p-10 rounded-3xl shadow-card text-center max-w-2xl mx-auto">
-              <div className="w-24 h-24 bg-blue-500/20 rounded-full flex items-center justify-center text-blue-500 mx-auto mb-6">
-                <Video size={48} />
-              </div>
-              <h2 className="text-2xl font-black text-white mb-2">شاهد إعلاناً، اكسب كوينز!</h2>
-              <p className="text-gray-400 mb-8 max-w-md mx-auto">
-                ساعد في دعم المنصة عن طريق مشاهدة إعلان قصير، واحصل على {rewardStatus.ads.amountPerAd} كوينز فوراً لمحفظتك.
-              </p>
-              
-              <div className="bg-black/50 border border-white/5 rounded-2xl p-4 mb-8 flex justify-center gap-8">
-                <div>
-                  <p className="text-xs text-gray-500 mb-1">إعلانات اليوم</p>
-                  <p className="text-xl font-black text-white">{rewardStatus.ads.watchedToday} / {rewardStatus.ads.maxPerDay}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500 mb-1">المكافأة للإعلان</p>
-                  <p className="text-xl font-black text-primary font-mono">+{rewardStatus.ads.amountPerAd} ¢</p>
-                </div>
-              </div>
-
-              <button 
-                onClick={handleWatchAd}
-                disabled={loadingAction === 'ad' || !rewardStatus.ads.available}
-                className="w-full bg-blue-600 hover:bg-blue-500 text-white font-black py-4 rounded-2xl transition-all disabled:opacity-50"
-              >
-                {adTimer !== null ? `جاري المشاهدة... (${adTimer}ث)` : 
-                 rewardStatus.ads.watchedToday >= rewardStatus.ads.maxPerDay ? 'الحد الأقصى للإعلانات' : 
-                 rewardStatus.remainingToday < rewardStatus.ads.amountPerAd ? 'الحد الأقصى اليومي للكوينز' :
-                 'شاهد الإعلان الآن'}
-              </button>
             </div>
           )}
 
@@ -553,6 +568,74 @@ export default function RewardsPage() {
 
         </div>
       </main>
+
+      {/* AD WATCH MODAL */}
+      {adModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-md p-4">
+          <div className="bg-[#121212] border border-white/10 w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden animate-fade-in relative">
+            <button 
+              onClick={closeAdModal}
+              className="absolute top-4 left-4 text-gray-400 hover:text-white bg-black/50 p-2 rounded-full transition-colors z-10"
+            >
+              <X size={20} />
+            </button>
+
+            <div className="p-8 text-center flex flex-col items-center">
+              <div className="w-20 h-20 bg-blue-500/10 text-blue-500 rounded-full flex items-center justify-center mb-6">
+                <Video size={40} />
+              </div>
+              
+              <h2 className="text-2xl font-black text-white mb-2">شاهد إعلانًا قصيرًا</h2>
+              <p className="text-gray-400 text-sm mb-8 leading-relaxed max-w-sm mx-auto">
+                شاهد الإعلان بالكامل للحصول على {adType === 'BOOSTED' ? rewardStatus?.ads?.boostedAmount : rewardStatus?.ads?.amountPerAd} كوين.
+              </p>
+
+              {/* Timer UI */}
+              <div className="mb-8">
+                {!adFinished ? (
+                  <div className="relative w-32 h-32 flex items-center justify-center">
+                    <svg className="absolute inset-0 w-full h-full transform -rotate-90">
+                      <circle cx="64" cy="64" r="60" stroke="currentColor" strokeWidth="6" fill="transparent" className="text-white/10" />
+                      <circle 
+                        cx="64" cy="64" r="60" stroke="currentColor" strokeWidth="6" fill="transparent" 
+                        strokeDasharray={2 * Math.PI * 60} 
+                        strokeDashoffset={2 * Math.PI * 60 * (1 - adTimer / 15)} 
+                        className="text-blue-500 transition-all duration-1000 ease-linear" 
+                      />
+                    </svg>
+                    <span className="text-4xl font-mono font-black text-white">{adTimer}</span>
+                  </div>
+                ) : (
+                  <div className="w-32 h-32 bg-green-500/20 text-green-500 rounded-full flex items-center justify-center animate-pulse">
+                    <CheckCircle2 size={64} />
+                  </div>
+                )}
+              </div>
+
+              {/* Action Button */}
+              {adFinished ? (
+                <button 
+                  onClick={handleClaimAd}
+                  disabled={loadingAction === 'ad'}
+                  className="w-full bg-blue-600 hover:bg-blue-500 text-white font-black py-4 rounded-xl transition-all shadow-[0_0_15px_rgba(37,99,235,0.4)] disabled:opacity-50"
+                >
+                  {loadingAction === 'ad' ? 'جاري الاستلام...' : 'استلام المكافأة'}
+                </button>
+              ) : (
+                <button disabled className="w-full bg-white/5 border border-white/10 text-gray-500 font-bold py-4 rounded-xl cursor-not-allowed">
+                  يرجى الانتظار حتى ينتهي العداد...
+                </button>
+              )}
+
+              {/* Disclaimer */}
+              <p className="text-xs text-gray-600 mt-6 flex items-center justify-center gap-1.5 bg-white/5 p-3 rounded-lg w-full">
+                <AlertCircle size={14} /> الكوينز المكتسبة افتراضية تماماً ولا تقبل التحويل.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

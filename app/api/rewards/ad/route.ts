@@ -11,6 +11,16 @@ export async function POST(req: Request) {
   }
 
   try {
+    let requestType = 'REGULAR';
+    try {
+      const body = await req.json();
+      if (body?.type === 'BOOSTED') {
+        requestType = 'BOOSTED';
+      }
+    } catch(e) {
+      // ignore JSON parse error if body is empty
+    }
+
     const user = await prisma.user.findUnique({
       where: { email: session.user.email! },
       include: { rewards: true }
@@ -20,17 +30,26 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
-    // Check daily limit for ads (Max 10 ads/day)
+    // Check daily limit for ads (Max 10 ads/day total)
     if (user.adsWatchedToday >= 10) {
       return NextResponse.json({ error: 'Daily ad limit reached (10/10)' }, { status: 400 });
     }
 
-    const adRewardAmount = 50;
-
-    // Check Daily Cap (1500)
     const now = new Date();
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const dailyCappedTypes = ['DAILY', 'AD_WATCH', 'TASK_FIRST_TRADE', 'TASK_UNDERVALUED', 'TASK_PROFIT_SELL', 'TASK_WATCHLIST', 'TASK_DIVERSIFY'];
+
+    if (requestType === 'BOOSTED') {
+      const claimedBoostedToday = user.rewards.some(r => r.type === 'AD_WATCH_BOOSTED' && r.claimedAt >= todayStart);
+      if (claimedBoostedToday) {
+        return NextResponse.json({ error: 'لقد شاهدت الإعلان المعزز اليوم مسبقاً.' }, { status: 400 });
+      }
+    }
+
+    const adRewardAmount = requestType === 'BOOSTED' ? 100 : 50;
+    const rewardTypeDb = requestType === 'BOOSTED' ? 'AD_WATCH_BOOSTED' : 'AD_WATCH';
+
+    // Check Daily Cap (1500)
+    const dailyCappedTypes = ['DAILY', 'AD_WATCH', 'AD_WATCH_BOOSTED', 'TASK_FIRST_TRADE', 'TASK_UNDERVALUED', 'TASK_PROFIT_SELL', 'TASK_WATCHLIST', 'TASK_DIVERSIFY'];
     
     let earnedToday = 0;
     user.rewards.forEach(r => {
@@ -57,7 +76,7 @@ export async function POST(req: Request) {
       prisma.reward.create({
         data: {
           userId: user.id,
-          type: 'AD_WATCH',
+          type: rewardTypeDb,
           amount: adRewardAmount
         }
       })

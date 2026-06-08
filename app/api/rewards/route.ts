@@ -27,7 +27,7 @@ export async function GET(req: Request) {
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
     // 1. Calculate Earned Today against the Cap
-    const dailyCappedTypes = ['DAILY', 'AD_WATCH', 'TASK_FIRST_TRADE', 'TASK_UNDERVALUED', 'TASK_PROFIT_SELL', 'TASK_WATCHLIST', 'TASK_DIVERSIFY'];
+    const dailyCappedTypes = ['DAILY', 'AD_WATCH', 'AD_WATCH_BOOSTED', 'TASK_FIRST_TRADE', 'TASK_UNDERVALUED', 'TASK_PROFIT_SELL', 'TASK_WATCHLIST', 'TASK_DIVERSIFY'];
     
     let earnedToday = 0;
     user.rewards.forEach(r => {
@@ -54,7 +54,6 @@ export async function GET(req: Request) {
       }
     }
 
-    // Determine next daily amount
     let nextDailyAmount = 300;
     if (dailyStreak === 0) nextDailyAmount = 300;
     else if (dailyStreak === 1) nextDailyAmount = 350;
@@ -62,24 +61,22 @@ export async function GET(req: Request) {
     else if (dailyStreak === 3) nextDailyAmount = 450;
     else if (dailyStreak === 4) nextDailyAmount = 500;
     else if (dailyStreak === 5) nextDailyAmount = 600;
-    else if (dailyStreak === 6) nextDailyAmount = 1000;
-    else if (dailyStreak >= 7) nextDailyAmount = 1000;
+    else if (dailyStreak >= 6) nextDailyAmount = 1000;
 
-    // 3. Weekly Rewards Status (Determine login days this week)
+    // 3. Weekly Rewards Status
     const weekStart = new Date(now);
-    weekStart.setDate(now.getDate() - now.getDay()); // Sunday start
+    weekStart.setDate(now.getDate() - now.getDay()); 
     weekStart.setHours(0, 0, 0, 0);
 
     const loginRewardsThisWeek = user.rewards.filter(r => r.type === 'DAILY' && r.claimedAt >= weekStart);
-    // Unique days claimed this week
     const loginDaysThisWeek = new Set(loginRewardsThisWeek.map(r => r.claimedAt.toDateString())).size;
 
     let canClaimWeekly = true;
     let nextWeeklyAt = null;
     const lastWeekly = user.rewards.filter(r => r.type === 'WEEKLY').sort((a, b) => b.claimedAt.getTime() - a.claimedAt.getTime())[0];
     if (lastWeekly && lastWeekly.claimedAt >= weekStart) {
-      canClaimWeekly = false; // Already claimed this week
-      nextWeeklyAt = new Date(weekStart.getTime() + 7 * 24 * 60 * 60 * 1000); // Next Sunday
+      canClaimWeekly = false; 
+      nextWeeklyAt = new Date(weekStart.getTime() + 7 * 24 * 60 * 60 * 1000); 
     }
 
     // 4. Referral System
@@ -92,7 +89,6 @@ export async function GET(req: Request) {
       });
     }
 
-    // Cap referrals to 10 per month
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
     const paidReferralsThisMonth = await prisma.reward.count({
       where: {
@@ -111,6 +107,9 @@ export async function GET(req: Request) {
       diversify: user.rewards.some(r => r.type === 'TASK_DIVERSIFY' && r.claimedAt >= todayStart),
     };
 
+    // Boosted Ad status
+    const boostedAdClaimedToday = user.rewards.some(r => r.type === 'AD_WATCH_BOOSTED' && r.claimedAt >= todayStart);
+
     return NextResponse.json({
       dailyCap: dailyRewardCap,
       earnedToday,
@@ -118,7 +117,7 @@ export async function GET(req: Request) {
       daily: {
         available: canClaimDaily,
         nextAvailableAt: nextDailyAt,
-        amount: Math.min(nextDailyAmount, remainingToday), // Respect cap
+        amount: Math.min(nextDailyAmount, remainingToday), 
         streak: dailyStreak
       },
       weekly: {
@@ -138,7 +137,9 @@ export async function GET(req: Request) {
         watchedToday: user.adsWatchedToday,
         maxPerDay: 10,
         amountPerAd: 50,
-        available: user.adsWatchedToday < 10 && remainingToday >= 50
+        available: user.adsWatchedToday < 10 && remainingToday >= 50,
+        boostedAdAvailable: !boostedAdClaimedToday && user.adsWatchedToday < 10 && remainingToday >= 100,
+        boostedAmount: 100
       },
       tasks
     });
