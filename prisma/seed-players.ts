@@ -140,7 +140,7 @@ async function main() {
           type: 'PLAYER',
           name: p.name,
           code: p.code,
-          image: team.image, 
+          image: '', 
           teamId: team.id,
           current_price: pFinalPrice,
           high_price: pHighPrice,

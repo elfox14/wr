@@ -102,7 +102,7 @@ export default function AssetClient() {
                 className={`flex items-center justify-between p-3 rounded-lg transition-colors ${t.id === asset.id ? 'bg-[#0FF0FC]/10 border border-[#0FF0FC]/30' : 'hover:bg-white/5 border border-transparent'}`}
               >
                 <div className="flex items-center gap-2">
-                  <AssetImage image={t.image} name={t.name} className="text-xl w-6 h-6" width={24} height={24} />
+                  <AssetImage image={t.image} name={t.name} type={t.type as 'TEAM' | 'PLAYER'} className="text-xl w-6 h-6" width={24} height={24} />
                   <span className={`text-sm font-bold ${t.id === asset.id ? 'text-[#0FF0FC]' : 'text-gray-300'}`}>{t.name}</span>
                 </div>
                 <span className="text-xs font-mono text-gray-500">{Math.round(t.marketPrice ?? t.current_price)}¢</span>
@@ -119,7 +119,7 @@ export default function AssetClient() {
             <div className="absolute top-0 right-0 w-64 h-64 bg-[#0FF0FC]/5 rounded-full blur-3xl pointer-events-none"></div>
             
             <div className="flex items-center gap-6 relative z-10">
-              <AssetImage image={asset.image} name={asset.name} className="text-7xl drop-shadow-xl w-32 h-32" width={128} height={128} />
+              <AssetImage image={asset.image} name={asset.name} type={asset.type as 'TEAM' | 'PLAYER'} className="text-7xl drop-shadow-xl w-32 h-32" width={128} height={128} />
               <div>
                 <h1 className="text-4xl font-black text-white tracking-tight">{asset.name} <span className="text-2xl text-gray-500 font-mono">({asset.code})</span></h1>
                 
@@ -403,7 +403,7 @@ function TeamDetailView({ asset }: { asset: any }) {
               <Link href={`/asset/${item.player?.id}`} key={idx} className="bg-black/40 p-3 rounded-lg border border-white/5 hover:border-primary/50 transition-colors text-center group">
                 <p className="text-[10px] text-gray-500 uppercase mb-3">{item.label}</p>
                 <div className="flex justify-center mb-2">
-                  <AssetImage image={item.player?.image} name={item.player?.name || ''} className="w-12 h-12" width={48} height={48} />
+                  <AssetImage image={item.player?.image} name={item.player?.name || ''} type="PLAYER" className="w-12 h-12" width={48} height={48} />
                 </div>
                 <p className="text-xs font-bold text-white group-hover:text-primary truncate">{item.player?.name}</p>
                 <p className="text-[10px] text-accent mt-1">{item.val}</p>
@@ -451,7 +451,7 @@ function TeamDetailView({ asset }: { asset: any }) {
                 return (
                   <tr key={p.id} className="border-b border-white/5 hover:bg-white/5">
                     <td className="p-4 font-bold text-white flex items-center gap-2">
-                      <AssetImage image={p.image} name={p.name} className="w-8 h-8 rounded" width={32} height={32} />
+                      <AssetImage image={p.image} name={p.name} type="PLAYER" className="w-8 h-8 rounded" width={32} height={32} />
                       {p.name}
                     </td>
                     <td className="p-4 text-center text-gray-400">{p.position}</td>
@@ -644,7 +644,7 @@ function PlayerDetailView({ asset, assets }: { asset: any, assets: any[] }) {
                 return (
                   <tr key={p.id} className="border-b border-white/5 hover:bg-white/5">
                     <td className="p-4 font-bold text-white flex items-center gap-2">
-                      <AssetImage image={p.image} name={p.name} className="w-8 h-8 rounded" width={32} height={32} />
+                      <AssetImage image={p.image} name={p.name} type="PLAYER" className="w-8 h-8 rounded" width={32} height={32} />
                       {p.name}
                     </td>
                     <td className="p-4 text-center text-gray-400">{p.position}</td>

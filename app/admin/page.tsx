@@ -21,6 +21,8 @@ export default function AdminPage() {
   const [syncForce, setSyncForce] = useState(false);
   const [syncLoading, setSyncLoading] = useState(false);
   const [syncResult, setSyncResult] = useState<any>(null);
+  const [cleanupLoading, setCleanupLoading] = useState(false);
+  const [cleanupResult, setCleanupResult] = useState<any>(null);
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -138,6 +140,33 @@ export default function AdminPage() {
       showNotification('حدث خطأ أثناء الاتصال بالخادم', 'error');
     } finally {
       setSyncLoading(false);
+    }
+  };
+
+  const handleCleanupPlayerImages = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setCleanupLoading(true);
+    setCleanupResult(null);
+    setSyncResult(null);
+
+    try {
+      const res = await fetch('/api/admin/cleanup-player-images', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        setCleanupResult(data);
+        showNotification(`تم تنظيف ${data.totalCleaned} من صور اللاعبين بنجاح!`, 'success');
+        fetchAssets(); // Refresh assets
+      } else {
+        showNotification(`خطأ: ${data.error}`, 'error');
+      }
+    } catch (err) {
+      showNotification('حدث خطأ أثناء الاتصال بالخادم', 'error');
+    } finally {
+      setCleanupLoading(false);
     }
   };
 
@@ -384,50 +413,84 @@ export default function AdminPage() {
           </form>
         </div>
 
-        {/* Player Images Sync Form */}
+        {/* Player Images Management Form */}
         <div className="mt-8 bg-[#1A1A1A] border border-blue-500/30 p-6 rounded-2xl relative overflow-hidden">
           <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 rounded-full blur-3xl pointer-events-none"></div>
           
           <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
-            <RefreshCw className={`text-blue-400 ${syncLoading ? 'animate-spin' : ''}`} />
-            مزامنة صور اللاعبين
+            <RefreshCw className={`text-blue-400 ${(syncLoading || cleanupLoading) ? 'animate-spin' : ''}`} />
+            صور اللاعبين
           </h2>
           <p className="text-sm text-gray-400 mb-6">
-            جلب صور اللاعبين من TheSportsDB وحفظها داخل قاعدة البيانات.
+            تنظيف صور اللاعبين الحالية (إزالة الأعلام/الرموز التعبيرية) وجلب صور حقيقية للاعبين من TheSportsDB.
           </p>
 
-          <form onSubmit={handleSyncPlayerImages} className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-end">
-              <div>
-                <label className="block text-sm text-gray-400 mb-2">الحد الأقصى للاعبين المراد فحصهم</label>
-                <input 
-                  type="number" 
-                  min="1" 
-                  max="500"
-                  value={syncLimit}
-                  onChange={(e) => setSyncLimit(parseInt(e.target.value) || 50)}
-                  className="w-full bg-black/50 border border-white/10 rounded-lg p-3 text-white outline-none focus:border-blue-400"
-                  required
-                />
-              </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 border-b border-white/5 pb-6">
+            {/* Step 1: Cleanup */}
+            <div className="space-y-4">
+              <h3 className="text-md font-bold text-white flex items-center gap-2">
+                <span className="text-lg">🧹</span> الخطوة 1: تنظيف صور اللاعبين
+              </h3>
+              <p className="text-xs text-gray-400 leading-relaxed">
+                يقوم هذا الإجراء بالبحث عن اللاعبين الذين لديهم أعلام دول أو رموز تعبيرية (👤) كصورة لهم، ويقوم بإفراغ الحقل في قاعدة البيانات ليتمكن محرك المزامنة من جلب صورهم الصحيحة.
+              </p>
+              <button 
+                onClick={handleCleanupPlayerImages}
+                disabled={cleanupLoading || syncLoading}
+                className="w-full sm:w-auto bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white font-bold py-3 px-6 rounded-lg transition-colors flex justify-center items-center gap-2 cursor-pointer"
+              >
+                {cleanupLoading ? (
+                  <>
+                    <RefreshCw className="animate-spin" size={18} />
+                    جاري التنظيف...
+                  </>
+                ) : (
+                  'تنظيف صور اللاعبين 🧹'
+                )}
+              </button>
+            </div>
 
-              <div className="flex items-center h-12">
-                <label className="flex items-center gap-2 cursor-pointer select-none text-gray-300 hover:text-white">
-                  <input 
-                    type="checkbox" 
-                    checked={syncForce}
-                    onChange={(e) => setSyncForce(e.target.checked)}
-                    className="w-5 h-5 rounded bg-black/50 border border-white/10 text-blue-500 focus:ring-0 focus:ring-offset-0 cursor-pointer"
-                  />
-                  <span>إجبار إعادة الكتابة على الصور الحالية (Force)</span>
-                </label>
-              </div>
+            {/* Step 2: Sync */}
+            <div className="space-y-4">
+              <h3 className="text-md font-bold text-white flex items-center gap-2">
+                <span className="text-lg">🔄</span> الخطوة 2: مزامنة صور اللاعبين من TheSportsDB
+              </h3>
+              <p className="text-xs text-gray-400 leading-relaxed">
+                يقوم بالبحث في TheSportsDB عن صور اللاعبين الذين ليس لديهم صور (فارغة)، وتحديثها بأفضل صورة متاحة.
+              </p>
+              
+              <form onSubmit={handleSyncPlayerImages} className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs text-gray-400 mb-1">الحد الأقصى للاعبين</label>
+                    <input 
+                      type="number" 
+                      min="1" 
+                      max="500"
+                      value={syncLimit}
+                      onChange={(e) => setSyncLimit(parseInt(e.target.value) || 50)}
+                      className="w-full bg-black/50 border border-white/10 rounded-lg p-2 text-white outline-none focus:border-blue-400 text-sm"
+                      required
+                    />
+                  </div>
 
-              <div>
+                  <div className="flex items-end pb-2">
+                    <label className="flex items-center gap-2 cursor-pointer select-none text-xs text-gray-300 hover:text-white">
+                      <input 
+                        type="checkbox" 
+                        checked={syncForce}
+                        onChange={(e) => setSyncForce(e.target.checked)}
+                        className="w-4 h-4 rounded bg-black/50 border border-white/10 text-blue-500 focus:ring-0 focus:ring-offset-0 cursor-pointer"
+                      />
+                      <span>إعادة الكتابة على الصور الحالية (Force)</span>
+                    </label>
+                  </div>
+                </div>
+
                 <button 
                   type="submit" 
-                  disabled={syncLoading}
-                  className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold py-3 px-4 rounded-lg transition-colors flex justify-center items-center gap-2 shadow-[0_0_15px_rgba(59,130,246,0.3)] cursor-pointer"
+                  disabled={syncLoading || cleanupLoading}
+                  className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold py-3 px-6 rounded-lg transition-colors flex justify-center items-center gap-2 shadow-[0_0_15px_rgba(59,130,246,0.3)] cursor-pointer"
                 >
                   {syncLoading ? (
                     <>
@@ -435,68 +498,100 @@ export default function AdminPage() {
                       جاري مزامنة الصور...
                     </>
                   ) : (
-                    'مزامنة الصور 🔄'
+                    'مزامنة صور اللاعبين من TheSportsDB 🔄'
                   )}
                 </button>
-              </div>
+              </form>
             </div>
+          </div>
 
-            {syncResult && (
-              <div className="mt-6 bg-black/40 border border-white/10 p-5 rounded-xl space-y-4">
-                <h3 className="text-lg font-bold text-white flex items-center gap-2 border-b border-white/10 pb-2">
-                  <ImageIcon size={18} className="text-blue-400" />
-                  ملخص عملية المزامنة الأخيرة:
-                </h3>
-                
-                <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 text-center">
-                  <div className="bg-white/5 p-3 rounded-lg border border-white/5">
-                    <div className="text-2xl font-black text-blue-400">{syncResult.total}</div>
-                    <div className="text-xs text-gray-400 mt-1">الإجمالي المفحوص</div>
-                  </div>
-                  <div className="bg-white/5 p-3 rounded-lg border border-white/5">
-                    <div className="text-2xl font-black text-green-400">{syncResult.updated}</div>
-                    <div className="text-xs text-gray-400 mt-1">تم تحديثها</div>
-                  </div>
-                  <div className="bg-white/5 p-3 rounded-lg border border-white/5">
-                    <div className="text-2xl font-black text-yellow-400">{syncResult.skipped}</div>
-                    <div className="text-xs text-gray-400 mt-1">تم تخطيها</div>
-                  </div>
-                  <div className="bg-white/5 p-3 rounded-lg border border-white/5">
-                    <div className="text-2xl font-black text-gray-400">{syncResult.notFound + syncResult.noImage}</div>
-                    <div className="text-xs text-gray-400 mt-1">غير موجود / بلا صورة</div>
-                  </div>
-                  <div className="bg-white/5 p-3 rounded-lg border border-white/5">
-                    <div className="text-2xl font-black text-red-400">{syncResult.failed}</div>
-                    <div className="text-xs text-gray-400 mt-1">فشلت</div>
+          {/* Results Summary */}
+          {cleanupResult && (
+            <div className="mt-6 bg-black/40 border border-white/10 p-5 rounded-xl space-y-4">
+              <h3 className="text-lg font-bold text-white flex items-center gap-2 border-b border-white/10 pb-2">
+                <span className="text-lg">🧹</span> ملخص عملية التنظيف الأخيرة:
+              </h3>
+              <div className="grid grid-cols-2 gap-4 text-center max-w-md">
+                <div className="bg-white/5 p-3 rounded-lg border border-white/5">
+                  <div className="text-2xl font-black text-amber-400">{cleanupResult.totalProcessed}</div>
+                  <div className="text-xs text-gray-400 mt-1">إجمالي اللاعبين المفحوصين</div>
+                </div>
+                <div className="bg-white/5 p-3 rounded-lg border border-white/5">
+                  <div className="text-2xl font-black text-green-400">{cleanupResult.totalCleaned}</div>
+                  <div className="text-xs text-gray-400 mt-1">تم تنظيفها (إزالة العلم)</div>
+                </div>
+              </div>
+              {cleanupResult.cleaned && cleanupResult.cleaned.length > 0 && (
+                <div className="mt-4">
+                  <div className="text-sm font-semibold text-gray-300 mb-2">اللاعبين الذين تم تنظيف صورهم:</div>
+                  <div className="max-h-40 overflow-y-auto space-y-2 pr-1 custom-scrollbar text-xs">
+                    {cleanupResult.cleaned.map((c: any) => (
+                      <div key={c.id} className="flex justify-between items-center bg-white/5 p-2 rounded border border-white/5">
+                        <span className="text-gray-200">{c.name}</span>
+                        <span className="text-gray-500 font-mono">القيمة السابقة: {c.previousImage}</span>
+                      </div>
+                    ))}
                   </div>
                 </div>
+              )}
+            </div>
+          )}
 
-                {syncResult.results && syncResult.results.length > 0 && (
-                  <div className="mt-4">
-                    <div className="text-sm font-semibold text-gray-300 mb-2">تفاصيل المعالجة:</div>
-                    <div className="max-h-60 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
-                      {syncResult.results.map((r: any, idx: number) => (
-                        <div key={r.id || idx} className="flex justify-between items-center text-xs bg-white/5 p-2 rounded border border-white/5">
-                          <span className="font-semibold text-gray-200">{r.name}</span>
-                          <span className={`px-2 py-0.5 rounded font-bold ${
-                            r.status === 'updated' ? 'bg-green-500/10 text-green-400 border border-green-500/20' :
-                            r.status === 'skipped' ? 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20' :
-                            r.status === 'not_found' ? 'bg-gray-500/10 text-gray-400 border border-gray-500/20' :
-                            'bg-red-500/10 text-red-400 border border-red-500/20'
-                          }`}>
-                            {r.status === 'updated' ? 'تم التحديث' :
-                             r.status === 'skipped' ? 'تم التخطي' :
-                             r.status === 'not_found' ? 'غير موجود' :
-                             r.status === 'no_image' ? 'لا توجد صورة' : 'فشل'}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
+          {syncResult && (
+            <div className="mt-6 bg-black/40 border border-white/10 p-5 rounded-xl space-y-4">
+              <h3 className="text-lg font-bold text-white flex items-center gap-2 border-b border-white/10 pb-2">
+                <ImageIcon size={18} className="text-blue-400" />
+                ملخص عملية المزامنة الأخيرة:
+              </h3>
+              
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 text-center">
+                <div className="bg-white/5 p-3 rounded-lg border border-white/5">
+                  <div className="text-2xl font-black text-blue-400">{syncResult.total}</div>
+                  <div className="text-xs text-gray-400 mt-1">الإجمالي المفحوص</div>
+                </div>
+                <div className="bg-white/5 p-3 rounded-lg border border-white/5">
+                  <div className="text-2xl font-black text-green-400">{syncResult.updated}</div>
+                  <div className="text-xs text-gray-400 mt-1">تم تحديثها</div>
+                </div>
+                <div className="bg-white/5 p-3 rounded-lg border border-white/5">
+                  <div className="text-2xl font-black text-yellow-400">{syncResult.skipped}</div>
+                  <div className="text-xs text-gray-400 mt-1">تم تخطيها</div>
+                </div>
+                <div className="bg-white/5 p-3 rounded-lg border border-white/5">
+                  <div className="text-2xl font-black text-gray-400">{syncResult.notFound + syncResult.noImage}</div>
+                  <div className="text-xs text-gray-400 mt-1">غير موجود / بلا صورة</div>
+                </div>
+                <div className="bg-white/5 p-3 rounded-lg border border-white/5">
+                  <div className="text-2xl font-black text-red-400">{syncResult.failed}</div>
+                  <div className="text-xs text-gray-400 mt-1">فشلت</div>
+                </div>
               </div>
-            )}
-          </form>
+
+              {syncResult.results && syncResult.results.length > 0 && (
+                <div className="mt-4">
+                  <div className="text-sm font-semibold text-gray-300 mb-2">تفاصيل المعالجة:</div>
+                  <div className="max-h-60 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
+                    {syncResult.results.map((r: any, idx: number) => (
+                      <div key={r.id || idx} className="flex justify-between items-center text-xs bg-white/5 p-2 rounded border border-white/5">
+                        <span className="font-semibold text-gray-200">{r.name}</span>
+                        <span className={`px-2 py-0.5 rounded font-bold ${
+                          r.status === 'updated' ? 'bg-green-500/10 text-green-400 border border-green-500/20' :
+                          r.status === 'skipped' ? 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20' :
+                          r.status === 'not_found' ? 'bg-gray-500/10 text-gray-400 border border-gray-500/20' :
+                          'bg-red-500/10 text-red-400 border border-red-500/20'
+                        }`}>
+                          {r.status === 'updated' ? 'تم التحديث' :
+                           r.status === 'skipped' ? 'تم التخطي' :
+                           r.status === 'not_found' ? 'غير موجود' :
+                           r.status === 'no_image' ? 'لا توجد صورة' : 'فشل'}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
       </main>

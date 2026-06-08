@@ -100,7 +100,7 @@ export function StockCard({
             className="w-14 h-14 rounded-xl overflow-hidden flex-shrink-0 bg-black/40 flex items-center justify-center relative"
             style={{ border: `2px solid ${accentColor}60` }}
           >
-            <AssetImage image={image} name={name} className="w-10 h-10" width={40} height={40} />
+            <AssetImage image={image} name={name} type={type} className="w-10 h-10" width={40} height={40} />
           </div>
 
           <div className="flex-1 min-w-0">

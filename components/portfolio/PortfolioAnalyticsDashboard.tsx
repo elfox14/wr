@@ -120,7 +120,7 @@ export function PortfolioAnalyticsDashboard() {
           {bestPerformer ? (
              <div className="flex items-center justify-between">
                <div className="flex items-center gap-3">
-                 <AssetImage image={bestPerformer.asset?.image || ''} name={bestPerformer.asset?.name || ''} width={40} height={40} className="w-10 h-10" />
+                 <AssetImage image={bestPerformer.asset?.image || ''} name={bestPerformer.asset?.name || ''} type={bestPerformer.asset?.type as 'TEAM' | 'PLAYER'} width={40} height={40} className="w-10 h-10" />
                  <div>
                    <p className="font-bold text-white">{bestPerformer.asset?.name}</p>
                    <p className="text-xs text-gray-500">{bestPerformer.asset?.code}</p>
@@ -144,7 +144,7 @@ export function PortfolioAnalyticsDashboard() {
           {worstPerformer ? (
              <div className="flex items-center justify-between">
                <div className="flex items-center gap-3">
-                 <AssetImage image={worstPerformer.asset?.image || ''} name={worstPerformer.asset?.name || ''} width={40} height={40} className="w-10 h-10" />
+                 <AssetImage image={worstPerformer.asset?.image || ''} name={worstPerformer.asset?.name || ''} type={worstPerformer.asset?.type as 'TEAM' | 'PLAYER'} width={40} height={40} className="w-10 h-10" />
                  <div>
                    <p className="font-bold text-white">{worstPerformer.asset?.name}</p>
                    <p className="text-xs text-gray-500">{worstPerformer.asset?.code}</p>
@@ -284,7 +284,7 @@ export function PortfolioAnalyticsDashboard() {
                    <tr key={h.id} className="hover:bg-white/5 transition-colors">
                      <td className="px-4 py-3">
                        <Link href={`/asset/${h.assetId}`} className="flex items-center gap-3 group">
-                         <AssetImage image={h.asset?.image || ''} name={h.asset?.name || ''} width={32} height={32} className="w-8 h-8" />
+                         <AssetImage image={h.asset?.image || ''} name={h.asset?.name || ''} type={h.asset?.type as 'TEAM' | 'PLAYER'} width={32} height={32} className="w-8 h-8" />
                          <div>
                            <p className="font-bold text-white group-hover:text-[#0FF0FC] transition-colors">{h.asset?.name}</p>
                            <p className="text-[10px] text-gray-500">{h.asset?.type}</p>

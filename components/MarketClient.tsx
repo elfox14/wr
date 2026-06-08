@@ -249,7 +249,7 @@ export default function MarketClient({
               <div className="flex flex-col gap-2">
                 {topTeams.map(t => (
                   <div key={t.id} className="flex justify-between text-sm font-bold">
-                    <span className="flex items-center gap-1"><AssetImage image={t.image} name={t.name} className="w-5 h-5" width={20} height={20} /> {t.name}</span>
+                    <span className="flex items-center gap-1"><AssetImage image={t.image} name={t.name} type={t.type as 'TEAM' | 'PLAYER'} className="w-5 h-5" width={20} height={20} /> {t.name}</span>
                     <span className="text-accent tabular-nums">{t.score?.toFixed(1)}</span>
                   </div>
                 ))}
@@ -429,7 +429,7 @@ export default function MarketClient({
                         <button onClick={(e) => toggleWatchlist(e, asset.id)} className="p-1 hover:bg-white/10 rounded transition-colors flex-shrink-0">
                           <Star size={16} className={isWatched ? "text-yellow-400 fill-yellow-400" : "text-gray-500"} />
                         </button>
-                        <AssetImage image={asset.image} name={asset.name} className="w-10 h-10 bg-background/40 flex items-center justify-center rounded-xl overflow-hidden flex-shrink-0" width={40} height={40} />
+                        <AssetImage image={asset.image} name={asset.name} type={asset.type as 'TEAM' | 'PLAYER'} className="w-10 h-10 bg-background/40 flex items-center justify-center rounded-xl overflow-hidden flex-shrink-0" width={40} height={40} />
                         <div>
                           <p className="font-bold text-white text-md group-hover:text-primary transition-colors">{asset.name}</p>
                           <p className="text-xs text-gray-500">{asset.code}</p>
