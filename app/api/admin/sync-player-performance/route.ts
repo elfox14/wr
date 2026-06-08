@@ -13,6 +13,15 @@ type ApiFootballPlayerStats = {
   statistics?: Array<any>;
 };
 
+type AdminSession = {
+  user?: {
+    id?: string;
+    email?: string | null;
+    name?: string | null;
+    role?: string | null;
+  };
+} | null;
+
 function toNumber(value: any, fallback = 0) {
   const n = Number(value);
   return Number.isFinite(n) ? n : fallback;
@@ -107,13 +116,13 @@ async function findLocalAsset(apiPlayer: ApiFootballPlayerStats) {
 }
 
 export async function POST(req: Request) {
-  const session = await getServerSession(authOptions as any);
+  const session = await getServerSession(authOptions as any) as AdminSession;
 
   if (!session?.user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  if ((session.user as any).role !== 'ADMIN') {
+  if (session.user.role !== 'ADMIN') {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
