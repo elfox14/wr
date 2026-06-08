@@ -11,3 +11,10 @@ beginners-guide -> /articles/beginners-guide.png
 injuries-impact-on-stocks -> /articles/injury-impact.png
 africa-asia-world-cup-2026 -> /articles/africa-asia.png
 knockout-stage-strategy -> /articles/knockout-stage.png
+what-is-mc-prime-exchange -> /articles/mc-prime-intro.png
+how-to-build-first-portfolio -> /articles/first-portfolio.png
+market-price-vs-fair-value -> /articles/market-indicators.png
+risk-management-no-all-in -> /articles/diversified-risk.png
+events-impact-on-players -> /articles/player-events-impact.png
+qualification-odds-impact -> /articles/team-qualification-odds.png
+
