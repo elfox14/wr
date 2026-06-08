@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { useStore } from '@/lib/store';
-import { Settings, ShieldAlert, TrendingUp, TrendingDown, Users, Activity } from 'lucide-react';
+import { Settings, ShieldAlert, TrendingUp, TrendingDown, Users, Activity, RefreshCw, Image as ImageIcon } from 'lucide-react';
 
 export default function AdminPage() {
   const { data: session, status } = useSession();
@@ -17,6 +17,10 @@ export default function AdminPage() {
   const [customMessage, setCustomMessage] = useState('');
   const [loadingAction, setLoadingAction] = useState(false);
   const [notification, setNotification] = useState('');
+  const [syncLimit, setSyncLimit] = useState(50);
+  const [syncForce, setSyncForce] = useState(false);
+  const [syncLoading, setSyncLoading] = useState(false);
+  const [syncResult, setSyncResult] = useState<any>(null);
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -104,6 +108,36 @@ export default function AdminPage() {
       showNotification('حدث خطأ أثناء التوزيع', 'error');
     } finally {
       setLoadingAction(false);
+    }
+  };
+
+  const handleSyncPlayerImages = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSyncLoading(true);
+    setSyncResult(null);
+
+    try {
+      const res = await fetch('/api/admin/sync-player-images', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          limit: Number(syncLimit),
+          force: syncForce
+        })
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        setSyncResult(data);
+        showNotification('تمت عملية مزامنة الصور بنجاح!', 'success');
+        fetchAssets(); // Refresh assets
+      } else {
+        showNotification(`خطأ: ${data.error}`, 'error');
+      }
+    } catch (err) {
+      showNotification('حدث خطأ أثناء الاتصال بالخادم', 'error');
+    } finally {
+      setSyncLoading(false);
     }
   };
 
@@ -347,6 +381,121 @@ export default function AdminPage() {
               </button>
             </div>
 
+          </form>
+        </div>
+
+        {/* Player Images Sync Form */}
+        <div className="mt-8 bg-[#1A1A1A] border border-blue-500/30 p-6 rounded-2xl relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 rounded-full blur-3xl pointer-events-none"></div>
+          
+          <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
+            <RefreshCw className={`text-blue-400 ${syncLoading ? 'animate-spin' : ''}`} />
+            مزامنة صور اللاعبين
+          </h2>
+          <p className="text-sm text-gray-400 mb-6">
+            جلب صور اللاعبين من TheSportsDB وحفظها داخل قاعدة البيانات.
+          </p>
+
+          <form onSubmit={handleSyncPlayerImages} className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-end">
+              <div>
+                <label className="block text-sm text-gray-400 mb-2">الحد الأقصى للاعبين المراد فحصهم</label>
+                <input 
+                  type="number" 
+                  min="1" 
+                  max="500"
+                  value={syncLimit}
+                  onChange={(e) => setSyncLimit(parseInt(e.target.value) || 50)}
+                  className="w-full bg-black/50 border border-white/10 rounded-lg p-3 text-white outline-none focus:border-blue-400"
+                  required
+                />
+              </div>
+
+              <div className="flex items-center h-12">
+                <label className="flex items-center gap-2 cursor-pointer select-none text-gray-300 hover:text-white">
+                  <input 
+                    type="checkbox" 
+                    checked={syncForce}
+                    onChange={(e) => setSyncForce(e.target.checked)}
+                    className="w-5 h-5 rounded bg-black/50 border border-white/10 text-blue-500 focus:ring-0 focus:ring-offset-0 cursor-pointer"
+                  />
+                  <span>إجبار إعادة الكتابة على الصور الحالية (Force)</span>
+                </label>
+              </div>
+
+              <div>
+                <button 
+                  type="submit" 
+                  disabled={syncLoading}
+                  className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold py-3 px-4 rounded-lg transition-colors flex justify-center items-center gap-2 shadow-[0_0_15px_rgba(59,130,246,0.3)] cursor-pointer"
+                >
+                  {syncLoading ? (
+                    <>
+                      <RefreshCw className="animate-spin" size={18} />
+                      جاري مزامنة الصور...
+                    </>
+                  ) : (
+                    'مزامنة الصور 🔄'
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {syncResult && (
+              <div className="mt-6 bg-black/40 border border-white/10 p-5 rounded-xl space-y-4">
+                <h3 className="text-lg font-bold text-white flex items-center gap-2 border-b border-white/10 pb-2">
+                  <ImageIcon size={18} className="text-blue-400" />
+                  ملخص عملية المزامنة الأخيرة:
+                </h3>
+                
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 text-center">
+                  <div className="bg-white/5 p-3 rounded-lg border border-white/5">
+                    <div className="text-2xl font-black text-blue-400">{syncResult.total}</div>
+                    <div className="text-xs text-gray-400 mt-1">الإجمالي المفحوص</div>
+                  </div>
+                  <div className="bg-white/5 p-3 rounded-lg border border-white/5">
+                    <div className="text-2xl font-black text-green-400">{syncResult.updated}</div>
+                    <div className="text-xs text-gray-400 mt-1">تم تحديثها</div>
+                  </div>
+                  <div className="bg-white/5 p-3 rounded-lg border border-white/5">
+                    <div className="text-2xl font-black text-yellow-400">{syncResult.skipped}</div>
+                    <div className="text-xs text-gray-400 mt-1">تم تخطيها</div>
+                  </div>
+                  <div className="bg-white/5 p-3 rounded-lg border border-white/5">
+                    <div className="text-2xl font-black text-gray-400">{syncResult.notFound + syncResult.noImage}</div>
+                    <div className="text-xs text-gray-400 mt-1">غير موجود / بلا صورة</div>
+                  </div>
+                  <div className="bg-white/5 p-3 rounded-lg border border-white/5">
+                    <div className="text-2xl font-black text-red-400">{syncResult.failed}</div>
+                    <div className="text-xs text-gray-400 mt-1">فشلت</div>
+                  </div>
+                </div>
+
+                {syncResult.results && syncResult.results.length > 0 && (
+                  <div className="mt-4">
+                    <div className="text-sm font-semibold text-gray-300 mb-2">تفاصيل المعالجة:</div>
+                    <div className="max-h-60 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
+                      {syncResult.results.map((r: any, idx: number) => (
+                        <div key={r.id || idx} className="flex justify-between items-center text-xs bg-white/5 p-2 rounded border border-white/5">
+                          <span className="font-semibold text-gray-200">{r.name}</span>
+                          <span className={`px-2 py-0.5 rounded font-bold ${
+                            r.status === 'updated' ? 'bg-green-500/10 text-green-400 border border-green-500/20' :
+                            r.status === 'skipped' ? 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20' :
+                            r.status === 'not_found' ? 'bg-gray-500/10 text-gray-400 border border-gray-500/20' :
+                            'bg-red-500/10 text-red-400 border border-red-500/20'
+                          }`}>
+                            {r.status === 'updated' ? 'تم التحديث' :
+                             r.status === 'skipped' ? 'تم التخطي' :
+                             r.status === 'not_found' ? 'غير موجود' :
+                             r.status === 'no_image' ? 'لا توجد صورة' : 'فشل'}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </form>
         </div>
 

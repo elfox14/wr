@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { getAvatarFallbackUrl } from '@/lib/images';
 
@@ -27,20 +27,48 @@ export function AssetImage({
   sizes,
   fill = false
 }: AssetImageProps) {
-  const [imgSrc, setImgSrc] = useState<string>(() => {
-    // If it's an emoji (e.g. 🇧🇷) or totally empty, immediately use fallback
-    if (!image || image.length < 10 || !image.startsWith('http')) {
-      return getAvatarFallbackUrl(name);
-    }
-    return image;
-  });
+  const [hasError, setHasError] = useState(false);
+
+  // Reset error state when the image prop changes
+  useEffect(() => {
+    setHasError(false);
+  }, [image]);
+
+  const isLocal = !!image && image.startsWith('/');
+  const isExternal = !!image && (image.startsWith('http://') || image.startsWith('https://'));
+  
+  // Heuristic to detect if the string is an emoji (e.g. flag emojis or single soccer ball emojis)
+  const isEmojiStr = !!image && (
+    image.length <= 8 && 
+    (/[\u{1F300}-\u{1F9FF}]|[\u{1F600}-\u{1F64F}]|[\u{1F680}-\u{1F6FF}]|[\u{2600}-\u{27BF}]|[\u{1F1E6}-\u{1F1FF}]{2}/u.test(image))
+  );
+
+  const fallbackUrl = getAvatarFallbackUrl(name);
+
+  // If the image source is an emoji, render it as text in a styled container
+  if (isEmojiStr && image) {
+    return (
+      <div 
+        className={`flex items-center justify-center select-none ${className}`} 
+        style={{ 
+          width: fill ? '100%' : width, 
+          height: fill ? '100%' : height,
+          fontSize: fill ? 'inherit' : `${Math.min(width, height) * 0.6}px`,
+          lineHeight: 1
+        }}
+        aria-label={alt || name}
+      >
+        {image}
+      </div>
+    );
+  }
+
+  // Load the target image if it is local/external; otherwise, use fallback avatar
+  const srcToLoad = (isLocal || isExternal) ? image : fallbackUrl;
+  const currentSrc = hasError ? fallbackUrl : srcToLoad;
 
   const handleError = () => {
-    // If the original image errors, swap to ui-avatars
-    const fallback = getAvatarFallbackUrl(name);
-    if (imgSrc !== fallback) {
-      setImgSrc(fallback);
-    }
+    setHasError(true);
   };
 
   const imageProps = fill
@@ -49,11 +77,11 @@ export function AssetImage({
 
   return (
     <Image
-      src={imgSrc}
+      src={currentSrc || fallbackUrl}
       alt={alt || name}
       className={className}
       onError={handleError}
-      unoptimized // Adding unoptimized to avoid weird remote pattern failures temporarily if Next.js blocks it before restart
+      unoptimized
       {...imageProps}
     />
   );
