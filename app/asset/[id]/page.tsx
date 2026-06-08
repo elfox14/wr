@@ -1,5 +1,6 @@
 import { Metadata, ResolvingMetadata } from 'next';
 import AssetClient from '@/components/AssetClient';
+import { PlayerAnalysisPanel } from '@/components/PlayerAnalysisPanel';
 import prisma from '@/lib/prisma';
 
 type Props = {
@@ -45,7 +46,16 @@ export async function generateMetadata(
 
 export default async function AssetPage({ params }: Props) {
   const { id } = await params;
-  const asset = await prisma.asset.findUnique({ where: { id } });
+  const asset = await prisma.asset.findUnique({
+    where: { id },
+    include: {
+      team: true,
+      performances: {
+        orderBy: { createdAt: 'desc' },
+        take: 8,
+      },
+    },
+  });
 
   const isTeam = asset?.type === 'TEAM';
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://mcprime-exchange.com';
@@ -66,6 +76,7 @@ export default async function AssetPage({ params }: Props) {
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
       )}
+      {!isTeam && asset && <PlayerAnalysisPanel asset={asset} />}
       <AssetClient />
     </>
   );
