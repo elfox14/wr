@@ -63,6 +63,10 @@ function shouldReplaceImage(currentImage?: string | null) {
   return true;
 }
 
+function isRealImage(image?: string | null) {
+  return !!image && (image.startsWith('http://') || image.startsWith('https://'));
+}
+
 export async function POST(req: Request) {
   const admin = await requireAdmin(req);
   if (admin.error) return admin.error;
@@ -70,14 +74,19 @@ export async function POST(req: Request) {
   const body = await req.json().catch(() => ({}));
   const type = body.type === 'PLAYER' ? 'PLAYER' : body.type === 'TEAM' ? 'TEAM' : undefined;
   const assetId = body.assetId ? String(body.assetId) : undefined;
-  const limit = Math.min(200, Math.max(1, Number(body.limit || 50)));
+  const syncAll = body.all === true || body.limit === 'all';
+  const limit = syncAll ? 5000 : Math.min(1000, Math.max(1, Number(body.limit || 50)));
   const dryRun = body.dryRun === true;
   const overwriteImages = body.overwriteImages === true;
+  const fallbackToTeamImage = body.fallbackToTeamImage !== false;
 
   const assets = await prisma.asset.findMany({
     where: {
       ...(type ? { type } : {}),
       ...(assetId ? { id: assetId } : {}),
+    },
+    include: {
+      team: true,
     },
     orderBy: [{ type: 'asc' }, { name: 'asc' }],
     take: assetId ? 1 : limit,
@@ -134,23 +143,27 @@ export async function POST(req: Request) {
           providerId: match.idTeam,
           imageBefore: asset.image,
           imageAfter: shouldUpdateImage && image ? image : asset.image,
+          imageSource: image ? 'thesportsdb_team' : 'unchanged',
           profile,
         });
       } else {
         const players = await searchPlayers(asset.name);
         const match = bestPlayerMatch(asset.name, players);
-        const image = match ? pickPlayerImage(match) : null;
+        const playerImage = match ? pickPlayerImage(match) : null;
         const profile = match ? extractPlayerProfile(match) : null;
+        const teamImage = fallbackToTeamImage ? asset.team?.image || null : null;
+        const finalImage = playerImage || (isRealImage(teamImage) ? teamImage : null);
+        const imageSource = playerImage ? 'thesportsdb_player' : finalImage ? 'team_fallback' : 'unchanged';
         const shouldUpdateImage = overwriteImages || shouldReplaceImage(asset.image);
 
-        if (!match) {
+        if (!match && !finalImage) {
           results.push({ assetId: asset.id, name: asset.name, type: asset.type, status: 'not_found' });
           continue;
         }
 
         if (!dryRun) {
           const updateData: any = {
-            image: shouldUpdateImage && image ? image : asset.image,
+            image: shouldUpdateImage && finalImage ? finalImage : asset.image,
           };
 
           if (profile?.position && !asset.position) updateData.position = profile.position;
@@ -167,10 +180,11 @@ export async function POST(req: Request) {
           name: asset.name,
           type: asset.type,
           status: dryRun ? 'matched_dry_run' : 'updated',
-          providerName: match.strPlayer,
-          providerId: match.idPlayer,
+          providerName: match?.strPlayer || asset.team?.name || null,
+          providerId: match?.idPlayer || null,
           imageBefore: asset.image,
-          imageAfter: shouldUpdateImage && image ? image : asset.image,
+          imageAfter: shouldUpdateImage && finalImage ? finalImage : asset.image,
+          imageSource,
           profile,
         });
       }
@@ -193,6 +207,8 @@ export async function POST(req: Request) {
     matched: results.filter((r) => r.status === 'updated' || r.status === 'matched_dry_run').length,
     notFound: results.filter((r) => r.status === 'not_found').length,
     errors: results.filter((r) => r.status === 'error').length,
+    teamFallbackImages: results.filter((r) => r.imageSource === 'team_fallback').length,
+    realPlayerImages: results.filter((r) => r.imageSource === 'thesportsdb_player').length,
     results,
   });
 }
