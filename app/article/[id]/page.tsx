@@ -4,6 +4,7 @@ import { getArticleById, getAllArticles } from '@/lib/articles';
 import Link from 'next/link';
 import { ArrowRight, Calendar, User, Tag, Clock, BookOpen, Coins, TrendingUp } from 'lucide-react';
 import { Metadata } from 'next';
+import prisma from '@/lib/prisma';
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params;
@@ -47,6 +48,22 @@ export default async function ArticlePage({ params }: { params: Promise<{ id: st
 
   if (!article) {
     notFound();
+  }
+
+  // Query related assets if present
+  let relatedDbAssets: any[] = [];
+  if (article.relatedAssets && article.relatedAssets.length > 0) {
+    try {
+      relatedDbAssets = await prisma.asset.findMany({
+        where: {
+          id: {
+            in: article.relatedAssets
+          }
+        }
+      });
+    } catch (err) {
+      console.error("Failed to query related assets:", err);
+    }
   }
 
   const levelLabels = {
@@ -174,6 +191,78 @@ export default async function ArticlePage({ params }: { params: Promise<{ id: st
                 prose-strong:text-white"
               dangerouslySetInnerHTML={{ __html: article.content }}
             />
+
+            {/* Related Assets Section */}
+            {relatedDbAssets && relatedDbAssets.length > 0 && (
+              <div className="mt-12 pt-8 border-t border-white/5 space-y-4">
+                <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                  <TrendingUp className="text-[#0FF0FC]" size={18} /> أصول ذات صلة للتداول الافتراضي
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                  {relatedDbAssets.map((asset) => {
+                    const isPositive = asset.change >= 0;
+                    return (
+                      <div key={asset.id} className="bg-black/40 border border-white/5 hover:border-[#0FF0FC]/40 rounded-2xl p-4 flex flex-col justify-between transition-all group/asset-card">
+                        <div className="flex items-center gap-3 mb-3">
+                          <span className="text-3xl">{asset.image || '⚽'}</span>
+                          <div className="min-w-0">
+                            <h4 className="font-bold text-white text-sm truncate">{asset.name}</h4>
+                            <span className="text-[10px] text-gray-500 bg-white/5 px-1.5 py-0.5 rounded">
+                              {asset.type === 'TEAM' ? 'منتخب' : 'لاعب'}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between border-t border-white/5 pt-3 mt-2">
+                          <div>
+                            <p className="text-[10px] text-gray-500">السعر الحالي</p>
+                            <p className="text-xs font-bold text-[#FFD700] flex items-center gap-0.5">
+                              {asset.current_price} <span className="text-[9px] text-gray-400">كوين</span>
+                            </p>
+                          </div>
+                          <div className="text-left">
+                            <p className="text-[10px] text-gray-500">التغيير (24س)</p>
+                            <p className={`text-xs font-bold ${isPositive ? 'text-emerald-400' : 'text-rose-400'}`}>
+                              {isPositive ? '+' : ''}{asset.change}%
+                            </p>
+                          </div>
+                        </div>
+                        <Link 
+                          href={`/asset/${asset.id}`}
+                          className="w-full mt-4 py-2 bg-[#0FF0FC]/10 hover:bg-[#0FF0FC] text-[#0FF0FC] hover:text-black font-bold rounded-xl text-xs flex items-center justify-center gap-1 transition-all duration-300 border border-[#0FF0FC]/20 hover:border-[#0FF0FC]"
+                        >
+                          تداول الآن
+                        </Link>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Custom Quick-Navigation for Knockout Stage Article */}
+            {article.id === 'knockout-stage-strategy' && (
+              <div className="mt-12 pt-8 border-t border-white/5 space-y-4">
+                <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                  <TrendingUp className="text-[#0FF0FC]" size={18} /> روابط سريعة للمتابعة
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <Link href="/groups" className="bg-black/40 border border-white/5 hover:border-[#0FF0FC]/40 rounded-2xl p-5 block transition-all group/nav text-right">
+                    <h4 className="font-bold text-white text-base group-hover/nav:text-[#0FF0FC] transition-colors mb-2">جدول المجموعات وحسابات التأهل</h4>
+                    <p className="text-xs text-gray-400 leading-relaxed">تابع ترتيب المجموعات ونسب صعود المنتخبات لتحديد أفضل فرص الشراء والبيع الافتراضي.</p>
+                    <span className="text-[11px] text-[#0FF0FC] mt-4 inline-flex items-center gap-1 font-bold">
+                      عرض المجموعات <ArrowRight size={12} />
+                    </span>
+                  </Link>
+                  <Link href="/matches" className="bg-black/40 border border-white/5 hover:border-[#0FF0FC]/40 rounded-2xl p-5 block transition-all group/nav text-right">
+                    <h4 className="font-bold text-white text-base group-hover/nav:text-[#0FF0FC] transition-colors mb-2">جدول المباريات والنتائج المباشرة</h4>
+                    <p className="text-xs text-gray-400 leading-relaxed">تابع مواعيد مباريات خروج المغلوب وحلل أداء المنتخبات لتعديل محفظتك الافتراضية قبل الصافرة.</p>
+                    <span className="text-[11px] text-[#0FF0FC] mt-4 inline-flex items-center gap-1 font-bold">
+                      عرض المباريات <ArrowRight size={12} />
+                    </span>
+                  </Link>
+                </div>
+              </div>
+            )}
 
             {article.tags && article.tags.length > 0 && (
               <div className="flex flex-wrap gap-2 pt-6 mt-8 border-t border-white/5">
