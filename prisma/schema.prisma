@@ -179,6 +179,12 @@ model Asset {
   marketPrice       Float?  @default(0)  // Affected by real supply/demand
   // -------------------------------------
 
+  // --- EXTERNAL PERFORMANCE PROVIDERS ---
+  apiFootballId          Int?
+  lastPerformanceRating  Float?
+  lastPerformanceSyncAt  DateTime?
+  // --------------------------------------
+
   // Relation: A player belongs to a team
   teamId        String?
   team          Asset?         @relation("TeamPlayers", fields: [teamId], references: [id])
@@ -193,6 +199,9 @@ model Asset {
   marketNews    MarketNews[]
   priceHistory  PriceHistory[]
   captains      CaptainSelection[]
+  performances  PlayerPerformance[]
+
+  @@index([apiFootballId])
 }
 
 model Match {
@@ -219,6 +228,51 @@ model PriceHistory {
   asset     Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
   price     Int
   timestamp DateTime @default(now())
+}
+
+model PlayerPerformance {
+  id                String   @id @default(cuid())
+  assetId           String
+  asset             Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  provider          String   @default("API_FOOTBALL")
+  providerPlayerId  Int?
+  providerFixtureId Int?
+
+  season            Int?
+  competition       String?
+  teamName          String?
+  opponentName      String?
+
+  minutes           Int      @default(0)
+  started           Boolean  @default(false)
+  goals             Int      @default(0)
+  assists           Int      @default(0)
+  shotsTotal        Int      @default(0)
+  shotsOnTarget     Int      @default(0)
+  passes            Int      @default(0)
+  keyPasses         Int      @default(0)
+  passAccuracy      Float    @default(0)
+  tackles           Int      @default(0)
+  interceptions     Int      @default(0)
+  saves             Int      @default(0)
+  goalsConceded     Int      @default(0)
+  yellowCards       Int      @default(0)
+  redCards          Int      @default(0)
+
+  apiRating         Float?
+  internalRating    Float    @default(50)
+  momentumImpact    Float    @default(0)
+  marketImpact      Float    @default(0)
+
+  rawData           Json?
+  matchDate         DateTime?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([assetId])
+  @@index([providerFixtureId])
+  @@unique([assetId, providerFixtureId])
 }
 
 model Holding {
