@@ -4,7 +4,7 @@ import { Metadata } from 'next';
 
 export const metadata: Metadata = {
   title: 'اتصل بنا',
-  description: 'تواصل مع فريق الدعم في WorldCup Exchange',
+  description: 'تواصل مع فريق الدعم في MC PRIME Exchange',
 };
 
 export default function ContactPage() {

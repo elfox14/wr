@@ -7,13 +7,13 @@ export const metadata: Metadata = {
     canonical: '/articles',
   },
   openGraph: {
-    title: 'جميع المقالات والتحليلات | WorldCup Exchange',
+    title: 'جميع المقالات والتحليلات | MC PRIME Exchange',
     description: 'استراتيجيات تداول وتحليلات كأس العالم.',
     images: ['/og-image.jpg'],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'جميع المقالات والتحليلات | WorldCup Exchange',
+    title: 'جميع المقالات والتحليلات | MC PRIME Exchange',
     description: 'استراتيجيات تداول وتحليلات كأس العالم.',
     images: ['/og-image.jpg'],
   }

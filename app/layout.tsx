@@ -19,23 +19,23 @@ const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://worldcup.mcprim.com
 export const metadata: Metadata = {
   metadataBase: new URL(baseUrl),
   title: {
-    default: "WorldCup Exchange | منصة تداول كرة القدم الافتراضية",
-    template: "%s | WorldCup Exchange",
+    default: "MC PRIME Exchange | منصة تداول كرة القدم الافتراضية",
+    template: "%s | MC PRIME Exchange",
   },
-  description: "أول منصة لتداول أسهم منتخبات ولاعبي كأس العالم افتراضياً. حلل الأداء، استثمر في النجوم، ونافس على صدارة السوق العالمي.",
-  keywords: ["كأس العالم", "تداول كرة القدم", "أسهم اللاعبين", "استثمار رياضي", "فانتازي كأس العالم", "WorldCup Exchange", "تحليلات رياضية", "بورصة كرة القدم"],
-  authors: [{ name: "WorldCup Exchange Team" }],
+  description: "أول منصة لتداول أسهم منتخبات ولاعبي كأس العالم افتراضياً. حلل الأداء، قم بالتداول الافتراضي للنجوم، ونافس على صدارة السوق العالمي.",
+  keywords: ["كأس العالم", "تداول كرة القدم", "أسهم اللاعبين", "تداول رياضي افتراضي", "فانتازي كأس العالم", "MC PRIME Exchange", "تحليلات رياضية", "بورصة كرة القدم"],
+  authors: [{ name: "MC PRIME Exchange Team" }],
   openGraph: {
-    title: "WorldCup Exchange | منصة تداول كرة القدم الافتراضية",
+    title: "MC PRIME Exchange | منصة تداول كرة القدم الافتراضية",
     description: "أول منصة لتداول أسهم منتخبات ولاعبي كأس العالم افتراضياً. استثمر في النجوم ونافس عالمياً.",
     url: baseUrl, // Replace with real domain later
-    siteName: "WorldCup Exchange",
+    siteName: "MC PRIME Exchange",
     images: [
       {
         url: "/og-image.jpg",
         width: 1200,
         height: 630,
-        alt: "WorldCup Exchange",
+        alt: "MC PRIME Exchange",
       },
     ],
     locale: "ar_EG",
@@ -47,7 +47,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "WorldCup Exchange | منصة تداول كرة القدم الافتراضية",
+    title: "MC PRIME Exchange | منصة تداول كرة القدم الافتراضية",
     description: "تداول أسهم المنتخبات واللاعبين بناءً على أدائهم في كأس العالم.",
     images: ["/og-image.jpg"],
   },

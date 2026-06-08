@@ -4,7 +4,7 @@ import { Metadata } from 'next';
 
 export const metadata: Metadata = {
   title: 'من نحن',
-  description: 'تعرف على قصة ورؤية منصة WorldCup Exchange',
+  description: 'تعرف على قصة ورؤية منصة MC PRIME Exchange',
 };
 
 export default function AboutPage() {
@@ -21,7 +21,7 @@ export default function AboutPage() {
       <div className="space-y-8">
         <div className="bg-surface p-8 rounded-2xl border border-white/5 text-gray-300 leading-relaxed text-lg">
           <p className="mb-6">
-            مرحباً بك في <strong className="text-white">WorldCup Exchange</strong>، المنصة الأولى من نوعها التي تدمج بين شغف كرة القدم المونديالية وعبقرية التداول المالي.
+            مرحباً بك في <strong className="text-white">MC PRIME Exchange</strong>، المنصة الأولى من نوعها التي تدمج بين شغف كرة القدم المونديالية وعبقرية التداول المالي.
           </p>
           <p>
             بدأت الفكرة من تساؤل بسيط: ماذا لو أمكننا تحويل أداء اللاعبين والمنتخبات إلى أصول قابلة للتداول؟ ماذا لو كان تحليلك الرياضي وتوقعك الصحيح يمكن أن يجعلك تتصدر قائمة المتداولين؟ من هنا وُلدت منصتنا.

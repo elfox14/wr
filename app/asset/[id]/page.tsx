@@ -20,13 +20,13 @@ export async function generateMetadata(
 
   if (!asset) {
     return {
-      title: 'أصل غير موجود | WorldCup Exchange',
+      title: 'أصل غير موجود | MC PRIME Exchange',
     };
   }
 
   return {
     title: `${asset.name} (${asset.code}) | تداول في بورصة المونديال`,
-    description: `تداول أسهم ${asset.name} في منصة WorldCup Exchange. تابع السعر المباشر: ${asset.current_price}¢ وأداء الأصل في البطولة.`,
+    description: `تداول أسهم ${asset.name} في منصة MC PRIME Exchange. تابع السعر المباشر: ${asset.current_price}¢ وأداء الأصل في البطولة.`,
     openGraph: {
       images: [asset.image], // Ideally a real URL, but fallback to emoji if that's what image is
     },
@@ -44,7 +44,7 @@ export default async function AssetPage({ params }: Props) {
     "@context": "https://schema.org",
     "@type": isTeam ? "SportsTeam" : "Person",
     "name": asset.name,
-    "description": `تداول أسهم ${asset.name} في منصة WorldCup Exchange. السعر المباشر: ${asset.current_price}¢.`,
+    "description": `تداول أسهم ${asset.name} في منصة MC PRIME Exchange. السعر المباشر: ${asset.current_price}¢.`,
     "url": `${baseUrl}/asset/${asset.id}`,
   } : null;
 

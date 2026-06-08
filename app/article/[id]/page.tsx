@@ -56,7 +56,7 @@ export default async function ArticlePage({ params }: { params: Promise<{ id: st
     "datePublished": article.date,
     "publisher": {
       "@type": "Organization",
-      "name": "WorldCup Exchange",
+      "name": "MC PRIME Exchange",
       "logo": {
         "@type": "ImageObject",
         "url": `${baseUrl}/og-image.jpg`

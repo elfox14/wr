@@ -4,7 +4,7 @@ import { Metadata } from 'next';
 
 export const metadata: Metadata = {
   title: 'سياسة الخصوصية',
-  description: 'سياسة الخصوصية لمنصة WorldCup Exchange',
+  description: 'سياسة الخصوصية لمنصة MC PRIME Exchange',
 };
 
 export default function PrivacyPage() {
@@ -24,7 +24,7 @@ export default function PrivacyPage() {
           <section>
             <h2 className="text-2xl font-bold text-white mb-4">1. مقدمة</h2>
             <p>
-              في WorldCup Exchange، نولي أهمية قصوى لخصوصية زوارنا ومستخدمينا. توضح هذه السياسة ماهية المعلومات التي نجمعها، وكيفية استخدامها، وحماية بياناتك الشخصية عند استخدامك لمنصتنا.
+              في MC PRIME Exchange، نولي أهمية قصوى لخصوصية زوارنا ومستخدمينا. توضح هذه السياسة ماهية المعلومات التي نجمعها، وكيفية استخدامها، وحماية بياناتك الشخصية عند استخدامك لمنصتنا.
             </p>
           </section>
 

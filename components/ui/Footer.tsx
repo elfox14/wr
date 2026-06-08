@@ -83,10 +83,10 @@ export function Footer() {
         {/* Disclaimer & Copyright */}
         <div className="pt-8 border-t border-white/10 flex flex-col md:flex-row justify-between items-center gap-4 text-center md:text-right">
           <p className="text-xs text-gray-500 max-w-2xl leading-relaxed">
-            <strong className="text-gray-400">تنويه إخلاء مسؤولية:</strong> منصة WorldCup Exchange هي منصة ترفيهية تفاعلية تعتمد على أسواق افتراضية بالكامل. جميع الأرقام والأرصدة والأصول هي افتراضية فقط ولا تمثل تداولاً حقيقياً بأموال واقعية أو أوراق مالية. الأداء السابق للأصول الافتراضية لا يضمن الأداء المستقبلي.
+            <strong className="text-gray-400">تنويه إخلاء مسؤولية:</strong> منصة MC PRIME Exchange هي منصة ترفيهية تفاعلية تعتمد على أسواق افتراضية بالكامل. جميع الأرقام والأرصدة والأصول هي افتراضية فقط ولا تمثل تداولاً بأموال واقعية أو أوراق مالية حقيقية. الأداء السابق للأصول الافتراضية لا يضمن الأداء المستقبلي.
           </p>
           <div className="text-sm font-bold text-gray-400 shrink-0">
-            © {new Date().getFullYear()} WorldCup Exchange. جميع الحقوق محفوظة.
+            © {new Date().getFullYear()} MC PRIME Exchange. جميع الحقوق محفوظة.
           </div>
         </div>
       </div>

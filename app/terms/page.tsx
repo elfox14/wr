@@ -4,7 +4,7 @@ import { Metadata } from 'next';
 
 export const metadata: Metadata = {
   title: 'شروط الاستخدام',
-  description: 'شروط وأحكام استخدام منصة WorldCup Exchange',
+  description: 'شروط وأحكام استخدام منصة MC PRIME Exchange',
 };
 
 export default function TermsPage() {
@@ -22,14 +22,14 @@ export default function TermsPage() {
           <section>
             <h2 className="text-2xl font-bold text-white mb-4">1. القبول بالشروط</h2>
             <p>
-              بدخولك إلى موقع WorldCup Exchange واستخدامه، فإنك توافق صراحة على الالتزام بشروط الاستخدام هذه. إذا كنت لا توافق على أي جزء من هذه الشروط، فلا يحق لك استخدام المنصة.
+              بدخولك إلى موقع MC PRIME Exchange واستخدامه، فإنك توافق صراحة على الالتزام بشروط الاستخدام هذه. إذا كنت لا توافق على أي جزء من هذه الشروط، فلا يحق لك استخدام المنصة.
             </p>
           </section>
 
           <section>
             <h2 className="text-2xl font-bold text-white mb-4">2. طبيعة المنصة (تنويه هام)</h2>
             <p>
-              WorldCup Exchange هي منصة <strong className="text-white">ترفيهية وتفاعلية بحتة</strong>. جميع الأصول، اللاعبين، المنتخبات، والأرصدة (العملات) داخل الموقع هي <strong className="text-white">وهمية وافتراضية ولا تحمل أي قيمة مالية حقيقية</strong>. لا يتم تداول أي أموال حقيقية أو أوراق مالية قانونية في هذه المنصة بأي شكل من الأشكال.
+              MC PRIME Exchange هي منصة <strong className="text-white">ترفيهية وتفاعلية بحتة</strong>. جميع الأصول، اللاعبين، المنتخبات، والأرصدة (العملات) داخل الموقع هي <strong className="text-white">وهمية وافتراضية ولا تحمل أي قيمة مالية حقيقية</strong>. لا يتم تداول أي أموال حقيقية أو أوراق مالية قانونية في هذه المنصة بأي شكل من الأشكال.
             </p>
           </section>
 
@@ -45,7 +45,7 @@ export default function TermsPage() {
           <section>
             <h2 className="text-2xl font-bold text-white mb-4">4. حقوق الملكية الفكرية</h2>
             <p>
-              جميع المحتويات المعروضة على الموقع، بما في ذلك النصوص والرسومات والشعارات والأيقونات والبرمجيات، هي ملك لمنصة WorldCup Exchange أو الجهات المرخصة لها، ومحمية بموجب قوانين حقوق الطبع والنشر.
+              جميع المحتويات المعروضة على الموقع، بما في ذلك النصوص والرسومات والشعارات والأيقونات والبرمجيات، هي ملك لمنصة MC PRIME Exchange أو الجهات المرخصة لها، ومحمية بموجب قوانين حقوق الطبع والنشر.
             </p>
           </section>
 

@@ -25,7 +25,7 @@ export default async function Home() {
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "WebSite",
-    "name": "WorldCup Exchange",
+    "name": "MC PRIME Exchange",
     "url": baseUrl,
     "description": "أول منصة لتداول أسهم منتخبات ولاعبي كأس العالم افتراضياً. حلل الأداء، استثمر في النجوم، ونافس على صدارة السوق العالمي."
   };

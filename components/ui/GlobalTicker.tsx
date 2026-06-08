@@ -18,9 +18,9 @@ export function GlobalTicker() {
 
   if (marketNews.length === 0) {
     marketNews.push(
-      { id: 'fallback-1', titleAr: 'مرحباً بكم في منصة WorldCup Exchange! ابدأ بناء محفظتك الآن.', changePercent: null, asset: { image: '🌟' } },
+      { id: 'fallback-1', titleAr: 'مرحباً بكم في منصة MC PRIME Exchange! ابدأ بناء محفظتك الآن.', changePercent: null, asset: { image: '🌟' } },
       { id: 'fallback-2', titleAr: 'الأسعار الحالية هي الأسعار الافتتاحية.. ترقبوا انطلاق المونديال!', changePercent: null, asset: { image: '📈' } },
-      { id: 'fallback-3', titleAr: 'تابع قسم المقالات للحصول على تحليلات دقيقة لأفضل الاستثمارات.', changePercent: null, asset: { image: '🗞️' } }
+      { id: 'fallback-3', titleAr: 'تابع قسم المقالات للحصول على تحليلات دقيقة لأفضل التداولات الافتراضية.', changePercent: null, asset: { image: '🗞️' } }
     );
   }
 

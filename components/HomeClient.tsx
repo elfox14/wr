@@ -78,12 +78,12 @@ export default function HomeClient({
               السوق مفتوح الآن
             </div>
             <h1 className="text-4xl lg:text-5xl font-black leading-[1.1] mb-4">
-              <span className="text-transparent bg-clip-text bg-gradient-to-b from-white to-gray-400">بورصة المونديال</span>
+              <span className="text-transparent bg-clip-text bg-gradient-to-b from-white to-gray-400">بورصة المونديال الافتراضية</span>
               <br />
-              <span className="text-white">بين يديك</span>
+              <span className="text-white">من MC PRIME</span>
             </h1>
             <p className="text-gray-400 text-sm md:text-base leading-relaxed max-w-md mb-6">
-              تداول أسهم المنتخبات واللاعبين، راقب تحركات السوق مع كل هدف، وتصدّر الترتيب العالمي.
+              اشترِ وبيع أسهم المنتخبات واللاعبين بعملات افتراضية، ونافس أصدقاءك في سوق كروي يتغير مع كل مباراة.
             </p>
           </div>
           <div className="relative z-10 flex flex-wrap gap-3">

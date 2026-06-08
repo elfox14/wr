@@ -45,7 +45,7 @@ export default function LeaderboardClient() {
       {/* PRIZE BANNER */}
       <div className="bg-gradient-to-r from-orange-600 to-orange-400 text-white text-center py-3 px-4 shadow-[0_0_20px_rgba(249,115,22,0.3)]">
         <p className="font-bold text-sm flex items-center justify-center gap-2">
-          <Trophy size={16} /> الترتيب يعتمد على صافي الثروة الافتراضية داخل المنصة. لا توجد أموال حقيقية أو سحب نقدي.
+          <Trophy size={16} /> الترتيب يعتمد على صافي الثروة الافتراضية داخل المنصة. الكوينز افتراضية بالكامل.
         </p>
       </div>
 

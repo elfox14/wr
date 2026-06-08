@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { useStore } from '@/lib/store';
 import { InsufficientFundsModal } from './InsufficientFundsModal';
+import { BrandLogo } from './BrandLogo';
 
 export function Navbar() {
   const { data: session, status } = useSession();
@@ -72,12 +73,12 @@ export function Navbar() {
             {/* RIGHT: Logo Section */}
             <div className="flex items-center">
               <Link href="/" className="flex items-center gap-3 group">
-                <div className="w-10 h-10 lg:w-12 lg:h-12 rounded-xl bg-gradient-to-br from-[#0FF0FC]/20 to-[#FFD700]/20 border border-white/10 flex items-center justify-center shadow-[0_0_15px_rgba(15,240,252,0.15)] group-hover:shadow-[0_0_25px_rgba(255,215,0,0.3)] transition-all duration-300">
-                  <Trophy className="text-[#FFD700] group-hover:scale-110 transition-transform" size={24} />
+                <div className="w-10 h-10 lg:w-12 lg:h-12 flex items-center justify-center transition-transform duration-300 group-hover:scale-105">
+                  <BrandLogo width={48} height={48} />
                 </div>
                 <div className="flex flex-col">
                   <span className="font-black text-lg lg:text-xl tracking-wide text-white flex items-center gap-1 group-hover:text-[#0FF0FC] transition-colors">
-                    WorldCup <span className="text-[#FFD700]">Exchange</span>
+                    MC PRIME <span className="text-[#FFD700]">Exchange</span>
                   </span>
                   <span className="text-[10px] lg:text-xs text-gray-400 font-bold tracking-widest uppercase">بورصة المونديال</span>
                 </div>
