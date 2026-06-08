@@ -24,11 +24,21 @@ export async function generateMetadata(
     };
   }
 
+  const isValidOgImage =
+    typeof asset.image === 'string' &&
+    (asset.image.startsWith('http://') ||
+     asset.image.startsWith('https://') ||
+     asset.image.startsWith('/'));
+
+  const ogImage = isValidOgImage ? asset.image : '/og-image.jpg';
+
   return {
-    title: `${asset.name} (${asset.code}) | تداول في بورصة المونديال`,
+    title: `${asset.name} (${asset.code}) | MC PRIME Exchange`,
     description: `تداول أسهم ${asset.name} في منصة MC PRIME Exchange. تابع السعر المباشر: ${asset.current_price}¢ وأداء الأصل في البطولة.`,
     openGraph: {
-      images: [asset.image], // Ideally a real URL, but fallback to emoji if that's what image is
+      title: `${asset.name} | MC PRIME Exchange`,
+      description: `تداول أسهم ${asset.name} في بورصة المونديال الافتراضية.`,
+      images: [ogImage],
     },
   };
 }

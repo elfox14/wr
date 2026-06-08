@@ -16,6 +16,7 @@ export default function AssetClient() {
   const [asset, setAsset] = useState<Asset | null>(null);
   const [quantity, setQuantity] = useState(1);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchPortfolio();
@@ -23,13 +24,40 @@ export default function AssetClient() {
   }, [fetchPortfolio, fetchAssets, assets.length]);
 
   useEffect(() => {
+    setLoading(true);
+    setError(null);
+
     fetch(`/api/assets/${id}`)
-      .then(res => res.json())
+      .then(async res => {
+        if (!res.ok) {
+          const data = await res.json().catch(() => null);
+          throw new Error(data?.error || 'Asset not found');
+        }
+        return res.json();
+      })
       .then(data => {
         setAsset(data);
+      })
+      .catch(err => {
+        console.error('Asset load error:', err);
+        setError('تعذر تحميل صفحة الأصل. حاول مرة أخرى.');
+      })
+      .finally(() => {
         setLoading(false);
       });
   }, [id]);
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-[#121212] text-white flex flex-col items-center justify-center gap-4 p-6 text-center">
+        <h1 className="text-2xl font-black">تعذر تحميل الأصل</h1>
+        <p className="text-gray-400">{error}</p>
+        <Link href="/market" className="bg-primary text-black px-6 py-3 rounded-xl font-bold">
+          العودة إلى السوق
+        </Link>
+      </div>
+    );
+  }
 
   if (loading || !asset) return <div className="min-h-screen bg-[#121212] text-white p-10 flex items-center justify-center">جاري تحميل منصة التداول...</div>;
 
@@ -54,7 +82,8 @@ export default function AssetClient() {
     else await sellAsset(asset.id, quantity);
   };
 
-  const hasNews = asset.news && asset.news.length > 0;
+  const news = (asset as any).marketNews || asset.news || [];
+  const hasNews = news.length > 0;
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-white selection:bg-[#0FF0FC]/30 flex flex-col">
@@ -230,10 +259,10 @@ export default function AssetClient() {
             <h3 className="font-bold text-gray-300 mb-4 flex items-center gap-2 pb-4 border-b border-white/10">
               <AlertCircle className="text-yellow-400" size={18} /> الأخبار المؤثرة
             </h3>
-            <div className="space-y-4">
+            <div className="space-y-3 relative z-10 max-h-[300px] overflow-y-auto custom-scrollbar pr-2">
               {hasNews ? (
-                asset.news?.map((n: any, i: number) => (
-                  <div key={i} className={`bg-black/40 border border-white/5 p-3 rounded-lg border-r-2 ${n.impact > 0 ? 'border-r-green-500' : n.impact < 0 ? 'border-r-red-500' : 'border-r-gray-500'}`}>
+                news.map((n: any, i: number) => (
+                  <div key={i} className={`p-4 bg-[#111111] rounded-xl border border-white/5 hover:bg-white/5 transition-colors border-r-2 ${n.impact > 0 ? 'border-r-green-500' : n.impact < 0 ? 'border-r-red-500' : 'border-r-gray-500'}`}>
                     <p className="text-sm text-gray-200 font-bold mb-1">{n.title}</p>
                     <p className="text-xs text-gray-400 leading-relaxed">{n.content}</p>
                   </div>
