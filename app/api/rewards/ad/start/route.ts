@@ -9,6 +9,8 @@ const DAILY_CAPPED_TYPES = [
   'TASK_UNDERVALUED', 'TASK_PROFIT_SELL', 'TASK_WATCHLIST', 'TASK_DIVERSIFY'
 ];
 
+const AD_REWARD_TYPES = ['AD_WATCH', 'AD_WATCH_BOOSTED'];
+
 export async function POST(req: Request) {
   const session = await getServerSession(authOptions);
 
@@ -27,38 +29,53 @@ export async function POST(req: Request) {
 
     const user = await prisma.user.findUnique({
       where: { id: session.user.id },
-      include: { rewards: true }
+      select: { id: true }
     });
 
     if (!user) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
-    if (user.adsWatchedToday >= 10) {
-      return NextResponse.json({ error: 'Daily ad limit reached (10/10)' }, { status: 400 });
-    }
-
     const now = new Date();
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
-    if (requestType === 'BOOSTED') {
-      const claimedBoostedToday = user.rewards.some(
-        (reward) => reward.type === 'AD_WATCH_BOOSTED' && reward.claimedAt >= todayStart
-      );
-      if (claimedBoostedToday) {
-        return NextResponse.json({ error: 'لقد شاهدت الإعلان المعزز اليوم مسبقاً.' }, { status: 400 });
-      }
+    const [adsClaimedToday, boostedClaimedToday, earnedToday] = await Promise.all([
+      prisma.reward.count({
+        where: {
+          userId: user.id,
+          type: { in: AD_REWARD_TYPES },
+          claimedAt: { gte: todayStart },
+        },
+      }),
+      prisma.reward.count({
+        where: {
+          userId: user.id,
+          type: 'AD_WATCH_BOOSTED',
+          claimedAt: { gte: todayStart },
+        },
+      }),
+      prisma.reward.aggregate({
+        where: {
+          userId: user.id,
+          type: { in: DAILY_CAPPED_TYPES },
+          claimedAt: { gte: todayStart },
+        },
+        _sum: { amount: true },
+      }),
+    ]);
+
+    if (adsClaimedToday >= 10) {
+      return NextResponse.json({ error: 'Daily ad limit reached (10/10)' }, { status: 400 });
+    }
+
+    if (requestType === 'BOOSTED' && boostedClaimedToday > 0) {
+      return NextResponse.json({ error: 'لقد شاهدت الإعلان المعزز اليوم مسبقاً.' }, { status: 400 });
     }
 
     const adRewardAmount = requestType === 'BOOSTED' ? 100 : 50;
-    const earnedToday = user.rewards.reduce((sum, reward) => {
-      if (reward.claimedAt >= todayStart && DAILY_CAPPED_TYPES.includes(reward.type)) {
-        return sum + reward.amount;
-      }
-      return sum;
-    }, 0);
+    const totalEarnedToday = earnedToday._sum.amount || 0;
 
-    if (earnedToday + adRewardAmount > 1500) {
+    if (totalEarnedToday + adRewardAmount > 1500) {
       return NextResponse.json({ error: 'Daily reward cap reached (1500/1500)' }, { status: 400 });
     }
 
@@ -79,6 +96,7 @@ export async function POST(req: Request) {
       success: true,
       token,
       reward: adRewardAmount,
+      adsClaimedToday,
     });
 
   } catch (error) {
