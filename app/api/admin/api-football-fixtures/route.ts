@@ -30,10 +30,8 @@ function hasValidAdminSecret(req: Request) {
   const auth = req.headers.get('authorization') || '';
   const bearer = auth.startsWith('Bearer ') ? auth.slice(7).trim() : '';
   const headerSecret = req.headers.get('x-admin-secret') || '';
-  const { searchParams } = new URL(req.url);
-  const querySecret = searchParams.get('adminSecret') || '';
 
-  return [bearer, headerSecret, querySecret].some((value) => value && value === expectedSecret);
+  return [bearer, headerSecret].some((value) => value && value === expectedSecret);
 }
 
 async function requireAdmin(req: Request) {
