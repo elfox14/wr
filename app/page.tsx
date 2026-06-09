@@ -1,3 +1,5 @@
+import Link from 'next/link';
+import { ArrowRight, Brain, Sparkles } from 'lucide-react';
 import HomeClient from '@/components/HomeClient';
 import { getAssets } from '@/lib/store-server';
 import prisma from '@/lib/prisma';
@@ -110,6 +112,23 @@ export default async function Home() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
+
+      <section className="mx-auto max-w-7xl px-4 pt-6 sm:px-6 lg:px-8">
+        <div className="relative overflow-hidden rounded-[1.7rem] border border-[#0FF0FC]/20 bg-[#0FF0FC]/[0.06] p-4 shadow-[0_18px_55px_rgba(15,240,252,0.08)] lg:p-5">
+          <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_top_left,rgba(15,240,252,0.18),transparent_36%)]" />
+          <div className="relative flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <div className="mb-2 inline-flex items-center gap-2 rounded-xl border border-[#0FF0FC]/20 bg-black/25 px-3 py-1 text-xs font-black text-[#0FF0FC]"><Brain size={14} /> AI Analyst</div>
+              <h2 className="text-xl font-black text-white lg:text-2xl">ابدأ من التحليل الذكي قبل التداول</h2>
+              <p className="mt-1 max-w-3xl text-xs leading-6 text-gray-400 lg:text-sm">اكتشف أفضل الفرص الفنية، التحذيرات السعرية، وأعلى جودة فنية داخل السوق في صفحة واحدة.</p>
+            </div>
+            <Link href="/ai-analyst" className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#0FF0FC] px-5 py-3 text-sm font-black text-black transition hover:scale-[1.02] hover:bg-[#70f7ff] active:scale-[0.98]">
+              افتح AI Analyst <ArrowRight size={16} />
+            </Link>
+          </div>
+        </div>
+      </section>
+
       <HomeClient 
         initialAssets={assets} 
         usersCount={usersCount}
