@@ -166,8 +166,8 @@ export default function TeamPitchLineup({ team }: { team: any }) {
     : 'لم يتوفر Lineup رسمي بعد؛ تم ترتيب الأساسيين حسب المركز، التقييم، والسعر الافتراضي.';
 
   return (
-    <section className="mx-auto mb-4 w-full max-w-[1600px] px-3 sm:px-4">
-      <div className="rounded-[1.7rem] border border-emerald-400/15 bg-[#101217] p-3 shadow-card sm:rounded-3xl sm:p-5 md:p-6">
+    <section className="mx-auto mb-4 w-full max-w-[1600px] px-3 lg:px-4">
+      <div className="rounded-[1.7rem] border border-emerald-400/15 bg-[#101217] p-3 shadow-card lg:rounded-3xl lg:p-6">
         <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <div className="mb-2 flex flex-wrap items-center gap-2">
@@ -177,14 +177,14 @@ export default function TeamPitchLineup({ team }: { team: any }) {
               </span>
               {officialLineup?.formation && <span className="rounded-xl border border-white/10 bg-white/5 px-3 py-1 text-xs font-black text-gray-300">الخطة {officialLineup.formation}</span>}
             </div>
-            <h2 className="text-xl font-black text-white sm:text-2xl md:text-3xl">قائمة الفريق</h2>
-            <p className="mt-1 hidden max-w-4xl text-sm leading-7 text-gray-400 sm:block">الأساسيون داخل الملعب والاحتياطيون حوله. {sourceHint}</p>
-            <p className="mt-1 text-xs leading-6 text-gray-400 sm:hidden">عرض مختصر للتشكيل الأساسي والاحتياطيين بدون مساحة ملعب فارغة.</p>
+            <h2 className="text-xl font-black text-white lg:text-3xl">قائمة الفريق</h2>
+            <p className="mt-1 hidden max-w-4xl text-sm leading-7 text-gray-400 lg:block">الأساسيون داخل الملعب والاحتياطيون حوله. {sourceHint}</p>
+            <p className="mt-1 text-xs leading-6 text-gray-400 lg:hidden">عرض مختصر للتشكيل الأساسي والاحتياطيين بدون مساحة ملعب فارغة.</p>
           </div>
           <div className="grid grid-cols-3 gap-2 text-center text-xs">
-            <div className="rounded-2xl border border-white/10 bg-black/30 px-3 py-2 sm:px-4 sm:py-3"><p className="text-gray-500">الأساسيون</p><p className="text-lg font-black text-white sm:text-xl">{starters.length}</p></div>
-            <div className="rounded-2xl border border-white/10 bg-black/30 px-3 py-2 sm:px-4 sm:py-3"><p className="text-gray-500">الاحتياطيون</p><p className="text-lg font-black text-white sm:text-xl">{substitutes.length}</p></div>
-            <div className="rounded-2xl border border-white/10 bg-black/30 px-3 py-2 sm:px-4 sm:py-3"><p className="text-gray-500">القائمة</p><p className="text-lg font-black text-white sm:text-xl">{players.length}</p></div>
+            <div className="rounded-2xl border border-white/10 bg-black/30 px-3 py-2 lg:px-4 lg:py-3"><p className="text-gray-500">الأساسيون</p><p className="text-lg font-black text-white lg:text-xl">{starters.length}</p></div>
+            <div className="rounded-2xl border border-white/10 bg-black/30 px-3 py-2 lg:px-4 lg:py-3"><p className="text-gray-500">الاحتياطيون</p><p className="text-lg font-black text-white lg:text-xl">{substitutes.length}</p></div>
+            <div className="rounded-2xl border border-white/10 bg-black/30 px-3 py-2 lg:px-4 lg:py-3"><p className="text-gray-500">القائمة</p><p className="text-lg font-black text-white lg:text-xl">{players.length}</p></div>
           </div>
         </div>
 
@@ -194,7 +194,7 @@ export default function TeamPitchLineup({ team }: { team: any }) {
           </div>
         ) : (
           <div className="grid gap-4 xl:grid-cols-[1fr_340px]">
-            <div className="block rounded-[1.5rem] border border-emerald-400/20 bg-[radial-gradient(circle_at_top,rgba(16,185,129,0.20),rgba(4,18,14,0.96))] p-3 sm:hidden">
+            <div className="block rounded-[1.5rem] border border-emerald-400/20 bg-[radial-gradient(circle_at_top,rgba(16,185,129,0.20),rgba(4,18,14,0.96))] p-3 lg:hidden">
               <div className="mb-3 flex items-center justify-between">
                 <h3 className="font-black text-white">التشكيل الأساسي</h3>
                 <span className="rounded-full bg-emerald-400/10 px-3 py-1 text-[10px] font-black text-emerald-300">Starting XI</span>
@@ -207,13 +207,13 @@ export default function TeamPitchLineup({ team }: { team: any }) {
               </div>
             </div>
 
-            <div className="relative hidden overflow-hidden rounded-[1.5rem] border border-emerald-400/20 bg-[radial-gradient(circle_at_center,rgba(16,185,129,0.30),rgba(2,44,34,0.92))] p-3 shadow-inner sm:block sm:rounded-[2rem] sm:p-4 md:p-6">
-              <div className="absolute inset-3 rounded-[1.2rem] border-2 border-white/15 sm:inset-4 sm:rounded-[1.5rem]" />
-              <div className="absolute left-1/2 top-1/2 h-20 w-20 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white/15 sm:h-24 sm:w-24" />
-              <div className="absolute left-1/2 top-1/2 h-px w-[calc(100%-1.5rem)] -translate-x-1/2 bg-white/15 sm:w-[calc(100%-2rem)]" />
-              <div className="absolute left-1/2 top-0 h-14 w-32 -translate-x-1/2 rounded-b-full border-x-2 border-b-2 border-white/15 sm:h-20 sm:w-44" />
-              <div className="absolute bottom-0 left-1/2 h-14 w-32 -translate-x-1/2 rounded-t-full border-x-2 border-t-2 border-white/15 sm:h-20 sm:w-44" />
-              <div className="relative z-10 flex min-h-[500px] flex-col justify-between py-6 md:min-h-[560px]">
+            <div className="relative hidden overflow-hidden rounded-[2rem] border border-emerald-400/20 bg-[radial-gradient(circle_at_center,rgba(16,185,129,0.30),rgba(2,44,34,0.92))] p-6 shadow-inner lg:block">
+              <div className="absolute inset-4 rounded-[1.5rem] border-2 border-white/15" />
+              <div className="absolute left-1/2 top-1/2 h-24 w-24 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white/15" />
+              <div className="absolute left-1/2 top-1/2 h-px w-[calc(100%-2rem)] -translate-x-1/2 bg-white/15" />
+              <div className="absolute left-1/2 top-0 h-20 w-44 -translate-x-1/2 rounded-b-full border-x-2 border-b-2 border-white/15" />
+              <div className="absolute bottom-0 left-1/2 h-20 w-44 -translate-x-1/2 rounded-t-full border-x-2 border-t-2 border-white/15" />
+              <div className="relative z-10 flex min-h-[560px] flex-col justify-between py-6">
                 <Line players={lines.FWD.length ? lines.FWD : lines.OTHER.slice(0, 3)} />
                 <Line players={lines.MID} />
                 <Line players={lines.DEF} />
@@ -221,8 +221,8 @@ export default function TeamPitchLineup({ team }: { team: any }) {
               </div>
             </div>
 
-            <aside className="rounded-[1.5rem] border border-white/10 bg-white/[0.04] p-3 sm:rounded-[2rem] sm:p-4">
-              <div className="mb-3 flex items-center justify-between gap-3 sm:mb-4">
+            <aside className="rounded-[1.5rem] border border-white/10 bg-white/[0.04] p-3 lg:rounded-[2rem] lg:p-4">
+              <div className="mb-3 flex items-center justify-between gap-3 lg:mb-4">
                 <h3 className="flex items-center gap-2 font-black text-white"><Users size={18} className="text-[#FFD700]" /> الاحتياطيون</h3>
                 <span className="rounded-full bg-[#FFD700]/10 px-2 py-1 text-[10px] font-black text-[#FFD700]">Bench</span>
               </div>
@@ -237,7 +237,7 @@ export default function TeamPitchLineup({ team }: { team: any }) {
           </div>
         )}
 
-        <div className="mt-4 grid gap-2 text-xs text-gray-400 sm:gap-3 md:grid-cols-3">
+        <div className="mt-4 grid gap-2 text-xs text-gray-400 lg:grid-cols-3 lg:gap-3">
           <div className="rounded-2xl border border-white/10 bg-black/25 p-3"><CircleDot size={14} className="mb-2 text-[#0FF0FC]" /> اضغط على أي لاعب لفتح صفحة تحليله وسهمه الافتراضي.</div>
           <div className="rounded-2xl border border-white/10 bg-black/25 p-3"><Users size={14} className="mb-2 text-[#FFD700]" /> الاحتياطيون يظهرون حسب Lineup الرسمي أو بقية القائمة عند عدم توفره.</div>
           <div className="rounded-2xl border border-white/10 bg-black/25 p-3"><ShieldCheck size={14} className="mb-2 text-emerald-300" /> عند عدم توفر التشكيل الرسمي، يتم تمييزه بوضوح كتشكيل متوقع.</div>
