@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { Activity, Database, Home, ShieldCheck, Sparkles, Wrench } from 'lucide-react';
 
@@ -16,7 +17,7 @@ export default function AdminShell({
   title: string;
   subtitle: string;
   badge?: string;
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
   return (
     <div className="min-h-screen bg-[#050505] text-white">

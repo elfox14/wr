@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import AdminHomeDashboard from '@/components/admin/AdminHomeDashboard';
+import AdminApiDashboard from '@/components/admin/AdminApiDashboard';
 
 type AdminSession = {
   user?: {
@@ -16,12 +16,12 @@ function isAdmin(session: AdminSession) {
 }
 
 export const metadata = {
-  title: 'لوحة الإدارة | MC PRIME Exchange',
+  title: 'اختبارات API | MC PRIME Exchange',
 };
 
-export default async function AdminPage() {
+export default async function AdminApisPage() {
   const session = await getServerSession(authOptions as any) as AdminSession;
   if (!session?.user) redirect('/login');
   if (!isAdmin(session)) redirect('/');
-  return <AdminHomeDashboard />;
+  return <AdminApiDashboard />;
 }
