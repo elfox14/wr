@@ -2,13 +2,13 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { BarChart3, Briefcase, CalendarDays, Home, Trophy, WalletCards } from 'lucide-react';
+import { BarChart3, Brain, Briefcase, CalendarDays, Home } from 'lucide-react';
 
 const mobileNavItems = [
   { name: 'الرئيسية', href: '/', icon: Home },
   { name: 'السوق', href: '/market', icon: BarChart3 },
+  { name: 'AI', href: '/ai-analyst', icon: Brain },
   { name: 'المباريات', href: '/matches', icon: CalendarDays },
-  { name: 'الترتيب', href: '/leaderboard', icon: Trophy },
   { name: 'محفظتي', href: '/portfolio', icon: Briefcase },
 ];
 
