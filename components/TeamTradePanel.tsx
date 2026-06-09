@@ -49,7 +49,7 @@ export default function TeamTradePanel({ assetId, initialPrice, fairValue, chang
   }
 
   return (
-    <section className="mx-auto mb-4 w-full max-w-[1600px] px-4">
+    <section id="trade-panel" className="mx-auto mb-4 scroll-mt-24 w-full max-w-[1600px] px-4">
       <div className="rounded-3xl border border-[#0FF0FC]/15 bg-[#101217] p-5 shadow-card md:p-6">
         <div className="grid gap-5 lg:grid-cols-[1fr_420px] lg:items-center">
           <div>
