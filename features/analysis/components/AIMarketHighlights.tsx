@@ -3,23 +3,8 @@ import { Brain, ArrowRight, TrendingDown, TrendingUp } from 'lucide-react';
 import { AssetImage } from '@/components/ui/AssetImage';
 import { MarketAnalysisBadge } from './MarketAnalysisBadge';
 import { analyzeFootballAsset } from '../lib/analysis-adapter';
+import { buildAIAnalystGroups } from '../lib/ai-analyst-ranking';
 import { formatVirtualCoins, getFairValue, getMarketPrice, getValueGapPercent } from '../lib/value-fit';
-
-function sortByTechnicalOpportunity(a: any, b: any) {
-  const analysisA = analyzeFootballAsset(a);
-  const analysisB = analyzeFootballAsset(b);
-  const aScore = analysisA.weightedScore + Math.max(0, -getValueGapPercent(a)) * 1.6;
-  const bScore = analysisB.weightedScore + Math.max(0, -getValueGapPercent(b)) * 1.6;
-  return bScore - aScore;
-}
-
-function sortByTechnicalOverprice(a: any, b: any) {
-  const analysisA = analyzeFootballAsset(a);
-  const analysisB = analyzeFootballAsset(b);
-  const aScore = Math.max(0, getValueGapPercent(a)) * 2 + Math.max(0, 72 - analysisA.weightedScore);
-  const bScore = Math.max(0, getValueGapPercent(b)) * 2 + Math.max(0, 72 - analysisB.weightedScore);
-  return bScore - aScore;
-}
 
 function MiniAssetRow({ asset, danger = false }: { asset: any; danger?: boolean }) {
   const analysis = analyzeFootballAsset(asset);
@@ -50,23 +35,9 @@ function MiniAssetRow({ asset, danger = false }: { asset: any; danger?: boolean 
 }
 
 export function AIMarketHighlights({ assets = [] }: { assets?: any[] }) {
-  const normalized = assets.map((asset) => ({
-    ...asset,
-    marketPrice: getMarketPrice(asset),
-    fairValue: getFairValue(asset),
-  }));
+  const { opportunities, warnings } = buildAIAnalystGroups(assets, 4);
 
-  const opportunities = [...normalized]
-    .filter((asset) => getValueGapPercent(asset) <= -5 || analyzeFootballAsset(asset).weightedScore >= 75)
-    .sort(sortByTechnicalOpportunity)
-    .slice(0, 4);
-
-  const overpriced = [...normalized]
-    .filter((asset) => getValueGapPercent(asset) >= 8)
-    .sort(sortByTechnicalOverprice)
-    .slice(0, 4);
-
-  if (!opportunities.length && !overpriced.length) return null;
+  if (!opportunities.length && !warnings.length) return null;
 
   return (
     <section className="mx-auto mb-6 max-w-[1500px] px-4 sm:px-6 lg:px-8">
@@ -90,7 +61,7 @@ export function AIMarketHighlights({ assets = [] }: { assets?: any[] }) {
           <div className="rounded-2xl border border-red-400/15 bg-red-400/5 p-3">
             <div className="mb-3 flex items-center gap-2 text-sm font-black text-red-300"><TrendingDown size={17} /> أصول تحتاج حذرًا</div>
             <div className="space-y-2">
-              {overpriced.length ? overpriced.map((asset) => <MiniAssetRow key={asset.id} asset={asset} danger />) : <p className="p-3 text-xs text-gray-500">لا توجد مبالغة فنية واضحة الآن.</p>}
+              {warnings.length ? warnings.map((asset) => <MiniAssetRow key={asset.id} asset={asset} danger />) : <p className="p-3 text-xs text-gray-500">لا توجد مبالغة فنية واضحة الآن.</p>}
             </div>
           </div>
         </div>
