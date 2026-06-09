@@ -1,4 +1,6 @@
+import Link from 'next/link';
 import { Metadata } from 'next';
+import { ArrowRight, Brain } from 'lucide-react';
 import MarketClient from '@/components/MarketClient';
 import { AIMarketHighlights } from '@/features/analysis/components/AIMarketHighlights';
 import prisma from '@/lib/prisma';
@@ -53,6 +55,19 @@ export default async function MarketPage() {
 
   return (
     <>
+      <section className="mx-auto max-w-[1500px] px-4 pt-6 sm:px-6 lg:px-8">
+        <div className="mb-5 flex flex-col gap-3 rounded-[1.5rem] border border-[#0FF0FC]/15 bg-[#0FF0FC]/5 p-4 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <div className="mb-1 inline-flex items-center gap-2 rounded-xl border border-[#0FF0FC]/20 bg-black/25 px-3 py-1 text-xs font-black text-[#0FF0FC]"><Brain size={14} /> AI Analyst</div>
+            <h1 className="text-xl font-black text-white lg:text-2xl">قراءة ذكية للسوق قبل التداول</h1>
+            <p className="mt-1 text-xs leading-6 text-gray-400 lg:text-sm">افتح صفحة التحليل الذكي لمشاهدة الفرص الفنية، التحذيرات السعرية، وأعلى جودة فنية.</p>
+          </div>
+          <Link href="/ai-analyst" className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#0FF0FC] px-5 py-3 text-sm font-black text-black transition hover:scale-[1.02] active:scale-[0.98]">
+            افتح AI Analyst <ArrowRight size={16} />
+          </Link>
+        </div>
+      </section>
+
       <AIMarketHighlights assets={analysisAssets} />
       <MarketClient
         usersCount={usersCount}
