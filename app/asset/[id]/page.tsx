@@ -1,7 +1,6 @@
 import { Metadata, ResolvingMetadata } from 'next';
 import AssetClient from '@/components/AssetClient';
 import { PlayerAnalysisPanel } from '@/components/PlayerAnalysisPanel';
-import { TeamAnalysisPanel } from '@/components/TeamAnalysisPanel';
 import TeamPitchLineup from '@/components/TeamPitchLineup';
 import prisma from '@/lib/prisma';
 import { apiFootballFetch } from '@/lib/apiFootball';
@@ -25,19 +24,13 @@ export async function generateMetadata(
 ): Promise<Metadata> {
   const { id } = await params;
 
-  const asset = await prisma.asset.findUnique({
-    where: { id },
-  });
+  const asset = await prisma.asset.findUnique({ where: { id } });
 
-  if (!asset) {
-    return { title: 'أصل غير موجود | MC PRIME Exchange' };
-  }
+  if (!asset) return { title: 'أصل غير موجود | MC PRIME Exchange' };
 
   const isValidOgImage =
     typeof asset.image === 'string' &&
-    (asset.image.startsWith('http://') ||
-     asset.image.startsWith('https://') ||
-     asset.image.startsWith('/'));
+    (asset.image.startsWith('http://') || asset.image.startsWith('https://') || asset.image.startsWith('/'));
 
   const ogImage = isValidOgImage ? asset.image : '/og-image.jpg';
 
@@ -173,9 +166,8 @@ export default async function AssetPage({ params }: Props) {
         />
       )}
       {isTeam && normalizedAsset && <TeamPitchLineup team={normalizedAsset} />}
-      {isTeam && normalizedAsset && <TeamAnalysisPanel team={normalizedAsset} />}
       {!isTeam && normalizedAsset && <PlayerAnalysisPanel asset={normalizedAsset} />}
-      <AssetClient />
+      {!isTeam && <AssetClient />}
     </>
   );
 }
