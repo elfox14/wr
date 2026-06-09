@@ -86,6 +86,51 @@ async function healthCheck() {
   };
 }
 
+async function recentMatches(limit = 30) {
+  const matches = await prisma.match.findMany({
+    where: { externalId: { not: null } },
+    orderBy: { matchDate: 'desc' },
+    take: Math.min(Math.max(limit, 1), 100),
+    include: {
+      homeTeam: { select: { id: true, name: true, image: true } },
+      awayTeam: { select: { id: true, name: true, image: true } },
+    },
+  });
+
+  const fixtureIds = matches
+    .map((match) => Number(match.externalId))
+    .filter((id) => Number.isFinite(id));
+
+  const performanceCounts = await prisma.playerPerformance.groupBy({
+    by: ['providerFixtureId'],
+    where: { providerFixtureId: { in: fixtureIds } },
+    _count: { id: true },
+  });
+
+  const countsByFixtureId = new Map(
+    performanceCounts.map((item) => [item.providerFixtureId, item._count.id])
+  );
+
+  return {
+    ok: true,
+    count: matches.length,
+    matches: matches.map((match) => {
+      const fixtureId = Number(match.externalId);
+      return {
+        id: match.id,
+        fixtureId,
+        matchDate: match.matchDate,
+        status: match.status,
+        homeScore: match.homeScore,
+        awayScore: match.awayScore,
+        homeTeam: match.homeTeam,
+        awayTeam: match.awayTeam,
+        performanceRecords: countsByFixtureId.get(fixtureId) || 0,
+      };
+    }),
+  };
+}
+
 export async function GET(req: Request) {
   const admin = await requireAdmin();
   if (admin.error) return admin.error;
@@ -95,10 +140,15 @@ export async function GET(req: Request) {
   const date = searchParams.get('date') || new Date().toISOString().slice(0, 10);
   const fixtureId = searchParams.get('fixtureId');
   const force = searchParams.get('force') === 'true';
+  const limit = Number(searchParams.get('limit') || 30);
 
   try {
     if (action === 'health') {
       return NextResponse.json(await healthCheck());
+    }
+
+    if (action === 'recent-matches') {
+      return NextResponse.json(await recentMatches(limit));
     }
 
     if (action === 'fixtures') {
