@@ -71,10 +71,15 @@ function mapIsportsParams(path: string, params: ApiFootballParams = {}, apiKey: 
       mapped.teamId = value;
       return;
     }
-    if ((path === '/teams' || path === '/standings') && key === 'league') {
-      mapped.leagueId = value;
+    if ((path === '/fixtures' || path === '/teams' || path === '/standings') && key === 'league') {
+      mapped.leagueID = value;
       return;
     }
+    if (key === 'from') {
+      mapped.date = value;
+      return;
+    }
+    if (key === 'to' || key === 'season') return;
     mapped[key] = value;
   });
   return mapped;
@@ -151,7 +156,7 @@ function normalizeIsportsFixture(item: any) {
   const homeId = item.homeId || item.home_id || item.homeTeamId || item.home_team_id || item.homeTeam?.id || item.home?.id;
   const awayId = item.awayId || item.away_id || item.awayTeamId || item.away_team_id || item.awayTeam?.id || item.away?.id;
   const homeLogo = item.homeLogo || item.home_logo || item.homeTeam?.logo || item.home?.logo;
-  const awayLogo = item.awayLogo || item.away_logo || item.homeTeam?.logo || item.away?.logo;
+  const awayLogo = item.awayLogo || item.away_logo || item.awayTeam?.logo || item.away?.logo;
   const matchTime = item.matchTime || item.match_time || item.date || item.time || item.kickoffTime || item.startTime;
   return {
     fixture: { id: fixtureId, date: matchTime, timestamp: item.timestamp, status: { short: item.status || item.statusCode || item.status_code || item.matchStatus || item.match_status, long: item.statusName || item.status_name || item.status || item.matchStatus } },
@@ -173,20 +178,7 @@ function normalizeIsportsSquad(path: string, payload: any, params?: ApiFootballP
   const items = getArrayPayload(payload);
   const teamId = Number(params?.team || items?.[0]?.teamId || items?.[0]?.team_id || 0);
   const teamName = items?.[0]?.teamName || items?.[0]?.team_name;
-  return {
-    ...payload,
-    response: [{
-      team: { id: teamId || undefined, name: teamName },
-      players: items.map((item: any) => ({
-        id: Number(item.playerId ?? item.player_id ?? item.id),
-        name: item.name ?? item.playerName ?? item.player_name,
-        age: item.age,
-        number: item.number ?? item.shirtNumber ?? item.shirt_number,
-        position: item.position,
-        photo: item.photo || item.avatar || item.image,
-      })),
-    }],
-  };
+  return { ...payload, response: [{ team: { id: teamId || undefined, name: teamName }, players: items.map((item: any) => ({ id: Number(item.playerId ?? item.player_id ?? item.id), name: item.name ?? item.playerName ?? item.player_name, age: item.age, number: item.number ?? item.shirtNumber ?? item.shirt_number, position: item.position, photo: item.photo || item.avatar || item.image })) }] };
 }
 
 function normalizeIsportsPlayerStats(item: any) {
@@ -201,10 +193,7 @@ function normalizeIsportsPlayerStats(item: any) {
   const playerId = player.id ?? item.playerId ?? item.player_id ?? item.id;
   const playerName = player.name ?? item.playerName ?? item.player_name ?? item.name;
   const teamName = team.name ?? item.teamName ?? item.team_name;
-  return {
-    player: { id: playerId == null ? undefined : Number(playerId), name: playerName },
-    statistics: [{ team: { name: teamName, id: team.id ?? item.teamId ?? item.team_id }, games: { minutes: item.minutes ?? item.playedMinutes ?? item.played_minutes ?? games.minutes, position: item.position ?? games.position, captain: item.captain ?? games.captain, lineups: item.lineups ?? item.started ?? item.isStart ?? item.is_start ?? games.lineups, rating: item.rating ?? item.score ?? games.rating }, goals: { total: item.goals ?? item.goal ?? goals.total, assists: item.assists ?? item.assist ?? goals.assists, conceded: item.goalsConceded ?? item.goals_conceded ?? goals.conceded, saves: item.saves ?? goals.saves }, shots: { total: item.shotsTotal ?? item.shots_total ?? shots.total, on: item.shotsOnTarget ?? item.shots_on_target ?? shots.on }, passes: { total: item.passes ?? item.passesTotal ?? item.passes_total ?? passes.total, key: item.keyPasses ?? item.key_passes ?? passes.key, accuracy: item.passAccuracy ?? item.pass_accuracy ?? passes.accuracy }, tackles: { total: item.tackles ?? item.tacklesTotal ?? item.tackles_total ?? tackles.total, interceptions: item.interceptions ?? tackles.interceptions }, cards: { yellow: item.yellowCards ?? item.yellow_cards ?? cards.yellow, red: item.redCards ?? item.red_cards ?? cards.red }, raw: item }],
-  };
+  return { player: { id: playerId == null ? undefined : Number(playerId), name: playerName }, statistics: [{ team: { name: teamName, id: team.id ?? item.teamId ?? item.team_id }, games: { minutes: item.minutes ?? item.playedMinutes ?? item.played_minutes ?? games.minutes, position: item.position ?? games.position, captain: item.captain ?? games.captain, lineups: item.lineups ?? item.started ?? item.isStart ?? item.is_start ?? games.lineups, rating: item.rating ?? item.score ?? games.rating }, goals: { total: item.goals ?? item.goal ?? goals.total, assists: item.assists ?? item.assist ?? goals.assists, conceded: item.goalsConceded ?? item.goals_conceded ?? goals.conceded, saves: item.saves ?? goals.saves }, shots: { total: item.shotsTotal ?? item.shots_total ?? shots.total, on: item.shotsOnTarget ?? item.shots_on_target ?? shots.on }, passes: { total: item.passes ?? item.passesTotal ?? item.passes_total ?? passes.total, key: item.keyPasses ?? item.key_passes ?? passes.key, accuracy: item.passAccuracy ?? item.pass_accuracy ?? passes.accuracy }, tackles: { total: item.tackles ?? item.tacklesTotal ?? item.tackles_total ?? tackles.total, interceptions: item.interceptions ?? tackles.interceptions }, cards: { yellow: item.yellowCards ?? item.yellow_cards ?? cards.yellow, red: item.redCards ?? item.red_cards ?? cards.red }, raw: item }] };
 }
 
 function normalizeIsportsPayload(path: string, payload: any, params?: ApiFootballParams) {
