@@ -5,6 +5,7 @@ import { AssetImage } from '@/components/ui/AssetImage';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { MarketAnalysisBadge } from '@/features/analysis/components/MarketAnalysisBadge';
 import { analyzeFootballAsset } from '@/features/analysis/lib/analysis-adapter';
+import { formatVirtualCoins, getFairValue, getMarketPrice, getValueGapPercent } from '@/features/analysis/lib/value-fit';
 import prisma from '@/lib/prisma';
 
 export const metadata: Metadata = {
@@ -12,29 +13,11 @@ export const metadata: Metadata = {
   description: 'تحليل ذكي يربط بين السعر الافتراضي، القيمة العادلة، والتحليل الفني داخل الملعب.',
 };
 
-function marketPrice(asset: any) {
-  return Number(asset?.marketPrice ?? asset?.current_price ?? 0);
-}
-
-function fairValue(asset: any) {
-  return Number(asset?.fairValue ?? asset?.current_price ?? marketPrice(asset));
-}
-
-function priceGap(asset: any) {
-  const fair = fairValue(asset);
-  if (!fair) return 0;
-  return ((marketPrice(asset) - fair) / fair) * 100;
-}
-
-function formatPrice(value: number) {
-  return `${Math.round(Number(value || 0)).toLocaleString()}¢`;
-}
-
 function normalizeAsset(asset: any) {
   return {
     ...asset,
-    marketPrice: marketPrice(asset),
-    fairValue: fairValue(asset),
+    marketPrice: getMarketPrice(asset),
+    fairValue: getFairValue(asset),
     momentum: Number(asset?.momentum ?? 50),
     marketDemand: Number(asset?.marketDemand ?? 50),
     volatilityScore: Number(asset?.volatilityScore ?? 50),
@@ -43,19 +26,19 @@ function normalizeAsset(asset: any) {
 
 function analystScore(asset: any) {
   const analysis = analyzeFootballAsset(asset);
-  const gap = priceGap(asset);
+  const gap = getValueGapPercent(asset);
   return analysis.weightedScore + Math.max(0, -gap) * 1.4 - Math.max(0, gap) * 0.6;
 }
 
 function warningScore(asset: any) {
   const analysis = analyzeFootballAsset(asset);
-  const gap = priceGap(asset);
+  const gap = getValueGapPercent(asset);
   return Math.max(0, gap) * 1.8 + Math.max(0, 70 - analysis.weightedScore) + Number(asset.volatilityScore ?? 50) * 0.25;
 }
 
 function AssetRow({ asset, danger = false }: { asset: any; danger?: boolean }) {
   const analysis = analyzeFootballAsset(asset);
-  const gap = priceGap(asset);
+  const gap = getValueGapPercent(asset);
   const typeLabel = asset.type === 'TEAM' ? 'منتخب' : 'لاعب';
 
   return (
@@ -70,7 +53,7 @@ function AssetRow({ asset, danger = false }: { asset: any; danger?: boolean }) {
               {gap > 0 ? '+' : ''}{gap.toFixed(1)}%
             </span>
           </div>
-          <p className="mt-1 text-xs text-gray-500">السوق {formatPrice(marketPrice(asset))} · العادلة {formatPrice(fairValue(asset))} · Technical {analysis.weightedScore}</p>
+          <p className="mt-1 text-xs text-gray-500">السوق {formatVirtualCoins(getMarketPrice(asset))} · العادلة {formatVirtualCoins(getFairValue(asset))} · Technical {analysis.weightedScore}</p>
         </div>
         <ArrowRight size={16} className="text-gray-500 transition group-hover:text-[#0FF0FC]" />
       </div>
