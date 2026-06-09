@@ -109,6 +109,14 @@ function simplifyPlayerStats(item: any) {
   };
 }
 
+async function countInvalidMatches() {
+  const all = await prisma.match.findMany({
+    where: { externalId: { not: null } },
+    select: { homeTeamId: true, awayTeamId: true },
+  });
+  return all.filter((match) => match.homeTeamId === match.awayTeamId).length;
+}
+
 async function healthCheck() {
   const [assets, teams, players, matches, performances, news, invalidMatches] = await Promise.all([
     prisma.asset.count(),
@@ -117,10 +125,7 @@ async function healthCheck() {
     prisma.match.count(),
     prisma.playerPerformance.count(),
     prisma.marketNews.count(),
-    prisma.match.count({ where: { externalId: { not: null }, homeTeamId: { equals: prisma.match.fields.awayTeamId } } } as any).catch(async () => {
-      const all = await prisma.match.findMany({ where: { externalId: { not: null } }, select: { homeTeamId: true, awayTeamId: true } });
-      return all.filter((match) => match.homeTeamId === match.awayTeamId).length;
-    }),
+    countInvalidMatches(),
   ]);
 
   return {
@@ -214,7 +219,13 @@ async function cleanupInvalidMatches(dryRun = true) {
   const fixtureIds = scan.matches.map((match: any) => match.fixtureId).filter(Boolean);
 
   if (dryRun || ids.length === 0) {
-    return { ok: true, dryRun, deletedMatches: 0, deletedPerformances: 0, ...scan };
+    return {
+      ...scan,
+      ok: true,
+      dryRun,
+      deletedMatches: 0,
+      deletedPerformances: 0,
+    };
   }
 
   const [performanceDelete, matchDelete] = await prisma.$transaction([
