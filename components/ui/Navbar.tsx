@@ -19,7 +19,8 @@ import {
   ChevronDown,
   Coins,
   ShieldAlert,
-  BookOpen
+  BookOpen,
+  Brain
 } from 'lucide-react';
 import { useStore } from '@/lib/store';
 import { InsufficientFundsModal } from './InsufficientFundsModal';
@@ -58,6 +59,7 @@ export function Navbar() {
 
   const navLinks = [
     { name: 'السوق', href: '/market', icon: <TrendingUp size={16} /> },
+    { name: 'AI Analyst', href: '/ai-analyst', icon: <Brain size={16} /> },
     { name: 'المباريات', href: '/matches', icon: <CalendarDays size={16} /> },
     { name: 'المجموعات', href: '/groups', icon: <Grid3X3 size={16} /> },
     { name: 'الترتيب', href: '/leaderboard', icon: <Trophy size={16} /> },
