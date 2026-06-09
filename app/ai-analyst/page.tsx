@@ -5,6 +5,7 @@ import { AssetImage } from '@/components/ui/AssetImage';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { MarketAnalysisBadge } from '@/features/analysis/components/MarketAnalysisBadge';
 import { analyzeFootballAsset } from '@/features/analysis/lib/analysis-adapter';
+import { buildAIAnalystGroups } from '@/features/analysis/lib/ai-analyst-ranking';
 import { formatVirtualCoins, getFairValue, getMarketPrice, getValueGapPercent } from '@/features/analysis/lib/value-fit';
 import prisma from '@/lib/prisma';
 
@@ -13,27 +14,12 @@ export const metadata: Metadata = {
   description: 'تحليل ذكي يربط بين السعر الافتراضي، القيمة العادلة، والتحليل الفني داخل الملعب.',
 };
 
-function normalizeAsset(asset: any) {
-  return {
-    ...asset,
-    marketPrice: getMarketPrice(asset),
-    fairValue: getFairValue(asset),
-    momentum: Number(asset?.momentum ?? 50),
-    marketDemand: Number(asset?.marketDemand ?? 50),
-    volatilityScore: Number(asset?.volatilityScore ?? 50),
-  };
-}
-
-function analystScore(asset: any) {
-  const analysis = analyzeFootballAsset(asset);
-  const gap = getValueGapPercent(asset);
-  return analysis.weightedScore + Math.max(0, -gap) * 1.4 - Math.max(0, gap) * 0.6;
-}
-
-function warningScore(asset: any) {
-  const analysis = analyzeFootballAsset(asset);
-  const gap = getValueGapPercent(asset);
-  return Math.max(0, gap) * 1.8 + Math.max(0, 70 - analysis.weightedScore) + Number(asset.volatilityScore ?? 50) * 0.25;
+function EmptyState({ text }: { text: string }) {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-black/25 p-6 text-center text-sm font-bold leading-7 text-gray-500">
+      {text}
+    </div>
+  );
 }
 
 function AssetRow({ asset, danger = false }: { asset: any; danger?: boolean }) {
@@ -91,10 +77,7 @@ export default async function AIAnalystPage() {
     take: 120,
   });
 
-  const assets = rawAssets.map(normalizeAsset);
-  const opportunities = [...assets].sort((a, b) => analystScore(b) - analystScore(a)).slice(0, 6);
-  const warnings = [...assets].sort((a, b) => warningScore(b) - warningScore(a)).slice(0, 6);
-  const highTechnical = [...assets].sort((a, b) => analyzeFootballAsset(b).weightedScore - analyzeFootballAsset(a).weightedScore).slice(0, 6);
+  const { assets, opportunities, warnings, highTechnical } = buildAIAnalystGroups(rawAssets, 6);
 
   return (
     <main className="min-h-screen bg-background px-4 py-8 text-foreground sm:px-6 lg:px-8">
@@ -125,19 +108,23 @@ export default async function AIAnalystPage() {
           </div>
         </div>
 
-        <div className="grid gap-5 xl:grid-cols-3">
-          <Section title="فرص فنية" tone="green" icon={<TrendingUp size={16} />} description="أصول تجمع بين Technical Score جيد وسعر أقل أو قريب من القيمة العادلة.">
-            {opportunities.map((asset) => <AssetRow key={asset.id} asset={asset} />)}
-          </Section>
+        {assets.length === 0 ? (
+          <EmptyState text="لا توجد أصول كافية للتحليل بعد. بعد إضافة المنتخبات واللاعبين سيظهر AI Analyst تلقائيًا." />
+        ) : (
+          <div className="grid gap-5 xl:grid-cols-3">
+            <Section title="فرص فنية" tone="green" icon={<TrendingUp size={16} />} description="أصول تجمع بين Technical Score جيد وسعر أقل أو قريب من القيمة العادلة.">
+              {opportunities.length ? opportunities.map((asset) => <AssetRow key={asset.id} asset={asset} />) : <EmptyState text="لا توجد فرص فنية واضحة الآن." />}
+            </Section>
 
-          <Section title="تحذيرات سعرية" tone="red" icon={<TrendingDown size={16} />} description="أصول قد يكون السعر الحالي أعلى من المبرر الفني أو أكثر تقلبًا من اللازم.">
-            {warnings.map((asset) => <AssetRow key={asset.id} asset={asset} danger />)}
-          </Section>
+            <Section title="تحذيرات سعرية" tone="red" icon={<TrendingDown size={16} />} description="أصول قد يكون السعر الحالي أعلى من المبرر الفني أو أكثر تقلبًا من اللازم.">
+              {warnings.length ? warnings.map((asset) => <AssetRow key={asset.id} asset={asset} danger />) : <EmptyState text="لا توجد تحذيرات سعرية واضحة الآن." />}
+            </Section>
 
-          <Section title="أعلى جودة فنية" tone="cyan" icon={<Brain size={16} />} description="أفضل اللاعبين والمنتخبات من ناحية القراءة الفنية، بغض النظر عن السعر الحالي.">
-            {highTechnical.map((asset) => <AssetRow key={asset.id} asset={asset} />)}
-          </Section>
-        </div>
+            <Section title="أعلى جودة فنية" tone="cyan" icon={<Brain size={16} />} description="أفضل اللاعبين والمنتخبات من ناحية القراءة الفنية، بغض النظر عن السعر الحالي.">
+              {highTechnical.length ? highTechnical.map((asset) => <AssetRow key={asset.id} asset={asset} />) : <EmptyState text="لا توجد قراءة فنية كافية الآن." />}
+            </Section>
+          </div>
+        )}
       </div>
     </main>
   );
