@@ -235,12 +235,12 @@ export async function GET(req: Request) {
           lt: new Date(`${date}T23:59:59.999Z`),
         },
         status: { in: ['IN_PLAY', 'FINISHED'] },
-        NOT: { homeTeamId: { equals: prisma.match.fields.awayTeamId } },
       },
       take: 50,
     });
 
     for (const match of todayMatches) {
+      if (match.homeTeamId === match.awayTeamId) continue;
       const fixtureId = Number(match.externalId);
       if (fixtureId && !syncCandidates.has(fixtureId)) {
         syncCandidates.set(fixtureId, { fixture: null, force: match.status === 'IN_PLAY' || force });
