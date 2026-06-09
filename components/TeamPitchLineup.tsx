@@ -134,14 +134,14 @@ export default function TeamPitchLineup({ team }: { team: any }) {
         <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <div className="mb-2 flex flex-wrap items-center gap-2">
-              <span className="inline-flex items-center gap-2 rounded-xl border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-xs font-black text-emerald-300"><ShieldCheck size={14} /> التشكيل الفني للمنتخب</span>
+              <span className="inline-flex items-center gap-2 rounded-xl border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-xs font-black text-emerald-300"><ShieldCheck size={14} /> قائمة الفريق</span>
               <span className={`inline-flex items-center gap-2 rounded-xl border px-3 py-1 text-xs font-black ${hasOfficialLineup ? 'border-[#0FF0FC]/30 bg-[#0FF0FC]/10 text-[#0FF0FC]' : 'border-[#FFD700]/30 bg-[#FFD700]/10 text-[#FFD700]'}`}>
                 {hasOfficialLineup ? <BadgeCheck size={14} /> : <AlertCircle size={14} />}{statusLabel}
               </span>
               {officialLineup?.formation && <span className="rounded-xl border border-white/10 bg-white/5 px-3 py-1 text-xs font-black text-gray-300">الخطة {officialLineup.formation}</span>}
             </div>
-            <h2 className="text-2xl font-black text-white md:text-3xl">الأساسيون على الملعب والاحتياطيون حوله</h2>
-            <p className="mt-1 max-w-4xl text-sm leading-7 text-gray-400">{sourceHint}</p>
+            <h2 className="text-2xl font-black text-white md:text-3xl">قائمة الفريق</h2>
+            <p className="mt-1 max-w-4xl text-sm leading-7 text-gray-400">الأساسيون يظهرون داخل الملعب، وباقي لاعبي القائمة يظهرون كاحتياطيين حول الملعب. {sourceHint}</p>
           </div>
           <div className="grid grid-cols-3 gap-2 text-center text-xs">
             <div className="rounded-2xl border border-white/10 bg-black/30 px-4 py-3"><p className="text-gray-500">الأساسيون</p><p className="text-xl font-black text-white">{starters.length}</p></div>
