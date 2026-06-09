@@ -133,7 +133,7 @@ function MobileLine({ title, players }: { title: string; players: PlayerAsset[] 
 
 function SubstituteCard({ player }: { player: PlayerAsset }) {
   return (
-    <Link href={`/asset/${player.id}`} className="flex min-w-[210px] items-center gap-2 rounded-2xl border border-white/10 bg-black/35 p-2 transition active:scale-[0.98] hover:border-[#FFD700]/35 hover:bg-[#FFD700]/10 xl:min-w-0">
+    <Link href={`/asset/${player.id}`} className="flex w-full items-center gap-2 rounded-2xl border border-white/10 bg-black/35 p-2 transition active:scale-[0.98] hover:border-[#FFD700]/35 hover:bg-[#FFD700]/10">
       <AssetImage image={player.image || ''} type="PLAYER" name={player.name} width={30} height={30} className="h-8 w-8 rounded-full object-cover" />
       <div className="min-w-0 flex-1">
         <p className="truncate text-xs font-black text-white">{player.name}</p>
@@ -222,16 +222,28 @@ export default function TeamPitchLineup({ team }: { team: any }) {
             </div>
 
             <aside className="rounded-[1.5rem] border border-white/10 bg-white/[0.04] p-3 lg:rounded-[2rem] lg:p-4">
-              <div className="mb-3 flex items-center justify-between gap-3 lg:mb-4">
+              <div className="mb-3 hidden items-center justify-between gap-3 lg:flex lg:mb-4">
                 <h3 className="flex items-center gap-2 font-black text-white"><Users size={18} className="text-[#FFD700]" /> الاحتياطيون</h3>
                 <span className="rounded-full bg-[#FFD700]/10 px-2 py-1 text-[10px] font-black text-[#FFD700]">Bench</span>
               </div>
               {substitutes.length === 0 ? (
                 <p className="rounded-2xl border border-white/10 bg-black/30 p-4 text-sm text-gray-400">لا يوجد لاعبون احتياطيون ظاهرون حاليًا.</p>
               ) : (
-                <div className="flex gap-2 overflow-x-auto pb-1 pr-1 xl:block xl:max-h-[590px] xl:space-y-2 xl:overflow-auto">
-                  {substitutes.map((player) => <SubstituteCard key={player.id} player={player} />)}
-                </div>
+                <>
+                  <details className="group lg:hidden">
+                    <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-2xl border border-[#FFD700]/20 bg-[#FFD700]/10 px-4 py-3 text-sm font-black text-[#FFD700] active:scale-[0.99]">
+                      <span className="flex items-center gap-2"><Users size={18} /> عرض الاحتياطيين</span>
+                      <span className="rounded-full bg-black/35 px-2 py-1 text-[11px] text-white">{substitutes.length}</span>
+                    </summary>
+                    <div className="mt-3 max-h-[58vh] space-y-2 overflow-y-auto rounded-2xl border border-white/10 bg-black/25 p-2">
+                      {substitutes.map((player) => <SubstituteCard key={player.id} player={player} />)}
+                    </div>
+                  </details>
+
+                  <div className="hidden max-h-[590px] space-y-2 overflow-auto pr-1 lg:block">
+                    {substitutes.map((player) => <SubstituteCard key={player.id} player={player} />)}
+                  </div>
+                </>
               )}
             </aside>
           </div>
