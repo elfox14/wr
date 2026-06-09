@@ -40,6 +40,15 @@ function normalizePosition(position?: string | null) {
   return value || 'MID';
 }
 
+function positionLabel(position?: string | null) {
+  const pos = normalizePosition(position);
+  if (pos === 'GK') return 'حارس';
+  if (pos === 'DEF') return 'دفاع';
+  if (pos === 'MID') return 'وسط';
+  if (pos === 'FWD') return 'هجوم';
+  return pos;
+}
+
 function sortBest(players: PlayerAsset[]) {
   return [...players].sort((a, b) => {
     const bScore = Number(b.score ?? b.lastPerformanceRating ?? b.marketPrice ?? b.current_price ?? 0);
@@ -94,13 +103,41 @@ function Line({ players }: { players: PlayerAsset[] }) {
   return <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-3 md:gap-7">{players.map((player) => <PlayerDot key={player.id} player={player} />)}</div>;
 }
 
+function MobileStarterCard({ player }: { player: PlayerAsset }) {
+  return (
+    <Link href={`/asset/${player.id}`} className="flex items-center gap-2 rounded-2xl border border-white/10 bg-black/35 p-2 active:scale-[0.98]">
+      <AssetImage image={player.image || ''} type="PLAYER" name={player.name} width={34} height={34} className="h-9 w-9 rounded-xl object-cover" />
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-xs font-black text-white">{player.name}</p>
+        <p className="text-[10px] text-gray-400">{positionLabel(player.position)} • {priceOf(player)}¢</p>
+      </div>
+      <span className="rounded-full bg-[#0FF0FC]/15 px-2 py-1 text-[10px] font-black text-[#0FF0FC]">{scoreOf(player)}</span>
+    </Link>
+  );
+}
+
+function MobileLine({ title, players }: { title: string; players: PlayerAsset[] }) {
+  if (!players.length) return null;
+  return (
+    <div className="rounded-2xl border border-white/10 bg-white/[0.035] p-2">
+      <div className="mb-2 flex items-center justify-between px-1">
+        <span className="text-xs font-black text-white">{title}</span>
+        <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-black text-gray-300">{players.length}</span>
+      </div>
+      <div className="grid grid-cols-1 gap-2">
+        {players.map((player) => <MobileStarterCard key={player.id} player={player} />)}
+      </div>
+    </div>
+  );
+}
+
 function SubstituteCard({ player }: { player: PlayerAsset }) {
   return (
     <Link href={`/asset/${player.id}`} className="flex min-w-[210px] items-center gap-2 rounded-2xl border border-white/10 bg-black/35 p-2 transition active:scale-[0.98] hover:border-[#FFD700]/35 hover:bg-[#FFD700]/10 xl:min-w-0">
       <AssetImage image={player.image || ''} type="PLAYER" name={player.name} width={30} height={30} className="h-8 w-8 rounded-full object-cover" />
       <div className="min-w-0 flex-1">
         <p className="truncate text-xs font-black text-white">{player.name}</p>
-        <p className="text-[10px] text-gray-400">{normalizePosition(player.position)} • {priceOf(player)}¢</p>
+        <p className="text-[10px] text-gray-400">{positionLabel(player.position)} • {priceOf(player)}¢</p>
       </div>
       <span className="rounded-full bg-white/10 px-2 py-1 text-[10px] font-black text-gray-300">{scoreOf(player)}</span>
     </Link>
@@ -141,7 +178,8 @@ export default function TeamPitchLineup({ team }: { team: any }) {
               {officialLineup?.formation && <span className="rounded-xl border border-white/10 bg-white/5 px-3 py-1 text-xs font-black text-gray-300">الخطة {officialLineup.formation}</span>}
             </div>
             <h2 className="text-xl font-black text-white sm:text-2xl md:text-3xl">قائمة الفريق</h2>
-            <p className="mt-1 max-w-4xl text-xs leading-6 text-gray-400 sm:text-sm sm:leading-7">الأساسيون داخل الملعب والاحتياطيون حوله. {sourceHint}</p>
+            <p className="mt-1 hidden max-w-4xl text-sm leading-7 text-gray-400 sm:block">الأساسيون داخل الملعب والاحتياطيون حوله. {sourceHint}</p>
+            <p className="mt-1 text-xs leading-6 text-gray-400 sm:hidden">عرض مختصر للتشكيل الأساسي والاحتياطيين بدون مساحة ملعب فارغة.</p>
           </div>
           <div className="grid grid-cols-3 gap-2 text-center text-xs">
             <div className="rounded-2xl border border-white/10 bg-black/30 px-3 py-2 sm:px-4 sm:py-3"><p className="text-gray-500">الأساسيون</p><p className="text-lg font-black text-white sm:text-xl">{starters.length}</p></div>
@@ -156,13 +194,26 @@ export default function TeamPitchLineup({ team }: { team: any }) {
           </div>
         ) : (
           <div className="grid gap-4 xl:grid-cols-[1fr_340px]">
-            <div className="relative overflow-hidden rounded-[1.5rem] border border-emerald-400/20 bg-[radial-gradient(circle_at_center,rgba(16,185,129,0.30),rgba(2,44,34,0.92))] p-3 shadow-inner sm:rounded-[2rem] sm:p-4 md:p-6">
+            <div className="block rounded-[1.5rem] border border-emerald-400/20 bg-[radial-gradient(circle_at_top,rgba(16,185,129,0.20),rgba(4,18,14,0.96))] p-3 sm:hidden">
+              <div className="mb-3 flex items-center justify-between">
+                <h3 className="font-black text-white">التشكيل الأساسي</h3>
+                <span className="rounded-full bg-emerald-400/10 px-3 py-1 text-[10px] font-black text-emerald-300">Starting XI</span>
+              </div>
+              <div className="space-y-2">
+                <MobileLine title="الهجوم" players={lines.FWD.length ? lines.FWD : lines.OTHER.slice(0, 3)} />
+                <MobileLine title="الوسط" players={lines.MID} />
+                <MobileLine title="الدفاع" players={lines.DEF} />
+                <MobileLine title="حراسة المرمى" players={lines.GK.length ? lines.GK : lines.OTHER.slice(3, 4)} />
+              </div>
+            </div>
+
+            <div className="relative hidden overflow-hidden rounded-[1.5rem] border border-emerald-400/20 bg-[radial-gradient(circle_at_center,rgba(16,185,129,0.30),rgba(2,44,34,0.92))] p-3 shadow-inner sm:block sm:rounded-[2rem] sm:p-4 md:p-6">
               <div className="absolute inset-3 rounded-[1.2rem] border-2 border-white/15 sm:inset-4 sm:rounded-[1.5rem]" />
               <div className="absolute left-1/2 top-1/2 h-20 w-20 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white/15 sm:h-24 sm:w-24" />
               <div className="absolute left-1/2 top-1/2 h-px w-[calc(100%-1.5rem)] -translate-x-1/2 bg-white/15 sm:w-[calc(100%-2rem)]" />
               <div className="absolute left-1/2 top-0 h-14 w-32 -translate-x-1/2 rounded-b-full border-x-2 border-b-2 border-white/15 sm:h-20 sm:w-44" />
               <div className="absolute bottom-0 left-1/2 h-14 w-32 -translate-x-1/2 rounded-t-full border-x-2 border-t-2 border-white/15 sm:h-20 sm:w-44" />
-              <div className="relative z-10 flex min-h-[380px] flex-col justify-between py-4 sm:min-h-[500px] sm:py-6 md:min-h-[560px]">
+              <div className="relative z-10 flex min-h-[500px] flex-col justify-between py-6 md:min-h-[560px]">
                 <Line players={lines.FWD.length ? lines.FWD : lines.OTHER.slice(0, 3)} />
                 <Line players={lines.MID} />
                 <Line players={lines.DEF} />
