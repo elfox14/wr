@@ -1,30 +1,27 @@
-'use client';
+import { redirect } from 'next/navigation';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
+import AdminHomeDashboard from '@/components/admin/AdminHomeDashboard';
 
-import { useEffect } from 'react';
-import { useSession } from 'next-auth/react';
-import { useRouter } from 'next/navigation';
-import AdminApiDashboard from '@/components/admin/AdminApiDashboard';
+type AdminSession = {
+  user?: {
+    email?: string | null;
+    role?: string | null;
+  };
+} | null;
 
-function isAdmin(email?: string | null, role?: string | null) {
-  return role === 'ADMIN' || email === 'admin@worldcup.com' || email === 'elfox14usa@gmail.com';
+function isAdmin(session: AdminSession) {
+  const email = session?.user?.email || '';
+  return session?.user?.role === 'ADMIN' || email === 'admin@worldcup.com' || email === 'elfox14usa@gmail.com';
 }
 
-export default function AdminPage() {
-  const { data: session, status } = useSession();
-  const router = useRouter();
+export const metadata = {
+  title: 'لوحة الإدارة | MC PRIME Exchange',
+};
 
-  useEffect(() => {
-    if (status === 'unauthenticated') router.push('/login');
-    if (status === 'authenticated' && !isAdmin(session?.user?.email, (session?.user as any)?.role)) router.push('/');
-  }, [status, session, router]);
-
-  if (status === 'loading') {
-    return <div className="min-h-screen bg-[#050505] p-10 text-center text-white">جاري تحميل لوحة الإدارة...</div>;
-  }
-
-  if (!isAdmin(session?.user?.email, (session?.user as any)?.role)) {
-    return <div className="min-h-screen bg-[#050505] p-10 text-center text-white">غير مصرح لك بالدخول.</div>;
-  }
-
-  return <AdminApiDashboard />;
+export default async function AdminPage() {
+  const session = await getServerSession(authOptions as any) as AdminSession;
+  if (!session?.user) redirect('/login');
+  if (!isAdmin(session)) redirect('/');
+  return <AdminHomeDashboard />;
 }
