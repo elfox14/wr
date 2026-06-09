@@ -90,7 +90,7 @@ model Notification {
   id        String   @id @default(cuid())
   userId    String
   user      User     @relation(fields: [userId], references: [id])
-  title     String
+  title     String   
   message   String
   type      String   // INFO, SUCCESS, WARNING, ERROR
   read      Boolean  @default(false)
@@ -181,6 +181,7 @@ model Asset {
 
   // --- EXTERNAL PERFORMANCE PROVIDERS ---
   apiFootballId          Int?
+  isportsId              Int?
   lastPerformanceRating  Float?
   lastPerformanceSyncAt  DateTime?
   // --------------------------------------
@@ -202,6 +203,7 @@ model Asset {
   performances  PlayerPerformance[]
 
   @@index([apiFootballId])
+  @@index([isportsId])
 }
 
 model Match {
@@ -341,32 +343,54 @@ model CaptainSelection {
 model LeagueMatch {
   id         String   @id @default(cuid())
   leagueId   String
-  league     League   @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+  league     League  @relation(fields: [leagueId], references: [id], onDelete: Cascade)
   userAId    String
+  userA      User    @relation("MatchUserA", fields: [userAId], references: [id])
   userBId    String
-  userA      User     @relation("MatchUserA", fields: [userAId], references: [id])
-  userB      User     @relation("MatchUserB", fields: [userBId], references: [id])
-  winnerId   String?  // Null if draw
-  matchweek  Int
+  userB      User    @relation("MatchUserB", fields: [userBId], references: [id])
+
+  scoreA     Int     @default(0)
+  scoreB     Int     @default(0)
+  status     String  @default("PENDING") // PENDING, PLAYED
+  round      Int
+
   createdAt  DateTime @default(now())
+
+  @@unique([leagueId, userAId, userBId, round])
+}
+
+model CaptainSelectionHistory {
+  id        String   @id @default(cuid())
+  userId    String
+  assetId   String
+  round     Int
+  score     Int
+  createdAt DateTime @default(now())
 }
 
 model UserAchievement {
-  id          String   @id @default(cuid())
-  userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  badgeId     String   // E.g., 'DIAMOND_HANDS', 'WOLF_OF_WALL_STREET'
-  earnedAt    DateTime @default(now())
+  id             String   @id @default(cuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  achievementKey String
+  unlockedAt     DateTime @default(now())
 
-  @@unique([userId, badgeId])
+  @@unique([userId, achievementKey])
 }
 
 model AdSession {
-  id        String   @id @default(cuid())
-  token     String   @unique
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  type      String   @default("REGULAR") // REGULAR or BOOSTED
-  claimed   Boolean  @default(false)
-  createdAt DateTime @default(now())
+  id               String   @id @default(cuid())
+  userId           String
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  adType           String   // "INTERSTITIAL", "REWARDED"
+  provider         String   // "ADMOB", "APPLOVIN", etc.
+  status           String   // "STARTED", "COMPLETED", "FAILED"
+  rewardAmount     Int      @default(0)
+  placement        String?
+  externalAdId     String?
+  createdAt        DateTime @default(now())
+  completedAt      DateTime?
+
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
 }
