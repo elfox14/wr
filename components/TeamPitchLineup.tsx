@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { AlertCircle, BadgeCheck, Bench, CircleDot, ShieldCheck, Users } from 'lucide-react';
+import { AlertCircle, BadgeCheck, CircleDot, ShieldCheck, Users } from 'lucide-react';
 import { AssetImage } from '@/components/ui/AssetImage';
 
 type PlayerAsset = {
@@ -172,7 +172,7 @@ export default function TeamPitchLineup({ team }: { team: any }) {
 
             <aside className="rounded-[2rem] border border-white/10 bg-white/[0.04] p-4">
               <div className="mb-4 flex items-center justify-between gap-3">
-                <h3 className="flex items-center gap-2 font-black text-white"><Bench size={18} className="text-[#FFD700]" /> الاحتياطيون حول الملعب</h3>
+                <h3 className="flex items-center gap-2 font-black text-white"><Users size={18} className="text-[#FFD700]" /> الاحتياطيون حول الملعب</h3>
                 <span className="rounded-full bg-[#FFD700]/10 px-2 py-1 text-[10px] font-black text-[#FFD700]">Bench</span>
               </div>
               {substitutes.length === 0 ? (
