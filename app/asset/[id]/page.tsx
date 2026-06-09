@@ -4,6 +4,7 @@ import { PlayerAnalysisPanel } from '@/components/PlayerAnalysisPanel';
 import TeamPitchLineup from '@/components/TeamPitchLineup';
 import TeamOverviewPanel from '@/components/TeamOverviewPanel';
 import TeamTradePanel from '@/components/TeamTradePanel';
+import { StickyTradeCTA } from '@/components/ui/StickyTradeCTA';
 import prisma from '@/lib/prisma';
 import { apiFootballFetch } from '@/lib/apiFootball';
 
@@ -172,6 +173,7 @@ export default async function AssetPage({ params }: Props) {
       {isTeam && normalizedAsset && <TeamOverviewPanel team={normalizedAsset} />}
       {!isTeam && normalizedAsset && <PlayerAnalysisPanel asset={normalizedAsset} />}
       {!isTeam && <AssetClient />}
+      {normalizedAsset && <StickyTradeCTA assetId={normalizedAsset.id} assetName={normalizedAsset.name} price={normalizedAsset.marketPrice ?? normalizedAsset.current_price} isTeam={isTeam} />}
     </>
   );
 }
