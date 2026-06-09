@@ -1,24 +1,21 @@
 type ApiFootballParams = Record<string, string | number | boolean | undefined | null>;
 
-type Provider = 'ISPORTS' | 'API_FOOTBALL';
+type Provider = 'API_FOOTBALL' | 'ISPORTS';
 
 export class ApiFootballError extends Error {
   status?: number;
   payload?: unknown;
   keyIndex?: number;
+  provider?: Provider;
 
-  constructor(message: string, status?: number, payload?: unknown, keyIndex?: number) {
+  constructor(message: string, status?: number, payload?: unknown, keyIndex?: number, provider?: Provider) {
     super(message);
     this.name = 'ApiFootballError';
     this.status = status;
     this.payload = payload;
     this.keyIndex = keyIndex;
+    this.provider = provider;
   }
-}
-
-function getProvider(): Provider {
-  if (process.env.ISPORTS_API_KEY || process.env.ISPORTS_API_KEYS) return 'ISPORTS';
-  return 'API_FOOTBALL';
 }
 
 function getBaseUrl(provider: Provider) {
@@ -43,6 +40,13 @@ function getApiKeys(provider: Provider) {
   const keyPool = splitKeys(process.env.API_FOOTBALL_KEYS);
   if (keyPool.length > 0) return keyPool;
   return [process.env.API_FOOTBALL_KEY].filter(Boolean) as string[];
+}
+
+function getProviderOrder(): Provider[] {
+  const order: Provider[] = [];
+  if (getApiKeys('API_FOOTBALL').length > 0) order.push('API_FOOTBALL');
+  if (getApiKeys('ISPORTS').length > 0) order.push('ISPORTS');
+  return order;
 }
 
 function mapIsportsPath(path: string) {
@@ -78,15 +82,37 @@ function mapIsportsParams(path: string, params: ApiFootballParams = {}, apiKey: 
   return mapped;
 }
 
+function mapApiFootballParams(path: string, params: ApiFootballParams = {}) {
+  const cleanPath = path.startsWith('/') ? path : `/${path}`;
+  const mapped: ApiFootballParams = {};
+
+  Object.entries(params).forEach(([key, value]) => {
+    if (value === undefined || value === null || value === '') return;
+
+    if (cleanPath === '/livescores') {
+      if (key === 'date') return;
+      if (key === 'live') {
+        mapped.live = value;
+        return;
+      }
+      return;
+    }
+
+    mapped[key] = value;
+  });
+
+  if (cleanPath === '/livescores' && !mapped.live) mapped.live = 'all';
+  return mapped;
+}
+
 function buildUrl(provider: Provider, path: string, params: ApiFootballParams = {}, apiKey?: string) {
-  const cleanPath = provider === 'ISPORTS'
-    ? mapIsportsPath(path)
-    : (path.startsWith('/') ? path : `/${path}`);
+  const cleanInputPath = path.startsWith('/') ? path : `/${path}`;
+  const cleanPath = provider === 'ISPORTS' ? mapIsportsPath(cleanInputPath) : (cleanInputPath === '/livescores' ? '/fixtures' : cleanInputPath);
 
   const url = new URL(`${getBaseUrl(provider)}${cleanPath}`);
   const finalParams = provider === 'ISPORTS'
-    ? mapIsportsParams(path.startsWith('/') ? path : `/${path}`, params, apiKey || '')
-    : params;
+    ? mapIsportsParams(cleanInputPath, params, apiKey || '')
+    : mapApiFootballParams(cleanInputPath, params);
 
   Object.entries(finalParams).forEach(([key, value]) => {
     if (value !== undefined && value !== null && value !== '') {
@@ -238,7 +264,7 @@ function normalizeIsportsPayload(path: string, payload: any) {
   const cleanPath = path.startsWith('/') ? path : `/${path}`;
   const items = getArrayPayload(payload);
 
-  if (cleanPath === '/fixtures') {
+  if (cleanPath === '/fixtures' || cleanPath === '/livescores') {
     return { ...payload, response: items.map(normalizeIsportsFixture) };
   }
 
@@ -249,14 +275,11 @@ function normalizeIsportsPayload(path: string, payload: any) {
   return { ...payload, response: items };
 }
 
-export async function apiFootballFetch<T = any>(path: string, params: ApiFootballParams = {}): Promise<T> {
-  const provider = getProvider();
+async function fetchFromProvider<T>(provider: Provider, path: string, params: ApiFootballParams = {}): Promise<T> {
   const keys = getApiKeys(provider);
 
   if (keys.length === 0) {
-    throw new ApiFootballError(provider === 'ISPORTS'
-      ? 'ISPORTS_API_KEY or ISPORTS_API_KEYS is missing'
-      : 'API_FOOTBALL_KEY or API_FOOTBALL_KEYS is missing');
+    throw new ApiFootballError(`${provider} API key is missing`, undefined, undefined, undefined, provider);
   }
 
   const errors: ApiFootballError[] = [];
@@ -281,7 +304,7 @@ export async function apiFootballFetch<T = any>(path: string, params: ApiFootbal
     }
 
     if (!response.ok) {
-      const error = new ApiFootballError(`${provider} request failed with status ${response.status}`, response.status, payload, keyIndex);
+      const error = new ApiFootballError(`${provider} request failed with status ${response.status}`, response.status, payload, keyIndex, provider);
       errors.push(error);
       if (isQuotaOrRateLimitError(response.status, payload) && keyIndex < keys.length - 1) continue;
       throw error;
@@ -289,7 +312,7 @@ export async function apiFootballFetch<T = any>(path: string, params: ApiFootbal
 
     if (hasProviderErrors(payload, provider)) {
       const providerErrors = getProviderErrorPayload(payload, provider);
-      const error = new ApiFootballError(`${provider} returned errors`, response.status, providerErrors, keyIndex);
+      const error = new ApiFootballError(`${provider} returned errors`, response.status, providerErrors, keyIndex, provider);
       errors.push(error);
       if (isQuotaOrRateLimitError(response.status, providerErrors) && keyIndex < keys.length - 1) continue;
       throw error;
@@ -300,7 +323,32 @@ export async function apiFootballFetch<T = any>(path: string, params: ApiFootbal
   }
 
   const lastError = errors[errors.length - 1];
-  throw lastError || new ApiFootballError(`${provider} request failed for all keys`);
+  throw lastError || new ApiFootballError(`${provider} request failed for all keys`, undefined, undefined, undefined, provider);
+}
+
+export async function apiFootballFetch<T = any>(path: string, params: ApiFootballParams = {}): Promise<T> {
+  const providers = getProviderOrder();
+
+  if (providers.length === 0) {
+    throw new ApiFootballError('API_FOOTBALL_KEY/API_FOOTBALL_KEYS or ISPORTS_API_KEY/ISPORTS_API_KEYS is missing');
+  }
+
+  const errors: ApiFootballError[] = [];
+
+  for (const provider of providers) {
+    try {
+      return await fetchFromProvider<T>(provider, path, params);
+    } catch (error) {
+      if (error instanceof ApiFootballError) {
+        errors.push(error);
+        continue;
+      }
+      throw error;
+    }
+  }
+
+  const lastError = errors[errors.length - 1];
+  throw lastError || new ApiFootballError('All football data providers failed');
 }
 
 export function normalizeName(value?: string | null) {
