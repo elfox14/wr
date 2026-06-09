@@ -13,16 +13,16 @@ export async function checkAndAwardAchievements(userId: string, profit: number =
     const existing = await prisma.userAchievement.findMany({
       where: { userId }
     });
-    const existingBadgeIds = new Set(existing.map(a => a.badgeId));
+    const existingAchievementKeys = new Set(existing.map((achievement) => achievement.achievementKey));
 
-    for (const badgeId of achievementsToAward) {
-      if (!existingBadgeIds.has(badgeId)) {
+    for (const achievementKey of achievementsToAward) {
+      if (!existingAchievementKeys.has(achievementKey)) {
         await prisma.userAchievement.create({
-          data: { userId, badgeId }
+          data: { userId, achievementKey }
         });
 
-        const badgeNames: Record<string, string> = {
-          'WOLF_OF_WALL_STREET': 'ذئب وول ستريت 🐺📈'
+        const achievementNames: Record<string, string> = {
+          WOLF_OF_WALL_STREET: 'ذئب وول ستريت 🐺📈'
         };
 
         // Notify user
@@ -30,7 +30,7 @@ export async function checkAndAwardAchievements(userId: string, profit: number =
           data: {
             userId,
             title: 'إنجاز جديد! 🏆',
-            message: `لقد فتحت إنجاز: ${badgeNames[badgeId] || badgeId}`,
+            message: `لقد فتحت إنجاز: ${achievementNames[achievementKey] || achievementKey}`,
             type: 'SUCCESS'
           }
         });
