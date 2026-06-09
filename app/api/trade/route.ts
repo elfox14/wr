@@ -1,315 +1,200 @@
 import { NextResponse } from 'next/server';
+import { Prisma } from '@prisma/client';
 import prisma from '@/lib/prisma';
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/lib/auth";
-import { checkAndAwardAchievements } from "@/lib/achievements";
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '@/lib/auth';
+
+class TradeError extends Error {
+  status: number;
+
+  constructor(message: string, status = 400) {
+    super(message);
+    this.status = status;
+  }
+}
+
+function canRetry(error: unknown) {
+  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2034';
+}
+
+async function serialTx<T>(work: (tx: Prisma.TransactionClient) => Promise<T>) {
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    try {
+      return await prisma.$transaction(work, {
+        isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+      });
+    } catch (error) {
+      if (attempt < 3 && canRetry(error)) continue;
+      throw error;
+    }
+  }
+  throw new Error('Transaction failed');
+}
+
+function updateAssetData(asset: any, price: number, qty: number, action: 'BUY' | 'SELL', nextPrice: number) {
+  const demandDelta = Math.min(2, qty * 0.05);
+  const data: any = {
+    marketDemand: action === 'BUY'
+      ? Math.min(100, (asset.marketDemand ?? 50) + demandDelta)
+      : Math.max(0, (asset.marketDemand ?? 50) - demandDelta),
+  };
+
+  if (nextPrice !== price) {
+    data.current_price = nextPrice;
+    data.marketPrice = nextPrice;
+    data.high_price = Math.max(asset.high_price, nextPrice);
+    data.low_price = Math.min(asset.low_price, nextPrice);
+    data.priceHistory = { create: { price: nextPrice } };
+  }
+
+  return data;
+}
 
 export async function POST(request: Request) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session || !session.user) {
+    if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const { assetId, type, quantity, positionType = 'LONG' } = await request.json();
-    
+    const qty = Number(quantity);
+
     if (positionType !== 'LONG') {
-      return NextResponse.json(
-        { error: 'Short selling is currently disabled' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Only LONG positions are enabled' }, { status: 400 });
     }
-    
-    if (!assetId || !type || !quantity || quantity <= 0) {
+
+    if (!assetId || !['BUY', 'SELL'].includes(type) || !Number.isInteger(qty) || qty <= 0) {
       return NextResponse.json({ error: 'Invalid input' }, { status: 400 });
     }
 
-    const qty = parseInt(quantity, 10);
+    const result = await serialTx(async (tx) => {
+      const user = await tx.user.findUnique({ where: { id: session.user.id } });
+      if (!user) throw new TradeError('User not found', 404);
 
-    const user = await prisma.user.findUnique({ where: { id: session.user.id } });
-    if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
+      const asset = await tx.asset.findUnique({ where: { id: assetId } });
+      if (!asset) throw new TradeError('Asset not found', 404);
 
-    const asset = await prisma.asset.findUnique({ where: { id: assetId } });
-    if (!asset) return NextResponse.json({ error: 'Asset not found' }, { status: 404 });
+      const price = Math.max(1, Math.round(asset.marketPrice ?? asset.current_price));
+      const value = price * qty;
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
 
-    const tradePrice = Math.round(asset.marketPrice ?? asset.current_price);
-    const totalValue = tradePrice * qty;
-
-    if (type === 'BUY') {
-      // Calculate trading fee
-      const buyTransactionsCount = await prisma.transaction.count({
-        where: { userId: user.id, type: 'BUY' }
+      const firstPriceToday = await tx.priceHistory.findFirst({
+        where: { assetId: asset.id, timestamp: { gte: today } },
+        orderBy: { timestamp: 'asc' },
       });
-      
-      const isFreeBuy = buyTransactionsCount < 5;
-      const tradingFee = isFreeBuy ? 0 : Math.round(totalValue * 0.02);
-      const totalCost = totalValue + tradingFee;
 
-      if (user.balance < totalCost) {
-        return NextResponse.json({ error: 'الرصيد غير كافٍ لإتمام العملية (بما في ذلك رسوم التداول)' }, { status: 400 });
-      }
+      const { applyVolatilityCap } = await import('@/lib/liveEngine');
+      const startPrice = firstPriceToday?.price || price;
+      const risk = (asset.volatilityScore ?? 50) / 100;
+      const isIPO = process.env.NEXT_PUBLIC_MARKET_STATE === 'IPO';
 
-      // --- Rule: 1 Distinct Player Per Position ---
-      if (asset.type === 'PLAYER' && asset.position) {
-        const userHoldings = await prisma.holding.findMany({
-          where: { userId: user.id },
-          include: { asset: true }
-        });
+      if (type === 'BUY') {
+        const buyCount = await tx.transaction.count({ where: { userId: user.id, type: 'BUY' } });
+        const fee = buyCount < 5 ? 0 : Math.round(value * 0.02);
+        const totalCost = value + fee;
 
-        const conflict = userHoldings.find(h => 
-          h.asset.type === 'PLAYER' && 
-          h.asset.position === asset.position && 
-          h.asset.id !== asset.id &&
-          h.quantity > 0
-        );
-
-        if (conflict) {
-          const positionNames: Record<string, string> = { 'GK': 'حارس مرمى', 'DEF': 'مدافع', 'MID': 'لاعب وسط', 'FWD': 'مهاجم' };
-          const posAr = positionNames[asset.position] || asset.position;
-          return NextResponse.json({ error: `لقد قمت بشراء لاعب في مركز ${posAr} مسبقاً. يجب شراء لاعب واحد فقط في كل مركز.` }, { status: 400 });
+        if (user.balance < totalCost) {
+          throw new TradeError('الرصيد غير كافٍ لإتمام العملية (بما في ذلك رسوم التداول)', 400);
         }
-      }
 
-      // Find existing holding
-      const existingHolding = await prisma.holding.findFirst({
-        where: { userId: user.id, assetId: asset.id, positionType }
-      });
+        if (asset.type === 'PLAYER' && asset.position) {
+          const conflict = await tx.holding.findFirst({
+            where: {
+              userId: user.id,
+              positionType: 'LONG',
+              quantity: { gt: 0 },
+              asset: {
+                type: 'PLAYER',
+                position: asset.position,
+                id: { not: asset.id },
+              },
+            },
+          });
 
-      let newAvgPrice = tradePrice;
-
-      if (existingHolding) {
-        const totalCostOld = existingHolding.quantity * existingHolding.avg_buy_price;
-        const totalCostNew = qty * tradePrice;
-        newAvgPrice = (totalCostOld + totalCostNew) / (existingHolding.quantity + qty);
-
-        await prisma.holding.update({
-          where: { id: existingHolding.id },
-          data: {
-            quantity: existingHolding.quantity + qty,
-            avg_buy_price: newAvgPrice
+          if (conflict) {
+            const names: Record<string, string> = { GK: 'حارس مرمى', DEF: 'مدافع', MID: 'لاعب وسط', FWD: 'مهاجم' };
+            const pos = names[asset.position] || asset.position;
+            throw new TradeError(`لقد قمت بشراء لاعب في مركز ${pos} مسبقاً. يجب شراء لاعب واحد فقط في كل مركز.`, 400);
           }
+        }
+
+        const holding = await tx.holding.findFirst({
+          where: { userId: user.id, assetId: asset.id, positionType: 'LONG' },
         });
-      } else {
-        await prisma.holding.create({
-          data: {
-            userId: user.id,
-            assetId: asset.id,
-            positionType,
-            quantity: qty,
-            avg_buy_price: tradePrice
-          }
-        });
+
+        if (holding) {
+          const newAvg = ((holding.quantity * holding.avg_buy_price) + (qty * price)) / (holding.quantity + qty);
+          await tx.holding.update({
+            where: { id: holding.id },
+            data: { quantity: { increment: qty }, avg_buy_price: newAvg },
+          });
+        } else {
+          await tx.holding.create({
+            data: { userId: user.id, assetId: asset.id, positionType: 'LONG', quantity: qty, avg_buy_price: price },
+          });
+        }
+
+        await tx.user.update({ where: { id: user.id }, data: { balance: { decrement: totalCost } } });
+        await tx.transaction.create({ data: { userId: user.id, assetId: asset.id, type: 'BUY', quantity: qty, price_at_time: price } });
+
+        const nextPrice = isIPO ? price : applyVolatilityCap(startPrice, Math.round(price * (1 + qty * 0.0005)), risk);
+        await tx.asset.update({ where: { id: asset.id }, data: updateAssetData(asset, price, qty, 'BUY', nextPrice) });
+        await tx.notification.create({ data: { userId: user.id, title: 'تم الشراء بنجاح', message: `تم تنفيذ أمر شراء عدد ${qty} سهم من ${asset.name}`, type: 'SUCCESS' } });
+
+        return {
+          success: true,
+          message: `تم الشراء (LONG) ${qty} من ${asset.name}` + (fee > 0 ? ` (رسوم التداول: ${fee})` : ''),
+          fee,
+          totalCost,
+        };
       }
 
-      // Deduct balance and record transaction
-      await prisma.user.update({
+      const holding = await tx.holding.findFirst({
+        where: { userId: user.id, assetId: asset.id, positionType: 'LONG' },
+      });
+
+      if (!holding || holding.quantity < qty) {
+        throw new TradeError('Insufficient holdings to sell', 400);
+      }
+
+      const costBasis = holding.avg_buy_price * qty;
+      const profit = value - costBasis;
+      const tax = profit > costBasis * 0.5 ? Math.round(profit * 0.10) : 0;
+      const payout = value - tax;
+      const netProfit = profit - tax;
+
+      if (holding.quantity === qty) {
+        await tx.holding.delete({ where: { id: holding.id } });
+      } else {
+        await tx.holding.update({ where: { id: holding.id }, data: { quantity: { decrement: qty } } });
+      }
+
+      await tx.user.update({
         where: { id: user.id },
-        data: { balance: user.balance - totalCost }
+        data: { balance: { increment: payout }, total_profit: { increment: netProfit } },
       });
+      await tx.transaction.create({ data: { userId: user.id, assetId: asset.id, type: 'SELL', quantity: qty, price_at_time: price } });
 
-      await prisma.transaction.create({
-        data: {
-          userId: user.id,
-          assetId: asset.id,
-          type: 'BUY',
-          quantity: qty,
-          price_at_time: tradePrice
-        }
-      });
+      const nextPrice = isIPO ? price : applyVolatilityCap(startPrice, Math.max(1, Math.round(price * (1 - qty * 0.0005))), risk);
+      await tx.asset.update({ where: { id: asset.id }, data: updateAssetData(asset, price, qty, 'SELL', nextPrice) });
+      await tx.notification.create({ data: { userId: user.id, title: 'تم البيع بنجاح', message: `تم تنفيذ أمر بيع عدد ${qty} سهم من ${asset.name}`, type: 'INFO' } });
 
-      // Supply & Demand Engine
-      const isIPOPhase = process.env.NEXT_PUBLIC_MARKET_STATE === 'IPO';
-      const newMarketDemand = Math.min(100, (asset.marketDemand ?? 50) + Math.min(2, qty * 0.05));
-      
-      let updateData: any = {
-        marketDemand: newMarketDemand
+      return {
+        success: true,
+        message: `تم البيع (LONG) ${qty} من ${asset.name}` + (tax > 0 ? ` (ضريبة الأرباح: ${tax})` : ''),
+        profit: netProfit,
+        tax,
       };
+    });
 
-      if (!isIPOPhase) {
-        const priceIncreaseRatio = 1 + (qty * 0.0005);
-        const calculatedNewPriceBuy = Math.round(tradePrice * priceIncreaseRatio);
-        
-        // Find start of day price to apply correct volatility cap
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const firstPriceToday = await prisma.priceHistory.findFirst({
-          where: { assetId: asset.id, timestamp: { gte: today } },
-          orderBy: { timestamp: 'asc' }
-        });
-        const startOfDayPrice = firstPriceToday ? firstPriceToday.price : tradePrice;
-        
-        const volatilityRisk = (asset.volatilityScore ?? 50) / 100;
-        const { applyVolatilityCap } = await import('@/lib/liveEngine');
-        const finalNewPriceBuy = applyVolatilityCap(startOfDayPrice, calculatedNewPriceBuy, volatilityRisk);
-        
-        if (finalNewPriceBuy !== tradePrice) {
-          updateData = {
-            ...updateData,
-            current_price: finalNewPriceBuy,
-            marketPrice: finalNewPriceBuy,
-            high_price: Math.max(asset.high_price, finalNewPriceBuy),
-            low_price: Math.min(asset.low_price, finalNewPriceBuy),
-            priceHistory: {
-              create: {
-                price: finalNewPriceBuy
-              }
-            }
-          };
-        }
-      }
-
-      await prisma.asset.update({
-        where: { id: asset.id },
-        data: updateData
-      });
-
-      // Create notification
-      await prisma.notification.create({
-        data: {
-          userId: user.id,
-          title: 'تم الشراء بنجاح',
-          message: `تم تنفيذ أمر شراء عدد ${qty} سهم من ${asset.name}`,
-          type: 'SUCCESS'
-        }
-      });
-
-      return NextResponse.json({ 
-        success: true, 
-        message: `تم الشراء (${positionType}) ${qty} من ${asset.name}` + (tradingFee > 0 ? ` (رسوم التداول: ${tradingFee})` : ''),
-        fee: tradingFee,
-        totalCost: totalCost
-      });
-    } 
-    
-    if (type === 'SELL') {
-      const existingHolding = await prisma.holding.findFirst({
-        where: { userId: user.id, assetId: asset.id, positionType }
-      });
-
-      if (!existingHolding || existingHolding.quantity < qty) {
-        return NextResponse.json({ error: 'Insufficient holdings to sell' }, { status: 400 });
-      }
-
-      // Calculate profit/loss based on positionType
-      const costBasis = existingHolding.avg_buy_price * qty;
-      let profit = 0;
-      let grossPayout = 0;
-
-      if (existingHolding.positionType === 'LONG') {
-        profit = totalValue - costBasis;
-        grossPayout = totalValue;
-      } else {
-        // SHORT position: Profit if current price is lower than buy price
-        profit = costBasis - totalValue;
-        grossPayout = Math.max(0, costBasis + profit); // User loses margin if price goes too high, max loss = costBasis
-      }
-
-      // Capital Gains Tax: 10% tax if profit > 50% of cost basis
-      let tax = 0;
-      if (profit > costBasis * 0.5) {
-        tax = Math.round(profit * 0.10);
-      }
-
-      const finalPayout = grossPayout - tax;
-      const finalProfit = profit - tax;
-
-      if (existingHolding.quantity === qty) {
-        // Sell all
-        await prisma.holding.delete({ where: { id: existingHolding.id } });
-      } else {
-        // Sell partial
-        await prisma.holding.update({
-          where: { id: existingHolding.id },
-          data: { quantity: existingHolding.quantity - qty }
-        });
-      }
-
-      // Add balance and record transaction
-      await prisma.user.update({
-        where: { id: user.id },
-        data: { 
-          balance: user.balance + finalPayout,
-          total_profit: user.total_profit + finalProfit
-        }
-      });
-
-      await prisma.transaction.create({
-        data: {
-          userId: user.id,
-          assetId: asset.id,
-          type: 'SELL',
-          quantity: qty,
-          price_at_time: tradePrice
-        }
-      });
-
-      // Supply & Demand Engine
-      const isIPOPhase = process.env.NEXT_PUBLIC_MARKET_STATE === 'IPO';
-      const newMarketDemand = Math.max(0, (asset.marketDemand ?? 50) - Math.min(2, qty * 0.05));
-      
-      let updateData: any = {
-        marketDemand: newMarketDemand
-      };
-
-      if (!isIPOPhase) {
-        const priceDecreaseRatio = 1 - (qty * 0.0005);
-        const calculatedNewPriceSell = Math.max(1, Math.round(tradePrice * priceDecreaseRatio));
-        
-        // Find start of day price to apply correct volatility cap
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const firstPriceToday = await prisma.priceHistory.findFirst({
-          where: { assetId: asset.id, timestamp: { gte: today } },
-          orderBy: { timestamp: 'asc' }
-        });
-        const startOfDayPrice = firstPriceToday ? firstPriceToday.price : tradePrice;
-        
-        const volatilityRisk = (asset.volatilityScore ?? 50) / 100;
-        const { applyVolatilityCap } = await import('@/lib/liveEngine');
-        const finalNewPriceSell = applyVolatilityCap(startOfDayPrice, calculatedNewPriceSell, volatilityRisk);
-        
-        if (finalNewPriceSell !== tradePrice) {
-          updateData = {
-            ...updateData,
-            current_price: finalNewPriceSell,
-            marketPrice: finalNewPriceSell,
-            high_price: Math.max(asset.high_price, finalNewPriceSell),
-            low_price: Math.min(asset.low_price, finalNewPriceSell),
-            priceHistory: {
-              create: {
-                price: finalNewPriceSell
-              }
-            }
-          };
-        }
-      }
-
-      await prisma.asset.update({
-        where: { id: asset.id },
-        data: updateData
-      });
-
-      // Create notification
-      await prisma.notification.create({
-        data: {
-          userId: user.id,
-          title: 'تم البيع بنجاح',
-          message: `تم تنفيذ أمر بيع عدد ${qty} سهم من ${asset.name}`,
-          type: 'INFO'
-        }
-      });
-
-      return NextResponse.json({ 
-        success: true, 
-        message: `تم البيع (${existingHolding.positionType}) ${qty} من ${asset.name}` + (tax > 0 ? ` (ضريبة الأرباح: ${tax})` : ''),
-        profit: finalProfit,
-        tax
-      });
+    return NextResponse.json(result);
+  } catch (error) {
+    if (error instanceof TradeError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
     }
 
-    return NextResponse.json({ error: 'Invalid trade type' }, { status: 400 });
-
-  } catch (error) {
     console.error('Trade error:', error);
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
