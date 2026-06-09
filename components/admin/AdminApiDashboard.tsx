@@ -1,14 +1,26 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Activity, CalendarDays, Database, Loader2, Play, RefreshCcw, ShieldCheck, TestTube2 } from 'lucide-react';
+import { Activity, CalendarDays, Database, Loader2, Play, RefreshCcw, ShieldCheck, TestTube2, ListChecks } from 'lucide-react';
 
 type ResultState = {
   title: string;
   status?: number;
   ok?: boolean;
-  data?: unknown;
+  data?: any;
   error?: string;
+};
+
+type RecentMatch = {
+  id: string;
+  fixtureId: number;
+  matchDate: string;
+  status: string;
+  homeScore: number;
+  awayScore: number;
+  homeTeam: { id: string; name: string; image?: string | null };
+  awayTeam: { id: string; name: string; image?: string | null };
+  performanceRecords: number;
 };
 
 function todayIso() {
@@ -69,10 +81,11 @@ export default function AdminApiDashboard() {
   const [force, setForce] = useState(false);
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
   const [result, setResult] = useState<ResultState | null>(null);
+  const [recentMatches, setRecentMatches] = useState<RecentMatch[]>([]);
 
   const apiBase = useMemo(() => '/api/admin/control', []);
 
-  async function runAction(title: string, action: string, params: Record<string, string | boolean> = {}) {
+  async function runAction(title: string, action: string, params: Record<string, string | boolean | number> = {}) {
     setLoadingAction(action);
     setResult({ title, data: { loading: true } });
 
@@ -88,6 +101,10 @@ export default function AdminApiDashboard() {
       });
       const data = await response.json().catch(() => null);
       setResult({ title, status: response.status, ok: response.ok, data });
+
+      if (action === 'recent-matches' && data?.matches) {
+        setRecentMatches(data.matches);
+      }
     } catch (error: any) {
       setResult({ title, error: error.message || 'Request failed' });
     } finally {
@@ -95,11 +112,20 @@ export default function AdminApiDashboard() {
     }
   }
 
+  async function syncFixtureFromRow(match: RecentMatch) {
+    setFixtureId(String(match.fixtureId));
+    await runAction(`مزامنة مباراة ${match.homeTeam?.name || ''} × ${match.awayTeam?.name || ''}`, 'sync-performance', {
+      fixtureId: String(match.fixtureId),
+      force: true,
+    });
+    await runAction('آخر المباريات', 'recent-matches', { limit: 40 });
+  }
+
   function Button({ action, title, children, params, variant = 'primary' }: {
     action: string;
     title: string;
     children: React.ReactNode;
-    params?: Record<string, string | boolean>;
+    params?: Record<string, string | boolean | number>;
     variant?: 'primary' | 'gold' | 'danger';
   }) {
     const isLoading = loadingAction === action;
@@ -190,6 +216,16 @@ export default function AdminApiDashboard() {
             </Card>
 
             <Card
+              title="آخر المباريات المحفوظة"
+              description="اعرض المباريات التي تم جلبها واختر أي مباراة لمزامنة أدائها بضغطة واحدة."
+              icon={<ListChecks size={22} />}
+            >
+              <Button action="recent-matches" title="آخر المباريات" params={{ limit: 40 }}>
+                عرض آخر المباريات
+              </Button>
+            </Card>
+
+            <Card
               title="اختبار مباراة محددة"
               description="ضع fixtureId لتحديث أداء اللاعبين والمنتخب لهذه المباراة مباشرة."
               icon={<TestTube2 size={22} />}
@@ -211,7 +247,41 @@ export default function AdminApiDashboard() {
             </Card>
           </div>
 
-          <div className="lg:sticky lg:top-24 lg:self-start">
+          <div className="space-y-5 lg:sticky lg:top-24 lg:self-start">
+            {recentMatches.length > 0 && (
+              <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <h3 className="font-black text-white">آخر المباريات</h3>
+                  <span className="rounded-full bg-white/10 px-3 py-1 text-xs text-gray-300">{recentMatches.length}</span>
+                </div>
+                <div className="max-h-[380px] space-y-2 overflow-auto pr-1">
+                  {recentMatches.map((match) => (
+                    <div key={match.id} className="rounded-2xl border border-white/10 bg-black/30 p-3">
+                      <div className="mb-2 flex items-center justify-between gap-3 text-xs text-gray-400">
+                        <span className="direction-ltr text-left">Fixture #{match.fixtureId}</span>
+                        <span className={`rounded-full px-2 py-1 font-bold ${match.performanceRecords > 0 ? 'bg-green-500/10 text-green-400' : 'bg-yellow-500/10 text-yellow-300'}`}>
+                          {match.performanceRecords > 0 ? `${match.performanceRecords} أداء` : 'لا يوجد أداء'}
+                        </span>
+                      </div>
+                      <div className="mb-2 text-sm font-bold text-white">
+                        {match.homeTeam?.image} {match.homeTeam?.name} {match.homeScore} - {match.awayScore} {match.awayTeam?.name} {match.awayTeam?.image}
+                      </div>
+                      <div className="mb-3 flex items-center justify-between text-xs text-gray-500">
+                        <span>{match.status}</span>
+                        <span>{new Date(match.matchDate).toLocaleString('ar-EG')}</span>
+                      </div>
+                      <button
+                        onClick={() => syncFixtureFromRow(match)}
+                        disabled={Boolean(loadingAction)}
+                        className="w-full rounded-xl bg-red-500 px-3 py-2 text-xs font-black text-white hover:bg-red-400 disabled:opacity-60"
+                      >
+                        مزامنة أداء هذه المباراة
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
             <JsonBox result={result} />
           </div>
         </div>
