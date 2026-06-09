@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import prisma from '@/lib/prisma';
 import { authOptions } from '@/lib/auth';
+import { apiFootballFetch } from '@/lib/apiFootball';
 
 type AdminSession = {
   user?: {
@@ -49,6 +50,66 @@ async function callInternal(req: Request, path: string, init: RequestInit = {}) 
     ok: response.ok,
     status: response.status,
     data,
+  };
+}
+
+function simplifyFixture(item: any) {
+  return {
+    fixtureId: item.fixture?.id,
+    date: item.fixture?.date,
+    timestamp: item.fixture?.timestamp,
+    status: item.fixture?.status?.short || item.fixture?.status?.long,
+    statusLong: item.fixture?.status?.long,
+    league: item.league?.name,
+    country: item.league?.country,
+    season: item.league?.season,
+    round: item.league?.round,
+    homeTeam: {
+      id: item.teams?.home?.id,
+      name: item.teams?.home?.name,
+      logo: item.teams?.home?.logo,
+      winner: item.teams?.home?.winner,
+    },
+    awayTeam: {
+      id: item.teams?.away?.id,
+      name: item.teams?.away?.name,
+      logo: item.teams?.away?.logo,
+      winner: item.teams?.away?.winner,
+    },
+    goals: item.goals,
+    score: item.score,
+  };
+}
+
+function simplifyPlayerStats(item: any) {
+  const stats = item.statistics?.[0] || {};
+  const games = stats.games || {};
+  const goals = stats.goals || {};
+  const shots = stats.shots || {};
+  const passes = stats.passes || {};
+  const tackles = stats.tackles || {};
+  const cards = stats.cards || {};
+
+  return {
+    providerPlayerId: item.player?.id,
+    name: item.player?.name,
+    teamName: stats.team?.name,
+    position: games.position,
+    minutes: games.minutes,
+    rating: games.rating,
+    goals: goals.total,
+    assists: goals.assists,
+    saves: goals.saves,
+    goalsConceded: goals.conceded,
+    shotsTotal: shots.total,
+    shotsOnTarget: shots.on,
+    passes: passes.total,
+    keyPasses: passes.key,
+    passAccuracy: passes.accuracy,
+    tackles: tackles.total,
+    interceptions: tackles.interceptions,
+    yellowCards: cards.yellow,
+    redCards: cards.red,
   };
 }
 
@@ -131,6 +192,47 @@ async function recentMatches(limit = 30) {
   };
 }
 
+async function providerFixtures(date: string) {
+  const payload = await apiFootballFetch<{ response?: any[] }>('/fixtures', { date });
+  const fixtures = payload.response || [];
+  return {
+    ok: true,
+    source: 'provider',
+    endpoint: '/fixtures',
+    date,
+    count: fixtures.length,
+    fixtures: fixtures.map(simplifyFixture),
+    raw: fixtures,
+  };
+}
+
+async function providerLiveScores() {
+  const payload = await apiFootballFetch<{ response?: any[] }>('/livescores', { live: 'all' });
+  const fixtures = payload.response || [];
+  return {
+    ok: true,
+    source: 'provider',
+    endpoint: '/livescores',
+    count: fixtures.length,
+    fixtures: fixtures.map(simplifyFixture),
+    raw: fixtures,
+  };
+}
+
+async function providerPlayerStats(fixtureId: string) {
+  const payload = await apiFootballFetch<{ response?: any[] }>('/fixtures/players', { fixture: Number(fixtureId) });
+  const players = payload.response || [];
+  return {
+    ok: true,
+    source: 'provider',
+    endpoint: '/fixtures/players',
+    fixtureId: Number(fixtureId),
+    count: players.length,
+    players: players.map(simplifyPlayerStats),
+    raw: players,
+  };
+}
+
 export async function GET(req: Request) {
   const admin = await requireAdmin();
   if (admin.error) return admin.error;
@@ -143,12 +245,13 @@ export async function GET(req: Request) {
   const limit = Number(searchParams.get('limit') || 30);
 
   try {
-    if (action === 'health') {
-      return NextResponse.json(await healthCheck());
-    }
-
-    if (action === 'recent-matches') {
-      return NextResponse.json(await recentMatches(limit));
+    if (action === 'health') return NextResponse.json(await healthCheck());
+    if (action === 'recent-matches') return NextResponse.json(await recentMatches(limit));
+    if (action === 'provider-fixtures') return NextResponse.json(await providerFixtures(date));
+    if (action === 'provider-live') return NextResponse.json(await providerLiveScores());
+    if (action === 'provider-player-stats') {
+      if (!fixtureId) return NextResponse.json({ error: 'fixtureId is required' }, { status: 400 });
+      return NextResponse.json(await providerPlayerStats(fixtureId));
     }
 
     if (action === 'fixtures') {
