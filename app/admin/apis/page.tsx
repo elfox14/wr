@@ -1,7 +1,6 @@
 import { redirect } from 'next/navigation';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import AdminShell from '@/components/admin/AdminShell';
 import AdminApiDashboard from '@/components/admin/AdminApiDashboard';
 
 type AdminSession = {
@@ -24,14 +23,5 @@ export default async function AdminApisPage() {
   const session = await getServerSession(authOptions as any) as AdminSession;
   if (!session?.user) redirect('/login');
   if (!isAdmin(session)) redirect('/');
-
-  return (
-    <AdminShell
-      title="اختبارات ومراقبة APIs"
-      subtitle="اختبر اتصال المزود، اعرض مباريات API، راقب المباريات الحية، افحص أداء اللاعبين، ونظّف المباريات الخاطئة من مكان واحد."
-      badge="API Control Center"
-    >
-      <AdminApiDashboard embedded />
-    </AdminShell>
-  );
+  return <AdminApiDashboard />;
 }
