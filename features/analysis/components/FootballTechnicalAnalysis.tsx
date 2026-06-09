@@ -1,5 +1,6 @@
 import { Activity, Brain, ShieldAlert, Sparkles, Target, TrendingUp, WalletCards } from 'lucide-react';
 import { analyzeFootballAsset } from '../lib/analysis-adapter';
+import { analyzeValueFit, formatVirtualCoins } from '../lib/value-fit';
 
 type Props = {
   asset: any;
@@ -20,61 +21,6 @@ function barTone(score: number) {
   return 'bg-red-400';
 }
 
-function formatCoins(value: number) {
-  return `${Math.round(Number(value || 0)).toLocaleString()}¢`;
-}
-
-function getValueFit(asset: any, technicalScore: number) {
-  const currentPrice = Number(asset?.marketPrice ?? asset?.current_price ?? 0);
-  const fairValue = Number(asset?.fairValue ?? 0);
-  const hasFairValue = Number.isFinite(fairValue) && fairValue > 0;
-  const referenceValue = hasFairValue ? fairValue : Math.max(1, currentPrice || 1);
-  const gap = currentPrice && referenceValue ? ((currentPrice - referenceValue) / referenceValue) * 100 : 0;
-  const technicalSignal = technicalScore - 60;
-
-  if (hasFairValue && gap >= 12 && technicalScore < 72) {
-    return {
-      label: 'السعر أعلى من المبرر الفني',
-      tone: 'border-red-400/20 bg-red-400/10 text-red-200',
-      gap,
-      currentPrice,
-      fairValue,
-      reason: 'السعر الحالي مرتفع مقارنة بالقيمة العادلة، بينما التحليل الفني لا يعطي دعمًا كافيًا لهذا الارتفاع.',
-    };
-  }
-
-  if (hasFairValue && gap <= -8 && technicalScore >= 65) {
-    return {
-      label: 'فرصة أقل من قيمتها فنيًا',
-      tone: 'border-emerald-400/20 bg-emerald-400/10 text-emerald-200',
-      gap,
-      currentPrice,
-      fairValue,
-      reason: 'السعر أقل من القيمة العادلة مع وجود مؤشر فني جيد، لذلك يستحق المتابعة.',
-    };
-  }
-
-  if (technicalSignal >= 18) {
-    return {
-      label: 'السعر مدعوم فنيًا',
-      tone: 'border-[#0FF0FC]/20 bg-[#0FF0FC]/10 text-[#0FF0FC]',
-      gap,
-      currentPrice,
-      fairValue,
-      reason: 'التحليل الفني قوي بما يكفي ليبرر اهتمام السوق بهذا الأصل، مع ضرورة مراقبة الطلب والزخم.',
-    };
-  }
-
-  return {
-    label: 'تقييم متوازن',
-    tone: 'border-[#FFD700]/20 bg-[#FFD700]/10 text-[#FFD700]',
-    gap,
-    currentPrice,
-    fairValue,
-    reason: 'السعر لا يظهر انحرافًا حادًا عن القراءة الفنية الحالية، والتغير القادم يعتمد على الأداء والزخم.',
-  };
-}
-
 function IconForCategory({ label }: { label: string }) {
   if (label.includes('فنية')) return <Sparkles size={16} />;
   if (label.includes('تكتيكي')) return <Brain size={16} />;
@@ -88,7 +34,7 @@ export function FootballTechnicalAnalysis({ asset, compact = false }: Props) {
   if (!asset) return null;
 
   const analysis = analyzeFootballAsset(asset);
-  const valueFit = getValueFit(asset, analysis.weightedScore);
+  const valueFit = analyzeValueFit(asset, analysis.weightedScore);
   const title = asset.type === 'TEAM' ? 'التحليل الفني للمنتخب' : 'التحليل الفني للاعب';
   const subtitle = asset.type === 'TEAM'
     ? 'قراءة تكتيكية مبسطة لشكل المنتخب داخل الملعب بناءً على مؤشرات القوة، الزخم، الطلب، والاستقرار.'
@@ -124,11 +70,11 @@ export function FootballTechnicalAnalysis({ asset, compact = false }: Props) {
             <div className="mb-3 grid grid-cols-2 gap-2 text-xs">
               <div className="rounded-xl bg-black/25 p-2">
                 <p className="text-black/50 dark:text-white/50">السعر الحالي</p>
-                <p className="font-black text-white">{formatCoins(valueFit.currentPrice)}</p>
+                <p className="font-black text-white">{formatVirtualCoins(valueFit.marketPrice)}</p>
               </div>
               <div className="rounded-xl bg-black/25 p-2">
                 <p className="text-black/50 dark:text-white/50">القيمة العادلة</p>
-                <p className="font-black text-white">{valueFit.fairValue ? formatCoins(valueFit.fairValue) : 'غير متاحة'}</p>
+                <p className="font-black text-white">{valueFit.fairValue ? formatVirtualCoins(valueFit.fairValue) : 'غير متاحة'}</p>
               </div>
             </div>
             <p className="mb-1 text-sm font-black">{valueFit.label}</p>
