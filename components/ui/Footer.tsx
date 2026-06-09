@@ -2,7 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { TrendingUp, Mail, ShieldAlert, FileText, Info, HelpCircle } from 'lucide-react';
+import { TrendingUp, Mail, ShieldAlert, FileText, Info, HelpCircle, Brain } from 'lucide-react';
 
 export function Footer() {
   return (
@@ -46,6 +46,7 @@ export function Footer() {
             </h3>
             <ul className="space-y-3">
               <li><Link href="/market" className="text-gray-400 hover:text-primary transition-colors text-sm flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-white/20"></span> السوق</Link></li>
+              <li><Link href="/ai-analyst" className="text-gray-400 hover:text-primary transition-colors text-sm flex items-center gap-2"><Brain size={14} className="text-[#0FF0FC]" /> AI Analyst</Link></li>
               <li><Link href="/matches" className="text-gray-400 hover:text-primary transition-colors text-sm flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-white/20"></span> المباريات</Link></li>
               <li><Link href="/groups" className="text-gray-400 hover:text-primary transition-colors text-sm flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-white/20"></span> المجموعات</Link></li>
               <li><Link href="/leaderboard" className="text-gray-400 hover:text-primary transition-colors text-sm flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-white/20"></span> الترتيب</Link></li>
