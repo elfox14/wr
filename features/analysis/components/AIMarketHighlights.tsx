@@ -3,46 +3,29 @@ import { Brain, ArrowRight, TrendingDown, TrendingUp } from 'lucide-react';
 import { AssetImage } from '@/components/ui/AssetImage';
 import { MarketAnalysisBadge } from './MarketAnalysisBadge';
 import { analyzeFootballAsset } from '../lib/analysis-adapter';
-
-function price(asset: any) {
-  return Number(asset?.marketPrice ?? asset?.current_price ?? 0);
-}
-
-function fair(asset: any) {
-  return Number(asset?.fairValue ?? asset?.current_price ?? price(asset));
-}
-
-function gap(asset: any) {
-  const fairValue = fair(asset);
-  if (!fairValue) return 0;
-  return ((price(asset) - fairValue) / fairValue) * 100;
-}
-
-function formatPrice(value: number) {
-  return `${Math.round(value || 0).toLocaleString()}¢`;
-}
+import { formatVirtualCoins, getFairValue, getMarketPrice, getValueGapPercent } from '../lib/value-fit';
 
 function sortByTechnicalOpportunity(a: any, b: any) {
   const analysisA = analyzeFootballAsset(a);
   const analysisB = analyzeFootballAsset(b);
-  const aScore = analysisA.weightedScore + Math.max(0, -gap(a)) * 1.6;
-  const bScore = analysisB.weightedScore + Math.max(0, -gap(b)) * 1.6;
+  const aScore = analysisA.weightedScore + Math.max(0, -getValueGapPercent(a)) * 1.6;
+  const bScore = analysisB.weightedScore + Math.max(0, -getValueGapPercent(b)) * 1.6;
   return bScore - aScore;
 }
 
 function sortByTechnicalOverprice(a: any, b: any) {
   const analysisA = analyzeFootballAsset(a);
   const analysisB = analyzeFootballAsset(b);
-  const aScore = Math.max(0, gap(a)) * 2 + Math.max(0, 72 - analysisA.weightedScore);
-  const bScore = Math.max(0, gap(b)) * 2 + Math.max(0, 72 - analysisB.weightedScore);
+  const aScore = Math.max(0, getValueGapPercent(a)) * 2 + Math.max(0, 72 - analysisA.weightedScore);
+  const bScore = Math.max(0, getValueGapPercent(b)) * 2 + Math.max(0, 72 - analysisB.weightedScore);
   return bScore - aScore;
 }
 
 function MiniAssetRow({ asset, danger = false }: { asset: any; danger?: boolean }) {
   const analysis = analyzeFootballAsset(asset);
-  const current = price(asset);
-  const fairValue = fair(asset);
-  const valueGap = gap(asset);
+  const current = getMarketPrice(asset);
+  const fairValue = getFairValue(asset);
+  const valueGap = getValueGapPercent(asset);
 
   return (
     <Link href={`/asset/${asset.id}`} className="group block rounded-2xl border border-white/10 bg-black/25 p-3 transition hover:border-[#0FF0FC]/35 hover:bg-white/[0.04]">
@@ -55,7 +38,7 @@ function MiniAssetRow({ asset, danger = false }: { asset: any; danger?: boolean 
               {valueGap > 0 ? '+' : ''}{valueGap.toFixed(1)}%
             </span>
           </div>
-          <p className="text-[11px] text-gray-500">{formatPrice(current)} / عادلة {formatPrice(fairValue)} · Tech {analysis.weightedScore}</p>
+          <p className="text-[11px] text-gray-500">{formatVirtualCoins(current)} / عادلة {formatVirtualCoins(fairValue)} · Tech {analysis.weightedScore}</p>
         </div>
         <ArrowRight size={15} className="text-gray-500 transition group-hover:text-[#0FF0FC]" />
       </div>
@@ -69,17 +52,17 @@ function MiniAssetRow({ asset, danger = false }: { asset: any; danger?: boolean 
 export function AIMarketHighlights({ assets = [] }: { assets?: any[] }) {
   const normalized = assets.map((asset) => ({
     ...asset,
-    marketPrice: Number(asset.marketPrice ?? asset.current_price ?? 0),
-    fairValue: Number(asset.fairValue ?? asset.current_price ?? asset.marketPrice ?? 0),
+    marketPrice: getMarketPrice(asset),
+    fairValue: getFairValue(asset),
   }));
 
   const opportunities = [...normalized]
-    .filter((asset) => gap(asset) <= -5 || analyzeFootballAsset(asset).weightedScore >= 75)
+    .filter((asset) => getValueGapPercent(asset) <= -5 || analyzeFootballAsset(asset).weightedScore >= 75)
     .sort(sortByTechnicalOpportunity)
     .slice(0, 4);
 
   const overpriced = [...normalized]
-    .filter((asset) => gap(asset) >= 8)
+    .filter((asset) => getValueGapPercent(asset) >= 8)
     .sort(sortByTechnicalOverprice)
     .slice(0, 4);
 
