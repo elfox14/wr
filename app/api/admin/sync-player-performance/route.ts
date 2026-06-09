@@ -6,6 +6,7 @@ import { apiFootballFetch, normalizeName } from '@/lib/apiFootball';
 import { blendRecentFundamental, calculatePlayerPerformanceRating } from '@/lib/playerPerformance';
 import { blendTeamFundamental, calculateTeamMatchPerformanceRating } from '@/lib/teamPerformance';
 import { calculateAssetScore, calculateFairValue } from '@/lib/scoring';
+import { applyVolatilityCap } from '@/lib/liveEngine';
 
 type ApiFootballPlayerStats = {
   player?: {
@@ -218,6 +219,36 @@ async function getDailyProviderUsage() {
   return syncedFixtures.length;
 }
 
+async function calculateImmediateMarketPrice(asset: any, fairValue: number) {
+  const currentPrice = Math.max(1, Math.round(Number(asset.marketPrice || asset.current_price || fairValue)));
+  const firstPriceToday = await prisma.priceHistory.findFirst({
+    where: { assetId: asset.id, timestamp: { gte: getTodayStart() } },
+    orderBy: { timestamp: 'asc' },
+  });
+
+  const startOfDayPrice = firstPriceToday?.price || currentPrice;
+  const volatilityRisk = clamp(Number(asset.volatilityScore ?? 50), 0, 100) / 100;
+  return applyVolatilityCap(startOfDayPrice, Math.round(fairValue), volatilityRisk);
+}
+
+function buildImmediatePriceUpdate(asset: any, nextMarketPrice: number) {
+  const currentPrice = Math.max(1, Math.round(Number(asset.marketPrice || asset.current_price || nextMarketPrice)));
+  const data: any = {
+    current_price: nextMarketPrice,
+    marketPrice: nextMarketPrice,
+    high_price: Math.max(asset.high_price || nextMarketPrice, nextMarketPrice),
+    low_price: Math.min(asset.low_price || nextMarketPrice, nextMarketPrice),
+  };
+
+  if (nextMarketPrice !== currentPrice) {
+    data.priceHistory = {
+      create: { price: nextMarketPrice },
+    };
+  }
+
+  return data;
+}
+
 async function updateTeamsFromBuckets(buckets: Map<string, TeamBucket>, fixtureId: number, dryRun: boolean) {
   const teamResults: any[] = [];
 
@@ -254,8 +285,9 @@ async function updateTeamsFromBuckets(buckets: Map<string, TeamBucket>, fixtureI
       marketDemand: newMarketDemand,
     }, players);
     const fairValue = calculateFairValue(score, 'TEAM');
-    const oldFairValue = Number(team.fairValue || team.current_price || fairValue);
-    const changePercent = oldFairValue > 0 ? ((fairValue - oldFairValue) / oldFairValue) * 100 : 0;
+    const oldMarketPrice = Number(team.marketPrice || team.current_price || fairValue);
+    const nextMarketPrice = await calculateImmediateMarketPrice(team, fairValue);
+    const changePercent = oldMarketPrice > 0 ? ((nextMarketPrice - oldMarketPrice) / oldMarketPrice) * 100 : 0;
 
     if (!dryRun) {
       await prisma.asset.update({
@@ -268,6 +300,7 @@ async function updateTeamsFromBuckets(buckets: Map<string, TeamBucket>, fixtureI
           marketDemand: newMarketDemand,
           score,
           fairValue,
+          ...buildImmediatePriceUpdate(team, nextMarketPrice),
         },
       });
 
@@ -280,13 +313,13 @@ async function updateTeamsFromBuckets(buckets: Map<string, TeamBucket>, fixtureI
             eventType: 'team_performance',
             severity: Math.abs(changePercent) >= 8 ? 'high' : 'normal',
             localeGroupKey,
-            priceBefore: oldFairValue,
-            priceAfter: fairValue,
+            priceBefore: oldMarketPrice,
+            priceAfter: nextMarketPrice,
             changePercent,
             titleAr: `تحديث أداء ${team.name}`,
-            bodyAr: `تم تحديث تقييم المنتخب بعد المباراة. تقييم الأداء: ${calculated.teamRating.toFixed(1)}/100، ومتوسط أداء اللاعبين: ${averagePlayerRating.toFixed(1)}/100.`,
-            titleEn: `${team.name} performance update`,
-            bodyEn: `Team valuation updated after match performance. Rating: ${calculated.teamRating.toFixed(1)}/100, average player rating: ${averagePlayerRating.toFixed(1)}/100.`,
+            bodyAr: `تم تحديث سعر المنتخب فورًا بعد المباراة. تقييم الأداء: ${calculated.teamRating.toFixed(1)}/100، ومتوسط أداء اللاعبين: ${averagePlayerRating.toFixed(1)}/100.`,
+            titleEn: `${team.name} market price update`,
+            bodyEn: `Team market price updated immediately after match performance. Rating: ${calculated.teamRating.toFixed(1)}/100, average player rating: ${averagePlayerRating.toFixed(1)}/100.`,
             context: {
               fixtureId,
               averagePlayerRating,
@@ -296,6 +329,9 @@ async function updateTeamsFromBuckets(buckets: Map<string, TeamBucket>, fixtureI
               redCards: bucket.redCards,
               momentumImpact: calculated.momentumImpact,
               marketImpact: calculated.marketImpact,
+              fairValue,
+              oldMarketPrice,
+              nextMarketPrice,
             } as any,
           },
         });
@@ -313,8 +349,10 @@ async function updateTeamsFromBuckets(buckets: Map<string, TeamBucket>, fixtureI
       teamRating: calculated.teamRating,
       momentumImpact: calculated.momentumImpact,
       marketImpact: calculated.marketImpact,
-      fairValueBefore: oldFairValue,
+      fairValueBefore: Number(team.fairValue || team.current_price || fairValue),
       fairValueAfter: fairValue,
+      marketPriceBefore: oldMarketPrice,
+      marketPriceAfter: nextMarketPrice,
       changePercent: Math.round(changePercent * 10) / 10,
     });
   }
@@ -401,6 +439,8 @@ export async function POST(req: Request) {
         marketDemand,
       });
       const playerFairValue = calculateFairValue(playerScore, 'PLAYER');
+      const oldMarketPrice = Number(localAsset.marketPrice || localAsset.current_price || playerFairValue);
+      const nextMarketPrice = await calculateImmediateMarketPrice(localAsset, playerFairValue);
 
       addToTeamBucket(teamBuckets, {
         teamId: localAsset.teamId,
@@ -483,6 +523,7 @@ export async function POST(req: Request) {
               marketDemand,
               score: playerScore,
               fairValue: playerFairValue,
+              ...buildImmediatePriceUpdate(localAsset, nextMarketPrice),
             },
           }),
         ]);
@@ -498,6 +539,8 @@ export async function POST(req: Request) {
         momentumImpact: calculated.momentumImpact,
         marketImpact: calculated.marketImpact,
         fairValueAfter: playerFairValue,
+        marketPriceBefore: oldMarketPrice,
+        marketPriceAfter: nextMarketPrice,
       });
     }
 
