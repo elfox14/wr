@@ -1,5 +1,6 @@
 import { Metadata } from 'next';
 import MarketClient from '@/components/MarketClient';
+import { AIMarketHighlights } from '@/features/analysis/components/AIMarketHighlights';
 import prisma from '@/lib/prisma';
 
 export const metadata: Metadata = {
@@ -20,6 +21,7 @@ export default async function MarketPage() {
     volumeResult,
     nextMatch,
     recentNews,
+    analysisAssets,
   ] = await Promise.all([
     prisma.user.count(),
     prisma.asset.count(),
@@ -37,22 +39,32 @@ export default async function MarketPage() {
       take: 6,
       include: { asset: true },
     }),
+    prisma.asset.findMany({
+      orderBy: [
+        { score: 'desc' },
+        { marketPrice: 'desc' },
+      ],
+      take: 80,
+    }),
   ]);
 
   const todayVolume = Number((volumeResult as any)[0]?.volume || 0);
   const nextMatchDate = nextMatch ? nextMatch.matchDate.toISOString() : null;
 
   return (
-    <MarketClient
-      usersCount={usersCount}
-      todayVolume={todayVolume}
-      todayTradesCount={todayTradesCount}
-      assetsCount={assetsCount}
-      teamsCount={teamsCount}
-      playersCount={playersCount}
-      nextMatchDate={nextMatchDate}
-      nextMatch={nextMatch}
-      recentNews={recentNews}
-    />
+    <>
+      <AIMarketHighlights assets={analysisAssets} />
+      <MarketClient
+        usersCount={usersCount}
+        todayVolume={todayVolume}
+        todayTradesCount={todayTradesCount}
+        assetsCount={assetsCount}
+        teamsCount={teamsCount}
+        playersCount={playersCount}
+        nextMatchDate={nextMatchDate}
+        nextMatch={nextMatch}
+        recentNews={recentNews}
+      />
+    </>
   );
 }
