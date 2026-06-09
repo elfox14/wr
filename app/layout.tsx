@@ -7,6 +7,7 @@ import { NotificationProvider } from "@/components/ui/NotificationProvider";
 import { GlobalTicker } from "@/components/ui/GlobalTicker";
 import { Navbar } from "@/components/ui/Navbar";
 import { Footer } from "@/components/ui/Footer";
+import { MobileBottomNav } from "@/components/ui/MobileBottomNav";
 
 const cairo = Cairo({
   variable: "--font-cairo",
@@ -28,7 +29,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "MC PRIME Exchange",
     description: "بورصة المونديال الافتراضية من MC PRIME — تداول المنتخبات واللاعبين بعملات افتراضية فقط. استثمر في النجوم ونافس عالمياً.",
-    url: baseUrl, // Replace with real domain later
+    url: baseUrl,
     siteName: "MC PRIME Exchange",
     images: [
       {
@@ -87,10 +88,11 @@ export default function RootLayout({
         <Providers>
           <NotificationProvider>
             <Navbar />
-            <div className="pb-10 min-h-[calc(100vh-100px)]"> {/* Padding bottom for the fixed ticker */}
+            <div className="pb-28 lg:pb-10 min-h-[calc(100vh-100px)]">
               {children}
             </div>
             <Footer />
+            <MobileBottomNav />
             <GlobalTicker />
           </NotificationProvider>
         </Providers>
