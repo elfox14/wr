@@ -46,11 +46,7 @@ async function callInternal(req: Request, path: string, init: RequestInit = {}) 
   });
 
   const data = await response.json().catch(() => null);
-  return {
-    ok: response.ok,
-    status: response.status,
-    data,
-  };
+  return { ok: response.ok, status: response.status, data };
 }
 
 function simplifyFixture(item: any) {
@@ -114,13 +110,17 @@ function simplifyPlayerStats(item: any) {
 }
 
 async function healthCheck() {
-  const [assets, teams, players, matches, performances, news] = await Promise.all([
+  const [assets, teams, players, matches, performances, news, invalidMatches] = await Promise.all([
     prisma.asset.count(),
     prisma.asset.count({ where: { type: 'TEAM' } }),
     prisma.asset.count({ where: { type: 'PLAYER' } }),
     prisma.match.count(),
     prisma.playerPerformance.count(),
     prisma.marketNews.count(),
+    prisma.match.count({ where: { externalId: { not: null }, homeTeamId: { equals: prisma.match.fields.awayTeamId } } } as any).catch(async () => {
+      const all = await prisma.match.findMany({ where: { externalId: { not: null } }, select: { homeTeamId: true, awayTeamId: true } });
+      return all.filter((match) => match.homeTeamId === match.awayTeamId).length;
+    }),
   ]);
 
   return {
@@ -136,14 +136,7 @@ async function healthCheck() {
       isportsKey: Boolean(process.env.ISPORTS_API_KEY || process.env.ISPORTS_API_KEYS),
       marketState: process.env.NEXT_PUBLIC_MARKET_STATE || null,
     },
-    database: {
-      assets,
-      teams,
-      players,
-      matches,
-      performances,
-      news,
-    },
+    database: { assets, teams, players, matches, performances, news, invalidMatches },
   };
 }
 
@@ -158,19 +151,13 @@ async function recentMatches(limit = 30) {
     },
   });
 
-  const fixtureIds = matches
-    .map((match) => Number(match.externalId))
-    .filter((id) => Number.isFinite(id));
-
+  const fixtureIds = matches.map((match) => Number(match.externalId)).filter((id) => Number.isFinite(id));
   const performanceCounts = await prisma.playerPerformance.groupBy({
     by: ['providerFixtureId'],
     where: { providerFixtureId: { in: fixtureIds } },
     _count: { id: true },
   });
-
-  const countsByFixtureId = new Map(
-    performanceCounts.map((item) => [item.providerFixtureId, item._count.id])
-  );
+  const countsByFixtureId = new Map(performanceCounts.map((item) => [item.providerFixtureId, item._count.id]));
 
   return {
     ok: true,
@@ -186,51 +173,81 @@ async function recentMatches(limit = 30) {
         awayScore: match.awayScore,
         homeTeam: match.homeTeam,
         awayTeam: match.awayTeam,
+        isInvalidSameTeam: match.homeTeamId === match.awayTeamId,
         performanceRecords: countsByFixtureId.get(fixtureId) || 0,
       };
     }),
   };
 }
 
+async function invalidMatches() {
+  const matches = await prisma.match.findMany({
+    where: { externalId: { not: null } },
+    orderBy: { matchDate: 'desc' },
+    take: 500,
+    include: {
+      homeTeam: { select: { id: true, name: true, image: true } },
+      awayTeam: { select: { id: true, name: true, image: true } },
+    },
+  });
+
+  const invalid = matches.filter((match) => match.homeTeamId === match.awayTeamId);
+  return {
+    ok: true,
+    count: invalid.length,
+    matches: invalid.map((match) => ({
+      id: match.id,
+      fixtureId: Number(match.externalId),
+      matchDate: match.matchDate,
+      status: match.status,
+      homeScore: match.homeScore,
+      awayScore: match.awayScore,
+      homeTeam: match.homeTeam,
+      awayTeam: match.awayTeam,
+    })),
+  };
+}
+
+async function cleanupInvalidMatches(dryRun = true) {
+  const scan = await invalidMatches();
+  const ids = scan.matches.map((match: any) => match.id);
+  const fixtureIds = scan.matches.map((match: any) => match.fixtureId).filter(Boolean);
+
+  if (dryRun || ids.length === 0) {
+    return { ok: true, dryRun, deletedMatches: 0, deletedPerformances: 0, ...scan };
+  }
+
+  const [performanceDelete, matchDelete] = await prisma.$transaction([
+    prisma.playerPerformance.deleteMany({ where: { providerFixtureId: { in: fixtureIds } } }),
+    prisma.match.deleteMany({ where: { id: { in: ids } } }),
+  ]);
+
+  return {
+    ok: true,
+    dryRun,
+    scannedInvalidMatches: scan.count,
+    deletedMatches: matchDelete.count,
+    deletedPerformances: performanceDelete.count,
+    fixtureIds,
+  };
+}
+
 async function providerFixtures(date: string) {
   const payload = await apiFootballFetch<{ response?: any[] }>('/fixtures', { date });
   const fixtures = payload.response || [];
-  return {
-    ok: true,
-    source: 'provider',
-    endpoint: '/fixtures',
-    date,
-    count: fixtures.length,
-    fixtures: fixtures.map(simplifyFixture),
-    raw: fixtures,
-  };
+  return { ok: true, source: 'provider', endpoint: '/fixtures', date, count: fixtures.length, fixtures: fixtures.map(simplifyFixture), raw: fixtures };
 }
 
 async function providerLiveScores() {
   const payload = await apiFootballFetch<{ response?: any[] }>('/livescores', { live: 'all' });
   const fixtures = payload.response || [];
-  return {
-    ok: true,
-    source: 'provider',
-    endpoint: '/livescores',
-    count: fixtures.length,
-    fixtures: fixtures.map(simplifyFixture),
-    raw: fixtures,
-  };
+  return { ok: true, source: 'provider', endpoint: '/livescores', count: fixtures.length, fixtures: fixtures.map(simplifyFixture), raw: fixtures };
 }
 
 async function providerPlayerStats(fixtureId: string) {
   const payload = await apiFootballFetch<{ response?: any[] }>('/fixtures/players', { fixture: Number(fixtureId) });
   const players = payload.response || [];
-  return {
-    ok: true,
-    source: 'provider',
-    endpoint: '/fixtures/players',
-    fixtureId: Number(fixtureId),
-    count: players.length,
-    players: players.map(simplifyPlayerStats),
-    raw: players,
-  };
+  return { ok: true, source: 'provider', endpoint: '/fixtures/players', fixtureId: Number(fixtureId), count: players.length, players: players.map(simplifyPlayerStats), raw: players };
 }
 
 export async function GET(req: Request) {
@@ -242,11 +259,14 @@ export async function GET(req: Request) {
   const date = searchParams.get('date') || new Date().toISOString().slice(0, 10);
   const fixtureId = searchParams.get('fixtureId');
   const force = searchParams.get('force') === 'true';
+  const dryRun = searchParams.get('dryRun') !== 'false';
   const limit = Number(searchParams.get('limit') || 30);
 
   try {
     if (action === 'health') return NextResponse.json(await healthCheck());
     if (action === 'recent-matches') return NextResponse.json(await recentMatches(limit));
+    if (action === 'invalid-matches') return NextResponse.json(await invalidMatches());
+    if (action === 'cleanup-invalid-matches') return NextResponse.json(await cleanupInvalidMatches(dryRun));
     if (action === 'provider-fixtures') return NextResponse.json(await providerFixtures(date));
     if (action === 'provider-live') return NextResponse.json(await providerLiveScores());
     if (action === 'provider-player-stats') {
@@ -277,22 +297,17 @@ export async function GET(req: Request) {
 
     return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
   } catch (error: any) {
-    return NextResponse.json({
-      error: error.message || 'Admin control action failed',
-      details: error.payload || null,
-    }, { status: error.status || 500 });
+    return NextResponse.json({ error: error.message || 'Admin control action failed', details: error.payload || null }, { status: error.status || 500 });
   }
 }
 
 export async function POST(req: Request) {
   const admin = await requireAdmin();
   if (admin.error) return admin.error;
-
   const body = await req.json().catch(() => ({}));
   const url = new URL(req.url);
   Object.entries(body).forEach(([key, value]) => {
     if (value !== undefined && value !== null) url.searchParams.set(key, String(value));
   });
-
   return GET(new Request(url.toString(), { headers: req.headers }));
 }
