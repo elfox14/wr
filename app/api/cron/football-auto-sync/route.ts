@@ -35,22 +35,36 @@ function hasValidCronSecret(req: Request) {
   return [bearer, cronHeader, adminHeader].some((value) => value && value === expected);
 }
 
+function normalizeTeamName(name?: string | null) {
+  return normalizeName(name || '')
+    .replace(/\bfootball club\b/g, '')
+    .replace(/\bfc\b/g, '')
+    .replace(/\bnational team\b/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 async function findTeamAsset(providerId?: number | string | null, name?: string | null) {
   const providerNumber = providerId == null ? null : Number(providerId);
   if (providerNumber && Number.isFinite(providerNumber)) {
     const byApiId = await prisma.asset.findFirst({ where: { type: 'TEAM', apiFootballId: providerNumber } });
-    if (byApiId) return byApiId;
+    if (byApiId) return { asset: byApiId, matchMethod: 'apiFootballId' };
+
     const byIsportsId = await prisma.asset.findFirst({ where: { type: 'TEAM', isportsId: providerNumber } });
-    if (byIsportsId) return byIsportsId;
+    if (byIsportsId) return { asset: byIsportsId, matchMethod: 'isportsId' };
   }
 
-  const normalizedName = normalizeName(name || '');
-  if (!normalizedName) return null;
+  const normalizedName = normalizeTeamName(name);
+  if (!normalizedName || normalizedName.length < 3) return null;
 
   const teams = await prisma.asset.findMany({ where: { type: 'TEAM' }, take: 500 });
-  return teams.find((team) => normalizeName(team.name) === normalizedName) ||
-    teams.find((team) => normalizeName(team.name).includes(normalizedName) || normalizedName.includes(normalizeName(team.name))) ||
-    null;
+  const exact = teams.find((team) => normalizeTeamName(team.name) === normalizedName);
+  if (exact) return { asset: exact, matchMethod: 'exactName' };
+
+  const codeMatch = teams.find((team) => normalizeTeamName(team.code) === normalizedName);
+  if (codeMatch) return { asset: codeMatch, matchMethod: 'exactCode' };
+
+  return null;
 }
 
 async function upsertFixtureMatch(fixture: any) {
@@ -59,22 +73,37 @@ async function upsertFixtureMatch(fixture: any) {
   const away = fixture.teams?.away || {};
 
   if (!fixtureId || !home.name || !away.name) {
-    return { status: 'skipped_missing_fixture_data', fixtureId };
+    return { status: 'skipped_missing_fixture_data', fixtureId, providerHome: home.name, providerAway: away.name };
   }
 
-  const [homeTeam, awayTeam] = await Promise.all([
+  const [homeMatch, awayMatch] = await Promise.all([
     findTeamAsset(home.id, home.name),
     findTeamAsset(away.id, away.name),
   ]);
 
-  if (!homeTeam || !awayTeam) {
+  if (!homeMatch || !awayMatch) {
     return {
       status: 'skipped_team_not_matched',
       fixtureId,
-      homeTeam: home.name,
-      awayTeam: away.name,
-      homeMatched: Boolean(homeTeam),
-      awayMatched: Boolean(awayTeam),
+      providerHome: { id: home.id, name: home.name },
+      providerAway: { id: away.id, name: away.name },
+      homeMatched: Boolean(homeMatch),
+      awayMatched: Boolean(awayMatch),
+    };
+  }
+
+  const homeTeam = homeMatch.asset;
+  const awayTeam = awayMatch.asset;
+
+  if (homeTeam.id === awayTeam.id) {
+    return {
+      status: 'skipped_same_team_match_guard',
+      fixtureId,
+      providerHome: { id: home.id, name: home.name },
+      providerAway: { id: away.id, name: away.name },
+      matchedTeam: homeTeam.name,
+      homeMatchMethod: homeMatch.matchMethod,
+      awayMatchMethod: awayMatch.matchMethod,
     };
   }
 
@@ -109,7 +138,17 @@ async function upsertFixtureMatch(fixture: any) {
     },
   });
 
-  return { status: 'match_upserted', fixtureId, matchStatus: status, homeTeam: homeTeam.name, awayTeam: awayTeam.name };
+  return {
+    status: 'match_upserted',
+    fixtureId,
+    matchStatus: status,
+    providerHome: { id: home.id, name: home.name },
+    providerAway: { id: away.id, name: away.name },
+    homeTeam: homeTeam.name,
+    awayTeam: awayTeam.name,
+    homeMatchMethod: homeMatch.matchMethod,
+    awayMatchMethod: awayMatch.matchMethod,
+  };
 }
 
 async function syncPlayerPerformance(req: Request, fixtureId: number, force = false) {
@@ -196,6 +235,7 @@ export async function GET(req: Request) {
           lt: new Date(`${date}T23:59:59.999Z`),
         },
         status: { in: ['IN_PLAY', 'FINISHED'] },
+        NOT: { homeTeamId: { equals: prisma.match.fields.awayTeamId } },
       },
       take: 50,
     });
