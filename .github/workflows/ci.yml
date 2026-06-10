@@ -58,6 +58,9 @@ jobs:
       - name: Lint AI analysis files
         run: npm run lint:ai
 
+      - name: Lint asset page
+        run: npm run lint:asset-page
+
       - name: Type-check
         run: npm run type-check
 
