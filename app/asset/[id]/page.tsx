@@ -79,13 +79,18 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     (asset.image.startsWith('http://') || asset.image.startsWith('https://') || asset.image.startsWith('/'));
 
   const ogImage = isValidOgImage ? asset.image : '/og-image.jpg';
+  const isTeam = asset.type === 'TEAM';
 
   return {
-    title: `${asset.name} (${asset.code}) | MC PRIME Exchange`,
-    description: `تداول أسهم ${asset.name} في منصة MC PRIME Exchange. تابع السعر المباشر: ${asset.current_price}¢ وأداء الأصل في البطولة.`,
+    title: `${asset.name} (${asset.code}) | ${isTeam ? 'تحليل المنتخب' : 'تحليل اللاعب'} | MC PRIME Exchange`,
+    description: isTeam
+      ? `تحليل فني وإحصائي لمنتخب ${asset.name}: قوة الخطوط، اللاعبين المؤثرين، المباريات، ومؤشرات الجاهزية.`
+      : `تحليل فني وسوقي للاعب ${asset.name}. تابع الأداء والسعر الافتراضي داخل منصة MC PRIME Exchange.`,
     openGraph: {
-      title: `${asset.name} | MC PRIME Exchange`,
-      description: `تداول أسهم ${asset.name} في بورصة المونديال الافتراضية.`,
+      title: `${asset.name} | ${isTeam ? 'تحليل المنتخب' : 'MC PRIME Exchange'}`,
+      description: isTeam
+        ? `ملف كروي لمنتخب ${asset.name} يشمل القراءة الفنية والإحصائيات واللاعبين المؤثرين.`
+        : `تداول أسهم ${asset.name} في بورصة المونديال الافتراضية.`,
       images: [ogImage],
     },
   };
@@ -199,7 +204,9 @@ export default async function AssetPage({ params }: Props) {
     "@context": "https://schema.org",
     "@type": isTeam ? "SportsTeam" : "Person",
     "name": asset.name,
-    "description": `تداول أسهم ${asset.name} في منصة MC PRIME Exchange. السعر المباشر: ${asset.current_price}¢.`,
+    "description": isTeam
+      ? `تحليل فني وإحصائي لمنتخب ${asset.name}: قوة الخطوط، اللاعبين المؤثرين، والمباريات.`
+      : `تداول أسهم ${asset.name} في منصة MC PRIME Exchange. السعر المباشر: ${asset.current_price}¢.`,
     "url": `${baseUrl}/asset/${asset.id}`,
   } : null;
 
@@ -224,7 +231,7 @@ export default async function AssetPage({ params }: Props) {
         />
       )}
 
-      {normalizedAsset && <StickyTradeCTA assetId={normalizedAsset.id} assetName={normalizedAsset.name} price={normalizedAsset.marketPrice ?? normalizedAsset.current_price} isTeam={isTeam} />}
+      {normalizedAsset && !isTeam && <StickyTradeCTA assetId={normalizedAsset.id} assetName={normalizedAsset.name} price={normalizedAsset.marketPrice ?? normalizedAsset.current_price} isTeam={isTeam} />}
     </>
   );
 }
