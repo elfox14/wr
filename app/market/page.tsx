@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { Metadata } from 'next';
 import { ArrowRight, Brain } from 'lucide-react';
-import MarketClient from '@/components/MarketClient';
+import MarketClient from '@/components/market/MarketClientClean';
 import { AIMarketHighlights } from '@/features/analysis/components/AIMarketHighlights';
 import prisma from '@/lib/prisma';
 
