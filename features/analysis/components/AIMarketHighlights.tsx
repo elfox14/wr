@@ -45,9 +45,9 @@ export function AIMarketHighlights({ assets = [] }: { assets?: FootballAnalysisA
       <div className="rounded-[1.7rem] border border-[#0FF0FC]/15 bg-[#101217] p-4 shadow-card lg:rounded-3xl lg:p-6">
         <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <div className="mb-2 inline-flex items-center gap-2 rounded-xl border border-[#0FF0FC]/20 bg-[#0FF0FC]/10 px-3 py-1 text-xs font-black text-[#0FF0FC]"><Brain size={14} /> AI Market Lens</div>
-            <h2 className="text-xl font-black text-white lg:text-2xl">فرص وتحذيرات فنية داخل السوق</h2>
-            <p className="mt-1 text-xs leading-6 text-gray-400 lg:text-sm">قراءة تجمع السعر العادل مع التحليل الفني، حتى تظهر الفرص قبل فتح صفحة الأصل.</p>
+            <div className="mb-2 inline-flex items-center gap-2 rounded-xl border border-[#0FF0FC]/20 bg-[#0FF0FC]/10 px-3 py-1 text-xs font-black text-[#0FF0FC]"><Brain size={14} /> Market Intelligence Lens</div>
+            <h2 className="text-xl font-black text-white lg:text-2xl">فرص وتحذيرات قبل فتح السوق</h2>
+            <p className="mt-1 text-xs leading-6 text-gray-400 lg:text-sm">قراءة سريعة تجمع بين السعر الحالي، القيمة العادلة، ودرجة التحليل الفني حتى ترى السبب قبل الدخول في تفاصيل الأصل.</p>
           </div>
         </div>
 
