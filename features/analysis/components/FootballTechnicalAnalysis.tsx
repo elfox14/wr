@@ -1,9 +1,9 @@
 import { Activity, Brain, ShieldAlert, Sparkles, Target, TrendingUp, WalletCards } from 'lucide-react';
-import { analyzeFootballAsset } from '../lib/analysis-adapter';
+import { analyzeFootballAsset, type FootballAnalysisAssetInput } from '../lib/analysis-adapter';
 import { analyzeValueFit, formatVirtualCoins } from '../lib/value-fit';
 
 type Props = {
-  asset: any;
+  asset: FootballAnalysisAssetInput;
   compact?: boolean;
 };
 
@@ -78,39 +78,43 @@ export function FootballTechnicalAnalysis({ asset, compact = false }: Props) {
               </div>
             </div>
             <p className="mb-1 text-sm font-black">{valueFit.label}</p>
-            <p className="text-xs leading-6 text-gray-300">{valueFit.reason}</p>
+            <p className="text-xs leading-6 opacity-85">{valueFit.reason}</p>
           </div>
         </div>
 
-        <div className={`grid gap-3 ${compact ? 'lg:grid-cols-3' : 'lg:grid-cols-6'}`}>
-          {analysis.categoryScores.map((category) => (
-            <div key={category.key} className="rounded-2xl border border-white/10 bg-black/25 p-3">
-              <div className="mb-3 flex items-center justify-between gap-2">
-                <span className="flex items-center gap-1.5 text-xs font-black text-white"><IconForCategory label={category.label} /> {category.label}</span>
-                <span className="text-sm font-black text-white tabular-nums">{category.score}</span>
-              </div>
-              <div className="h-2 overflow-hidden rounded-full bg-white/10">
-                <div className={`h-full rounded-full ${barTone(category.score)}`} style={{ width: `${category.score}%` }} />
-              </div>
-              <p className="mt-2 text-[11px] leading-5 text-gray-500">{category.reasons[0]}</p>
+        {!compact && (
+          <>
+            <div className="mb-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              {analysis.categoryScores.map((category) => (
+                <div key={category.key} className="rounded-2xl border border-white/10 bg-black/25 p-4">
+                  <div className="mb-3 flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 text-sm font-black text-white"><IconForCategory label={category.label} /> {category.label}</div>
+                    <span className={`rounded-lg border px-2 py-1 text-xs font-black ${scoreTone(category.score)}`}>{category.score}</span>
+                  </div>
+                  <div className="h-2 overflow-hidden rounded-full bg-white/10">
+                    <div className={`h-full rounded-full ${barTone(category.score)}`} style={{ width: `${category.score}%` }} />
+                  </div>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
 
-        <div className="mt-5 grid gap-3 lg:grid-cols-2">
-          <div className="rounded-2xl border border-emerald-400/15 bg-emerald-400/5 p-4">
-            <h3 className="mb-3 text-sm font-black text-emerald-300">نقاط القوة</h3>
-            <ul className="space-y-2 text-xs leading-6 text-gray-300">
-              {analysis.strengths.map((item) => <li key={item}>• {item}</li>)}
-            </ul>
-          </div>
-          <div className="rounded-2xl border border-[#FFD700]/15 bg-[#FFD700]/5 p-4">
-            <h3 className="mb-3 text-sm font-black text-[#FFD700]">نقاط تحتاج متابعة</h3>
-            <ul className="space-y-2 text-xs leading-6 text-gray-300">
-              {analysis.weaknesses.map((item) => <li key={item}>• {item}</li>)}
-            </ul>
-          </div>
-        </div>
+            <div className="grid gap-3 lg:grid-cols-2">
+              <div className="rounded-2xl border border-emerald-400/15 bg-emerald-400/5 p-4">
+                <div className="mb-3 flex items-center gap-2 text-sm font-black text-emerald-300"><TrendingUp size={17} /> نقاط القوة</div>
+                <ul className="space-y-2 text-sm leading-6 text-gray-300">
+                  {analysis.strengths.map((item) => <li key={item}>• {item}</li>)}
+                </ul>
+              </div>
+
+              <div className="rounded-2xl border border-red-400/15 bg-red-400/5 p-4">
+                <div className="mb-3 flex items-center gap-2 text-sm font-black text-red-300"><ShieldAlert size={17} /> نقاط تحتاج متابعة</div>
+                <ul className="space-y-2 text-sm leading-6 text-gray-300">
+                  {analysis.weaknesses.map((item) => <li key={item}>• {item}</li>)}
+                </ul>
+              </div>
+            </div>
+          </>
+        )}
       </div>
     </section>
   );
