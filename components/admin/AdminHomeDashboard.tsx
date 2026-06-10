@@ -20,7 +20,7 @@ const modules = [
   {
     href: '/admin/team-intelligence',
     title: 'إدارة تقارير المنتخبات',
-    description: 'تشغيل seed تقارير Team Intelligence يدويًا، ثم مراجعة النتائج في مركز التقارير وAI Analyst.',
+    description: 'تشغيل seed تقارير Team Intelligence يدويًا، ثم مراجعة النتائج في مركز التحليل وIntelligence Hub.',
     icon: FileText,
     tag: 'ذكاء المنتخبات',
   },
@@ -44,7 +44,7 @@ export default function AdminHomeDashboard() {
   return (
     <AdminShell
       title="مركز إدارة المنصة"
-      subtitle="لوحة منظمة لإدارة بيانات كأس العالم، اختبار مزودي البيانات، تنظيف الأخطاء، ومراقبة جاهزية السوق الافتراضي."
+      subtitle="لوحة منظمة لإدارة بيانات كأس العالم، اختبار مزودي البيانات، تنظيف الأخطاء، ومراقبة جاهزية التحليل والسوق الافتراضي."
       badge="لوحة تحكم احترافية"
     >
       <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
