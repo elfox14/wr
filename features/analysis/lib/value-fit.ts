@@ -1,5 +1,11 @@
 export type ValueFitSignal = 'UNDERVALUED' | 'OVERVALUED' | 'TECH_SUPPORTED' | 'BALANCED';
 
+export type ValueFitAssetInput = {
+  marketPrice?: number | string | null;
+  current_price?: number | string | null;
+  fairValue?: number | string | null;
+};
+
 export type ValueFitResult = {
   signal: ValueFitSignal;
   label: string;
@@ -11,16 +17,16 @@ export type ValueFitResult = {
   gapPercent: number;
 };
 
-export function getMarketPrice(asset: any) {
+export function getMarketPrice(asset: ValueFitAssetInput) {
   return Number(asset?.marketPrice ?? asset?.current_price ?? 0);
 }
 
-export function getFairValue(asset: any) {
+export function getFairValue(asset: ValueFitAssetInput) {
   const marketPrice = getMarketPrice(asset);
   return Number(asset?.fairValue ?? asset?.current_price ?? marketPrice ?? 0);
 }
 
-export function getValueGapPercent(asset: any) {
+export function getValueGapPercent(asset: ValueFitAssetInput) {
   const fairValue = getFairValue(asset);
   if (!Number.isFinite(fairValue) || fairValue <= 0) return 0;
   return ((getMarketPrice(asset) - fairValue) / fairValue) * 100;
@@ -30,7 +36,7 @@ export function formatVirtualCoins(value: number) {
   return `${Math.round(Number(value || 0)).toLocaleString()}¢`;
 }
 
-export function analyzeValueFit(asset: any, technicalScore: number): ValueFitResult {
+export function analyzeValueFit(asset: ValueFitAssetInput, technicalScore: number): ValueFitResult {
   const marketPrice = getMarketPrice(asset);
   const fairValue = getFairValue(asset);
   const gapPercent = getValueGapPercent(asset);
