@@ -10,6 +10,7 @@ import { TransactionHistory } from '@/components/portfolio/TransactionHistory';
 import { AchievementsList } from '@/components/portfolio/AchievementsList';
 import { PitchPortfolio } from '@/components/portfolio/PitchPortfolio';
 import { PortfolioAnalyticsDashboard } from '@/components/portfolio/PortfolioAnalyticsDashboard';
+import { AIPortfolioInsights } from '@/features/analysis/components/AIPortfolioInsights';
 
 function formatCoins(value: number) {
   return `${Math.round(Number(value || 0)).toLocaleString()}¢`;
@@ -28,8 +29,9 @@ export default function PortfolioPage() {
       setLoadError(null);
       try {
         await fetchPortfolio();
-      } catch (error: any) {
-        if (mounted) setLoadError(error?.message || 'تعذر تحميل المحفظة.');
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : 'تعذر تحميل المحفظة.';
+        if (mounted) setLoadError(message);
       } finally {
         if (mounted) setIsLoading(false);
       }
@@ -134,6 +136,8 @@ export default function PortfolioPage() {
             <span className="font-black text-white">{mobileSummary.holdingsCount}</span>
           </div>
         </section>
+
+        <AIPortfolioInsights holdings={holdings} userStats={userStats} />
 
         <PortfolioAnalyticsDashboard />
 
