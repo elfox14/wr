@@ -252,6 +252,26 @@ export default function MarketClientClean({
           </div>
         </section>
 
+        <section className="mb-8 rounded-[1.7rem] border border-accent/20 bg-[linear-gradient(135deg,rgba(255,215,0,0.12),rgba(15,240,252,0.06))] p-5 shadow-card">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex gap-4">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-accent/25 bg-accent/10 text-accent">
+                <ShieldCheck size={22} />
+              </div>
+              <div>
+                <p className="text-xs font-black text-accent">قبل قراءة الفرص</p>
+                <h2 className="text-xl font-black text-white">افهم التسعير قبل أي تداول افتراضي</h2>
+                <p className="mt-1 max-w-3xl text-sm leading-7 text-gray-300">
+                  تعرف على الفرق بين السعر الحالي والقيمة العادلة، ولماذا يتحرك الأصل بسبب الأداء، الطلب، الشعبية، إرث المونديال، والزخم.
+                </p>
+              </div>
+            </div>
+            <Link href="/methodology" className="inline-flex items-center justify-center gap-2 rounded-2xl bg-accent px-5 py-3 text-sm font-black text-black transition hover:bg-accent/90">
+              افتح منهجية التسعير <ArrowRight size={15} />
+            </Link>
+          </div>
+        </section>
+
         <section className="mb-8 grid gap-4 lg:grid-cols-3">
           <Link href={strongestMomentum ? `/asset/${strongestMomentum.id}` : '/market'} className="rounded-3xl border border-primary/15 bg-primary/10 p-5 shadow-card transition hover:border-primary/35">
             <div className="mb-3 flex items-center justify-between text-primary"><Zap size={22} /><span className="text-xs font-black">LIVE PULSE</span></div>
