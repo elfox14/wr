@@ -6,7 +6,7 @@ import { PageHeader } from '@/components/ui/PageHeader';
 import { MarketAnalysisBadge } from '@/features/analysis/components/MarketAnalysisBadge';
 import { SmartTradeAlerts } from '@/features/analysis/components/SmartTradeAlerts';
 import { analyzeFootballAsset } from '@/features/analysis/lib/analysis-adapter';
-import { buildAIAnalystGroups } from '@/features/analysis/lib/ai-analyst-ranking';
+import { buildAIAnalystGroups, type NormalizedAIAnalystAsset } from '@/features/analysis/lib/ai-analyst-ranking';
 import { buildSmartTradeAlerts } from '@/features/analysis/lib/smart-alerts';
 import { formatVirtualCoins, getFairValue, getMarketPrice, getValueGapPercent } from '@/features/analysis/lib/value-fit';
 import prisma from '@/lib/prisma';
@@ -24,15 +24,16 @@ function EmptyState({ text }: { text: string }) {
   );
 }
 
-function AssetRow({ asset, danger = false }: { asset: any; danger?: boolean }) {
+function AssetRow({ asset, danger = false }: { asset: NormalizedAIAnalystAsset; danger?: boolean }) {
   const analysis = analyzeFootballAsset(asset);
   const gap = getValueGapPercent(asset);
   const typeLabel = asset.type === 'TEAM' ? 'منتخب' : 'لاعب';
+  const assetType = asset.type === 'TEAM' ? 'TEAM' : 'PLAYER';
 
   return (
     <Link href={`/asset/${asset.id}`} className="group block rounded-2xl border border-white/10 bg-black/25 p-4 transition hover:border-[#0FF0FC]/35 hover:bg-white/[0.04]">
       <div className="flex items-center gap-3">
-        <AssetImage image={asset.image || ''} type={asset.type as 'TEAM' | 'PLAYER'} name={asset.name} width={46} height={46} className="h-12 w-12 rounded-xl border border-white/10 object-cover" />
+        <AssetImage image={asset.image || ''} type={assetType} name={asset.name || 'Asset'} width={46} height={46} className="h-12 w-12 rounded-xl border border-white/10 object-cover" />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="truncate font-black text-white group-hover:text-[#0FF0FC]">{asset.name}</h3>
