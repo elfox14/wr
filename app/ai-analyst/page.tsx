@@ -16,6 +16,28 @@ export const metadata: Metadata = {
   description: 'تحليل ذكي يربط بين السعر الافتراضي، القيمة العادلة، والتحليل الفني داخل الملعب.',
 };
 
+type ReportBackedTeam = {
+  id: string;
+  name: string;
+  code: string;
+  image: string;
+  current_price: number;
+  marketPrice?: number | null;
+  fairValue?: number | null;
+  score?: number | null;
+};
+
+type ReportBackedSignal = {
+  id: string;
+  title: string;
+  summary: string;
+  confidence?: string | null;
+  publishedAt?: Date | string | null;
+  team: ReportBackedTeam;
+  marketGap: number;
+  signal: 'opportunity' | 'watch' | 'risk';
+};
+
 function EmptyState({ text }: { text: string }) {
   return (
     <div className="rounded-2xl border border-white/10 bg-black/25 p-6 text-center text-sm font-bold leading-7 text-gray-500">
@@ -37,6 +59,51 @@ function formatDate(value?: Date | string | null) {
     day: 'numeric',
     month: 'short',
   });
+}
+
+function getTeamMarketGap(team: ReportBackedTeam) {
+  const marketPrice = Number(team.marketPrice ?? team.current_price ?? 0);
+  const fairValue = Number(team.fairValue ?? team.current_price ?? 0);
+  if (!marketPrice || !fairValue) return 0;
+  return ((fairValue - marketPrice) / marketPrice) * 100;
+}
+
+function getReportSignal(report: { confidence?: string | null; team: ReportBackedTeam }) {
+  const gap = getTeamMarketGap(report.team);
+  const confidence = report.confidence || 'D';
+  if ((confidence === 'A' || confidence === 'B') && gap >= 8) return 'opportunity';
+  if (gap <= -10) return 'risk';
+  return 'watch';
+}
+
+function ReportSignalCard({ signal }: { signal: ReportBackedSignal }) {
+  const toneClass = signal.signal === 'opportunity'
+    ? 'border-emerald-400/15 bg-emerald-400/5 text-emerald-300'
+    : signal.signal === 'risk'
+      ? 'border-red-400/15 bg-red-400/5 text-red-300'
+      : 'border-[#FFD700]/15 bg-[#FFD700]/5 text-[#FFD700]';
+  const label = signal.signal === 'opportunity' ? 'فرصة مدعومة بتقرير' : signal.signal === 'risk' ? 'مراقبة مخاطر' : 'قائمة متابعة';
+
+  return (
+    <Link href={`/asset/${signal.team.id}`} className="group block rounded-2xl border border-white/10 bg-black/25 p-4 transition hover:border-primary/30 hover:bg-white/[0.04]">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-3">
+          <AssetImage image={signal.team.image || ''} type="TEAM" name={signal.team.name} width={42} height={42} className="h-11 w-11 rounded-xl border border-white/10 object-cover" />
+          <div className="min-w-0">
+            <div className="text-[10px] font-black text-primary">{signal.team.code} · {formatDate(signal.publishedAt)}</div>
+            <h3 className="truncate font-black text-white group-hover:text-primary">{signal.team.name}</h3>
+          </div>
+        </div>
+        <span className={`shrink-0 rounded-lg border px-2 py-1 text-[10px] font-black ${toneClass}`}>{label}</span>
+      </div>
+      <div className="mb-2 flex flex-wrap items-center gap-2 text-[10px] font-black">
+        <span className="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-gray-300">{confidenceLabel(signal.confidence)}</span>
+        <span className="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-gray-300">Gap {signal.marketGap > 0 ? '+' : ''}{signal.marketGap.toFixed(1)}%</span>
+      </div>
+      <h4 className="line-clamp-2 text-sm font-black leading-6 text-white">{signal.title}</h4>
+      <p className="mt-2 line-clamp-2 text-xs leading-5 text-gray-500">{signal.summary}</p>
+    </Link>
+  );
 }
 
 function AssetRow({ asset, danger = false }: { asset: NormalizedAIAnalystAsset; danger?: boolean }) {
@@ -97,7 +164,7 @@ export default async function AIAnalystPage() {
     }),
     prisma.teamIntelligenceReport.findMany({
       orderBy: { publishedAt: 'desc' },
-      take: 3,
+      take: 6,
       include: { team: true },
     }),
     prisma.teamIntelligenceReport.count(),
@@ -109,13 +176,23 @@ export default async function AIAnalystPage() {
 
   const { assets, opportunities, warnings, highTechnical } = buildAIAnalystGroups(rawAssets, 6);
   const alerts = buildSmartTradeAlerts(rawAssets, 8);
+  const reportSignals: ReportBackedSignal[] = latestTeamReports.map((report) => ({
+    id: report.id,
+    title: report.title,
+    summary: report.summary,
+    confidence: report.confidence,
+    publishedAt: report.publishedAt,
+    team: report.team,
+    marketGap: getTeamMarketGap(report.team),
+    signal: getReportSignal(report),
+  }));
 
   return (
     <main className="min-h-screen bg-background px-4 py-8 text-foreground sm:px-6 lg:px-8">
       <div className="mx-auto max-w-[1500px]">
         <PageHeader
           title="AI Analyst"
-          description="مركز ذكي يربط بين التحليل الفني داخل الملعب، السعر الحالي، والقيمة العادلة للأصول الافتراضية."
+          description="مركز ذكي يربط بين التحليل الفني داخل الملعب، السعر الحالي، القيمة العادلة، وتقارير المنتخبات الموثقة."
           icon={<Brain size={48} />}
           glowColor="bg-[#0FF0FC]/10"
           textColor="text-[#0FF0FC]"
@@ -157,27 +234,12 @@ export default async function AIAnalystPage() {
             </Link>
           </div>
 
-          {latestTeamReports.length ? (
+          {reportSignals.length ? (
             <div className="grid gap-3 lg:grid-cols-3">
-              {latestTeamReports.map((report) => (
-                <Link key={report.id} href={`/asset/${report.team.id}`} className="group rounded-2xl border border-white/10 bg-black/25 p-4 transition hover:border-primary/30 hover:bg-white/[0.04]">
-                  <div className="mb-3 flex items-center gap-3">
-                    <AssetImage image={report.team.image} type="TEAM" name={report.team.name} width={42} height={42} className="h-11 w-11 rounded-xl border border-white/10 object-cover" />
-                    <div className="min-w-0">
-                      <div className="text-[10px] font-black text-primary">{report.team.code} · {formatDate(report.publishedAt)}</div>
-                      <h3 className="truncate font-black text-white group-hover:text-primary">{report.team.name}</h3>
-                    </div>
-                  </div>
-                  <div className="mb-2 inline-flex rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[10px] font-black text-gray-300">
-                    {confidenceLabel(report.confidence)}
-                  </div>
-                  <h4 className="line-clamp-2 text-sm font-black leading-6 text-white">{report.title}</h4>
-                  <p className="mt-2 line-clamp-2 text-xs leading-5 text-gray-500">{report.summary}</p>
-                </Link>
-              ))}
+              {reportSignals.slice(0, 6).map((signal) => <ReportSignalCard key={signal.id} signal={signal} />)}
             </div>
           ) : (
-            <EmptyState text="لا توجد تقارير منتخبات مرتبطة بعد. شغّل seed:team-intelligence ثم ستظهر هنا تلقائيًا." />
+            <EmptyState text="لا توجد تقارير منتخبات مرتبطة بعد. شغّل seed:team-intelligence أو أضف تقريرًا يدويًا من لوحة الإدارة." />
           )}
         </section>
 
