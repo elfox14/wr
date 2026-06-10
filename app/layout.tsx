@@ -20,15 +20,15 @@ const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://worldcup.mcprim.com
 export const metadata: Metadata = {
   metadataBase: new URL(baseUrl),
   title: {
-    default: "MC PRIME Exchange | بورصة المونديال الافتراضية",
+    default: "MC PRIME Exchange | Football Intelligence Exchange",
     template: "%s | MC PRIME Exchange",
   },
-  description: "منصة تداول رياضي افتراضية تتيح لك شراء وبيع أسهم المنتخبات واللاعبين باستخدام كوينز افتراضية، والتنافس مع أصدقائك في بورصة المونديال.",
-  keywords: ["MC PRIME Exchange", "بورصة المونديال", "تداول رياضي افتراضي", "كأس العالم", "fantasy exchange", "football trading game"],
+  description: "منصة ذكاء كروي وسوق رياضي افتراضي لكأس العالم: تقارير منتخبات، منهجية تسعير، قيمة عادلة، زخم، طلب، ومحفظة بأرصدة افتراضية فقط.",
+  keywords: ["MC PRIME Exchange", "بورصة المونديال", "تحليل كروي", "منهجية التسعير", "سوق رياضي افتراضي", "كأس العالم", "fantasy exchange", "football intelligence"],
   authors: [{ name: "MC PRIME Exchange Team" }],
   openGraph: {
-    title: "MC PRIME Exchange",
-    description: "بورصة المونديال الافتراضية من MC PRIME — تداول المنتخبات واللاعبين بعملات افتراضية فقط. استثمر في النجوم ونافس عالمياً.",
+    title: "MC PRIME Exchange | Football Intelligence Exchange",
+    description: "تحليل كروي أولًا وسوق رياضي افتراضي ثانيًا: اقرأ التقارير، افهم التسعير، ثم راقب المنتخبات واللاعبين بأرصدة افتراضية فقط.",
     url: baseUrl,
     siteName: "MC PRIME Exchange",
     images: [
@@ -36,7 +36,7 @@ export const metadata: Metadata = {
         url: "/og-image.jpg",
         width: 1200,
         height: 630,
-        alt: "MC PRIME Exchange",
+        alt: "MC PRIME Exchange Football Intelligence Exchange",
       },
     ],
     locale: "ar_EG",
@@ -48,8 +48,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "MC PRIME Exchange | منصة تداول كرة القدم الافتراضية",
-    description: "تداول أسهم المنتخبات واللاعبين بناءً على أدائهم في كأس العالم.",
+    title: "MC PRIME Exchange | Football Intelligence Exchange",
+    description: "تقارير منتخبات، منهجية تسعير، قيمة عادلة، وسوق رياضي افتراضي بأرصدة لعب فقط.",
     images: ["/og-image.jpg"],
   },
   robots: {
