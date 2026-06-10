@@ -67,6 +67,9 @@ jobs:
       - name: Lint market client
         run: npm run lint:market-client
 
+      - name: Lint portfolio AI
+        run: npm run lint:portfolio-ai
+
       - name: Type-check
         run: npm run type-check
 
