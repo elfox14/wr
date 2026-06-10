@@ -13,6 +13,7 @@
     "lint:market-client": "eslint components/market/MarketClientClean.tsx components/market/market-client-types.ts --max-warnings=0",
     "lint:portfolio-ai": "eslint app/portfolio/page.tsx features/analysis/components/AIPortfolioInsights.tsx features/analysis/lib/portfolio-insights.ts --max-warnings=0",
     "lint:team-intelligence": "eslint app/team-intelligence/page.tsx lib/teamIntelligenceSources.ts lib/seedTeamIntelligenceReports.ts prisma/seedTeamIntelligenceReports.ts app/api/admin/seed-team-intelligence/route.ts --max-warnings=0",
+    "lint:navbar": "eslint components/ui/Navbar.tsx --max-warnings=0",
     "type-check": "tsc --noEmit",
     "sync-api": "tsx prisma/seedApi.ts",
     "sync-api:optional": "tsx prisma/seedApi.ts || echo \"Skipping API sync; continuing build\"",
