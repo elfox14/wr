@@ -79,6 +79,9 @@ jobs:
       - name: Lint team overview
         run: npm run lint:team-overview
 
+      - name: Lint team intelligence admin
+        run: npm run lint:team-intelligence-admin
+
       - name: Type-check
         run: npm run type-check
 
