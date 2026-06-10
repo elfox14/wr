@@ -12,7 +12,7 @@ type AdminSession = {
 
 function isAdmin(session: AdminSession) {
   const email = session?.user?.email || '';
-  return session?.user?.role === 'ADMIN' || email === 'admin@worldcup.com' || email === 'elfox14usa@gmail.com';
+  return session?.user?.role === 'ADMIN' || email === 'worldcup@mcprim.com' || email === 'elfox14usa@gmail.com';
 }
 
 export const metadata = {
