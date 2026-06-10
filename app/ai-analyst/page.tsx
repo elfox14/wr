@@ -4,8 +4,10 @@ import { ArrowRight, Brain, ShieldAlert, Sparkles, TrendingDown, TrendingUp } fr
 import { AssetImage } from '@/components/ui/AssetImage';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { MarketAnalysisBadge } from '@/features/analysis/components/MarketAnalysisBadge';
+import { SmartTradeAlerts } from '@/features/analysis/components/SmartTradeAlerts';
 import { analyzeFootballAsset } from '@/features/analysis/lib/analysis-adapter';
 import { buildAIAnalystGroups } from '@/features/analysis/lib/ai-analyst-ranking';
+import { buildSmartTradeAlerts } from '@/features/analysis/lib/smart-alerts';
 import { formatVirtualCoins, getFairValue, getMarketPrice, getValueGapPercent } from '@/features/analysis/lib/value-fit';
 import prisma from '@/lib/prisma';
 
@@ -78,6 +80,7 @@ export default async function AIAnalystPage() {
   });
 
   const { assets, opportunities, warnings, highTechnical } = buildAIAnalystGroups(rawAssets, 6);
+  const alerts = buildSmartTradeAlerts(rawAssets, 8);
 
   return (
     <main className="min-h-screen bg-background px-4 py-8 text-foreground sm:px-6 lg:px-8">
@@ -89,6 +92,8 @@ export default async function AIAnalystPage() {
           glowColor="bg-[#0FF0FC]/10"
           textColor="text-[#0FF0FC]"
         />
+
+        <SmartTradeAlerts alerts={alerts} />
 
         <div className="mb-8 grid gap-4 md:grid-cols-3">
           <div className="rounded-3xl border border-[#0FF0FC]/15 bg-[#0FF0FC]/5 p-5">
