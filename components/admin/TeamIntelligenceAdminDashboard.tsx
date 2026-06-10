@@ -41,16 +41,18 @@ type ManualForm = {
   weaknesses: string;
 };
 
-const initialManualForm: ManualForm = {
-  teamId: '',
-  title: '',
-  summary: '',
-  body: '',
-  confidence: 'B',
-  tacticalTags: '',
-  strengths: '',
-  weaknesses: '',
-};
+function buildInitialManualForm(teamId = ''): ManualForm {
+  return {
+    teamId,
+    title: '',
+    summary: '',
+    body: '',
+    confidence: 'B',
+    tacticalTags: '',
+    strengths: '',
+    weaknesses: '',
+  };
+}
 
 function getResponseMessage(data: SeedResponse) {
   if (data.error) return data.error;
@@ -69,7 +71,7 @@ function getResponseMessage(data: SeedResponse) {
   return 'تم استلام رد غير متوقع من الخادم.';
 }
 
-export default function TeamIntelligenceAdminDashboard({ teams }: { teams: TeamOption[] }) {
+export default function TeamIntelligenceAdminDashboard({ teams, initialTeamId = '' }: { teams: TeamOption[]; initialTeamId?: string }) {
   const [secret, setSecret] = useState('');
   const [loading, setLoading] = useState(false);
   const [manualLoading, setManualLoading] = useState(false);
@@ -78,7 +80,7 @@ export default function TeamIntelligenceAdminDashboard({ teams }: { teams: TeamO
   const [manualMessage, setManualMessage] = useState('');
   const [manualError, setManualError] = useState('');
   const [lastResult, setLastResult] = useState<SeedResponse | null>(null);
-  const [manualForm, setManualForm] = useState<ManualForm>(initialManualForm);
+  const [manualForm, setManualForm] = useState<ManualForm>(() => buildInitialManualForm(initialTeamId));
 
   const runSeed = async () => {
     setLoading(true);
@@ -135,7 +137,7 @@ export default function TeamIntelligenceAdminDashboard({ teams }: { teams: TeamO
 
       const teamName = data.report?.team?.name || 'المنتخب';
       setManualMessage(`تم حفظ تقرير يدوي جديد لـ ${teamName}.`);
-      setManualForm(initialManualForm);
+      setManualForm(buildInitialManualForm(initialTeamId));
     } catch (caughtError) {
       const fallbackMessage = caughtError instanceof Error ? caughtError.message : 'فشل حفظ التقرير اليدوي.';
       setManualError(fallbackMessage);
