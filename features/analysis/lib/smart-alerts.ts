@@ -1,9 +1,15 @@
-import { analyzeFootballAsset } from './analysis-adapter';
+import { analyzeFootballAsset, type FootballAnalysisAssetInput } from './analysis-adapter';
 import { buildAIAnalystGroups } from './ai-analyst-ranking';
 import { analyzeValueFit, formatVirtualCoins } from './value-fit';
 
 export type SmartTradeAlertType = 'OPPORTUNITY' | 'WARNING' | 'QUALITY' | 'MOMENTUM';
 export type SmartTradeAlertSeverity = 'LOW' | 'MEDIUM' | 'HIGH';
+
+export type SmartTradeAlertAsset = FootballAnalysisAssetInput & {
+  id: string;
+  name: string;
+  type: string;
+};
 
 export type SmartTradeAlert = {
   id: string;
@@ -35,7 +41,7 @@ function severityFromGap(gapPercent: number): SmartTradeAlertSeverity {
   return 'LOW';
 }
 
-function toAlert(asset: any, type: SmartTradeAlertType): SmartTradeAlert {
+function toAlert(asset: SmartTradeAlertAsset, type: SmartTradeAlertType): SmartTradeAlert {
   const analysis = analyzeFootballAsset(asset);
   const valueFit = analyzeValueFit(asset, analysis.weightedScore);
   const severity = type === 'QUALITY' ? 'MEDIUM' : severityFromGap(valueFit.gapPercent);
@@ -81,8 +87,13 @@ function toAlert(asset: any, type: SmartTradeAlertType): SmartTradeAlert {
   };
 }
 
-export function buildSmartTradeAlerts(assets: any[], limit = 8): SmartTradeAlert[] {
-  const groups = buildAIAnalystGroups(assets, Math.max(limit, 6));
+function hasRequiredAlertFields(asset: FootballAnalysisAssetInput): asset is SmartTradeAlertAsset {
+  return Boolean(asset.id && asset.name && asset.type);
+}
+
+export function buildSmartTradeAlerts(assets: FootballAnalysisAssetInput[], limit = 8): SmartTradeAlert[] {
+  const typedAssets = assets.filter(hasRequiredAlertFields);
+  const groups = buildAIAnalystGroups(typedAssets, Math.max(limit, 6));
 
   const opportunityAlerts = groups.opportunities.slice(0, 3).map((asset) => toAlert(asset, 'OPPORTUNITY'));
   const warningAlerts = groups.warnings.slice(0, 3).map((asset) => toAlert(asset, 'WARNING'));
