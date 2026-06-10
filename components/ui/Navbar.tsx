@@ -33,6 +33,7 @@ export function Navbar() {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
+  const isAdminUser = session.user?.email === 'admin@worldcup.com';
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -163,10 +164,15 @@ export function Navbar() {
                         <Link href="/rewards" className="flex items-center gap-3 px-3 py-2.5 text-sm text-[#FFD700] hover:bg-[#FFD700]/10 rounded-xl transition-colors font-bold">
                           <Gift size={16} /> المكافآت
                         </Link>
-                        {session.user?.email === 'admin@worldcup.com' && (
-                          <Link href="/admin" className="flex items-center gap-3 px-3 py-2.5 text-sm text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-xl transition-colors">
-                            <ShieldAlert size={16} /> الإدارة
-                          </Link>
+                        {isAdminUser && (
+                          <>
+                            <Link href="/admin" className="flex items-center gap-3 px-3 py-2.5 text-sm text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-xl transition-colors">
+                              <ShieldAlert size={16} /> الإدارة
+                            </Link>
+                            <Link href="/admin/team-intelligence" className="flex items-center gap-3 px-3 py-2.5 text-sm text-primary hover:text-white hover:bg-primary/10 rounded-xl transition-colors">
+                              <Shield size={16} /> إدارة تقارير المنتخبات
+                            </Link>
+                          </>
                         )}
                       </div>
                       <div className="p-2 border-t border-white/5">
@@ -276,6 +282,19 @@ export function Navbar() {
                 >
                   <Trophy size={18} />
                   دورياتي
+                </Link>
+              )}
+              {isAdminUser && (
+                <Link
+                  href="/admin/team-intelligence"
+                  className={`flex items-center gap-3 px-4 py-4 rounded-xl text-base font-bold transition-colors ${
+                    pathname?.startsWith('/admin/team-intelligence')
+                      ? 'bg-[#0FF0FC]/10 border border-[#0FF0FC]/20 text-[#0FF0FC]'
+                      : 'text-primary hover:bg-primary/10 hover:text-white border border-transparent'
+                  }`}
+                >
+                  <Shield size={18} />
+                  إدارة تقارير المنتخبات
                 </Link>
               )}
             </div>
