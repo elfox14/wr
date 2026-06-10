@@ -2,7 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { TrendingUp, Mail, ShieldAlert, FileText, Info, HelpCircle, Brain } from 'lucide-react';
+import { TrendingUp, Mail, ShieldAlert, FileText, Info, HelpCircle, Brain, BookOpen } from 'lucide-react';
 
 export function Footer() {
   return (
@@ -21,7 +21,7 @@ export function Footer() {
               </span>
             </Link>
             <p className="text-gray-400 text-sm leading-relaxed max-w-xs">
-              منصة تداول رياضي افتراضية للمتعة والمنافسة. جميع الكوينز افتراضية ولا تمثل أموالًا حقيقية.
+              منصة تحليل كروي وسوق رياضي افتراضي. ابدأ بالتقارير، افهم منهجية التسعير، ثم راقب السوق بأرصدة افتراضية فقط.
             </p>
             <div className="flex gap-4 pt-2">
               {/* Twitter SVG */}
@@ -45,12 +45,12 @@ export function Footer() {
               <TrendingUp size={16} className="text-primary" /> روابط سريعة
             </h3>
             <ul className="space-y-3">
+              <li><Link href="/team-intelligence" className="text-gray-400 hover:text-primary transition-colors text-sm flex items-center gap-2"><Brain size={14} className="text-[#0FF0FC]" /> مركز التحليل</Link></li>
+              <li><Link href="/methodology" className="text-gray-400 hover:text-primary transition-colors text-sm flex items-center gap-2"><BookOpen size={14} className="text-[#FFD700]" /> منهجية التسعير</Link></li>
               <li><Link href="/market" className="text-gray-400 hover:text-primary transition-colors text-sm flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-white/20"></span> السوق</Link></li>
-              <li><Link href="/ai-analyst" className="text-gray-400 hover:text-primary transition-colors text-sm flex items-center gap-2"><Brain size={14} className="text-[#0FF0FC]" /> AI Analyst</Link></li>
               <li><Link href="/matches" className="text-gray-400 hover:text-primary transition-colors text-sm flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-white/20"></span> المباريات</Link></li>
               <li><Link href="/groups" className="text-gray-400 hover:text-primary transition-colors text-sm flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-white/20"></span> المجموعات</Link></li>
               <li><Link href="/leaderboard" className="text-gray-400 hover:text-primary transition-colors text-sm flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-white/20"></span> الترتيب</Link></li>
-              <li><Link href="/rewards" className="text-gray-400 hover:text-primary transition-colors text-sm flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-white/20"></span> المكافآت</Link></li>
             </ul>
           </div>
 
@@ -85,7 +85,7 @@ export function Footer() {
         {/* Disclaimer & Copyright */}
         <div className="pt-8 border-t border-white/10 flex flex-col md:flex-row justify-between items-center gap-4 text-center md:text-right">
           <p className="text-xs text-gray-500 max-w-2xl leading-relaxed">
-            <strong className="text-gray-400">تنويه إخلاء مسؤولية:</strong> منصة MC PRIME Exchange هي منصة ترفيهية تفاعلية تعتمد على أسواق افتراضية بالكامل. جميع الأرقام والأرصدة والأصول هي افتراضية فقط ولا تمثل تداولاً بأموال واقعية أو أوراق مالية حقيقية. الأداء السابق للأصول الافتراضية لا يضمن الأداء المستقبلي.
+            <strong className="text-gray-400">تنويه إخلاء مسؤولية:</strong> منصة MC PRIME Exchange هي منصة تحليل وسوق رياضي افتراضي بالكامل. جميع الأرقام والأرصدة والأصول هي افتراضية فقط ولا تمثل تداولاً بأموال واقعية أو أوراق مالية حقيقية. الأداء السابق للأصول الافتراضية لا يضمن الأداء المستقبلي.
           </p>
           <div className="text-sm font-bold text-gray-400 shrink-0">
             © {new Date().getFullYear()} MC PRIME Exchange. جميع الحقوق محفوظة.
