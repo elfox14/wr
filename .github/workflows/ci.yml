@@ -76,6 +76,9 @@ jobs:
       - name: Lint navbar
         run: npm run lint:navbar
 
+      - name: Lint team overview
+        run: npm run lint:team-overview
+
       - name: Type-check
         run: npm run type-check
 
