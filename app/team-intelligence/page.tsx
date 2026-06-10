@@ -18,6 +18,13 @@ type TeamIntelligencePageProps = {
   }>;
 };
 
+const CONFIDENCE_OPTIONS = [
+  { value: 'A', label: 'A - موثوقية عالية' },
+  { value: 'B', label: 'B - موثوقية جيدة' },
+  { value: 'C', label: 'C - بحاجة لمراجعة' },
+  { value: 'D', label: 'D - تقدير افتتاحي' },
+];
+
 function formatDate(value?: Date | string | null) {
   if (!value) return '—';
   return new Date(value).toLocaleDateString('ar-EG', {
@@ -39,7 +46,15 @@ function getFirstParam(value?: string | string[]) {
 }
 
 function getValidConfidence(value: string) {
-  return ['A', 'B', 'C', 'D'].includes(value) ? value : '';
+  return CONFIDENCE_OPTIONS.some((option) => option.value === value) ? value : '';
+}
+
+function buildTeamIntelligenceHref(query: string, confidence: string) {
+  const params = new URLSearchParams();
+  if (query) params.set('q', query);
+  if (confidence) params.set('confidence', confidence);
+  const queryString = params.toString();
+  return queryString ? `/team-intelligence?${queryString}` : '/team-intelligence';
 }
 
 export default async function TeamIntelligencePage({ searchParams }: TeamIntelligencePageProps) {
@@ -87,6 +102,10 @@ export default async function TeamIntelligencePage({ searchParams }: TeamIntelli
 
   const coveredTeams = new Set(reportStats.map((report) => report.teamId)).size;
   const highConfidence = reportStats.filter((report) => ['A', 'B'].includes(report.confidence)).length;
+  const confidenceCounts = reportStats.reduce<Record<string, number>>((counts, report) => ({
+    ...counts,
+    [report.confidence]: (counts[report.confidence] || 0) + 1,
+  }), {});
 
   return (
     <div className="min-h-screen bg-background text-foreground selection:bg-primary/30">
@@ -145,10 +164,9 @@ export default async function TeamIntelligencePage({ searchParams }: TeamIntelli
               className="h-12 rounded-2xl border border-white/10 bg-black/25 px-4 text-sm font-black text-white outline-none transition focus:border-primary/50"
             >
               <option value="">كل مستويات الثقة</option>
-              <option value="A">A - موثوقية عالية</option>
-              <option value="B">B - موثوقية جيدة</option>
-              <option value="C">C - بحاجة لمراجعة</option>
-              <option value="D">D - تقدير افتتاحي</option>
+              {CONFIDENCE_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
             </select>
             <button type="submit" className="inline-flex h-12 items-center justify-center gap-2 rounded-2xl bg-primary px-5 text-sm font-black text-black transition hover:bg-primary/90">
               تطبيق الفلترة <Search size={15} />
@@ -159,6 +177,19 @@ export default async function TeamIntelligencePage({ searchParams }: TeamIntelli
               </Link>
             )}
           </form>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Link href={buildTeamIntelligenceHref(query, '')} className={`rounded-full border px-3 py-1.5 text-[11px] font-black transition ${confidence ? 'border-white/10 bg-white/5 text-gray-300 hover:border-primary/30 hover:text-primary' : 'border-primary/30 bg-primary/10 text-primary'}`}>
+              كل التقارير · {reportStats.length}
+            </Link>
+            {CONFIDENCE_OPTIONS.map((option) => {
+              const isActive = confidence === option.value;
+              return (
+                <Link key={option.value} href={buildTeamIntelligenceHref(query, option.value)} className={`rounded-full border px-3 py-1.5 text-[11px] font-black transition ${isActive ? 'border-primary/30 bg-primary/10 text-primary' : 'border-white/10 bg-white/5 text-gray-300 hover:border-primary/30 hover:text-primary'}`}>
+                  {option.label} · {confidenceCounts[option.value] || 0}
+                </Link>
+              );
+            })}
+          </div>
           <p className="mt-3 text-xs leading-6 text-gray-500">
             {hasFilters ? `تم العثور على ${reports.length} تقرير مطابق للفلترة الحالية.` : 'استخدم البحث للوصول بسرعة لتقارير منتخب، مصدر، مجموعة، أو مستوى ثقة محدد.'}
           </p>
