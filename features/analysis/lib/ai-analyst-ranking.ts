@@ -1,5 +1,5 @@
 import { analyzeFootballAsset, type FootballAnalysisAssetInput } from './analysis-adapter';
-import { analyzeValueFit, getFairValue, getMarketPrice, getValueGapPercent } from './value-fit';
+import { analyzeValueFit, getFairValue, getMarketPrice } from './value-fit';
 
 export type AIAnalystAsset = FootballAnalysisAssetInput;
 
