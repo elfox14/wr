@@ -1,11 +1,11 @@
 import { analyzeFootballAsset, type FootballAnalysisAssetInput } from './analysis-adapter';
-import { buildAIAnalystGroups } from './ai-analyst-ranking';
+import { buildAIAnalystGroups, type NormalizedAIAnalystAsset } from './ai-analyst-ranking';
 import { analyzeValueFit, formatVirtualCoins } from './value-fit';
 
 export type SmartTradeAlertType = 'OPPORTUNITY' | 'WARNING' | 'QUALITY' | 'MOMENTUM';
 export type SmartTradeAlertSeverity = 'LOW' | 'MEDIUM' | 'HIGH';
 
-export type SmartTradeAlertAsset = FootballAnalysisAssetInput & {
+export type SmartTradeAlertAsset = NormalizedAIAnalystAsset & {
   id: string;
   name: string;
   type: string;
@@ -81,13 +81,17 @@ function toAlert(asset: SmartTradeAlertAsset, type: SmartTradeAlertType): SmartT
       marketPrice: valueFit.marketPrice,
       fairValue: valueFit.fairValue,
       gapPercent: Number(valueFit.gapPercent.toFixed(2)),
-      momentum: Number(asset?.momentum ?? 0),
-      marketDemand: Number(asset?.marketDemand ?? 0),
+      momentum: Number(asset.momentum ?? 0),
+      marketDemand: Number(asset.marketDemand ?? 0),
     },
   };
 }
 
-function hasRequiredAlertFields(asset: FootballAnalysisAssetInput): asset is SmartTradeAlertAsset {
+function hasRequiredAlertFields(asset: FootballAnalysisAssetInput): asset is FootballAnalysisAssetInput & { id: string; name: string; type: string } {
+  return Boolean(asset.id && asset.name && asset.type);
+}
+
+function hasNormalizedAlertFields(asset: NormalizedAIAnalystAsset): asset is SmartTradeAlertAsset {
   return Boolean(asset.id && asset.name && asset.type);
 }
 
@@ -95,13 +99,14 @@ export function buildSmartTradeAlerts(assets: FootballAnalysisAssetInput[], limi
   const typedAssets = assets.filter(hasRequiredAlertFields);
   const groups = buildAIAnalystGroups(typedAssets, Math.max(limit, 6));
 
-  const opportunityAlerts = groups.opportunities.slice(0, 3).map((asset) => toAlert(asset, 'OPPORTUNITY'));
-  const warningAlerts = groups.warnings.slice(0, 3).map((asset) => toAlert(asset, 'WARNING'));
-  const qualityAlerts = groups.highTechnical.slice(0, 2).map((asset) => toAlert(asset, 'QUALITY'));
+  const opportunityAlerts = groups.opportunities.filter(hasNormalizedAlertFields).slice(0, 3).map((asset) => toAlert(asset, 'OPPORTUNITY'));
+  const warningAlerts = groups.warnings.filter(hasNormalizedAlertFields).slice(0, 3).map((asset) => toAlert(asset, 'WARNING'));
+  const qualityAlerts = groups.highTechnical.filter(hasNormalizedAlertFields).slice(0, 2).map((asset) => toAlert(asset, 'QUALITY'));
 
   const momentumAlerts = groups.assets
-    .filter((asset) => Number(asset?.momentum ?? 0) >= 75)
-    .sort((a, b) => Number(b?.momentum ?? 0) - Number(a?.momentum ?? 0))
+    .filter(hasNormalizedAlertFields)
+    .filter((asset) => Number(asset.momentum ?? 0) >= 75)
+    .sort((a, b) => Number(b.momentum ?? 0) - Number(a.momentum ?? 0))
     .slice(0, 2)
     .map((asset) => toAlert(asset, 'MOMENTUM'));
 
