@@ -12,6 +12,26 @@ jobs:
     name: Lint, type-check, and build
     runs-on: ubuntu-latest
 
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: wr_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres -d wr_ci"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/wr_ci?schema=public
+      NEXTAUTH_SECRET: ci-placeholder-secret
+      NEXTAUTH_URL: http://localhost:3000
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -28,6 +48,9 @@ jobs:
       - name: Generate Prisma client
         run: npx prisma generate
 
+      - name: Prepare database schema
+        run: npx prisma db push --skip-generate
+
       - name: Lint
         run: npm run lint
 
@@ -36,7 +59,3 @@ jobs:
 
       - name: Build
         run: npm run build
-        env:
-          NEXTAUTH_SECRET: ci-placeholder-secret
-          NEXTAUTH_URL: http://localhost:3000
-          DATABASE_URL: file:./ci.db
