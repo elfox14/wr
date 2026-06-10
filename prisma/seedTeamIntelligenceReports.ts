@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { Prisma, PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
@@ -15,7 +15,7 @@ type SeedReport = {
   tacticalTags: string[];
   strengths: string[];
   weaknesses: string[];
-  metrics?: Record<string, unknown>;
+  metrics?: Prisma.InputJsonObject;
 };
 
 const reports: SeedReport[] = [
@@ -180,7 +180,7 @@ async function main() {
         sourceCategory: report.sourceCategory,
         confidence: report.confidence,
         provider: report.provider,
-        metrics: report.metrics,
+        metrics: report.metrics ?? Prisma.JsonNull,
         tacticalTags: report.tacticalTags,
         strengths: report.strengths,
         weaknesses: report.weaknesses,
