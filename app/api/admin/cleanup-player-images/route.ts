@@ -23,7 +23,7 @@ export async function POST(req: Request) {
   try {
     const session = await getServerSession(authOptions);
 
-    if (!session || !session.user || session.user.email !== "admin@worldcup.com") {
+    if (!session || !session.user || session.user.email !== "worldcup@mcprim.com") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
