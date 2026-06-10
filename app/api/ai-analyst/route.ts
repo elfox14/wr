@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { buildAIAnalystGroups } from '@/features/analysis/lib/ai-analyst-ranking';
+import { buildAIAnalystGroups, type AIAnalystAsset } from '@/features/analysis/lib/ai-analyst-ranking';
 import { analyzeFootballAsset } from '@/features/analysis/lib/analysis-adapter';
 import { buildSmartTradeAlerts } from '@/features/analysis/lib/smart-alerts';
 import { analyzeValueFit } from '@/features/analysis/lib/value-fit';
@@ -7,7 +7,7 @@ import prisma from '@/lib/prisma';
 
 export const dynamic = 'force-dynamic';
 
-function toAssetSummary(asset: any) {
+function toAssetSummary(asset: AIAnalystAsset) {
   const analysis = analyzeFootballAsset(asset);
   const valueFit = analyzeValueFit(asset, analysis.weightedScore);
 
