@@ -13,7 +13,7 @@ export type TeamIntelligenceSeedReport = {
   tacticalTags: string[];
   strengths: string[];
   weaknesses: string[];
-  metrics?: Prisma.InputJsonObject;
+  metrics?: Prisma.InputJsonValue;
 };
 
 export const teamIntelligenceSeedReports: TeamIntelligenceSeedReport[] = [
@@ -163,6 +163,8 @@ export async function seedTeamIntelligenceReports(prisma: PrismaClient) {
       continue;
     }
 
+    const metrics: Prisma.NullableJsonNullValueInput | Prisma.InputJsonValue = report.metrics ?? Prisma.JsonNull;
+
     await prisma.teamIntelligenceReport.create({
       data: {
         teamId: team.id,
@@ -176,7 +178,7 @@ export async function seedTeamIntelligenceReports(prisma: PrismaClient) {
         sourceCategory: report.sourceCategory,
         confidence: report.confidence,
         provider: report.provider,
-        metrics: report.metrics ?? Prisma.JsonNull,
+        metrics,
         tacticalTags: report.tacticalTags,
         strengths: report.strengths,
         weaknesses: report.weaknesses,
