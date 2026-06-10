@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { Metadata } from 'next';
-import { ArrowRight, Brain, ShieldAlert, Sparkles, TrendingDown, TrendingUp } from 'lucide-react';
+import { ArrowRight, Brain, FileText, ShieldAlert, Sparkles, TrendingDown, TrendingUp } from 'lucide-react';
 import { AssetImage } from '@/components/ui/AssetImage';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { MarketAnalysisBadge } from '@/features/analysis/components/MarketAnalysisBadge';
@@ -22,6 +22,21 @@ function EmptyState({ text }: { text: string }) {
       {text}
     </div>
   );
+}
+
+function confidenceLabel(value?: string | null) {
+  if (value === 'A') return 'رسمي / عالٍ';
+  if (value === 'B') return 'إحصائي موثوق';
+  if (value === 'C') return 'بحاجة مراجعة';
+  return 'تقدير داخلي';
+}
+
+function formatDate(value?: Date | string | null) {
+  if (!value) return '—';
+  return new Date(value).toLocaleDateString('ar-EG', {
+    day: 'numeric',
+    month: 'short',
+  });
 }
 
 function AssetRow({ asset, danger = false }: { asset: NormalizedAIAnalystAsset; danger?: boolean }) {
@@ -72,13 +87,25 @@ function Section({ title, description, icon, children, tone = 'cyan' }: { title:
 }
 
 export default async function AIAnalystPage() {
-  const rawAssets = await prisma.asset.findMany({
-    orderBy: [
-      { score: 'desc' },
-      { marketPrice: 'desc' },
-    ],
-    take: 120,
-  });
+  const [rawAssets, latestTeamReports, teamReportsCount, coveredTeamsCount] = await Promise.all([
+    prisma.asset.findMany({
+      orderBy: [
+        { score: 'desc' },
+        { marketPrice: 'desc' },
+      ],
+      take: 120,
+    }),
+    prisma.teamIntelligenceReport.findMany({
+      orderBy: { publishedAt: 'desc' },
+      take: 3,
+      include: { team: true },
+    }),
+    prisma.teamIntelligenceReport.count(),
+    prisma.teamIntelligenceReport.findMany({
+      distinct: ['teamId'],
+      select: { teamId: true },
+    }),
+  ]);
 
   const { assets, opportunities, warnings, highTechnical } = buildAIAnalystGroups(rawAssets, 6);
   const alerts = buildSmartTradeAlerts(rawAssets, 8);
@@ -113,6 +140,46 @@ export default async function AIAnalystPage() {
             <p className="mt-1 truncate text-2xl font-black text-white">{warnings[0]?.name || 'غير متاح'}</p>
           </div>
         </div>
+
+        <section className="mb-8 rounded-[1.6rem] border border-primary/10 bg-primary/[0.035] p-4 shadow-card lg:rounded-3xl lg:p-6">
+          <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <div className="mb-2 inline-flex items-center gap-2 rounded-xl border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-black text-primary">
+                <FileText size={15} /> Team Intelligence Reports
+              </div>
+              <h2 className="text-2xl font-black text-white">تقارير المنتخبات داخل AI Analyst</h2>
+              <p className="mt-1 text-sm leading-7 text-gray-400">
+                اربط القراءة السعرية والفنية بأحدث تقارير المنتخبات الموثقة: {teamReportsCount} تقرير تغطي {coveredTeamsCount.length} منتخب.
+              </p>
+            </div>
+            <Link href="/team-intelligence" className="inline-flex items-center justify-center gap-2 rounded-2xl bg-primary px-5 py-3 text-sm font-black text-black transition hover:bg-primary/90">
+              فتح مركز التقارير <ArrowRight size={15} />
+            </Link>
+          </div>
+
+          {latestTeamReports.length ? (
+            <div className="grid gap-3 lg:grid-cols-3">
+              {latestTeamReports.map((report) => (
+                <Link key={report.id} href={`/asset/${report.team.id}`} className="group rounded-2xl border border-white/10 bg-black/25 p-4 transition hover:border-primary/30 hover:bg-white/[0.04]">
+                  <div className="mb-3 flex items-center gap-3">
+                    <AssetImage image={report.team.image} type="TEAM" name={report.team.name} width={42} height={42} className="h-11 w-11 rounded-xl border border-white/10 object-cover" />
+                    <div className="min-w-0">
+                      <div className="text-[10px] font-black text-primary">{report.team.code} · {formatDate(report.publishedAt)}</div>
+                      <h3 className="truncate font-black text-white group-hover:text-primary">{report.team.name}</h3>
+                    </div>
+                  </div>
+                  <div className="mb-2 inline-flex rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[10px] font-black text-gray-300">
+                    {confidenceLabel(report.confidence)}
+                  </div>
+                  <h4 className="line-clamp-2 text-sm font-black leading-6 text-white">{report.title}</h4>
+                  <p className="mt-2 line-clamp-2 text-xs leading-5 text-gray-500">{report.summary}</p>
+                </Link>
+              ))}
+            </div>
+          ) : (
+            <EmptyState text="لا توجد تقارير منتخبات مرتبطة بعد. شغّل seed:team-intelligence ثم ستظهر هنا تلقائيًا." />
+          )}
+        </section>
 
         {assets.length === 0 ? (
           <EmptyState text="لا توجد أصول كافية للتحليل بعد. بعد إضافة المنتخبات واللاعبين سيظهر AI Analyst تلقائيًا." />
