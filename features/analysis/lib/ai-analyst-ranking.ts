@@ -1,9 +1,17 @@
-import { analyzeFootballAsset } from './analysis-adapter';
+import { analyzeFootballAsset, type FootballAnalysisAssetInput } from './analysis-adapter';
 import { analyzeValueFit, getFairValue, getMarketPrice, getValueGapPercent } from './value-fit';
 
-export type AIAnalystAsset = any;
+export type AIAnalystAsset = FootballAnalysisAssetInput;
 
-export function normalizeAnalysisAsset(asset: AIAnalystAsset) {
+export type NormalizedAIAnalystAsset = AIAnalystAsset & {
+  marketPrice: number;
+  fairValue: number;
+  momentum: number;
+  marketDemand: number;
+  volatilityScore: number;
+};
+
+export function normalizeAnalysisAsset(asset: AIAnalystAsset): NormalizedAIAnalystAsset {
   return {
     ...asset,
     marketPrice: getMarketPrice(asset),
