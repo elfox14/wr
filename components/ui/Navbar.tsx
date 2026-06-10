@@ -59,7 +59,7 @@ export function Navbar() {
     { name: 'السوق', href: '/market', icon: <TrendingUp size={16} /> },
     { name: 'المباريات', href: '/matches', icon: <CalendarDays size={16} /> },
     { name: 'المحفظة', href: '/portfolio', icon: <Briefcase size={16} /> },
-    { name: 'الأكاديمية', href: '/articles', icon: <BookOpen size={16} /> },
+    { name: 'المنهجية', href: '/methodology', icon: <BookOpen size={16} /> },
   ];
 
   return (
@@ -154,6 +154,12 @@ export function Navbar() {
                         </Link>
                         <Link href="/team-intelligence" className="flex items-center gap-3 px-3 py-2.5 text-sm text-gray-300 hover:text-white hover:bg-white/5 rounded-xl transition-colors">
                           <Shield size={16} /> مركز التحليل
+                        </Link>
+                        <Link href="/methodology" className="flex items-center gap-3 px-3 py-2.5 text-sm text-gray-300 hover:text-white hover:bg-white/5 rounded-xl transition-colors">
+                          <BookOpen size={16} /> منهجية التسعير
+                        </Link>
+                        <Link href="/articles" className="flex items-center gap-3 px-3 py-2.5 text-sm text-gray-300 hover:text-white hover:bg-white/5 rounded-xl transition-colors">
+                          <BookOpen size={16} /> الأكاديمية
                         </Link>
                         <Link href="/leagues" className="flex items-center gap-3 px-3 py-2.5 text-sm text-gray-300 hover:text-white hover:bg-white/5 rounded-xl transition-colors">
                           <Trophy size={16} /> دورياتي
