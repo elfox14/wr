@@ -19,6 +19,25 @@ export type SourcedMetric = {
   note: string;
 };
 
+type TeamMetricAsset = {
+  fifaRank?: number | null;
+  homeMatches?: unknown[] | null;
+  awayMatches?: unknown[] | null;
+};
+
+type TeamMetricPlayer = {
+  id?: string | null;
+};
+
+type TeamLineScores = {
+  attack: number;
+  midfield: number;
+  defense: number;
+  goalkeeper: number;
+  teamPower: number;
+  avgPlayerScore: number;
+};
+
 export const TEAM_INTELLIGENCE_SOURCES: TeamDataSource[] = [
   {
     key: 'fifa-ranking',
@@ -92,8 +111,10 @@ export function getSourceBadge(confidence: SourceConfidence) {
   return 'تقدير داخلي';
 }
 
-export function buildTeamSourcedMetrics(team: any, players: any[], lineScores: { attack: number; midfield: number; defense: number; goalkeeper: number; teamPower: number; avgPlayerScore: number; }) {
+export function buildTeamSourcedMetrics(team: TeamMetricAsset, players: TeamMetricPlayer[], lineScores: TeamLineScores) {
   const metrics: SourcedMetric[] = [];
+  const homeMatchesCount = Array.isArray(team.homeMatches) ? team.homeMatches.length : 0;
+  const awayMatchesCount = Array.isArray(team.awayMatches) ? team.awayMatches.length : 0;
 
   metrics.push({
     key: 'fifaRank',
@@ -107,7 +128,7 @@ export function buildTeamSourcedMetrics(team: any, players: any[], lineScores: {
   metrics.push({
     key: 'matches',
     label: 'المباريات المرتبطة',
-    value: Number((team.homeMatches || []).length + (team.awayMatches || []).length),
+    value: homeMatchesCount + awayMatchesCount,
     sourceKey: 'football-data',
     confidence: 'B',
     note: 'يعتمد على مباريات World Cup المخزنة من مزامنة football-data.org.',
