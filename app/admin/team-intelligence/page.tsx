@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
+import prisma from '@/lib/prisma';
 import TeamIntelligenceAdminDashboard from '@/components/admin/TeamIntelligenceAdminDashboard';
 
 type AdminSession = {
@@ -24,5 +25,11 @@ export default async function TeamIntelligenceAdminPage() {
   if (!session?.user) redirect('/login');
   if (!isAdmin(session)) redirect('/');
 
-  return <TeamIntelligenceAdminDashboard />;
+  const teams = await prisma.asset.findMany({
+    where: { type: 'TEAM' },
+    select: { id: true, name: true, code: true },
+    orderBy: { name: 'asc' },
+  });
+
+  return <TeamIntelligenceAdminDashboard teams={teams} />;
 }
