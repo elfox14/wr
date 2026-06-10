@@ -2,20 +2,21 @@ import Link from 'next/link';
 import { Brain, ArrowRight, TrendingDown, TrendingUp } from 'lucide-react';
 import { AssetImage } from '@/components/ui/AssetImage';
 import { MarketAnalysisBadge } from './MarketAnalysisBadge';
-import { analyzeFootballAsset } from '../lib/analysis-adapter';
-import { buildAIAnalystGroups } from '../lib/ai-analyst-ranking';
+import { analyzeFootballAsset, type FootballAnalysisAssetInput } from '../lib/analysis-adapter';
+import { buildAIAnalystGroups, type NormalizedAIAnalystAsset } from '../lib/ai-analyst-ranking';
 import { formatVirtualCoins, getFairValue, getMarketPrice, getValueGapPercent } from '../lib/value-fit';
 
-function MiniAssetRow({ asset, danger = false }: { asset: any; danger?: boolean }) {
+function MiniAssetRow({ asset, danger = false }: { asset: NormalizedAIAnalystAsset; danger?: boolean }) {
   const analysis = analyzeFootballAsset(asset);
   const current = getMarketPrice(asset);
   const fairValue = getFairValue(asset);
   const valueGap = getValueGapPercent(asset);
+  const assetType = asset.type === 'TEAM' ? 'TEAM' : 'PLAYER';
 
   return (
     <Link href={`/asset/${asset.id}`} className="group block rounded-2xl border border-white/10 bg-black/25 p-3 transition hover:border-[#0FF0FC]/35 hover:bg-white/[0.04]">
       <div className="flex items-center gap-3">
-        <AssetImage image={asset.image || ''} type={asset.type as 'TEAM' | 'PLAYER'} name={asset.name} width={40} height={40} className="h-11 w-11 rounded-xl border border-white/10 object-cover" />
+        <AssetImage image={asset.image || ''} type={assetType} name={asset.name || 'Asset'} width={40} height={40} className="h-11 w-11 rounded-xl border border-white/10 object-cover" />
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <h3 className="truncate text-sm font-black text-white group-hover:text-[#0FF0FC]">{asset.name}</h3>
@@ -34,7 +35,7 @@ function MiniAssetRow({ asset, danger = false }: { asset: any; danger?: boolean 
   );
 }
 
-export function AIMarketHighlights({ assets = [] }: { assets?: any[] }) {
+export function AIMarketHighlights({ assets = [] }: { assets?: FootballAnalysisAssetInput[] }) {
   const { opportunities, warnings } = buildAIAnalystGroups(assets, 4);
 
   if (!opportunities.length && !warnings.length) return null;
