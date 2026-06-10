@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { buildAIAnalystGroups } from '@/features/analysis/lib/ai-analyst-ranking';
 import { analyzeFootballAsset } from '@/features/analysis/lib/analysis-adapter';
+import { buildSmartTradeAlerts } from '@/features/analysis/lib/smart-alerts';
 import { analyzeValueFit } from '@/features/analysis/lib/value-fit';
 import prisma from '@/lib/prisma';
 
@@ -47,6 +48,7 @@ export async function GET(request: Request) {
   });
 
   const groups = buildAIAnalystGroups(rawAssets, limit);
+  const alerts = buildSmartTradeAlerts(rawAssets, Math.min(limit + 2, 20));
 
   return NextResponse.json({
     count: groups.assets.length,
@@ -54,6 +56,7 @@ export async function GET(request: Request) {
       type: type === 'TEAM' || type === 'PLAYER' ? type : 'ALL',
       limit,
     },
+    alerts,
     opportunities: groups.opportunities.map(toAssetSummary),
     warnings: groups.warnings.map(toAssetSummary),
     highTechnical: groups.highTechnical.map(toAssetSummary),
