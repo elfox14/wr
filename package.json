@@ -15,7 +15,7 @@
     "lint:team-intelligence": "eslint app/team-intelligence/page.tsx lib/teamIntelligenceSources.ts lib/seedTeamIntelligenceReports.ts prisma/seedTeamIntelligenceReports.ts app/api/admin/seed-team-intelligence/route.ts --max-warnings=0",
     "lint:navbar": "eslint components/ui/Navbar.tsx --max-warnings=0",
     "lint:team-overview": "eslint components/TeamOverviewPanel.tsx --max-warnings=0",
-    "lint:team-intelligence-admin": "eslint app/admin/team-intelligence/page.tsx components/admin/TeamIntelligenceAdminDashboard.tsx --max-warnings=0",
+    "lint:team-intelligence-admin": "eslint app/admin/team-intelligence/page.tsx components/admin/TeamIntelligenceAdminDashboard.tsx app/api/admin/team-intelligence-report/route.ts --max-warnings=0",
     "type-check": "tsc --noEmit",
     "sync-api": "tsx prisma/seedApi.ts",
     "sync-api:optional": "tsx prisma/seedApi.ts || echo \"Skipping API sync; continuing build\"",
