@@ -1,4 +1,5 @@
 import { Metadata } from 'next';
+import Link from 'next/link';
 import type { Prisma } from '@prisma/client';
 import AssetClient from '@/components/AssetClient';
 import { PlayerAnalysisPanel } from '@/components/PlayerAnalysisPanel';
@@ -222,6 +223,17 @@ export default async function AssetPage({ params }: Props) {
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
+      )}
+
+      {normalizedAsset && isTeam && (
+        <div className="mx-auto mb-4 flex w-full max-w-[1600px] justify-end px-4">
+          <Link
+            href={`/admin/team-intelligence?teamId=${normalizedAsset.id}`}
+            className="rounded-2xl border border-primary/30 bg-primary/10 px-4 py-3 text-sm font-black text-primary transition hover:bg-primary hover:text-black"
+          >
+            إضافة / تحديث تقرير هذا المنتخب
+          </Link>
+        </div>
       )}
 
       {normalizedAsset && (
