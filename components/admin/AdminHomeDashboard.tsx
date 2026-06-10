@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import AdminShell from './AdminShell';
-import { Activity, ArrowLeft, BarChart3, Database, RefreshCcw, ShieldAlert, Trophy, Users } from 'lucide-react';
+import { Activity, ArrowLeft, BarChart3, Database, FileText, RefreshCcw, ShieldAlert, Trophy, Users } from 'lucide-react';
 
 const modules = [
   {
@@ -16,6 +16,13 @@ const modules = [
     description: 'جلب المنتخبات، صورهم، اللاعبين، صور اللاعبين، المباريات، والمجموعات من المزود.',
     icon: Database,
     tag: 'تهيئة البطولة',
+  },
+  {
+    href: '/admin/team-intelligence',
+    title: 'إدارة تقارير المنتخبات',
+    description: 'تشغيل seed تقارير Team Intelligence يدويًا، ثم مراجعة النتائج في مركز التقارير وAI Analyst.',
+    icon: FileText,
+    tag: 'ذكاء المنتخبات',
   },
   {
     href: '/portfolio',
