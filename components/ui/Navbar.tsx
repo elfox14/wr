@@ -9,7 +9,6 @@ import {
   Trophy, 
   TrendingUp, 
   CalendarDays, 
-  Grid3X3, 
   Gift, 
   Briefcase, 
   LogOut, 
@@ -56,15 +55,11 @@ export function Navbar() {
   }, [session, userStats, fetchPortfolio]);
 
   const navLinks = [
+    { name: 'مركز التحليل', href: '/team-intelligence', icon: <Brain size={16} /> },
     { name: 'السوق', href: '/market', icon: <TrendingUp size={16} /> },
-    { name: 'AI Analyst', href: '/ai-analyst', icon: <Brain size={16} /> },
-    { name: 'تقارير المنتخبات', href: '/team-intelligence', icon: <Shield size={16} /> },
     { name: 'المباريات', href: '/matches', icon: <CalendarDays size={16} /> },
-    { name: 'المجموعات', href: '/groups', icon: <Grid3X3 size={16} /> },
-    { name: 'الترتيب', href: '/leaderboard', icon: <Trophy size={16} /> },
-    { name: 'المكافآت', href: '/rewards', icon: <Gift size={16} /> },
-    { name: 'الأكاديمية', href: '/articles', icon: <BookOpen size={16} /> },
     { name: 'المحفظة', href: '/portfolio', icon: <Briefcase size={16} /> },
+    { name: 'الأكاديمية', href: '/articles', icon: <BookOpen size={16} /> },
   ];
 
   return (
@@ -158,7 +153,7 @@ export function Navbar() {
                           <Briefcase size={16} /> محفظتي
                         </Link>
                         <Link href="/team-intelligence" className="flex items-center gap-3 px-3 py-2.5 text-sm text-gray-300 hover:text-white hover:bg-white/5 rounded-xl transition-colors">
-                          <Shield size={16} /> تقارير المنتخبات
+                          <Shield size={16} /> مركز التحليل
                         </Link>
                         <Link href="/leagues" className="flex items-center gap-3 px-3 py-2.5 text-sm text-gray-300 hover:text-white hover:bg-white/5 rounded-xl transition-colors">
                           <Trophy size={16} /> دورياتي
