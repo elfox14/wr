@@ -33,7 +33,7 @@ export function Navbar() {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
-  const isAdminUser = session.user?.email === 'admin@worldcup.com';
+  const isAdminUser = session?.user?.email === 'admin@worldcup.com';
 
   // Close dropdown on outside click
   useEffect(() => {
