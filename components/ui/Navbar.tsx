@@ -34,7 +34,8 @@ export function Navbar() {
   const dropdownRef = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
   const userEmail = session?.user?.email ?? '';
-  const isAdminUser = userEmail === 'admin@worldcup.com';
+  const isAuthenticated = status === 'authenticated';
+  const isAdminUser = isAuthenticated && userEmail === 'admin@worldcup.com';
 
   // Close dropdown on outside click
   useEffect(() => {
