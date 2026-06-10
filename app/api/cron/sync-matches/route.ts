@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { calculateNewPrice } from '@/lib/pricingService';
+import { applyMarketMove, calculateMatchPriceDelta } from '@/lib/pricingService';
 import { generateMarketNews } from '@/lib/market-news/generator';
 
 const FOOTBALL_DATA_URL = 'https://api.football-data.org/v4/competitions/WC/matches';
@@ -18,7 +18,6 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'FOOTBALL_DATA_API_KEY not set' }, { status: 500 });
     }
 
-    // Fetch matches from football-data.org
     const res = await fetch(FOOTBALL_DATA_URL, {
       headers: { 'X-Auth-Token': apiKey },
     });
@@ -36,7 +35,6 @@ export async function GET(request: Request) {
     let priceUpdatesCount = 0;
     let newsGeneratedCount = 0;
 
-    // Map football-data.org stage names to our stages
     function mapStage(stage: string): string {
       const s = (stage || '').toUpperCase();
       if (s.includes('GROUP')) return 'group';
@@ -48,7 +46,6 @@ export async function GET(request: Request) {
       return 'group';
     }
 
-    // Map football-data.org status to our status
     function mapStatus(status: string): string {
       switch (status) {
         case 'FINISHED': return 'FINISHED';
@@ -57,31 +54,22 @@ export async function GET(request: Request) {
       }
     }
 
-    // Process each match
     for (const m of matches) {
-      const homeTeamName = m.homeTeam?.name;
-      const awayTeamName = m.awayTeam?.name;
-      const homeTla = m.homeTeam?.tla; // 3-letter code e.g. "ARG"
+      const homeTla = m.homeTeam?.tla;
       const awayTla = m.awayTeam?.tla;
-
       if (!homeTla || !awayTla) continue;
 
-      // Find teams in our DB by code
       const homeTeam = await prisma.asset.findFirst({ where: { type: 'TEAM', code: homeTla } });
       const awayTeam = await prisma.asset.findFirst({ where: { type: 'TEAM', code: awayTla } });
-
       if (!homeTeam || !awayTeam) continue;
 
-      const hasScore = m.score?.fullTime?.home != null && m.score?.fullTime?.away != null;
       const matchStatus = mapStatus(m.status);
       const stage = mapStage(m.stage);
-      const externalId = String(m.id); // football-data.org match ID
-
+      const externalId = String(m.id);
       const homeScore = m.score?.fullTime?.home ?? 0;
       const awayScore = m.score?.fullTime?.away ?? 0;
       const matchDate = m.utcDate ? new Date(m.utcDate) : new Date();
 
-      // Upsert match
       await prisma.match.upsert({
         where: { externalId },
         update: {
@@ -107,7 +95,6 @@ export async function GET(request: Request) {
       processedCount++;
     }
 
-    // --- RECALCULATE PRICES FOR ALL TEAMS ---
     const allTeams = await prisma.asset.findMany({ where: { type: 'TEAM' } });
 
     for (const team of allTeams) {
@@ -116,30 +103,52 @@ export async function GET(request: Request) {
           OR: [{ homeTeamId: team.id }, { awayTeamId: team.id }],
           status: 'FINISHED',
         },
+        orderBy: { matchDate: 'asc' },
       });
 
-      let won = 0, drawn = 0, lost = 0, goalsFor = 0, goalsAgainst = 0;
-      let isEliminated = false;
+      if (teamMatches.length === 0) continue;
+
+      let simulatedPrice = team.fairValue && team.fairValue > 0 ? Math.round(team.fairValue) : team.current_price;
+      let totalDelta = 0;
+      let won = 0, drawn = 0, lost = 0;
+      let lastContext: any = null;
 
       for (const match of teamMatches) {
         const isHome = match.homeTeamId === team.id;
         const gf = isHome ? match.homeScore : match.awayScore;
         const ga = isHome ? match.awayScore : match.homeScore;
-        goalsFor += gf;
-        goalsAgainst += ga;
-        if (gf > ga) won++;
-        else if (gf === ga) drawn++;
-        else {
-          lost++;
-          if (match.stage !== 'group') {
-            isEliminated = true;
-          }
-        }
+        const opponentId = isHome ? match.awayTeamId : match.homeTeamId;
+        const opponent = allTeams.find(t => t.id === opponentId) || null;
+        const wonMatch = gf > ga;
+        const drawnMatch = gf === ga;
+        const lostMatch = gf < ga;
+        const isKnockout = match.stage !== 'group';
+        const isEliminated = lostMatch && isKnockout;
+        const wonTournament = wonMatch && match.stage === 'final';
+
+        if (wonMatch) won++;
+        else if (drawnMatch) drawn++;
+        else lost++;
+
+        const delta = calculateMatchPriceDelta({
+          team,
+          opponent,
+          match,
+          won: wonMatch,
+          drawn: drawnMatch,
+          lost: lostMatch,
+          goalsFor: gf,
+          goalsAgainst: ga,
+          isEliminated,
+          wonTournament,
+        });
+
+        simulatedPrice = applyMarketMove(simulatedPrice, delta);
+        totalDelta += delta;
+        lastContext = { match, opponent, gf, ga, delta, wonMatch, drawnMatch, lostMatch, isEliminated, wonTournament };
       }
 
-      if (teamMatches.length === 0) continue; // No finished matches yet
-
-      const newPrice = calculateNewPrice(team, { won, drawn, lost, goalsFor, goalsAgainst }, isEliminated);
+      const newPrice = Math.max(1, Math.round(simulatedPrice));
 
       if (newPrice !== team.current_price) {
         const priceBefore = team.current_price;
@@ -148,7 +157,9 @@ export async function GET(request: Request) {
           where: { id: team.id },
           data: {
             current_price: newPrice,
+            marketPrice: newPrice,
             change: ((newPrice - priceBefore) / priceBefore) * 100,
+            momentum: Math.max(0, Math.min(100, 50 + totalDelta)),
             high_price: Math.max(team.high_price, newPrice),
             low_price: Math.min(team.low_price, newPrice),
             priceHistory: { create: { price: newPrice } },
@@ -157,39 +168,35 @@ export async function GET(request: Request) {
 
         priceUpdatesCount++;
 
-        // Determine context for news
-        const lastMatch = teamMatches[teamMatches.length - 1];
-        const isHome = lastMatch.homeTeamId === team.id;
-        const opponentId = isHome ? lastMatch.awayTeamId : lastMatch.homeTeamId;
-        const opponent = allTeams.find(t => t.id === opponentId);
-        const lastGf = isHome ? lastMatch.homeScore : lastMatch.awayScore;
-        const lastGa = isHome ? lastMatch.awayScore : lastMatch.homeScore;
+        if (lastContext) {
+          const newsContext: any = {
+            reason: `نتائج ذكية حسب قوة الخصم والمرحلة (فوز: ${won}, تعادل: ${drawn}, خسارة: ${lost})`,
+            stage: lastContext.match.stage || 'group',
+            opponent: lastContext.opponent?.name || '',
+            delta: Number(lastContext.delta.toFixed(2)),
+          };
 
-        const newsContext: any = {
-          reason: `نتائج المباريات (فوز: ${won}, تعادل: ${drawn}, خسارة: ${lost})`,
-          stage: lastMatch.stage || 'group',
-          opponent: opponent?.name || '',
-        };
+          if (lastContext.wonMatch && lastContext.opponent && (team.fifaRank || 99) > (lastContext.opponent.fifaRank || 99)) {
+            newsContext.upsetWin = true;
+          }
+          if (lastContext.isEliminated) newsContext.eliminated = true;
+          if (lastContext.wonTournament) newsContext.wonTournament = true;
 
-        // Check for upset win (lower-ranked team beats higher-ranked)
-        if (lastGf > lastGa && opponent && (team.fifaRank || 99) > (opponent.fifaRank || 99)) {
-          newsContext.upsetWin = true;
+          const news = await generateMarketNews({
+            assetId: team.id,
+            before: priceBefore,
+            after: newPrice,
+            context: newsContext,
+          });
+          if (news) newsGeneratedCount++;
         }
-
-        const news = await generateMarketNews({
-          assetId: team.id,
-          before: priceBefore,
-          after: newPrice,
-          context: newsContext,
-        });
-        if (news) newsGeneratedCount++;
       }
     }
 
     return NextResponse.json({
       success: true,
       source: 'football-data.org',
-      message: `Matches synced: ${processedCount}. Price updates: ${priceUpdatesCount}. News generated: ${newsGeneratedCount}.`,
+      message: `Matches synced: ${processedCount}. Smart price updates: ${priceUpdatesCount}. News generated: ${newsGeneratedCount}.`,
     });
   } catch (error: any) {
     console.error('Match Sync Error:', error);
