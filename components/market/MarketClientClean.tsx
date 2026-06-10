@@ -8,6 +8,8 @@ import { PageHeader } from '@/components/ui/PageHeader';
 import { useStore } from '@/lib/store';
 import type { MarketClientProps, ProcessedMarketAsset } from './market-client-types';
 
+type AssetTypeFilter = 'ALL' | 'TEAM' | 'PLAYER';
+
 function formatCompactNumber(value: number) {
   if (!Number.isFinite(value)) return '0';
   if (Math.abs(value) >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
@@ -64,6 +66,7 @@ export default function MarketClientClean({
 }: MarketClientProps) {
   const { assets, fetchAssets } = useStore();
   const [searchQuery, setSearchQuery] = useState('');
+  const [typeFilter, setTypeFilter] = useState<AssetTypeFilter>('ALL');
   const [watchlist, setWatchlist] = useState<string[]>(() => {
     if (typeof window === 'undefined') return [];
     try {
@@ -83,11 +86,17 @@ export default function MarketClientClean({
     [assets],
   );
 
+  const visibleTeamsCount = processedAssets.filter((asset) => asset.type === 'TEAM').length;
+  const visiblePlayersCount = processedAssets.filter((asset) => asset.type === 'PLAYER').length;
+
   const filteredAssets = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
-    if (!q) return processedAssets;
-    return processedAssets.filter((asset) => [asset.name, asset.code, asset.position || '', asset.club || '', asset.group || ''].join(' ').toLowerCase().includes(q));
-  }, [processedAssets, searchQuery]);
+    return processedAssets.filter((asset) => {
+      const matchesType = typeFilter === 'ALL' || asset.type === typeFilter;
+      const matchesQuery = !q || [asset.name, asset.code, asset.position || '', asset.club || '', asset.group || '', asset.continent || ''].join(' ').toLowerCase().includes(q);
+      return matchesType && matchesQuery;
+    });
+  }, [processedAssets, searchQuery, typeFilter]);
 
   const opportunities = useMemo(
     () => [...processedAssets]
@@ -109,6 +118,12 @@ export default function MarketClientClean({
       return next;
     });
   };
+
+  const typeTabs: { id: AssetTypeFilter; label: string; count: number }[] = [
+    { id: 'ALL', label: 'الكل', count: processedAssets.length },
+    { id: 'TEAM', label: 'المنتخبات', count: visibleTeamsCount || teamsCount },
+    { id: 'PLAYER', label: 'اللاعبون', count: visiblePlayersCount || playersCount },
+  ];
 
   return (
     <div className="min-h-screen bg-background text-foreground selection:bg-primary/30">
@@ -137,7 +152,7 @@ export default function MarketClientClean({
           <div className="rounded-2xl border border-white/5 bg-surface/80 p-4 shadow-card">
             <div className="mb-2 text-sm font-bold text-yellow-300">الأصول</div>
             <div className="text-2xl font-black text-white">{(assetsCount || processedAssets.length).toLocaleString()}</div>
-            <div className="mt-1 text-xs text-gray-500">{teamsCount} منتخبات · {playersCount} لاعبين</div>
+            <div className="mt-1 text-xs text-gray-500">{teamsCount || visibleTeamsCount} منتخبات · {playersCount || visiblePlayersCount} لاعبين</div>
           </div>
         </section>
 
@@ -196,6 +211,21 @@ export default function MarketClientClean({
         </section>
 
         <section className="mb-6 rounded-3xl border border-white/5 bg-surface p-4 shadow-card">
+          <div className="mb-4 flex flex-wrap gap-2">
+            {typeTabs.map((tab) => {
+              const selected = typeFilter === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setTypeFilter(tab.id)}
+                  className={`rounded-2xl px-4 py-2 text-xs font-black transition ${selected ? 'bg-primary text-black' : 'bg-white/5 text-gray-300 hover:bg-white/10 hover:text-white'}`}
+                >
+                  {tab.label} <span className="opacity-70">{tab.count}</span>
+                </button>
+              );
+            })}
+          </div>
           <div className="relative">
             <Search className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
             <input
@@ -238,6 +268,12 @@ export default function MarketClientClean({
             );
           })}
         </section>
+
+        {filteredAssets.length === 0 && (
+          <div className="mt-6 rounded-3xl border border-dashed border-white/10 bg-surface p-8 text-center text-sm text-gray-500">
+            لا توجد أصول مطابقة. جرّب اختيار “الكل” أو “المنتخبات”.
+          </div>
+        )}
       </main>
     </div>
   );
