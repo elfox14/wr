@@ -1,4 +1,4 @@
-import { Metadata, ResolvingMetadata } from 'next';
+import { Metadata } from 'next';
 import type { Prisma } from '@prisma/client';
 import AssetClient from '@/components/AssetClient';
 import { PlayerAnalysisPanel } from '@/components/PlayerAnalysisPanel';
@@ -67,10 +67,7 @@ type ApiFootballLineupItem = {
   substitutes?: ApiFootballLineupPlayer[];
 };
 
-export async function generateMetadata(
-  { params }: Props,
-  parent: ResolvingMetadata
-): Promise<Metadata> {
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
 
   const asset = await prisma.asset.findUnique({ where: { id } });
