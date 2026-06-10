@@ -10,6 +10,10 @@ export const metadata: Metadata = {
   description: 'استكشف المنتخبات واللاعبين، وقارن بين الأسعار العادلة والزخم والطلب في سوق MC PRIME Exchange.',
 };
 
+type VolumeRow = {
+  volume: number | string | bigint | null;
+};
+
 export default async function MarketPage() {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -30,7 +34,7 @@ export default async function MarketPage() {
     prisma.asset.count({ where: { type: 'TEAM' } }),
     prisma.asset.count({ where: { type: 'PLAYER' } }),
     prisma.transaction.count({ where: { timestamp: { gte: today } } }),
-    prisma.$queryRaw`SELECT COALESCE(SUM(quantity * price_at_time), 0) as volume FROM "Transaction" WHERE "timestamp" >= ${today}`,
+    prisma.$queryRaw<VolumeRow[]>`SELECT COALESCE(SUM(quantity * price_at_time), 0) as volume FROM "Transaction" WHERE "timestamp" >= ${today}`,
     prisma.match.findFirst({
       where: { status: { in: ['SCHEDULED', 'IN_PLAY', 'LIVE'] } },
       orderBy: { matchDate: 'asc' },
@@ -50,7 +54,7 @@ export default async function MarketPage() {
     }),
   ]);
 
-  const todayVolume = Number((volumeResult as any)[0]?.volume || 0);
+  const todayVolume = Number(volumeResult[0]?.volume || 0);
   const nextMatchDate = nextMatch ? nextMatch.matchDate.toISOString() : null;
 
   return (
