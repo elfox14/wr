@@ -55,6 +55,9 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      - name: Lint AI analysis files
+        run: npm run lint:ai
+
       - name: Type-check
         run: npm run type-check
 
