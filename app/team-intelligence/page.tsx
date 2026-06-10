@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { Metadata } from 'next';
-import { ArrowRight, Brain, Database, ExternalLink, ShieldCheck, Sparkles, Target, Trophy } from 'lucide-react';
+import type { Prisma } from '@prisma/client';
+import { ArrowRight, Brain, Database, ExternalLink, Filter, Search, ShieldCheck, Sparkles, Target, Trophy, XCircle } from 'lucide-react';
 import { AssetImage } from '@/components/ui/AssetImage';
 import { PageHeader } from '@/components/ui/PageHeader';
 import prisma from '@/lib/prisma';
@@ -8,6 +9,13 @@ import prisma from '@/lib/prisma';
 export const metadata: Metadata = {
   title: 'AI Team Intelligence | MC PRIME Exchange',
   description: 'مركز تقارير المنتخبات الذكية: ملفات فنية، نقاط قوة وضعف، ومؤشرات جاهزية للمنتخبات في كأس العالم.',
+};
+
+type TeamIntelligencePageProps = {
+  searchParams?: Promise<{
+    q?: string | string[];
+    confidence?: string | string[];
+  }>;
 };
 
 function formatDate(value?: Date | string | null) {
@@ -26,18 +34,59 @@ function confidenceLabel(value?: string | null) {
   return 'تقدير افتتاحي';
 }
 
-export default async function TeamIntelligencePage() {
-  const [reports, teamsCount] = await Promise.all([
+function getFirstParam(value?: string | string[]) {
+  return Array.isArray(value) ? value[0] || '' : value || '';
+}
+
+function getValidConfidence(value: string) {
+  return ['A', 'B', 'C', 'D'].includes(value) ? value : '';
+}
+
+export default async function TeamIntelligencePage({ searchParams }: TeamIntelligencePageProps) {
+  const params = await searchParams;
+  const query = getFirstParam(params?.q).trim();
+  const confidence = getValidConfidence(getFirstParam(params?.confidence));
+  const hasFilters = Boolean(query || confidence);
+
+  const reportWhere: Prisma.TeamIntelligenceReportWhereInput = {
+    ...(confidence ? { confidence } : {}),
+    ...(query ? {
+      OR: [
+        { title: { contains: query, mode: 'insensitive' } },
+        { summary: { contains: query, mode: 'insensitive' } },
+        { sourceName: { contains: query, mode: 'insensitive' } },
+        { tacticalTags: { has: query } },
+        {
+          team: {
+            is: {
+              OR: [
+                { name: { contains: query, mode: 'insensitive' } },
+                { code: { contains: query, mode: 'insensitive' } },
+                { group: { contains: query, mode: 'insensitive' } },
+                { continent: { contains: query, mode: 'insensitive' } },
+              ],
+            },
+          },
+        },
+      ],
+    } : {}),
+  };
+
+  const [reports, teamsCount, reportStats] = await Promise.all([
     prisma.teamIntelligenceReport.findMany({
+      where: reportWhere,
       orderBy: { publishedAt: 'desc' },
       take: 24,
       include: { team: true },
     }),
     prisma.asset.count({ where: { type: 'TEAM' } }),
+    prisma.teamIntelligenceReport.findMany({
+      select: { teamId: true, confidence: true },
+    }),
   ]);
 
-  const coveredTeams = new Set(reports.map((report) => report.teamId)).size;
-  const highConfidence = reports.filter((report) => ['A', 'B'].includes(report.confidence)).length;
+  const coveredTeams = new Set(reportStats.map((report) => report.teamId)).size;
+  const highConfidence = reportStats.filter((report) => ['A', 'B'].includes(report.confidence)).length;
 
   return (
     <div className="min-h-screen bg-background text-foreground selection:bg-primary/30">
@@ -62,8 +111,8 @@ export default async function TeamIntelligencePage() {
           </div>
           <div className="rounded-3xl border border-white/5 bg-surface p-5 shadow-card">
             <div className="mb-2 flex items-center gap-2 text-sm font-black text-accent"><Database size={18} /> تقارير منشورة</div>
-            <div className="text-3xl font-black text-white">{reports.length}</div>
-            <p className="mt-1 text-xs text-gray-500">أحدث تقارير الذكاء الفني المتاحة.</p>
+            <div className="text-3xl font-black text-white">{reportStats.length}</div>
+            <p className="mt-1 text-xs text-gray-500">أحدث تقارير الذكاء الفني المتاحة. المعروض الآن: {reports.length}</p>
           </div>
           <div className="rounded-3xl border border-white/5 bg-surface p-5 shadow-card">
             <div className="mb-2 flex items-center gap-2 text-sm font-black text-emerald-300"><ShieldCheck size={18} /> تغطية حالية</div>
@@ -72,12 +121,63 @@ export default async function TeamIntelligencePage() {
           </div>
         </section>
 
+        <section className="mb-8 rounded-3xl border border-white/5 bg-surface p-5 shadow-card">
+          <div className="mb-4 flex items-center gap-2 text-lg font-black text-white">
+            <Filter size={20} className="text-primary" /> فلترة التقارير
+          </div>
+          <form action="/team-intelligence" className="grid gap-3 lg:grid-cols-[1fr_220px_auto_auto]">
+            <label htmlFor="team-intelligence-search" className="sr-only">ابحث عن منتخب أو تقرير</label>
+            <div className="relative">
+              <Search className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
+              <input
+                id="team-intelligence-search"
+                name="q"
+                defaultValue={query}
+                placeholder="ابحث باسم المنتخب، الكود، المجموعة، المصدر، أو عنوان التقرير..."
+                className="h-12 w-full rounded-2xl border border-white/10 bg-black/25 pr-11 pl-4 text-sm font-bold text-white outline-none transition placeholder:text-gray-600 focus:border-primary/50"
+              />
+            </div>
+            <label htmlFor="team-intelligence-confidence" className="sr-only">مستوى الثقة</label>
+            <select
+              id="team-intelligence-confidence"
+              name="confidence"
+              defaultValue={confidence}
+              className="h-12 rounded-2xl border border-white/10 bg-black/25 px-4 text-sm font-black text-white outline-none transition focus:border-primary/50"
+            >
+              <option value="">كل مستويات الثقة</option>
+              <option value="A">A - موثوقية عالية</option>
+              <option value="B">B - موثوقية جيدة</option>
+              <option value="C">C - بحاجة لمراجعة</option>
+              <option value="D">D - تقدير افتتاحي</option>
+            </select>
+            <button type="submit" className="inline-flex h-12 items-center justify-center gap-2 rounded-2xl bg-primary px-5 text-sm font-black text-black transition hover:bg-primary/90">
+              تطبيق الفلترة <Search size={15} />
+            </button>
+            {hasFilters && (
+              <Link href="/team-intelligence" className="inline-flex h-12 items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-5 text-sm font-black text-white transition hover:bg-white/10">
+                مسح <XCircle size={15} />
+              </Link>
+            )}
+          </form>
+          <p className="mt-3 text-xs leading-6 text-gray-500">
+            {hasFilters ? `تم العثور على ${reports.length} تقرير مطابق للفلترة الحالية.` : 'استخدم البحث للوصول بسرعة لتقارير منتخب، مصدر، مجموعة، أو مستوى ثقة محدد.'}
+          </p>
+        </section>
+
         {reports.length === 0 ? (
           <section className="rounded-3xl border border-dashed border-white/10 bg-surface p-8 text-center shadow-card">
             <Sparkles className="mx-auto mb-3 text-primary" size={34} />
-            <h2 className="text-2xl font-black text-white">لا توجد تقارير بعد</h2>
-            <p className="mt-2 text-sm leading-7 text-gray-400">شغّل seed تقارير المنتخبات ثم ارجع لهذه الصفحة.</p>
-            <code className="mt-4 inline-block rounded-xl border border-white/10 bg-black/30 px-4 py-2 text-xs text-primary">npm run seed:team-intelligence</code>
+            <h2 className="text-2xl font-black text-white">{hasFilters ? 'لا توجد نتائج مطابقة' : 'لا توجد تقارير بعد'}</h2>
+            <p className="mt-2 text-sm leading-7 text-gray-400">
+              {hasFilters ? 'جرّب تغيير كلمة البحث أو مستوى الثقة لعرض تقارير أخرى.' : 'شغّل seed تقارير المنتخبات ثم ارجع لهذه الصفحة.'}
+            </p>
+            {hasFilters ? (
+              <Link href="/team-intelligence" className="mt-4 inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-xs font-black text-primary hover:bg-white/10">
+                عرض كل التقارير <ArrowRight size={14} />
+              </Link>
+            ) : (
+              <code className="mt-4 inline-block rounded-xl border border-white/10 bg-black/30 px-4 py-2 text-xs text-primary">npm run seed:team-intelligence</code>
+            )}
           </section>
         ) : (
           <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
