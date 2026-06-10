@@ -1,9 +1,9 @@
 import { Brain, TrendingDown, TrendingUp, WalletCards } from 'lucide-react';
-import { analyzeFootballAsset } from '../lib/analysis-adapter';
+import { analyzeFootballAsset, type FootballAnalysisAssetInput } from '../lib/analysis-adapter';
 import { analyzeValueFit, formatVirtualCoins } from '../lib/value-fit';
 
 type MarketAnalysisBadgeProps = {
-  asset: any;
+  asset: FootballAnalysisAssetInput;
   compact?: boolean;
 };
 
