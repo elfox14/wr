@@ -13,7 +13,6 @@ import {
   Sparkles,
   Star,
   Target,
-  TrendingUp,
   Users,
   Zap,
 } from 'lucide-react';
