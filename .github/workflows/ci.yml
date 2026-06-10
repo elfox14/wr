@@ -64,6 +64,9 @@ jobs:
       - name: Lint market lite
         run: npm run lint:market-lite
 
+      - name: Lint market client
+        run: npm run lint:market-client
+
       - name: Type-check
         run: npm run type-check
 
