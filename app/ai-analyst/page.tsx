@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { Metadata } from 'next';
-import { ArrowRight, Brain, FileText, ShieldAlert, Sparkles, TrendingDown, TrendingUp } from 'lucide-react';
+import { ArrowRight, BookOpen, Brain, FileText, ShieldAlert, Sparkles, TrendingDown, TrendingUp } from 'lucide-react';
 import { AssetImage } from '@/components/ui/AssetImage';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { MarketAnalysisBadge } from '@/features/analysis/components/MarketAnalysisBadge';
@@ -12,8 +12,8 @@ import { formatVirtualCoins, getFairValue, getMarketPrice, getValueGapPercent } 
 import prisma from '@/lib/prisma';
 
 export const metadata: Metadata = {
-  title: 'AI Analyst | MC PRIME Exchange',
-  description: 'تحليل ذكي يربط بين السعر الافتراضي، القيمة العادلة، والتحليل الفني داخل الملعب.',
+  title: 'Intelligence Hub | MC PRIME Exchange',
+  description: 'مركز ذكاء كروي يربط بين تقارير المنتخبات، منهجية التسعير، السعر الافتراضي، القيمة العادلة، والتحليل الفني داخل الملعب.',
 };
 
 type ReportBackedTeam = {
@@ -191,12 +191,37 @@ export default async function AIAnalystPage() {
     <main className="min-h-screen bg-background px-4 py-8 text-foreground sm:px-6 lg:px-8">
       <div className="mx-auto max-w-[1500px]">
         <PageHeader
-          title="AI Analyst"
-          description="مركز ذكي يربط بين التحليل الفني داخل الملعب، السعر الحالي، القيمة العادلة، وتقارير المنتخبات الموثقة."
+          title="Intelligence Hub"
+          description="مركز ذكي يربط بين تقارير المنتخبات، منهجية التسعير، السعر الحالي، القيمة العادلة، والتحليل الفني داخل الملعب."
           icon={<Brain size={48} />}
           glowColor="bg-[#0FF0FC]/10"
           textColor="text-[#0FF0FC]"
         />
+
+        <section className="mb-8 rounded-[1.6rem] border border-[#FFD700]/15 bg-[#FFD700]/[0.055] p-4 shadow-card lg:rounded-3xl lg:p-6">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <p className="mb-2 inline-flex items-center gap-2 rounded-xl border border-[#FFD700]/20 bg-[#FFD700]/10 px-3 py-1 text-xs font-black text-[#FFD700]">
+                <Sparkles size={15} /> مسار القرار الذكي
+              </p>
+              <h2 className="text-2xl font-black text-white">حلّل أولًا، افهم التسعير، ثم افتح السوق</h2>
+              <p className="mt-2 max-w-3xl text-sm leading-7 text-gray-300">
+                هذه الصفحة تحتفظ بقراءات الذكاء السريعة، لكن المسار الأساسي للمستخدم أصبح: مركز التحليل، منهجية التسعير، ثم السوق.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Link href="/team-intelligence" className="inline-flex items-center justify-center gap-2 rounded-2xl bg-primary px-4 py-3 text-sm font-black text-black transition hover:bg-primary/90">
+                مركز التحليل <ArrowRight size={15} />
+              </Link>
+              <Link href="/methodology" className="inline-flex items-center justify-center gap-2 rounded-2xl border border-[#FFD700]/25 bg-[#FFD700]/10 px-4 py-3 text-sm font-black text-[#FFD700] transition hover:bg-[#FFD700]/15">
+                منهجية التسعير <BookOpen size={15} />
+              </Link>
+              <Link href="/market" className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-sm font-black text-white transition hover:bg-white/15">
+                السوق <TrendingUp size={15} />
+              </Link>
+            </div>
+          </div>
+        </section>
 
         <SmartTradeAlerts alerts={alerts} />
 
@@ -224,13 +249,13 @@ export default async function AIAnalystPage() {
               <div className="mb-2 inline-flex items-center gap-2 rounded-xl border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-black text-primary">
                 <FileText size={15} /> Team Intelligence Reports
               </div>
-              <h2 className="text-2xl font-black text-white">تقارير المنتخبات داخل AI Analyst</h2>
+              <h2 className="text-2xl font-black text-white">تقارير المنتخبات داخل مركز الذكاء</h2>
               <p className="mt-1 text-sm leading-7 text-gray-400">
                 اربط القراءة السعرية والفنية بأحدث تقارير المنتخبات الموثقة: {teamReportsCount} تقرير تغطي {coveredTeamsCount.length} منتخب.
               </p>
             </div>
             <Link href="/team-intelligence" className="inline-flex items-center justify-center gap-2 rounded-2xl bg-primary px-5 py-3 text-sm font-black text-black transition hover:bg-primary/90">
-              فتح مركز التقارير <ArrowRight size={15} />
+              فتح مركز التحليل <ArrowRight size={15} />
             </Link>
           </div>
 
@@ -244,7 +269,7 @@ export default async function AIAnalystPage() {
         </section>
 
         {assets.length === 0 ? (
-          <EmptyState text="لا توجد أصول كافية للتحليل بعد. بعد إضافة المنتخبات واللاعبين سيظهر AI Analyst تلقائيًا." />
+          <EmptyState text="لا توجد أصول كافية للتحليل بعد. بعد إضافة المنتخبات واللاعبين ستظهر قراءات مركز الذكاء تلقائيًا." />
         ) : (
           <div className="grid gap-5 xl:grid-cols-3">
             <Section title="فرص فنية" tone="green" icon={<TrendingUp size={16} />} description="أصول تجمع بين Technical Score جيد وسعر أقل أو قريب من القيمة العادلة.">
