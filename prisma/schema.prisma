@@ -62,7 +62,6 @@ model Reward {
   claimedAt DateTime @default(now())
 }
 
-
 model League {
   id          String   @id @default(cuid())
   name        String
@@ -145,53 +144,40 @@ model Asset {
   volume        String
   change        Float
 
-  // Group for World Cup (e.g. "A", "B", etc. - only for teams)
   group         String?
-
-  // --- NEW SCORING & FILTERING FIELDS ---
-  continent     String? // e.g., "South America", "Europe", "Africa"
-  fifaRank      Int?    // e.g. 1 (for Argentina)
-  position      String? // e.g. "GK", "DEF", "MID", "FWD" (for players)
-  playerTier    Float?  // 1.0 (Star), 0.8 (Starter), 0.5 (Sub), etc.
-  roleImportance Float? // 1.0 to 0.1
-  score         Float?  // The dynamic or static score 0-100
-  isAvailable   Boolean @default(true) // For World Cup 26 roster
-  
-  // --- ADVANCED TRADING FIELDS ---
+  continent     String?
+  fifaRank      Int?
+  position      String?
+  playerTier    Float?
+  roleImportance Float?
+  score         Float?
+  isAvailable   Boolean @default(true)
   age               Int?
   club              String?
   coach             String?
   participations    Int?
-  injuries          Int?    @default(0) // 0 means perfect health
+  injuries          Int?    @default(0)
   harmony           Float?  @default(1.0)
-  riskIndex         Float?  @default(0.5) // 0.0 to 1.0
+  riskIndex         Float?  @default(0.5)
   ownersCount       Int     @default(0)
-  globalMarketValue Float?  // in millions, e.g. 180 for Mbappe
-  
-  // --- ECONOMY REFACTOR FIELDS ---
-  popularity        Float?  @default(50) // Global fan popularity (0-100)
-  fundamental       Float?  @default(50) // Football quality (0-100)
-  worldCupLegacy    Float?  @default(50) // Historical legacy (0-100)
-  marketDemand      Float?  @default(50) // Calculated from trading activity
-  momentum          Float?  @default(50) // Short term performance
-  volatilityScore   Float?  @default(10) // e.g. Yamal=70, Messi=15
-  fairValue         Float?  @default(0)  // Calculated from 5 pillars
-  marketPrice       Float?  @default(0)  // Affected by real supply/demand
-  // -------------------------------------
-
-  // --- EXTERNAL PERFORMANCE PROVIDERS ---
+  globalMarketValue Float?
+  popularity        Float?  @default(50)
+  fundamental       Float?  @default(50)
+  worldCupLegacy    Float?  @default(50)
+  marketDemand      Float?  @default(50)
+  momentum          Float?  @default(50)
+  volatilityScore   Float?  @default(10)
+  fairValue         Float?  @default(0)
+  marketPrice       Float?  @default(0)
   apiFootballId          Int?
   isportsId              Int?
   lastPerformanceRating  Float?
   lastPerformanceSyncAt  DateTime?
-  // --------------------------------------
 
-  // Relation: A player belongs to a team
   teamId        String?
   team          Asset?         @relation("TeamPlayers", fields: [teamId], references: [id])
   players       Asset[]        @relation("TeamPlayers")
 
-  // Relation: Matches
   homeMatches   Match[]        @relation("HomeTeam")
   awayMatches   Match[]        @relation("AwayTeam")
 
@@ -201,6 +187,7 @@ model Asset {
   priceHistory  PriceHistory[]
   captains      CaptainSelection[]
   performances  PlayerPerformance[]
+  intelligenceReports TeamIntelligenceReport[]
 
   @@index([apiFootballId])
   @@index([isportsId])
@@ -208,20 +195,17 @@ model Asset {
 
 model Match {
   id          String   @id @default(cuid())
-  externalId  String?  @unique // Matches from openfootball
+  externalId  String?  @unique
   homeTeamId  String
   homeTeam    Asset    @relation("HomeTeam", fields: [homeTeamId], references: [id])
   awayTeamId  String
   awayTeam    Asset    @relation("AwayTeam", fields: [awayTeamId], references: [id])
-  
   matchDate   DateTime
-  status      String   @default("SCHEDULED") // SCHEDULED, IN_PLAY, FINISHED
-  
+  status      String   @default("SCHEDULED")
   homeScore   Int      @default(0)
   awayScore   Int      @default(0)
-  
-  groupPhase  String?  // e.g. "Group A"
-  stage       String   @default("group") // group, round_of_16, quarter_final, semi_final, final
+  groupPhase  String?
+  stage       String   @default("group")
 }
 
 model PriceHistory {
@@ -236,16 +220,13 @@ model PlayerPerformance {
   id                String   @id @default(cuid())
   assetId           String
   asset             Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
-
   provider          String   @default("API_FOOTBALL")
   providerPlayerId  Int?
   providerFixtureId Int?
-
   season            Int?
   competition       String?
   teamName          String?
   opponentName      String?
-
   minutes           Int      @default(0)
   started           Boolean  @default(false)
   goals             Int      @default(0)
@@ -261,12 +242,10 @@ model PlayerPerformance {
   goalsConceded     Int      @default(0)
   yellowCards       Int      @default(0)
   redCards          Int      @default(0)
-
   apiRating         Float?
   internalRating    Float    @default(50)
   momentumImpact    Float    @default(0)
   marketImpact      Float    @default(0)
-
   rawData           Json?
   matchDate         DateTime?
   createdAt         DateTime @default(now())
@@ -277,13 +256,41 @@ model PlayerPerformance {
   @@unique([assetId, providerFixtureId])
 }
 
+model TeamIntelligenceReport {
+  id             String   @id @default(cuid())
+  teamId         String
+  team           Asset    @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  title          String
+  summary        String
+  body           String?
+  reportType     String   @default("TEAM_PROFILE")
+  language       String   @default("ar")
+  sourceName     String
+  sourceUrl      String?
+  sourceCategory String   @default("editorial")
+  confidence     String   @default("D")
+  provider       String?
+  metrics        Json?
+  tacticalTags   String[] @default([])
+  strengths      String[] @default([])
+  weaknesses     String[] @default([])
+  lastCheckedAt  DateTime?
+  publishedAt    DateTime @default(now())
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([teamId, publishedAt])
+  @@index([sourceCategory])
+  @@index([confidence])
+}
+
 model Holding {
   id             String   @id @default(cuid())
   user           User     @relation(fields: [userId], references: [id])
   userId         String
   asset          Asset    @relation(fields: [assetId], references: [id])
   assetId        String
-  positionType   String   @default("LONG") // "LONG" or "SHORT"
+  positionType   String   @default("LONG")
   quantity       Int
   avg_buy_price  Float
 
@@ -296,7 +303,7 @@ model Transaction {
   userId         String
   asset          Asset    @relation(fields: [assetId], references: [id])
   assetId        String
-  type           String   // "BUY" or "SELL"
+  type           String
   quantity       Int
   price_at_time  Int
   timestamp      DateTime @default(now())
@@ -306,30 +313,26 @@ model MarketNews {
   id              String   @id @default(cuid())
   asset           Asset    @relation(fields: [assetId], references: [id])
   assetId         String
-  eventType       String   // price_spike, price_drop, win, loss, qualification, elimination, upset_win, strong_rally, sharp_selloff
-  severity        String   @default("normal") // low, normal, high
-  localeGroupKey  String?  // For deduplication: "{assetId}:{eventType}"
+  eventType       String
+  severity        String   @default("normal")
+  localeGroupKey  String?
   priceBefore     Float?
   priceAfter      Float?
   changePercent   Float    @default(0)
-  // Static rendered text (backward compatible)
   titleAr         String
   bodyAr          String
   titleEn         String
   bodyEn          String
-  // Template-based i18n (new)
-  titleKey        String?  // e.g. "marketNews.price_spike.title"
-  bodyKey         String?  // e.g. "marketNews.price_spike.body"
-  titleParams     Json?    // e.g. {"team": "Argentina", "change": "3.50"}
-  bodyParams      Json?    // e.g. {"team": "Argentina", "before": "5000", "after": "5175", "reason": "..."}
-  context         Json?    // Extra context: {"stage": "group", "opponent": "France"}
+  titleKey        String?
+  bodyKey         String?
+  titleParams     Json?
+  bodyParams      Json?
+  context         Json?
   publishedAt     DateTime @default(now())
 
   @@index([assetId, publishedAt])
   @@index([eventType, publishedAt])
 }
-
-// --- PHASE 2 MODELS ---
 
 model CaptainSelection {
   id        String   @id @default(cuid())
@@ -348,12 +351,10 @@ model LeagueMatch {
   userA      User    @relation("MatchUserA", fields: [userAId], references: [id])
   userBId    String
   userB      User    @relation("MatchUserB", fields: [userBId], references: [id])
-
   scoreA     Int     @default(0)
   scoreB     Int     @default(0)
-  status     String  @default("PENDING") // PENDING, PLAYED
+  status     String  @default("PENDING")
   round      Int
-
   createdAt  DateTime @default(now())
 
   @@unique([leagueId, userAId, userBId, round])
@@ -382,9 +383,9 @@ model AdSession {
   id               String   @id @default(cuid())
   userId           String
   user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  adType           String   // "INTERSTITIAL", "REWARDED"
-  provider         String   // "ADMOB", "APPLOVIN", etc.
-  status           String   // "STARTED", "COMPLETED", "FAILED"
+  adType           String
+  provider         String
+  status           String
   rewardAmount     Int      @default(0)
   placement        String?
   externalAdId     String?
