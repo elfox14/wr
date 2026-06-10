@@ -73,6 +73,9 @@ jobs:
       - name: Lint team intelligence
         run: npm run lint:team-intelligence
 
+      - name: Lint navbar
+        run: npm run lint:navbar
+
       - name: Type-check
         run: npm run type-check
 
