@@ -2,6 +2,7 @@ import { Metadata } from 'next';
 import Link from 'next/link';
 import type { Prisma } from '@prisma/client';
 import AssetClient from '@/components/AssetClient';
+import { AssetCommandHeader } from '@/components/asset/AssetCommandHeader';
 import { PlayerAnalysisPanel } from '@/components/PlayerAnalysisPanel';
 import TeamPitchLineup from '@/components/TeamPitchLineup';
 import TeamOverviewPanel from '@/components/TeamOverviewPanel';
@@ -225,6 +226,8 @@ export default async function AssetPage({ params }: Props) {
         />
       )}
 
+      {normalizedAsset && <AssetCommandHeader asset={normalizedAsset} isTeam={isTeam} />}
+
       {normalizedAsset && isTeam && (
         <div className="mx-auto mb-4 flex w-full max-w-[1600px] justify-end px-4">
           <Link
@@ -241,7 +244,7 @@ export default async function AssetPage({ params }: Props) {
           isTeam={isTeam}
           lineup={isTeam ? <TeamPitchLineup team={normalizedAsset} /> : undefined}
           trade={isTeam ? <TeamTradePanel assetId={normalizedAsset.id} initialPrice={normalizedAsset.marketPrice ?? normalizedAsset.current_price} fairValue={normalizedAsset.fairValue} change={normalizedAsset.change} /> : undefined}
-          technical={<FootballTechnicalAnalysis asset={normalizedAsset} />}
+          technical={<div id="technical-analysis"><FootballTechnicalAnalysis asset={normalizedAsset} /></div>}
           overview={isTeam ? <TeamOverviewPanel team={normalizedAsset} /> : undefined}
           playerOverview={!isTeam ? <PlayerAnalysisPanel asset={normalizedAsset} /> : undefined}
           market={!isTeam ? <AssetClient /> : undefined}
