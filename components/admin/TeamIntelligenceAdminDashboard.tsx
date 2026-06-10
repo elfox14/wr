@@ -164,7 +164,7 @@ export default function TeamIntelligenceAdminDashboard({ teams, initialTeamId = 
               <Link href="/team-intelligence" className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-black text-white hover:border-primary/40 hover:text-primary">
                 مركز التحليل <ArrowRight size={15} />
               </Link>
-              <Link href="/ai-analyst" className="inline-flex items-center gap-2 rounded-2xl bg-primary px-4 py-3 text-sm font-black text-black hover:bg-primary/90">
+              <Link href="/intelligence" className="inline-flex items-center gap-2 rounded-2xl bg-primary px-4 py-3 text-sm font-black text-black hover:bg-primary/90">
                 Intelligence Hub <Sparkles size={15} />
               </Link>
             </div>
