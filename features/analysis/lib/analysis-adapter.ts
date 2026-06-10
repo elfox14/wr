@@ -1,17 +1,43 @@
 import { mapPositionToAnalysisRole, scorePlayerProfile, type FootballPosition, type MetricScores } from './player-scoring-engine';
+import type { ValueFitAssetInput } from './value-fit';
 
-function n(value: any, fallback = 50) {
+export type FootballAnalysisAssetInput = ValueFitAssetInput & {
+  id?: string;
+  name?: string | null;
+  type?: string | null;
+  image?: string | null;
+  position?: string | null;
+  score?: number | string | null;
+  lastPerformanceRating?: number | string | null;
+  fundamental?: number | string | null;
+  momentum?: number | string | null;
+  change?: number | string | null;
+  marketDemand?: number | string | null;
+  demandScore?: number | string | null;
+  popularity?: number | string | null;
+  popularityScore?: number | string | null;
+  consistency?: number | string | null;
+  volatilityScore?: number | string | null;
+  availability?: number | string | null;
+  squadQuality?: number | string | null;
+  qualityScore?: number | string | null;
+  teamScore?: number | string | null;
+  worldCupLegacy?: number | string | null;
+  legacyScore?: number | string | null;
+};
+
+function n(value: unknown, fallback = 50) {
   const num = Number(value);
   return Number.isFinite(num) ? num : fallback;
 }
 
-function normalizePercent(value: any, fallback = 50) {
+function normalizePercent(value: unknown, fallback = 50) {
   const num = n(value, fallback);
   if (num <= 1) return Math.round(num * 100);
   return Math.max(0, Math.min(100, Math.round(num)));
 }
 
-function priceSignal(asset: any) {
+function priceSignal(asset: FootballAnalysisAssetInput) {
   const current = n(asset?.marketPrice ?? asset?.current_price, 0);
   const fair = n(asset?.fairValue, current || 1);
   if (!current || !fair) return 50;
@@ -19,7 +45,7 @@ function priceSignal(asset: any) {
   return Math.max(0, Math.min(100, Math.round(55 + discount * 2)));
 }
 
-export function buildPlayerMetrics(asset: any): MetricScores {
+export function buildPlayerMetrics(asset: FootballAnalysisAssetInput): MetricScores {
   const baseScore = normalizePercent(asset?.score ?? asset?.lastPerformanceRating ?? asset?.fundamental ?? 55);
   const momentum = normalizePercent(asset?.momentum ?? asset?.change ?? 50);
   const demand = normalizePercent(asset?.marketDemand ?? asset?.demandScore ?? 50);
@@ -63,7 +89,7 @@ export function buildPlayerMetrics(asset: any): MetricScores {
   };
 }
 
-export function buildTeamMetrics(team: any): MetricScores {
+export function buildTeamMetrics(team: FootballAnalysisAssetInput): MetricScores {
   const baseScore = normalizePercent(team?.score ?? team?.fundamental ?? team?.teamScore ?? 60);
   const squadQuality = normalizePercent(team?.squadQuality ?? team?.qualityScore ?? baseScore);
   const momentum = normalizePercent(team?.momentum ?? team?.change ?? 50);
@@ -107,7 +133,7 @@ export function buildTeamMetrics(team: any): MetricScores {
   };
 }
 
-export function analyzeFootballAsset(asset: any) {
+export function analyzeFootballAsset(asset: FootballAnalysisAssetInput) {
   const role: FootballPosition = mapPositionToAnalysisRole(asset?.position, asset?.type);
   const metrics = asset?.type === 'TEAM' ? buildTeamMetrics(asset) : buildPlayerMetrics(asset);
   return scorePlayerProfile(role, metrics);
