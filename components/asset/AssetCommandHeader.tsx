@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Brain, ShieldCheck, Target, TrendingDown, TrendingUp, Zap } from 'lucide-react';
+import { BookOpen, Brain, ShieldCheck, Target, TrendingDown, TrendingUp, Zap } from 'lucide-react';
 
 type AssetCommandHeaderProps = {
   asset: any;
@@ -127,6 +127,20 @@ export function AssetCommandHeader({ asset, isTeam }: AssetCommandHeaderProps) {
             <div className="flex items-center justify-between"><span className="text-xs font-bold text-gray-400">المخاطرة</span><ShieldCheck size={16} className="text-emerald-300" /></div>
             <p className="mt-2 text-lg font-black text-white">{volatility}/100</p>
             {metricBar(100 - volatility, 'bg-emerald-400')}
+          </div>
+        </div>
+
+        <div className="mt-5 rounded-2xl border border-[#FFD700]/15 bg-[#FFD700]/10 p-4">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="text-xs font-black text-[#FFD700]">لماذا هذا السعر؟</p>
+              <p className="mt-1 text-sm leading-6 text-gray-300">
+                راجع منهجية التسعير لفهم علاقة السعر بالقيمة العادلة، الزخم، الطلب، المخاطرة، وتأثير المباريات.
+              </p>
+            </div>
+            <Link href="/methodology" className="inline-flex shrink-0 items-center justify-center gap-2 rounded-2xl bg-[#FFD700] px-4 py-3 text-xs font-black text-black transition hover:bg-[#ffe45c]">
+              منهجية التسعير <BookOpen size={14} />
+            </Link>
           </div>
         </div>
 
