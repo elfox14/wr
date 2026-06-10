@@ -162,10 +162,10 @@ export default function TeamIntelligenceAdminDashboard({ teams, initialTeamId = 
             </div>
             <div className="flex flex-wrap gap-2">
               <Link href="/team-intelligence" className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-black text-white hover:border-primary/40 hover:text-primary">
-                مركز التقارير <ArrowRight size={15} />
+                مركز التحليل <ArrowRight size={15} />
               </Link>
               <Link href="/ai-analyst" className="inline-flex items-center gap-2 rounded-2xl bg-primary px-4 py-3 text-sm font-black text-black hover:bg-primary/90">
-                AI Analyst <Sparkles size={15} />
+                Intelligence Hub <Sparkles size={15} />
               </Link>
             </div>
           </div>
@@ -258,7 +258,6 @@ export default function TeamIntelligenceAdminDashboard({ teams, initialTeamId = 
                 <textarea
                   value={manualForm.summary}
                   onChange={(event) => updateManualForm('summary', event.target.value)}
-                  placeholder="ملخص قصير يظهر في مركز التقارير وAI Analyst"
                   className="min-h-24 w-full rounded-2xl border border-white/10 bg-background px-4 py-3 text-white outline-none focus:border-primary"
                   required
                 />
