@@ -131,18 +131,108 @@ export const teamIntelligenceSeedReports: TeamIntelligenceSeedReport[] = [
   },
 ];
 
+type SeedTeam = {
+  id: string;
+  name: string;
+  code: string;
+  group?: string | null;
+  continent?: string | null;
+  fifaRank?: number | null;
+  score?: number | null;
+  momentum?: number | null;
+  worldCupLegacy?: number | null;
+};
+
+function buildGenericReport(team: SeedTeam): Omit<TeamIntelligenceSeedReport, 'teamCodes'> {
+  const rankText = team.fifaRank ? `تصنيف FIFA الحالي داخل المنصة: #${team.fifaRank}.` : 'تصنيف FIFA غير مكتمل داخل قاعدة البيانات ويحتاج تحديثًا لاحقًا.';
+  const groupText = team.group ? `المجموعة ${team.group}` : 'المجموعة غير محددة بعد';
+  const scoreText = Math.round(Number(team.score || 50));
+
+  return {
+    title: `ملف ${team.name} الفني: تقرير افتتاحي قابل للتحديث`,
+    summary: `${team.name} لديه ملف افتتاحي في مركز Team Intelligence يعتمد على بيانات قاعدة المنصة الحالية، ${groupText}، ومؤشر قوة داخلي ${scoreText}/100.`,
+    body: `هذا التقرير تم إنشاؤه تلقائيًا لضمان تغطية جميع المنتخبات داخل مركز تقارير المنتخبات. ${rankText} القراءة الحالية افتتاحية وليست بديلًا عن المصادر الرسمية أو تقارير المباريات، لكنها تمنح الصفحة أساسًا قابلًا للتطوير بإضافة نقاط القوة والضعف والوسوم التكتيكية يدويًا أو من مصادر إحصائية لاحقًا.`,
+    sourceName: 'MC PRIME Auto Intelligence Baseline',
+    sourceCategory: 'editorial',
+    confidence: 'D',
+    provider: 'MC_PRIME_AUTO',
+    tacticalTags: ['تقرير افتتاحي', 'متابعة مطلوبة', 'تحديث تدريجي'],
+    strengths: ['وجود المنتخب داخل قاعدة البيانات', 'إمكانية تحديث التقرير من لوحة الإدارة', 'قابلية الربط لاحقًا بمصادر رسمية وإحصائية'],
+    weaknesses: ['التحليل الحالي عام', 'يحتاج قائمة رسمية ومؤشرات مباريات حديثة', 'الثقة D حتى إضافة مصادر خارجية موثقة'],
+    metrics: {
+      model: 'auto-baseline-v1',
+      dataDepth: 'generic-team-coverage',
+      teamCode: team.code,
+      teamGroup: team.group || null,
+      teamContinent: team.continent || null,
+      teamScore: team.score || null,
+      momentum: team.momentum || null,
+      worldCupLegacy: team.worldCupLegacy || null,
+    },
+  };
+}
+
+async function createReportForTeam(prisma: PrismaClient, team: SeedTeam, report: Omit<TeamIntelligenceSeedReport, 'teamCodes'>) {
+  const existing = await prisma.teamIntelligenceReport.findFirst({
+    where: {
+      teamId: team.id,
+      title: report.title,
+      provider: report.provider,
+    },
+  });
+
+  if (existing) return false;
+
+  const metrics: Prisma.NullableJsonNullValueInput | Prisma.InputJsonValue = report.metrics ?? Prisma.JsonNull;
+
+  await prisma.teamIntelligenceReport.create({
+    data: {
+      teamId: team.id,
+      title: report.title,
+      summary: report.summary,
+      body: report.body,
+      reportType: 'TEAM_PROFILE',
+      language: 'ar',
+      sourceName: report.sourceName,
+      sourceUrl: report.sourceUrl,
+      sourceCategory: report.sourceCategory,
+      confidence: report.confidence,
+      provider: report.provider,
+      metrics,
+      tacticalTags: report.tacticalTags,
+      strengths: report.strengths,
+      weaknesses: report.weaknesses,
+      lastCheckedAt: new Date(),
+      publishedAt: new Date(),
+    },
+  });
+
+  return true;
+}
+
 export async function seedTeamIntelligenceReports(prisma: PrismaClient) {
   let created = 0;
   let skipped = 0;
   const missingTeams: string[] = [];
 
+  const teams = await prisma.asset.findMany({
+    where: { type: 'TEAM' },
+    select: {
+      id: true,
+      name: true,
+      code: true,
+      group: true,
+      continent: true,
+      fifaRank: true,
+      score: true,
+      momentum: true,
+      worldCupLegacy: true,
+    },
+    orderBy: { name: 'asc' },
+  });
+
   for (const report of teamIntelligenceSeedReports) {
-    const team = await prisma.asset.findFirst({
-      where: {
-        type: 'TEAM',
-        OR: report.teamCodes.map((code) => ({ code: { equals: code, mode: 'insensitive' as const } })),
-      },
-    });
+    const team = teams.find((candidate) => report.teamCodes.some((code) => candidate.code.toLowerCase() === code.toLowerCase()));
 
     if (!team) {
       skipped++;
@@ -150,50 +240,33 @@ export async function seedTeamIntelligenceReports(prisma: PrismaClient) {
       continue;
     }
 
-    const existing = await prisma.teamIntelligenceReport.findFirst({
-      where: {
-        teamId: team.id,
-        title: report.title,
-        provider: report.provider,
-      },
+    const wasCreated = await createReportForTeam(prisma, team, report);
+    if (wasCreated) created++;
+    else skipped++;
+  }
+
+  for (const team of teams) {
+    const hasAnyReport = await prisma.teamIntelligenceReport.findFirst({
+      where: { teamId: team.id },
+      select: { id: true },
     });
 
-    if (existing) {
+    if (hasAnyReport) {
       skipped++;
       continue;
     }
 
-    const metrics: Prisma.NullableJsonNullValueInput | Prisma.InputJsonValue = report.metrics ?? Prisma.JsonNull;
-
-    await prisma.teamIntelligenceReport.create({
-      data: {
-        teamId: team.id,
-        title: report.title,
-        summary: report.summary,
-        body: report.body,
-        reportType: 'TEAM_PROFILE',
-        language: 'ar',
-        sourceName: report.sourceName,
-        sourceUrl: report.sourceUrl,
-        sourceCategory: report.sourceCategory,
-        confidence: report.confidence,
-        provider: report.provider,
-        metrics,
-        tacticalTags: report.tacticalTags,
-        strengths: report.strengths,
-        weaknesses: report.weaknesses,
-        lastCheckedAt: new Date(),
-        publishedAt: new Date(),
-      },
-    });
-
-    created++;
+    const genericReport = buildGenericReport(team);
+    const wasCreated = await createReportForTeam(prisma, team, genericReport);
+    if (wasCreated) created++;
+    else skipped++;
   }
 
   return {
     created,
     skipped,
     missingTeams,
-    totalReports: teamIntelligenceSeedReports.length,
+    totalTeams: teams.length,
+    curatedReports: teamIntelligenceSeedReports.length,
   };
 }
