@@ -9,8 +9,8 @@
     "lint": "echo \"Lint advisory only; type-check and build remain required\"",
     "lint:ai": "eslint features/analysis app/ai-analyst app/api/ai-analyst app/market/page.tsx app/api/ai-analyst/alerts/route.ts --max-warnings=0",
     "lint:asset-page": "eslint 'app/asset/[id]/page.tsx' --max-warnings=0",
-    "lint:market-lite": "eslint app/market/page.tsx features/analysis/components/AIMarketHighlights.tsx features/analysis/components/MarketAnalysisBadge.tsx features/analysis/components/FootballTechnicalAnalysis.tsx features/analysis/components/SmartTradeAlerts.tsx --max-warnings=0",
-    "lint:market-client": "echo \"MarketClient lint advisory only\"",
+    "lint:market-lite": "eslint app/market/page.tsx components/market/MarketClientClean.tsx components/market/market-client-types.ts features/analysis/components/AIMarketHighlights.tsx features/analysis/components/MarketAnalysisBadge.tsx features/analysis/components/FootballTechnicalAnalysis.tsx features/analysis/components/SmartTradeAlerts.tsx --max-warnings=0",
+    "lint:market-client": "eslint components/market/MarketClientClean.tsx components/market/market-client-types.ts --max-warnings=0",
     "type-check": "tsc --noEmit",
     "sync-api": "tsx prisma/seedApi.ts",
     "sync-api:optional": "tsx prisma/seedApi.ts || echo \"Skipping API sync; continuing build\""
