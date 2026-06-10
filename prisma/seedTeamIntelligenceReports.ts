@@ -5,7 +5,9 @@ const prisma = new PrismaClient();
 
 async function main() {
   const result = await seedTeamIntelligenceReports(prisma);
-  console.log(`Team intelligence reports seed completed. Created: ${result.created}. Skipped: ${result.skipped}. Total: ${result.totalReports}.`);
+  console.log(
+    `Team intelligence reports seed completed. Created: ${result.created}. Skipped: ${result.skipped}. Total teams: ${result.totalTeams}. Curated templates: ${result.curatedReports}.`,
+  );
   if (result.missingTeams.length > 0) {
     console.warn(`Missing teams for codes: ${result.missingTeams.join(', ')}`);
   }
