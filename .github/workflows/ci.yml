@@ -40,7 +40,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
 
       - name: Install dependencies
@@ -69,6 +69,9 @@ jobs:
 
       - name: Lint portfolio AI
         run: npm run lint:portfolio-ai
+
+      - name: Lint team intelligence
+        run: npm run lint:team-intelligence
 
       - name: Type-check
         run: npm run type-check
