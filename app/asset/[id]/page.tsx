@@ -1,4 +1,5 @@
 import { Metadata, ResolvingMetadata } from 'next';
+import type { Prisma } from '@prisma/client';
 import AssetClient from '@/components/AssetClient';
 import { PlayerAnalysisPanel } from '@/components/PlayerAnalysisPanel';
 import TeamPitchLineup from '@/components/TeamPitchLineup';
@@ -21,6 +22,49 @@ type OfficialLineup = {
   matchLabel?: string | null;
   starters?: number[];
   substitutes?: number[];
+};
+
+type AssetPageAsset = Prisma.AssetGetPayload<{
+  include: {
+    team: true;
+    performances: true;
+    players: {
+      include: {
+        performances: true;
+      };
+    };
+    marketNews: true;
+    homeMatches: {
+      include: {
+        homeTeam: true;
+        awayTeam: true;
+      };
+    };
+    awayMatches: {
+      include: {
+        homeTeam: true;
+        awayTeam: true;
+      };
+    };
+  };
+}>;
+
+type AssetPageMatch = AssetPageAsset['homeMatches'][number] | AssetPageAsset['awayMatches'][number];
+type AssetPagePlayer = AssetPageAsset['players'][number];
+
+type ApiFootballLineupPlayer = {
+  player?: {
+    id?: number | string | null;
+  } | null;
+};
+
+type ApiFootballLineupItem = {
+  team?: {
+    id?: number | string | null;
+  } | null;
+  formation?: string | null;
+  startXI?: ApiFootballLineupPlayer[];
+  substitutes?: ApiFootballLineupPlayer[];
 };
 
 export async function generateMetadata(
@@ -50,13 +94,13 @@ export async function generateMetadata(
   };
 }
 
-function normalizeProviderPlayerId(value: any) {
+function normalizeProviderPlayerId(value: unknown) {
   const n = Number(value);
   return Number.isFinite(n) ? n : null;
 }
 
-async function getOfficialLineupForTeam(team: any, matches: any[]): Promise<OfficialLineup | null> {
-  if (!team?.apiFootballId || !Array.isArray(matches) || matches.length === 0) return null;
+async function getOfficialLineupForTeam(team: AssetPageAsset, matches: AssetPageMatch[]): Promise<OfficialLineup | null> {
+  if (!team.apiFootballId || !Array.isArray(matches) || matches.length === 0) return null;
 
   const candidates = [...matches]
     .filter((match) => match.externalId)
@@ -70,17 +114,17 @@ async function getOfficialLineupForTeam(team: any, matches: any[]): Promise<Offi
 
   for (const match of candidates) {
     try {
-      const payload = await apiFootballFetch<{ response?: any[] }>('/lineups', { fixture: Number(match.externalId) });
+      const payload = await apiFootballFetch<{ response?: ApiFootballLineupItem[] }>('/lineups', { fixture: Number(match.externalId) });
       const lineups = payload.response || [];
-      const teamLineup = lineups.find((item: any) => Number(item?.team?.id) === Number(team.apiFootballId));
+      const teamLineup = lineups.find((item) => Number(item.team?.id) === Number(team.apiFootballId));
       if (!teamLineup) continue;
 
       const starters = (teamLineup.startXI || [])
-        .map((item: any) => normalizeProviderPlayerId(item?.player?.id))
-        .filter(Boolean) as number[];
+        .map((item) => normalizeProviderPlayerId(item.player?.id))
+        .filter((playerId): playerId is number => Boolean(playerId));
       const substitutes = (teamLineup.substitutes || [])
-        .map((item: any) => normalizeProviderPlayerId(item?.player?.id))
-        .filter(Boolean) as number[];
+        .map((item) => normalizeProviderPlayerId(item.player?.id))
+        .filter((playerId): playerId is number => Boolean(playerId));
 
       if (starters.length > 0 || substitutes.length > 0) {
         const opponent = match.homeTeamId === team.id || match.homeTeam?.id === team.id ? match.awayTeam : match.homeTeam;
@@ -148,7 +192,7 @@ export default async function AssetPage({ params }: Props) {
   const normalizedAsset = asset ? {
     ...asset,
     officialLineup,
-    players: asset.players?.map((player: any) => ({
+    players: asset.players?.map((player: AssetPagePlayer) => ({
       ...player,
       lastPerformanceRating: player.lastPerformanceRating ?? player.performances?.[0]?.internalRating ?? null,
     })) || [],
