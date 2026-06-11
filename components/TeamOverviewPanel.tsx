@@ -78,6 +78,11 @@ type TeamOverviewTeam = {
   marketNews?: TeamOverviewNewsItem[] | null;
 };
 
+type ReportSection = {
+  title: string;
+  content: string;
+};
+
 function normalizeConfidence(value?: string | null): SourceConfidence {
   if (value === 'A' || value === 'B' || value === 'C' || value === 'D') return value;
   return 'D';
@@ -156,6 +161,24 @@ function getTacticalRisks(team: TeamOverviewTeam, players: TeamOverviewPlayer[])
   return risks.slice(0, 4);
 }
 
+function parseReportBody(body?: string | null): ReportSection[] {
+  if (!body) return [];
+
+  return body
+    .split(/\n\s*\n/g)
+    .map((block) => block.trim())
+    .filter(Boolean)
+    .map((block, index) => {
+      const colonIndex = block.indexOf(':');
+      const possibleTitle = colonIndex > 0 ? block.slice(0, colonIndex).trim() : '';
+      const hasReadableTitle = possibleTitle.length >= 3 && possibleTitle.length <= 60 && !/[.!؟]$/.test(possibleTitle);
+      return {
+        title: hasReadableTitle ? possibleTitle : `ملاحظة تحليلية ${index + 1}`,
+        content: hasReadableTitle ? block.slice(colonIndex + 1).trim() : block,
+      };
+    });
+}
+
 function MetricCard({ label, value, hint, icon, accent = 'text-primary', source }: { label: string; value: string | number; hint?: string; icon: ReactNode; accent?: string; source?: string; }) {
   return (
     <div className="rounded-2xl border border-white/5 bg-black/30 p-4">
@@ -209,6 +232,22 @@ function SourceRegistry() {
   );
 }
 
+function ReportBodySections({ body }: { body?: string | null }) {
+  const sections = parseReportBody(body);
+  if (!sections.length) return null;
+
+  return (
+    <div className="mt-4 grid gap-3">
+      {sections.map((section, index) => (
+        <section key={`${section.title}-${index}`} className="rounded-2xl border border-white/5 bg-black/25 p-4">
+          <h5 className="mb-2 text-xs font-black text-primary">{section.title}</h5>
+          <p className="whitespace-pre-line text-xs leading-6 text-gray-300">{section.content}</p>
+        </section>
+      ))}
+    </div>
+  );
+}
+
 function IntelligenceReportCard({ report }: { report: TeamOverviewReport }) {
   const confidence = normalizeConfidence(report.confidence);
   const tacticalTags = report.tacticalTags || [];
@@ -224,7 +263,7 @@ function IntelligenceReportCard({ report }: { report: TeamOverviewReport }) {
       </div>
       <h4 className="text-lg font-black text-white">{report.title}</h4>
       <p className="mt-2 text-sm leading-7 text-gray-300">{report.summary}</p>
-      {report.body && <p className="mt-3 text-xs leading-6 text-gray-400">{report.body}</p>}
+      <ReportBodySections body={report.body} />
       {!!(tacticalTags.length || strengths.length || weaknesses.length) && (
         <div className="mt-4 grid gap-3 md:grid-cols-3">
           {!!tacticalTags.length && <div><div className="mb-2 text-xs font-black text-primary">وسوم تكتيكية</div><div className="flex flex-wrap gap-2">{tacticalTags.map((tag) => <span key={tag} className="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-[11px] text-gray-300">{tag}</span>)}</div></div>}
