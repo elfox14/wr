@@ -4,12 +4,11 @@ import prisma from '@/lib/prisma';
 import { authOptions } from '@/lib/auth';
 import { apiFootballFetch } from '@/lib/apiFootball';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 type AdminSession = {
-  user?: {
-    id?: string;
-    email?: string | null;
-    role?: string | null;
-  };
+  user?: { id?: string; email?: string | null; role?: string | null };
 } | null;
 
 function isAdminSession(session: AdminSession) {
@@ -55,7 +54,10 @@ function todayRange() {
 
 function liveWindowRange() {
   const now = new Date();
-  return { from: new Date(now.getTime() - 30 * 60 * 1000), to: new Date(now.getTime() + 150 * 60 * 1000) };
+  return {
+    from: new Date(now.getTime() - 8 * 60 * 60 * 1000),
+    to: new Date(now.getTime() + 4 * 60 * 60 * 1000),
+  };
 }
 
 async function runProviderProbe() {
@@ -81,7 +83,7 @@ async function runProviderProbe() {
 
 export async function GET(req: Request) {
   const auth = await requireAdmin(req);
-  if (!auth.ok) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!auth.ok) return NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers: { 'Cache-Control': 'no-store' } });
 
   const { searchParams } = new URL(req.url);
   const probeProvider = searchParams.get('probe') === 'true';
@@ -92,7 +94,7 @@ export async function GET(req: Request) {
   const [totalMatches, todayMatches, liveWindowMatches, inPlayMatches, matchesWithExternalId, matchesWithAnimationId, assets, teamAssets, priceHistoryRecent, marketNewsRecent, recentMatches, recentPriceEvents] = await Promise.all([
     prisma.match.count(),
     prisma.match.count({ where: { matchDate: { gte: start, lt: end } } }),
-    prisma.match.count({ where: { OR: [{ status: 'IN_PLAY' }, { status: { in: ['SCHEDULED', 'LIVE'] }, matchDate: { gte: from, lte: to } }] } }),
+    prisma.match.count({ where: { OR: [{ status: 'IN_PLAY' }, { status: { in: ['SCHEDULED', 'LIVE', 'IN_PLAY'] }, matchDate: { gte: from, lte: to } }, { status: { in: ['SCHEDULED', 'LIVE', 'IN_PLAY'] }, matchDate: { gte: start, lt: end } }] } }),
     prisma.match.count({ where: { status: 'IN_PLAY' } }),
     prisma.match.count({ where: { externalId: { not: null } } }),
     prisma.match.count({ where: { animationMatchId: { not: null } } }),
@@ -121,7 +123,7 @@ export async function GET(req: Request) {
   if (totalMatches === 0) blockers.push('No matches in database');
   if (teamAssets === 0) blockers.push('No TEAM assets in database');
   if (matchesWithAnimationId === 0) blockers.push('No matches have animationMatchId yet');
-  if (liveWindowMatches === 0) blockers.push('No local match is currently live or near kickoff; cron will skip provider fetch by design');
+  if (liveWindowMatches === 0) blockers.push('No local match today or within the extended live recovery window; cron will skip provider fetch by design');
 
   return NextResponse.json({
     ok: true,
@@ -141,9 +143,7 @@ export async function GET(req: Request) {
     recentPriceEvents,
     blockers,
     nextActions: blockers.length ? ['Fix blockers above, then call /api/cron/live-market-sync with the cron/admin secret.', 'Run this endpoint again with ?probe=true to verify provider response.'] : ['System prerequisites look ready. Trigger /api/cron/live-market-sync and verify priceHistoryLast24h / marketNewsLast24h increase after live events.'],
-  });
+  }, { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate' } });
 }
 
-export async function POST(req: Request) {
-  return GET(req);
-}
+export async function POST(req: Request) { return GET(req); }
