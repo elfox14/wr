@@ -6,12 +6,9 @@ import { useStore } from '@/lib/store';
 import { AssetImage } from '@/components/ui/AssetImage';
 import {
   ArrowLeft,
-  Brain,
   Calendar,
   Globe,
   ShieldCheck,
-  TrendingUp,
-  Trophy,
   Users,
   Wallet,
 } from 'lucide-react';
@@ -110,32 +107,28 @@ export default function HomeClient({
       text: 'صفحات مختصرة لكل منتخب: بطاقة، مجموعة، نجوم، نقاط قوة وضعف.',
       href: '/market?type=TEAM',
       action: 'استكشف المنتخبات',
-      icon: Trophy,
-      tone: 'border-emerald-400/20 bg-emerald-400/[0.06] text-emerald-300',
+      tone: 'border-emerald-400/20 bg-emerald-400/[0.045] text-emerald-300',
     },
     {
       title: 'اللاعبون',
       text: 'تقييمات وأسعار افتراضية ومقارنة سريعة بين أبرز الأسماء.',
       href: '/market?type=PLAYER',
       action: 'تقييمات اللاعبين',
-      icon: Users,
-      tone: 'border-[#0FF0FC]/20 bg-[#0FF0FC]/[0.06] text-[#0FF0FC]',
+      tone: 'border-[#0FF0FC]/20 bg-[#0FF0FC]/[0.045] text-[#0FF0FC]',
     },
     {
       title: 'التحليل الكروي',
       text: 'أداء، أسلوب لعب، زخم، مؤشرات فنية وملخصات قابلة للتحويل لإنفوجرافيك.',
       href: '/team-intelligence',
       action: 'افتح التحليل',
-      icon: Brain,
-      tone: 'border-violet-400/20 bg-violet-400/[0.06] text-violet-300',
+      tone: 'border-violet-400/20 bg-violet-400/[0.045] text-violet-300',
     },
     {
       title: 'البورصة الافتراضية',
       text: 'سوق تعليمي افتراضي بالكامل مبني على الأداء والطلب داخل المنصة.',
       href: '/market',
       action: 'راقب السوق',
-      icon: TrendingUp,
-      tone: 'border-[#FFD700]/20 bg-[#FFD700]/[0.06] text-[#FFD700]',
+      tone: 'border-[#FFD700]/20 bg-[#FFD700]/[0.045] text-[#FFD700]',
     },
   ];
 
@@ -208,23 +201,16 @@ export default function HomeClient({
         </div>
       </section>
 
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {gatewayCards.map((card) => {
-          const Icon = card.icon;
-          return (
-            <Link key={card.title} href={card.href} className={`group rounded-[1.7rem] border p-5 shadow-card transition hover:-translate-y-1 hover:border-white/25 ${card.tone}`}>
-              <div className="mb-5 flex items-center justify-between">
-                <Icon size={26} />
-                <span className="rounded-full bg-white/10 px-3 py-1 text-[10px] font-black text-white/80">دخول سريع</span>
-              </div>
-              <h2 className="text-2xl font-black text-white">{card.title}</h2>
-              <p className="mt-3 min-h-[72px] text-sm leading-7 text-gray-300">{card.text}</p>
-              <p className="mt-5 inline-flex items-center gap-2 text-sm font-black text-white group-hover:text-[#0FF0FC]">
-                {card.action} <ArrowLeft size={15} />
-              </p>
-            </Link>
-          );
-        })}
+      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {gatewayCards.map((card) => (
+          <Link key={card.title} href={card.href} className={`group rounded-2xl border px-4 py-3 shadow-card transition hover:-translate-y-0.5 hover:border-white/25 ${card.tone}`}>
+            <h2 className="text-lg font-black text-white">{card.title}</h2>
+            <p className="mt-2 min-h-[48px] text-xs leading-6 text-gray-300">{card.text}</p>
+            <p className="mt-3 inline-flex items-center gap-1.5 text-xs font-black text-white group-hover:text-[#0FF0FC]">
+              {card.action} <ArrowLeft size={13} />
+            </p>
+          </Link>
+        ))}
       </section>
 
       <section className="grid gap-6 lg:grid-cols-[1.35fr_0.65fr]">
