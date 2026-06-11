@@ -107,15 +107,22 @@ function normalizeProviderPlayerId(value: unknown) {
 async function getOfficialLineupForTeam(team: AssetPageAsset, matches: AssetPageMatch[]): Promise<OfficialLineup | null> {
   if (!team.apiFootballId || !Array.isArray(matches) || matches.length === 0) return null;
 
-  const candidates = [...matches]
-    .filter((match) => match.externalId)
+  const now = Date.now();
+  const finishedCandidates = [...matches]
+    .filter((match) => match.externalId && (match.status === 'FINISHED' || new Date(match.matchDate).getTime() <= now))
+    .sort((a, b) => new Date(b.matchDate).getTime() - new Date(a.matchDate).getTime())
+    .slice(0, 6);
+
+  const fallbackCandidates = [...matches]
+    .filter((match) => match.externalId && !finishedCandidates.some((candidate) => candidate.id === match.id))
     .sort((a, b) => {
-      const now = Date.now();
       const da = Math.abs(new Date(a.matchDate).getTime() - now);
       const db = Math.abs(new Date(b.matchDate).getTime() - now);
       return da - db;
     })
     .slice(0, 4);
+
+  const candidates = [...finishedCandidates, ...fallbackCandidates];
 
   for (const match of candidates) {
     try {
@@ -181,13 +188,13 @@ export default async function AssetPage({ params }: Props) {
         take: 8,
       },
       homeMatches: {
-        orderBy: { matchDate: 'asc' },
-        take: 8,
+        orderBy: { matchDate: 'desc' },
+        take: 12,
         include: { homeTeam: true, awayTeam: true },
       },
       awayMatches: {
-        orderBy: { matchDate: 'asc' },
-        take: 8,
+        orderBy: { matchDate: 'desc' },
+        take: 12,
         include: { homeTeam: true, awayTeam: true },
       },
     },
