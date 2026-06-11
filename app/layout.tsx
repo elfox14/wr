@@ -10,6 +10,7 @@ import { GlobalTicker } from "@/components/ui/GlobalTicker";
 import { Navbar } from "@/components/ui/Navbar";
 import { Footer } from "@/components/ui/Footer";
 import { MobileBottomNav } from "@/components/ui/MobileBottomNav";
+import { LiveMatchBanner } from "@/components/ui/LiveMatchBanner";
 
 const cairo = Cairo({
   variable: "--font-cairo",
@@ -33,21 +34,12 @@ export const metadata: Metadata = {
     description: "تحليل كروي أولًا وسوق رياضي افتراضي ثانيًا: اقرأ التقارير، افهم التسعير، ثم راقب المنتخبات واللاعبين بأرصدة افتراضية فقط.",
     url: baseUrl,
     siteName: "MC PRIME Exchange",
-    images: [
-      {
-        url: "/og-image.jpg",
-        width: 1200,
-        height: 630,
-        alt: "MC PRIME Exchange Football Intelligence Exchange",
-      },
-    ],
+    images: [{ url: "/og-image.jpg", width: 1200, height: 630, alt: "MC PRIME Exchange Football Intelligence Exchange" }],
     locale: "ar_EG",
     alternateLocale: ["ar_SA", "ar_AE", "ar_MA", "ar_QA"],
     type: "website",
   },
-  alternates: {
-    canonical: '/',
-  },
+  alternates: { canonical: '/' },
   twitter: {
     card: "summary_large_image",
     title: "MC PRIME Exchange | Football Intelligence Exchange",
@@ -57,34 +49,15 @@ export const metadata: Metadata = {
   robots: {
     index: true,
     follow: true,
-    googleBot: {
-      index: true,
-      follow: true,
-      'max-video-preview': -1,
-      'max-image-preview': 'large',
-      'max-snippet': -1,
-    },
+    googleBot: { index: true, follow: true, 'max-video-preview': -1, 'max-image-preview': 'large', 'max-snippet': -1 },
   },
 };
 
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html
-      lang="ar"
-      dir="rtl"
-      className={`${cairo.variable} h-full antialiased tabular-nums`}
-    >
+    <html lang="ar" dir="rtl" className={`${cairo.variable} h-full antialiased tabular-nums`}>
       <head>
-        <Script
-          async
-          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9147440531390790"
-          crossOrigin="anonymous"
-          strategy="afterInteractive"
-        />
+        <Script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9147440531390790" crossOrigin="anonymous" strategy="afterInteractive" />
       </head>
       <body className="min-h-full flex flex-col">
         <Providers>
@@ -92,6 +65,7 @@ export default function RootLayout({
             <Suspense fallback={<div className="h-16 lg:h-20" />}>
               <Navbar />
             </Suspense>
+            <LiveMatchBanner />
             <div className="pb-28 lg:pb-10 min-h-[calc(100vh-100px)]">
               {children}
             </div>
