@@ -13,7 +13,7 @@ type AdminSession = {
   };
 } | null;
 
-const GROUP_A_CODES = ['MEX', 'ZAF', 'KOR', 'CZE'];
+const GROUP_A_CODES = ['MEX', 'RSA', 'KOR', 'CZE'];
 
 function hasValidSecret(request: Request) {
   const secret = process.env.ADMIN_CRON_SECRET;
