@@ -1,9 +1,20 @@
 import HomeClient from '@/components/HomeClient';
 import { getAssets } from '@/lib/store-server';
+import { getAllArticles } from '@/lib/articles';
 import prisma from '@/lib/prisma';
 
 export default async function Home() {
   const assets = await getAssets();
+  const academyArticles = getAllArticles().slice(0, 4).map((article) => ({
+    id: article.id,
+    title: article.title,
+    excerpt: article.excerpt,
+    category: article.category,
+    readingTime: article.readingTime,
+    level: article.level,
+    imageUrl: article.imageUrl,
+    date: article.date,
+  }));
   
   // 1. Fetch real data for stats
   const usersCount = await prisma.user.count();
@@ -126,6 +137,7 @@ export default async function Home() {
         topDemandAssets={topDemandAssets}
         topMomentumAssets={topMomentumAssets}
         undervaluedAssets={undervaluedAssets}
+        academyArticles={academyArticles}
       />
     </>
   );
