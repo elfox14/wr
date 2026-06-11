@@ -14,6 +14,7 @@ import {
   LogOut, 
   User as UserIcon, 
   Users,
+  Radio,
   Menu, 
   X, 
   ChevronDown,
@@ -61,6 +62,7 @@ export function Navbar() {
     { name: 'اللاعبون', href: '/market?type=PLAYER', icon: <Users size={16} />, activeType: 'PLAYER' },
     { name: 'السوق', href: '/market', icon: <TrendingUp size={16} /> },
     { name: 'المباريات', href: '/matches', icon: <CalendarDays size={16} /> },
+    { name: 'بث أنيميشن', href: '/animation-live', icon: <Radio size={16} /> },
     { name: 'المحفظة', href: '/portfolio', icon: <Briefcase size={16} /> },
     { name: 'المنهجية', href: '/methodology', icon: <BookOpen size={16} /> },
   ];
@@ -169,6 +171,9 @@ export function Navbar() {
                         </Link>
                         <Link href="/market?type=PLAYER" className="flex items-center gap-3 px-3 py-2.5 text-sm text-gray-300 hover:text-white hover:bg-white/5 rounded-xl transition-colors">
                           <Users size={16} /> اللاعبون
+                        </Link>
+                        <Link href="/animation-live" className="flex items-center gap-3 px-3 py-2.5 text-sm text-[#FFD700] hover:bg-[#FFD700]/10 rounded-xl transition-colors font-bold">
+                          <Radio size={16} /> بث أنيميشن
                         </Link>
                         <Link href="/methodology" className="flex items-center gap-3 px-3 py-2.5 text-sm text-gray-300 hover:text-white hover:bg-white/5 rounded-xl transition-colors">
                           <BookOpen size={16} /> منهجية التسعير
