@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { normalizeSearchText, textMatchesTeamAlias } from '@/lib/teamNameAliases';
+import { createSourceAutomationLog } from '@/lib/sourceAutomationLog';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,8 +30,8 @@ type IntakePayload = {
 };
 
 function hasValidSecret(request: Request) {
-  const secret = process.env.ADMIN_CRON_SECRET || process.env.SOURCE_INBOX_SECRET;
-  if (!secret) return false;
+  const allowedSecrets = [process.env.ADMIN_CRON_SECRET, process.env.SOURCE_INBOX_SECRET, process.env.CRON_SECRET].filter(Boolean);
+  if (!allowedSecrets.length) return false;
 
   const authHeader = request.headers.get('authorization') || '';
   const bearerToken = authHeader.startsWith('Bearer ') ? authHeader.slice('Bearer '.length).trim() : '';
@@ -37,7 +39,7 @@ function hasValidSecret(request: Request) {
   const queryToken = url.searchParams.get('secret') || '';
   const headerToken = request.headers.get('x-source-inbox-secret') || '';
 
-  return bearerToken === secret || queryToken === secret || headerToken === secret;
+  return allowedSecrets.some((secret) => bearerToken === secret || queryToken === secret || headerToken === secret);
 }
 
 function compactText(value: string, maxLength = 700) {
@@ -73,6 +75,13 @@ function getSafeEditorialSummary(payload: IntakePayload, sourceName: string) {
     : `وصل تحديث من ${sourceName} بعنوان: ${subject}.${url}`;
 }
 
+function buildFingerprint(payload: IntakePayload, teamId: string, provider: string) {
+  const sourceUrl = normalizeSearchText(payload.sourceUrl || '');
+  const subject = normalizeSearchText(payload.subject || '');
+  const from = normalizeSearchText(payload.from || '');
+  return [provider, teamId, sourceUrl || subject, from].join('|').slice(0, 900);
+}
+
 async function findMatchingTeam(payload: IntakePayload) {
   const teams = await prisma.asset.findMany({
     where: { type: 'TEAM' },
@@ -80,16 +89,15 @@ async function findMatchingTeam(payload: IntakePayload) {
   });
 
   const explicitCode = String(payload.teamCode || '').trim().toLowerCase();
-  const explicitName = String(payload.teamName || '').trim().toLowerCase();
-  const combined = `${payload.subject || ''} ${payload.body || ''} ${payload.sourceUrl || ''}`.toLowerCase();
+  const explicitName = normalizeSearchText(payload.teamName || '');
+  const combined = `${payload.subject || ''} ${payload.body || ''} ${payload.sourceUrl || ''} ${payload.teamName || ''}`;
 
   return teams.find((team) => {
     const code = String(team.code || '').toLowerCase();
-    const name = team.name.toLowerCase();
+    const name = normalizeSearchText(team.name);
     if (explicitCode && code === explicitCode) return true;
     if (explicitName && name === explicitName) return true;
-    if (code && combined.includes(code)) return true;
-    return combined.includes(name);
+    return textMatchesTeamAlias(combined, team);
   }) || null;
 }
 
@@ -103,6 +111,14 @@ export async function POST(request: Request) {
   const team = await findMatchingTeam(payload);
 
   if (!team) {
+    await createSourceAutomationLog({
+      job: 'source-inbox-intake',
+      status: 'skipped',
+      imported: 0,
+      skipped: 1,
+      details: { reason: 'No matching team found', subject: payload.subject || null, source },
+    });
+
     return NextResponse.json({
       success: false,
       status: 'skipped',
@@ -114,7 +130,34 @@ export async function POST(request: Request) {
   const summary = getSafeEditorialSummary(payload, source.sourceName);
   const title = `${source.sourceName} inbox update — ${team.name}`;
   const sourceUrl = String(payload.sourceUrl || '').trim() || null;
+  const fingerprint = buildFingerprint(payload, team.id, source.provider);
 
+  const duplicate = await prisma.teamIntelligenceReport.findFirst({
+    where: {
+      teamId: team.id,
+      provider: source.provider,
+      tacticalTags: { has: `source-fingerprint:${fingerprint}` },
+    },
+    select: { id: true, title: true, team: { select: { name: true, code: true } } },
+  });
+
+  if (duplicate) {
+    await createSourceAutomationLog({
+      job: 'source-inbox-intake',
+      status: 'skipped',
+      imported: 0,
+      skipped: 1,
+      details: { reason: 'Duplicate source payload', duplicateId: duplicate.id, team: duplicate.team, sourceUrl, subject: payload.subject || null },
+    });
+
+    return NextResponse.json({
+      success: true,
+      status: 'duplicate_skipped',
+      report: duplicate,
+    });
+  }
+
+  const needsReview = source.sourceCategory === 'editorial' || source.provider === 'SOURCE_INBOX';
   const sections = {
     'بطاقة المنتخب': `${team.name}${team.code ? ` — ${team.code}` : ''}.`,
     'ملخص تنفيذي موثق': summary,
@@ -133,20 +176,34 @@ export async function POST(request: Request) {
       title,
       summary,
       body: buildBody(sections),
-      confidence: source.sourceName === 'The Athletic' ? 'C' : 'B',
-      reportType: 'TEAM_PROFILE',
+      confidence: needsReview ? 'C' : 'B',
+      reportType: needsReview ? 'TEAM_PROFILE_REVIEW' : 'TEAM_PROFILE',
       sourceName: source.sourceName,
       sourceUrl,
       sourceCategory: source.sourceCategory,
       provider: source.provider,
-      tacticalTags: ['source inbox', source.sourceName],
+      tacticalTags: ['source inbox', source.sourceName, needsReview ? 'NEEDS_REVIEW' : 'AUTO_IMPORTED', `source-fingerprint:${fingerprint}`],
       strengths: [],
-      weaknesses: ['automatic inbox intake requires source review before adding detailed tactical claims'],
+      weaknesses: needsReview ? ['NEEDS_REVIEW: automatic inbox intake requires source review before adding detailed tactical claims'] : [],
+      metrics: {
+        reviewStatus: needsReview ? 'NEEDS_REVIEW' : 'AUTO_IMPORTED',
+        sourceFingerprint: fingerprint,
+        from: payload.from || null,
+        subject: payload.subject || null,
+      },
       lastCheckedAt: new Date(),
     },
     include: {
       team: { select: { id: true, name: true, code: true } },
     },
+  });
+
+  await createSourceAutomationLog({
+    job: 'source-inbox-intake',
+    status: 'success',
+    imported: 1,
+    skipped: 0,
+    details: { reportId: report.id, team: report.team, provider: source.provider, needsReview },
   });
 
   return NextResponse.json({
