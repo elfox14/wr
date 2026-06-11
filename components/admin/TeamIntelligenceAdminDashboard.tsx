@@ -242,6 +242,14 @@ export default function TeamIntelligenceAdminDashboard({ teams, initialTeamId = 
             </div>
           </div>
           <div className="rounded-2xl border border-yellow-300/10 bg-yellow-300/[0.055] p-4 text-sm leading-7 text-yellow-100">صفحة محمية للأدمن. يمكنك تشغيل seed بجلسة الأدمن الحالية، أو بإدخال <code className="rounded bg-black/25 px-1 text-yellow-200">ADMIN_CRON_SECRET</code> عند التشغيل من خارج لوحة الإدارة.</div>
+          <div className="mt-4 rounded-2xl border border-primary/10 bg-primary/[0.04] p-4">
+            <div className="mb-3 text-sm font-black text-white">مصادر التحليل والقوالب</div>
+            <div className="grid gap-3 md:grid-cols-3">
+              <a href="/api/admin/sports-reference-status" target="_blank" rel="noreferrer" className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-xs font-black text-white hover:border-primary/40 hover:text-primary">حالة Sports Reference <ExternalLink size={13} /></a>
+              <a href="/api/admin/sports-reference-templates" target="_blank" rel="noreferrer" className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-xs font-black text-white hover:border-primary/40 hover:text-primary">قوالب Sports Reference <ExternalLink size={13} /></a>
+              <a href="/api/admin/athletic-editorial-templates" target="_blank" rel="noreferrer" className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-xs font-black text-white hover:border-primary/40 hover:text-primary">قوالب The Athletic <ExternalLink size={13} /></a>
+            </div>
+          </div>
         </section>
 
         <div className="grid gap-6 lg:grid-cols-2">
