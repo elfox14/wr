@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { CalendarDays, Database, ExternalLink, FileText, Newspaper, ShieldAlert, Sparkles } from 'lucide-react';
+import { Activity, CalendarDays, Database, ExternalLink, FileText, Goal, ListChecks, Newspaper, Shield, ShieldAlert, Sparkles, Target, Users, Zap } from 'lucide-react';
 import { AssetImage } from '@/components/ui/AssetImage';
 
 type TeamOverviewPlayer = {
@@ -75,8 +75,23 @@ type ReportSection = {
   content: string;
 };
 
+type CardTone = 'summary' | 'identity' | 'attack' | 'defense' | 'midfield' | 'setPieces' | 'players' | 'missing' | 'sources';
+
 const AUTO_BASELINE_PROVIDERS = new Set(['MC_PRIME_AUTO']);
 const AUTO_BASELINE_SOURCE_NAMES = new Set(['MC PRIME Auto Intelligence Baseline']);
+const UNAVAILABLE = 'غير متوفر في المصادر';
+
+const cardToneClass: Record<CardTone, string> = {
+  summary: 'border-cyan-300/20 bg-[radial-gradient(circle_at_top_right,rgba(15,240,252,0.18),transparent_34%),linear-gradient(135deg,rgba(15,240,252,0.08),rgba(255,255,255,0.025))]',
+  identity: 'border-violet-300/20 bg-[radial-gradient(circle_at_top_right,rgba(168,85,247,0.20),transparent_36%),linear-gradient(135deg,rgba(168,85,247,0.08),rgba(255,255,255,0.025))]',
+  attack: 'border-red-300/20 bg-[radial-gradient(circle_at_top_right,rgba(248,113,113,0.20),transparent_36%),linear-gradient(135deg,rgba(248,113,113,0.08),rgba(255,255,255,0.025))]',
+  defense: 'border-emerald-300/20 bg-[radial-gradient(circle_at_top_right,rgba(52,211,153,0.20),transparent_36%),linear-gradient(135deg,rgba(52,211,153,0.08),rgba(255,255,255,0.025))]',
+  midfield: 'border-amber-300/20 bg-[radial-gradient(circle_at_top_right,rgba(251,191,36,0.20),transparent_36%),linear-gradient(135deg,rgba(251,191,36,0.08),rgba(255,255,255,0.025))]',
+  setPieces: 'border-blue-300/20 bg-[radial-gradient(circle_at_top_right,rgba(96,165,250,0.20),transparent_36%),linear-gradient(135deg,rgba(96,165,250,0.08),rgba(255,255,255,0.025))]',
+  players: 'border-fuchsia-300/20 bg-[radial-gradient(circle_at_top_right,rgba(232,121,249,0.20),transparent_36%),linear-gradient(135deg,rgba(232,121,249,0.08),rgba(255,255,255,0.025))]',
+  missing: 'border-yellow-300/20 bg-[radial-gradient(circle_at_top_right,rgba(250,204,21,0.20),transparent_36%),linear-gradient(135deg,rgba(250,204,21,0.08),rgba(255,255,255,0.025))]',
+  sources: 'border-slate-300/15 bg-[radial-gradient(circle_at_top_right,rgba(148,163,184,0.18),transparent_36%),linear-gradient(135deg,rgba(148,163,184,0.08),rgba(255,255,255,0.025))]',
+};
 
 function formatDate(value?: Date | string | null) {
   if (!value) return '—';
@@ -108,8 +123,22 @@ function parseReportBody(body?: string | null): ReportSection[] {
     });
 }
 
+function getAllSections(reports: TeamOverviewReport[]) {
+  return reports.flatMap((report) => parseReportBody(report.body).map((section) => ({ ...section, report })));
+}
+
+function findSectionText(sections: Array<ReportSection & { report: TeamOverviewReport }>, keywords: string[], fallback = UNAVAILABLE) {
+  const normalizedKeywords = keywords.map((keyword) => keyword.toLowerCase());
+  const match = sections.find((section) => {
+    const haystack = `${section.title} ${section.content}`.toLowerCase();
+    return normalizedKeywords.some((keyword) => haystack.includes(keyword));
+  });
+
+  return match?.content || fallback;
+}
+
 function HighlightedReportText({ text }: { text: string }) {
-  const marker = 'غير متوفر في المصادر';
+  const marker = UNAVAILABLE;
   const parts = text.split(marker);
 
   if (parts.length === 1) return <>{text}</>;
@@ -127,6 +156,24 @@ function HighlightedReportText({ text }: { text: string }) {
         </span>
       ))}
     </>
+  );
+}
+
+function ThemedAnalysisCard({ tone, icon, eyebrow, title, children }: { tone: CardTone; icon: React.ReactNode; eyebrow: string; title: string; children: React.ReactNode }) {
+  return (
+    <article className={`relative overflow-hidden rounded-3xl border p-5 shadow-[0_18px_45px_rgba(0,0,0,0.18)] ${cardToneClass[tone]}`}>
+      <div className="pointer-events-none absolute -left-10 -top-10 h-28 w-28 rounded-full bg-white/5 blur-2xl" />
+      <div className="relative z-10">
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <div className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-black/25 px-3 py-2 text-[11px] font-black text-white/80">
+            {icon}
+            {eyebrow}
+          </div>
+        </div>
+        <h4 className="mb-3 text-lg font-black text-white">{title}</h4>
+        <div className="text-sm leading-7 text-gray-200">{children}</div>
+      </div>
+    </article>
   );
 }
 
@@ -201,6 +248,60 @@ function MatchCard({ match, teamId }: { match: TeamOverviewMatch; teamId: string
   );
 }
 
+function ThemedAnalysisGrid({ team, reports }: { team: TeamOverviewTeam; reports: TeamOverviewReport[] }) {
+  const sections = getAllSections(reports);
+  const latestReport = reports[0];
+  const summary = latestReport?.summary || UNAVAILABLE;
+  const identity = findSectionText(sections, ['بطاقة المنتخب', 'طريقة التأهل', 'المدرب'], `المنتخب: ${team.name}. المجموعة: ${team.group || UNAVAILABLE}. القارة: ${team.continent || UNAVAILABLE}.`);
+  const attack = findSectionText(sections, ['قراءة هجومية', 'القوة الهجومية', 'الأهداف', 'xg']);
+  const defense = findSectionText(sections, ['قراءة دفاعية', 'القوة الدفاعية', 'الأهداف المستقبلة', 'xga']);
+  const midfield = findSectionText(sections, ['وسط الملعب', 'التحكم', 'الاستحواذ', 'دقة التمرير']);
+  const setPieces = findSectionText(sections, ['الكرات الثابتة', 'ركلات ركنية', 'set pieces']);
+  const players = findSectionText(sections, ['أسماء بارزة', 'القائمة', 'النجم الأبرز']);
+  const missing = findSectionText(sections, ['معلومات غير متوفرة', 'غير متوفرة في المصادر', 'غير متوفر في المصادر']);
+
+  return (
+    <div className="mb-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+      <ThemedAnalysisCard tone="summary" icon={<Sparkles size={15} />} eyebrow="ملخص" title="ملخص تنفيذي موثق">
+        <HighlightedReportText text={summary} />
+      </ThemedAnalysisCard>
+      <ThemedAnalysisCard tone="identity" icon={<FileText size={15} />} eyebrow="بطاقة" title="بطاقة المنتخب">
+        <HighlightedReportText text={identity} />
+      </ThemedAnalysisCard>
+      <ThemedAnalysisCard tone="attack" icon={<Goal size={15} />} eyebrow="هجوم" title="القوة الهجومية">
+        <HighlightedReportText text={attack} />
+      </ThemedAnalysisCard>
+      <ThemedAnalysisCard tone="defense" icon={<Shield size={15} />} eyebrow="دفاع" title="القوة الدفاعية">
+        <HighlightedReportText text={defense} />
+      </ThemedAnalysisCard>
+      <ThemedAnalysisCard tone="midfield" icon={<Zap size={15} />} eyebrow="وسط" title="وسط الملعب والتحكم">
+        <HighlightedReportText text={midfield} />
+      </ThemedAnalysisCard>
+      <ThemedAnalysisCard tone="setPieces" icon={<Target size={15} />} eyebrow="كرات ثابتة" title="الكرات الثابتة">
+        <HighlightedReportText text={setPieces} />
+      </ThemedAnalysisCard>
+      <ThemedAnalysisCard tone="players" icon={<Users size={15} />} eyebrow="قائمة" title="أسماء بارزة في القائمة">
+        <HighlightedReportText text={players} />
+      </ThemedAnalysisCard>
+      <ThemedAnalysisCard tone="missing" icon={<ListChecks size={15} />} eyebrow="شفافية" title="معلومات غير متوفرة">
+        <HighlightedReportText text={missing} />
+      </ThemedAnalysisCard>
+      <ThemedAnalysisCard tone="sources" icon={<Database size={15} />} eyebrow="مصادر" title="سجل المصادر">
+        {reports.length ? (
+          <ul className="space-y-2 text-xs leading-6">
+            {reports.slice(0, 4).map((report) => (
+              <li key={report.id} className="flex items-start gap-2">
+                <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
+                <span>{report.sourceName} — {getConfidenceLabel(report.confidence)}</span>
+              </li>
+            ))}
+          </ul>
+        ) : UNAVAILABLE}
+      </ThemedAnalysisCard>
+    </div>
+  );
+}
+
 export default function TeamOverviewPanel({ team }: { team: TeamOverviewTeam }) {
   if (!team || team.type !== 'TEAM') return null;
 
@@ -240,6 +341,8 @@ export default function TeamOverviewPanel({ team }: { team: TeamOverviewTeam }) 
             <Link href="/matches" className="rounded-2xl border border-primary/30 bg-primary/10 px-4 py-3 text-sm font-black text-primary hover:bg-primary hover:text-black">المباريات</Link>
           </div>
         </div>
+
+        <ThemedAnalysisGrid team={team} reports={reports} />
 
         <div className="mb-5 rounded-3xl border border-primary/10 bg-black/25 p-5">
           <h3 className="mb-2 flex items-center gap-2 text-xl font-black text-white"><Newspaper size={20} className="text-primary" /> التقارير الفنية من المصادر</h3>
