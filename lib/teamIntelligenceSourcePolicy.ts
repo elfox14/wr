@@ -88,6 +88,13 @@ export const teamIntelligenceSourcePolicy: TeamIntelligenceSourcePolicy[] = [
     notes: 'Use public pages as manually cited reference. Do not copy full tables into reports.',
   },
   {
+    name: 'Sports Reference / Stathead / FBref subscription',
+    tier: 'stats',
+    preferredUse: ['team standard stats', 'player advanced stats', 'competition history', 'comparisons', 'form context', 'passing', 'shooting', 'defensive actions'],
+    defaultRights: 'manual-citation',
+    notes: 'The project has access to a Sports Reference subscription. Use it as a subscribed/manual stats source for sourced metrics and short cited summaries. Do not bulk republish tables or automate protected exports unless the subscription terms explicitly allow that use.',
+  },
+  {
     name: 'The Athletic',
     tier: 'editorial',
     preferredUse: ['tactical context', 'injury context', 'coach quotes', 'squad narrative', 'expert analysis'],
@@ -109,7 +116,7 @@ export const teamIntelligenceSourceRules = {
   limitedStatsTitle: 'If individual stats are insufficient, use the section title: أسماء بارزة في القائمة.',
   ratingsPolicy: 'Any /10 rating must be isolated in a separate section titled: تقييم مبدئي مبني على البيانات المتاحة. Do not create a rating when the source data is insufficient.',
   separationPolicy: 'Separate football analysis from trading, valuation, or buy/sell commentary.',
-  rightsPolicy: 'Until licences are active, use these sources as citation and verification layers only, not as bulk data feeds.',
+  rightsPolicy: 'Use subscribed or licensed sources as manual/cited verification layers unless bulk republication or automated export is explicitly permitted by the source terms.',
 } as const;
 
 export function getSourcePolicyByName(name: string) {
