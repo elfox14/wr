@@ -40,10 +40,8 @@ function getHeaderOrQuerySecret(req: Request) {
 async function requireAdmin(req: Request) {
   const secretAuth = getHeaderOrQuerySecret(req);
   if (secretAuth.valid) return { ok: true, authMethod: secretAuth.method };
-
   const session = await getServerSession(authOptions as any) as AdminSession;
   if (session?.user && isAdminSession(session)) return { ok: true, authMethod: 'admin_session' };
-
   return { ok: false, authMethod: null };
 }
 
@@ -57,19 +55,12 @@ function todayRange() {
 
 function liveWindowRange() {
   const now = new Date();
-  return {
-    from: new Date(now.getTime() - 30 * 60 * 1000),
-    to: new Date(now.getTime() + 150 * 60 * 1000),
-  };
+  return { from: new Date(now.getTime() - 30 * 60 * 1000), to: new Date(now.getTime() + 150 * 60 * 1000) };
 }
 
 async function runProviderProbe() {
   try {
-    const payload = await apiFootballFetch<{ response?: any[]; _provider?: string }>('/livescores', {
-      live: 'all',
-      date: new Date().toISOString().slice(0, 10),
-    });
-
+    const payload = await apiFootballFetch<{ response?: any[]; _provider?: string }>('/livescores', { live: 'all', date: new Date().toISOString().slice(0, 10) });
     const fixtures = payload.response || [];
     return {
       ok: true,
@@ -84,12 +75,7 @@ async function runProviderProbe() {
       })),
     };
   } catch (error: any) {
-    return {
-      ok: false,
-      providerUsed: error.provider || null,
-      message: error.message || 'Provider probe failed',
-      details: error.payload || null,
-    };
+    return { ok: false, providerUsed: error.provider || null, message: error.message || 'Provider probe failed', details: error.payload || null };
   }
 }
 
@@ -101,38 +87,19 @@ export async function GET(req: Request) {
   const probeProvider = searchParams.get('probe') === 'true';
   const { start, end } = todayRange();
   const { from, to } = liveWindowRange();
+  const last24h = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
-  const [
-    totalMatches,
-    todayMatches,
-    liveWindowMatches,
-    inPlayMatches,
-    matchesWithExternalId,
-    matchesWithAnimationId,
-    assets,
-    teamAssets,
-    priceHistoryRecent,
-    marketNewsRecent,
-    recentMatches,
-    recentPriceEvents,
-  ] = await Promise.all([
+  const [totalMatches, todayMatches, liveWindowMatches, inPlayMatches, matchesWithExternalId, matchesWithAnimationId, assets, teamAssets, priceHistoryRecent, marketNewsRecent, recentMatches, recentPriceEvents] = await Promise.all([
     prisma.match.count(),
     prisma.match.count({ where: { matchDate: { gte: start, lt: end } } }),
-    prisma.match.count({
-      where: {
-        OR: [
-          { status: 'IN_PLAY' },
-          { status: { in: ['SCHEDULED', 'LIVE'] }, matchDate: { gte: from, lte: to } },
-        ],
-      },
-    }),
+    prisma.match.count({ where: { OR: [{ status: 'IN_PLAY' }, { status: { in: ['SCHEDULED', 'LIVE'] }, matchDate: { gte: from, lte: to } }] } }),
     prisma.match.count({ where: { status: 'IN_PLAY' } }),
     prisma.match.count({ where: { externalId: { not: null } } }),
     prisma.match.count({ where: { animationMatchId: { not: null } } }),
     prisma.asset.count(),
     prisma.asset.count({ where: { type: 'TEAM' } }),
-    prisma.priceHistory.count({ where: { timestamp: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) } } }),
-    prisma.marketNews.count({ where: { createdAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) } } }),
+    prisma.priceHistory.count({ where: { timestamp: { gte: last24h } } }),
+    prisma.marketNews.count({ where: { publishedAt: { gte: last24h } } }),
     prisma.match.findMany({
       orderBy: { matchDate: 'asc' },
       take: 12,
@@ -140,15 +107,14 @@ export async function GET(req: Request) {
       include: { homeTeam: { select: { id: true, name: true } }, awayTeam: { select: { id: true, name: true } } },
     }),
     prisma.marketNews.findMany({
-      orderBy: { createdAt: 'desc' },
+      orderBy: { publishedAt: 'desc' },
       take: 8,
-      select: { id: true, eventType: true, titleAr: true, priceBefore: true, priceAfter: true, changePercent: true, createdAt: true, localeGroupKey: true },
+      select: { id: true, eventType: true, titleAr: true, priceBefore: true, priceAfter: true, changePercent: true, publishedAt: true, localeGroupKey: true },
     }),
   ]);
 
   const providerProbe = probeProvider ? await runProviderProbe() : null;
-
-  const blockers = [];
+  const blockers: string[] = [];
   if (!process.env.ISPORTS_API_KEY && !process.env.ISPORTS_API_KEYS) blockers.push('ISPORTS_API_KEY/ISPORTS_API_KEYS is missing');
   if (!process.env.API_FOOTBALL_KEY && !process.env.API_FOOTBALL_KEYS) blockers.push('API_FOOTBALL_KEY/API_FOOTBALL_KEYS fallback is missing');
   if (!process.env.CRON_SECRET && !process.env.ADMIN_API_SECRET) blockers.push('CRON_SECRET or ADMIN_API_SECRET is missing');
@@ -169,34 +135,12 @@ export async function GET(req: Request) {
       adminApiSecret: Boolean(process.env.ADMIN_API_SECRET),
       isportsAnimationAccessKey: Boolean(process.env.ISPORTS_ANIMATION_ACCESS_KEY || process.env.NEXT_PUBLIC_ISPORTS_ANIMATION_ACCESS_KEY),
     },
-    database: {
-      assets,
-      teamAssets,
-      totalMatches,
-      todayMatches,
-      liveWindowMatches,
-      inPlayMatches,
-      matchesWithExternalId,
-      matchesWithAnimationId,
-      priceHistoryLast24h: priceHistoryRecent,
-      marketNewsLast24h: marketNewsRecent,
-    },
+    database: { assets, teamAssets, totalMatches, todayMatches, liveWindowMatches, inPlayMatches, matchesWithExternalId, matchesWithAnimationId, priceHistoryLast24h: priceHistoryRecent, marketNewsLast24h: marketNewsRecent },
     providerProbe,
-    recentMatches: recentMatches.map((match) => ({
-      id: match.id,
-      externalId: match.externalId,
-      animationMatchId: match.animationMatchId,
-      status: match.status,
-      matchDate: match.matchDate,
-      score: `${match.homeScore}-${match.awayScore}`,
-      homeTeam: match.homeTeam?.name,
-      awayTeam: match.awayTeam?.name,
-    })),
+    recentMatches: recentMatches.map((match) => ({ id: match.id, externalId: match.externalId, animationMatchId: match.animationMatchId, status: match.status, matchDate: match.matchDate, score: `${match.homeScore}-${match.awayScore}`, homeTeam: match.homeTeam?.name, awayTeam: match.awayTeam?.name })),
     recentPriceEvents,
     blockers,
-    nextActions: blockers.length
-      ? ['Fix blockers above, then call /api/cron/live-market-sync with the cron/admin secret.', 'Run this endpoint again with ?probe=true to verify provider response.']
-      : ['System prerequisites look ready. Trigger /api/cron/live-market-sync and verify priceHistoryLast24h / marketNewsLast24h increase after live events.'],
+    nextActions: blockers.length ? ['Fix blockers above, then call /api/cron/live-market-sync with the cron/admin secret.', 'Run this endpoint again with ?probe=true to verify provider response.'] : ['System prerequisites look ready. Trigger /api/cron/live-market-sync and verify priceHistoryLast24h / marketNewsLast24h increase after live events.'],
   });
 }
 
