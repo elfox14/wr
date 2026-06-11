@@ -21,8 +21,11 @@ type SeedResponse = {
   message?: string;
 };
 
-type GroupAStatusResponse = {
+type GroupKey = 'A' | 'B';
+
+type GroupStatusResponse = {
   ok?: boolean;
+  group?: GroupKey;
   ready?: boolean;
   error?: string;
   missingTeamCodes?: string[];
@@ -33,7 +36,8 @@ type GroupAStatusResponse = {
     group?: string | null;
     reportCount: number;
     curatedReportCount: number;
-    hasGroupAReport: boolean;
+    hasCuratedReport: boolean;
+    hasGroupAReport?: boolean;
     latestReport?: {
       title?: string | null;
       provider?: string | null;
@@ -77,6 +81,10 @@ function buildInitialManualForm(teamId = ''): ManualForm {
   };
 }
 
+function getGroupName(group: GroupKey) {
+  return group === 'A' ? 'المجموعة الأولى' : 'المجموعة الثانية';
+}
+
 function getResponseMessage(data: SeedResponse) {
   if (data.error) return data.error;
   if (data.message) return data.message;
@@ -95,18 +103,19 @@ function getResponseMessage(data: SeedResponse) {
   return 'تم استلام رد غير متوقع من الخادم.';
 }
 
-function getStatusMessage(data: GroupAStatusResponse) {
+function getStatusMessage(data: GroupStatusResponse, fallbackGroup: GroupKey) {
   if (data.error) return data.error;
-  if (data.ready) return 'تقارير المجموعة الأولى جاهزة للعرض لكل المنتخبات الأربعة.';
+  const groupName = getGroupName(data.group || fallbackGroup);
+  if (data.ready) return `تقارير ${groupName} جاهزة للعرض لكل المنتخبات الأربعة.`;
   const missing = data.missingTeamCodes?.length ? ` منتخبات غير موجودة: ${data.missingTeamCodes.join(', ')}.` : '';
-  return `الفحص اكتمل، لكن بعض التقارير غير جاهزة بعد.${missing}`;
+  return `الفحص اكتمل، لكن بعض تقارير ${groupName} غير جاهزة بعد.${missing}`;
 }
 
 export default function TeamIntelligenceAdminDashboard({ teams, initialTeamId = '' }: { teams: TeamOption[]; initialTeamId?: string }) {
   const [secret, setSecret] = useState('');
   const [loading, setLoading] = useState(false);
-  const [reseedLoading, setReseedLoading] = useState(false);
-  const [statusLoading, setStatusLoading] = useState(false);
+  const [reseedLoadingGroup, setReseedLoadingGroup] = useState<GroupKey | null>(null);
+  const [statusLoadingGroup, setStatusLoadingGroup] = useState<GroupKey | null>(null);
   const [manualLoading, setManualLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
@@ -115,21 +124,28 @@ export default function TeamIntelligenceAdminDashboard({ teams, initialTeamId = 
   const [manualMessage, setManualMessage] = useState('');
   const [manualError, setManualError] = useState('');
   const [lastResult, setLastResult] = useState<SeedResponse | null>(null);
-  const [groupAStatus, setGroupAStatus] = useState<GroupAStatusResponse | null>(null);
+  const [groupStatus, setGroupStatus] = useState<GroupStatusResponse | null>(null);
   const [manualForm, setManualForm] = useState<ManualForm>(() => buildInitialManualForm(initialTeamId));
 
-  const isBusy = loading || reseedLoading || statusLoading;
+  const isBusy = loading || Boolean(reseedLoadingGroup) || Boolean(statusLoadingGroup);
 
   const getOptionalAuthHeaders = () => {
     const trimmedSecret = secret.trim();
     return trimmedSecret ? { Authorization: `Bearer ${trimmedSecret}` } : undefined;
   };
 
-  const runSeed = async () => {
-    setLoading(true);
+  const resetRunMessages = () => {
     setMessage('');
     setError('');
+    setStatusMessage('');
+    setStatusError('');
     setLastResult(null);
+    setGroupStatus(null);
+  };
+
+  const runSeed = async () => {
+    setLoading(true);
+    resetRunMessages();
 
     try {
       const res = await fetch('/api/admin/seed-team-intelligence', {
@@ -153,20 +169,16 @@ export default function TeamIntelligenceAdminDashboard({ teams, initialTeamId = 
     }
   };
 
-  const reseedGroupA = async () => {
-    const confirmed = window.confirm('سيتم حذف تقارير المجموعة الأولى المزروعة فقط ثم إعادة زراعتها. هل تريد المتابعة؟');
+  const reseedGroup = async (group: GroupKey) => {
+    const groupName = getGroupName(group);
+    const confirmed = window.confirm(`سيتم حذف تقارير ${groupName} المزروعة فقط ثم إعادة زراعتها. هل تريد المتابعة؟`);
     if (!confirmed) return;
 
-    setReseedLoading(true);
-    setMessage('');
-    setError('');
-    setStatusMessage('');
-    setStatusError('');
-    setLastResult(null);
-    setGroupAStatus(null);
+    setReseedLoadingGroup(group);
+    resetRunMessages();
 
     try {
-      const res = await fetch('/api/admin/reseed-group-a-intelligence', {
+      const res = await fetch(`/api/admin/reseed-group-${group.toLowerCase()}-intelligence`, {
         method: 'POST',
         headers: getOptionalAuthHeaders(),
       });
@@ -178,41 +190,41 @@ export default function TeamIntelligenceAdminDashboard({ teams, initialTeamId = 
         return;
       }
 
-      setMessage(`تمت إعادة زراعة المجموعة الأولى بنجاح. ${getResponseMessage(data)}`);
+      setMessage(`تمت إعادة زراعة ${groupName} بنجاح. ${getResponseMessage(data)}`);
     } catch (caughtError) {
-      const fallbackMessage = caughtError instanceof Error ? caughtError.message : 'فشل إعادة زراعة تقارير المجموعة الأولى.';
+      const fallbackMessage = caughtError instanceof Error ? caughtError.message : `فشل إعادة زراعة تقارير ${groupName}.`;
       setError(fallbackMessage);
     } finally {
-      setReseedLoading(false);
+      setReseedLoadingGroup(null);
     }
   };
 
-  const checkGroupAStatus = async () => {
-    setStatusLoading(true);
+  const checkGroupStatus = async (group: GroupKey) => {
+    setStatusLoadingGroup(group);
     setStatusMessage('');
     setStatusError('');
-    setGroupAStatus(null);
+    setGroupStatus(null);
 
     try {
-      const res = await fetch('/api/admin/team-intelligence-status', {
+      const res = await fetch(`/api/admin/team-intelligence-status?group=${group}`, {
         method: 'GET',
         headers: getOptionalAuthHeaders(),
       });
-      const data = await res.json() as GroupAStatusResponse;
-      setGroupAStatus(data);
+      const data = await res.json() as GroupStatusResponse;
+      setGroupStatus(data);
 
       if (!res.ok) {
-        setStatusError(getStatusMessage(data));
+        setStatusError(getStatusMessage(data, group));
         return;
       }
 
-      if (data.ready) setStatusMessage(getStatusMessage(data));
-      else setStatusError(getStatusMessage(data));
+      if (data.ready) setStatusMessage(getStatusMessage(data, group));
+      else setStatusError(getStatusMessage(data, group));
     } catch (caughtError) {
-      const fallbackMessage = caughtError instanceof Error ? caughtError.message : 'فشل فحص حالة تقارير المجموعة الأولى.';
+      const fallbackMessage = caughtError instanceof Error ? caughtError.message : `فشل فحص حالة تقارير ${getGroupName(group)}.`;
       setStatusError(fallbackMessage);
     } finally {
-      setStatusLoading(false);
+      setStatusLoadingGroup(null);
     }
   };
 
@@ -250,6 +262,30 @@ export default function TeamIntelligenceAdminDashboard({ teams, initialTeamId = 
     }
   };
 
+  const renderGroupControls = (group: GroupKey) => {
+    const groupName = getGroupName(group);
+    return (
+      <div className="grid gap-3 rounded-2xl border border-white/10 bg-white/[0.03] p-3 sm:grid-cols-2">
+        <button
+          type="button"
+          onClick={() => reseedGroup(group)}
+          disabled={isBusy}
+          className="inline-flex items-center justify-center gap-2 rounded-2xl border border-yellow-300/20 bg-yellow-300/10 px-5 py-3 font-black text-yellow-100 hover:border-yellow-300/40 hover:bg-yellow-300/15 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {reseedLoadingGroup === group ? 'جاري إعادة الزراعة...' : `إعادة زراعة ${groupName}`} <RefreshCw size={17} className={reseedLoadingGroup === group ? 'animate-spin' : ''} />
+        </button>
+        <button
+          type="button"
+          onClick={() => checkGroupStatus(group)}
+          disabled={isBusy}
+          className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-5 py-3 font-black text-white hover:border-primary/40 hover:text-primary disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {statusLoadingGroup === group ? 'جاري الفحص...' : `فحص حالة ${groupName}`} <Database size={17} className={statusLoadingGroup === group ? 'animate-pulse' : ''} />
+        </button>
+      </div>
+    );
+  };
+
   return (
     <div className="min-h-screen bg-background pb-24 text-foreground selection:bg-primary/30">
       <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
@@ -261,7 +297,7 @@ export default function TeamIntelligenceAdminDashboard({ teams, initialTeamId = 
               </div>
               <h1 className="text-2xl font-black text-white md:text-3xl">إدارة تقارير المنتخبات</h1>
               <p className="mt-2 max-w-3xl text-sm leading-7 text-gray-400">
-                شغّل seed تقارير TeamIntelligenceReport يدويًا، أو أضف تقريرًا تحليليًا يدويًا من لوحة الإدارة.
+                شغّل seed تقارير TeamIntelligenceReport يدويًا، أو أعد زراعة تقارير المجموعات، أو أضف تقريرًا تحليليًا يدويًا من لوحة الإدارة.
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -296,32 +332,16 @@ export default function TeamIntelligenceAdminDashboard({ teams, initialTeamId = 
                   className="w-full rounded-2xl border border-white/10 bg-background px-4 py-3 text-white outline-none focus:border-primary"
                 />
               </label>
-              <div className="grid gap-3 xl:grid-cols-3">
-                <button
-                  type="button"
-                  onClick={runSeed}
-                  disabled={isBusy}
-                  className="inline-flex items-center justify-center gap-2 rounded-2xl bg-primary px-5 py-3 font-black text-black hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {loading ? 'جاري التشغيل...' : 'تشغيل seed'} <RefreshCw size={17} className={loading ? 'animate-spin' : ''} />
-                </button>
-                <button
-                  type="button"
-                  onClick={reseedGroupA}
-                  disabled={isBusy}
-                  className="inline-flex items-center justify-center gap-2 rounded-2xl border border-yellow-300/20 bg-yellow-300/10 px-5 py-3 font-black text-yellow-100 hover:border-yellow-300/40 hover:bg-yellow-300/15 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {reseedLoading ? 'جاري إعادة الزراعة...' : 'إعادة زراعة المجموعة الأولى'} <RefreshCw size={17} className={reseedLoading ? 'animate-spin' : ''} />
-                </button>
-                <button
-                  type="button"
-                  onClick={checkGroupAStatus}
-                  disabled={isBusy}
-                  className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-5 py-3 font-black text-white hover:border-primary/40 hover:text-primary disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {statusLoading ? 'جاري الفحص...' : 'فحص حالة المجموعة الأولى'} <Database size={17} className={statusLoading ? 'animate-pulse' : ''} />
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={runSeed}
+                disabled={isBusy}
+                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-primary px-5 py-3 font-black text-black hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {loading ? 'جاري التشغيل...' : 'تشغيل seed'} <RefreshCw size={17} className={loading ? 'animate-spin' : ''} />
+              </button>
+              {renderGroupControls('A')}
+              {renderGroupControls('B')}
             </div>
 
             {message && (
@@ -348,27 +368,30 @@ export default function TeamIntelligenceAdminDashboard({ teams, initialTeamId = 
               </div>
             )}
 
-            {groupAStatus?.teams?.length ? (
+            {groupStatus?.teams?.length ? (
               <div className="mt-5 grid gap-3">
-                {groupAStatus.teams.map((team) => (
-                  <div key={team.id} className={`rounded-2xl border p-4 ${team.hasGroupAReport ? 'border-success/20 bg-success/10' : 'border-danger/20 bg-danger/10'}`}>
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <div>
-                        <div className="text-sm font-black text-white">{team.name} — {team.code}</div>
-                        <div className="mt-1 text-xs text-gray-400">كل التقارير: {team.reportCount} · تقارير المجموعة الأولى: {team.curatedReportCount}</div>
+                {groupStatus.teams.map((team) => {
+                  const isReady = team.hasCuratedReport || team.hasGroupAReport;
+                  return (
+                    <div key={team.id} className={`rounded-2xl border p-4 ${isReady ? 'border-success/20 bg-success/10' : 'border-danger/20 bg-danger/10'}`}>
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                          <div className="text-sm font-black text-white">{team.name} — {team.code}</div>
+                          <div className="mt-1 text-xs text-gray-400">كل التقارير: {team.reportCount} · تقارير المجموعة {groupStatus.group || team.group || '—'}: {team.curatedReportCount}</div>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Link href={`/asset/${team.id}`} className="inline-flex items-center gap-1 rounded-xl border border-white/10 bg-black/20 px-3 py-1 text-xs font-black text-white hover:border-primary/40 hover:text-primary">
+                            فتح صفحة المنتخب <ExternalLink size={12} />
+                          </Link>
+                          <span className={`rounded-xl px-3 py-1 text-xs font-black ${isReady ? 'bg-success/15 text-success' : 'bg-danger/15 text-danger'}`}>
+                            {isReady ? 'جاهز' : 'غير جاهز'}
+                          </span>
+                        </div>
                       </div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <Link href={`/asset/${team.id}`} className="inline-flex items-center gap-1 rounded-xl border border-white/10 bg-black/20 px-3 py-1 text-xs font-black text-white hover:border-primary/40 hover:text-primary">
-                          فتح صفحة المنتخب <ExternalLink size={12} />
-                        </Link>
-                        <span className={`rounded-xl px-3 py-1 text-xs font-black ${team.hasGroupAReport ? 'bg-success/15 text-success' : 'bg-danger/15 text-danger'}`}>
-                          {team.hasGroupAReport ? 'جاهز' : 'غير جاهز'}
-                        </span>
-                      </div>
+                      {team.latestReport?.title && <div className="mt-3 text-xs leading-6 text-gray-300">آخر تقرير: {team.latestReport.title}</div>}
                     </div>
-                    {team.latestReport?.title && <div className="mt-3 text-xs leading-6 text-gray-300">آخر تقرير: {team.latestReport.title}</div>}
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             ) : null}
 
