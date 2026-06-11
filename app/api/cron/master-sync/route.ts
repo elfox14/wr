@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import prisma from '@/lib/prisma';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -12,6 +13,16 @@ type StepResult = {
   reason?: string;
   durationMs?: number;
   payload?: unknown;
+};
+
+type SyncWindow = {
+  now: string;
+  liveOrInPlayMatches: number;
+  nearUpcomingMatches: number;
+  recentlyFinishedMatches: number;
+  activeOrNear: boolean;
+  nearWindowHours: number;
+  recentWindowHours: number;
 };
 
 function getAuth(req: Request) {
@@ -40,13 +51,61 @@ function getAuth(req: Request) {
   return matched ? { valid: true, method: matched.method } : { valid: false, method: null };
 }
 
-function shouldRunAnimationSync(req: Request) {
+async function getSyncWindow(req: Request): Promise<SyncWindow> {
+  const url = new URL(req.url);
+  const now = new Date();
+  const nearWindowHours = Math.min(Math.max(Number(url.searchParams.get('nearHours') || 3), 1), 12);
+  const recentWindowHours = Math.min(Math.max(Number(url.searchParams.get('recentHours') || 4), 1), 12);
+  const nearUntil = new Date(now.getTime() + nearWindowHours * 60 * 60 * 1000);
+  const recentSince = new Date(now.getTime() - recentWindowHours * 60 * 60 * 1000);
+
+  const [liveOrInPlayMatches, nearUpcomingMatches, recentlyFinishedMatches] = await Promise.all([
+    prisma.match.count({ where: { status: { in: ['IN_PLAY', 'LIVE'] } } }),
+    prisma.match.count({ where: { status: 'SCHEDULED', matchDate: { gte: now, lte: nearUntil } } }),
+    prisma.match.count({ where: { status: 'FINISHED', matchDate: { gte: recentSince, lte: now } } }),
+  ]);
+
+  return {
+    now: now.toISOString(),
+    liveOrInPlayMatches,
+    nearUpcomingMatches,
+    recentlyFinishedMatches,
+    activeOrNear: liveOrInPlayMatches > 0 || nearUpcomingMatches > 0 || recentlyFinishedMatches > 0,
+    nearWindowHours,
+    recentWindowHours,
+  };
+}
+
+function minuteModulo(interval: number) {
+  return new Date().getUTCMinutes() % interval === 0;
+}
+
+function shouldRunAnimationSync(req: Request, window: SyncWindow) {
   const url = new URL(req.url);
   if (url.searchParams.get('animation') === 'false') return false;
   if (url.searchParams.get('forceAnimation') === 'true') return true;
+  if (!window.activeOrNear) return false;
 
-  const minute = new Date().getUTCMinutes();
-  return minute % 5 === 0;
+  const interval = Math.min(Math.max(Number(url.searchParams.get('animationInterval') || 15), 5), 60);
+  return minuteModulo(interval);
+}
+
+function shouldRunLiveMarket(req: Request, window: SyncWindow) {
+  const url = new URL(req.url);
+  if (url.searchParams.get('liveMarket') === 'false') return false;
+  if (url.searchParams.get('forceLive') === 'true') return true;
+  return window.activeOrNear;
+}
+
+function shouldRunFootballAuto(req: Request, window: SyncWindow) {
+  const url = new URL(req.url);
+  if (url.searchParams.get('footballAuto') === 'false') return false;
+  if (url.searchParams.get('includeFootballAuto') === 'true') return true;
+  if (process.env.ENABLE_API_FOOTBALL_CRON !== 'true') return false;
+  if (!window.activeOrNear) return false;
+
+  const interval = Math.min(Math.max(Number(url.searchParams.get('footballAutoInterval') || 120), 30), 720);
+  return minuteModulo(interval);
 }
 
 async function runStep(origin: string, name: string, path: string, secret: string, query?: Record<string, string>): Promise<StepResult> {
@@ -95,6 +154,10 @@ async function runStep(origin: string, name: string, path: string, secret: strin
   }
 }
 
+function skippedStep(name: string, path: string, reason: string): StepResult {
+  return { name, path, ok: true, status: 200, skipped: true, reason };
+}
+
 export async function GET(req: Request) {
   const auth = getAuth(req);
   if (!auth.valid) {
@@ -106,43 +169,63 @@ export async function GET(req: Request) {
   const secret = process.env.CRON_SECRET || process.env.ADMIN_API_SECRET || '';
   const date = url.searchParams.get('date') || '';
   const forceAnimation = url.searchParams.get('forceAnimation') === 'true';
-  const runAnimation = shouldRunAnimationSync(req);
   const startedAt = new Date();
   const steps: StepResult[] = [];
+  const syncWindow = await getSyncWindow(req);
+  const runAnimation = shouldRunAnimationSync(req, syncWindow);
+  const runLive = shouldRunLiveMarket(req, syncWindow);
+  const runFootballAuto = shouldRunFootballAuto(req, syncWindow);
 
   if (runAnimation) {
     steps.push(await runStep(origin, 'sync-animation-matches', '/api/cron/sync-animation-matches', secret, {
       dryRun: 'false',
     }));
   } else {
-    steps.push({
-      name: 'sync-animation-matches',
-      path: '/api/cron/sync-animation-matches',
-      ok: true,
-      status: 200,
-      skipped: true,
-      reason: 'Runs every 5 minutes by default. Use forceAnimation=true to run now.',
-    });
+    steps.push(skippedStep(
+      'sync-animation-matches',
+      '/api/cron/sync-animation-matches',
+      syncWindow.activeOrNear ? 'Budget mode: runs every 15 minutes by default. Use forceAnimation=true to run now.' : 'No live, near, or recently finished local matches.'
+    ));
   }
 
-  steps.push(await runStep(origin, 'football-auto-sync', '/api/cron/football-auto-sync', secret, {
-    ...(date ? { date } : {}),
-  }));
+  if (runFootballAuto) {
+    steps.push(await runStep(origin, 'football-auto-sync', '/api/cron/football-auto-sync', secret, {
+      ...(date ? { date } : {}),
+    }));
+  } else {
+    steps.push(skippedStep(
+      'football-auto-sync',
+      '/api/cron/football-auto-sync',
+      'API-Football budget protection: skipped by default. Use includeFootballAuto=true manually or set ENABLE_API_FOOTBALL_CRON=true with a long interval.'
+    ));
+  }
 
-  steps.push(await runStep(origin, 'live-market-sync', '/api/cron/live-market-sync', secret, {
-    ...(date ? { date } : {}),
-  }));
+  if (runLive) {
+    steps.push(await runStep(origin, 'live-market-sync', '/api/cron/live-market-sync', secret, {
+      ...(date ? { date } : {}),
+    }));
+  } else {
+    steps.push(skippedStep('live-market-sync', '/api/cron/live-market-sync', 'No live, near, or recently finished local matches.'));
+  }
 
   const ok = steps.every((step) => step.ok || step.skipped);
 
   return NextResponse.json({
     ok,
-    mode: 'master_sync',
+    mode: 'budget_aware_master_sync',
     authMethod: auth.method,
     startedAt: startedAt.toISOString(),
     finishedAt: new Date().toISOString(),
+    syncWindow,
     animationSyncRan: runAnimation,
+    footballAutoSyncRan: runFootballAuto,
+    liveMarketSyncRan: runLive,
     forceAnimation,
+    apiFootballProtection: {
+      enabled: true,
+      defaultBehavior: 'football-auto-sync is skipped unless includeFootballAuto=true or ENABLE_API_FOOTBALL_CRON=true',
+      dailyLimitTarget: 100,
+    },
     steps,
   }, {
     status: ok ? 200 : 207,
