@@ -38,8 +38,29 @@ function getCronAuth(req: Request) {
   return matched ? { valid: true, method: matched.method } : { valid: false, method: null };
 }
 
+function aliasTeamName(value: string) {
+  if (value === 'south korea' || value === 'korea republic' || value === 'republic of korea') return 'korea republic';
+  if (value === 'czech republic' || value === 'czechia') return 'czechia';
+  if (value === 'bosnia h' || value === 'bosnia herzegovina' || value === 'bosnia and herzegovina') return 'bosnia h';
+  if (value === 'united states' || value === 'united states of america' || value === 'usa') return 'usa';
+  if (value === 'turkiye') return 'turkey';
+  return value;
+}
+
 function normalizeTeamName(name?: string | null) {
-  return normalizeName(name || '').replace(/\bfootball club\b/g, '').replace(/\bfc\b/g, '').replace(/\bnational team\b/g, '').replace(/\s+/g, ' ').trim();
+  const normalized = normalizeName(name || '')
+    .replace(/\bfootball club\b/g, '')
+    .replace(/\bfc\b/g, '')
+    .replace(/\bnational team\b/g, '')
+    .replace(/\bu20\b/g, '')
+    .replace(/\bu19\b/g, '')
+    .replace(/\bu23\b/g, '')
+    .replace(/\bw\b/g, '')
+    .replace(/\(w\)/g, '')
+    .replace(/[.\-]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return aliasTeamName(normalized);
 }
 
 function toScore(value: unknown) {
@@ -131,32 +152,10 @@ async function saveProviderMatch(params: { previousMatch: any; externalId: strin
   if (params.previousMatch) {
     return prisma.match.update({
       where: { id: params.previousMatch.id },
-      data: {
-        ...(params.animationMatchId ? { animationMatchId: params.animationMatchId } : {}),
-        homeTeamId: params.homeTeamId,
-        awayTeamId: params.awayTeamId,
-        matchDate: params.matchDate,
-        status: params.status,
-        homeScore: params.homeScore,
-        awayScore: params.awayScore,
-        groupPhase: params.groupPhase || null,
-      },
+      data: { ...(params.animationMatchId ? { animationMatchId: params.animationMatchId } : {}), homeTeamId: params.homeTeamId, awayTeamId: params.awayTeamId, matchDate: params.matchDate, status: params.status, homeScore: params.homeScore, awayScore: params.awayScore, groupPhase: params.groupPhase || null },
     });
   }
-  return prisma.match.create({
-    data: {
-      externalId: params.externalId,
-      animationMatchId: params.animationMatchId,
-      homeTeamId: params.homeTeamId,
-      awayTeamId: params.awayTeamId,
-      matchDate: params.matchDate,
-      status: params.status,
-      homeScore: params.homeScore,
-      awayScore: params.awayScore,
-      groupPhase: params.groupPhase || null,
-      stage: 'group',
-    },
-  });
+  return prisma.match.create({ data: { externalId: params.externalId, animationMatchId: params.animationMatchId, homeTeamId: params.homeTeamId, awayTeamId: params.awayTeamId, matchDate: params.matchDate, status: params.status, homeScore: params.homeScore, awayScore: params.awayScore, groupPhase: params.groupPhase || null, stage: 'group' } });
 }
 
 async function processGoalEvents(params: { fixtureId: number; homeScore: number; awayScore: number; homeTeam: any; awayTeam: any }) {
@@ -190,19 +189,14 @@ async function processLiveFixture(fixture: any, providerSource?: string) {
   const previousMatch = await findExistingMatch(externalId, animationMatchId);
   const previousHomeScore = previousMatch?.homeScore ?? 0;
   const previousAwayScore = previousMatch?.awayScore ?? 0;
-
   await saveProviderMatch({ previousMatch, externalId, animationMatchId, homeTeamId: homeTeam.id, awayTeamId: awayTeam.id, matchDate, status, homeScore, awayScore, groupPhase: fixture.league?.round || fixture.league?.name || null });
-
-  const priceUpdates = (status === 'IN_PLAY' || status === 'FINISHED')
-    ? await processGoalEvents({ fixtureId, homeScore, awayScore, homeTeam, awayTeam })
-    : [];
-
+  const priceUpdates = (status === 'IN_PLAY' || status === 'FINISHED') ? await processGoalEvents({ fixtureId, homeScore, awayScore, homeTeam, awayTeam }) : [];
   return { status: 'live_fixture_processed', providerSource, fixtureId, animationMatchId: animationMatchId || null, matchStatus: status, homeTeam: homeTeam.name, awayTeam: awayTeam.name, previousScore: `${previousHomeScore}-${previousAwayScore}`, currentScore: `${homeScore}-${awayScore}`, priceUpdates };
 }
 
 export async function GET(req: Request) {
   const auth = getCronAuth(req);
-  if (!auth.valid) return NextResponse.json({ error: 'Unauthorized', hint: 'Use Authorization: Bearer <CRON_SECRET>, x-cron-secret, x-admin-secret, or cronSecret/adminSecret query only for private testing.' }, { status: 401, headers: { 'Cache-Control': 'no-store' } });
+  if (!auth.valid) return NextResponse.json({ error: 'Unauthorized', hint: 'Use Authorization bearer token, x-cron-secret, x-admin-secret, or private query secret for testing.' }, { status: 401, headers: { 'Cache-Control': 'no-store' } });
   const summary: any = { success: true, mode: 'isports_first_live_market_sync', providerPriority: ['ISPORTS', 'API_FOOTBALL'], providerUsed: null, authMethod: auth.method, externalRequestsUsed: 0, skippedProviderFetch: false, fixturesFetched: 0, processed: [], errors: [] };
   const shouldFetchLive = await hasPotentialLiveWindow();
   if (!shouldFetchLive) {
