@@ -1,6 +1,10 @@
 {
   "crons": [
     {
+      "path": "/api/cron/live-market-sync",
+      "schedule": "* * * * *"
+    },
+    {
       "path": "/api/cron/football-auto-sync",
       "schedule": "*/5 * * * *"
     },
