@@ -7,39 +7,19 @@ export const dynamic = 'force-dynamic';
 
 type AdminSession = {
   user?: {
-    email?: string | null;
     role?: string | null;
   };
 } | null;
 
-const GROUP_A_CODES = ['MEX', 'ZAF', 'KOR', 'CZE'];
+const GROUP_A_CODES = ['MEX', 'RSA', 'KOR', 'CZE'];
 
-function hasValidSecret(request: Request) {
-  const secret = process.env.ADMIN_CRON_SECRET;
-  if (!secret) return false;
-
-  const authHeader = request.headers.get('authorization') || '';
-  const bearerToken = authHeader.startsWith('Bearer ') ? authHeader.slice('Bearer '.length).trim() : '';
-  const url = new URL(request.url);
-  const queryToken = url.searchParams.get('secret') || '';
-
-  return bearerToken === secret || queryToken === secret;
-}
-
-function isAdminSession(session: AdminSession) {
-  const email = session?.user?.email || '';
-  return session?.user?.role === 'ADMIN' || email === 'worldcup@mcprim.com' || email === 'elfox14usa@gmail.com';
-}
-
-async function isAuthorized(request: Request) {
-  if (hasValidSecret(request)) return true;
-
+async function isAuthorized() {
   const session = await getServerSession(authOptions as never) as AdminSession;
-  return isAdminSession(session);
+  return session?.user?.role === 'ADMIN';
 }
 
-export async function GET(request: Request) {
-  if (!(await isAuthorized(request))) {
+export async function GET() {
+  if (!(await isAuthorized())) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
