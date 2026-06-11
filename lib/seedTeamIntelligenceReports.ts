@@ -1,5 +1,6 @@
 import { Prisma, PrismaClient } from '@prisma/client';
 import { groupAWorldCupReports } from './groupAWorldCupReports';
+import { groupBWorldCupReports } from './groupBWorldCupReports';
 
 export type TeamIntelligenceSeedReport = {
   teamCodes: string[];
@@ -134,6 +135,7 @@ const editorialSeedReports: TeamIntelligenceSeedReport[] = [
 
 export const teamIntelligenceSeedReports: TeamIntelligenceSeedReport[] = [
   ...groupAWorldCupReports,
+  ...groupBWorldCupReports,
   ...editorialSeedReports,
 ];
 
