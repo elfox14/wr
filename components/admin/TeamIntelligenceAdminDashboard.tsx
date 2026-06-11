@@ -329,6 +329,8 @@ export default function TeamIntelligenceAdminDashboard({ teams, initialTeamId = 
               <p className="mt-2 max-w-3xl text-sm leading-7 text-gray-400">شغّل seed تقارير TeamIntelligenceReport يدويًا، أو أعد زراعة تقارير المجموعات، أو أضف تقريرًا تحليليًا من مصدر موثق إلى كروت صفحة المنتخب.</p>
             </div>
             <div className="flex flex-wrap gap-2">
+              <Link href="/admin/source-automation" className="inline-flex items-center gap-2 rounded-2xl border border-primary/20 bg-primary/10 px-4 py-3 text-sm font-black text-primary hover:border-primary/50">أتمتة المصادر <Database size={15} /></Link>
+              <Link href="/admin/source-review" className="inline-flex items-center gap-2 rounded-2xl border border-yellow-300/20 bg-yellow-300/10 px-4 py-3 text-sm font-black text-yellow-100 hover:border-yellow-300/40">مراجعة المصادر <ShieldAlert size={15} /></Link>
               <Link href="/team-intelligence" className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-black text-white hover:border-primary/40 hover:text-primary">مركز التحليل <ArrowRight size={15} /></Link>
               <Link href="/intelligence" className="inline-flex items-center gap-2 rounded-2xl bg-primary px-4 py-3 text-sm font-black text-black hover:bg-primary/90">Intelligence Hub <Sparkles size={15} /></Link>
             </div>
