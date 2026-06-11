@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
+import { Prisma } from '@prisma/client';
 import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 import { createSourceAutomationLog } from '@/lib/sourceAutomationLog';
@@ -42,9 +43,9 @@ function cleanWeaknesses(weaknesses: string[]) {
   return weaknesses.filter((item) => !item.startsWith('NEEDS_REVIEW'));
 }
 
-function mergeMetrics(metrics: unknown, values: Record<string, unknown>) {
+function mergeMetrics(metrics: Prisma.JsonValue | null, values: Record<string, Prisma.JsonValue | null>): Prisma.InputJsonValue {
   if (metrics && typeof metrics === 'object' && !Array.isArray(metrics)) {
-    return { ...(metrics as Record<string, unknown>), ...values };
+    return { ...(metrics as Prisma.JsonObject), ...values };
   }
   return values;
 }
