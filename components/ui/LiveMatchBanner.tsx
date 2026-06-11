@@ -8,9 +8,7 @@ function scoreLabel(match: { homeScore: number; awayScore: number }) {
 
 export async function LiveMatchBanner() {
   const match = await prisma.match.findFirst({
-    where: {
-      status: { in: ['IN_PLAY', 'LIVE'] },
-    },
+    where: { status: { in: ['IN_PLAY', 'LIVE'] } },
     orderBy: { matchDate: 'asc' },
     select: {
       animationMatchId: true,
@@ -24,7 +22,7 @@ export async function LiveMatchBanner() {
   if (!match) return null;
 
   const href = match.animationMatchId
-    ? `/animation-live?matchId=${encodeURIComponent(String(match.animationMatchId))}&lang=en&statsPanel=simple&teamPanel=1`
+    ? `/animation-live?matchId=${encodeURIComponent(String(match.animationMatchId))}&lang=en&statsPanel=hide&teamPanel=1`
     : '/matches';
 
   return (
