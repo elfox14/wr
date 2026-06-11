@@ -15,6 +15,7 @@ type AdminSession = {
 const GROUP_CODES = {
   A: ['MEX', 'RSA', 'KOR', 'CZE'],
   B: ['CAN', 'BIH', 'QAT', 'SUI'],
+  C: ['BRA', 'MAR', 'HAI', 'SCO'],
 } as const;
 
 type SupportedGroup = keyof typeof GROUP_CODES;
@@ -46,7 +47,9 @@ async function isAuthorized(request: Request) {
 function getRequestedGroup(request: Request): SupportedGroup {
   const url = new URL(request.url);
   const group = (url.searchParams.get('group') || 'A').toUpperCase();
-  return group === 'B' ? 'B' : 'A';
+  if (group === 'C') return 'C';
+  if (group === 'B') return 'B';
+  return 'A';
 }
 
 export async function GET(request: Request) {
