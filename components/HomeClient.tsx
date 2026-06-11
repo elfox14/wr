@@ -161,21 +161,17 @@ export default function HomeClient({
             ) : (
               <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.03] p-6 text-center text-sm text-gray-400">سيظهر هنا أقرب لقاء بعد مزامنة جدول المباريات.</div>
             )}
+
+            <div className="mt-3 grid grid-cols-4 gap-2">
+              {quickStats.map((stat) => (
+                <div key={stat.label} className="rounded-2xl border border-white/10 bg-black/30 px-2 py-2 text-center">
+                  <div className="text-lg font-black leading-none text-white tabular-nums">{stat.value}</div>
+                  <div className="mt-1 text-[10px] font-bold text-gray-500">{stat.label}</div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
-      </section>
-
-      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        {quickStats.map((stat) => {
-          const Icon = stat.icon;
-          return (
-            <div key={stat.label} className="rounded-3xl border border-white/10 bg-surface p-5 shadow-card">
-              <Icon className={stat.tone} size={22} />
-              <div className="mt-4 text-3xl font-black text-white tabular-nums">{stat.value}</div>
-              <div className="mt-1 text-sm font-bold text-gray-500">{stat.label}</div>
-            </div>
-          );
-        })}
       </section>
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
