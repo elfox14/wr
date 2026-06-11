@@ -149,6 +149,11 @@ function getArrayPayload(payload: any) {
   return [];
 }
 
+function isExcludedIsportsFixtureName(name?: string | null) {
+  const value = String(name || '').toLowerCase();
+  return /\b(u19|u20|u21|u23|youth|reserves|reserve)\b/.test(value) || /\(w\)|\bwomen\b|\bfemenil\b/.test(value);
+}
+
 function normalizeIsportsFixture(item: any) {
   const fixtureId = Number(item.matchId ?? item.match_id ?? item.id ?? item.fixtureId ?? item.fixture_id);
   const homeName = item.homeName || item.home_name || item.homeTeamName || item.home_team_name || item.homeTeam?.name || item.home?.name;
@@ -199,7 +204,14 @@ function normalizeIsportsPlayerStats(item: any) {
 function normalizeIsportsPayload(path: string, payload: any, params?: ApiFootballParams) {
   const cleanPath = path.startsWith('/') ? path : `/${path}`;
   const items = getArrayPayload(payload);
-  if (cleanPath === '/fixtures' || cleanPath === '/livescores') return { ...payload, response: items.map(normalizeIsportsFixture) };
+  if (cleanPath === '/fixtures' || cleanPath === '/livescores') {
+    const filteredItems = items.filter((item: any) => {
+      const homeName = item.homeName || item.home_name || item.homeTeamName || item.home_team_name || item.homeTeam?.name || item.home?.name;
+      const awayName = item.awayName || item.away_name || item.awayTeamName || item.away_team_name || item.awayTeam?.name || item.away?.name;
+      return !isExcludedIsportsFixtureName(homeName) && !isExcludedIsportsFixtureName(awayName);
+    });
+    return { ...payload, response: filteredItems.map(normalizeIsportsFixture) };
+  }
   if (cleanPath === '/fixtures/players') return { ...payload, response: items.map(normalizeIsportsPlayerStats) };
   if (cleanPath === '/teams') return { ...payload, response: items.map(normalizeIsportsTeam) };
   if (cleanPath === '/players/squads') return normalizeIsportsSquad(cleanPath, payload, params);
