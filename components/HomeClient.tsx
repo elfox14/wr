@@ -19,7 +19,7 @@ type AcademyArticle = {
   excerpt: string;
   category: string;
   readingTime?: string;
-  level?: 'beginner' | 'intermediate' | 'advanced';
+  level?: string;
   imageUrl?: string;
   date?: string;
 };
@@ -138,113 +138,78 @@ export default function HomeClient({
           <div className="rounded-[1.6rem] border border-white/10 bg-black/40 p-5 backdrop-blur-xl">
             <div className="mb-4 flex items-center justify-between gap-3">
               <div>
-                <p className="text-xs font-bold text-gray-400">Next Impact</p>
-                <h2 className="text-xl font-black text-white">المباراة القادمة</h2>
+                <p className="text-xs font-black text-gray-500">المباراة القادمة</p>
+                <h2 className="mt-1 text-xl font-black text-white">{nextMatch ? 'مباراة قادمة' : 'جدول المباريات'}</h2>
               </div>
-              <Calendar className="text-[#0FF0FC]" size={22} />
+              <ShieldCheck className="text-[#0FF0FC]" size={30} />
             </div>
-
             {nextMatch ? (
-              <Link href="/matches" className="block rounded-2xl border border-white/10 bg-white/[0.04] p-4 transition hover:border-[#0FF0FC]/35">
-                <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 text-center">
-                  <div className="flex flex-col items-center gap-2">
+              <div className="rounded-2xl border border-white/10 bg-white/[0.045] p-4">
+                <div className="mb-4 flex items-center justify-between gap-3">
+                  <div className="flex flex-col items-center gap-2 text-center">
                     {renderMatchTeamLogo(nextMatch.homeTeam)}
-                    <p className="max-w-[8rem] truncate text-xs font-black text-white">{nextMatch.homeTeam?.name || '—'}</p>
+                    <span className="text-xs font-black text-white">{nextMatch.homeTeam?.name || 'الفريق الأول'}</span>
                   </div>
-                  <div className="rounded-full border border-white/10 bg-black/50 px-3 py-1 text-sm font-black text-[#FFD700]">×</div>
-                  <div className="flex flex-col items-center gap-2">
+                  <div className="rounded-full border border-white/10 bg-black/40 px-4 py-2 text-sm font-black text-[#FFD700]">VS</div>
+                  <div className="flex flex-col items-center gap-2 text-center">
                     {renderMatchTeamLogo(nextMatch.awayTeam)}
-                    <p className="max-w-[8rem] truncate text-xs font-black text-white">{nextMatch.awayTeam?.name || '—'}</p>
+                    <span className="text-xs font-black text-white">{nextMatch.awayTeam?.name || 'الفريق الثاني'}</span>
                   </div>
                 </div>
-                <p className="mt-4 text-center text-xs text-gray-400">{nextMatch.matchDate ? new Date(nextMatch.matchDate).toLocaleString('ar-EG') : 'موعد غير محدد'}</p>
-                <p className="mx-auto mt-3 flex w-fit rounded-full bg-[#0FF0FC]/10 px-3 py-1 text-[10px] font-bold text-[#0FF0FC]">تؤثر على الزخم والسعر</p>
-              </Link>
+                <div className="text-center text-xs font-bold text-gray-400">{new Date(nextMatch.matchDate).toLocaleString('ar-EG')}</div>
+              </div>
             ) : (
-              <p className="rounded-2xl border border-white/10 bg-white/[0.04] p-4 text-sm leading-7 text-gray-400">لا توجد مباريات مجدولة حاليًا. افتح صفحة المباريات عند تحديث الجدول.</p>
+              <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.03] p-6 text-center text-sm text-gray-400">سيظهر هنا أقرب لقاء بعد مزامنة جدول المباريات.</div>
             )}
-
-            <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-              {quickStats.map((stat) => {
-                const Icon = stat.icon;
-                return (
-                  <div key={stat.label} className="rounded-2xl border border-white/10 bg-black/35 p-3">
-                    <div className="mb-2 flex items-center justify-between gap-2">
-                      <Icon size={16} className={stat.tone} />
-                      <span className="text-[10px] font-bold text-gray-500">{stat.label}</span>
-                    </div>
-                    <p className="font-mono text-xl font-black text-white">{Number(stat.value || 0).toLocaleString()}</p>
-                  </div>
-                );
-              })}
-            </div>
           </div>
-        </div>
-
-        <div className="relative mt-5 rounded-[1.6rem] border border-emerald-500/20 bg-emerald-500/10 px-5 py-4 text-sm leading-7 text-emerald-100 md:flex md:items-center md:justify-between md:gap-4">
-          <h2 className="mb-1 shrink-0 font-black text-white md:mb-0">تنبيه مهم</h2>
-          <p className="md:text-left">كل الأرصدة Virtual Credits فقط. لا توجد مراهنات، كريبتو، سحب أرباح، أو معاملات مالية حقيقية.</p>
         </div>
       </section>
 
-      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {quickStats.map((stat) => {
+          const Icon = stat.icon;
+          return (
+            <div key={stat.label} className="rounded-3xl border border-white/10 bg-surface p-5 shadow-card">
+              <Icon className={stat.tone} size={22} />
+              <div className="mt-4 text-3xl font-black text-white tabular-nums">{stat.value}</div>
+              <div className="mt-1 text-sm font-bold text-gray-500">{stat.label}</div>
+            </div>
+          );
+        })}
+      </section>
+
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {gatewayCards.map((card) => (
-          <Link key={card.title} href={card.href} className={`group rounded-2xl border px-4 py-3 shadow-card transition hover:-translate-y-0.5 hover:border-white/25 ${card.tone}`}>
-            <h2 className="text-lg font-black text-white">{card.title}</h2>
-            <p className="mt-2 min-h-[48px] text-xs leading-6 text-gray-300">{card.text}</p>
-            <p className="mt-3 inline-flex items-center gap-1.5 text-xs font-black text-white group-hover:text-[#0FF0FC]">
-              {card.action} <ArrowLeft size={13} />
-            </p>
+          <Link key={card.href} href={card.href} className={`group rounded-3xl border p-5 transition hover:-translate-y-1 ${card.tone}`}>
+            <h3 className="text-xl font-black text-white">{card.title}</h3>
+            <p className="mt-2 min-h-16 text-sm leading-6 text-gray-400">{card.text}</p>
+            <div className="mt-5 inline-flex items-center gap-2 text-sm font-black">
+              {card.action} <ArrowLeft size={16} className="transition group-hover:-translate-x-1" />
+            </div>
           </Link>
         ))}
       </section>
 
-      <section className="rounded-[2rem] border border-white/10 bg-white/[0.035] p-5 md:p-6">
-        <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <p className="text-xs font-bold text-gray-400">Academy Articles</p>
-            <h2 className="text-2xl font-black text-white">من الأكاديمية</h2>
+      {academyArticles.length > 0 && (
+        <section className="rounded-[2rem] border border-white/10 bg-surface p-5 shadow-card md:p-6">
+          <div className="mb-5 flex items-center justify-between gap-3">
+            <div>
+              <p className="text-xs font-black text-[#0FF0FC]">MC PRIME ACADEMY</p>
+              <h2 className="mt-1 text-2xl font-black text-white">أكاديمية بورصة المونديال</h2>
+            </div>
+            <Link href="/articles" className="rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-black text-white hover:border-[#0FF0FC]/40 hover:text-[#0FF0FC]">كل المقالات</Link>
           </div>
-          <Link href="/articles" className="rounded-2xl border border-[#0FF0FC]/25 bg-[#0FF0FC]/10 px-4 py-2 text-xs font-black text-[#0FF0FC] transition hover:bg-[#0FF0FC]/15">عرض كل المقالات</Link>
-        </div>
-
-        {academyArticles.length === 0 ? (
-          <p className="rounded-2xl border border-white/10 bg-black/30 p-6 text-center text-sm text-gray-400">سيتم عرض مقالات الأكاديمية هنا عند إضافتها.</p>
-        ) : (
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             {academyArticles.map((article) => (
-              <Link key={article.id} href={`/article/${article.id}`} className="group flex min-h-[170px] flex-col rounded-2xl border border-white/10 bg-black/30 p-4 transition hover:border-[#0FF0FC]/35 hover:bg-[#0FF0FC]/5">
-                <div className="mb-3 flex items-center justify-between gap-2">
-                  <span className="rounded-full bg-white/10 px-3 py-1 text-[10px] font-black text-[#FFD700]">{article.category}</span>
-                  {article.readingTime && <span className="text-[10px] font-bold text-gray-500">{article.readingTime}</span>}
-                </div>
-                <h3 className="line-clamp-2 text-base font-black leading-7 text-white group-hover:text-[#0FF0FC]">{article.title}</h3>
-                <p className="mt-2 line-clamp-3 text-xs leading-6 text-gray-400">{article.excerpt}</p>
-                <p className="mt-auto pt-4 inline-flex items-center gap-1.5 text-xs font-black text-white group-hover:text-[#0FF0FC]">
-                  اقرأ المقال <ArrowLeft size={13} />
-                </p>
+              <Link key={article.id} href={`/article/${article.id}`} className="rounded-2xl border border-white/10 bg-black/20 p-4 transition hover:border-[#0FF0FC]/40 hover:bg-white/[0.06]">
+                <div className="mb-3 text-[11px] font-black text-[#FFD700]">{article.category}</div>
+                <h3 className="line-clamp-2 font-black text-white">{article.title}</h3>
+                <p className="mt-2 line-clamp-3 text-xs leading-5 text-gray-400">{article.excerpt}</p>
               </Link>
             ))}
           </div>
-        )}
-      </section>
-
-      <section className="rounded-[2rem] border border-red-500/20 bg-red-500/10 p-5">
-        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <div className="flex items-start gap-3">
-            <ShieldCheck className="mt-1 shrink-0 text-red-200" size={22} />
-            <div>
-              <h2 className="font-black text-white">تنبيه الثقة والامتثال</h2>
-              <p className="mt-1 text-sm leading-7 text-red-100">
-                WorldCup Exchange لعبة تحليل وبورصة رياضية افتراضية. كل الأرصدة Virtual Credits فقط، ولا يوجد ربط بأموال حقيقية أو مراهنات أو سحب أو كريبتو.
-              </p>
-            </div>
-          </div>
-          <Link href="/methodology" className="inline-flex shrink-0 items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/10 px-4 py-2 text-xs font-black text-white hover:bg-white/15">
-            اقرأ المنهجية <ArrowLeft size={14} />
-          </Link>
-        </div>
-      </section>
+        </section>
+      )}
     </main>
   );
 }
