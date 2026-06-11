@@ -17,16 +17,27 @@ type AdminSession = {
   };
 } | null;
 
+function hasValidSecret(request: Request) {
+  const secret = process.env.ADMIN_CRON_SECRET;
+  if (!secret) return false;
+
+  const authHeader = request.headers.get('authorization') || '';
+  const bearerToken = authHeader.startsWith('Bearer ') ? authHeader.slice('Bearer '.length).trim() : '';
+  const url = new URL(request.url);
+  const queryToken = url.searchParams.get('secret') || '';
+
+  return bearerToken === secret || queryToken === secret;
+}
+
 function isAdminSession(session: AdminSession) {
   const email = session?.user?.email || '';
   return session?.user?.role === 'ADMIN' || email === 'worldcup@mcprim.com' || email === 'elfox14usa@gmail.com';
 }
 
-async function requireAdmin() {
+async function isAuthorized(request: Request) {
+  if (hasValidSecret(request)) return true;
   const session = await getServerSession(authOptions as never) as AdminSession;
-  if (!session?.user) return { error: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) };
-  if (!isAdminSession(session)) return { error: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) };
-  return { session };
+  return isAdminSession(session);
 }
 
 function safeName(value: string) {
@@ -52,9 +63,10 @@ async function findCsvForTeam(team: { code: string | null; name: string }) {
   return match ? path.join(EXPORT_DIR, match) : null;
 }
 
-export async function POST() {
-  const admin = await requireAdmin();
-  if (admin.error) return admin.error;
+export async function POST(request: Request) {
+  if (!(await isAuthorized(request))) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
 
   try {
     await fs.mkdir(EXPORT_DIR, { recursive: true });
@@ -135,9 +147,10 @@ export async function POST() {
   }
 }
 
-export async function GET() {
-  const admin = await requireAdmin();
-  if (admin.error) return admin.error;
+export async function GET(request: Request) {
+  if (!(await isAuthorized(request))) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
 
   return NextResponse.json({
     ok: true,
