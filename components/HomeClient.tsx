@@ -2,7 +2,6 @@
 
 import { useEffect } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
 import { useStore } from '@/lib/store';
 import { AssetImage } from '@/components/ui/AssetImage';
 import {
@@ -11,7 +10,6 @@ import {
   Calendar,
   Coins,
   Globe,
-  LineChart,
   ShieldCheck,
   Sparkles,
   TrendingUp,
@@ -121,57 +119,71 @@ export default function HomeClient({
 
   return (
     <main className="mx-auto max-w-7xl space-y-7 px-4 py-7 sm:px-6 lg:px-8">
-      <section className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(15,240,252,0.18),transparent_32%),radial-gradient(circle_at_bottom_left,rgba(255,215,0,0.14),transparent_30%),linear-gradient(135deg,rgba(255,255,255,0.06),rgba(255,255,255,0.015))] p-6 shadow-anti-gravity md:p-9">
-        <div className="pointer-events-none absolute inset-0 opacity-20 [background-image:linear-gradient(rgba(255,255,255,.05)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.05)_1px,transparent_1px)] [background-size:44px_44px]" />
-        <div className="relative grid gap-7 lg:grid-cols-[1.15fr_0.85fr] lg:items-center">
-          <div>
-            <div className="mb-6">
-              <Image src="/brand/logo-horizontal.png" alt="MC PRIME Exchange" width={230} height={58} className="h-9 w-auto" priority />
-            </div>
-            <p className="mb-4 inline-flex items-center gap-2 rounded-full border border-[#0FF0FC]/25 bg-[#0FF0FC]/10 px-4 py-2 text-xs font-black text-[#0FF0FC]">
+      <section className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(15,240,252,0.18),transparent_28%),radial-gradient(circle_at_bottom_left,rgba(255,215,0,0.12),transparent_24%),linear-gradient(135deg,rgba(255,255,255,0.055),rgba(255,255,255,0.015))] p-5 shadow-anti-gravity md:p-7">
+        <div className="pointer-events-none absolute inset-0 opacity-16 [background-image:linear-gradient(rgba(255,255,255,.05)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.05)_1px,transparent_1px)] [background-size:44px_44px]" />
+        <div className="relative grid gap-5 lg:grid-cols-[1.05fr_0.95fr] lg:items-stretch">
+          <div className="flex flex-col justify-center">
+            <p className="mb-4 inline-flex w-fit items-center gap-2 rounded-full border border-[#0FF0FC]/25 bg-[#0FF0FC]/10 px-4 py-2 text-xs font-black text-[#0FF0FC]">
               <Sparkles size={15} /> بوابة مونديال 2026
             </p>
-            <h1 className="max-w-4xl text-4xl font-black leading-tight text-white md:text-6xl">
-              بورصة المونديال في صفحة أوضح وأسرع
+            <h1 className="max-w-3xl text-3xl font-black leading-tight text-white md:text-5xl">
+              بورصة المونديال: تحليل سريع + سوق افتراضي واضح
             </h1>
-            <p className="mt-5 max-w-3xl text-sm leading-8 text-gray-300 md:text-lg">
-              ابدأ من المنتخبات، اللاعبين، التحليل الكروي، أو السوق الافتراضي. التفاصيل الثقيلة أصبحت داخل صفحاتها حتى تبقى الرئيسية بوابة سريعة وليست لوحة مزدحمة.
+            <p className="mt-4 max-w-3xl text-sm leading-7 text-gray-300 md:text-base">
+              الصفحة الرئيسية أصبحت أقصر ومباشرة: مؤشرات حقيقية، روابط دخول سريعة، والمباراة القادمة بدل مساحة كبيرة بلا قيمة.
             </p>
-            <div className="mt-7 flex flex-wrap gap-3">
-              <Link href="/team-intelligence" className="inline-flex items-center gap-2 rounded-2xl bg-[#0FF0FC] px-6 py-3 text-sm font-black text-black transition hover:bg-[#70f7ff]">
+
+            <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {quickStats.map((stat) => {
+                const Icon = stat.icon;
+                return (
+                  <div key={stat.label} className="rounded-2xl border border-white/10 bg-black/35 p-3">
+                    <div className="mb-2 flex items-center justify-between gap-2">
+                      <Icon size={16} className={stat.tone} />
+                      <span className="text-[10px] font-bold text-gray-500">{stat.label}</span>
+                    </div>
+                    <p className="font-mono text-xl font-black text-white">{Number(stat.value || 0).toLocaleString()}</p>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="mt-5 flex flex-wrap gap-3">
+              <Link href="/team-intelligence" className="inline-flex items-center gap-2 rounded-2xl bg-[#0FF0FC] px-5 py-3 text-sm font-black text-black transition hover:bg-[#70f7ff]">
                 <Brain size={18} /> ابدأ بالتحليل
               </Link>
-              <Link href="/market" className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white/10 px-6 py-3 text-sm font-black text-white transition hover:bg-white/15">
+              <Link href="/market" className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white/10 px-5 py-3 text-sm font-black text-white transition hover:bg-white/15">
                 <TrendingUp size={18} /> ادخل السوق
               </Link>
-              <Link href="/matches" className="inline-flex items-center gap-2 rounded-2xl border border-[#FFD700]/20 bg-[#FFD700]/10 px-6 py-3 text-sm font-black text-[#FFD700] transition hover:bg-[#FFD700]/15">
+              <Link href="/matches" className="inline-flex items-center gap-2 rounded-2xl border border-[#FFD700]/20 bg-[#FFD700]/10 px-5 py-3 text-sm font-black text-[#FFD700] transition hover:bg-[#FFD700]/15">
                 مباريات مؤثرة <ArrowLeft size={16} />
               </Link>
             </div>
           </div>
 
-          <div className="rounded-[2rem] border border-white/10 bg-black/40 p-5 backdrop-blur-xl">
-            <div className="mb-4 flex items-center justify-between">
-              <div>
-                <p className="text-xs font-bold text-gray-400">Quick Snapshot</p>
-                <h2 className="text-xl font-black text-white">ملخص سريع فقط</h2>
+          <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-1">
+            <div className="rounded-[1.6rem] border border-white/10 bg-black/40 p-5 backdrop-blur-xl">
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs font-bold text-gray-400">Next Impact</p>
+                  <h2 className="text-xl font-black text-white">المباراة القادمة المؤثرة</h2>
+                </div>
+                <Calendar className="text-[#0FF0FC]" size={22} />
               </div>
-              <div className="rounded-2xl bg-[#0FF0FC]/10 p-3 text-[#0FF0FC]"><LineChart size={22} /></div>
+              {nextMatch ? (
+                <Link href="/matches" className="block rounded-2xl border border-white/10 bg-white/[0.04] p-4 transition hover:border-[#0FF0FC]/35">
+                  <p className="text-base font-black text-white">{nextMatch.homeTeam?.name || '—'} × {nextMatch.awayTeam?.name || '—'}</p>
+                  <p className="mt-2 text-xs text-gray-400">{nextMatch.matchDate ? new Date(nextMatch.matchDate).toLocaleString('ar-EG') : 'موعد غير محدد'}</p>
+                  <p className="mt-3 inline-flex rounded-full bg-[#0FF0FC]/10 px-3 py-1 text-[10px] font-bold text-[#0FF0FC]">تؤثر على الزخم والسعر</p>
+                </Link>
+              ) : (
+                <p className="rounded-2xl border border-white/10 bg-white/[0.04] p-4 text-sm leading-7 text-gray-400">لا توجد مباريات مجدولة حاليًا. افتح صفحة المباريات عند تحديث الجدول.</p>
+              )}
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              {quickStats.map((stat) => {
-                const Icon = stat.icon;
-                return (
-                  <div key={stat.label} className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
-                    <Icon size={18} className={stat.tone} />
-                    <p className="mt-3 text-2xl font-black text-white">{Number(stat.value || 0).toLocaleString()}</p>
-                    <p className="text-xs text-gray-400">{stat.label}</p>
-                  </div>
-                );
-              })}
-            </div>
-            <div className="mt-4 rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-4 text-xs leading-6 text-emerald-100">
-              كل الأرصدة Virtual Credits فقط. لا توجد مراهنات، كريبتو، سحب أرباح، أو تعاملات مالية حقيقية.
+
+            <div className="rounded-[1.6rem] border border-emerald-500/20 bg-emerald-500/10 p-5 text-sm leading-7 text-emerald-100">
+              <h2 className="mb-2 font-black text-white">تنبيه مهم</h2>
+              كل الأرصدة Virtual Credits فقط. لا توجد مراهنات، كريبتو، سحب أرباح، أو معاملات مالية حقيقية.
             </div>
           </div>
         </div>
@@ -230,19 +242,6 @@ export default function HomeClient({
         </div>
 
         <div className="space-y-6">
-          <div className="rounded-[2rem] border border-white/10 bg-white/[0.035] p-6">
-            <h2 className="mb-4 text-xl font-black text-white">المباراة القادمة المؤثرة</h2>
-            {nextMatch ? (
-              <Link href="/matches" className="block rounded-2xl border border-white/10 bg-black/30 p-4 transition hover:border-[#0FF0FC]/35">
-                <p className="text-sm font-black text-white">{nextMatch.homeTeam?.name || '—'} × {nextMatch.awayTeam?.name || '—'}</p>
-                <p className="mt-2 text-xs text-gray-400">{nextMatch.matchDate ? new Date(nextMatch.matchDate).toLocaleString('ar-EG') : 'موعد غير محدد'}</p>
-                <p className="mt-3 inline-flex rounded-full bg-[#0FF0FC]/10 px-3 py-1 text-[10px] font-bold text-[#0FF0FC]">قد تؤثر على الزخم والسعر</p>
-              </Link>
-            ) : (
-              <p className="rounded-2xl border border-white/10 bg-black/30 p-6 text-center text-sm text-gray-400">لا توجد مباريات مجدولة حاليًا.</p>
-            )}
-          </div>
-
           <div className="rounded-[2rem] border border-white/10 bg-white/[0.035] p-6">
             <h2 className="mb-4 text-xl font-black text-white">نشاط مختصر</h2>
             <div className="grid grid-cols-2 gap-3 text-center text-xs">
