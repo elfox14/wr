@@ -1,120 +1,156 @@
 "use client";
 
-import React, { useEffect, useState } from 'react';
-import { TrendingUp, TrendingDown, Globe, Newspaper, ArrowUpRight, Flame } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
+import { Activity, ArrowUpRight, Clock, Newspaper, Radio, TrendingDown, TrendingUp } from 'lucide-react';
 
 interface NewsItem {
   id: string;
   title: string;
+  body?: string;
   source: string;
+  category?: 'match' | 'trading' | 'platform';
   type: string;
   link?: string;
   date: string;
+  assetName?: string;
+  assetImage?: string;
+  marketPrice?: number;
+  changePercent?: number;
+}
+
+function formatDate(value: string) {
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return '';
+  return date.toLocaleString('ar-EG', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: 'short' });
+}
+
+function NewsCard({ item }: { item: NewsItem }) {
+  const isTrading = item.category === 'trading';
+  const isMatch = item.category === 'match';
+  const positive = Number(item.changePercent || 0) >= 0;
+  const Icon = isMatch ? Radio : positive ? TrendingUp : TrendingDown;
+  const accent = isMatch ? 'text-[#FFD700] bg-[#FFD700]/10 border-[#FFD700]/20' : positive ? 'text-[#00FF88] bg-[#00FF88]/10 border-[#00FF88]/20' : 'text-[#FF3B5C] bg-[#FF3B5C]/10 border-[#FF3B5C]/20';
+
+  const content = (
+    <article className="group relative overflow-hidden rounded-3xl border border-white/5 bg-[#151515] p-5 transition-all hover:border-[#0FF0FC]/30 hover:bg-white/[0.04]">
+      <div className={`absolute -top-12 -right-12 h-32 w-32 rounded-full blur-[80px] opacity-25 ${isMatch ? 'bg-yellow-400' : positive ? 'bg-green-500' : 'bg-red-500'}`} />
+      <div className="relative flex items-start justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className={`rounded-2xl border p-2 ${accent}`}>
+            <Icon size={18} />
+          </div>
+          <div>
+            <span className="text-xs font-bold text-[#0FF0FC]">{item.source}</span>
+            <div className="mt-1 flex items-center gap-1.5 text-[11px] text-gray-500">
+              <Clock size={12} />
+              {formatDate(item.date)}
+            </div>
+          </div>
+        </div>
+        {item.link && <ArrowUpRight size={16} className="text-gray-500 transition-colors group-hover:text-[#0FF0FC]" />}
+      </div>
+
+      <h3 className="relative mt-4 text-base font-black leading-7 text-white transition-colors group-hover:text-[#0FF0FC]">
+        {item.title}
+      </h3>
+
+      {item.body && <p className="relative mt-3 line-clamp-3 text-sm leading-6 text-gray-400">{item.body}</p>}
+
+      {(item.assetName || item.marketPrice != null || item.changePercent != null) && (
+        <div className="relative mt-4 flex flex-wrap items-center gap-2 border-t border-white/5 pt-4 text-xs">
+          {item.assetName && <span className="rounded-full bg-white/5 px-3 py-1 font-bold text-white">{item.assetName}</span>}
+          {item.marketPrice != null && <span className="rounded-full bg-white/5 px-3 py-1 font-mono text-white">{Math.round(item.marketPrice)}¢</span>}
+          {item.changePercent != null && Math.abs(Number(item.changePercent)) > 0 && (
+            <span className={`rounded-full border px-3 py-1 font-mono font-bold ${accent}`} dir="ltr">
+              {Number(item.changePercent) > 0 ? '+' : ''}{Math.round(Number(item.changePercent) * 10) / 10}%
+            </span>
+          )}
+        </div>
+      )}
+    </article>
+  );
+
+  if (!item.link) return content;
+  return <Link href={item.link}>{content}</Link>;
 }
 
 export default function NewsPage() {
   const [news, setNews] = useState<NewsItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [updatedAt, setUpdatedAt] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch('/api/news')
-      .then(res => res.json())
-      .then(data => {
-        if (data.news) {
-          setNews(data.news);
-        }
+    fetch('/api/news', { cache: 'no-store' })
+      .then((res) => res.json())
+      .then((data) => {
+        setNews(Array.isArray(data.news) ? data.news : []);
+        setUpdatedAt(data.updatedAt || null);
         setLoading(false);
       })
       .catch(() => setLoading(false));
   }, []);
 
-  const marketNews = news.filter(n => n.type === 'market_up' || n.type === 'market_down');
-  const externalNews = news.filter(n => n.type === 'external');
+  const matchNews = useMemo(() => news.filter((item) => item.category === 'match'), [news]);
+  const tradingNews = useMemo(() => news.filter((item) => item.category === 'trading'), [news]);
+  const platformNews = useMemo(() => news.filter((item) => item.category === 'platform' || (!item.category && item.type === 'info')), [news]);
 
   return (
-    <div className="min-h-screen bg-[#121212] text-white">
-            
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="flex items-center gap-3 mb-10 border-b border-white/10 pb-6">
-          <div className="p-3 bg-[#0FF0FC]/10 rounded-xl">
-            <Newspaper size={32} className="text-[#0FF0FC]" />
+    <div className="min-h-screen bg-[#050505] text-white">
+      <main className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
+        <section className="mb-8 overflow-hidden rounded-[2rem] border border-white/8 bg-gradient-to-br from-[#111] via-[#0A0A0A] to-black p-6 shadow-2xl sm:p-8">
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-[#0FF0FC]/20 bg-[#0FF0FC]/10 px-4 py-2 text-xs font-bold text-[#0FF0FC]">
+                <Newspaper size={15} /> مركز الأخبار
+              </div>
+              <h1 className="text-3xl font-black tracking-tight sm:text-4xl">أخبار المباريات والتداول</h1>
+              <p className="mt-3 max-w-2xl text-sm leading-7 text-gray-400">
+                صفحة منفصلة تجمع أخبار الأهداف والمباريات بعيدًا عن أخبار التداول وحركة الأسعار داخل بورصة المونديال.
+              </p>
+            </div>
+            {updatedAt && <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-xs text-gray-400">آخر تحديث: {formatDate(updatedAt)}</div>}
           </div>
-          <div>
-            <h1 className="text-3xl font-extrabold text-white">أخبار السوق والبطولة</h1>
-            <p className="text-gray-400 mt-1">تغطية حصرية لتحركات الأسهم وآخر أحداث كرة القدم</p>
-          </div>
-        </div>
+        </section>
 
         {loading ? (
-          <div className="text-center py-20 text-gray-500">جاري تحميل الأخبار...</div>
+          <div className="rounded-3xl border border-white/5 bg-[#111] p-10 text-center text-gray-500">جاري تحميل الأخبار...</div>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            
-            {/* Market Movers Column */}
-            <div className="lg:col-span-1 space-y-6">
-              <h2 className="text-xl font-bold flex items-center gap-2 mb-4">
-                <Flame className="text-[#FFD700]" /> حركة السوق الداخلية
-              </h2>
-              
-              {marketNews.length === 0 ? (
-                <div className="bg-[#1A1A1A] p-6 rounded-3xl border border-white/5 text-center text-gray-500">
-                  لا توجد حركات قوية في السوق حالياً.
-                </div>
-              ) : (
-                marketNews.map((item) => (
-                  <div key={item.id} className="bg-gradient-to-br from-[#1A1A1A] to-[#111] p-6 rounded-3xl border border-white/5 hover:border-white/20 transition-all shadow-lg group relative overflow-hidden">
-                    <div className={`absolute top-0 right-0 w-32 h-32 rounded-full blur-[80px] opacity-20 pointer-events-none ${item.type === 'market_up' ? 'bg-green-500' : 'bg-red-500'}`} />
-                    
-                    <div className="flex items-center gap-3 mb-3">
-                      <div className={`p-2 rounded-lg ${item.type === 'market_up' ? 'bg-green-500/20 text-green-500' : 'bg-red-500/20 text-red-500'}`}>
-                        {item.type === 'market_up' ? <TrendingUp size={20} /> : <TrendingDown size={20} />}
-                      </div>
-                      <span className="text-xs text-gray-400 bg-white/5 px-2 py-1 rounded-full">{item.source}</span>
-                    </div>
-                    
-                    <h3 className="text-lg font-bold leading-tight mb-2 group-hover:text-[#0FF0FC] transition-colors">
-                      {item.title}
-                    </h3>
-                    <p className="text-xs text-gray-500">{new Date(item.date).toLocaleTimeString('ar-SA')} - اليوم</p>
-                  </div>
-                ))
-              )}
-            </div>
-
-            {/* External News Grid */}
-            <div className="lg:col-span-2">
-              <h2 className="text-xl font-bold flex items-center gap-2 mb-4">
-                <Globe className="text-[#0FF0FC]" /> آخر الأخبار الرياضية
-              </h2>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {externalNews.map((item) => (
-                  <a 
-                    key={item.id} 
-                    href={item.link || '#'} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="bg-[#1A1A1A] p-6 rounded-3xl border border-white/5 hover:border-[#0FF0FC]/30 hover:bg-white/5 transition-all flex flex-col h-full group"
-                  >
-                    <div className="flex-1">
-                      <div className="flex items-center justify-between mb-3">
-                        <span className="text-xs text-[#0FF0FC] bg-[#0FF0FC]/10 px-3 py-1 rounded-full font-bold">
-                          {item.source}
-                        </span>
-                        <ArrowUpRight size={16} className="text-gray-500 group-hover:text-[#0FF0FC] transition-colors" />
-                      </div>
-                      <h3 className="text-lg font-bold leading-relaxed mb-4 group-hover:text-white text-gray-200">
-                        {item.title}
-                      </h3>
-                    </div>
-                    <div className="mt-auto pt-4 border-t border-white/5 text-xs text-gray-500">
-                      {new Date(item.date).toLocaleString('ar-SA')}
-                    </div>
-                  </a>
-                ))}
+          <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
+            <section className="lg:col-span-2">
+              <div className="mb-4 flex items-center justify-between">
+                <h2 className="flex items-center gap-2 text-xl font-black"><Radio className="text-[#FFD700]" /> أخبار المباريات والأهداف</h2>
+                <span className="rounded-full bg-white/5 px-3 py-1 text-xs text-gray-400">{matchNews.length} خبر</span>
               </div>
-            </div>
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                {matchNews.length ? matchNews.map((item) => <NewsCard key={item.id} item={item} />) : (
+                  <div className="rounded-3xl border border-white/5 bg-[#111] p-8 text-center text-gray-500 md:col-span-2">لا توجد أخبار مباريات حاليًا.</div>
+                )}
+              </div>
+            </section>
 
+            <aside className="space-y-8">
+              <section>
+                <div className="mb-4 flex items-center justify-between">
+                  <h2 className="flex items-center gap-2 text-xl font-black"><Activity className="text-[#0FF0FC]" /> أخبار التداول</h2>
+                  <span className="rounded-full bg-white/5 px-3 py-1 text-xs text-gray-400">{tradingNews.length} خبر</span>
+                </div>
+                <div className="space-y-4">
+                  {tradingNews.length ? tradingNews.map((item) => <NewsCard key={item.id} item={item} />) : (
+                    <div className="rounded-3xl border border-white/5 bg-[#111] p-8 text-center text-gray-500">لا توجد أخبار تداول حاليًا.</div>
+                  )}
+                </div>
+              </section>
+
+              {platformNews.length > 0 && (
+                <section>
+                  <h2 className="mb-4 flex items-center gap-2 text-xl font-black"><Newspaper className="text-gray-300" /> تنبيهات المنصة</h2>
+                  <div className="space-y-4">
+                    {platformNews.map((item) => <NewsCard key={item.id} item={item} />)}
+                  </div>
+                </section>
+              )}
+            </aside>
           </div>
         )}
       </main>
