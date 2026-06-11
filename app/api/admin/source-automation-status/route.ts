@@ -5,6 +5,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 import { getSportsReferenceSourceStatus } from '@/lib/sportsReferenceSource';
+import { getLatestSourceAutomationLogs } from '@/lib/sourceAutomationLog';
 
 export const dynamic = 'force-dynamic';
 
@@ -58,6 +59,7 @@ export async function GET(request: Request) {
 
   const csvFiles = await getCsvFiles();
   const sportsReferenceStatus = getSportsReferenceSourceStatus();
+  const latestAutomationLogs = await getLatestSourceAutomationLogs(20);
 
   const latestAutoReports = await prisma.teamIntelligenceReport.findMany({
     where: {
@@ -73,6 +75,15 @@ export async function GET(request: Request) {
       sourceCategory: true,
       lastCheckedAt: true,
       team: { select: { id: true, name: true, code: true } },
+    },
+  });
+
+  const needsReviewCount = await prisma.teamIntelligenceReport.count({
+    where: {
+      OR: [
+        { reportType: 'TEAM_PROFILE_REVIEW' },
+        { tacticalTags: { has: 'NEEDS_REVIEW' } },
+      ],
     },
   });
 
@@ -101,6 +112,12 @@ export async function GET(request: Request) {
       ready: latestAutoReports.length > 0,
       note: latestAutoReports.length ? `${latestAutoReports.length} latest automatic reports found.` : 'No automatic source reports found yet.',
     },
+    {
+      key: 'automationLogs',
+      label: 'Automation run logs',
+      ready: latestAutomationLogs.length > 0,
+      note: latestAutomationLogs.length ? `${latestAutomationLogs.length} run logs found.` : 'No automation run logs found yet.',
+    },
   ];
 
   return NextResponse.json({
@@ -108,6 +125,8 @@ export async function GET(request: Request) {
     ready: readinessChecks.every((check) => check.ready),
     checkedAt: new Date().toISOString(),
     endpoints: {
+      sourceAutomationPage: '/admin/source-automation',
+      sourceReviewPage: '/admin/source-review',
       sportsReferenceAutoImport: '/api/admin/auto-import-sports-reference',
       sportsReferenceInfo: '/api/admin/auto-import-sports-reference?info=1',
       sourceInboxIntake: '/api/admin/source-inbox-intake',
@@ -116,6 +135,10 @@ export async function GET(request: Request) {
       athleticTemplates: '/api/admin/athletic-editorial-templates',
     },
     readinessChecks,
+    review: {
+      needsReviewCount,
+      page: '/admin/source-review',
+    },
     csv: {
       exportDir: 'data/sports-reference',
       count: csvFiles.length,
@@ -123,5 +146,6 @@ export async function GET(request: Request) {
     },
     sportsReferenceStatus,
     latestAutoReports,
+    latestAutomationLogs,
   });
 }
