@@ -38,11 +38,18 @@ function MatchChoiceCard({ match }: { match: any }) {
 }
 
 async function getAutoAnimationMatchId() {
-  const match = await prisma.match.findFirst({
-    where: { status: { in: ['IN_PLAY', 'LIVE', 'SCHEDULED'] }, animationMatchId: { not: null } },
-    orderBy: [{ status: 'asc' }, { matchDate: 'asc' }],
+  const liveMatch = await prisma.match.findFirst({
+    where: { status: { in: ['IN_PLAY', 'LIVE'] }, animationMatchId: { not: null } },
+    orderBy: { matchDate: 'asc' },
     select: { animationMatchId: true, matchDate: true, homeTeam: { select: { name: true } }, awayTeam: { select: { name: true } } },
   });
+
+  const match = liveMatch || await prisma.match.findFirst({
+    where: { status: { in: ['SCHEDULED', 'IN_PLAY', 'LIVE'] }, animationMatchId: { not: null } },
+    orderBy: { matchDate: 'asc' },
+    select: { animationMatchId: true, matchDate: true, homeTeam: { select: { name: true } }, awayTeam: { select: { name: true } } },
+  });
+
   if (!match?.animationMatchId) return null;
   return { matchId: String(match.animationMatchId), title: `${match.homeTeam.name} × ${match.awayTeam.name}`, matchDate: match.matchDate };
 }
@@ -87,6 +94,12 @@ export default async function AnimationLivePage({ searchParams }: { searchParams
     if (teamPanel) iframeUrl.searchParams.set('teamPanel', teamPanel);
   }
 
+  const missingReason = !matchId
+    ? 'لا يوجد Match ID متاح للبث الآن. اربط المباراة بحقل animationMatchId أو اختر مباراة من القائمة.'
+    : !accessKey
+      ? 'مفتاح ISPORTS_ANIMATION_ACCESS_KEY غير مضبوط على السيرفر، لذلك لا يمكن تحميل iframe البث.'
+      : '';
+
   return (
     <main className="min-h-screen bg-background px-2 py-2 text-white sm:px-4 lg:px-8">
       <section className="mx-auto max-w-7xl space-y-2 sm:space-y-3">
@@ -104,7 +117,7 @@ export default async function AnimationLivePage({ searchParams }: { searchParams
           </div>
         </div>
         {iframeUrl && <div className="rounded-xl border border-[#FFD700]/20 bg-[#FFD700]/10 px-3 py-2 text-[11px] font-bold leading-5 text-[#FFD700] sm:hidden"><span className="inline-flex items-center gap-1"><RotateCcw size={13} /> يفضّل تدوير الهاتف أفقيًا أو الضغط على تكبير الشاشة.</span></div>}
-        {iframeUrl ? <div className="overflow-hidden rounded-2xl border border-white/10 bg-black shadow-[0_25px_90px_rgba(0,0,0,0.45)]"><div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 bg-white/[0.035] px-3 py-2 text-[10px] font-black text-gray-300 md:px-4"><span>Match ID: {matchId}</span><span>Language: {lang}</span><span>Stats: {statsPanel}</span><span>Team Panel: {teamPanel || 'default'}</span></div><iframe title="Football Animation Live" src={iframeUrl.toString()} className="h-[82vh] w-full border-0 bg-black sm:h-[80vh] lg:h-[78vh]" allow="fullscreen; autoplay; encrypted-media; picture-in-picture" allowFullScreen referrerPolicy="strict-origin-when-cross-origin" /></div> : <div className="rounded-[2rem] border border-white/10 bg-white/[0.045] p-4 shadow-card md:p-5"><div className="mb-4 flex flex-col gap-2 md:flex-row md:items-center md:justify-between"><div><p className="text-xs font-black text-[#0FF0FC]">المباريات القادمة</p><h2 className="mt-1 text-2xl font-black text-white">اختر مباراة لمتابعة البث الأنيميشن</h2></div><Link href="/matches" className="inline-flex items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-xs font-black text-white hover:border-[#0FF0FC]/40 hover:text-[#0FF0FC]">كل المباريات</Link></div>{availableMatches.length > 0 && <><h3 className="mb-3 text-sm font-black text-[#FFD700]">بث أنيميشن متاح</h3><div className="mb-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">{availableMatches.map((match) => <MatchChoiceCard key={match.id} match={match} />)}</div></>}{waitingMatches.length > 0 && <><h3 className="mb-3 text-sm font-black text-gray-400">بانتظار الربط</h3><div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{waitingMatches.map((match) => <MatchChoiceCard key={match.id} match={match} />)}</div></>}{upcomingMatches.length === 0 && <div className="rounded-2xl border border-dashed border-white/10 bg-black/25 p-8 text-center text-sm text-gray-400">لا توجد مباريات قادمة حاليًا.</div>}</div>}
+        {iframeUrl ? <div className="overflow-hidden rounded-2xl border border-white/10 bg-black shadow-[0_25px_90px_rgba(0,0,0,0.45)]"><div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 bg-white/[0.035] px-3 py-2 text-[10px] font-black text-gray-300 md:px-4"><span>Match ID: {matchId}</span><span>Language: {lang}</span><span>Stats: {statsPanel}</span><span>Team Panel: {teamPanel || 'default'}</span></div><iframe title="Football Animation Live" src={iframeUrl.toString()} className="h-[82vh] w-full border-0 bg-black sm:h-[80vh] lg:h-[78vh]" allow="fullscreen; autoplay; encrypted-media; picture-in-picture" allowFullScreen referrerPolicy="strict-origin-when-cross-origin" /></div> : <div className="rounded-[2rem] border border-white/10 bg-white/[0.045] p-4 shadow-card md:p-5"><div className="mb-4 flex flex-col gap-2 md:flex-row md:items-center md:justify-between"><div><p className="text-xs font-black text-[#0FF0FC]">المباريات القادمة</p><h2 className="mt-1 text-2xl font-black text-white">اختر مباراة لمتابعة البث الأنيميشن</h2>{missingReason && <p className="mt-2 rounded-xl border border-red-400/20 bg-red-500/10 px-3 py-2 text-xs font-bold leading-5 text-red-200">{missingReason}</p>}</div><Link href="/matches" className="inline-flex items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-xs font-black text-white hover:border-[#0FF0FC]/40 hover:text-[#0FF0FC]">كل المباريات</Link></div>{availableMatches.length > 0 && <><h3 className="mb-3 text-sm font-black text-[#FFD700]">بث أنيميشن متاح</h3><div className="mb-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">{availableMatches.map((match) => <MatchChoiceCard key={match.id} match={match} />)}</div></>}{waitingMatches.length > 0 && <><h3 className="mb-3 text-sm font-black text-gray-400">بانتظار الربط</h3><div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{waitingMatches.map((match) => <MatchChoiceCard key={match.id} match={match} />)}</div></>}{upcomingMatches.length === 0 && <div className="rounded-2xl border border-dashed border-white/10 bg-black/25 p-8 text-center text-sm text-gray-400">لا توجد مباريات قادمة حاليًا.</div>}</div>}
         <div className="rounded-2xl border border-emerald-400/20 bg-emerald-400/10 px-3 py-2 text-[11px] font-bold leading-5 text-emerald-100"><span className="inline-flex items-center gap-2"><ShieldCheck size={14} /> مهم:</span> هذا تكامل عرض فقط داخل المنصة. كل الأرصدة Virtual Credits فقط، ولا توجد مراهنات أو كريبتو أو سحب أرباح.</div>
       </section>
     </main>
