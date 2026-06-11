@@ -97,6 +97,12 @@ export async function POST(request: Request, context: RouteContext) {
     });
   }
 
+  const approvalMetrics: Prisma.InputJsonObject = {
+    reviewStatus: 'APPROVED',
+    reviewedAt: new Date().toISOString(),
+    reviewNote: note || null,
+  };
+
   const updated = await prisma.teamIntelligenceReport.update({
     where: { id: report.id },
     data: {
@@ -104,11 +110,7 @@ export async function POST(request: Request, context: RouteContext) {
       confidence: report.confidence === 'D' ? 'C' : report.confidence,
       tacticalTags: [...cleanTags(report.tacticalTags), 'AUTO_REVIEW_APPROVED', 'review-status:approved'],
       weaknesses: cleanWeaknesses(report.weaknesses),
-      metrics: mergeMetrics(report.metrics, {
-        reviewStatus: 'APPROVED',
-        reviewedAt: new Date().toISOString(),
-        reviewNote: note || null,
-      }),
+      metrics: mergeMetrics(report.metrics, approvalMetrics),
       lastCheckedAt: new Date(),
     },
   });
