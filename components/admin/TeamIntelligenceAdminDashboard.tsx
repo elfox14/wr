@@ -2,7 +2,7 @@
 
 import { FormEvent, useState } from 'react';
 import Link from 'next/link';
-import { ArrowRight, CheckCircle2, Database, FileText, KeyRound, RefreshCw, ShieldAlert, Sparkles } from 'lucide-react';
+import { ArrowRight, CheckCircle2, Database, ExternalLink, FileText, KeyRound, RefreshCw, ShieldAlert, Sparkles } from 'lucide-react';
 
 type TeamOption = {
   id: string;
@@ -357,9 +357,14 @@ export default function TeamIntelligenceAdminDashboard({ teams, initialTeamId = 
                         <div className="text-sm font-black text-white">{team.name} — {team.code}</div>
                         <div className="mt-1 text-xs text-gray-400">كل التقارير: {team.reportCount} · تقارير المجموعة الأولى: {team.curatedReportCount}</div>
                       </div>
-                      <span className={`rounded-xl px-3 py-1 text-xs font-black ${team.hasGroupAReport ? 'bg-success/15 text-success' : 'bg-danger/15 text-danger'}`}>
-                        {team.hasGroupAReport ? 'جاهز' : 'غير جاهز'}
-                      </span>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Link href={`/asset/${team.id}`} className="inline-flex items-center gap-1 rounded-xl border border-white/10 bg-black/20 px-3 py-1 text-xs font-black text-white hover:border-primary/40 hover:text-primary">
+                          فتح صفحة المنتخب <ExternalLink size={12} />
+                        </Link>
+                        <span className={`rounded-xl px-3 py-1 text-xs font-black ${team.hasGroupAReport ? 'bg-success/15 text-success' : 'bg-danger/15 text-danger'}`}>
+                          {team.hasGroupAReport ? 'جاهز' : 'غير جاهز'}
+                        </span>
+                      </div>
                     </div>
                     {team.latestReport?.title && <div className="mt-3 text-xs leading-6 text-gray-300">آخر تقرير: {team.latestReport.title}</div>}
                   </div>
