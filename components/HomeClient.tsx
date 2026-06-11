@@ -14,7 +14,7 @@ function normalizeGroupKey(value?: string | null): string {
 }
 function groupHref(value?: string | null): string { return `/groups#group-${encodeURIComponent(normalizeGroupKey(value))}`; }
 function getAnimationMatchId(match: any) { return match?.animationMatchId || ''; }
-function getAnimationHref(match: any) { const id = getAnimationMatchId(match); return id ? `/animation-live/player?matchId=${encodeURIComponent(String(id))}&lang=en&statsPanel=simple&teamPanel=1` : '/animation-live/player'; }
+function getAnimationHref(match: any) { const id = getAnimationMatchId(match); return id ? `/animation-live/player?matchId=${encodeURIComponent(String(id))}&lang=en&statsPanel=simple&teamPanel=1` : '/animation-live'; }
 function formatMatchDate(value?: string | null) { return value ? new Date(value).toLocaleString('ar-EG') : 'غير محدد'; }
 function formatMatchTime(value?: string | null) { return value ? new Date(value).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }) : 'غير محدد'; }
 function sortMatches(matches: any[]) { return [...matches].sort((a, b) => new Date(a?.matchDate || 0).getTime() - new Date(b?.matchDate || 0).getTime()); }

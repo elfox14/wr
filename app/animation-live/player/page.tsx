@@ -19,7 +19,7 @@ function getSingleValue(value?: string | string[]) {
 
 export default async function AnimationLivePlayerPage({ searchParams }: { searchParams?: Promise<Record<string, string | string[] | undefined>> }) {
   const params = (await searchParams) || {};
-  const accessKey = process.env.ISPORTS_ANIMATION_ACCESS_KEY || process.env.NEXT_PUBLIC_ISPORTS_ANIMATION_ACCESS_KEY || '';
+  const accessKey = process.env.ISPORTS_ANIMATION_ACCESS_KEY || process.env.NEXT_PUBLIC_ISPORTS_ANIMATION_ACCESS_KEY || process.env.ISPORTS_API_KEY || '';
   const matchId = getSingleValue(params.matchId) || '';
   const requestedLang = getSingleValue(params.lang) || 'en';
   const lang = allowedLanguages.has(requestedLang) ? requestedLang : 'en';
@@ -53,15 +53,26 @@ export default async function AnimationLivePlayerPage({ searchParams }: { search
           </div>
         </div>
 
-        <div className="overflow-hidden rounded-2xl border border-white/10 bg-black shadow-[0_25px_90px_rgba(0,0,0,0.45)]">
-          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 bg-white/[0.035] px-3 py-2 text-[10px] font-black text-gray-300 md:px-4">
-            <span>{isLinkedMatch ? `Match ID: ${matchId}` : 'Football Animation Live'}</span>
-            <span>Language: {lang}</span>
-            {isLinkedMatch && <span>Stats: {statsPanel}</span>}
-            {isLinkedMatch && <span>Team Panel: {teamPanel || 'default'}</span>}
+        {isLinkedMatch ? (
+          <div className="overflow-hidden rounded-2xl border border-white/10 bg-black shadow-[0_25px_90px_rgba(0,0,0,0.45)]">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 bg-white/[0.035] px-3 py-2 text-[10px] font-black text-gray-300 md:px-4">
+              <span>Match ID: {matchId}</span>
+              <span>Language: {lang}</span>
+              <span>Stats: {statsPanel}</span>
+              <span>Team Panel: {teamPanel || 'default'}</span>
+            </div>
+            <iframe title="Football Animation Live" src={iframeUrl.toString()} className="h-[82vh] w-full border-0 bg-black sm:h-[80vh] lg:h-[78vh]" allow="fullscreen; autoplay; encrypted-media; picture-in-picture" allowFullScreen referrerPolicy="strict-origin-when-cross-origin" />
           </div>
-          <iframe title="Football Animation Live" src={iframeUrl.toString()} className="h-[82vh] w-full border-0 bg-black sm:h-[80vh] lg:h-[78vh]" allow="fullscreen; autoplay; encrypted-media; picture-in-picture" allowFullScreen referrerPolicy="strict-origin-when-cross-origin" />
-        </div>
+        ) : (
+          <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.03] p-10 text-center text-sm text-gray-400">
+            <Radio className="mx-auto mb-4 text-gray-500" size={48} />
+            <h2 className="mb-2 text-xl font-bold text-white">البث غير متاح</h2>
+            <p>المباراة التي اخترتها غير مرتبطة ببث أنيميشن حالياً (Match ID غير متوفر). يرجى اختيار مباراة أخرى من قائمة المباريات اليوم.</p>
+            <Link href="/animation-live" className="mt-6 inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-6 py-3 text-xs font-black text-white hover:border-[#0FF0FC]/40 hover:text-[#0FF0FC]">
+              العودة لقائمة البث
+            </Link>
+          </div>
+        )}
 
         <div className="rounded-2xl border border-emerald-400/20 bg-emerald-400/10 px-3 py-2 text-[11px] font-bold leading-5 text-emerald-100"><span className="inline-flex items-center gap-2"><ShieldCheck size={14} /> مهم:</span> هذا تكامل عرض فقط داخل المنصة. كل الأرصدة Virtual Credits فقط.</div>
       </section>
