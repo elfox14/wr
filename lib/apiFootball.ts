@@ -40,8 +40,8 @@ function getApiKeys(provider: Provider) {
 
 function getProviderOrder(): Provider[] {
   const order: Provider[] = [];
-  if (getApiKeys('API_FOOTBALL').length > 0) order.push('API_FOOTBALL');
   if (getApiKeys('ISPORTS').length > 0) order.push('ISPORTS');
+  if (getApiKeys('API_FOOTBALL').length > 0) order.push('API_FOOTBALL');
   return order;
 }
 
@@ -230,7 +230,8 @@ async function fetchFromProvider<T>(provider: Provider, path: string, params: Ap
       if (isQuotaOrRateLimitError(response.status, providerErrors) && keyIndex < keys.length - 1) continue;
       throw error;
     }
-    const finalPayload = provider === 'ISPORTS' ? normalizeIsportsPayload(path, payload, params) : payload;
+    const finalPayload: any = provider === 'ISPORTS' ? normalizeIsportsPayload(path, payload, params) : payload;
+    if (finalPayload && typeof finalPayload === 'object') finalPayload._provider = provider;
     return finalPayload as T;
   }
   const lastError = errors[errors.length - 1];
