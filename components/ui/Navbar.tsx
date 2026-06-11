@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { usePathname } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import { useSession, signOut } from 'next-auth/react';
 import { 
   Trophy, 
@@ -13,6 +13,7 @@ import {
   Briefcase, 
   LogOut, 
   User as UserIcon, 
+  Users,
   Menu, 
   X, 
   ChevronDown,
@@ -32,6 +33,7 @@ export function Navbar() {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const userEmail = session?.user?.email ?? '';
   const isAuthenticated = status === 'authenticated';
   const isAdminUser = isAuthenticated && userEmail === 'worldcup@mcprim.com';
@@ -56,11 +58,25 @@ export function Navbar() {
 
   const navLinks = [
     { name: 'مركز التحليل', href: '/team-intelligence', icon: <Brain size={16} /> },
+    { name: 'المجموعات', href: '/groups', icon: <Trophy size={16} /> },
+    { name: 'اللاعبون', href: '/market?type=PLAYER', icon: <Users size={16} />, activeType: 'PLAYER' },
     { name: 'السوق', href: '/market', icon: <TrendingUp size={16} /> },
     { name: 'المباريات', href: '/matches', icon: <CalendarDays size={16} /> },
     { name: 'المحفظة', href: '/portfolio', icon: <Briefcase size={16} /> },
     { name: 'المنهجية', href: '/methodology', icon: <BookOpen size={16} /> },
   ];
+
+  const isLinkActive = (link: { href: string; activeType?: string }) => {
+    if (link.activeType) {
+      return pathname === '/market' && searchParams?.get('type') === link.activeType;
+    }
+
+    if (link.href === '/market') {
+      return pathname === '/market' && !searchParams?.get('type');
+    }
+
+    return pathname?.startsWith(link.href);
+  };
 
   return (
     <>
@@ -85,7 +101,7 @@ export function Navbar() {
             {/* CENTER: Desktop Navigation */}
             <div className="hidden lg:flex items-center justify-center space-x-2 space-x-reverse flex-1 px-8">
               {navLinks.map((link) => {
-                const isActive = pathname?.startsWith(link.href);
+                const isActive = isLinkActive(link);
                 return (
                   <Link 
                     key={link.href} 
@@ -154,6 +170,12 @@ export function Navbar() {
                         </Link>
                         <Link href="/team-intelligence" className="flex items-center gap-3 px-3 py-2.5 text-sm text-gray-300 hover:text-white hover:bg-white/5 rounded-xl transition-colors">
                           <Shield size={16} /> مركز التحليل
+                        </Link>
+                        <Link href="/groups" className="flex items-center gap-3 px-3 py-2.5 text-sm text-gray-300 hover:text-white hover:bg-white/5 rounded-xl transition-colors">
+                          <Trophy size={16} /> المجموعات
+                        </Link>
+                        <Link href="/market?type=PLAYER" className="flex items-center gap-3 px-3 py-2.5 text-sm text-gray-300 hover:text-white hover:bg-white/5 rounded-xl transition-colors">
+                          <Users size={16} /> اللاعبون
                         </Link>
                         <Link href="/methodology" className="flex items-center gap-3 px-3 py-2.5 text-sm text-gray-300 hover:text-white hover:bg-white/5 rounded-xl transition-colors">
                           <BookOpen size={16} /> منهجية التسعير
@@ -258,7 +280,7 @@ export function Navbar() {
 
             <div className="space-y-2 mb-6 flex-1">
               {navLinks.map((link) => {
-                const isActive = pathname?.startsWith(link.href);
+                const isActive = isLinkActive(link);
                 return (
                   <Link
                     key={link.href}
