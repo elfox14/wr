@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth';
 import { AlertTriangle, ArrowRight, ExternalLink, FileText, ShieldCheck } from 'lucide-react';
 import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/prisma';
+import SourceReviewActions from '@/components/admin/SourceReviewActions';
 
 export const dynamic = 'force-dynamic';
 
@@ -98,6 +99,7 @@ export default async function SourceReviewPage() {
                       {report.sourceUrl && <a href={report.sourceUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-xl border border-primary/20 bg-primary/10 px-3 py-2 text-xs font-black text-primary hover:border-primary/50">فتح المصدر <ExternalLink size={12} /></a>}
                     </div>
                   </div>
+                  <SourceReviewActions reportId={report.id} />
                   <div className="mt-3 text-xs text-gray-600">تاريخ الإضافة: {new Date(report.publishedAt).toLocaleString('ar-EG')}</div>
                 </article>
               ))}
