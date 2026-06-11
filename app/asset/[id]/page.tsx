@@ -87,12 +87,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return {
     title: `${asset.name} (${asset.code}) | ${isTeam ? 'تحليل المنتخب' : 'تحليل اللاعب'} | MC PRIME Exchange`,
     description: isTeam
-      ? `تحليل فني وإحصائي لمنتخب ${asset.name}: تقارير موثقة، قوة الخطوط، اللاعبين المؤثرين، المباريات، ومؤشرات الجاهزية.`
+      ? `تحليل كروي موثق لمنتخب ${asset.name}: تقارير المصادر، قائمة الفريق، مؤشرات الجاهزية، والتداول في تب منفصل.`
       : `تحليل فني وسوقي للاعب ${asset.name}. تابع الأداء والسعر الافتراضي داخل منصة MC PRIME Exchange.`,
     openGraph: {
       title: `${asset.name} | ${isTeam ? 'تحليل المنتخب' : 'MC PRIME Exchange'}`,
       description: isTeam
-        ? `ملف كروي موثق لمنتخب ${asset.name} يشمل التقارير، الإحصائيات، واللاعبين المؤثرين.`
+        ? `ملف كروي موثق لمنتخب ${asset.name} يشمل التقارير، الإحصائيات، وقائمة الفريق.`
         : `تداول أسهم ${asset.name} في بورصة المونديال الافتراضية.`,
       images: [ogImage],
     },
@@ -169,7 +169,7 @@ export default async function AssetPage({ params }: Props) {
       },
       intelligenceReports: {
         orderBy: { publishedAt: 'desc' },
-        take: 8,
+        take: 12,
       },
       players: {
         orderBy: [
@@ -219,7 +219,7 @@ export default async function AssetPage({ params }: Props) {
     "@type": isTeam ? "SportsTeam" : "Person",
     "name": asset.name,
     "description": isTeam
-      ? `تحليل فني وإحصائي موثق لمنتخب ${asset.name}: التقارير، قوة الخطوط، اللاعبين المؤثرين، والمباريات.`
+      ? `تحليل كروي موثق لمنتخب ${asset.name}: التقارير، قائمة الفريق، مؤشرات الجاهزية، والمباريات.`
       : `تداول أسهم ${asset.name} في منصة MC PRIME Exchange. السعر المباشر: ${asset.current_price}¢.`,
     "url": `${baseUrl}/asset/${asset.id}`,
   } : null;
@@ -233,10 +233,10 @@ export default async function AssetPage({ params }: Props) {
         />
       )}
 
-      {normalizedAsset && <AssetCommandHeader asset={normalizedAsset} isTeam={isTeam} />}
+      {normalizedAsset && !isTeam && <AssetCommandHeader asset={normalizedAsset} isTeam={isTeam} />}
 
       {normalizedAsset && isTeam && (
-        <div className="mx-auto mb-4 flex w-full max-w-[1600px] justify-end px-4">
+        <div className="mx-auto mb-4 flex w-full max-w-[1600px] justify-end px-4 pt-4">
           <Link
             href={`/admin/team-intelligence?teamId=${normalizedAsset.id}`}
             className="rounded-2xl border border-primary/30 bg-primary/10 px-4 py-3 text-sm font-black text-primary transition hover:bg-primary hover:text-black"
