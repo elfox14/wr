@@ -2,9 +2,48 @@
 
 import React, { useEffect, useState } from 'react';
 import { PageHeader } from '@/components/ui/PageHeader';
-import { CalendarDays, Play, Clock, CheckCircle2, TrendingUp, Activity, BarChart3, ChevronLeft, Search, Filter } from 'lucide-react';
+import { CalendarDays, Play, Clock, CheckCircle2, TrendingUp, Activity, BarChart3, ChevronLeft, Filter } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+
+function normalizeGroupKey(value?: string | null): string {
+  if (!value) return 'غير محددة';
+  return value
+    .replace('Group', '')
+    .replace('المجموعة', '')
+    .trim()
+    .toUpperCase();
+}
+
+function groupHref(value?: string | null): string {
+  const key = normalizeGroupKey(value);
+  return `/groups#group-${encodeURIComponent(key)}`;
+}
+
+function getMatchGroup(match: any): string {
+  return normalizeGroupKey(match.groupPhase || match.group || match.homeTeam?.group || match.awayTeam?.group);
+}
+
+function getTeamHref(team: any): string {
+  return team?.id ? `/asset/${team.id}` : '/market?type=TEAM';
+}
+
+function TeamLogoLink({ team }: { team: any }) {
+  return (
+    <Link
+      href={getTeamHref(team)}
+      onClick={(event) => event.stopPropagation()}
+      className="w-20 h-20 md:w-24 md:h-24 bg-black/50 rounded-full flex items-center justify-center border border-white/10 overflow-hidden shadow-lg group-hover:scale-105 transition-transform hover:border-primary/50 focus:outline-none focus:ring-2 focus:ring-primary/40"
+      title={`صفحة ${team?.name || 'المنتخب'}`}
+    >
+      {team?.image?.startsWith?.('http') ? (
+        <img src={team.image} alt={team.name} className="w-full h-full object-cover" />
+      ) : (
+        <span className="text-5xl">{team?.image || '⚽'}</span>
+      )}
+    </Link>
+  );
+}
 
 export default function MatchesPage() {
   const [matches, setMatches] = useState<any[]>([]);
@@ -192,90 +231,101 @@ export default function MatchesPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {filteredMatches.map(match => (
-              <div 
-                key={match.id} 
-                onClick={() => router.push(`/matches/${match.id}`)}
-                className="group bg-surface border border-white/5 hover:border-primary/50 rounded-3xl p-6 shadow-card cursor-pointer transition-all hover:shadow-[0_0_20px_rgba(15,240,252,0.05)] relative overflow-hidden"
-              >
-                {/* Status Glow */}
-                <div className={`absolute top-0 right-0 w-32 h-32 rounded-bl-full blur-3xl opacity-10 pointer-events-none ${match.status === 'IN_PLAY' ? 'bg-red-500' : match.status === 'FINISHED' ? 'bg-[#FFD700]' : 'bg-primary'}`}></div>
+            {filteredMatches.map(match => {
+              const groupKey = getMatchGroup(match);
+              return (
+                <div 
+                  key={match.id} 
+                  onClick={() => router.push(`/matches/${match.id}`)}
+                  className="group bg-surface border border-white/5 hover:border-primary/50 rounded-3xl p-6 shadow-card cursor-pointer transition-all hover:shadow-[0_0_20px_rgba(15,240,252,0.05)] relative overflow-hidden"
+                >
+                  {/* Status Glow */}
+                  <div className={`absolute top-0 right-0 w-32 h-32 rounded-bl-full blur-3xl opacity-10 pointer-events-none ${match.status === 'IN_PLAY' ? 'bg-red-500' : match.status === 'FINISHED' ? 'bg-[#FFD700]' : 'bg-primary'}`}></div>
 
-                <div className="flex justify-between items-center mb-6 relative z-10">
-                  <div className="flex items-center gap-2">
-                    {getStatusDisplay(match.status)}
-                    <span className="text-xs text-gray-500 bg-black/30 px-2 py-1 rounded">{match.stage === 'group' ? 'دور المجموعات' : 'التصفيات'}</span>
-                  </div>
-                  <div className="text-xs text-gray-400 font-mono flex items-center gap-1">
-                    <Clock size={12} />
-                    {new Date(match.matchDate).toLocaleDateString('ar-EG', { month: 'short', day: 'numeric' })} · {new Date(match.matchDate).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-[1fr_auto_1fr] gap-4 items-center mb-8 relative z-10">
-                  {/* Home Team */}
-                  <div className="flex flex-col items-center text-center gap-3">
-                    <div className="w-20 h-20 md:w-24 md:h-24 bg-black/50 rounded-full flex items-center justify-center border border-white/10 overflow-hidden shadow-lg group-hover:scale-105 transition-transform">
-                      {match.homeTeam.image.startsWith('http') ? <img src={match.homeTeam.image} alt={match.homeTeam.name} className="w-full h-full object-cover" /> : <span className="text-5xl">{match.homeTeam.image}</span>}
+                  <div className="flex justify-between items-center mb-6 relative z-10">
+                    <div className="flex items-center gap-2">
+                      {getStatusDisplay(match.status)}
+                      <span className="text-xs text-gray-500 bg-black/30 px-2 py-1 rounded">{match.stage === 'group' ? 'دور المجموعات' : 'التصفيات'}</span>
                     </div>
-                    <div>
-                      <h3 className="font-black text-white text-lg md:text-xl group-hover:text-primary transition-colors">{match.homeTeam.name}</h3>
-                      <p className="text-xs text-gray-500 mt-1">#{match.homeTeam.fifaRank || '?'} · {match.homeTeam.marketPrice?.toLocaleString()}¢</p>
+                    <div className="text-xs text-gray-400 font-mono flex items-center gap-1">
+                      <Clock size={12} />
+                      {new Date(match.matchDate).toLocaleDateString('ar-EG', { month: 'short', day: 'numeric' })} · {new Date(match.matchDate).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}
                     </div>
                   </div>
 
-                  {/* Score / VS */}
-                  <div className="flex flex-col items-center justify-center">
-                    {(match.status === 'IN_PLAY' || match.status === 'FINISHED') ? (
-                      <div className="text-4xl md:text-5xl font-black text-white tracking-widest bg-black/40 px-4 py-3 rounded-2xl border border-white/10 shadow-inner">
-                        {match.homeScore} - {match.awayScore}
+                  <div className="grid grid-cols-[1fr_auto_1fr] gap-4 items-center mb-8 relative z-10">
+                    {/* Home Team */}
+                    <div className="flex flex-col items-center text-center gap-3">
+                      <TeamLogoLink team={match.homeTeam} />
+                      <div>
+                        <Link href={getTeamHref(match.homeTeam)} onClick={(event) => event.stopPropagation()} className="font-black text-white text-lg md:text-xl group-hover:text-primary transition-colors hover:text-primary">
+                          {match.homeTeam.name}
+                        </Link>
+                        <p className="text-xs text-gray-500 mt-1">#{match.homeTeam.fifaRank || '?'} · {match.homeTeam.marketPrice?.toLocaleString()}¢</p>
                       </div>
-                    ) : (
-                      <div className="flex flex-col items-center gap-2">
-                        <div className="text-2xl font-black text-gray-600">VS</div>
-                        <div className="w-px h-12 bg-white/10"></div>
+                    </div>
+
+                    {/* Group / Score / VS */}
+                    <div className="flex flex-col items-center justify-center gap-2">
+                      <Link
+                        href={groupHref(groupKey)}
+                        onClick={(event) => event.stopPropagation()}
+                        className="rounded-full border border-[#0FF0FC]/25 bg-[#0FF0FC]/10 px-3 py-1 text-[10px] font-black text-[#0FF0FC] transition hover:bg-[#0FF0FC]/20 hover:text-white"
+                        title={`اذهب إلى المجموعة ${groupKey}`}
+                      >
+                        المجموعة {groupKey}
+                      </Link>
+                      {(match.status === 'IN_PLAY' || match.status === 'FINISHED') ? (
+                        <div className="text-4xl md:text-5xl font-black text-white tracking-widest bg-black/40 px-4 py-3 rounded-2xl border border-white/10 shadow-inner">
+                          {match.homeScore} - {match.awayScore}
+                        </div>
+                      ) : (
+                        <div className="flex flex-col items-center gap-2">
+                          <div className="text-2xl font-black text-gray-600">VS</div>
+                          <div className="w-px h-10 bg-white/10"></div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Away Team */}
+                    <div className="flex flex-col items-center text-center gap-3">
+                      <TeamLogoLink team={match.awayTeam} />
+                      <div>
+                        <Link href={getTeamHref(match.awayTeam)} onClick={(event) => event.stopPropagation()} className="font-black text-white text-lg md:text-xl group-hover:text-primary transition-colors hover:text-primary">
+                          {match.awayTeam.name}
+                        </Link>
+                        <p className="text-xs text-gray-500 mt-1">#{match.awayTeam.fifaRank || '?'} · {match.awayTeam.marketPrice?.toLocaleString()}¢</p>
                       </div>
-                    )}
-                  </div>
-
-                  {/* Away Team */}
-                  <div className="flex flex-col items-center text-center gap-3">
-                    <div className="w-20 h-20 md:w-24 md:h-24 bg-black/50 rounded-full flex items-center justify-center border border-white/10 overflow-hidden shadow-lg group-hover:scale-105 transition-transform">
-                      {match.awayTeam.image.startsWith('http') ? <img src={match.awayTeam.image} alt={match.awayTeam.name} className="w-full h-full object-cover" /> : <span className="text-5xl">{match.awayTeam.image}</span>}
-                    </div>
-                    <div>
-                      <h3 className="font-black text-white text-lg md:text-xl group-hover:text-primary transition-colors">{match.awayTeam.name}</h3>
-                      <p className="text-xs text-gray-500 mt-1">#{match.awayTeam.fifaRank || '?'} · {match.awayTeam.marketPrice?.toLocaleString()}¢</p>
                     </div>
                   </div>
-                </div>
 
-                {/* Market Impact Metrics */}
-                <div className="grid grid-cols-3 gap-3 relative z-10 border-t border-white/5 pt-4">
-                  <div className="bg-black/20 rounded-xl p-3 text-center">
-                    <TrendingUp size={16} className="mx-auto mb-1 text-primary" />
-                    <p className="text-[10px] text-gray-500 mb-1">زخم مشترك</p>
-                    <p className="font-bold text-white font-mono">{((match.homeTeam.momentum || 50) + (match.awayTeam.momentum || 50)).toFixed(0)}</p>
+                  {/* Market Impact Metrics */}
+                  <div className="grid grid-cols-3 gap-3 relative z-10 border-t border-white/5 pt-4">
+                    <div className="bg-black/20 rounded-xl p-3 text-center">
+                      <TrendingUp size={16} className="mx-auto mb-1 text-primary" />
+                      <p className="text-[10px] text-gray-500 mb-1">زخم مشترك</p>
+                      <p className="font-bold text-white font-mono">{((match.homeTeam.momentum || 50) + (match.awayTeam.momentum || 50)).toFixed(0)}</p>
+                    </div>
+                    <div className="bg-black/20 rounded-xl p-3 text-center">
+                      <Activity size={16} className="mx-auto mb-1 text-orange-500" />
+                      <p className="text-[10px] text-gray-500 mb-1">طلب السوق</p>
+                      <p className="font-bold text-white font-mono">{((match.homeTeam.marketDemand || 50) + (match.awayTeam.marketDemand || 50)).toFixed(0)}</p>
+                    </div>
+                    <div className="bg-black/20 rounded-xl p-3 text-center">
+                      <BarChart3 size={16} className="mx-auto mb-1 text-[#FFD700]" />
+                      <p className="text-[10px] text-gray-500 mb-1">تأثير السعر</p>
+                      <p className="font-bold text-[#FFD700] font-mono">مرتفع</p>
+                    </div>
                   </div>
-                  <div className="bg-black/20 rounded-xl p-3 text-center">
-                    <Activity size={16} className="mx-auto mb-1 text-orange-500" />
-                    <p className="text-[10px] text-gray-500 mb-1">طلب السوق</p>
-                    <p className="font-bold text-white font-mono">{((match.homeTeam.marketDemand || 50) + (match.awayTeam.marketDemand || 50)).toFixed(0)}</p>
-                  </div>
-                  <div className="bg-black/20 rounded-xl p-3 text-center">
-                    <BarChart3 size={16} className="mx-auto mb-1 text-[#FFD700]" />
-                    <p className="text-[10px] text-gray-500 mb-1">تأثير السعر</p>
-                    <p className="font-bold text-[#FFD700] font-mono">مرتفع</p>
-                  </div>
-                </div>
 
-                <div className="mt-4 flex justify-end">
-                  <span className="flex items-center gap-1 text-primary text-sm font-bold group-hover:translate-x-[-4px] transition-transform">
-                    تحليل المباراة <ChevronLeft size={16} />
-                  </span>
+                  <div className="mt-4 flex justify-end">
+                    <span className="flex items-center gap-1 text-primary text-sm font-bold group-hover:translate-x-[-4px] transition-transform">
+                      تحليل المباراة <ChevronLeft size={16} />
+                    </span>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </main>
