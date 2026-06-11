@@ -21,7 +21,7 @@ type SeedResponse = {
   message?: string;
 };
 
-type GroupKey = 'A' | 'B' | 'C';
+type GroupKey = 'A' | 'B' | 'C' | 'D';
 
 type GroupStatusResponse = {
   ok?: boolean;
@@ -84,7 +84,8 @@ function buildInitialManualForm(teamId = ''): ManualForm {
 function getGroupName(group: GroupKey) {
   if (group === 'A') return 'المجموعة الأولى';
   if (group === 'B') return 'المجموعة الثانية';
-  return 'المجموعة الثالثة';
+  if (group === 'C') return 'المجموعة الثالثة';
+  return 'المجموعة الرابعة';
 }
 
 function getResponseMessage(data: SeedResponse) {
@@ -345,6 +346,7 @@ export default function TeamIntelligenceAdminDashboard({ teams, initialTeamId = 
               {renderGroupControls('A')}
               {renderGroupControls('B')}
               {renderGroupControls('C')}
+              {renderGroupControls('D')}
             </div>
 
             {message && (
