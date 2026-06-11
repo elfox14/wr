@@ -15,16 +15,28 @@ function normalizeStatus(status?: string | null) {
   return value || 'SCHEDULED';
 }
 
-function hasValidCronSecret(req: Request) {
+function getCronAuth(req: Request) {
   const expected = process.env.CRON_SECRET || process.env.ADMIN_API_SECRET;
-  if (!expected) return true;
+  if (!expected) return { valid: true, method: 'no_secret_configured' };
 
   const auth = req.headers.get('authorization') || '';
   const bearer = auth.startsWith('Bearer ') ? auth.slice(7).trim() : '';
   const cronHeader = req.headers.get('x-cron-secret') || '';
   const adminHeader = req.headers.get('x-admin-secret') || '';
+  const { searchParams } = new URL(req.url);
+  const cronQuery = searchParams.get('cronSecret') || '';
+  const adminQuery = searchParams.get('adminSecret') || '';
 
-  return [bearer, cronHeader, adminHeader].some((value) => value && value === expected);
+  const candidates = [
+    { method: 'authorization_bearer', value: bearer },
+    { method: 'x-cron-secret', value: cronHeader },
+    { method: 'x-admin-secret', value: adminHeader },
+    { method: 'cronSecret_query', value: cronQuery },
+    { method: 'adminSecret_query', value: adminQuery },
+  ];
+
+  const matched = candidates.find((item) => item.value && item.value === expected);
+  return matched ? { valid: true, method: matched.method } : { valid: false, method: null };
 }
 
 function normalizeTeamName(name?: string | null) {
@@ -276,13 +288,18 @@ async function processLiveFixture(fixture: any) {
 }
 
 export async function GET(req: Request) {
-  if (!hasValidCronSecret(req)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const auth = getCronAuth(req);
+  if (!auth.valid) {
+    return NextResponse.json({
+      error: 'Unauthorized',
+      hint: 'Use Authorization: Bearer <CRON_SECRET>, x-cron-secret, x-admin-secret, or cronSecret/adminSecret query only for private testing.',
+    }, { status: 401 });
   }
 
   const summary: any = {
     success: true,
     mode: 'light_live_market_sync',
+    authMethod: auth.method,
     externalRequestsUsed: 0,
     skippedProviderFetch: false,
     fixturesFetched: 0,
