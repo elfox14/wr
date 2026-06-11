@@ -1,10 +1,19 @@
 import { NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 import { seedTeamIntelligenceReports } from '@/lib/seedTeamIntelligenceReports';
 
 export const dynamic = 'force-dynamic';
 
-function isAuthorized(request: Request) {
+type AdminSession = {
+  user?: {
+    email?: string | null;
+    role?: string | null;
+  };
+} | null;
+
+function hasValidSecret(request: Request) {
   const secret = process.env.ADMIN_CRON_SECRET;
   if (!secret) return false;
 
@@ -16,8 +25,20 @@ function isAuthorized(request: Request) {
   return bearerToken === secret || queryToken === secret;
 }
 
+function isAdminSession(session: AdminSession) {
+  const email = session?.user?.email || '';
+  return session?.user?.role === 'ADMIN' || email === 'worldcup@mcprim.com' || email === 'elfox14usa@gmail.com';
+}
+
+async function isAuthorized(request: Request) {
+  if (hasValidSecret(request)) return true;
+
+  const session = await getServerSession(authOptions as never) as AdminSession;
+  return isAdminSession(session);
+}
+
 export async function POST(request: Request) {
-  if (!isAuthorized(request)) {
+  if (!(await isAuthorized(request))) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -31,7 +52,7 @@ export async function POST(request: Request) {
 }
 
 export async function GET(request: Request) {
-  if (!isAuthorized(request)) {
+  if (!(await isAuthorized(request))) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
