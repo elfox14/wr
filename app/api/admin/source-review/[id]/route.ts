@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
-import { Prisma } from '@prisma/client';
+import type { Prisma } from '@prisma/client';
 import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 import { createSourceAutomationLog } from '@/lib/sourceAutomationLog';
@@ -43,10 +43,17 @@ function cleanWeaknesses(weaknesses: string[]) {
   return weaknesses.filter((item) => !item.startsWith('NEEDS_REVIEW'));
 }
 
-function mergeMetrics(metrics: Prisma.JsonValue | null, values: Record<string, Prisma.JsonValue | null>): Prisma.InputJsonValue {
+function mergeMetrics(
+  metrics: Prisma.JsonValue | null,
+  values: Prisma.InputJsonObject,
+): Prisma.InputJsonObject {
   if (metrics && typeof metrics === 'object' && !Array.isArray(metrics)) {
-    return { ...(metrics as Prisma.JsonObject), ...values };
+    return {
+      ...(metrics as Prisma.InputJsonObject),
+      ...values,
+    };
   }
+
   return values;
 }
 
@@ -104,7 +111,6 @@ export async function POST(request: Request, context: RouteContext) {
       }),
       lastCheckedAt: new Date(),
     },
-    include: { team: { select: { id: true, name: true, code: true } } },
   });
 
   await createSourceAutomationLog({
@@ -114,7 +120,7 @@ export async function POST(request: Request, context: RouteContext) {
     skipped: 0,
     details: {
       approvedReportId: updated.id,
-      team: updated.team,
+      team: report.team,
       title: updated.title,
       note: note || null,
     },
@@ -123,7 +129,10 @@ export async function POST(request: Request, context: RouteContext) {
   return NextResponse.json({
     success: true,
     status: 'approved',
-    report: updated,
+    report: {
+      ...updated,
+      team: report.team,
+    },
   });
 }
 
