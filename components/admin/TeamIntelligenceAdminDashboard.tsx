@@ -16,6 +16,7 @@ type SeedResponse = {
   updated?: number;
   skipped?: number;
   count?: number;
+  deletedCuratedReports?: number;
   error?: string;
   message?: string;
 };
@@ -81,13 +82,14 @@ function getResponseMessage(data: SeedResponse) {
   if (data.message) return data.message;
   if (data.success) {
     const parts = [
+      typeof data.deletedCuratedReports === 'number' ? `deleted=${data.deletedCuratedReports}` : null,
       typeof data.created === 'number' ? `created=${data.created}` : null,
       typeof data.updated === 'number' ? `updated=${data.updated}` : null,
       typeof data.skipped === 'number' ? `skipped=${data.skipped}` : null,
       typeof data.count === 'number' ? `count=${data.count}` : null,
     ].filter(Boolean);
 
-    return parts.length ? `تم تشغيل seed بنجاح: ${parts.join(' · ')}` : 'تم تشغيل seed بنجاح.';
+    return parts.length ? `تم التشغيل بنجاح: ${parts.join(' · ')}` : 'تم التشغيل بنجاح.';
   }
 
   return 'تم استلام رد غير متوقع من الخادم.';
@@ -103,6 +105,7 @@ function getStatusMessage(data: GroupAStatusResponse) {
 export default function TeamIntelligenceAdminDashboard({ teams, initialTeamId = '' }: { teams: TeamOption[]; initialTeamId?: string }) {
   const [secret, setSecret] = useState('');
   const [loading, setLoading] = useState(false);
+  const [reseedLoading, setReseedLoading] = useState(false);
   const [statusLoading, setStatusLoading] = useState(false);
   const [manualLoading, setManualLoading] = useState(false);
   const [message, setMessage] = useState('');
@@ -114,6 +117,8 @@ export default function TeamIntelligenceAdminDashboard({ teams, initialTeamId = 
   const [lastResult, setLastResult] = useState<SeedResponse | null>(null);
   const [groupAStatus, setGroupAStatus] = useState<GroupAStatusResponse | null>(null);
   const [manualForm, setManualForm] = useState<ManualForm>(() => buildInitialManualForm(initialTeamId));
+
+  const isBusy = loading || reseedLoading || statusLoading;
 
   const getOptionalAuthHeaders = () => {
     const trimmedSecret = secret.trim();
@@ -145,6 +150,40 @@ export default function TeamIntelligenceAdminDashboard({ teams, initialTeamId = 
       setError(fallbackMessage);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const reseedGroupA = async () => {
+    const confirmed = window.confirm('سيتم حذف تقارير المجموعة الأولى المزروعة فقط ثم إعادة زراعتها. هل تريد المتابعة؟');
+    if (!confirmed) return;
+
+    setReseedLoading(true);
+    setMessage('');
+    setError('');
+    setStatusMessage('');
+    setStatusError('');
+    setLastResult(null);
+    setGroupAStatus(null);
+
+    try {
+      const res = await fetch('/api/admin/reseed-group-a-intelligence', {
+        method: 'POST',
+        headers: getOptionalAuthHeaders(),
+      });
+      const data = await res.json() as SeedResponse;
+      setLastResult(data);
+
+      if (!res.ok) {
+        setError(getResponseMessage(data));
+        return;
+      }
+
+      setMessage(`تمت إعادة زراعة المجموعة الأولى بنجاح. ${getResponseMessage(data)}`);
+    } catch (caughtError) {
+      const fallbackMessage = caughtError instanceof Error ? caughtError.message : 'فشل إعادة زراعة تقارير المجموعة الأولى.';
+      setError(fallbackMessage);
+    } finally {
+      setReseedLoading(false);
     }
   };
 
@@ -257,19 +296,27 @@ export default function TeamIntelligenceAdminDashboard({ teams, initialTeamId = 
                   className="w-full rounded-2xl border border-white/10 bg-background px-4 py-3 text-white outline-none focus:border-primary"
                 />
               </label>
-              <div className="grid gap-3 sm:grid-cols-2">
+              <div className="grid gap-3 xl:grid-cols-3">
                 <button
                   type="button"
                   onClick={runSeed}
-                  disabled={loading || statusLoading}
+                  disabled={isBusy}
                   className="inline-flex items-center justify-center gap-2 rounded-2xl bg-primary px-5 py-3 font-black text-black hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {loading ? 'جاري التشغيل...' : 'تشغيل seed'} <RefreshCw size={17} className={loading ? 'animate-spin' : ''} />
                 </button>
                 <button
                   type="button"
+                  onClick={reseedGroupA}
+                  disabled={isBusy}
+                  className="inline-flex items-center justify-center gap-2 rounded-2xl border border-yellow-300/20 bg-yellow-300/10 px-5 py-3 font-black text-yellow-100 hover:border-yellow-300/40 hover:bg-yellow-300/15 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {reseedLoading ? 'جاري إعادة الزراعة...' : 'إعادة زراعة المجموعة الأولى'} <RefreshCw size={17} className={reseedLoading ? 'animate-spin' : ''} />
+                </button>
+                <button
+                  type="button"
                   onClick={checkGroupAStatus}
-                  disabled={loading || statusLoading}
+                  disabled={isBusy}
                   className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-5 py-3 font-black text-white hover:border-primary/40 hover:text-primary disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {statusLoading ? 'جاري الفحص...' : 'فحص حالة المجموعة الأولى'} <Database size={17} className={statusLoading ? 'animate-pulse' : ''} />
