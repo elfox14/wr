@@ -16,6 +16,7 @@ const GROUP_CODES = {
   B: ['CAN', 'BIH', 'QAT', 'SUI'],
   C: ['BRA', 'MAR', 'HAI', 'SCO'],
   D: ['USA', 'PAR', 'AUS', 'TUR'],
+  E: ['GER', 'CUW', 'ECU', 'CIV'],
 } as const;
 
 type SupportedGroup = keyof typeof GROUP_CODES;
@@ -28,6 +29,7 @@ async function isAuthorized() {
 function getRequestedGroup(request: Request): SupportedGroup {
   const url = new URL(request.url);
   const group = (url.searchParams.get('group') || 'A').toUpperCase();
+  if (group === 'E') return 'E';
   if (group === 'D') return 'D';
   if (group === 'C') return 'C';
   if (group === 'B') return 'B';
