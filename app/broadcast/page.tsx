@@ -9,7 +9,12 @@ export const metadata: Metadata = {
 };
 
 export default async function BroadcastPage() {
-  const [nextMatchRaw, teamsCount, playersCount, assetsCount, matchesCount] = await Promise.all([
+  const [liveMatchRaw, nextMatchRaw, teamsCount, playersCount, assetsCount, matchesCount] = await Promise.all([
+    prisma.match.findFirst({
+      where: { status: { in: ['IN_PLAY', 'LIVE'] } },
+      orderBy: { matchDate: 'asc' },
+      include: { homeTeam: true, awayTeam: true },
+    }),
     prisma.match.findFirst({
       where: { status: { in: ['SCHEDULED', 'IN_PLAY', 'LIVE'] } },
       orderBy: { matchDate: 'asc' },
@@ -21,7 +26,8 @@ export default async function BroadcastPage() {
     prisma.match.count(),
   ]);
 
-  const nextMatch = nextMatchRaw ? JSON.parse(JSON.stringify(nextMatchRaw)) : null;
+  const selectedMatchRaw = liveMatchRaw || nextMatchRaw;
+  const nextMatch = selectedMatchRaw ? JSON.parse(JSON.stringify(selectedMatchRaw)) : null;
   const articles = getAllArticles().slice(0, 3).map((article) => ({
     id: article.id,
     title: article.title,
