@@ -11,7 +11,6 @@ import {
   Coins,
   Globe,
   ShieldCheck,
-  Sparkles,
   TrendingUp,
   Trophy,
   Users,
@@ -123,14 +122,14 @@ export default function HomeClient({
         <div className="pointer-events-none absolute inset-0 opacity-16 [background-image:linear-gradient(rgba(255,255,255,.05)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.05)_1px,transparent_1px)] [background-size:44px_44px]" />
         <div className="relative grid gap-5 lg:grid-cols-[1.05fr_0.95fr] lg:items-stretch">
           <div className="flex flex-col justify-center">
-            <p className="mb-4 inline-flex w-fit items-center gap-2 rounded-full border border-[#0FF0FC]/25 bg-[#0FF0FC]/10 px-4 py-2 text-xs font-black text-[#0FF0FC]">
-              <Sparkles size={15} /> بوابة مونديال 2026
+            <p className="mb-4 inline-flex w-fit rounded-full border border-[#0FF0FC]/25 bg-[#0FF0FC]/10 px-4 py-2 text-xs font-black text-[#0FF0FC]">
+              بورصة إم سي للمونديال
             </p>
             <h1 className="max-w-3xl text-3xl font-black leading-tight text-white md:text-5xl">
-              بورصة المونديال: تحليل سريع + سوق افتراضي واضح
+              منصة تحليلات وإحصائيات رياضية مع تجربة تداول افتراضية للمونديال
             </h1>
             <p className="mt-4 max-w-3xl text-sm leading-7 text-gray-300 md:text-base">
-              الصفحة الرئيسية أصبحت أقصر ومباشرة: مؤشرات حقيقية، روابط دخول سريعة، والمباراة القادمة بدل مساحة كبيرة بلا قيمة.
+              تابع بيانات المنتخبات واللاعبين، اقرأ التحليلات الكروية، وجرّب سوق بورصة المونديال بأرصدة افتراضية فقط لفهم حركة الأسعار والزخم بدون أي معاملات مالية حقيقية.
             </p>
 
             <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
