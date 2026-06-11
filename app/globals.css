@@ -159,6 +159,35 @@ img[src*="/brand/logo-horizontal.png"] {
   100% { background-position: -100% 0; }
 }
 
+/* ─── Team Intelligence Reports ─── */
+article p.text-xs.leading-6.text-gray-400 {
+  white-space: pre-line;
+  line-height: 1.95;
+}
+
+article p.text-xs.leading-6.text-gray-400::selection {
+  background: rgba(15, 240, 252, 0.22);
+}
+
+@media (min-width: 1024px) {
+  article p.text-xs.leading-6.text-gray-400 {
+    max-height: 34rem;
+    overflow-y: auto;
+    padding-left: 0.25rem;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255,255,255,0.18) transparent;
+  }
+
+  article p.text-xs.leading-6.text-gray-400::-webkit-scrollbar {
+    width: 5px;
+  }
+
+  article p.text-xs.leading-6.text-gray-400::-webkit-scrollbar-thumb {
+    background: rgba(255,255,255,0.18);
+    border-radius: 999px;
+  }
+}
+
 /* ─── Bento Grid Layout ─── */
 .home-grid {
   display: grid;
