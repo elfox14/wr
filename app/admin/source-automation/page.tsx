@@ -7,6 +7,7 @@ import { AlertTriangle, ArrowRight, CheckCircle2, Database, ExternalLink, Refres
 import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 import { getSportsReferenceSourceStatus } from '@/lib/sportsReferenceSource';
+import { getLatestSourceAutomationLogs } from '@/lib/sourceAutomationLog';
 
 export const dynamic = 'force-dynamic';
 
@@ -73,6 +74,16 @@ export default async function SourceAutomationAdminPage() {
     },
   });
 
+  const latestAutomationLogs = await getLatestSourceAutomationLogs(12);
+  const needsReviewCount = await prisma.teamIntelligenceReport.count({
+    where: {
+      OR: [
+        { reportType: 'TEAM_PROFILE_REVIEW' },
+        { tacticalTags: { has: 'NEEDS_REVIEW' } },
+      ],
+    },
+  });
+
   const checks = [
     {
       title: 'Secret للأتمتة',
@@ -94,6 +105,16 @@ export default async function SourceAutomationAdminPage() {
       ready: latestAutoReports.length > 0,
       note: latestAutoReports.length ? `تم العثور على ${latestAutoReports.length} تقرير تلقائي حديث.` : 'لم يتم حفظ تقارير تلقائية بعد.',
     },
+    {
+      title: 'مصادر تحتاج مراجعة',
+      ready: needsReviewCount === 0,
+      note: needsReviewCount ? `${needsReviewCount} مصدر يحتاج مراجعة تحريرية.` : 'لا توجد مصادر معلقة للمراجعة.',
+    },
+    {
+      title: 'سجل التشغيل',
+      ready: latestAutomationLogs.length > 0,
+      note: latestAutomationLogs.length ? `آخر ${latestAutomationLogs.length} عمليات تشغيل مسجلة.` : 'لا توجد عمليات تشغيل مسجلة بعد.',
+    },
   ];
 
   return (
@@ -108,13 +129,14 @@ export default async function SourceAutomationAdminPage() {
             </div>
             <div className="flex flex-wrap gap-2">
               <Link href="/admin/team-intelligence" className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-black text-white hover:border-primary/40 hover:text-primary">إدارة التقارير <ArrowRight size={15} /></Link>
+              <Link href="/admin/source-review" className="inline-flex items-center gap-2 rounded-2xl border border-yellow-300/20 bg-yellow-300/10 px-4 py-3 text-sm font-black text-yellow-100 hover:border-yellow-300/40">مصادر تحتاج مراجعة <AlertTriangle size={15} /></Link>
               <a href="/api/admin/source-automation-status" target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-2xl bg-primary px-4 py-3 text-sm font-black text-black hover:bg-primary/90">JSON Status <ExternalLink size={15} /></a>
             </div>
           </div>
           <div className="rounded-2xl border border-yellow-300/10 bg-yellow-300/[0.055] p-4 text-sm leading-7 text-yellow-100">هذه الصفحة لا تعرض قيم الأسرار نفسها، فقط تتحقق من وجودها. أي نقص في البيانات يظهر كـ “غير متوفر في المصادر” داخل التقارير.</div>
         </section>
 
-        <section className="mb-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <section className="mb-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {checks.map((check) => (
             <div key={check.title} className="rounded-3xl border border-white/5 bg-surface p-5 shadow-card">
               <div className="mb-3 flex items-center justify-between gap-3">
@@ -165,6 +187,27 @@ export default async function SourceAutomationAdminPage() {
             )}
           </section>
         </div>
+
+        <section className="mt-6 rounded-3xl border border-white/5 bg-surface p-5 shadow-card md:p-6">
+          <h2 className="mb-4 flex items-center gap-2 text-xl font-black text-white"><RefreshCw size={20} className="text-primary" /> سجل تشغيل الأتمتة</h2>
+          {latestAutomationLogs.length ? (
+            <div className="grid gap-3">
+              {latestAutomationLogs.map((log) => (
+                <div key={log.id} className="rounded-2xl border border-white/10 bg-black/20 p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <div className="font-black text-white">{log.title}</div>
+                      <div className="mt-1 text-xs leading-6 text-gray-500">{log.summary}</div>
+                    </div>
+                    <span className="rounded-xl bg-white/5 px-3 py-1 text-xs font-black text-gray-300">{log.lastCheckedAt ? new Date(log.lastCheckedAt).toLocaleString('ar-EG') : 'غير متوفر'}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-yellow-300/20 bg-yellow-300/10 p-4 text-sm font-bold leading-7 text-yellow-100">لا توجد عمليات تشغيل مسجلة بعد.</div>
+          )}
+        </section>
       </main>
     </div>
   );
