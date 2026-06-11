@@ -12,6 +12,7 @@ type StepResult = {
   skipped?: boolean;
   reason?: string;
   durationMs?: number;
+  targetUrl?: string;
   payload?: unknown;
 };
 
@@ -49,6 +50,13 @@ function getAuth(req: Request) {
 
   const matched = candidates.find((item) => item.value && item.value === expected);
   return matched ? { valid: true, method: matched.method } : { valid: false, method: null };
+}
+
+function getCronBaseUrl(req: Request) {
+  const configured = (process.env.CRON_BASE_URL || process.env.NEXT_PUBLIC_SITE_URL || '').trim().replace(/\/$/, '');
+  if (configured) return configured;
+  const url = new URL(req.url);
+  return url.origin;
 }
 
 async function getSyncWindow(req: Request): Promise<SyncWindow> {
@@ -108,9 +116,9 @@ function shouldRunFootballAuto(req: Request, window: SyncWindow) {
   return minuteModulo(interval);
 }
 
-async function runStep(origin: string, name: string, path: string, secret: string, query?: Record<string, string>): Promise<StepResult> {
+async function runStep(baseUrl: string, name: string, path: string, secret: string, query?: Record<string, string>): Promise<StepResult> {
   const started = Date.now();
-  const target = new URL(`${origin}${path}`);
+  const target = new URL(`${baseUrl}${path}`);
 
   if (query) {
     for (const [key, value] of Object.entries(query)) {
@@ -134,12 +142,15 @@ async function runStep(origin: string, name: string, path: string, secret: strin
       ? await response.json().catch(() => null)
       : await response.text().catch(() => null);
 
+    const logicalOk = response.ok || response.status === 207;
+
     return {
       name,
       path,
-      ok: response.ok,
+      ok: logicalOk,
       status: response.status,
       durationMs: Date.now() - started,
+      targetUrl: target.toString().replace(/(cronSecret|adminSecret|key)=([^&]+)/g, '$1=***'),
       payload,
     };
   } catch (error: any) {
@@ -147,9 +158,13 @@ async function runStep(origin: string, name: string, path: string, secret: strin
       name,
       path,
       ok: false,
-      status: 500,
+      status: 599,
       durationMs: Date.now() - started,
-      payload: { error: error?.message || 'Request failed' },
+      targetUrl: target.toString().replace(/(cronSecret|adminSecret|key)=([^&]+)/g, '$1=***'),
+      payload: {
+        error: error?.message || 'Request failed',
+        hint: 'Downstream cron endpoint could not be reached from master-sync. Set CRON_BASE_URL=https://worldcup.mcprim.com in Render, redeploy, then retry. If it still fails, use external-run jobs separately.',
+      },
     };
   }
 }
@@ -165,7 +180,7 @@ export async function GET(req: Request) {
   }
 
   const url = new URL(req.url);
-  const origin = url.origin;
+  const baseUrl = getCronBaseUrl(req);
   const secret = process.env.CRON_SECRET || process.env.ADMIN_API_SECRET || '';
   const date = url.searchParams.get('date') || '';
   const forceAnimation = url.searchParams.get('forceAnimation') === 'true';
@@ -177,7 +192,7 @@ export async function GET(req: Request) {
   const runFootballAuto = shouldRunFootballAuto(req, syncWindow);
 
   if (runAnimation) {
-    steps.push(await runStep(origin, 'sync-animation-matches', '/api/cron/sync-animation-matches', secret, {
+    steps.push(await runStep(baseUrl, 'sync-animation-matches', '/api/cron/sync-animation-matches', secret, {
       dryRun: 'false',
     }));
   } else {
@@ -189,7 +204,7 @@ export async function GET(req: Request) {
   }
 
   if (runFootballAuto) {
-    steps.push(await runStep(origin, 'football-auto-sync', '/api/cron/football-auto-sync', secret, {
+    steps.push(await runStep(baseUrl, 'football-auto-sync', '/api/cron/football-auto-sync', secret, {
       ...(date ? { date } : {}),
     }));
   } else {
@@ -201,7 +216,7 @@ export async function GET(req: Request) {
   }
 
   if (runLive) {
-    steps.push(await runStep(origin, 'live-market-sync', '/api/cron/live-market-sync', secret, {
+    steps.push(await runStep(baseUrl, 'live-market-sync', '/api/cron/live-market-sync', secret, {
       ...(date ? { date } : {}),
     }));
   } else {
@@ -214,6 +229,7 @@ export async function GET(req: Request) {
     ok,
     mode: 'budget_aware_master_sync',
     authMethod: auth.method,
+    baseUrl: baseUrl.replace(/(cronSecret|adminSecret|key)=([^&]+)/g, '$1=***'),
     startedAt: startedAt.toISOString(),
     finishedAt: new Date().toISOString(),
     syncWindow,
