@@ -8,6 +8,7 @@ import {
   ArrowLeft,
   Calendar,
   Globe,
+  Radio,
   ShieldCheck,
   Users,
   Wallet,
@@ -26,16 +27,21 @@ type AcademyArticle = {
 
 function normalizeGroupKey(value?: string | null): string {
   if (!value) return 'غير محددة';
-  return value
-    .replace('Group', '')
-    .replace('المجموعة', '')
-    .trim()
-    .toUpperCase();
+  return value.replace('Group', '').replace('المجموعة', '').trim().toUpperCase();
 }
 
 function groupHref(value?: string | null): string {
   const key = normalizeGroupKey(value);
   return `/groups#group-${encodeURIComponent(key)}`;
+}
+
+function getAnimationMatchId(match: any) {
+  return match?.animationMatchId || match?.isportsMatchId || match?.isportsId || match?.externalId || match?.matchId || '';
+}
+
+function getAnimationHref(match: any) {
+  const id = getAnimationMatchId(match);
+  return id ? `/animation-live?matchId=${encodeURIComponent(String(id))}&lang=en&statsPanel=simple&teamPanel=1` : '/animation-live';
 }
 
 export default function HomeClient({
@@ -129,43 +135,20 @@ export default function HomeClient({
 
   const countdown = getCountdown();
   const matchGroup = normalizeGroupKey(nextMatch?.groupPhase || nextMatch?.group || nextMatch?.homeTeam?.group || nextMatch?.awayTeam?.group);
+  const animationHref = getAnimationHref(nextMatch);
 
   const quickStats = [
     { label: 'منتخب', value: teamsCount || 48, icon: Globe, tone: 'text-emerald-300' },
-    { label: 'لاعب', value: playersCount || 1244, icon: Users, tone: 'text-[#0FF0FC]' },
-    { label: 'أصل', value: assetsCount || safeAssets.length, icon: Wallet, tone: 'text-[#FFD700]' },
-    { label: 'مباراة', value: upcomingMatchesCount, icon: Calendar, tone: 'text-rose-300' },
+    { label: 'لاعب', value: playersCount || 1249, icon: Users, tone: 'text-[#0FF0FC]' },
+    { label: 'أصل', value: assetsCount || 1297, icon: Wallet, tone: 'text-[#FFD700]' },
+    { label: 'مباراة', value: upcomingMatchesCount || 72, icon: Calendar, tone: 'text-rose-300' },
   ];
 
   const gatewayCards = [
-    {
-      title: 'المنتخبات',
-      text: 'صفحات مختصرة لكل منتخب: بطاقة، مجموعة، نجوم، نقاط قوة وضعف.',
-      href: '/market?type=TEAM',
-      action: 'استكشف المنتخبات',
-      tone: 'border-emerald-400/20 bg-emerald-400/[0.045] text-emerald-300',
-    },
-    {
-      title: 'اللاعبون',
-      text: 'تقييمات وأسعار افتراضية ومقارنة سريعة بين أبرز الأسماء.',
-      href: '/market?type=PLAYER',
-      action: 'تقييمات اللاعبين',
-      tone: 'border-[#0FF0FC]/20 bg-[#0FF0FC]/[0.045] text-[#0FF0FC]',
-    },
-    {
-      title: 'التحليل الكروي',
-      text: 'أداء، أسلوب لعب، زخم، مؤشرات فنية وملخصات قابلة للتحويل لإنفوجرافيك.',
-      href: '/team-intelligence',
-      action: 'افتح التحليل',
-      tone: 'border-violet-400/20 bg-violet-400/[0.045] text-violet-300',
-    },
-    {
-      title: 'البورصة الافتراضية',
-      text: 'سوق تعليمي افتراضي بالكامل مبني على الأداء والطلب داخل المنصة.',
-      href: '/market',
-      action: 'راقب السوق',
-      tone: 'border-[#FFD700]/20 bg-[#FFD700]/[0.045] text-[#FFD700]',
-    },
+    { title: 'المنتخبات', text: 'صفحات مختصرة لكل منتخب: بطاقة، مجموعة، نجوم، نقاط قوة وضعف.', href: '/market?type=TEAM', action: 'استكشف المنتخبات', tone: 'border-emerald-400/20 bg-emerald-400/[0.045] text-emerald-300' },
+    { title: 'اللاعبون', text: 'تقييمات وأسعار افتراضية ومقارنة سريعة بين أبرز الأسماء.', href: '/market?type=PLAYER', action: 'تقييمات اللاعبين', tone: 'border-[#0FF0FC]/20 bg-[#0FF0FC]/[0.045] text-[#0FF0FC]' },
+    { title: 'التحليل الكروي', text: 'أداء، أسلوب لعب، زخم، مؤشرات فنية وملخصات قابلة للتحويل لإنفوجرافيك.', href: '/team-intelligence', action: 'افتح التحليل', tone: 'border-violet-400/20 bg-violet-400/[0.045] text-violet-300' },
+    { title: 'البورصة الافتراضية', text: 'سوق تعليمي افتراضي بالكامل مبني على الأداء والطلب داخل المنصة.', href: '/market', action: 'راقب السوق', tone: 'border-[#FFD700]/20 bg-[#FFD700]/[0.045] text-[#FFD700]' },
   ];
 
   return (
@@ -174,15 +157,9 @@ export default function HomeClient({
         <div className="pointer-events-none absolute inset-0 opacity-16 [background-image:linear-gradient(rgba(255,255,255,.05)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.05)_1px,transparent_1px)] [background-size:44px_44px]" />
         <div className="relative grid gap-5 lg:grid-cols-[1.02fr_0.98fr] lg:items-stretch">
           <div className="flex flex-col justify-center">
-            <p className="mb-4 inline-flex w-fit rounded-full border border-[#0FF0FC]/25 bg-[#0FF0FC]/10 px-4 py-2 text-xs font-black text-[#0FF0FC]">
-              بورصة إم سي للمونديال
-            </p>
-            <h1 className="max-w-3xl text-3xl font-black leading-tight text-white md:text-5xl">
-              منصة تحليلات وإحصائيات رياضية مع تجربة تداول افتراضية للمونديال
-            </h1>
-            <p className="mt-4 max-w-3xl text-sm leading-7 text-gray-300 md:text-base">
-              تابع بيانات المنتخبات واللاعبين، اقرأ التحليلات الكروية، وجرّب سوق بورصة المونديال بأرصدة افتراضية فقط لفهم حركة الأسعار والزخم بدون أي معاملات مالية حقيقية.
-            </p>
+            <p className="mb-4 inline-flex w-fit rounded-full border border-[#0FF0FC]/25 bg-[#0FF0FC]/10 px-4 py-2 text-xs font-black text-[#0FF0FC]">بورصة إم سي للمونديال</p>
+            <h1 className="max-w-3xl text-3xl font-black leading-tight text-white md:text-5xl">منصة تحليلات وإحصائيات رياضية مع تجربة تداول افتراضية للمونديال</h1>
+            <p className="mt-4 max-w-3xl text-sm leading-7 text-gray-300 md:text-base">تابع بيانات المنتخبات واللاعبين، اقرأ التحليلات الكروية، وجرّب سوق بورصة المونديال بأرصدة افتراضية فقط لفهم حركة الأسعار والزخم بدون أي معاملات مالية حقيقية.</p>
           </div>
 
           <div className="rounded-[1.6rem] border border-white/10 bg-black/40 p-5 backdrop-blur-xl">
@@ -198,21 +175,15 @@ export default function HomeClient({
                 <div className="mb-4 grid grid-cols-[1fr_auto_1fr] items-center gap-3">
                   <div className="flex flex-col items-center gap-2 text-center">
                     {renderMatchTeamLogo(nextMatch.homeTeam)}
-                    <Link href={getTeamHref(nextMatch.homeTeam)} className="text-xs font-black text-white transition hover:text-[#0FF0FC]">
-                      {nextMatch.homeTeam?.name || 'الفريق الأول'}
-                    </Link>
+                    <Link href={getTeamHref(nextMatch.homeTeam)} className="text-xs font-black text-white transition hover:text-[#0FF0FC]">{nextMatch.homeTeam?.name || 'الفريق الأول'}</Link>
                   </div>
                   <div className="flex flex-col items-center gap-2">
-                    <Link href={groupHref(matchGroup)} className="rounded-full border border-[#0FF0FC]/25 bg-[#0FF0FC]/10 px-3 py-1 text-[10px] font-black text-[#0FF0FC] transition hover:bg-[#0FF0FC]/20 hover:text-white" title={`اذهب إلى المجموعة ${matchGroup}`}>
-                      المجموعة {matchGroup}
-                    </Link>
+                    <Link href={groupHref(matchGroup)} className="rounded-full border border-[#0FF0FC]/25 bg-[#0FF0FC]/10 px-3 py-1 text-[10px] font-black text-[#0FF0FC] transition hover:bg-[#0FF0FC]/20 hover:text-white" title={`اذهب إلى المجموعة ${matchGroup}`}>المجموعة {matchGroup}</Link>
                     <div className="rounded-full border border-white/10 bg-black/40 px-4 py-2 text-sm font-black text-[#FFD700]">VS</div>
                   </div>
                   <div className="flex flex-col items-center gap-2 text-center">
                     {renderMatchTeamLogo(nextMatch.awayTeam)}
-                    <Link href={getTeamHref(nextMatch.awayTeam)} className="text-xs font-black text-white transition hover:text-[#0FF0FC]">
-                      {nextMatch.awayTeam?.name || 'الفريق الثاني'}
-                    </Link>
+                    <Link href={getTeamHref(nextMatch.awayTeam)} className="text-xs font-black text-white transition hover:text-[#0FF0FC]">{nextMatch.awayTeam?.name || 'الفريق الثاني'}</Link>
                   </div>
                 </div>
                 <div className="text-center text-xs font-bold text-gray-400">{new Date(nextMatch.matchDate).toLocaleString('ar-EG')}</div>
@@ -228,6 +199,7 @@ export default function HomeClient({
                 ) : (
                   <div className="mt-3 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-center text-xs font-black text-emerald-200">بدأت أو اقتربت المباراة</div>
                 )}
+                <Link href={animationHref} className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-[#FFD700]/25 bg-[#FFD700]/10 px-3 py-2 text-xs font-black text-[#FFD700] transition hover:bg-[#FFD700] hover:text-black"><Radio size={15} /> مشاهدة البث الأنيميشن</Link>
               </div>
             ) : (
               <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.03] p-6 text-center text-sm text-gray-400">سيظهر هنا أقرب لقاء بعد مزامنة جدول المباريات.</div>
@@ -250,9 +222,7 @@ export default function HomeClient({
           <Link key={card.href} href={card.href} className={`group rounded-3xl border p-5 transition hover:-translate-y-1 ${card.tone}`}>
             <h3 className="text-xl font-black text-white">{card.title}</h3>
             <p className="mt-2 min-h-16 text-sm leading-6 text-gray-400">{card.text}</p>
-            <div className="mt-5 inline-flex items-center gap-2 text-sm font-black">
-              {card.action} <ArrowLeft size={16} className="transition group-hover:-translate-x-1" />
-            </div>
+            <div className="mt-5 inline-flex items-center gap-2 text-sm font-black">{card.action} <ArrowLeft size={16} className="transition group-hover:-translate-x-1" /></div>
           </Link>
         ))}
       </section>
