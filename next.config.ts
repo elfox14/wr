@@ -2,6 +2,15 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   devIndicators: false,
+  async redirects() {
+    return [
+      {
+        source: '/ai-analyst',
+        destination: '/intelligence',
+        permanent: true,
+      },
+    ];
+  },
   images: {
     remotePatterns: [
       { protocol: 'https', hostname: 'www.thesportsdb.com' },
