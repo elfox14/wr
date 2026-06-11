@@ -25,9 +25,9 @@ export function AssetPageTabs({ isTeam, lineup, playerOverview, trade, technical
     const base: TabItem[] = isTeam
       ? [
           { id: 'overview', label: 'التحليل الكروي', icon: <FileText size={16} />, content: overview },
-          { id: 'lineup', label: 'التشكيل واللاعبون', icon: <Users size={16} />, content: lineup },
+          { id: 'trade', label: 'التداول والنصائح', icon: <ShoppingCart size={16} />, content: trade },
+          { id: 'lineup', label: 'التشكيلة والاحتياطيون', icon: <Users size={16} />, content: lineup },
           { id: 'technical', label: 'مؤشرات الجاهزية', icon: <Brain size={16} />, content: technical },
-          { id: 'trade', label: 'التداول الافتراضي', icon: <ShoppingCart size={16} />, content: trade },
         ]
       : [
           { id: 'overview', label: 'نظرة اللاعب', icon: <LineChart size={16} />, content: playerOverview },
