@@ -1,9 +1,8 @@
-import { Activity, Brain, Gauge, ShieldAlert, Sparkles, Target, TrendingUp, WalletCards } from 'lucide-react';
+import { Activity, Brain, Gauge, ShieldAlert, Sparkles, Target, TrendingUp } from 'lucide-react';
 import { MarketAnalysisBadge } from './MarketAnalysisBadge';
 import { analyzeFootballAsset, type FootballAnalysisAssetInput } from '../lib/analysis-adapter';
-import { analyzeValueFit, formatVirtualCoins } from '../lib/value-fit';
 
-type Props = {
+ type Props = {
   asset: FootballAnalysisAssetInput;
   compact?: boolean;
 };
@@ -38,17 +37,28 @@ function IconForCategory({ label }: { label: string }) {
   return <TrendingUp size={16} />;
 }
 
+function SourceNotice({ isTeam }: { isTeam: boolean }) {
+  return (
+    <div className="rounded-2xl border border-yellow-300/15 bg-yellow-300/[0.045] p-4">
+      <div className="mb-2 flex items-center gap-2 text-sm font-black text-yellow-200"><Gauge size={17} /> مصدر الأرقام</div>
+      <p className="text-xs leading-6 text-gray-300">
+        {isTeam
+          ? 'هذا التب مخصص لمؤشرات الجاهزية فقط. أي رقم غير موثق من مصدر خارجي أو مزود بيانات مرخّص يجب التعامل معه كغير متوفر في المصادر، ولا يظهر هنا كتوصية تداول أو تقييم سعري.'
+          : 'هذا التقييم فني وسوقي مبسط داخل المنصة، وليس توصية مالية أو ضمان حركة سعرية.'}
+      </p>
+    </div>
+  );
+}
+
 export function FootballTechnicalAnalysis({ asset, compact = false }: Props) {
   if (!asset) return null;
 
   const analysis = analyzeFootballAsset(asset);
-  const valueFit = analyzeValueFit(asset, analysis.weightedScore);
   const isTeam = asset.type === 'TEAM';
-  const title = isTeam ? 'التحليل الفني للمنتخب' : 'التحليل الفني للاعب';
+  const title = isTeam ? 'مؤشرات الجاهزية' : 'التحليل الفني للاعب';
   const subtitle = isTeam
-    ? 'قراءة تكتيكية مبسطة لشكل المنتخب داخل الملعب بناءً على مؤشرات القوة، الزخم، الطلب، والاستقرار.'
+    ? 'تب منفصل لمؤشرات الجاهزية الكروية فقط. التداول والسعر والقيمة العادلة في تب التداول.'
     : 'قراءة فنية وتكتيكية مبسطة للاعب حسب مركزه ودوره داخل الملعب.';
-  const fairValueLabel = valueFit.fairValue ? formatVirtualCoins(valueFit.fairValue) : 'غير متاحة';
 
   return (
     <section className="mx-auto mb-4 w-full max-w-[1600px] px-3 lg:px-4">
@@ -57,7 +67,7 @@ export function FootballTechnicalAnalysis({ asset, compact = false }: Props) {
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div className="max-w-4xl">
               <div className="mb-2 inline-flex items-center gap-2 rounded-xl border border-[#0FF0FC]/20 bg-[#0FF0FC]/10 px-3 py-1 text-xs font-black text-[#0FF0FC]">
-                <Brain size={14} /> Football IQ
+                <Brain size={14} /> {isTeam ? 'READINESS INDICATORS' : 'Football IQ'}
               </div>
               <h2 className="text-xl font-black text-white lg:text-3xl">{title}</h2>
               <p className="mt-2 text-xs leading-6 text-gray-400 lg:text-sm lg:leading-7">{subtitle}</p>
@@ -65,40 +75,23 @@ export function FootballTechnicalAnalysis({ asset, compact = false }: Props) {
 
             <div className="grid gap-3 sm:grid-cols-2 lg:w-[420px]">
               <div className={`rounded-[1.4rem] border px-5 py-4 text-center ${scoreTone(analysis.weightedScore)}`}>
-                <p className="text-[11px] font-black uppercase tracking-wide">Technical Score</p>
+                <p className="text-[11px] font-black uppercase tracking-wide">Readiness Score</p>
                 <p className="text-4xl font-black tabular-nums">{analysis.weightedScore}</p>
                 <p className="mt-1 text-xs font-bold">{gradeLabel(analysis.weightedScore)}</p>
               </div>
-              <MarketAnalysisBadge asset={asset} />
+              {!isTeam && <MarketAnalysisBadge asset={asset} />}
+              {isTeam && <SourceNotice isTeam={isTeam} />}
             </div>
           </div>
         </div>
 
         <div className="p-4 lg:p-6">
-          <div className="mb-5 grid gap-3 lg:grid-cols-[1fr_0.9fr]">
-            <div className="rounded-2xl border border-white/10 bg-black/30 p-4">
-              <div className="mb-2 flex items-center gap-2 text-sm font-black text-white"><Sparkles size={17} className="text-[#FFD700]" /> حكم التحليل</div>
-              <p className="text-sm leading-7 text-gray-300">{analysis.verdict}</p>
-              <div className="mt-4 flex flex-wrap gap-2 text-[11px] font-black text-gray-300">
-                <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1">الدور: {analysis.roleLabel}</span>
-                <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1">نوع الأصل: {isTeam ? 'منتخب' : 'لاعب'}</span>
-              </div>
-            </div>
-
-            <div className={`rounded-2xl border p-4 ${valueFit.tone}`}>
-              <div className="mb-2 flex items-center gap-2 text-sm font-black"><WalletCards size={17} /> السعر مقابل القيمة الفنية</div>
-              <div className="mb-3 grid grid-cols-2 gap-2 text-xs">
-                <div className="rounded-xl bg-black/25 p-2">
-                  <p className="text-white/50">السعر الحالي</p>
-                  <p className="font-black text-white">{formatVirtualCoins(valueFit.marketPrice)}</p>
-                </div>
-                <div className="rounded-xl bg-black/25 p-2">
-                  <p className="text-white/50">القيمة العادلة</p>
-                  <p className="font-black text-white">{fairValueLabel}</p>
-                </div>
-              </div>
-              <p className="mb-1 text-sm font-black">{valueFit.label}</p>
-              <p className="text-xs leading-6 opacity-85">{valueFit.reason}</p>
+          <div className="mb-5 rounded-2xl border border-white/10 bg-black/30 p-4">
+            <div className="mb-2 flex items-center gap-2 text-sm font-black text-white"><Sparkles size={17} className="text-[#FFD700]" /> قراءة الجاهزية</div>
+            <p className="text-sm leading-7 text-gray-300">{analysis.verdict}</p>
+            <div className="mt-4 flex flex-wrap gap-2 text-[11px] font-black text-gray-300">
+              <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1">الدور: {analysis.roleLabel}</span>
+              <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1">نوع الأصل: {isTeam ? 'منتخب' : 'لاعب'}</span>
             </div>
           </div>
 
@@ -135,9 +128,11 @@ export function FootballTechnicalAnalysis({ asset, compact = false }: Props) {
               </div>
 
               <div className="mt-5 rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-                <div className="mb-2 flex items-center gap-2 text-sm font-black text-white"><Gauge size={17} className="text-[#0FF0FC]" /> قراءة تنفيذية</div>
+                <div className="mb-2 flex items-center gap-2 text-sm font-black text-white"><Gauge size={17} className="text-[#0FF0FC]" /> ملاحظة تحريرية</div>
                 <p className="text-xs leading-6 text-gray-400">
-                  هذا التقييم يدمج القراءة الفنية مع السعر الافتراضي داخل المنصة. الهدف منه مساعدة المستخدم على فهم جودة الأصل كرويًا، وليس تقديم توصية مالية أو ضمان حركة سعرية.
+                  {isTeam
+                    ? 'لا يتم استخدام هذا التب لعرض السعر، القيمة العادلة، أو توصيات التداول. أي رقم غير موثق بمصدر واضح يجب استبداله بعبارة: غير متوفر في المصادر.'
+                    : 'هذا التقييم يدمج القراءة الفنية مع السعر الافتراضي داخل المنصة. الهدف منه مساعدة المستخدم على فهم جودة الأصل كرويًا، وليس تقديم توصية مالية أو ضمان حركة سعرية.'}
                 </p>
               </div>
             </>
