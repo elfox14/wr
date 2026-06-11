@@ -89,11 +89,10 @@ export default function TeamIntelligenceAdminDashboard({ teams, initialTeamId = 
     setLastResult(null);
 
     try {
+      const trimmedSecret = secret.trim();
       const res = await fetch('/api/admin/seed-team-intelligence', {
         method: 'POST',
-        headers: {
-          Authorization: `Bearer ${secret.trim()}`,
-        },
+        headers: trimmedSecret ? { Authorization: `Bearer ${trimmedSecret}` } : undefined,
       });
       const data = await res.json() as SeedResponse;
       setLastResult(data);
@@ -171,7 +170,7 @@ export default function TeamIntelligenceAdminDashboard({ teams, initialTeamId = 
           </div>
 
           <div className="rounded-2xl border border-yellow-300/10 bg-yellow-300/[0.055] p-4 text-sm leading-7 text-yellow-100">
-            صفحة محمية للأدمن. تشغيل seed يحتاج قيمة <code className="rounded bg-black/25 px-1 text-yellow-200">ADMIN_CRON_SECRET</code>، أما التقرير اليدوي فيُحفظ بصلاحية الأدمن الحالية.
+            صفحة محمية للأدمن. يمكنك تشغيل seed بجلسة الأدمن الحالية، أو بإدخال <code className="rounded bg-black/25 px-1 text-yellow-200">ADMIN_CRON_SECRET</code> عند التشغيل من خارج لوحة الإدارة.
           </div>
         </section>
 
@@ -183,19 +182,19 @@ export default function TeamIntelligenceAdminDashboard({ teams, initialTeamId = 
 
             <div className="grid gap-4">
               <label className="block">
-                <span className="mb-2 block text-xs font-bold text-gray-500">ADMIN_CRON_SECRET</span>
+                <span className="mb-2 block text-xs font-bold text-gray-500">ADMIN_CRON_SECRET اختياري</span>
                 <input
                   type="password"
                   value={secret}
                   onChange={(event) => setSecret(event.target.value)}
-                  placeholder="أدخل السر لتشغيل seed"
+                  placeholder="اتركه فارغًا إذا كنت مسجل دخول كأدمن"
                   className="w-full rounded-2xl border border-white/10 bg-background px-4 py-3 text-white outline-none focus:border-primary"
                 />
               </label>
               <button
                 type="button"
                 onClick={runSeed}
-                disabled={loading || !secret.trim()}
+                disabled={loading}
                 className="inline-flex items-center justify-center gap-2 rounded-2xl bg-primary px-5 py-3 font-black text-black hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {loading ? 'جاري التشغيل...' : 'تشغيل seed'} <RefreshCw size={17} className={loading ? 'animate-spin' : ''} />
