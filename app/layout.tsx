@@ -2,6 +2,7 @@ import Script from "next/script";
 import type { Metadata } from "next";
 import { Cairo } from "next/font/google";
 import "./globals.css";
+import "./brand-logo.css";
 import { Providers } from "@/components/Providers";
 import { NotificationProvider } from "@/components/ui/NotificationProvider";
 import { GlobalTicker } from "@/components/ui/GlobalTicker";
