@@ -17,15 +17,11 @@ model User {
   password      String?
   balance          Int            @default(10000)
   total_profit     Int            @default(0)
-  role             String         @default("USER") // USER or ADMIN
+  role             String         @default("USER")
   createdAt        DateTime       @default(now())
-
-  // Ad Rewards
   adsWatchedToday     Int         @default(0)
   adsWatchedLifetime  Int         @default(0)
   rewardCreditsEarned Int         @default(0)
-
-  // Rewards & Referrals
   lastDailyReward  DateTime?
   lastWeeklyReward DateTime?
   dailyStreak      Int            @default(0)
@@ -34,18 +30,14 @@ model User {
   referredById     String?
   referredBy       User?          @relation("Referrals", fields: [referredById], references: [id])
   referrals        User[]         @relation("Referrals")
-
   accounts         Account[]
   sessions         Session[]
   holdings         Holding[]
   transactions     Transaction[]
   notifications    Notification[]
-
   createdLeagues   League[]        @relation("LeagueCreator")
   leagueMembers    LeagueMember[]
   rewards          Reward[]
-
-  // Phase 2 Relations
   captain          CaptainSelection?
   leagueMatchesA   LeagueMatch[]     @relation("MatchUserA")
   leagueMatchesB   LeagueMatch[]     @relation("MatchUserB")
@@ -57,7 +49,7 @@ model Reward {
   id        String   @id @default(cuid())
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  type      String   // "DAILY", "WEEKLY", "REFERRAL", "WELCOME"
+  type      String
   amount    Int
   claimedAt DateTime @default(now())
 }
@@ -69,7 +61,6 @@ model League {
   creatorId   String
   creator     User     @relation("LeagueCreator", fields: [creatorId], references: [id])
   createdAt   DateTime @default(now())
-
   members     LeagueMember[]
   matches     LeagueMatch[]
 }
@@ -81,7 +72,6 @@ model LeagueMember {
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   joinedAt  DateTime @default(now())
-
   @@unique([leagueId, userId])
 }
 
@@ -89,9 +79,9 @@ model Notification {
   id        String   @id @default(cuid())
   userId    String
   user      User     @relation(fields: [userId], references: [id])
-  title     String   
+  title     String
   message   String
-  type      String   // INFO, SUCCESS, WARNING, ERROR
+  type      String
   read      Boolean  @default(false)
   timestamp DateTime @default(now())
 }
@@ -109,9 +99,7 @@ model Account {
   scope              String?
   id_token           String?
   session_state      String?
-
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
   @@unique([provider, providerAccountId])
 }
 
@@ -127,23 +115,21 @@ model VerificationToken {
   identifier String
   token      String   @unique
   expires    DateTime
-
   @@unique([identifier, token])
 }
 
 model Asset {
-  id            String         @id // e.g. "team-ar", "player-messi"
-  type          String         // "TEAM" or "PLAYER"
+  id            String         @id
+  type          String
   name          String
-  code          String         // e.g. "AR", "LM10"
-  image         String         // flag or player face (emoji or url)
+  code          String
+  image         String
   current_price Int
   high_price    Int
   low_price     Int
   market_cap    String
   volume        String
   change        Float
-
   group         String?
   continent     String?
   fifaRank      Int?
@@ -173,14 +159,11 @@ model Asset {
   isportsId              Int?
   lastPerformanceRating  Float?
   lastPerformanceSyncAt  DateTime?
-
   teamId        String?
   team          Asset?         @relation("TeamPlayers", fields: [teamId], references: [id])
   players       Asset[]        @relation("TeamPlayers")
-
   homeMatches   Match[]        @relation("HomeTeam")
   awayMatches   Match[]        @relation("AwayTeam")
-
   holdings      Holding[]
   transactions  Transaction[]
   marketNews    MarketNews[]
@@ -188,7 +171,6 @@ model Asset {
   captains      CaptainSelection[]
   performances  PlayerPerformance[]
   intelligenceReports TeamIntelligenceReport[]
-
   @@index([apiFootballId])
   @@index([isportsId])
 }
@@ -196,6 +178,7 @@ model Asset {
 model Match {
   id          String   @id @default(cuid())
   externalId  String?  @unique
+  animationMatchId Int? @unique
   homeTeamId  String
   homeTeam    Asset    @relation("HomeTeam", fields: [homeTeamId], references: [id])
   awayTeamId  String
@@ -206,6 +189,7 @@ model Match {
   awayScore   Int      @default(0)
   groupPhase  String?
   stage       String   @default("group")
+  @@index([animationMatchId])
 }
 
 model PriceHistory {
@@ -250,7 +234,6 @@ model PlayerPerformance {
   matchDate         DateTime?
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
-
   @@index([assetId])
   @@index([providerFixtureId])
   @@unique([assetId, providerFixtureId])
@@ -278,7 +261,6 @@ model TeamIntelligenceReport {
   publishedAt    DateTime @default(now())
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
-
   @@index([teamId, publishedAt])
   @@index([sourceCategory])
   @@index([confidence])
@@ -293,7 +275,6 @@ model Holding {
   positionType   String   @default("LONG")
   quantity       Int
   avg_buy_price  Float
-
   @@unique([userId, assetId, positionType])
 }
 
@@ -329,7 +310,6 @@ model MarketNews {
   bodyParams      Json?
   context         Json?
   publishedAt     DateTime @default(now())
-
   @@index([assetId, publishedAt])
   @@index([eventType, publishedAt])
 }
@@ -356,7 +336,6 @@ model LeagueMatch {
   status     String  @default("PENDING")
   round      Int
   createdAt  DateTime @default(now())
-
   @@unique([leagueId, userAId, userBId, round])
 }
 
@@ -375,7 +354,6 @@ model UserAchievement {
   user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   achievementKey String
   unlockedAt     DateTime @default(now())
-
   @@unique([userId, achievementKey])
 }
 
@@ -391,7 +369,6 @@ model AdSession {
   externalAdId     String?
   createdAt        DateTime @default(now())
   completedAt      DateTime?
-
   @@index([userId, createdAt])
   @@index([status, createdAt])
 }
