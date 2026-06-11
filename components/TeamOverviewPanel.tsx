@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { CalendarDays, Database, ExternalLink, FileText, Goal, ListChecks, Newspaper, Shield, ShieldAlert, Sparkles, Target, Users, Zap } from 'lucide-react';
+import { CalendarDays, Database, FileText, Goal, ListChecks, Shield, ShieldAlert, Sparkles, Target, Users, Zap } from 'lucide-react';
 import { AssetImage } from '@/components/ui/AssetImage';
 
 type TeamOverviewPlayer = {
@@ -177,49 +177,6 @@ function ThemedAnalysisCard({ tone, icon, eyebrow, title, children }: { tone: Ca
   );
 }
 
-function ReportBodySections({ body }: { body?: string | null }) {
-  const sections = parseReportBody(body);
-  if (!sections.length) return null;
-
-  return (
-    <div className="mt-4 grid gap-3">
-      {sections.map((section, index) => (
-        <section key={`${section.title}-${index}`} className="rounded-2xl border border-white/5 bg-black/25 p-4">
-          <h5 className="mb-2 text-xs font-black text-primary">{section.title}</h5>
-          <p className="whitespace-pre-line text-xs leading-6 text-gray-300"><HighlightedReportText text={section.content} /></p>
-        </section>
-      ))}
-    </div>
-  );
-}
-
-function IntelligenceReportCard({ report }: { report: TeamOverviewReport }) {
-  const tacticalTags = report.tacticalTags || [];
-  const strengths = report.strengths || [];
-  const weaknesses = report.weaknesses || [];
-
-  return (
-    <article className="rounded-3xl border border-primary/10 bg-primary/[0.04] p-5">
-      <div className="mb-3 flex flex-wrap items-center gap-2 text-[11px] font-black">
-        <span className="rounded-lg border border-primary/20 bg-primary/10 px-2 py-1 text-primary">{getConfidenceLabel(report.confidence)}</span>
-        <span className="rounded-lg border border-white/10 bg-black/25 px-2 py-1 text-gray-300">{report.sourceName}</span>
-        <span className="rounded-lg border border-white/10 bg-black/25 px-2 py-1 text-gray-400">{formatDate(report.publishedAt)}</span>
-        {report.sourceUrl && <a href={report.sourceUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-primary hover:text-white">فتح المصدر <ExternalLink size={12} /></a>}
-      </div>
-      <h4 className="text-lg font-black text-white">{report.title}</h4>
-      <p className="mt-2 text-sm leading-7 text-gray-300">{report.summary}</p>
-      <ReportBodySections body={report.body} />
-      {!!(tacticalTags.length || strengths.length || weaknesses.length) && (
-        <div className="mt-4 grid gap-3 md:grid-cols-3">
-          {!!tacticalTags.length && <div><div className="mb-2 text-xs font-black text-primary">وسوم تكتيكية</div><div className="flex flex-wrap gap-2">{tacticalTags.map((tag) => <span key={tag} className="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-[11px] text-gray-300">{tag}</span>)}</div></div>}
-          {!!strengths.length && <div><div className="mb-2 text-xs font-black text-emerald-300">نقاط قوة موثقة</div><ul className="space-y-1 text-xs leading-5 text-gray-300">{strengths.slice(0, 4).map((item) => <li key={item}>• {item}</li>)}</ul></div>}
-          {!!weaknesses.length && <div><div className="mb-2 text-xs font-black text-red-300">نقاط تحتاج متابعة</div><ul className="space-y-1 text-xs leading-5 text-gray-300">{weaknesses.slice(0, 4).map((item) => <li key={item}>• {item}</li>)}</ul></div>}
-        </div>
-      )}
-    </article>
-  );
-}
-
 function MatchCard({ match, teamId }: { match: TeamOverviewMatch; teamId: string }) {
   const isHome = match.homeTeamId === teamId || match.homeTeam?.id === teamId;
   const opponent = isHome ? match.awayTeam : match.homeTeam;
@@ -344,20 +301,6 @@ export default function TeamOverviewPanel({ team }: { team: TeamOverviewTeam }) 
 
         <ThemedAnalysisGrid team={team} reports={reports} />
 
-        <div className="mb-5 rounded-3xl border border-primary/10 bg-black/25 p-5">
-          <h3 className="mb-2 flex items-center gap-2 text-xl font-black text-white"><Newspaper size={20} className="text-primary" /> التقارير الفنية من المصادر</h3>
-          <p className="mb-4 text-xs leading-6 text-gray-500">
-            يعرض هذا القسم التقارير المنسوبة إلى Reuters أو المصادر الرسمية أو مصادر البيانات والتحليل المعتمدة. تم إخفاء تقارير baseline والتقديرات الداخلية من هذا التب.
-          </p>
-          {reports.length ? (
-            <div className="grid gap-4 xl:grid-cols-2">{reports.map((report) => <IntelligenceReportCard key={report.id} report={report} />)}</div>
-          ) : (
-            <div className="rounded-2xl border border-dashed border-yellow-300/15 bg-yellow-300/[0.04] p-5 text-sm leading-7 text-yellow-100">
-              لا توجد تقارير كروية موثقة لهذا المنتخب بعد. غير متوفر في المصادر.
-            </div>
-          )}
-        </div>
-
         <div className="grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
           <div className="rounded-3xl border border-white/5 bg-black/25 p-5">
             <h3 className="mb-4 flex items-center gap-2 text-xl font-black text-white"><CalendarDays size={20} className="text-primary" /> المباريات المرتبطة</h3>
@@ -372,11 +315,11 @@ export default function TeamOverviewPanel({ team }: { team: TeamOverviewTeam }) 
           <div className="rounded-3xl border border-white/5 bg-black/25 p-5">
             <h3 className="mb-4 flex items-center gap-2 text-xl font-black text-white"><Database size={20} className="text-primary" /> سياسة المصادر</h3>
             <div className="space-y-3 text-sm leading-7 text-gray-300">
-              <p>المصادر المعتمدة للتحليل: الاتحادات الرسمية، Reuters، Opta/Opta Analyst، StatsBomb، Wyscout، FBref، Sofascore، WhoScored، Understat، Transfermarkt، CIES، The Athletic، Overlyzer عند توفر ترخيص أو رابط عام واضح.</p>
+              <p>المصادر المعتمدة للتحليل: الاتحادات الرسمية، Reuters، Opta/Opta Analyst، StatsBomb، Wyscout، FBref، Sofascore، WhoScored، Understat، Transfermarkt، CIES، The Athletic، Overlyzer، وSports Reference / Stathead / FBref عند توفر رابط عام أو export من الاشتراك.</p>
               <p>لا يتم استخدام أي رقم في هذا التب إلا إذا كان موثقًا داخل التقرير نفسه أو مرتبطًا بمصدر واضح.</p>
             </div>
             <div className="mt-4 rounded-2xl border border-yellow-300/10 bg-yellow-300/[0.04] p-4 text-xs leading-6 text-yellow-100">
-              <ShieldAlert size={15} className="ml-1 inline" /> البيانات المدفوعة أو المحمية لا تُنقل كجداول أو feeds كاملة إلا بعد الحصول على الترخيص المناسب.
+              <ShieldAlert size={15} className="ml-1 inline" /> البيانات المدفوعة أو المحمية لا تُنقل كجداول أو feeds كاملة إلا بعد الحصول على الترخيص المناسب أو export مسموح من الاشتراك.
             </div>
           </div>
         </div>
