@@ -2,12 +2,30 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { renderMarketNews } from '@/lib/market-news/render';
 
+type NewsCategory = 'match' | 'trading' | 'platform';
+
+type NewsItem = {
+  id: string;
+  title: string;
+  body?: string;
+  source: string;
+  category: NewsCategory;
+  type: string;
+  link?: string;
+  assetId?: string | null;
+  assetName?: string | null;
+  assetImage?: string | null;
+  marketPrice?: number | null;
+  changePercent?: number | null;
+  date: string;
+};
+
 function toNumber(value: unknown, fallback = 0) {
   const n = Number(value);
   return Number.isFinite(n) ? n : fallback;
 }
 
-function newsCategory(eventType?: string | null, source?: string | null) {
+function newsCategory(eventType?: string | null, source?: string | null): NewsCategory {
   const value = `${eventType || ''} ${source || ''}`.toLowerCase();
   if (value.includes('goal') || value.includes('match') || value.includes('fixture') || value.includes('live_match') || value.includes('upcoming_match')) return 'match';
   if (value.includes('price') || value.includes('trade') || value.includes('market') || value.includes('buy') || value.includes('sell')) return 'trading';
@@ -52,7 +70,7 @@ export async function GET() {
       }),
     ]);
 
-    const news = marketNewsRows.map((item) => {
+    const news: NewsItem[] = marketNewsRows.map((item) => {
       const rendered = renderMarketNews(item, 'ar');
       const category = newsCategory(item.eventType, 'market_news');
       const priceAfter = item.priceAfter == null ? null : Math.round(toNumber(item.priceAfter));
