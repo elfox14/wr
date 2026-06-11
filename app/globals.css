@@ -78,6 +78,13 @@ canvas {
   max-width: 100%;
 }
 
+img[src*="/brand/logo-horizontal.png"] {
+  content: url('/brand/logo-icon.png');
+  width: 48px !important;
+  height: 48px !important;
+  object-fit: contain !important;
+}
+
 .custom-scrollbar,
 .mobile-scrollbar {
   scrollbar-width: thin;
