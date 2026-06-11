@@ -17,16 +17,19 @@ type AdminSession = {
   };
 } | null;
 
+type ImportResult = { team: string; code: string | null; status: string; file?: string; reportId?: string; warning?: string; detectedRows?: number };
+
 function hasValidSecret(request: Request) {
-  const secret = process.env.ADMIN_CRON_SECRET;
-  if (!secret) return false;
+  const allowedSecrets = [process.env.ADMIN_CRON_SECRET, process.env.CRON_SECRET, process.env.SOURCE_INBOX_SECRET].filter(Boolean);
+  if (!allowedSecrets.length) return false;
 
   const authHeader = request.headers.get('authorization') || '';
   const bearerToken = authHeader.startsWith('Bearer ') ? authHeader.slice('Bearer '.length).trim() : '';
   const url = new URL(request.url);
   const queryToken = url.searchParams.get('secret') || '';
+  const headerToken = request.headers.get('x-source-inbox-secret') || '';
 
-  return bearerToken === secret || queryToken === secret;
+  return allowedSecrets.some((secret) => bearerToken === secret || queryToken === secret || headerToken === secret);
 }
 
 function isAdminSession(session: AdminSession) {
@@ -63,79 +66,83 @@ async function findCsvForTeam(team: { code: string | null; name: string }) {
   return match ? path.join(EXPORT_DIR, match) : null;
 }
 
-export async function POST(request: Request) {
+async function runAutoImport() {
+  await fs.mkdir(EXPORT_DIR, { recursive: true });
+
+  const teams = await prisma.asset.findMany({
+    where: { type: 'TEAM' },
+    select: { id: true, name: true, code: true },
+    orderBy: { name: 'asc' },
+  });
+
+  const results: ImportResult[] = [];
+
+  for (const team of teams) {
+    const csvPath = await findCsvForTeam(team);
+    if (!csvPath) {
+      results.push({ team: team.name, code: team.code, status: 'skipped', warning: 'No matching CSV export found.' });
+      continue;
+    }
+
+    const csvText = await fs.readFile(csvPath, 'utf8');
+    const draft = buildSportsReferenceCsvDraft({
+      teamName: team.name,
+      sourceName: 'Sports Reference / Stathead / FBref subscription',
+      sourceUrl: 'https://www.sports-reference.com/',
+      csvText,
+    });
+
+    if (!draft.detectedRows || draft.warnings.length) {
+      results.push({ team: team.name, code: team.code, status: 'skipped', file: path.basename(csvPath), warning: draft.warnings.join(' | '), detectedRows: draft.detectedRows });
+      continue;
+    }
+
+    await prisma.teamIntelligenceReport.deleteMany({
+      where: {
+        teamId: team.id,
+        provider: 'SPORTS_REFERENCE_AUTO_IMPORT',
+      },
+    });
+
+    const report = await prisma.teamIntelligenceReport.create({
+      data: {
+        teamId: team.id,
+        title: `Sports Reference / FBref export — ${team.name}`,
+        summary: draft.summary,
+        body: buildBody(draft.sections),
+        confidence: 'B',
+        reportType: 'TEAM_PROFILE',
+        sourceName: 'Sports Reference / Stathead / FBref subscription',
+        sourceUrl: 'https://www.sports-reference.com/',
+        sourceCategory: 'stats',
+        provider: 'SPORTS_REFERENCE_AUTO_IMPORT',
+        tacticalTags: ['Sports Reference', 'FBref', 'stats export'],
+        strengths: [],
+        weaknesses: draft.warnings,
+        lastCheckedAt: new Date(),
+      },
+      select: { id: true },
+    });
+
+    results.push({ team: team.name, code: team.code, status: 'imported', file: path.basename(csvPath), reportId: report.id, detectedRows: draft.detectedRows });
+  }
+
+  return {
+    success: true,
+    exportDir: 'data/sports-reference',
+    imported: results.filter((item) => item.status === 'imported').length,
+    skipped: results.filter((item) => item.status === 'skipped').length,
+    results,
+  };
+}
+
+async function handleImportRequest(request: Request) {
   if (!(await isAuthorized(request))) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   try {
-    await fs.mkdir(EXPORT_DIR, { recursive: true });
-
-    const teams = await prisma.asset.findMany({
-      where: { type: 'TEAM' },
-      select: { id: true, name: true, code: true },
-      orderBy: { name: 'asc' },
-    });
-
-    const results: Array<{ team: string; code: string | null; status: string; file?: string; reportId?: string; warning?: string; detectedRows?: number }> = [];
-
-    for (const team of teams) {
-      const csvPath = await findCsvForTeam(team);
-      if (!csvPath) {
-        results.push({ team: team.name, code: team.code, status: 'skipped', warning: 'No matching CSV export found.' });
-        continue;
-      }
-
-      const csvText = await fs.readFile(csvPath, 'utf8');
-      const draft = buildSportsReferenceCsvDraft({
-        teamName: team.name,
-        sourceName: 'Sports Reference / Stathead / FBref subscription',
-        sourceUrl: 'https://www.sports-reference.com/',
-        csvText,
-      });
-
-      if (!draft.detectedRows || draft.warnings.length) {
-        results.push({ team: team.name, code: team.code, status: 'skipped', file: path.basename(csvPath), warning: draft.warnings.join(' | '), detectedRows: draft.detectedRows });
-        continue;
-      }
-
-      await prisma.teamIntelligenceReport.deleteMany({
-        where: {
-          teamId: team.id,
-          provider: 'SPORTS_REFERENCE_AUTO_IMPORT',
-        },
-      });
-
-      const report = await prisma.teamIntelligenceReport.create({
-        data: {
-          teamId: team.id,
-          title: `Sports Reference / FBref export — ${team.name}`,
-          summary: draft.summary,
-          body: buildBody(draft.sections),
-          confidence: 'B',
-          reportType: 'TEAM_PROFILE',
-          sourceName: 'Sports Reference / Stathead / FBref subscription',
-          sourceUrl: 'https://www.sports-reference.com/',
-          sourceCategory: 'stats',
-          provider: 'SPORTS_REFERENCE_AUTO_IMPORT',
-          tacticalTags: ['Sports Reference', 'FBref', 'stats export'],
-          strengths: [],
-          weaknesses: draft.warnings,
-          lastCheckedAt: new Date(),
-        },
-        select: { id: true },
-      });
-
-      results.push({ team: team.name, code: team.code, status: 'imported', file: path.basename(csvPath), reportId: report.id, detectedRows: draft.detectedRows });
-    }
-
-    return NextResponse.json({
-      success: true,
-      exportDir: 'data/sports-reference',
-      imported: results.filter((item) => item.status === 'imported').length,
-      skipped: results.filter((item) => item.status === 'skipped').length,
-      results,
-    });
+    return NextResponse.json(await runAutoImport());
   } catch (error) {
     console.error('Failed to auto-import Sports Reference exports:', error);
     return NextResponse.json({
@@ -147,15 +154,24 @@ export async function POST(request: Request) {
   }
 }
 
+export async function POST(request: Request) {
+  return handleImportRequest(request);
+}
+
 export async function GET(request: Request) {
-  if (!(await isAuthorized(request))) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const url = new URL(request.url);
+  if (url.searchParams.get('info') === '1') {
+    if (!(await isAuthorized(request))) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    return NextResponse.json({
+      ok: true,
+      message: 'GET or POST this endpoint to automatically import Sports Reference / FBref CSV exports from data/sports-reference.',
+      fileNaming: 'Name CSV files by team code or team name, for example MEX.csv, Mexico.csv, GER.csv.',
+      exportDir: 'data/sports-reference',
+    });
   }
 
-  return NextResponse.json({
-    ok: true,
-    message: 'Use POST to automatically import Sports Reference / FBref CSV exports from data/sports-reference.',
-    fileNaming: 'Name CSV files by team code or team name, for example MEX.csv, Mexico.csv, GER.csv.',
-    exportDir: 'data/sports-reference',
-  });
+  return handleImportRequest(request);
 }
