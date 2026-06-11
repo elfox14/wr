@@ -5,6 +5,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 import { buildSportsReferenceCsvDraft } from '@/lib/sportsReferenceCsvDraft';
+import { createSourceAutomationLog } from '@/lib/sourceAutomationLog';
 
 export const dynamic = 'force-dynamic';
 
@@ -127,11 +128,23 @@ async function runAutoImport() {
     results.push({ team: team.name, code: team.code, status: 'imported', file: path.basename(csvPath), reportId: report.id, detectedRows: draft.detectedRows });
   }
 
+  const imported = results.filter((item) => item.status === 'imported').length;
+  const skipped = results.filter((item) => item.status === 'skipped').length;
+
+  await createSourceAutomationLog({
+    job: 'sports-reference-auto-import',
+    status: imported ? 'success' : 'warning',
+    imported,
+    skipped,
+    failed: 0,
+    details: { exportDir: 'data/sports-reference', results },
+  });
+
   return {
     success: true,
     exportDir: 'data/sports-reference',
-    imported: results.filter((item) => item.status === 'imported').length,
-    skipped: results.filter((item) => item.status === 'skipped').length,
+    imported,
+    skipped,
     results,
   };
 }
@@ -145,6 +158,14 @@ async function handleImportRequest(request: Request) {
     return NextResponse.json(await runAutoImport());
   } catch (error) {
     console.error('Failed to auto-import Sports Reference exports:', error);
+    await createSourceAutomationLog({
+      job: 'sports-reference-auto-import',
+      status: 'error',
+      imported: 0,
+      skipped: 0,
+      failed: 1,
+      details: { error: error instanceof Error ? error.message : 'Unknown error' },
+    });
     return NextResponse.json({
       success: false,
       error: 'Failed to auto-import Sports Reference exports.',
