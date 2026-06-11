@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import Script from "next/script";
 import type { Metadata } from "next";
 import { Cairo } from "next/font/google";
@@ -88,7 +89,9 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col">
         <Providers>
           <NotificationProvider>
-            <Navbar />
+            <Suspense fallback={<div className="h-16 lg:h-20" />}>
+              <Navbar />
+            </Suspense>
             <div className="pb-28 lg:pb-10 min-h-[calc(100vh-100px)]">
               {children}
             </div>
