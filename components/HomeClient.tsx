@@ -24,6 +24,20 @@ type AcademyArticle = {
   date?: string;
 };
 
+function normalizeGroupKey(value?: string | null): string {
+  if (!value) return 'غير محددة';
+  return value
+    .replace('Group', '')
+    .replace('المجموعة', '')
+    .trim()
+    .toUpperCase();
+}
+
+function groupHref(value?: string | null): string {
+  const key = normalizeGroupKey(value);
+  return `/groups#group-${encodeURIComponent(key)}`;
+}
+
 export default function HomeClient({
   initialAssets,
   upcomingMatches = [],
@@ -73,17 +87,24 @@ export default function HomeClient({
     });
   };
 
+  const getTeamHref = (team: any) => {
+    const matchedAsset = findTeamAsset(team);
+    return matchedAsset?.id ? `/asset/${matchedAsset.id}` : '/market?type=TEAM';
+  };
+
   const renderMatchTeamLogo = (team: any) => {
     const matchedAsset = findTeamAsset(team);
     return (
-      <AssetImage
-        image={team?.image || team?.logo || team?.badge || team?.flag || matchedAsset?.image}
-        name={team?.name || team?.teamName || matchedAsset?.name || 'Team'}
-        type="TEAM"
-        width={54}
-        height={54}
-        className="h-14 w-14 rounded-full border border-white/10 bg-black/40 object-cover shadow-[0_0_18px_rgba(15,240,252,0.12)]"
-      />
+      <Link href={getTeamHref(team)} className="rounded-full transition hover:scale-105 focus:outline-none focus:ring-2 focus:ring-[#0FF0FC]/40" title={`صفحة ${team?.name || matchedAsset?.name || 'المنتخب'}`}>
+        <AssetImage
+          image={team?.image || team?.logo || team?.badge || team?.flag || matchedAsset?.image}
+          name={team?.name || team?.teamName || matchedAsset?.name || 'Team'}
+          type="TEAM"
+          width={54}
+          height={54}
+          className="h-14 w-14 rounded-full border border-white/10 bg-black/40 object-cover shadow-[0_0_18px_rgba(15,240,252,0.12)] hover:border-[#0FF0FC]/50"
+        />
+      </Link>
     );
   };
 
@@ -107,6 +128,7 @@ export default function HomeClient({
   };
 
   const countdown = getCountdown();
+  const matchGroup = normalizeGroupKey(nextMatch?.groupPhase || nextMatch?.group || nextMatch?.homeTeam?.group || nextMatch?.awayTeam?.group);
 
   const quickStats = [
     { label: 'منتخب', value: teamsCount || 48, icon: Globe, tone: 'text-emerald-300' },
@@ -173,15 +195,24 @@ export default function HomeClient({
             </div>
             {nextMatch ? (
               <div className="rounded-2xl border border-white/10 bg-white/[0.045] p-4">
-                <div className="mb-4 flex items-center justify-between gap-3">
+                <div className="mb-4 grid grid-cols-[1fr_auto_1fr] items-center gap-3">
                   <div className="flex flex-col items-center gap-2 text-center">
                     {renderMatchTeamLogo(nextMatch.homeTeam)}
-                    <span className="text-xs font-black text-white">{nextMatch.homeTeam?.name || 'الفريق الأول'}</span>
+                    <Link href={getTeamHref(nextMatch.homeTeam)} className="text-xs font-black text-white transition hover:text-[#0FF0FC]">
+                      {nextMatch.homeTeam?.name || 'الفريق الأول'}
+                    </Link>
                   </div>
-                  <div className="rounded-full border border-white/10 bg-black/40 px-4 py-2 text-sm font-black text-[#FFD700]">VS</div>
+                  <div className="flex flex-col items-center gap-2">
+                    <Link href={groupHref(matchGroup)} className="rounded-full border border-[#0FF0FC]/25 bg-[#0FF0FC]/10 px-3 py-1 text-[10px] font-black text-[#0FF0FC] transition hover:bg-[#0FF0FC]/20 hover:text-white" title={`اذهب إلى المجموعة ${matchGroup}`}>
+                      المجموعة {matchGroup}
+                    </Link>
+                    <div className="rounded-full border border-white/10 bg-black/40 px-4 py-2 text-sm font-black text-[#FFD700]">VS</div>
+                  </div>
                   <div className="flex flex-col items-center gap-2 text-center">
                     {renderMatchTeamLogo(nextMatch.awayTeam)}
-                    <span className="text-xs font-black text-white">{nextMatch.awayTeam?.name || 'الفريق الثاني'}</span>
+                    <Link href={getTeamHref(nextMatch.awayTeam)} className="text-xs font-black text-white transition hover:text-[#0FF0FC]">
+                      {nextMatch.awayTeam?.name || 'الفريق الثاني'}
+                    </Link>
                   </div>
                 </div>
                 <div className="text-center text-xs font-bold text-gray-400">{new Date(nextMatch.matchDate).toLocaleString('ar-EG')}</div>
