@@ -20,6 +20,28 @@ type SeedResponse = {
   message?: string;
 };
 
+type GroupAStatusResponse = {
+  ok?: boolean;
+  ready?: boolean;
+  error?: string;
+  missingTeamCodes?: string[];
+  teams?: {
+    id: string;
+    name: string;
+    code: string;
+    group?: string | null;
+    reportCount: number;
+    curatedReportCount: number;
+    hasGroupAReport: boolean;
+    latestReport?: {
+      title?: string | null;
+      provider?: string | null;
+      confidence?: string | null;
+      publishedAt?: string | null;
+    } | null;
+  }[];
+};
+
 type ManualReportResponse = {
   success?: boolean;
   error?: string;
@@ -71,16 +93,32 @@ function getResponseMessage(data: SeedResponse) {
   return 'تم استلام رد غير متوقع من الخادم.';
 }
 
+function getStatusMessage(data: GroupAStatusResponse) {
+  if (data.error) return data.error;
+  if (data.ready) return 'تقارير المجموعة الأولى جاهزة للعرض لكل المنتخبات الأربعة.';
+  const missing = data.missingTeamCodes?.length ? ` منتخبات غير موجودة: ${data.missingTeamCodes.join(', ')}.` : '';
+  return `الفحص اكتمل، لكن بعض التقارير غير جاهزة بعد.${missing}`;
+}
+
 export default function TeamIntelligenceAdminDashboard({ teams, initialTeamId = '' }: { teams: TeamOption[]; initialTeamId?: string }) {
   const [secret, setSecret] = useState('');
   const [loading, setLoading] = useState(false);
+  const [statusLoading, setStatusLoading] = useState(false);
   const [manualLoading, setManualLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [statusMessage, setStatusMessage] = useState('');
+  const [statusError, setStatusError] = useState('');
   const [manualMessage, setManualMessage] = useState('');
   const [manualError, setManualError] = useState('');
   const [lastResult, setLastResult] = useState<SeedResponse | null>(null);
+  const [groupAStatus, setGroupAStatus] = useState<GroupAStatusResponse | null>(null);
   const [manualForm, setManualForm] = useState<ManualForm>(() => buildInitialManualForm(initialTeamId));
+
+  const getOptionalAuthHeaders = () => {
+    const trimmedSecret = secret.trim();
+    return trimmedSecret ? { Authorization: `Bearer ${trimmedSecret}` } : undefined;
+  };
 
   const runSeed = async () => {
     setLoading(true);
@@ -89,10 +127,9 @@ export default function TeamIntelligenceAdminDashboard({ teams, initialTeamId = 
     setLastResult(null);
 
     try {
-      const trimmedSecret = secret.trim();
       const res = await fetch('/api/admin/seed-team-intelligence', {
         method: 'POST',
-        headers: trimmedSecret ? { Authorization: `Bearer ${trimmedSecret}` } : undefined,
+        headers: getOptionalAuthHeaders(),
       });
       const data = await res.json() as SeedResponse;
       setLastResult(data);
@@ -108,6 +145,35 @@ export default function TeamIntelligenceAdminDashboard({ teams, initialTeamId = 
       setError(fallbackMessage);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const checkGroupAStatus = async () => {
+    setStatusLoading(true);
+    setStatusMessage('');
+    setStatusError('');
+    setGroupAStatus(null);
+
+    try {
+      const res = await fetch('/api/admin/team-intelligence-status', {
+        method: 'GET',
+        headers: getOptionalAuthHeaders(),
+      });
+      const data = await res.json() as GroupAStatusResponse;
+      setGroupAStatus(data);
+
+      if (!res.ok) {
+        setStatusError(getStatusMessage(data));
+        return;
+      }
+
+      if (data.ready) setStatusMessage(getStatusMessage(data));
+      else setStatusError(getStatusMessage(data));
+    } catch (caughtError) {
+      const fallbackMessage = caughtError instanceof Error ? caughtError.message : 'فشل فحص حالة تقارير المجموعة الأولى.';
+      setStatusError(fallbackMessage);
+    } finally {
+      setStatusLoading(false);
     }
   };
 
@@ -191,14 +257,24 @@ export default function TeamIntelligenceAdminDashboard({ teams, initialTeamId = 
                   className="w-full rounded-2xl border border-white/10 bg-background px-4 py-3 text-white outline-none focus:border-primary"
                 />
               </label>
-              <button
-                type="button"
-                onClick={runSeed}
-                disabled={loading}
-                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-primary px-5 py-3 font-black text-black hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {loading ? 'جاري التشغيل...' : 'تشغيل seed'} <RefreshCw size={17} className={loading ? 'animate-spin' : ''} />
-              </button>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <button
+                  type="button"
+                  onClick={runSeed}
+                  disabled={loading || statusLoading}
+                  className="inline-flex items-center justify-center gap-2 rounded-2xl bg-primary px-5 py-3 font-black text-black hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {loading ? 'جاري التشغيل...' : 'تشغيل seed'} <RefreshCw size={17} className={loading ? 'animate-spin' : ''} />
+                </button>
+                <button
+                  type="button"
+                  onClick={checkGroupAStatus}
+                  disabled={loading || statusLoading}
+                  className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-5 py-3 font-black text-white hover:border-primary/40 hover:text-primary disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {statusLoading ? 'جاري الفحص...' : 'فحص حالة المجموعة الأولى'} <Database size={17} className={statusLoading ? 'animate-pulse' : ''} />
+                </button>
+              </div>
             </div>
 
             {message && (
@@ -212,6 +288,37 @@ export default function TeamIntelligenceAdminDashboard({ teams, initialTeamId = 
                 <ShieldAlert className="ml-2 inline" size={16} />{error}
               </div>
             )}
+
+            {statusMessage && (
+              <div className="mt-5 rounded-2xl border border-success/20 bg-success/10 p-4 text-sm font-bold leading-7 text-success">
+                <CheckCircle2 className="ml-2 inline" size={16} />{statusMessage}
+              </div>
+            )}
+
+            {statusError && (
+              <div className="mt-5 rounded-2xl border border-danger/20 bg-danger/10 p-4 text-sm font-bold leading-7 text-danger">
+                <ShieldAlert className="ml-2 inline" size={16} />{statusError}
+              </div>
+            )}
+
+            {groupAStatus?.teams?.length ? (
+              <div className="mt-5 grid gap-3">
+                {groupAStatus.teams.map((team) => (
+                  <div key={team.id} className={`rounded-2xl border p-4 ${team.hasGroupAReport ? 'border-success/20 bg-success/10' : 'border-danger/20 bg-danger/10'}`}>
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <div className="text-sm font-black text-white">{team.name} — {team.code}</div>
+                        <div className="mt-1 text-xs text-gray-400">كل التقارير: {team.reportCount} · تقارير المجموعة الأولى: {team.curatedReportCount}</div>
+                      </div>
+                      <span className={`rounded-xl px-3 py-1 text-xs font-black ${team.hasGroupAReport ? 'bg-success/15 text-success' : 'bg-danger/15 text-danger'}`}>
+                        {team.hasGroupAReport ? 'جاهز' : 'غير جاهز'}
+                      </span>
+                    </div>
+                    {team.latestReport?.title && <div className="mt-3 text-xs leading-6 text-gray-300">آخر تقرير: {team.latestReport.title}</div>}
+                  </div>
+                ))}
+              </div>
+            ) : null}
 
             {lastResult && (
               <pre className="mt-5 max-h-72 overflow-auto rounded-2xl border border-white/10 bg-black/35 p-4 text-xs leading-6 text-gray-300">
