@@ -1,17 +1,11 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { Radio, ShieldCheck, Settings, Tv } from 'lucide-react';
+import prisma from '@/lib/prisma';
+import { Radio, ShieldCheck, Tv } from 'lucide-react';
 
 export const metadata: Metadata = {
   title: 'البث الأنيميشن للمباريات | MC PRIME Exchange',
   description: 'تشغيل Football Animation Live عبر iFrame داخل منصة بورصة المونديال.',
-};
-
-type AnimationLiveSearchParams = {
-  matchId?: string;
-  lang?: string;
-  statsPanel?: string;
-  teamPanel?: string;
 };
 
 const allowedLanguages = new Set(['en', 'th', 'vi', 'id']);
@@ -21,6 +15,30 @@ function getSingleValue(value?: string | string[]) {
   return Array.isArray(value) ? value[0] : value;
 }
 
+async function getAutoAnimationMatchId() {
+  const match = await prisma.match.findFirst({
+    where: {
+      status: { in: ['SCHEDULED', 'IN_PLAY', 'LIVE'] },
+      animationMatchId: { not: null },
+    },
+    orderBy: { matchDate: 'asc' },
+    select: {
+      animationMatchId: true,
+      matchDate: true,
+      homeTeam: { select: { name: true } },
+      awayTeam: { select: { name: true } },
+    },
+  });
+
+  if (!match?.animationMatchId) return null;
+
+  return {
+    matchId: String(match.animationMatchId),
+    title: `${match.homeTeam.name} × ${match.awayTeam.name}`,
+    matchDate: match.matchDate,
+  };
+}
+
 export default async function AnimationLivePage({
   searchParams,
 }: {
@@ -28,22 +46,22 @@ export default async function AnimationLivePage({
 }) {
   const params = (await searchParams) || {};
   const accessKey = process.env.ISPORTS_ANIMATION_ACCESS_KEY || process.env.NEXT_PUBLIC_ISPORTS_ANIMATION_ACCESS_KEY || '';
-  const matchId = getSingleValue(params.matchId);
+  const autoMatch = await getAutoAnimationMatchId();
+  const requestedMatchId = getSingleValue(params.matchId);
+  const matchId = requestedMatchId || autoMatch?.matchId || '';
   const requestedLang = getSingleValue(params.lang) || 'en';
   const lang = allowedLanguages.has(requestedLang) ? requestedLang : 'en';
-  const requestedStatsPanel = getSingleValue(params.statsPanel);
-  const statsPanel = requestedStatsPanel && allowedStatsPanel.has(requestedStatsPanel) ? requestedStatsPanel : '';
-  const teamPanel = getSingleValue(params.teamPanel) === '1' ? '1' : '';
+  const requestedStatsPanel = getSingleValue(params.statsPanel) || 'simple';
+  const statsPanel = allowedStatsPanel.has(requestedStatsPanel) ? requestedStatsPanel : 'simple';
+  const teamPanel = getSingleValue(params.teamPanel) === '0' ? '' : '1';
 
-  const iframeUrl = matchId && accessKey
-    ? new URL('https://www.isportslive8.com/football/detail.html')
-    : null;
+  const iframeUrl = matchId && accessKey ? new URL('https://www.isportslive8.com/football/detail.html') : null;
 
-  if (iframeUrl && matchId && accessKey) {
+  if (iframeUrl) {
     iframeUrl.searchParams.set('matchId', matchId);
     iframeUrl.searchParams.set('accessKey', accessKey);
     iframeUrl.searchParams.set('lang', lang);
-    if (statsPanel) iframeUrl.searchParams.set('statsPanel', statsPanel);
+    iframeUrl.searchParams.set('statsPanel', statsPanel);
     if (teamPanel) iframeUrl.searchParams.set('teamPanel', teamPanel);
   }
 
@@ -58,8 +76,13 @@ export default async function AnimationLivePage({
               </p>
               <h1 className="text-3xl font-black md:text-5xl">البث الأنيميشن للمباريات</h1>
               <p className="mt-3 max-w-3xl text-sm leading-7 text-gray-300 md:text-base">
-                صفحة مخصصة لتشغيل اشتراك Football Animation Live عبر iFrame بعد تمرير Match ID الخاص بالمزود.
+                يتم تشغيل البث تلقائيًا عند توفر Match ID الخاص بمزود الأنيميشن للمباراة القادمة.
               </p>
+              {autoMatch && !requestedMatchId && (
+                <p className="mt-2 text-xs font-bold text-[#FFD700]">
+                  المباراة المختارة تلقائيًا: {autoMatch.title} · {new Date(autoMatch.matchDate).toLocaleString('ar-EG')}
+                </p>
+              )}
             </div>
             <Link href="/broadcast" className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-5 py-3 text-sm font-black text-white hover:border-[#0FF0FC]/40 hover:text-[#0FF0FC]">
               <Tv size={16} /> شاشة البث العامة
@@ -67,35 +90,12 @@ export default async function AnimationLivePage({
           </div>
         </div>
 
-        {(!accessKey || !matchId) && (
-          <div className="rounded-[2rem] border border-yellow-400/20 bg-yellow-400/10 p-5 md:p-6">
-            <div className="mb-3 flex items-center gap-2 text-lg font-black text-yellow-200">
-              <Settings size={20} /> إعداد مطلوب قبل التشغيل
-            </div>
-            <div className="space-y-3 text-sm leading-7 text-yellow-50/90">
-              {!accessKey && (
-                <p>
-                  أضف Access Key في متغيرات البيئة على Render باسم <code className="rounded bg-black/30 px-2 py-1">ISPORTS_ANIMATION_ACCESS_KEY</code> بدون رفعه داخل الكود.
-                </p>
-              )}
-              {!matchId && (
-                <p>
-                  افتح الصفحة مع Match ID من المزود بهذا الشكل: <code className="rounded bg-black/30 px-2 py-1">/animation-live?matchId=123456&amp;lang=en&amp;statsPanel=simple&amp;teamPanel=1</code>
-                </p>
-              )}
-              <p>
-                يجب إضافة نطاق المنصة <code className="rounded bg-black/30 px-2 py-1">worldcup.mcprim.com</code> في Domain Whitelist داخل لوحة تحكم الاشتراك.
-              </p>
-            </div>
-          </div>
-        )}
-
-        {iframeUrl && (
+        {iframeUrl ? (
           <div className="overflow-hidden rounded-[2rem] border border-white/10 bg-black shadow-[0_25px_90px_rgba(0,0,0,0.45)]">
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 bg-white/[0.035] px-4 py-3 text-xs font-black text-gray-300 md:px-5">
               <span>Match ID: {matchId}</span>
               <span>Language: {lang}</span>
-              <span>Stats: {statsPanel || 'default'}</span>
+              <span>Stats: {statsPanel}</span>
               <span>Team Panel: {teamPanel || 'default'}</span>
             </div>
             <iframe
@@ -107,10 +107,21 @@ export default async function AnimationLivePage({
               referrerPolicy="strict-origin-when-cross-origin"
             />
           </div>
+        ) : (
+          <div className="rounded-[2rem] border border-white/10 bg-white/[0.045] p-8 text-center shadow-card">
+            <Radio size={44} className="mx-auto mb-4 text-[#0FF0FC]" />
+            <h2 className="text-2xl font-black text-white">لا يوجد بث أنيميشن متاح حاليًا</h2>
+            <p className="mx-auto mt-3 max-w-2xl text-sm leading-7 text-gray-400">
+              سيتم تشغيل البث هنا تلقائيًا عند إضافة Match ID الخاص بالمزود إلى إحدى المباريات القادمة.
+            </p>
+            <Link href="/matches" className="mt-5 inline-flex rounded-2xl border border-[#0FF0FC]/25 bg-[#0FF0FC]/10 px-5 py-3 text-sm font-black text-[#0FF0FC] hover:bg-[#0FF0FC] hover:text-black">
+              العودة إلى المباريات
+            </Link>
+          </div>
         )}
 
         <div className="rounded-2xl border border-emerald-400/20 bg-emerald-400/10 px-5 py-4 text-sm font-bold leading-7 text-emerald-100">
-          <span className="inline-flex items-center gap-2"><ShieldCheck size={16} /> مهم:</span> هذا تكامل عرض فقط داخل المنصة. لا يغير طبيعة بورصة المونديال: كل الأرصدة Virtual Credits فقط، ولا توجد مراهنات أو كريبتو أو سحب أرباح.
+          <span className="inline-flex items-center gap-2"><ShieldCheck size={16} /> مهم:</span> هذا تكامل عرض فقط داخل المنصة. كل الأرصدة Virtual Credits فقط، ولا توجد مراهنات أو كريبتو أو سحب أرباح.
         </div>
       </section>
     </main>
