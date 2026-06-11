@@ -67,6 +67,16 @@ function formatMatchTime(value?: string | null) {
   return value ? new Date(value).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }) : 'غير محدد';
 }
 
+function getElapsedMatchTime(match: any, now: number) {
+  if (!match?.matchDate) return null;
+  const start = new Date(match.matchDate).getTime();
+  if (!Number.isFinite(start) || now < start) return null;
+  const elapsedMinutes = Math.max(1, Math.floor((now - start) / 60000) + 1);
+  if (elapsedMinutes <= 90) return `الدقيقة ${elapsedMinutes}`;
+  if (elapsedMinutes <= 120) return `90+${elapsedMinutes - 90}`;
+  return 'بعد الدقيقة 120';
+}
+
 function sortMatches(matches: any[]) {
   return [...matches].sort((a, b) => new Date(a?.matchDate || 0).getTime() - new Date(b?.matchDate || 0).getTime());
 }
@@ -110,22 +120,50 @@ export default function HomeClient({
   academyArticles?: AcademyArticle[];
 }) {
   const [now, setNow] = useState(() => Date.now());
+  const [liveMatches, setLiveMatches] = useState<any[]>(() => Array.isArray(upcomingMatches) ? upcomingMatches : []);
 
   useEffect(() => {
     useStore.setState({ assets: initialAssets, loading: false });
   }, [initialAssets]);
 
   useEffect(() => {
+    setLiveMatches(Array.isArray(upcomingMatches) ? upcomingMatches : []);
+  }, [upcomingMatches]);
+
+  useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(timer);
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    const refreshLiveCard = async () => {
+      try {
+        const response = await fetch('/api/matches/live-card', { cache: 'no-store' });
+        if (!response.ok) return;
+        const data = await response.json();
+        if (!cancelled && Array.isArray(data?.matches)) setLiveMatches(data.matches);
+      } catch {
+        // Keep current data if polling fails.
+      }
+    };
+
+    refreshLiveCard();
+    const timer = window.setInterval(refreshLiveCard, 15000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, []);
+
   const safeAssets = Array.isArray(initialAssets) ? initialAssets : [];
-  const safeMatches = Array.isArray(upcomingMatches) ? upcomingMatches : [];
+  const safeMatches = Array.isArray(liveMatches) && liveMatches.length > 0 ? liveMatches : (Array.isArray(upcomingMatches) ? upcomingMatches : []);
   const { featuredMatch: nextMatch, followingMatch } = pickFeaturedMatch(safeMatches, now);
   const hasAnimation = Boolean(getAnimationMatchId(nextMatch));
   const showScore = shouldShowScore(nextMatch, now);
   const isLiveNow = Boolean(nextMatch) && (isLiveStatus(nextMatch) || isCurrentMatchWindow(nextMatch, now));
+  const elapsedMatchTime = isLiveNow ? getElapsedMatchTime(nextMatch, now) : null;
 
   const findTeamAsset = (team: any) => {
     const teamName = team?.name || team?.teamName || '';
@@ -214,10 +252,10 @@ export default function HomeClient({
                   </div>
                 </div>
 
-                <div className="flex items-center justify-center gap-2 text-center text-xs font-bold text-gray-400"><Clock size={13} /> {formatMatchDate(nextMatch.matchDate)}</div>
+                <div className="flex items-center justify-center gap-2 text-center text-xs font-bold text-gray-400"><Clock size={13} /> {elapsedMatchTime ? `زمن المباراة: ${elapsedMatchTime}` : formatMatchDate(nextMatch.matchDate)}</div>
 
                 {showScore ? (
-                  <div className="mt-3 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-center text-xs font-black text-emerald-200">النتيجة الحالية: {scoreLabel(nextMatch)}</div>
+                  <div className="mt-3 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-center text-xs font-black text-emerald-200">النتيجة الحالية: {scoreLabel(nextMatch)}{elapsedMatchTime ? ` · ${elapsedMatchTime}` : ''}</div>
                 ) : countdown ? (
                   <div className="mt-3 grid grid-cols-4 gap-2">
                     {countdown.map((item) => (
@@ -228,11 +266,11 @@ export default function HomeClient({
                     ))}
                   </div>
                 ) : (
-                  <div className="mt-3 rounded-xl border border-[#FFD700]/20 bg-[#FFD700]/10 px-3 py-2 text-center text-xs font-black text-[#FFD700]">موعد المباراة: {formatMatchTime(nextMatch.matchDate)}</div>
+                  <div className="mt-3 rounded-xl border border-[#FFD700]/20 bg-[#FFD700]/10 px-3 py-2 text-center text-xs font-black text-[#FFD700]">{elapsedMatchTime ? `زمن المباراة: ${elapsedMatchTime}` : `موعد المباراة: ${formatMatchTime(nextMatch.matchDate)}`}</div>
                 )}
 
                 <Link href={animationHref} className={`mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl px-3 py-2 text-xs font-black transition ${hasAnimation ? 'border border-[#FFD700]/25 bg-[#FFD700]/10 text-[#FFD700] hover:bg-[#FFD700] hover:text-black' : 'border border-[#0FF0FC]/25 bg-[#0FF0FC]/10 text-[#0FF0FC] hover:bg-[#0FF0FC] hover:text-black'}`}>
-                  <Radio size={15} /> {hasAnimation ? (isLiveNow ? 'بث الأنيميشن مباشر' : 'شاهد بث الأنيميشن') : `موعد المباراة: ${formatMatchTime(nextMatch.matchDate)}`}
+                  <Radio size={15} /> {hasAnimation ? (isLiveNow ? 'بث الأنيميشن مباشر' : 'شاهد بث الأنيميشن') : (elapsedMatchTime ? `زمن المباراة: ${elapsedMatchTime}` : `موعد المباراة: ${formatMatchTime(nextMatch.matchDate)}`)}
                 </Link>
 
                 {showScore && followingMatch && (
