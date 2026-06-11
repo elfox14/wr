@@ -73,7 +73,7 @@ async function getUpcomingMatches() {
 
 export default async function AnimationLivePage({ searchParams }: { searchParams?: Promise<Record<string, string | string[] | undefined>> }) {
   const params = (await searchParams) || {};
-  const accessKey = process.env.ISPORTS_ANIMATION_ACCESS_KEY || process.env.NEXT_PUBLIC_ISPORTS_ANIMATION_ACCESS_KEY || '';
+  const accessKey = process.env.ISPORTS_ANIMATION_ACCESS_KEY || process.env.NEXT_PUBLIC_ISPORTS_ANIMATION_ACCESS_KEY || process.env.ISPORTS_API_KEY || '';
   const [autoMatch, upcomingMatches] = await Promise.all([getAutoAnimationMatchId(), getUpcomingMatches()]);
   const availableMatches = upcomingMatches.filter((match) => match.animationMatchId);
   const waitingMatches = upcomingMatches.filter((match) => !match.animationMatchId);

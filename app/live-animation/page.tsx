@@ -1,9 +1,4 @@
-type SearchParams = {
-  matchId?: string;
-  lang?: string;
-  statsPanel?: string;
-  teamPanel?: string;
-};
+
 
 function safeLang(value?: string) {
   const allowed = ['en', 'th', 'vi', 'id'];
@@ -18,12 +13,21 @@ function safeTeamPanel(value?: string) {
   return value === '1' ? '1' : undefined;
 }
 
-export default function LiveAnimationPage({ searchParams }: { searchParams: SearchParams }) {
-  const matchId = Number(searchParams?.matchId);
-  const accessKey = process.env.ISPORTS_ANIMATION_ACCESS_KEY || '';
-  const lang = safeLang(searchParams?.lang);
-  const statsPanel = safeStatsPanel(searchParams?.statsPanel);
-  const teamPanel = safeTeamPanel(searchParams?.teamPanel);
+type SearchParams = Promise<Record<string, string | string[] | undefined>>;
+
+export default async function LiveAnimationPage({ searchParams }: { searchParams: SearchParams }) {
+  const paramsRaw = await searchParams || {};
+  const matchIdStr = Array.isArray(paramsRaw.matchId) ? paramsRaw.matchId[0] : paramsRaw.matchId;
+  const matchId = Number(matchIdStr);
+  
+  const langStr = Array.isArray(paramsRaw.lang) ? paramsRaw.lang[0] : paramsRaw.lang;
+  const statsPanelStr = Array.isArray(paramsRaw.statsPanel) ? paramsRaw.statsPanel[0] : paramsRaw.statsPanel;
+  const teamPanelStr = Array.isArray(paramsRaw.teamPanel) ? paramsRaw.teamPanel[0] : paramsRaw.teamPanel;
+
+  const accessKey = process.env.ISPORTS_ANIMATION_ACCESS_KEY || process.env.ISPORTS_API_KEY || '';
+  const lang = safeLang(langStr);
+  const statsPanel = safeStatsPanel(statsPanelStr);
+  const teamPanel = safeTeamPanel(teamPanelStr);
 
   const params = new URLSearchParams();
   if (matchId && Number.isFinite(matchId)) params.set('matchId', String(matchId));
