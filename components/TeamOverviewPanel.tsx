@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Activity, CalendarDays, Database, ExternalLink, FileText, Goal, ListChecks, Newspaper, Shield, ShieldAlert, Sparkles, Target, Users, Zap } from 'lucide-react';
+import { CalendarDays, Database, ExternalLink, FileText, Goal, ListChecks, Newspaper, Shield, ShieldAlert, Sparkles, Target, Users, Zap } from 'lucide-react';
 import { AssetImage } from '@/components/ui/AssetImage';
 
 type TeamOverviewPlayer = {
