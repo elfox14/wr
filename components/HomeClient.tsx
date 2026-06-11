@@ -18,9 +18,24 @@ function getAnimationHref(match: any) { const id = getAnimationMatchId(match); r
 function formatMatchDate(value?: string | null) { return value ? new Date(value).toLocaleString('ar-EG') : 'غير محدد'; }
 function formatMatchTime(value?: string | null) { return value ? new Date(value).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }) : 'غير محدد'; }
 function sortMatches(matches: any[]) { return [...matches].sort((a, b) => new Date(a?.matchDate || 0).getTime() - new Date(b?.matchDate || 0).getTime()); }
-function pickUpcomingMatch(matches: any[], now: number) {
-  const sortedMatches = sortMatches(matches);
-  return sortedMatches.find((match) => match?.matchDate && new Date(match.matchDate).getTime() > now) || sortedMatches[0] || null;
+function pickTopMatches(matches: any[], now: number) {
+  const sorted = sortMatches(matches);
+  const live = sorted.filter((m) => m.status === 'IN_PLAY' || m.status === 'LIVE');
+  const upcoming = sorted.filter((m) => m.status === 'SCHEDULED' && new Date(m.matchDate).getTime() > now);
+  const others = sorted.filter((m) => !live.includes(m) && !upcoming.includes(m));
+  return [...live, ...upcoming, ...others].slice(0, 2);
+}
+function getCountdownArray(matchDate: string | null | undefined, now: number) {
+  if (!matchDate) return null;
+  const diff = new Date(matchDate).getTime() - now;
+  if (diff <= 0) return null;
+  const totalSeconds = Math.floor(diff / 1000);
+  return [
+    { label: 'يوم', value: Math.floor(totalSeconds / 86400) },
+    { label: 'ساعة', value: Math.floor((totalSeconds % 86400) / 3600) },
+    { label: 'دقيقة', value: Math.floor((totalSeconds % 3600) / 60) },
+    { label: 'ثانية', value: totalSeconds % 60 },
+  ];
 }
 
 export default function HomeClient({ initialAssets, upcomingMatches = [], assetsCount = 0, playersCount = 0, teamsCount = 0, upcomingMatchesCount = 0, academyArticles = [] }: { initialAssets: any[]; usersCount?: number; tradeVolume?: number; executedTrades?: number; upcomingMatches?: any[]; assetsCount?: number; playersCount?: number; teamsCount?: number; upcomingMatchesCount?: number; recentTransactions?: any[]; mostTradedAssets?: any[]; topDemandAssets?: any[]; topMomentumAssets?: any[]; undervaluedAssets?: any[]; academyArticles?: AcademyArticle[] }) {
@@ -47,8 +62,7 @@ export default function HomeClient({ initialAssets, upcomingMatches = [], assets
 
   const safeAssets = Array.isArray(initialAssets) ? initialAssets : [];
   const safeMatches = Array.isArray(liveMatches) && liveMatches.length > 0 ? liveMatches : (Array.isArray(upcomingMatches) ? upcomingMatches : []);
-  const nextMatch = pickUpcomingMatch(safeMatches, now);
-  const hasAnimation = Boolean(getAnimationMatchId(nextMatch));
+  const topMatches = pickTopMatches(safeMatches, now);
 
   const findTeamAsset = (team: any) => {
     const teamName = team?.name || team?.teamName || '';
@@ -60,22 +74,7 @@ export default function HomeClient({ initialAssets, upcomingMatches = [], assets
     const matchedAsset = findTeamAsset(team);
     return <Link href={getTeamHref(team)} className="rounded-full transition hover:scale-105 focus:outline-none focus:ring-2 focus:ring-[#0FF0FC]/40" title={`صفحة ${team?.name || matchedAsset?.name || 'المنتخب'}`}><AssetImage image={team?.image || team?.logo || team?.badge || team?.flag || matchedAsset?.image} name={team?.name || team?.teamName || matchedAsset?.name || 'Team'} type="TEAM" width={54} height={54} className="h-14 w-14 rounded-full border border-white/10 bg-black/40 object-cover shadow-[0_0_18px_rgba(15,240,252,0.12)] hover:border-[#0FF0FC]/50" /></Link>;
   };
-  const getCountdown = () => {
-    if (!nextMatch?.matchDate) return null;
-    const diff = new Date(nextMatch.matchDate).getTime() - now;
-    if (diff <= 0) return null;
-    const totalSeconds = Math.floor(diff / 1000);
-    return [
-      { label: 'يوم', value: Math.floor(totalSeconds / 86400) },
-      { label: 'ساعة', value: Math.floor((totalSeconds % 86400) / 3600) },
-      { label: 'دقيقة', value: Math.floor((totalSeconds % 3600) / 60) },
-      { label: 'ثانية', value: totalSeconds % 60 },
-    ];
-  };
 
-  const countdown = getCountdown();
-  const matchGroup = normalizeGroupKey(nextMatch?.groupPhase || nextMatch?.group || nextMatch?.homeTeam?.group || nextMatch?.awayTeam?.group);
-  const animationHref = getAnimationHref(nextMatch);
   const quickStats = [{ label: 'منتخب', value: teamsCount || 0, icon: Globe }, { label: 'لاعب', value: playersCount || 0, icon: Users }, { label: 'أصل', value: assetsCount || 0, icon: Wallet }, { label: 'مباراة', value: upcomingMatchesCount || 0, icon: Calendar }];
   const gatewayCards = [
     { title: 'المنتخبات', text: 'صفحات مختصرة لكل منتخب: بطاقة، مجموعة، نجوم، نقاط قوة وضعف.', href: '/market?type=TEAM', action: 'استكشف المنتخبات', tone: 'border-emerald-400/20 bg-emerald-400/[0.045] text-emerald-300' },
@@ -88,8 +87,15 @@ export default function HomeClient({ initialAssets, upcomingMatches = [], assets
     <section className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(15,240,252,0.18),transparent_28%),radial-gradient(circle_at_bottom_left,rgba(255,215,0,0.12),transparent_24%),linear-gradient(135deg,rgba(255,255,255,0.055),rgba(255,255,255,0.015))] p-5 shadow-anti-gravity md:p-7">
       <div className="pointer-events-none absolute inset-0 opacity-16 [background-image:linear-gradient(rgba(255,255,255,.05)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.05)_1px,transparent_1px)] [background-size:44px_44px]" />
       <div className="relative grid gap-5 lg:grid-cols-[1.02fr_0.98fr] lg:items-stretch"><div className="flex flex-col justify-center"><p className="mb-4 inline-flex w-fit rounded-full border border-[#0FF0FC]/25 bg-[#0FF0FC]/10 px-4 py-2 text-xs font-black text-[#0FF0FC]">بورصة إم سي للمونديال</p><h1 className="max-w-3xl text-3xl font-black leading-tight text-white md:text-5xl">منصة تحليلات وإحصائيات رياضية مع تجربة تداول افتراضية للمونديال</h1><p className="mt-4 max-w-3xl text-sm leading-7 text-gray-300 md:text-base">تابع بيانات المنتخبات واللاعبين، اقرأ التحليلات الكروية، وجرّب سوق بورصة المونديال بأرصدة افتراضية فقط لفهم حركة الأسعار والزخم بدون أي معاملات مالية حقيقية.</p></div>
-        <div className="rounded-[1.6rem] border border-white/10 bg-black/40 p-5 backdrop-blur-xl"><div className="mb-4 flex items-center justify-between gap-3"><div><p className="text-xs font-black text-gray-500">المباراة القادمة</p><h2 className="mt-1 text-xl font-black text-white">{nextMatch ? 'المباراة القادمة' : 'جدول المباريات'}</h2></div><ShieldCheck className="text-[#0FF0FC]" size={30} /></div>
-          {nextMatch ? <div className="rounded-2xl border border-white/10 bg-white/[0.045] p-4"><div className="mb-4 grid grid-cols-[1fr_auto_1fr] items-center gap-3"><div className="flex flex-col items-center gap-2 text-center">{renderMatchTeamLogo(nextMatch.homeTeam)}<Link href={getTeamHref(nextMatch.homeTeam)} className="text-xs font-black text-white transition hover:text-[#0FF0FC]">{nextMatch.homeTeam?.name || 'الفريق الأول'}</Link></div><div className="flex flex-col items-center gap-2"><Link href={groupHref(matchGroup)} className="rounded-full border border-[#0FF0FC]/25 bg-[#0FF0FC]/10 px-3 py-1 text-[10px] font-black text-[#0FF0FC] transition hover:bg-[#0FF0FC]/20 hover:text-white">المجموعة {matchGroup}</Link><div className="rounded-full border border-white/10 bg-black/40 px-4 py-2 text-sm font-black text-[#FFD700]">VS</div></div><div className="flex flex-col items-center gap-2 text-center">{renderMatchTeamLogo(nextMatch.awayTeam)}<Link href={getTeamHref(nextMatch.awayTeam)} className="text-xs font-black text-white transition hover:text-[#0FF0FC]">{nextMatch.awayTeam?.name || 'الفريق الثاني'}</Link></div></div><div className="flex items-center justify-center gap-2 text-center text-xs font-bold text-gray-400"><Clock size={13} /> {formatMatchDate(nextMatch.matchDate)}</div>{countdown ? <div className="mt-3 grid grid-cols-4 gap-2">{countdown.map((item) => <div key={item.label} className="rounded-xl border border-[#0FF0FC]/15 bg-[#0FF0FC]/[0.06] px-2 py-2 text-center"><div className="font-mono text-lg font-black leading-none text-white tabular-nums">{String(item.value).padStart(2, '0')}</div><div className="mt-1 text-[10px] font-bold text-[#0FF0FC]">{item.label}</div></div>)}</div> : <div className="mt-3 rounded-xl border border-[#FFD700]/20 bg-[#FFD700]/10 px-3 py-2 text-center text-xs font-black text-[#FFD700]">موعد المباراة: {formatMatchTime(nextMatch.matchDate)}</div>}<Link href={animationHref} className={`mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl px-3 py-2 text-xs font-black transition ${hasAnimation ? 'border border-[#FFD700]/25 bg-[#FFD700]/10 text-[#FFD700] hover:bg-[#FFD700] hover:text-black' : 'border border-[#0FF0FC]/25 bg-[#0FF0FC]/10 text-[#0FF0FC] hover:bg-[#0FF0FC] hover:text-black'}`}><Radio size={15} /> دخول البث</Link><div className="mt-3 rounded-xl border border-white/10 bg-black/30 p-3"><div className="mb-2 text-[11px] font-black text-[#0FF0FC]">المباراة القادمة</div><div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 text-center"><div className="flex flex-col items-center gap-1">{renderMatchTeamLogo(nextMatch.homeTeam)}<span className="line-clamp-1 text-[11px] font-black text-white">{nextMatch.homeTeam?.name || 'الفريق الأول'}</span></div><span className="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-[10px] text-[#FFD700]">VS</span><div className="flex flex-col items-center gap-1">{renderMatchTeamLogo(nextMatch.awayTeam)}<span className="line-clamp-1 text-[11px] font-black text-white">{nextMatch.awayTeam?.name || 'الفريق الثاني'}</span></div></div></div></div> : <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.03] p-6 text-center text-sm text-gray-400">سيظهر هنا أقرب لقاء بعد مزامنة جدول المباريات.</div>}
+        <div className="rounded-[1.6rem] border border-white/10 bg-black/40 p-5 backdrop-blur-xl"><div className="mb-4 flex items-center justify-between gap-3"><div><p className="text-xs font-black text-gray-500">المباريات القادمة</p><h2 className="mt-1 text-xl font-black text-white">{topMatches.length > 0 ? 'المباريات القادمة' : 'جدول المباريات'}</h2></div><ShieldCheck className="text-[#0FF0FC]" size={30} /></div>
+          {topMatches.length > 0 ? <div className="flex flex-col gap-4">{topMatches.map(match => {
+            const matchGroup = normalizeGroupKey(match?.groupPhase || match?.group || match?.homeTeam?.group || match?.awayTeam?.group);
+            const isLive = match.status === 'IN_PLAY' || match.status === 'LIVE' || match.status === 'FINISHED';
+            const animationHref = getAnimationHref(match);
+            const hasAnimation = Boolean(getAnimationMatchId(match));
+            const countdown = getCountdownArray(match.matchDate, now);
+            return <div key={match.id || Math.random()} className="rounded-2xl border border-white/10 bg-white/[0.045] p-4"><div className="mb-4 grid grid-cols-[1fr_auto_1fr] items-center gap-3"><div className="flex flex-col items-center gap-2 text-center">{renderMatchTeamLogo(match.homeTeam)}<Link href={getTeamHref(match.homeTeam)} className="text-xs font-black text-white transition hover:text-[#0FF0FC]">{match.homeTeam?.name || 'الفريق الأول'}</Link></div><div className="flex flex-col items-center gap-2"><Link href={groupHref(matchGroup)} className="rounded-full border border-[#0FF0FC]/25 bg-[#0FF0FC]/10 px-3 py-1 text-[10px] font-black text-[#0FF0FC] transition hover:bg-[#0FF0FC]/20 hover:text-white">المجموعة {matchGroup}</Link>{isLive ? <div className="rounded-2xl border border-white/10 bg-black/40 px-4 py-2 text-xl font-black text-white shadow-inner">{match.homeScore ?? 0} - {match.awayScore ?? 0}</div> : <div className="rounded-full border border-white/10 bg-black/40 px-4 py-2 text-sm font-black text-[#FFD700]">VS</div>}</div><div className="flex flex-col items-center gap-2 text-center">{renderMatchTeamLogo(match.awayTeam)}<Link href={getTeamHref(match.awayTeam)} className="text-xs font-black text-white transition hover:text-[#0FF0FC]">{match.awayTeam?.name || 'الفريق الثاني'}</Link></div></div>{isLive ? <div className="flex items-center justify-center gap-2 text-center text-xs font-bold text-red-400"><div className="h-2 w-2 animate-pulse rounded-full bg-red-500" />{match.status === 'FINISHED' ? 'انتهت المباراة' : (match.minute ? `الدقيقة ${match.minute}` : 'جارية الآن')}</div> : <><div className="flex items-center justify-center gap-2 text-center text-xs font-bold text-gray-400"><Clock size={13} /> {formatMatchDate(match.matchDate)}</div>{countdown ? <div className="mt-3 grid grid-cols-4 gap-2">{countdown.map((item) => <div key={item.label} className="rounded-xl border border-[#0FF0FC]/15 bg-[#0FF0FC]/[0.06] px-2 py-2 text-center"><div className="font-mono text-lg font-black leading-none text-white tabular-nums">{String(item.value).padStart(2, '0')}</div><div className="mt-1 text-[10px] font-bold text-[#0FF0FC]">{item.label}</div></div>)}</div> : <div className="mt-3 rounded-xl border border-[#FFD700]/20 bg-[#FFD700]/10 px-3 py-2 text-center text-xs font-black text-[#FFD700]">موعد المباراة: {formatMatchTime(match.matchDate)}</div>}</>}<Link href={animationHref} className={`mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl px-3 py-2 text-xs font-black transition ${hasAnimation ? 'border border-[#FFD700]/25 bg-[#FFD700]/10 text-[#FFD700] hover:bg-[#FFD700] hover:text-black' : 'border border-[#0FF0FC]/25 bg-[#0FF0FC]/10 text-[#0FF0FC] hover:bg-[#0FF0FC] hover:text-black'}`}><Radio size={15} /> دخول البث</Link></div>;
+          })}</div> : <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.03] p-6 text-center text-sm text-gray-400">سيظهر هنا أقرب لقاء بعد مزامنة جدول المباريات.</div>}
           <div className="mt-3 grid grid-cols-4 gap-2">{quickStats.map((stat) => <div key={stat.label} className="rounded-2xl border border-white/10 bg-black/30 px-2 py-2 text-center"><div className="text-lg font-black leading-none text-white tabular-nums">{stat.value}</div><div className="mt-1 text-[10px] font-bold text-gray-500">{stat.label}</div></div>)}</div>
         </div></div></section>
     <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">{gatewayCards.map((card) => <Link key={card.href} href={card.href} className={`group rounded-3xl border p-5 transition hover:-translate-y-1 ${card.tone}`}><h3 className="text-xl font-black text-white">{card.title}</h3><p className="mt-2 min-h-16 text-sm leading-6 text-gray-400">{card.text}</p><div className="mt-5 inline-flex items-center gap-2 text-sm font-black">{card.action} <ArrowLeft size={16} className="transition group-hover:-translate-x-1" /></div></Link>)}</section>
