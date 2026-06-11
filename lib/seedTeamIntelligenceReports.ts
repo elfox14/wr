@@ -1,4 +1,5 @@
 import { Prisma, PrismaClient } from '@prisma/client';
+import { groupAWorldCupReports } from './groupAWorldCupReports';
 
 export type TeamIntelligenceSeedReport = {
   teamCodes: string[];
@@ -16,7 +17,7 @@ export type TeamIntelligenceSeedReport = {
   metrics?: Prisma.InputJsonValue;
 };
 
-export const teamIntelligenceSeedReports: TeamIntelligenceSeedReport[] = [
+const editorialSeedReports: TeamIntelligenceSeedReport[] = [
   {
     teamCodes: ['ARG', 'AR', 'ARGENTINA'],
     title: 'ملف الأرجنتين الفني: خبرة بطولة وشخصية مباريات كبيرة',
@@ -129,6 +130,11 @@ export const teamIntelligenceSeedReports: TeamIntelligenceSeedReport[] = [
     weaknesses: ['الحاجة للثبات الدفاعي', 'إدارة النسق أمام الضغط المستمر'],
     metrics: { model: 'editorial-v1', dataDepth: 'baseline' },
   },
+];
+
+export const teamIntelligenceSeedReports: TeamIntelligenceSeedReport[] = [
+  ...groupAWorldCupReports,
+  ...editorialSeedReports,
 ];
 
 type SeedTeam = {
