@@ -1,9 +1,7 @@
 'use client';
 
-import React, { useEffect, useState, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
+import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { useStore } from '@/lib/store';
 import { Zap, TrendingUp, TrendingDown, Radio, Flame, Users, AlertTriangle } from 'lucide-react';
 
 type TickerItemType = 'PRICE_UP' | 'PRICE_DOWN' | 'UNDERVALUED' | 'OVERVALUED' | 'HIGH_DEMAND' | 'HIGH_MOMENTUM' | 'MATCH_EVENT' | 'NEWS' | 'FALLBACK';
@@ -12,6 +10,7 @@ interface TickerData {
   id: string;
   type: TickerItemType;
   title: string;
+  body?: string;
   assetId?: string;
   assetName?: string;
   assetImage?: string;
@@ -21,129 +20,71 @@ interface TickerData {
   momentum?: number;
   marketDemand?: number;
   matchId?: string;
+  href?: string;
+  timestamp?: string;
+  source?: string;
+}
+
+function fallbackItems(): TickerData[] {
+  return [
+    { id: 'fallback-1', type: 'FALLBACK', title: 'مرحباً بك في MC PRIME Exchange — تابع السوق والمباريات مباشرة.' },
+    { id: 'fallback-2', type: 'FALLBACK', title: 'الأسعار تتحرك مع التداول وأحداث المباراة داخل المنصة.' },
+    { id: 'fallback-3', type: 'FALLBACK', title: 'جميع الكوينز افتراضية وتُستخدم داخل المنصة فقط.' },
+  ];
 }
 
 export function GlobalTicker() {
-  const router = useRouter();
-  const [marketNews, setMarketNews] = useState<any[]>([]);
-  const assets = (useStore(s => s.assets) || []) as any[];
+  const [tickerItems, setTickerItems] = useState<TickerData[]>(fallbackItems);
+  const [updatedAt, setUpdatedAt] = useState<string | null>(null);
 
   useEffect(() => {
-    // Fetch generic Market News
-    fetch('/api/market-news?limit=5')
-      .then(res => res.json())
-      .then(data => {
-        if (Array.isArray(data)) setMarketNews(data);
-      })
-      .catch(console.error);
+    let cancelled = false;
+
+    async function fetchTicker() {
+      try {
+        const res = await fetch('/api/live-ticker?limit=28', { cache: 'no-store' });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (cancelled) return;
+        const items = Array.isArray(data?.items) && data.items.length > 0 ? data.items : fallbackItems();
+        setTickerItems(items);
+        setUpdatedAt(data?.updatedAt || null);
+      } catch (error) {
+        console.error('Global ticker fetch failed:', error);
+      }
+    }
+
+    fetchTicker();
+    const timer = window.setInterval(fetchTicker, 20_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
   }, []);
 
-  const tickerItems = useMemo(() => {
-    const items: TickerData[] = [];
-
-    // 1. Generate items from active assets
-    if (assets.length > 0) {
-      // Top Gainers (PRICE_UP)
-      const gainers = [...assets].filter(a => (a.change || 0) > 0).sort((a, b) => b.change - a.change).slice(0, 2);
-      gainers.forEach(a => items.push({
-        id: `gainer-${a.id}`, type: 'PRICE_UP', title: 'زخم قوي وطلب متزايد',
-        assetId: a.id, assetName: a.name, assetImage: a.image, marketPrice: a.marketPrice ?? a.current_price, changePercent: a.change
-      }));
-
-      // Top Losers (PRICE_DOWN)
-      const losers = [...assets].filter(a => (a.change || 0) < 0).sort((a, b) => a.change - b.change).slice(0, 2);
-      losers.forEach(a => items.push({
-        id: `loser-${a.id}`, type: 'PRICE_DOWN', title: 'فرصة شراء بأسعار منخفضة',
-        assetId: a.id, assetName: a.name, assetImage: a.image, marketPrice: a.marketPrice ?? a.current_price, changePercent: a.change
-      }));
-
-      // Helper to calculate premium/discount locally
-      const getPremiumDiscount = (asset: any) => {
-        const marketPrice = asset.marketPrice ?? asset.current_price ?? 0;
-        const fairValue = asset.fairValue ?? asset.current_price ?? 0;
-        return fairValue > 0 ? ((marketPrice - fairValue) / fairValue) * 100 : 0;
-      };
-
-      // Undervalued
-      const undervalued = [...assets].filter(a => getPremiumDiscount(a) <= -10).slice(0, 2);
-      undervalued.forEach(a => items.push({
-        id: `under-${a.id}`, type: 'UNDERVALUED', title: `أقل من قيمته العادلة بـ ${Math.abs(Math.round(getPremiumDiscount(a)))}%`,
-        assetId: a.id, assetName: a.name, assetImage: a.image, premiumDiscountPercent: getPremiumDiscount(a)
-      }));
-
-      // Overvalued
-      const overvalued = [...assets].filter(a => getPremiumDiscount(a) >= 15).slice(0, 1);
-      overvalued.forEach(a => items.push({
-        id: `over-${a.id}`, type: 'OVERVALUED', title: `أعلى من قيمته العادلة بـ ${Math.abs(Math.round(getPremiumDiscount(a)))}%`,
-        assetId: a.id, assetName: a.name, assetImage: a.image, premiumDiscountPercent: getPremiumDiscount(a)
-      }));
-
-      // High Momentum
-      const highMom = [...assets].filter(a => (a.momentum || 0) >= 70).slice(0, 2);
-      highMom.forEach(a => items.push({
-        id: `mom-${a.id}`, type: 'HIGH_MOMENTUM', title: `Momentum ${(a.momentum || 0).toFixed(0)}/100`,
-        assetId: a.id, assetName: a.name, assetImage: a.image, momentum: a.momentum
-      }));
-
-      // High Demand
-      const highDem = [...assets].filter(a => (a.marketDemand || 0) >= 70).slice(0, 2);
-      highDem.forEach(a => items.push({
-        id: `dem-${a.id}`, type: 'HIGH_DEMAND', title: `Demand ${(a.marketDemand || 0).toFixed(0)}/100`,
-        assetId: a.id, assetName: a.name, assetImage: a.image, marketDemand: a.marketDemand
-      }));
-    }
-
-    // 2. Add real market news
-    marketNews.forEach(news => {
-      items.push({
-        id: `news-${news.id}`,
-        type: 'NEWS',
-        title: news.title || news.titleAr,
-        assetId: news.asset?.id,
-        assetName: news.asset?.name,
-        assetImage: news.asset?.image,
-        changePercent: news.changePercent ?? undefined
-      });
-    });
-
-    // 3. Fallbacks if too few items
-    if (items.length < 4) {
-      items.push(
-        { id: 'fallback-1', type: 'FALLBACK', title: 'مرحباً بك في MC PRIME Exchange — ابدأ بناء محفظتك الآن.' },
-        { id: 'fallback-2', type: 'FALLBACK', title: 'جميع الكوينز افتراضية وتُستخدم داخل المنصة فقط.' },
-        { id: 'fallback-3', type: 'FALLBACK', title: 'تابع السوق والمباريات لاكتشاف فرص التداول الافتراضي.' }
-      );
-    }
-
-    // Shuffle items a bit so it's mixed well
-    return items.sort(() => Math.random() - 0.5);
-  }, [assets, marketNews]);
-
-  // handleItemClick removed since we will use Link
+  const marqueeItems = useMemo(() => {
+    const items = tickerItems.length >= 4 ? tickerItems : [...tickerItems, ...fallbackItems()];
+    return items.slice(0, 32);
+  }, [tickerItems]);
 
   return (
     <div className="fixed bottom-0 left-0 right-0 z-50 bg-[#050505]/90 backdrop-blur-xl border-t border-white/5 shadow-[0_-8px_30px_rgba(0,0,0,0.4)] flex h-9 sm:h-11 overflow-hidden group">
-      
-      {/* Live Badge */}
-      <div className="bg-primary/10 text-[#0FF0FC] px-4 sm:px-6 py-1.5 font-black text-xs sm:text-sm flex items-center gap-2 whitespace-nowrap shrink-0 border-r border-[#0FF0FC]/20 z-20 relative shadow-[5px_0_15px_rgba(15,240,252,0.15)]">
+      <div className="bg-primary/10 text-[#0FF0FC] px-4 sm:px-6 py-1.5 font-black text-xs sm:text-sm flex items-center gap-2 whitespace-nowrap shrink-0 border-r border-[#0FF0FC]/20 z-20 relative shadow-[5px_0_15px_rgba(15,240,252,0.15)]" title={updatedAt ? `آخر تحديث: ${new Date(updatedAt).toLocaleTimeString('ar-EG')}` : undefined}>
         <Radio size={14} className="animate-pulse" />
-        <span className="hidden sm:inline tracking-wider">مباشر: MC PRIME Exchange</span>
-        <span className="sm:hidden tracking-wider font-mono">LIVE MARKET</span>
+        <span className="hidden sm:inline tracking-wider">مباشر: أخبار السوق والمباريات</span>
+        <span className="sm:hidden tracking-wider font-mono">LIVE NEWS</span>
         <div className="absolute right-0 top-0 bottom-0 w-[1px] bg-gradient-to-b from-transparent via-[#0FF0FC]/50 to-transparent"></div>
       </div>
-      
-      {/* Scrolling Content */}
+
       <div className="flex-1 overflow-hidden relative flex items-center">
-        {/* Gradient overlays for smooth fade at edges */}
         <div className="absolute left-0 top-0 bottom-0 w-8 sm:w-16 bg-gradient-to-r from-[#050505] to-transparent z-10 pointer-events-none"></div>
         <div className="absolute right-0 top-0 bottom-0 w-8 sm:w-16 bg-gradient-to-l from-[#050505] to-transparent z-10 pointer-events-none"></div>
 
         <div className="animate-marquee hover:[animation-play-state:paused] whitespace-nowrap flex gap-8 sm:gap-12 px-4 items-center h-full">
-          {tickerItems.map((item, i) => (
+          {marqueeItems.map((item, i) => (
             <TickerItemRenderer key={`${item.id}-${i}`} item={item} />
           ))}
-          {/* Duplicate for infinite seamless scroll */}
-          {tickerItems.map((item, i) => (
+          {marqueeItems.map((item, i) => (
             <TickerItemRenderer key={`dup-${item.id}-${i}`} item={item} />
           ))}
         </div>
@@ -155,7 +96,7 @@ export function GlobalTicker() {
 function TickerItemRenderer({ item }: { item: TickerData }) {
   let icon = null;
   let colorClass = 'text-gray-300';
-  let badgeClass = '';
+  let badgeClass = 'bg-white/5 text-gray-300 border-white/10';
 
   switch (item.type) {
     case 'PRICE_UP':
@@ -186,6 +127,8 @@ function TickerItemRenderer({ item }: { item: TickerData }) {
       break;
     case 'MATCH_EVENT':
       icon = <span>⚽</span>;
+      colorClass = 'text-[#FFD700]';
+      badgeClass = 'bg-[#FFD700]/10 text-[#FFD700] border-[#FFD700]/20';
       break;
     case 'NEWS':
       icon = <span>📰</span>;
@@ -195,12 +138,14 @@ function TickerItemRenderer({ item }: { item: TickerData }) {
       break;
   }
 
+  const displayHref = item.href || (item.assetId ? `/asset/${item.assetId}` : item.matchId ? '/matches' : undefined);
+
   const innerContent = (
     <>
       <div className="flex items-center gap-1.5">
         {icon}
         {item.assetImage && (
-          <img src={item.assetImage} alt={item.assetName} className="w-4 h-4 sm:w-5 sm:h-5 rounded-full object-cover border border-white/10" />
+          <img src={item.assetImage} alt={item.assetName || 'asset'} className="w-4 h-4 sm:w-5 sm:h-5 rounded-full object-cover border border-white/10" />
         )}
         {item.assetName && (
           <span className="font-bold text-white tracking-wide">{item.assetName}</span>
@@ -208,20 +153,19 @@ function TickerItemRenderer({ item }: { item: TickerData }) {
       </div>
 
       {item.marketPrice != null && (
-        <span className="font-mono font-bold text-white">{item.marketPrice}¢</span>
+        <span className="font-mono font-bold text-white">{Math.round(item.marketPrice)}¢</span>
       )}
 
-      {item.changePercent != null && (
+      {item.changePercent != null && Math.abs(Number(item.changePercent)) > 0 && (
         <span className={`font-mono text-[10px] sm:text-xs font-bold flex items-center gap-0.5 px-1 sm:px-1.5 py-0.5 rounded border ${badgeClass}`}>
-          <span dir="ltr">{item.changePercent > 0 ? '+' : ''}{item.changePercent}%</span>
+          <span dir="ltr">{Number(item.changePercent) > 0 ? '+' : ''}{Math.round(Number(item.changePercent) * 10) / 10}%</span>
         </span>
       )}
 
       <span className={`hidden sm:inline ${colorClass} font-medium`}>
         {item.title}
       </span>
-      {/* Mobile condensed version */}
-      <span className={`sm:hidden ${colorClass} font-medium max-w-[150px] truncate`}>
+      <span className={`sm:hidden ${colorClass} font-medium max-w-[180px] truncate`}>
         {item.title}
       </span>
 
@@ -229,18 +173,11 @@ function TickerItemRenderer({ item }: { item: TickerData }) {
     </>
   );
 
-  const className = `flex items-center gap-2 sm:gap-3 text-xs sm:text-sm cursor-pointer hover:bg-white/5 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg transition-colors ${item.assetId || item.matchId ? 'hover:scale-105' : ''}`;
+  const className = `flex items-center gap-2 sm:gap-3 text-xs sm:text-sm cursor-pointer hover:bg-white/5 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg transition-colors ${displayHref ? 'hover:scale-105' : ''}`;
 
-  if (item.assetId) {
-    return <Link href={`/asset/${item.assetId}`} className={className}>{innerContent}</Link>;
-  }
-  if (item.matchId) {
-    return <Link href={`/matches/${item.matchId}`} className={className}>{innerContent}</Link>;
+  if (displayHref) {
+    return <Link href={displayHref} className={className}>{innerContent}</Link>;
   }
 
-  return (
-    <div className={className}>
-      {innerContent}
-    </div>
-  );
+  return <div className={className}>{innerContent}</div>;
 }
