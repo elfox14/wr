@@ -66,26 +66,23 @@ export default async function AnimationLivePage({
   }
 
   return (
-    <main className="min-h-screen bg-background px-4 py-8 text-white sm:px-6 lg:px-8">
-      <section className="mx-auto max-w-7xl space-y-6">
-        <div className="rounded-[2rem] border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(15,240,252,0.16),transparent_30%),linear-gradient(135deg,rgba(255,255,255,0.055),rgba(255,255,255,0.015))] p-5 shadow-card md:p-7">
-          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+    <main className="min-h-screen bg-background px-4 py-4 text-white sm:px-6 lg:px-8">
+      <section className="mx-auto max-w-7xl space-y-4">
+        <div className="rounded-3xl border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(15,240,252,0.14),transparent_30%),linear-gradient(135deg,rgba(255,255,255,0.045),rgba(255,255,255,0.012))] p-4 shadow-card md:p-5">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div>
-              <p className="mb-3 inline-flex items-center gap-2 rounded-full border border-[#0FF0FC]/25 bg-[#0FF0FC]/10 px-4 py-2 text-xs font-black text-[#0FF0FC]">
-                <Radio size={15} /> Football Animation Live
+              <p className="mb-2 inline-flex items-center gap-2 rounded-full border border-[#0FF0FC]/25 bg-[#0FF0FC]/10 px-3 py-1.5 text-[11px] font-black text-[#0FF0FC]">
+                <Radio size={14} /> Football Animation Live
               </p>
-              <h1 className="text-3xl font-black md:text-5xl">البث الأنيميشن للمباريات</h1>
-              <p className="mt-3 max-w-3xl text-sm leading-7 text-gray-300 md:text-base">
-                يتم تشغيل البث تلقائيًا عند توفر Match ID الخاص بمزود الأنيميشن للمباراة القادمة.
-              </p>
+              <h1 className="text-2xl font-black md:text-4xl">البث الأنيميشن للمباريات</h1>
               {autoMatch && !requestedMatchId && (
                 <p className="mt-2 text-xs font-bold text-[#FFD700]">
                   المباراة المختارة تلقائيًا: {autoMatch.title} · {new Date(autoMatch.matchDate).toLocaleString('ar-EG')}
                 </p>
               )}
             </div>
-            <Link href="/broadcast" className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-5 py-3 text-sm font-black text-white hover:border-[#0FF0FC]/40 hover:text-[#0FF0FC]">
-              <Tv size={16} /> شاشة البث العامة
+            <Link href="/broadcast" className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-2.5 text-xs font-black text-white hover:border-[#0FF0FC]/40 hover:text-[#0FF0FC]">
+              <Tv size={15} /> شاشة البث العامة
             </Link>
           </div>
         </div>
@@ -101,7 +98,7 @@ export default async function AnimationLivePage({
             <iframe
               title="Football Animation Live"
               src={iframeUrl.toString()}
-              className="h-[72vh] w-full border-0 bg-black"
+              className="h-[76vh] w-full border-0 bg-black"
               allow="fullscreen; autoplay; encrypted-media; picture-in-picture"
               allowFullScreen
               referrerPolicy="strict-origin-when-cross-origin"
@@ -120,8 +117,8 @@ export default async function AnimationLivePage({
           </div>
         )}
 
-        <div className="rounded-2xl border border-emerald-400/20 bg-emerald-400/10 px-5 py-4 text-sm font-bold leading-7 text-emerald-100">
-          <span className="inline-flex items-center gap-2"><ShieldCheck size={16} /> مهم:</span> هذا تكامل عرض فقط داخل المنصة. كل الأرصدة Virtual Credits فقط، ولا توجد مراهنات أو كريبتو أو سحب أرباح.
+        <div className="rounded-2xl border border-emerald-400/20 bg-emerald-400/10 px-4 py-3 text-xs font-bold leading-6 text-emerald-100">
+          <span className="inline-flex items-center gap-2"><ShieldCheck size={15} /> مهم:</span> هذا تكامل عرض فقط داخل المنصة. كل الأرصدة Virtual Credits فقط، ولا توجد مراهنات أو كريبتو أو سحب أرباح.
         </div>
       </section>
     </main>
