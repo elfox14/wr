@@ -51,8 +51,52 @@ type ManualForm = {
   weaknesses: string;
 };
 
+const CARD_SECTION_TITLES = [
+  'بطاقة المنتخب',
+  'ملخص تنفيذي موثق',
+  'القوة الهجومية',
+  'القوة الدفاعية',
+  'وسط الملعب والتحكم',
+  'الكرات الثابتة',
+  'أسماء بارزة في القائمة',
+  'معلومات غير متوفرة',
+  'سجل المصادر',
+] as const;
+
+type CardSectionTitle = typeof CARD_SECTION_TITLES[number];
+
+type CardSourceForm = {
+  teamId: string;
+  title: string;
+  summary: string;
+  confidence: string;
+  sourceName: string;
+  sourceUrl: string;
+  sourceCategory: string;
+  tacticalTags: string;
+  strengths: string;
+  weaknesses: string;
+  sections: Record<CardSectionTitle, string>;
+};
+
 function buildInitialManualForm(teamId = ''): ManualForm {
   return { teamId, title: '', summary: '', body: '', confidence: 'B', tacticalTags: '', strengths: '', weaknesses: '' };
+}
+
+function buildInitialCardSourceForm(teamId = ''): CardSourceForm {
+  return {
+    teamId,
+    title: '',
+    summary: '',
+    confidence: 'B',
+    sourceName: 'Sports Reference / Stathead / FBref subscription',
+    sourceUrl: '',
+    sourceCategory: 'stats',
+    tacticalTags: '',
+    strengths: '',
+    weaknesses: '',
+    sections: CARD_SECTION_TITLES.reduce((acc, title) => ({ ...acc, [title]: '' }), {} as Record<CardSectionTitle, string>),
+  };
 }
 
 function getGroupName(group: GroupKey) {
@@ -93,15 +137,19 @@ export default function TeamIntelligenceAdminDashboard({ teams, initialTeamId = 
   const [reseedLoadingGroup, setReseedLoadingGroup] = useState<GroupKey | null>(null);
   const [statusLoadingGroup, setStatusLoadingGroup] = useState<GroupKey | null>(null);
   const [manualLoading, setManualLoading] = useState(false);
+  const [cardLoading, setCardLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [statusMessage, setStatusMessage] = useState('');
   const [statusError, setStatusError] = useState('');
   const [manualMessage, setManualMessage] = useState('');
   const [manualError, setManualError] = useState('');
+  const [cardMessage, setCardMessage] = useState('');
+  const [cardError, setCardError] = useState('');
   const [lastResult, setLastResult] = useState<SeedResponse | null>(null);
   const [groupStatus, setGroupStatus] = useState<GroupStatusResponse | null>(null);
   const [manualForm, setManualForm] = useState<ManualForm>(() => buildInitialManualForm(initialTeamId));
+  const [cardForm, setCardForm] = useState<CardSourceForm>(() => buildInitialCardSourceForm(initialTeamId));
 
   const isBusy = loading || Boolean(reseedLoadingGroup) || Boolean(statusLoadingGroup);
 
@@ -186,6 +234,14 @@ export default function TeamIntelligenceAdminDashboard({ teams, initialTeamId = 
     setManualForm((current) => ({ ...current, [field]: value }));
   };
 
+  const updateCardForm = (field: keyof Omit<CardSourceForm, 'sections'>, value: string) => {
+    setCardForm((current) => ({ ...current, [field]: value }));
+  };
+
+  const updateCardSection = (section: CardSectionTitle, value: string) => {
+    setCardForm((current) => ({ ...current, sections: { ...current.sections, [section]: value } }));
+  };
+
   const createManualReport = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setManualLoading(true);
@@ -212,6 +268,32 @@ export default function TeamIntelligenceAdminDashboard({ teams, initialTeamId = 
     }
   };
 
+  const createCardSourceReport = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setCardLoading(true);
+    setCardMessage('');
+    setCardError('');
+    try {
+      const res = await fetch('/api/admin/team-card-source-report', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(cardForm),
+      });
+      const data = await res.json() as ManualReportResponse;
+      if (!res.ok || !data.success) {
+        setCardError(data.error || 'فشل حفظ تقرير الكروت من المصدر.');
+        return;
+      }
+      const teamName = data.report?.team?.name || 'المنتخب';
+      setCardMessage(`تم حفظ تقرير كروت موثق لـ ${teamName}.`);
+      setCardForm(buildInitialCardSourceForm(initialTeamId));
+    } catch (caughtError) {
+      setCardError(caughtError instanceof Error ? caughtError.message : 'فشل حفظ تقرير الكروت من المصدر.');
+    } finally {
+      setCardLoading(false);
+    }
+  };
+
   const renderGroupControls = (group: GroupKey) => {
     const groupName = getGroupName(group);
     return (
@@ -226,15 +308,25 @@ export default function TeamIntelligenceAdminDashboard({ teams, initialTeamId = 
     );
   };
 
+  const renderTeamSelect = (value: string, onChange: (value: string) => void) => (
+    <label className="block">
+      <span className="mb-2 block text-xs font-bold text-gray-500">المنتخب</span>
+      <select value={value} onChange={(event) => onChange(event.target.value)} className="w-full rounded-2xl border border-white/10 bg-background px-4 py-3 text-white outline-none focus:border-primary" required>
+        <option value="">اختر المنتخب</option>
+        {teams.map((team) => <option key={team.id} value={team.id}>{team.name} — {team.code}</option>)}
+      </select>
+    </label>
+  );
+
   return (
     <div className="min-h-screen bg-background pb-24 text-foreground selection:bg-primary/30">
-      <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
+      <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
         <section className="mb-6 rounded-3xl border border-primary/10 bg-surface/70 p-5 shadow-card md:p-6">
           <div className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <div className="mb-2 flex items-center gap-2 text-xs font-black text-primary"><Database size={16} /> TEAM INTELLIGENCE ADMIN</div>
               <h1 className="text-2xl font-black text-white md:text-3xl">إدارة تقارير المنتخبات</h1>
-              <p className="mt-2 max-w-3xl text-sm leading-7 text-gray-400">شغّل seed تقارير TeamIntelligenceReport يدويًا، أو أعد زراعة تقارير المجموعات، أو أضف تقريرًا تحليليًا يدويًا من لوحة الإدارة.</p>
+              <p className="mt-2 max-w-3xl text-sm leading-7 text-gray-400">شغّل seed تقارير TeamIntelligenceReport يدويًا، أو أعد زراعة تقارير المجموعات، أو أضف تقريرًا تحليليًا من مصدر موثق إلى كروت صفحة المنتخب.</p>
             </div>
             <div className="flex flex-wrap gap-2">
               <Link href="/team-intelligence" className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-black text-white hover:border-primary/40 hover:text-primary">مركز التحليل <ArrowRight size={15} /></Link>
@@ -252,7 +344,7 @@ export default function TeamIntelligenceAdminDashboard({ teams, initialTeamId = 
           </div>
         </section>
 
-        <div className="grid gap-6 lg:grid-cols-2">
+        <div className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
           <section className="rounded-3xl border border-white/5 bg-surface p-5 shadow-card md:p-6">
             <h2 className="mb-4 flex items-center gap-2 text-xl font-black text-white"><KeyRound size={20} className="text-primary" /> تشغيل Seed يدوي</h2>
             <div className="grid gap-4">
@@ -286,21 +378,55 @@ export default function TeamIntelligenceAdminDashboard({ teams, initialTeamId = 
             {lastResult && <pre className="mt-5 max-h-72 overflow-auto rounded-2xl border border-white/10 bg-black/35 p-4 text-xs leading-6 text-gray-300">{JSON.stringify(lastResult, null, 2)}</pre>}
           </section>
 
-          <section className="rounded-3xl border border-white/5 bg-surface p-5 shadow-card md:p-6">
-            <h2 className="mb-4 flex items-center gap-2 text-xl font-black text-white"><FileText size={20} className="text-primary" /> إضافة تقرير يدوي</h2>
-            <form className="space-y-4" onSubmit={createManualReport}>
-              <label className="block"><span className="mb-2 block text-xs font-bold text-gray-500">المنتخب</span><select value={manualForm.teamId} onChange={(event) => updateManualForm('teamId', event.target.value)} className="w-full rounded-2xl border border-white/10 bg-background px-4 py-3 text-white outline-none focus:border-primary" required><option value="">اختر المنتخب</option>{teams.map((team) => <option key={team.id} value={team.id}>{team.name} — {team.code}</option>)}</select></label>
-              <label className="block"><span className="mb-2 block text-xs font-bold text-gray-500">عنوان التقرير</span><input value={manualForm.title} onChange={(event) => updateManualForm('title', event.target.value)} placeholder="مثال: قراءة تكتيكية محدثة قبل البطولة" className="w-full rounded-2xl border border-white/10 bg-background px-4 py-3 text-white outline-none focus:border-primary" required /></label>
-              <label className="block"><span className="mb-2 block text-xs font-bold text-gray-500">الملخص</span><textarea value={manualForm.summary} onChange={(event) => updateManualForm('summary', event.target.value)} className="min-h-24 w-full rounded-2xl border border-white/10 bg-background px-4 py-3 text-white outline-none focus:border-primary" required /></label>
-              <label className="block"><span className="mb-2 block text-xs font-bold text-gray-500">المحتوى التفصيلي</span><textarea value={manualForm.body} onChange={(event) => updateManualForm('body', event.target.value)} placeholder="تحليل أعمق: نقاط قوة، نقاط ضعف، أسلوب لعب، مخاطر السوق..." className="min-h-32 w-full rounded-2xl border border-white/10 bg-background px-4 py-3 text-white outline-none focus:border-primary" /></label>
-              <div className="grid gap-4 md:grid-cols-2"><label className="block"><span className="mb-2 block text-xs font-bold text-gray-500">درجة الثقة</span><select value={manualForm.confidence} onChange={(event) => updateManualForm('confidence', event.target.value)} className="w-full rounded-2xl border border-white/10 bg-background px-4 py-3 text-white outline-none focus:border-primary"><option value="A">A</option><option value="B">B</option><option value="C">C</option><option value="D">D</option></select></label><label className="block"><span className="mb-2 block text-xs font-bold text-gray-500">وسوم تكتيكية</span><input value={manualForm.tacticalTags} onChange={(event) => updateManualForm('tacticalTags', event.target.value)} placeholder="pressing, transition, set-pieces" className="w-full rounded-2xl border border-white/10 bg-background px-4 py-3 text-white outline-none focus:border-primary" /></label></div>
-              <div className="grid gap-4 md:grid-cols-2"><label className="block"><span className="mb-2 block text-xs font-bold text-gray-500">نقاط القوة</span><input value={manualForm.strengths} onChange={(event) => updateManualForm('strengths', event.target.value)} placeholder="الهجمات المرتدة, الخبرة" className="w-full rounded-2xl border border-white/10 bg-background px-4 py-3 text-white outline-none focus:border-primary" /></label><label className="block"><span className="mb-2 block text-xs font-bold text-gray-500">نقاط الضعف</span><input value={manualForm.weaknesses} onChange={(event) => updateManualForm('weaknesses', event.target.value)} placeholder="بطء التحول الدفاعي, قلة العمق" className="w-full rounded-2xl border border-white/10 bg-background px-4 py-3 text-white outline-none focus:border-primary" /></label></div>
-              <button type="submit" disabled={manualLoading || !manualForm.teamId || !manualForm.title.trim() || !manualForm.summary.trim()} className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-primary px-5 py-3 font-black text-black hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50">{manualLoading ? 'جاري الحفظ...' : 'حفظ التقرير اليدوي'}</button>
+          <section className="rounded-3xl border border-primary/10 bg-surface p-5 shadow-card md:p-6">
+            <h2 className="mb-2 flex items-center gap-2 text-xl font-black text-white"><Sparkles size={20} className="text-primary" /> إضافة تقرير كروت من مصدر</h2>
+            <p className="mb-4 text-xs leading-6 text-gray-500">استخدم هذا النموذج مع Sports Reference / FBref / Stathead / The Athletic / Reuters. أي كارت تتركه فارغًا سيظهر كـ “غير متوفر في المصادر”.</p>
+            <form className="space-y-4" onSubmit={createCardSourceReport}>
+              {renderTeamSelect(cardForm.teamId, (value) => updateCardForm('teamId', value))}
+              <div className="grid gap-4 md:grid-cols-2">
+                <label className="block"><span className="mb-2 block text-xs font-bold text-gray-500">عنوان التقرير</span><input value={cardForm.title} onChange={(event) => updateCardForm('title', event.target.value)} placeholder="مثال: تحديث Sports Reference — المكسيك" className="w-full rounded-2xl border border-white/10 bg-background px-4 py-3 text-white outline-none focus:border-primary" required /></label>
+                <label className="block"><span className="mb-2 block text-xs font-bold text-gray-500">درجة الثقة</span><select value={cardForm.confidence} onChange={(event) => updateCardForm('confidence', event.target.value)} className="w-full rounded-2xl border border-white/10 bg-background px-4 py-3 text-white outline-none focus:border-primary"><option value="A">A</option><option value="B">B</option><option value="C">C</option><option value="D">D</option></select></label>
+              </div>
+              <label className="block"><span className="mb-2 block text-xs font-bold text-gray-500">الملخص</span><textarea value={cardForm.summary} onChange={(event) => updateCardForm('summary', event.target.value)} className="min-h-20 w-full rounded-2xl border border-white/10 bg-background px-4 py-3 text-white outline-none focus:border-primary" required /></label>
+              <div className="grid gap-4 md:grid-cols-3">
+                <label className="block"><span className="mb-2 block text-xs font-bold text-gray-500">اسم المصدر</span><input value={cardForm.sourceName} onChange={(event) => updateCardForm('sourceName', event.target.value)} className="w-full rounded-2xl border border-white/10 bg-background px-4 py-3 text-white outline-none focus:border-primary" /></label>
+                <label className="block"><span className="mb-2 block text-xs font-bold text-gray-500">رابط المصدر</span><input value={cardForm.sourceUrl} onChange={(event) => updateCardForm('sourceUrl', event.target.value)} placeholder="https://..." className="w-full rounded-2xl border border-white/10 bg-background px-4 py-3 text-white outline-none focus:border-primary" /></label>
+                <label className="block"><span className="mb-2 block text-xs font-bold text-gray-500">نوع المصدر</span><select value={cardForm.sourceCategory} onChange={(event) => updateCardForm('sourceCategory', event.target.value)} className="w-full rounded-2xl border border-white/10 bg-background px-4 py-3 text-white outline-none focus:border-primary"><option value="stats">stats</option><option value="editorial">editorial</option><option value="official">official</option><option value="analysis">analysis</option><option value="manual">manual</option></select></label>
+              </div>
+              <div className="grid gap-4 md:grid-cols-2">
+                <label className="block"><span className="mb-2 block text-xs font-bold text-gray-500">وسوم تكتيكية</span><input value={cardForm.tacticalTags} onChange={(event) => updateCardForm('tacticalTags', event.target.value)} placeholder="هجوم, دفاع, كرات ثابتة" className="w-full rounded-2xl border border-white/10 bg-background px-4 py-3 text-white outline-none focus:border-primary" /></label>
+                <label className="block"><span className="mb-2 block text-xs font-bold text-gray-500">نقاط القوة</span><input value={cardForm.strengths} onChange={(event) => updateCardForm('strengths', event.target.value)} placeholder="افصل بينها بفاصلة" className="w-full rounded-2xl border border-white/10 bg-background px-4 py-3 text-white outline-none focus:border-primary" /></label>
+              </div>
+              <label className="block"><span className="mb-2 block text-xs font-bold text-gray-500">نقاط تحتاج متابعة</span><input value={cardForm.weaknesses} onChange={(event) => updateCardForm('weaknesses', event.target.value)} placeholder="افصل بينها بفاصلة" className="w-full rounded-2xl border border-white/10 bg-background px-4 py-3 text-white outline-none focus:border-primary" /></label>
+              <div className="grid gap-3">
+                {CARD_SECTION_TITLES.map((section) => (
+                  <label key={section} className="block rounded-2xl border border-white/5 bg-black/20 p-3">
+                    <span className="mb-2 block text-xs font-black text-primary">{section}</span>
+                    <textarea value={cardForm.sections[section]} onChange={(event) => updateCardSection(section, event.target.value)} placeholder="اتركه فارغًا إذا لم تتوفر المعلومة في المصدر" className="min-h-20 w-full rounded-2xl border border-white/10 bg-background px-4 py-3 text-sm text-white outline-none focus:border-primary" />
+                  </label>
+                ))}
+              </div>
+              <button type="submit" disabled={cardLoading || !cardForm.teamId || !cardForm.title.trim() || !cardForm.summary.trim()} className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-primary px-5 py-3 font-black text-black hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50">{cardLoading ? 'جاري حفظ تقرير الكروت...' : 'حفظ تقرير الكروت من المصدر'}</button>
             </form>
-            {manualMessage && <div className="mt-5 rounded-2xl border border-success/20 bg-success/10 p-4 text-sm font-bold leading-7 text-success"><CheckCircle2 className="ml-2 inline" size={16} />{manualMessage}</div>}
-            {manualError && <div className="mt-5 rounded-2xl border border-danger/20 bg-danger/10 p-4 text-sm font-bold leading-7 text-danger"><ShieldAlert className="ml-2 inline" size={16} />{manualError}</div>}
+            {cardMessage && <div className="mt-5 rounded-2xl border border-success/20 bg-success/10 p-4 text-sm font-bold leading-7 text-success"><CheckCircle2 className="ml-2 inline" size={16} />{cardMessage}</div>}
+            {cardError && <div className="mt-5 rounded-2xl border border-danger/20 bg-danger/10 p-4 text-sm font-bold leading-7 text-danger"><ShieldAlert className="ml-2 inline" size={16} />{cardError}</div>}
           </section>
         </div>
+
+        <section className="mt-6 rounded-3xl border border-white/5 bg-surface p-5 shadow-card md:p-6">
+          <h2 className="mb-4 flex items-center gap-2 text-xl font-black text-white"><FileText size={20} className="text-primary" /> إضافة تقرير يدوي عام</h2>
+          <form className="space-y-4" onSubmit={createManualReport}>
+            {renderTeamSelect(manualForm.teamId, (value) => updateManualForm('teamId', value))}
+            <label className="block"><span className="mb-2 block text-xs font-bold text-gray-500">عنوان التقرير</span><input value={manualForm.title} onChange={(event) => updateManualForm('title', event.target.value)} placeholder="مثال: قراءة تكتيكية محدثة قبل البطولة" className="w-full rounded-2xl border border-white/10 bg-background px-4 py-3 text-white outline-none focus:border-primary" required /></label>
+            <label className="block"><span className="mb-2 block text-xs font-bold text-gray-500">الملخص</span><textarea value={manualForm.summary} onChange={(event) => updateManualForm('summary', event.target.value)} className="min-h-24 w-full rounded-2xl border border-white/10 bg-background px-4 py-3 text-white outline-none focus:border-primary" required /></label>
+            <label className="block"><span className="mb-2 block text-xs font-bold text-gray-500">المحتوى التفصيلي</span><textarea value={manualForm.body} onChange={(event) => updateManualForm('body', event.target.value)} placeholder="تحليل أعمق: نقاط قوة، نقاط ضعف، أسلوب لعب..." className="min-h-32 w-full rounded-2xl border border-white/10 bg-background px-4 py-3 text-white outline-none focus:border-primary" /></label>
+            <div className="grid gap-4 md:grid-cols-2"><label className="block"><span className="mb-2 block text-xs font-bold text-gray-500">درجة الثقة</span><select value={manualForm.confidence} onChange={(event) => updateManualForm('confidence', event.target.value)} className="w-full rounded-2xl border border-white/10 bg-background px-4 py-3 text-white outline-none focus:border-primary"><option value="A">A</option><option value="B">B</option><option value="C">C</option><option value="D">D</option></select></label><label className="block"><span className="mb-2 block text-xs font-bold text-gray-500">وسوم تكتيكية</span><input value={manualForm.tacticalTags} onChange={(event) => updateManualForm('tacticalTags', event.target.value)} placeholder="pressing, transition, set-pieces" className="w-full rounded-2xl border border-white/10 bg-background px-4 py-3 text-white outline-none focus:border-primary" /></label></div>
+            <div className="grid gap-4 md:grid-cols-2"><label className="block"><span className="mb-2 block text-xs font-bold text-gray-500">نقاط القوة</span><input value={manualForm.strengths} onChange={(event) => updateManualForm('strengths', event.target.value)} placeholder="الهجمات المرتدة, الخبرة" className="w-full rounded-2xl border border-white/10 bg-background px-4 py-3 text-white outline-none focus:border-primary" /></label><label className="block"><span className="mb-2 block text-xs font-bold text-gray-500">نقاط الضعف</span><input value={manualForm.weaknesses} onChange={(event) => updateManualForm('weaknesses', event.target.value)} placeholder="بطء التحول الدفاعي, قلة العمق" className="w-full rounded-2xl border border-white/10 bg-background px-4 py-3 text-white outline-none focus:border-primary" /></label></div>
+            <button type="submit" disabled={manualLoading || !manualForm.teamId || !manualForm.title.trim() || !manualForm.summary.trim()} className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-primary px-5 py-3 font-black text-black hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50">{manualLoading ? 'جاري الحفظ...' : 'حفظ التقرير اليدوي'}</button>
+          </form>
+          {manualMessage && <div className="mt-5 rounded-2xl border border-success/20 bg-success/10 p-4 text-sm font-bold leading-7 text-success"><CheckCircle2 className="ml-2 inline" size={16} />{manualMessage}</div>}
+          {manualError && <div className="mt-5 rounded-2xl border border-danger/20 bg-danger/10 p-4 text-sm font-bold leading-7 text-danger"><ShieldAlert className="ml-2 inline" size={16} />{manualError}</div>}
+        </section>
       </main>
     </div>
   );
