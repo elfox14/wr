@@ -3,6 +3,9 @@ import prisma from '@/lib/prisma';
 import { apiFootballFetch, normalizeName } from '@/lib/apiFootball';
 import { applyVolatilityCap } from '@/lib/liveEngine';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 const LIVE_STATUSES = new Set(['1H', 'HT', '2H', 'ET', 'BT', 'P', 'LIVE', 'IN_PLAY']);
 const FINISHED_STATUSES = new Set(['FT', 'AET', 'PEN', 'FINISHED', 'ENDED', '-1']);
 const UPCOMING_STATUSES = new Set(['NS', 'TBD', 'SCHEDULED', '0']);
@@ -56,6 +59,14 @@ function todayRange() {
   return { start, end };
 }
 
+function parseProviderDate(value: any) {
+  if (!value) return new Date();
+  const numeric = Number(value);
+  const normalized = Number.isFinite(numeric) && numeric > 100000 ? (numeric < 10000000000 ? numeric * 1000 : numeric) : value;
+  const date = new Date(normalized);
+  return Number.isFinite(date.getTime()) ? date : new Date();
+}
+
 async function hasPotentialLiveWindow() {
   const now = new Date();
   const from = new Date(now.getTime() - 8 * 60 * 60 * 1000);
@@ -65,8 +76,8 @@ async function hasPotentialLiveWindow() {
     where: {
       OR: [
         { status: 'IN_PLAY' },
-        { status: { in: ['SCHEDULED', 'LIVE', 'IN_PLAY'] }, matchDate: { gte: from, lte: to } },
-        { status: { in: ['SCHEDULED', 'LIVE', 'IN_PLAY'] }, matchDate: { gte: start, lt: end } },
+        { status: { in: ['SCHEDULED', 'LIVE', 'IN_PLAY', 'FINISHED'] }, matchDate: { gte: from, lte: to } },
+        { status: { in: ['SCHEDULED', 'LIVE', 'IN_PLAY', 'FINISHED'] }, matchDate: { gte: start, lt: end } },
       ],
     },
   });
@@ -108,6 +119,59 @@ async function applyLiveTeamPriceEvent(params: { assetId: string; fixtureId: num
   return { status: nextPrice === currentPrice ? 'capped_no_change' : 'price_updated', assetId: asset.id, name: asset.name, priceBefore: currentPrice, priceAfter: nextPrice, changePercent: Math.round(changePercent * 10) / 10 };
 }
 
+async function findExistingMatch(externalId: string, animationMatchId?: number) {
+  if (animationMatchId) {
+    const byAnimation = await prisma.match.findFirst({ where: { animationMatchId } });
+    if (byAnimation) return byAnimation;
+  }
+  return prisma.match.findUnique({ where: { externalId } });
+}
+
+async function saveProviderMatch(params: { previousMatch: any; externalId: string; animationMatchId?: number; homeTeamId: string; awayTeamId: string; matchDate: Date; status: string; homeScore: number; awayScore: number; groupPhase?: string | null }) {
+  if (params.previousMatch) {
+    return prisma.match.update({
+      where: { id: params.previousMatch.id },
+      data: {
+        ...(params.animationMatchId ? { animationMatchId: params.animationMatchId } : {}),
+        homeTeamId: params.homeTeamId,
+        awayTeamId: params.awayTeamId,
+        matchDate: params.matchDate,
+        status: params.status,
+        homeScore: params.homeScore,
+        awayScore: params.awayScore,
+        groupPhase: params.groupPhase || null,
+      },
+    });
+  }
+  return prisma.match.create({
+    data: {
+      externalId: params.externalId,
+      animationMatchId: params.animationMatchId,
+      homeTeamId: params.homeTeamId,
+      awayTeamId: params.awayTeamId,
+      matchDate: params.matchDate,
+      status: params.status,
+      homeScore: params.homeScore,
+      awayScore: params.awayScore,
+      groupPhase: params.groupPhase || null,
+      stage: 'group',
+    },
+  });
+}
+
+async function processGoalEvents(params: { fixtureId: number; homeScore: number; awayScore: number; homeTeam: any; awayTeam: any }) {
+  const priceUpdates: any[] = [];
+  for (let goalNumber = 1; goalNumber <= params.homeScore; goalNumber += 1) {
+    priceUpdates.push(await applyLiveTeamPriceEvent({ assetId: params.homeTeam.id, fixtureId: params.fixtureId, localeGroupKey: `${params.fixtureId}:live_goal:home:${goalNumber}`, eventType: 'live_goal_for', multiplier: 1.03, titleAr: `⚽ هدف لـ ${params.homeTeam.name}`, bodyAr: `تحرك سعر ${params.homeTeam.name} صعودًا بعد تسجيل هدف أمام ${params.awayTeam.name}.` }));
+    priceUpdates.push(await applyLiveTeamPriceEvent({ assetId: params.awayTeam.id, fixtureId: params.fixtureId, localeGroupKey: `${params.fixtureId}:live_goal_against:away:${goalNumber}`, eventType: 'live_goal_against', multiplier: 0.98, titleAr: `📉 هدف مستقبَل على ${params.awayTeam.name}`, bodyAr: `تحرك سعر ${params.awayTeam.name} هبوطًا بعد استقبال هدف من ${params.homeTeam.name}.` }));
+  }
+  for (let goalNumber = 1; goalNumber <= params.awayScore; goalNumber += 1) {
+    priceUpdates.push(await applyLiveTeamPriceEvent({ assetId: params.awayTeam.id, fixtureId: params.fixtureId, localeGroupKey: `${params.fixtureId}:live_goal:away:${goalNumber}`, eventType: 'live_goal_for', multiplier: 1.03, titleAr: `⚽ هدف لـ ${params.awayTeam.name}`, bodyAr: `تحرك سعر ${params.awayTeam.name} صعودًا بعد تسجيل هدف أمام ${params.homeTeam.name}.` }));
+    priceUpdates.push(await applyLiveTeamPriceEvent({ assetId: params.homeTeam.id, fixtureId: params.fixtureId, localeGroupKey: `${params.fixtureId}:live_goal_against:home:${goalNumber}`, eventType: 'live_goal_against', multiplier: 0.98, titleAr: `📉 هدف مستقبَل على ${params.homeTeam.name}`, bodyAr: `تحرك سعر ${params.homeTeam.name} هبوطًا بعد استقبال هدف من ${params.awayTeam.name}.` }));
+  }
+  return priceUpdates;
+}
+
 async function processLiveFixture(fixture: any, providerSource?: string) {
   const fixtureId = Number(fixture.fixture?.id);
   const home = fixture.teams?.home || {};
@@ -118,46 +182,33 @@ async function processLiveFixture(fixture: any, providerSource?: string) {
   const externalId = String(fixtureId);
   const rawStatus = fixture.fixture?.status?.short || fixture.fixture?.status?.long;
   const status = normalizeStatus(rawStatus);
-  const matchDate = fixture.fixture?.date ? new Date(fixture.fixture.date) : new Date();
+  const matchDate = parseProviderDate(fixture.fixture?.date || fixture.fixture?.timestamp || fixture.raw?.matchTime || fixture.raw?.match_time || fixture.raw?.time);
   const homeScore = toScore(fixture.goals?.home);
   const awayScore = toScore(fixture.goals?.away);
-  const previousMatch = await prisma.match.findUnique({ where: { externalId } });
-  const previousHomeScore = previousMatch?.homeScore ?? 0;
-  const previousAwayScore = previousMatch?.awayScore ?? 0;
   const isISports = providerSource === 'ISPORTS';
   const animationMatchId = isISports && Number.isFinite(fixtureId) ? fixtureId : undefined;
-  await prisma.match.upsert({
-    where: { externalId },
-    create: { externalId, animationMatchId, homeTeamId: homeTeam.id, awayTeamId: awayTeam.id, matchDate, status, homeScore, awayScore, groupPhase: fixture.league?.round || fixture.league?.name || null, stage: 'group' },
-    update: { ...(animationMatchId ? { animationMatchId } : {}), homeTeamId: homeTeam.id, awayTeamId: awayTeam.id, matchDate, status, homeScore, awayScore, groupPhase: fixture.league?.round || fixture.league?.name || null },
-  });
-  const priceUpdates: any[] = [];
-  if (status === 'IN_PLAY' || status === 'FINISHED') {
-    const homeDelta = Math.max(0, homeScore - previousHomeScore);
-    const awayDelta = Math.max(0, awayScore - previousAwayScore);
-    for (let index = 1; index <= homeDelta; index += 1) {
-      const goalNumber = previousHomeScore + index;
-      priceUpdates.push(await applyLiveTeamPriceEvent({ assetId: homeTeam.id, fixtureId, localeGroupKey: `${fixtureId}:live_goal:home:${goalNumber}`, eventType: 'live_goal_for', multiplier: 1.03, titleAr: `⚽ هدف لـ ${homeTeam.name}`, bodyAr: `تحرك سعر ${homeTeam.name} صعودًا بعد تسجيل هدف أمام ${awayTeam.name}.` }));
-      priceUpdates.push(await applyLiveTeamPriceEvent({ assetId: awayTeam.id, fixtureId, localeGroupKey: `${fixtureId}:live_goal_against:away:${goalNumber}`, eventType: 'live_goal_against', multiplier: 0.98, titleAr: `📉 هدف مستقبَل على ${awayTeam.name}`, bodyAr: `تحرك سعر ${awayTeam.name} هبوطًا بعد استقبال هدف من ${homeTeam.name}.` }));
-    }
-    for (let index = 1; index <= awayDelta; index += 1) {
-      const goalNumber = previousAwayScore + index;
-      priceUpdates.push(await applyLiveTeamPriceEvent({ assetId: awayTeam.id, fixtureId, localeGroupKey: `${fixtureId}:live_goal:away:${goalNumber}`, eventType: 'live_goal_for', multiplier: 1.03, titleAr: `⚽ هدف لـ ${awayTeam.name}`, bodyAr: `تحرك سعر ${awayTeam.name} صعودًا بعد تسجيل هدف أمام ${homeTeam.name}.` }));
-      priceUpdates.push(await applyLiveTeamPriceEvent({ assetId: homeTeam.id, fixtureId, localeGroupKey: `${fixtureId}:live_goal_against:home:${goalNumber}`, eventType: 'live_goal_against', multiplier: 0.98, titleAr: `📉 هدف مستقبَل على ${homeTeam.name}`, bodyAr: `تحرك سعر ${homeTeam.name} هبوطًا بعد استقبال هدف من ${awayTeam.name}.` }));
-    }
-  }
+  const previousMatch = await findExistingMatch(externalId, animationMatchId);
+  const previousHomeScore = previousMatch?.homeScore ?? 0;
+  const previousAwayScore = previousMatch?.awayScore ?? 0;
+
+  await saveProviderMatch({ previousMatch, externalId, animationMatchId, homeTeamId: homeTeam.id, awayTeamId: awayTeam.id, matchDate, status, homeScore, awayScore, groupPhase: fixture.league?.round || fixture.league?.name || null });
+
+  const priceUpdates = (status === 'IN_PLAY' || status === 'FINISHED')
+    ? await processGoalEvents({ fixtureId, homeScore, awayScore, homeTeam, awayTeam })
+    : [];
+
   return { status: 'live_fixture_processed', providerSource, fixtureId, animationMatchId: animationMatchId || null, matchStatus: status, homeTeam: homeTeam.name, awayTeam: awayTeam.name, previousScore: `${previousHomeScore}-${previousAwayScore}`, currentScore: `${homeScore}-${awayScore}`, priceUpdates };
 }
 
 export async function GET(req: Request) {
   const auth = getCronAuth(req);
-  if (!auth.valid) return NextResponse.json({ error: 'Unauthorized', hint: 'Use Authorization: Bearer <CRON_SECRET>, x-cron-secret, x-admin-secret, or cronSecret/adminSecret query only for private testing.' }, { status: 401 });
+  if (!auth.valid) return NextResponse.json({ error: 'Unauthorized', hint: 'Use Authorization: Bearer <CRON_SECRET>, x-cron-secret, x-admin-secret, or cronSecret/adminSecret query only for private testing.' }, { status: 401, headers: { 'Cache-Control': 'no-store' } });
   const summary: any = { success: true, mode: 'isports_first_live_market_sync', providerPriority: ['ISPORTS', 'API_FOOTBALL'], providerUsed: null, authMethod: auth.method, externalRequestsUsed: 0, skippedProviderFetch: false, fixturesFetched: 0, processed: [], errors: [] };
   const shouldFetchLive = await hasPotentialLiveWindow();
   if (!shouldFetchLive) {
     summary.skippedProviderFetch = true;
     summary.reason = 'No local match today or within the extended live recovery window, so no provider request was used.';
-    return NextResponse.json(summary);
+    return NextResponse.json(summary, { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate' } });
   }
   try {
     const payload = await apiFootballFetch<{ response?: any[]; _provider?: string }>('/livescores', { live: 'all', date: dateKey() });
@@ -170,7 +221,7 @@ export async function GET(req: Request) {
   } catch (error: any) {
     summary.errors.push({ message: error.message || 'Failed to run iSports-first live market sync', provider: error.provider || null, details: error.payload || null });
   }
-  return NextResponse.json(summary, { status: summary.errors.length ? 207 : 200 });
+  return NextResponse.json(summary, { status: summary.errors.length ? 207 : 200, headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate' } });
 }
 
 export async function POST(req: Request) { return GET(req); }
