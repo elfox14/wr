@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useStore } from '@/lib/store';
 import { AssetImage } from '@/components/ui/AssetImage';
@@ -49,9 +49,16 @@ export default function HomeClient({
   undervaluedAssets?: any[];
   academyArticles?: AcademyArticle[];
 }) {
+  const [now, setNow] = useState(() => Date.now());
+
   useEffect(() => {
     useStore.setState({ assets: initialAssets, loading: false });
   }, [initialAssets]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   const safeAssets = Array.isArray(initialAssets) ? initialAssets : [];
   const nextMatch = upcomingMatches[0] || null;
@@ -79,6 +86,27 @@ export default function HomeClient({
       />
     );
   };
+
+  const getCountdown = () => {
+    if (!nextMatch?.matchDate) return null;
+    const diff = new Date(nextMatch.matchDate).getTime() - now;
+    if (diff <= 0) return null;
+
+    const totalSeconds = Math.floor(diff / 1000);
+    const days = Math.floor(totalSeconds / 86400);
+    const hours = Math.floor((totalSeconds % 86400) / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+
+    return [
+      { label: 'يوم', value: days },
+      { label: 'ساعة', value: hours },
+      { label: 'دقيقة', value: minutes },
+      { label: 'ثانية', value: seconds },
+    ];
+  };
+
+  const countdown = getCountdown();
 
   const quickStats = [
     { label: 'منتخب', value: teamsCount || 48, icon: Globe, tone: 'text-emerald-300' },
@@ -157,6 +185,18 @@ export default function HomeClient({
                   </div>
                 </div>
                 <div className="text-center text-xs font-bold text-gray-400">{new Date(nextMatch.matchDate).toLocaleString('ar-EG')}</div>
+                {countdown ? (
+                  <div className="mt-3 grid grid-cols-4 gap-2">
+                    {countdown.map((item) => (
+                      <div key={item.label} className="rounded-xl border border-[#0FF0FC]/15 bg-[#0FF0FC]/[0.06] px-2 py-2 text-center">
+                        <div className="font-mono text-lg font-black leading-none text-white tabular-nums">{String(item.value).padStart(2, '0')}</div>
+                        <div className="mt-1 text-[10px] font-bold text-[#0FF0FC]">{item.label}</div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="mt-3 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-center text-xs font-black text-emerald-200">بدأت أو اقتربت المباراة</div>
+                )}
               </div>
             ) : (
               <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.03] p-6 text-center text-sm text-gray-400">سيظهر هنا أقرب لقاء بعد مزامنة جدول المباريات.</div>
