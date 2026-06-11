@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import prisma from '@/lib/prisma';
-import { Radio, ShieldCheck, Tv } from 'lucide-react';
+import { CalendarDays, Radio, ShieldCheck, Tv } from 'lucide-react';
 
 export const metadata: Metadata = {
   title: 'البث الأنيميشن للمباريات | MC PRIME Exchange',
@@ -39,6 +39,28 @@ async function getAutoAnimationMatchId() {
   };
 }
 
+async function getUpcomingMatches() {
+  return prisma.match.findMany({
+    where: { status: { in: ['SCHEDULED', 'IN_PLAY', 'LIVE'] } },
+    orderBy: { matchDate: 'asc' },
+    take: 12,
+    select: {
+      id: true,
+      animationMatchId: true,
+      matchDate: true,
+      status: true,
+      groupPhase: true,
+      homeTeam: { select: { name: true, image: true, code: true } },
+      awayTeam: { select: { name: true, image: true, code: true } },
+    },
+  });
+}
+
+function animationHref(animationMatchId?: number | null) {
+  if (!animationMatchId) return '/matches';
+  return `/animation-live?matchId=${animationMatchId}&lang=en&statsPanel=simple&teamPanel=1`;
+}
+
 export default async function AnimationLivePage({
   searchParams,
 }: {
@@ -46,7 +68,7 @@ export default async function AnimationLivePage({
 }) {
   const params = (await searchParams) || {};
   const accessKey = process.env.ISPORTS_ANIMATION_ACCESS_KEY || process.env.NEXT_PUBLIC_ISPORTS_ANIMATION_ACCESS_KEY || '';
-  const autoMatch = await getAutoAnimationMatchId();
+  const [autoMatch, upcomingMatches] = await Promise.all([getAutoAnimationMatchId(), getUpcomingMatches()]);
   const requestedMatchId = getSingleValue(params.matchId);
   const matchId = requestedMatchId || autoMatch?.matchId || '';
   const requestedLang = getSingleValue(params.lang) || 'en';
@@ -105,15 +127,51 @@ export default async function AnimationLivePage({
             />
           </div>
         ) : (
-          <div className="rounded-[2rem] border border-white/10 bg-white/[0.045] p-8 text-center shadow-card">
-            <Radio size={44} className="mx-auto mb-4 text-[#0FF0FC]" />
-            <h2 className="text-2xl font-black text-white">لا يوجد بث أنيميشن متاح حاليًا</h2>
-            <p className="mx-auto mt-3 max-w-2xl text-sm leading-7 text-gray-400">
-              سيتم تشغيل البث هنا تلقائيًا عند إضافة Match ID الخاص بالمزود إلى إحدى المباريات القادمة.
-            </p>
-            <Link href="/matches" className="mt-5 inline-flex rounded-2xl border border-[#0FF0FC]/25 bg-[#0FF0FC]/10 px-5 py-3 text-sm font-black text-[#0FF0FC] hover:bg-[#0FF0FC] hover:text-black">
-              العودة إلى المباريات
-            </Link>
+          <div className="rounded-[2rem] border border-white/10 bg-white/[0.045] p-4 shadow-card md:p-5">
+            <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+              <div>
+                <p className="text-xs font-black text-[#0FF0FC]">المباريات القادمة</p>
+                <h2 className="mt-1 text-2xl font-black text-white">اختر مباراة لمتابعة البث الأنيميشن</h2>
+              </div>
+              <Link href="/matches" className="inline-flex items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-xs font-black text-white hover:border-[#0FF0FC]/40 hover:text-[#0FF0FC]">
+                كل المباريات
+              </Link>
+            </div>
+
+            {upcomingMatches.length > 0 ? (
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                {upcomingMatches.map((match) => (
+                  <Link
+                    key={match.id}
+                    href={animationHref(match.animationMatchId)}
+                    className={`rounded-2xl border p-4 transition ${match.animationMatchId ? 'border-[#FFD700]/25 bg-[#FFD700]/[0.06] hover:bg-[#FFD700]/10' : 'border-white/10 bg-black/25 hover:border-[#0FF0FC]/30'}`}
+                  >
+                    <div className="mb-3 flex items-center justify-between gap-3 text-[11px] font-black">
+                      <span className="rounded-full border border-white/10 bg-black/25 px-2 py-1 text-gray-300">{match.groupPhase || 'دور المجموعات'}</span>
+                      <span className={match.animationMatchId ? 'text-[#FFD700]' : 'text-gray-500'}>{match.animationMatchId ? 'بث متاح' : 'بانتظار Match ID'}</span>
+                    </div>
+                    <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 text-center">
+                      <div>
+                        <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-black/40 text-2xl">{match.homeTeam.image || '⚽'}</div>
+                        <div className="line-clamp-1 text-sm font-black text-white">{match.homeTeam.name}</div>
+                      </div>
+                      <div className="rounded-full border border-white/10 bg-black/40 px-3 py-1 text-xs font-black text-[#0FF0FC]">VS</div>
+                      <div>
+                        <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-black/40 text-2xl">{match.awayTeam.image || '⚽'}</div>
+                        <div className="line-clamp-1 text-sm font-black text-white">{match.awayTeam.name}</div>
+                      </div>
+                    </div>
+                    <div className="mt-3 flex items-center justify-center gap-2 text-xs font-bold text-gray-400">
+                      <CalendarDays size={13} /> {new Date(match.matchDate).toLocaleString('ar-EG')}
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            ) : (
+              <div className="rounded-2xl border border-dashed border-white/10 bg-black/25 p-8 text-center text-sm text-gray-400">
+                لا توجد مباريات قادمة حاليًا.
+              </div>
+            )}
           </div>
         )}
 
