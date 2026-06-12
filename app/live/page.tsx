@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { Activity, Clock, Newspaper, Radio, RefreshCw, TrendingDown, TrendingUp, Zap } from 'lucide-react';
 
@@ -13,6 +13,8 @@ type LivePayload = {
   ok: boolean;
   updatedAt: string;
   pollingSeconds?: number;
+  cacheSeconds?: number;
+  fromCache?: boolean;
   health: { liveCount: number; upcomingCount: number; recentCount: number; linkedMatches: number; unlinkedNearMatches: number; providerMode: string };
   matches: { live: LiveMatch[]; upcoming: LiveMatch[]; recent: LiveMatch[] };
   news: { latest: NewsItem[]; match: NewsItem[]; trading: NewsItem[] };
@@ -78,8 +80,9 @@ export default function LiveCenterPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastTick, setLastTick] = useState<Date | null>(null);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  async function load() {
+  async function load(scheduleNext = true) {
     try {
       const res = await fetch('/api/live-center', { cache: 'no-store' });
       const json = await res.json();
@@ -87,20 +90,31 @@ export default function LiveCenterPage() {
       setData(json);
       setError(null);
       setLastTick(new Date());
+      if (scheduleNext) {
+        if (timerRef.current) clearTimeout(timerRef.current);
+        const seconds = Math.min(Math.max(Number(json.pollingSeconds || 45), 15), 90);
+        timerRef.current = setTimeout(() => load(true), seconds * 1000);
+      }
     } catch (err: any) {
       setError(err?.message || 'خطأ في تحميل اللايف');
+      if (scheduleNext) {
+        if (timerRef.current) clearTimeout(timerRef.current);
+        timerRef.current = setTimeout(() => load(true), 60_000);
+      }
     } finally {
       setLoading(false);
     }
   }
 
   useEffect(() => {
-    load();
-    const timer = setInterval(load, 20_000);
-    return () => clearInterval(timer);
+    load(true);
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
   }, []);
 
   const allMatches = useMemo(() => data ? [...data.matches.live, ...data.matches.upcoming, ...data.matches.recent] : [], [data]);
+  const pollingSeconds = data?.pollingSeconds || 45;
 
   return (
     <main className="min-h-screen bg-[#050505] px-4 py-8 text-white sm:px-6 lg:px-8" dir="rtl">
@@ -112,7 +126,7 @@ export default function LiveCenterPage() {
               <h1 className="text-3xl font-black sm:text-4xl">بورصة المونديال لايف</h1>
               <p className="mt-3 max-w-2xl text-sm leading-7 text-gray-400">متابعة تلقائية للمباريات، الأهداف، أخبار التداول، وحالة الربط مع iSports.</p>
             </div>
-            <button onClick={load} className="inline-flex items-center justify-center gap-2 rounded-2xl border border-[#0FF0FC]/20 bg-[#0FF0FC]/10 px-4 py-3 text-sm font-black text-[#0FF0FC]"><RefreshCw size={16} /> تحديث الآن</button>
+            <button onClick={() => load(true)} className="inline-flex items-center justify-center gap-2 rounded-2xl border border-[#0FF0FC]/20 bg-[#0FF0FC]/10 px-4 py-3 text-sm font-black text-[#0FF0FC]"><RefreshCw size={16} /> تحديث الآن</button>
           </div>
         </section>
 
@@ -155,7 +169,7 @@ export default function LiveCenterPage() {
               </aside>
             </div>
 
-            <div className="mt-8 text-center text-xs text-gray-600">آخر تحديث: {lastTick ? formatTime(lastTick.toISOString()) : formatTime(data.updatedAt)} — يتم التحديث تلقائيًا كل 20 ثانية</div>
+            <div className="mt-8 text-center text-xs text-gray-600">آخر تحديث: {lastTick ? formatTime(lastTick.toISOString()) : formatTime(data.updatedAt)} — التحديث التالي تلقائيًا كل {pollingSeconds} ثانية {data.fromCache ? '— نسخة مخزنة مؤقتًا' : ''}</div>
           </>
         )}
       </div>
