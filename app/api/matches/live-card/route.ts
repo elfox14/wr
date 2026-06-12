@@ -40,10 +40,48 @@ function isProviderLiveStatus(status: string) {
   return ['1H', '2H', 'ET', 'BT', 'P', 'LIVE', 'IN_PLAY'].includes(status) || isHalftimeStatus(status);
 }
 
+function nullableNumber(value: unknown) {
+  if (value === null || value === undefined || value === '') return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
 function providerMinute(value: any) {
   const raw = value?.fixture?.status?.elapsed ?? value?.fixture?.status?.minute ?? value?.minute ?? value?.elapsed;
   const n = Number(raw);
   return Number.isFinite(n) ? Math.max(1, Math.min(135, Math.round(n))) : null;
+}
+
+function quoteSql(value: string) {
+  return `'${String(value).replace(/'/g, "''")}'`;
+}
+
+function pickLiveScore(providerValue: unknown, snapshotValue: unknown, matchValue: unknown) {
+  const provider = nullableNumber(providerValue);
+  if (provider !== null) return provider;
+  const snapshot = nullableNumber(snapshotValue);
+  if (snapshot !== null) return snapshot;
+  return nullableNumber(matchValue) ?? 0;
+}
+
+async function fetchLatestScoreSnapshots(matchIds: string[]) {
+  if (!matchIds.length) return new Map<string, any>();
+  try {
+    const idList = matchIds.map(quoteSql).join(',');
+    const rows = await prisma.$queryRawUnsafe<any[]>(`
+      SELECT DISTINCT ON ("matchId")
+        "matchId", "minute", "homeScore", "awayScore", "capturedAt"
+      FROM "MatchStatsSnapshot"
+      WHERE "matchId" IN (${idList})
+      ORDER BY "matchId", "capturedAt" DESC
+    `);
+    return new Map(rows.map((row) => [row.matchId, row]));
+  } catch (error: any) {
+    if (!String(error?.message || '').includes('MatchStatsSnapshot')) {
+      console.warn('live-card score snapshot lookup failed:', error?.message || error);
+    }
+    return new Map<string, any>();
+  }
 }
 
 async function fetchAnimationLiveState() {
@@ -57,8 +95,8 @@ async function fetchAnimationLiveState() {
         map.set(id, {
           status: rawStatus(fixture),
           minute: providerMinute(fixture),
-          homeScore: Number.isFinite(Number(fixture?.goals?.home)) ? Number(fixture.goals.home) : null,
-          awayScore: Number.isFinite(Number(fixture?.goals?.away)) ? Number(fixture.goals.away) : null,
+          homeScore: nullableNumber(fixture?.goals?.home ?? fixture?.score?.fulltime?.home ?? fixture?.score?.halftime?.home),
+          awayScore: nullableNumber(fixture?.goals?.away ?? fixture?.score?.fulltime?.away ?? fixture?.score?.halftime?.away),
         });
       }
     }
@@ -69,7 +107,7 @@ async function fetchAnimationLiveState() {
   }
 }
 
-function decorateMatch(match: any, now: Date, providerState?: any) {
+function decorateMatch(match: any, now: Date, providerState?: any, snapshotState?: any) {
   const matchDate = new Date(match.matchDate);
   const localMinute = minutesFromKickoff(matchDate, now);
   const dbStatus = String(match.status || '').toUpperCase();
@@ -77,6 +115,7 @@ function decorateMatch(match: any, now: Date, providerState?: any) {
   const effectiveStatus = providerStatus || dbStatus;
   const providerHasState = Boolean(providerStatus);
   const providerHasMinute = providerState?.minute != null;
+  const snapshotMinute = nullableNumber(snapshotState?.minute);
   const isHalfTimeFromProvider = isHalftimeStatus(effectiveStatus);
   const isLocalHalftimeFallback = !providerHasState && dbStatus === 'SCHEDULED' && localMinute >= 46 && localMinute <= 65;
   const isHalfTime = isHalfTimeFromProvider || isLocalHalftimeFallback;
@@ -86,14 +125,15 @@ function decorateMatch(match: any, now: Date, providerState?: any) {
   const isLiveNow = isDbLive || isProviderLive || isLikelyLiveByTime;
   const isFinished = dbStatus === 'FINISHED' || ['FT', 'AET', 'PEN', 'FINISHED'].includes(effectiveStatus);
   const localFirstHalfMinute = isLikelyLiveByTime && localMinute <= 45 ? Math.max(1, localMinute) : null;
-  const displayMinute = isHalfTime ? null : (providerHasMinute ? providerState.minute : localFirstHalfMinute);
+  const displayMinute = isHalfTime ? null : (providerHasMinute ? providerState.minute : (snapshotMinute ?? localFirstHalfMinute));
   const fallbackLabel = isLikelyLiveByTime && localMinute > 65 ? 'الشوط الثاني جارٍ' : null;
 
   return {
     ...match,
     status: isHalfTime ? 'HT' : (isProviderLive ? 'IN_PLAY' : match.status),
-    homeScore: providerState?.homeScore ?? match.homeScore,
-    awayScore: providerState?.awayScore ?? match.awayScore,
+    homeScore: pickLiveScore(providerState?.homeScore, snapshotState?.homeScore, match.homeScore),
+    awayScore: pickLiveScore(providerState?.awayScore, snapshotState?.awayScore, match.awayScore),
+    scoreSource: providerState?.homeScore != null || providerState?.awayScore != null ? 'provider' : snapshotState ? 'snapshot' : 'match',
     isLiveNow,
     isHalfTime,
     isLikelyLiveByTime,
@@ -138,8 +178,10 @@ export async function GET() {
     fetchAnimationLiveState(),
   ]);
 
-  const decoratedWindow = windowMatches.map((match) => decorateMatch(match, now, match.animationMatchId ? providerStates.get(Number(match.animationMatchId)) : null));
-  const decoratedFinished = recentlyFinished.map((match) => decorateMatch(match, now, match.animationMatchId ? providerStates.get(Number(match.animationMatchId)) : null));
+  const scoreSnapshots = await fetchLatestScoreSnapshots([...windowMatches, ...recentlyFinished].map((match) => match.id));
+
+  const decoratedWindow = windowMatches.map((match) => decorateMatch(match, now, match.animationMatchId ? providerStates.get(Number(match.animationMatchId)) : null, scoreSnapshots.get(match.id)));
+  const decoratedFinished = recentlyFinished.map((match) => decorateMatch(match, now, match.animationMatchId ? providerStates.get(Number(match.animationMatchId)) : null, scoreSnapshots.get(match.id)));
 
   const live = decoratedWindow.filter((match) => match.isLiveNow);
   const upcoming = decoratedWindow.filter((match) => !match.isLiveNow && match.status === 'SCHEDULED' && new Date(match.matchDate).getTime() > now.getTime());
@@ -157,7 +199,7 @@ export async function GET() {
       upcomingCount: upcoming.length,
       recentlyFinishedCount: decoratedFinished.length,
       recentFinishedWindowHours: 6,
-      liveDetection: 'animation_provider_status_then_safe_time_window',
+      liveDetection: 'provider_or_snapshot_score_then_safe_time_window',
       selectionMode: 'one_live_plus_one_next',
       updatedEverySeconds: 15,
     },
