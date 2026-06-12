@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { Activity, ArrowLeft, CalendarDays, CheckCircle2, Clock, FileText, Newspaper, Radio, Sparkles, TrendingUp, Video } from 'lucide-react';
 import prisma from '@/lib/prisma';
 import { renderMarketNews } from '@/lib/market-news/render';
+import DailySummaryContentTools from '@/components/ui/DailySummaryContentTools';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -127,7 +128,10 @@ function MatchRow({ match }: { match: any }) {
         </div>
         <Link href={`/asset/${match.awayTeam?.id}`} className="font-black text-white hover:text-[#0FF0FC]">{match.awayTeam?.name}</Link>
       </div>
-      {match.animationMatchId && <Link href={`/animation-live/player?matchId=${match.animationMatchId}&lang=en&statsPanel=simple&teamPanel=1`} className="mt-3 inline-flex items-center gap-2 rounded-xl border border-[#FFD700]/25 bg-[#FFD700]/10 px-3 py-2 text-xs font-black text-[#FFD700] hover:bg-[#FFD700] hover:text-black"><Radio size={13} /> بث أنيميشن</Link>}
+      <div className="mt-3 flex flex-wrap gap-2">
+        <Link href={`/match-center/${match.id}`} className="inline-flex items-center gap-2 rounded-xl border border-[#0FF0FC]/25 bg-[#0FF0FC]/10 px-3 py-2 text-xs font-black text-[#0FF0FC] hover:bg-[#0FF0FC] hover:text-black">مركز المباراة</Link>
+        {match.animationMatchId && <Link href={`/animation-live/player?matchId=${match.animationMatchId}&lang=en&statsPanel=simple&teamPanel=1`} className="inline-flex items-center gap-2 rounded-xl border border-[#FFD700]/25 bg-[#FFD700]/10 px-3 py-2 text-xs font-black text-[#FFD700] hover:bg-[#FFD700] hover:text-black"><Radio size={13} /> بث أنيميشن</Link>}
+      </div>
     </article>
   );
 }
@@ -162,11 +166,22 @@ function buildVideoScript(data: Awaited<ReturnType<typeof getDailyData>>) {
   ].join('\n');
 }
 
+function buildSummaryLine(data: Awaited<ReturnType<typeof getDailyData>>) {
+  const finished = data.todayMatches.filter((m: any) => String(m.status).toUpperCase() === 'FINISHED');
+  const live = data.todayMatches.filter((m: any) => ['IN_PLAY', 'LIVE', 'HT'].includes(String(m.status).toUpperCase()));
+  const headline = data.pressNews[0]?.title || data.marketNews[0]?.title || 'أبرز أخبار اليوم في كأس العالم';
+  const resultText = finished[0] ? `أبرز نتيجة: ${matchLabel(finished[0])} ${finished[0].homeScore}-${finished[0].awayScore}.` : 'لا توجد نتيجة نهائية مؤكدة حتى الآن.';
+  const liveText = live.length ? `مباشر الآن: ${live.map(matchLabel).join('، ')}.` : 'لا توجد مباراة مباشرة مسجلة حاليًا.';
+  return `${headline}. ${resultText} ${liveText}`;
+}
+
 export default async function DailySummaryPage() {
   const data = await getDailyData();
   const finishedCount = data.todayMatches.filter((m) => String(m.status).toUpperCase() === 'FINISHED').length;
   const liveCount = data.todayMatches.filter((m) => ['IN_PLAY', 'LIVE', 'HT'].includes(String(m.status).toUpperCase())).length;
   const script = buildVideoScript(data);
+  const headline = data.pressNews[0]?.title || data.marketNews[0]?.title || 'ملخص اليوم من بورصة المونديال';
+  const summaryLine = buildSummaryLine(data);
 
   return (
     <main className="min-h-screen bg-background px-4 py-6 text-white sm:px-6 lg:px-8" dir="rtl">
@@ -176,7 +191,7 @@ export default async function DailySummaryPage() {
             <div>
               <p className="mb-3 inline-flex items-center gap-2 rounded-full border border-[#0FF0FC]/25 bg-[#0FF0FC]/10 px-4 py-2 text-xs font-black text-[#0FF0FC]"><Sparkles size={14} /> ملخص قابل للنشر</p>
               <h1 className="text-3xl font-black leading-tight md:text-5xl">ملخص اليوم</h1>
-              <p className="mt-3 max-w-3xl text-sm font-bold leading-7 text-gray-400">لقطة يومية تجمع النتائج، المباريات القادمة، الأخبار الصحفية، وأخبار السوق الافتراضي مع سكربت سريع للفيديو.</p>
+              <p className="mt-3 max-w-3xl text-sm font-bold leading-7 text-gray-400">لقطة يومية تجمع النتائج، المباريات القادمة، الأخبار الصحفية، وأخبار السوق الافتراضي مع باقة محتوى قابلة للنسخ.</p>
             </div>
             <div className="grid grid-cols-3 gap-2 text-center text-xs font-black">
               <div className="rounded-2xl border border-white/10 bg-black/25 px-4 py-3"><div className="text-2xl text-[#FFD700]">{finishedCount}</div><div className="text-gray-500">نتائج</div></div>
@@ -185,6 +200,8 @@ export default async function DailySummaryPage() {
             </div>
           </div>
         </div>
+
+        <DailySummaryContentTools script={script} headline={headline} summaryLine={summaryLine} />
 
         <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
           <section className="rounded-[2rem] border border-white/10 bg-white/[0.035] p-5 md:p-6">
