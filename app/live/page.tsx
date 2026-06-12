@@ -2,10 +2,12 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { Activity, Clock, Newspaper, Radio, RefreshCw, TrendingDown, TrendingUp, Zap } from 'lucide-react';
+import { Activity, BarChart3, Clock, Newspaper, Radio, RefreshCw, TrendingDown, TrendingUp, Zap } from 'lucide-react';
 
 type Team = { id: string; name: string; code?: string; image?: string; price?: number; change?: number };
-type LiveMatch = { id: string; animationMatchId?: number; status: string; matchDate: string; homeScore: number; awayScore: number; homeTeam: Team | null; awayTeam: Team | null; groupPhase?: string };
+type LiveStatsSide = { possession?: number | null; attacks?: number | null; dangerousAttacks?: number | null; shots?: number | null; shotsOnTarget?: number | null; shotsOffTarget?: number | null; score?: number | null };
+type LiveStats = { id: string; provider?: string; providerMatchId?: number | null; minute?: number | null; capturedAt?: string; dataStatus?: string; momentum?: number; home: LiveStatsSide; away: LiveStatsSide };
+type LiveMatch = { id: string; animationMatchId?: number; status: string; matchDate: string; homeScore: number; awayScore: number; homeTeam: Team | null; awayTeam: Team | null; groupPhase?: string; liveStats?: LiveStats | null };
 type NewsItem = { id: string; title: string; body?: string; category: string; publishedAt: string; asset?: Team | null; changePercent?: number };
 type Mover = { id: string; name: string; code?: string; image?: string; price: number; change: number };
 
@@ -27,6 +29,18 @@ function formatTime(value: string) {
   return date.toLocaleString('ar-EG', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
 }
 
+function statValue(value?: number | null, suffix = '') {
+  if (value === null || value === undefined || Number.isNaN(Number(value))) return '—';
+  return `${value}${suffix}`;
+}
+
+function momentumLabel(value?: number) {
+  const n = Number(value || 0);
+  if (n > 4) return { text: 'زخم للمنتخب الأول', className: 'text-[#00FF88]' };
+  if (n < -4) return { text: 'زخم للمنتخب الثاني', className: 'text-red-300' };
+  return { text: 'متوازن', className: 'text-[#FFD700]' };
+}
+
 function TeamPill({ team }: { team: Team | null }) {
   return (
     <div className="flex min-w-0 items-center gap-2">
@@ -34,6 +48,40 @@ function TeamPill({ team }: { team: Team | null }) {
       <div className="min-w-0">
         <div className="truncate text-sm font-black text-white">{team?.name || 'غير متوفر'}</div>
         {team?.price != null && <div className="text-[11px] font-mono text-gray-500">{team.price}¢</div>}
+      </div>
+    </div>
+  );
+}
+
+function StatRow({ label, home, away, suffix = '' }: { label: string; home?: number | null; away?: number | null; suffix?: string }) {
+  return (
+    <div className="grid grid-cols-[52px_1fr_52px] items-center gap-3 text-[11px]">
+      <div className="rounded-lg bg-black/40 px-2 py-1 text-center font-mono font-black text-white">{statValue(home, suffix)}</div>
+      <div className="text-center font-bold text-gray-500">{label}</div>
+      <div className="rounded-lg bg-black/40 px-2 py-1 text-center font-mono font-black text-white">{statValue(away, suffix)}</div>
+    </div>
+  );
+}
+
+function LiveStatsPanel({ stats }: { stats?: LiveStats | null }) {
+  if (!stats) return null;
+  const momentum = momentumLabel(stats.momentum);
+  return (
+    <div className="mt-4 rounded-2xl border border-[#0FF0FC]/10 bg-gradient-to-br from-[#0FF0FC]/8 to-[#FFD700]/5 p-3">
+      <div className="mb-3 flex items-center justify-between gap-3 text-[11px]">
+        <span className="inline-flex items-center gap-1 font-black text-[#0FF0FC]"><BarChart3 size={13} /> إحصائيات مباشرة</span>
+        <span className="rounded-full border border-white/10 bg-black/30 px-2 py-1 text-gray-400">{stats.minute ? `د ${stats.minute}` : 'Live'} · غير نهائية</span>
+      </div>
+      <div className="space-y-2">
+        <StatRow label="استحواذ" home={stats.home.possession} away={stats.away.possession} suffix="%" />
+        <StatRow label="هجمات" home={stats.home.attacks} away={stats.away.attacks} />
+        <StatRow label="خطيرة" home={stats.home.dangerousAttacks} away={stats.away.dangerousAttacks} />
+        <StatRow label="تسديدات" home={stats.home.shots} away={stats.away.shots} />
+        <StatRow label="على المرمى" home={stats.home.shotsOnTarget} away={stats.away.shotsOnTarget} />
+      </div>
+      <div className="mt-3 flex items-center justify-between border-t border-white/5 pt-3 text-[11px]">
+        <span className="text-gray-500">مؤشر الزخم اللحظي</span>
+        <span className={`font-black ${momentum.className}`}>{momentum.text}</span>
       </div>
     </div>
   );
@@ -54,6 +102,7 @@ function MatchCard({ match }: { match: LiveMatch }) {
         </div>
         <div className="text-right"><TeamPill team={match.awayTeam} /></div>
       </div>
+      <LiveStatsPanel stats={match.liveStats} />
       {match.animationMatchId && <div className="mt-3 text-[11px] text-gray-600">iSports: {match.animationMatchId}</div>}
     </Link>
   );
