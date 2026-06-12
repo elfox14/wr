@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Loader2, Mail, Newspaper, Plus, Save, Sparkles } from 'lucide-react';
+import { ArrowLeft, Copy, FileText, Image as ImageIcon, Loader2, Mail, Newspaper, Plus, Save, Sparkles, Video } from 'lucide-react';
 
 type PressNewsItem = {
   id: string;
@@ -15,6 +15,14 @@ type PressNewsItem = {
   status: string;
   importance: number;
   publishedAt: string;
+};
+
+type ContentPack = {
+  facebookPost: string;
+  tiktokScript: string;
+  youtubeTitle: string;
+  youtubeDescription: string;
+  infographicPoints: string[];
 };
 
 const initialForm = {
@@ -118,10 +126,44 @@ function generateDraftFromEmail(raw: string) {
   };
 }
 
+function trimmed(value: string, max = 180) {
+  if (!value) return '';
+  return value.length > max ? `${value.slice(0, max - 3).trim()}...` : value;
+}
+
+function generateContentPack(form: typeof initialForm): ContentPack {
+  const title = form.title.trim();
+  const body = form.body.trim();
+  const source = form.sourceName.trim() || 'مصدر صحفي';
+  const tags = form.tags.split(',').map((item) => item.trim()).filter(Boolean).slice(0, 5);
+  const hashtagLine = ['#بورصة_المونديال', '#كأس_العالم', ...tags.map((tag) => `#${tag.replace(/\s+/g, '_')}`)].slice(0, 8).join(' ');
+  const shortBody = trimmed(body, 230);
+
+  return {
+    facebookPost: `${title}\n\n${shortBody}\n\nالمصدر: ${source}\nملاحظة: هذا رصد صحفي وتحليل كروي، وليس توصية تداول.\n\n${hashtagLine}`,
+    tiktokScript: `افتتاحية قوية للفيديو:\nهل هذا الخبر يغير قراءة المشهد في كأس العالم؟\n\nالخبر باختصار: ${title}.\n${trimmed(body, 260)}\n\nزاوية التحليل: نتابع التأثير الكروي أولًا، ثم نراقب إن كان سيظهر أثر افتراضي على زخم المنتخب أو اللاعب داخل بورصة المونديال.\n\nالخاتمة: تابعونا لتحديثات أسرع وتحليل بدون مبالغة.`,
+    youtubeTitle: trimmed(`${title} | تحليل ورصد صحفي من بورصة المونديال`, 90),
+    youtubeDescription: `${shortBody}\n\nفي هذا الفيديو/الملخص نراجع الخبر من زاوية كروية فقط، مع فصل واضح عن أي حركة في السوق الافتراضي.\n\nالمصدر: ${source}\n\n${hashtagLine}`,
+    infographicPoints: [
+      title,
+      `المصدر: ${source}`,
+      `التصنيف: ${form.category}`,
+      trimmed(body, 110),
+      'لا توجد توصية شراء أو بيع — رصد وتحليل فقط.',
+    ],
+  };
+}
+
+async function copyText(text: string) {
+  if (!text) return;
+  await navigator.clipboard?.writeText(text);
+}
+
 export default function AdminPressNewsClient() {
   const [items, setItems] = useState<PressNewsItem[]>([]);
   const [form, setForm] = useState(initialForm);
   const [emailText, setEmailText] = useState('');
+  const [contentPack, setContentPack] = useState<ContentPack | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -154,7 +196,19 @@ export default function AdminPressNewsClient() {
     }
     const draft = generateDraftFromEmail(emailText);
     setForm((current) => ({ ...current, ...draft }));
+    setContentPack(null);
     setMessage('تم توليد مسودة خبر من نص الإيميل. راجعها وعدّلها قبل النشر.');
+  }
+
+  function generateContent() {
+    setError(null);
+    setMessage(null);
+    if (!form.title.trim() || !form.body.trim()) {
+      setError('اكتب أو ولّد عنوان الخبر ونصه أولًا قبل تحويله إلى محتوى.');
+      return;
+    }
+    setContentPack(generateContentPack(form));
+    setMessage('تم توليد باقة محتوى من الخبر. يمكنك النسخ والنشر بعد المراجعة.');
   }
 
   async function submit(event: React.FormEvent) {
@@ -173,6 +227,7 @@ export default function AdminPressNewsClient() {
       setMessage('تم نشر الخبر بنجاح في صفحة الأخبار.');
       setForm(initialForm);
       setEmailText('');
+      setContentPack(null);
       await loadItems();
     } catch (err: any) {
       setError(err?.message || 'فشل حفظ الخبر');
@@ -183,6 +238,7 @@ export default function AdminPressNewsClient() {
 
   function updateField(field: string, value: any) {
     setForm((current) => ({ ...current, [field]: value }));
+    setContentPack(null);
   }
 
   return (
@@ -193,7 +249,7 @@ export default function AdminPressNewsClient() {
             <div>
               <p className="mb-2 inline-flex items-center gap-2 rounded-full border border-[#0FF0FC]/25 bg-[#0FF0FC]/10 px-3 py-1 text-xs font-black text-[#0FF0FC]"><Newspaper size={14} /> إدارة الأخبار</p>
               <h1 className="text-3xl font-black">إضافة خبر صحفي</h1>
-              <p className="mt-2 text-sm font-bold leading-7 text-gray-400">الصق نص الإيميل، ولّد مسودة خبر، ثم راجعها وانشرها في صفحة الأخبار.</p>
+              <p className="mt-2 text-sm font-bold leading-7 text-gray-400">الصق نص الإيميل، ولّد مسودة خبر، ثم حوّلها إلى محتوى وانشرها عند المراجعة.</p>
             </div>
             <Link href="/news" className="inline-flex items-center justify-center gap-2 rounded-2xl border border-[#FFD700]/25 bg-[#FFD700]/10 px-4 py-3 text-sm font-black text-[#FFD700] hover:bg-[#FFD700] hover:text-black">
               عرض الأخبار <ArrowLeft size={15} />
@@ -261,10 +317,25 @@ export default function AdminPressNewsClient() {
             <input value={form.tags} onChange={(event) => updateField('tags', event.target.value)} className="w-full rounded-2xl border border-white/10 bg-black/35 px-4 py-3 text-sm font-bold text-white outline-none focus:border-[#0FF0FC]/50" placeholder="Mexico, South Africa, red cards" />
           </label>
 
-          <button disabled={saving} className="md:col-span-2 inline-flex items-center justify-center gap-2 rounded-2xl bg-[#0FF0FC] px-5 py-3 text-sm font-black text-black transition hover:bg-[#FFD700] disabled:opacity-60">
-            {saving ? <Loader2 className="animate-spin" size={16} /> : <Save size={16} />} نشر الخبر
-          </button>
+          <div className="md:col-span-2 grid gap-3 md:grid-cols-2">
+            <button type="button" onClick={generateContent} className="inline-flex items-center justify-center gap-2 rounded-2xl border border-[#FFD700]/25 bg-[#FFD700]/10 px-5 py-3 text-sm font-black text-[#FFD700] transition hover:bg-[#FFD700] hover:text-black">
+              <FileText size={16} /> تحويل الخبر إلى محتوى
+            </button>
+            <button disabled={saving} className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#0FF0FC] px-5 py-3 text-sm font-black text-black transition hover:bg-[#FFD700] disabled:opacity-60">
+              {saving ? <Loader2 className="animate-spin" size={16} /> : <Save size={16} />} نشر الخبر
+            </button>
+          </div>
         </form>
+
+        {contentPack && <section className="rounded-[2rem] border border-[#0FF0FC]/15 bg-[#0FF0FC]/[0.035] p-5 md:p-6">
+          <div className="mb-4 flex items-center gap-2 text-xl font-black"><Sparkles className="text-[#0FF0FC]" /> باقة محتوى جاهزة للمراجعة</div>
+          <div className="grid gap-4 lg:grid-cols-2">
+            <ContentBox title="منشور فيسبوك" icon={<FileText size={16} />} text={contentPack.facebookPost} />
+            <ContentBox title="سكريبت تيك توك / ريلز" icon={<Video size={16} />} text={contentPack.tiktokScript} />
+            <ContentBox title="عنوان ووصف يوتيوب" icon={<Video size={16} />} text={`${contentPack.youtubeTitle}\n\n${contentPack.youtubeDescription}`} />
+            <ContentBox title="نقاط إنفوجرافيك" icon={<ImageIcon size={16} />} text={contentPack.infographicPoints.map((point, index) => `${index + 1}. ${point}`).join('\n')} />
+          </div>
+        </section>}
 
         <section className="rounded-[2rem] border border-white/10 bg-white/[0.035] p-5 md:p-6">
           <div className="mb-4 flex items-center gap-2 text-xl font-black"><Plus className="text-[#FFD700]" /> آخر الأخبار المضافة</div>
@@ -285,5 +356,19 @@ export default function AdminPressNewsClient() {
         </section>
       </section>
     </main>
+  );
+}
+
+function ContentBox({ title, text, icon }: { title: string; text: string; icon: React.ReactNode }) {
+  return (
+    <article className="rounded-2xl border border-white/10 bg-black/25 p-4">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <h3 className="inline-flex items-center gap-2 text-sm font-black text-white">{icon}{title}</h3>
+        <button type="button" onClick={() => copyText(text)} className="inline-flex items-center gap-1 rounded-xl border border-white/10 px-3 py-2 text-[11px] font-black text-gray-400 transition hover:border-[#0FF0FC]/30 hover:text-[#0FF0FC]">
+          <Copy size={13} /> نسخ
+        </button>
+      </div>
+      <pre className="max-h-72 whitespace-pre-wrap rounded-xl bg-black/35 p-3 text-xs font-bold leading-6 text-gray-300 overflow-auto">{text}</pre>
+    </article>
   );
 }
