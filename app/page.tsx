@@ -1,4 +1,4 @@
-import HomeClientSportsTwo from '@/components/HomeClientSportsTwo';
+import HomeClientSportsCompact from '@/components/HomeClientSportsCompact';
 import { getAssets } from '@/lib/store-server';
 import { getAllArticles } from '@/lib/articles';
 import prisma from '@/lib/prisma';
@@ -71,7 +71,7 @@ export default async function Home() {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
 
-      <HomeClientSportsTwo {...homeClientProps} />
+      <HomeClientSportsCompact {...homeClientProps} />
     </>
   );
 }
