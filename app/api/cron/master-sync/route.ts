@@ -26,18 +26,28 @@ type SyncWindow = {
   recentWindowHours: number;
 };
 
+function configuredSecrets() {
+  return [process.env.CRON_SECRET, process.env.ADMIN_API_SECRET]
+    .map((value) => String(value || '').trim())
+    .filter(Boolean);
+}
+
+function downstreamSecret() {
+  return String(process.env.CRON_SECRET || process.env.ADMIN_API_SECRET || '').trim();
+}
+
 function getAuth(req: Request) {
-  const expected = process.env.CRON_SECRET || process.env.ADMIN_API_SECRET || '';
-  if (!expected) return { valid: false, method: 'missing_server_secret' };
+  const validSecrets = configuredSecrets();
+  if (validSecrets.length === 0) return { valid: false, method: 'missing_server_secret' };
 
   const url = new URL(req.url);
   const auth = req.headers.get('authorization') || '';
   const bearer = auth.startsWith('Bearer ') ? auth.slice(7).trim() : '';
-  const cronHeader = req.headers.get('x-cron-secret') || '';
-  const adminHeader = req.headers.get('x-admin-secret') || '';
-  const cronQuery = url.searchParams.get('cronSecret') || '';
-  const adminQuery = url.searchParams.get('adminSecret') || '';
-  const keyQuery = url.searchParams.get('key') || '';
+  const cronHeader = req.headers.get('x-cron-secret')?.trim() || '';
+  const adminHeader = req.headers.get('x-admin-secret')?.trim() || '';
+  const cronQuery = url.searchParams.get('cronSecret')?.trim() || '';
+  const adminQuery = url.searchParams.get('adminSecret')?.trim() || '';
+  const keyQuery = url.searchParams.get('key')?.trim() || '';
 
   const candidates = [
     { method: 'authorization_bearer', value: bearer },
@@ -48,7 +58,7 @@ function getAuth(req: Request) {
     { method: 'key_query', value: keyQuery },
   ];
 
-  const matched = candidates.find((item) => item.value && item.value === expected);
+  const matched = candidates.find((item) => item.value && validSecrets.includes(item.value));
   return matched ? { valid: true, method: matched.method } : { valid: false, method: null };
 }
 
@@ -181,7 +191,7 @@ export async function GET(req: Request) {
 
   const url = new URL(req.url);
   const baseUrl = getCronBaseUrl(req);
-  const secret = process.env.CRON_SECRET || process.env.ADMIN_API_SECRET || '';
+  const secret = downstreamSecret();
   const date = url.searchParams.get('date') || '';
   const forceAnimation = url.searchParams.get('forceAnimation') === 'true';
   const startedAt = new Date();
