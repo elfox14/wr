@@ -100,12 +100,22 @@ function isMatchLive(match: any, now?: number) {
   return false;
 }
 
+function isUpcomingScheduled(match: any, now: number) {
+  const status = String(match?.displayStatus || match?.status || '').toUpperCase();
+  const date = safeDate(match?.matchDate);
+  return !isMatchLive(match, now) && status === 'SCHEDULED' && !!date && date.getTime() > now;
+}
+
 function pickTopMatches(matches: any[], now: number) {
   const sorted = sortMatches(matches);
   const live = sorted.filter((match) => isMatchLive(match, now));
-  const upcoming = sorted.filter((match) => !isMatchLive(match, now) && match.status === 'SCHEDULED' && new Date(match.matchDate).getTime() > now);
+  const upcoming = sorted.filter((match) => isUpcomingScheduled(match, now));
   const others = sorted.filter((match) => !live.includes(match) && !upcoming.includes(match));
   return [...live, ...upcoming, ...others].slice(0, 4);
+}
+
+function pickNextScheduledMatch(matches: any[], currentMatch: any, now: number) {
+  return sortMatches(matches).find((match) => match !== currentMatch && isUpcomingScheduled(match, now)) || null;
 }
 
 function liveMinuteLabel(match: any, now: number) {
@@ -218,7 +228,9 @@ export default function HomeClient({
   const safeMatches = Array.isArray(liveMatches) && liveMatches.length > 0 ? liveMatches : Array.isArray(upcomingMatches) ? upcomingMatches : [];
   const topMatches = pickTopMatches(safeMatches, now);
   const tickerMatch = topMatches[0] || null;
+  const tickerIsLive = tickerMatch ? isMatchLive(tickerMatch, now) : false;
   const hasLiveMatch = topMatches.some((match) => isMatchLive(match, now));
+  const nextScheduledMatch = pickNextScheduledMatch(safeMatches, tickerMatch, now);
   const allTeams = safeAssets.filter((asset) => asset.type === 'TEAM');
   const featuredTeams = allTeams.slice(0, 4);
   const featuredPlayers = safeAssets.filter((asset) => asset.type === 'PLAYER').slice(0, 4);
@@ -264,10 +276,10 @@ export default function HomeClient({
   );
 
   const heroStats = [
-    { label: 'منتخب', value: 48, icon: Globe },
-    { label: 'لاعب', value: 1249, icon: Users },
-    { label: 'أصل افتراضي', value: 1297, icon: Wallet },
-    { label: 'مباراة', value: 71, icon: Calendar },
+    { label: 'منتخب', value: teamsCount || 48, icon: Globe },
+    { label: 'لاعب', value: playersCount || 1249, icon: Users },
+    { label: 'أصل افتراضي', value: assetsCount || 1297, icon: Wallet },
+    { label: 'مباراة', value: upcomingMatchesCount || 71, icon: Calendar },
   ];
 
   const commandLinks = [
@@ -278,7 +290,7 @@ export default function HomeClient({
   ];
 
   const mobileQuickActions = [
-    { title: 'المباريات', subtitle: 'نتائج ومواعيد', href: '/animation-live', icon: Radio, tone: 'border-red-400/25 bg-red-500/10 text-red-300' },
+    { title: 'المباريات', subtitle: 'نتائج ومواعيد', href: '/matches', icon: Radio, tone: 'border-red-400/25 bg-red-500/10 text-red-300' },
     { title: 'الأخبار', subtitle: 'موثق وسريع', href: '#news', icon: Newspaper, tone: 'border-[#FFD700]/25 bg-[#FFD700]/10 text-[#FFD700]' },
     { title: 'التحليل', subtitle: 'قبل وبعد', href: '#analysis', icon: LineChart, tone: 'border-[#0FF0FC]/25 bg-[#0FF0FC]/10 text-[#0FF0FC]' },
     { title: 'المنتخبات', subtitle: 'بطاقات وقوائم', href: '#teams', icon: Trophy, tone: 'border-emerald-400/25 bg-emerald-400/10 text-emerald-300' },
@@ -294,7 +306,7 @@ export default function HomeClient({
   const groupCards = [
     { title: 'ترتيب المجموعات', text: 'مدخل سريع لفهم موقف كل منتخب داخل مجموعته.', href: '/groups' },
     { title: 'صفحات المنتخبات', text: 'بطاقة المنتخب، القائمة، التحليل، والمصادر المتاحة.', href: '/market?type=TEAM' },
-    { title: 'مسار البطولة', text: 'انتقل من المباراة إلى المجموعة ثم إلى صفحة المنتخب.', href: '/animation-live' },
+    { title: 'مسار البطولة', text: 'انتقل من المباراة إلى المجموعة ثم إلى صفحة المنتخب.', href: '/matches' },
   ];
 
   return (
@@ -311,7 +323,7 @@ export default function HomeClient({
                 <>
                   <span className="text-white">{tickerMatch.homeTeam?.name || 'الفريق الأول'}</span>
                   <span className="rounded-lg border border-white/15 bg-black/30 px-3 py-1 font-mono font-black text-[#FFD700] tabular-nums">
-                    {isMatchLive(tickerMatch, now) || String(tickerMatch.status).toUpperCase() === 'FINISHED' ? `${tickerMatch.homeScore ?? 0} - ${tickerMatch.awayScore ?? 0}` : 'VS'}
+                    {tickerIsLive || String(tickerMatch.status).toUpperCase() === 'FINISHED' ? `${tickerMatch.homeScore ?? 0} - ${tickerMatch.awayScore ?? 0}` : 'VS'}
                   </span>
                   <span className="text-white">{tickerMatch.awayTeam?.name || 'الفريق الثاني'}</span>
                   <Link href={getAnimationHref(tickerMatch)} className="rounded-full border border-[#FFD700]/30 bg-[#FFD700]/10 px-3 py-1 text-xs font-black text-[#FFD700] transition hover:bg-[#FFD700] hover:text-black">
@@ -378,7 +390,7 @@ export default function HomeClient({
               })}
             </div>
             <div className="mt-5 grid grid-cols-2 gap-3 sm:flex sm:flex-wrap">
-              <Link href="/animation-live" className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#0FF0FC] px-4 py-3 text-xs font-black text-black transition active:scale-95 hover:bg-[#70f7ff] sm:px-5 sm:text-sm">
+              <Link href="/matches" className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#0FF0FC] px-4 py-3 text-xs font-black text-black transition active:scale-95 hover:bg-[#70f7ff] sm:px-5 sm:text-sm">
                 <Radio size={18} /> مركز المباريات
               </Link>
               <Link href="/articles" className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-xs font-black text-white transition active:scale-95 hover:bg-white/15 sm:px-5 sm:text-sm">
@@ -397,7 +409,7 @@ export default function HomeClient({
             </div>
 
             {tickerMatch ? (
-              <div className={`rounded-2xl border p-4 ${isMatchLive(tickerMatch, now) ? 'border-red-500/25 bg-red-500/[0.06]' : 'border-white/10 bg-white/[0.045]'}`}>
+              <div className={`rounded-2xl border p-4 ${tickerIsLive ? 'border-red-500/25 bg-red-500/[0.06]' : 'border-white/10 bg-white/[0.045]'}`}>
                 <div className="mb-4 grid grid-cols-[1fr_auto_1fr] items-center gap-2 sm:gap-3">
                   <div className="flex flex-col items-center gap-2 text-center">
                     {renderMatchTeamLogo(tickerMatch.homeTeam)}
@@ -409,7 +421,7 @@ export default function HomeClient({
                     <Link href={groupHref(tickerMatch?.groupPhase || tickerMatch?.group || tickerMatch?.homeTeam?.group || tickerMatch?.awayTeam?.group)} className="rounded-full border border-[#0FF0FC]/25 bg-[#0FF0FC]/10 px-3 py-1 text-[10px] font-black text-[#0FF0FC] transition hover:bg-[#0FF0FC]/20 hover:text-white">
                       المجموعة {normalizeGroupKey(tickerMatch?.groupPhase || tickerMatch?.group || tickerMatch?.homeTeam?.group || tickerMatch?.awayTeam?.group)}
                     </Link>
-                    {isMatchLive(tickerMatch, now) || String(tickerMatch.status).toUpperCase() === 'FINISHED' ? (
+                    {tickerIsLive || String(tickerMatch.status).toUpperCase() === 'FINISHED' ? (
                       <div className="rounded-2xl border border-white/10 bg-black/60 px-4 py-3 text-xl font-black text-white shadow-inner tabular-nums sm:px-5 sm:text-2xl">
                         {tickerMatch.homeScore ?? 0} - {tickerMatch.awayScore ?? 0}
                       </div>
@@ -432,9 +444,43 @@ export default function HomeClient({
                   <Radio size={14} />
                   {getAnimationMatchId(tickerMatch) ? 'مشاهدة البث التفاعلي' : 'فتح مركز البث'}
                 </Link>
+
+                {tickerIsLive ? (
+                  <div className="mt-4 rounded-2xl border border-[#0FF0FC]/18 bg-black/35 p-3">
+                    <div className="mb-3 flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-[10px] font-black text-[#0FF0FC]">المباراة القادمة</p>
+                        {nextScheduledMatch ? (
+                          <h3 className="mt-1 line-clamp-1 text-sm font-black text-white">
+                            {nextScheduledMatch.homeTeam?.name || 'الفريق الأول'} <span className="text-[#FFD700]">VS</span> {nextScheduledMatch.awayTeam?.name || 'الفريق الثاني'}
+                          </h3>
+                        ) : (
+                          <h3 className="mt-1 text-sm font-black text-white">لا توجد مباراة قادمة محملة حاليًا</h3>
+                        )}
+                      </div>
+                      <Calendar className="shrink-0 text-[#0FF0FC]" size={20} />
+                    </div>
+                    <div className="mb-3 flex items-center gap-2 text-[11px] font-bold text-gray-400">
+                      <Clock size={12} />
+                      {nextScheduledMatch ? formatMatchDate(nextScheduledMatch.matchDate) : 'راجع صفحة المباريات لكل المواعيد'}
+                    </div>
+                    <Link href="/matches" className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#0FF0FC] px-3 py-2 text-xs font-black text-black transition active:scale-95 hover:bg-[#70f7ff]">
+                      عرض صفحة المباريات <ArrowLeft size={14} />
+                    </Link>
+                  </div>
+                ) : (
+                  <Link href="/matches" className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-[#0FF0FC]/25 bg-[#0FF0FC]/10 px-3 py-2 text-xs font-black text-[#0FF0FC] transition active:scale-95 hover:bg-[#0FF0FC] hover:text-black">
+                    عرض كل المباريات <ArrowLeft size={14} />
+                  </Link>
+                )}
               </div>
             ) : (
-              <div className="rounded-2xl border border-dashed border-white/10 p-6 text-center text-sm text-gray-500">لم يتم تحميل مباريات بعد.</div>
+              <div className="rounded-2xl border border-dashed border-white/10 p-6 text-center text-sm text-gray-500">
+                لم يتم تحميل مباريات بعد.
+                <Link href="/matches" className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-[#0FF0FC]/25 bg-[#0FF0FC]/10 px-3 py-2 text-xs font-black text-[#0FF0FC] transition active:scale-95 hover:bg-[#0FF0FC] hover:text-black">
+                  فتح صفحة المباريات <ArrowLeft size={14} />
+                </Link>
+              </div>
             )}
           </div>
         </div>
