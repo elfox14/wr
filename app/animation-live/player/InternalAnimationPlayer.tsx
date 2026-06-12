@@ -12,6 +12,14 @@ type LiveStatsResponse = {
   updatedAt?: string;
   pollingSeconds?: number;
   hasStats?: boolean;
+  sourceStatus?: {
+    primary?: string;
+    statsProvider?: string;
+    mode?: string;
+    isportsBlocked?: boolean;
+    blockedUntil?: string | null;
+    reason?: string | null;
+  };
   match?: {
     id: string;
     animationMatchId?: number;
@@ -154,6 +162,8 @@ export default function InternalAnimationPlayer({ matchId }: { matchId: string }
 
   const latest = stats?.latest || null;
   const match = stats?.match;
+  const sourceStatus = stats?.sourceStatus;
+  const isFallbackMode = Boolean(sourceStatus?.isportsBlocked);
   const lastEvent = events[0] || null;
   const ball = useMemo(() => inferBallPosition(lastEvent), [lastEvent]);
   const hasStats = Boolean(stats?.hasStats || hasAnyStat(latest));
@@ -178,14 +188,19 @@ export default function InternalAnimationPlayer({ matchId }: { matchId: string }
           <div>
             <p className="inline-flex items-center gap-2 rounded-full border border-emerald-400/25 bg-emerald-400/10 px-3 py-1 text-[10px] font-black text-emerald-200"><Database size={13} /> Internal DB Animation</p>
             <h2 className="mt-2 text-2xl font-black text-white">بث أنيميشن داخلي من قاعدة البيانات</h2>
-            <p className="mt-1 text-xs leading-5 text-gray-400">لا يتم تحميل iSports افتراضيًا. الإحصائيات كل 5 دقائق، والأحداث المهمة من قاعدة البيانات كل 30 ثانية.</p>
+            <p className="mt-1 text-xs leading-5 text-gray-400">iSports هو المصدر الأساسي للإحصائيات. عند انتهاء الحد اليومي، يتم التحول تلقائيًا إلى football-data.org للنتيجة والحالة.</p>
           </div>
           <div className="flex flex-wrap gap-2 text-xs font-black">
+            <span className={`rounded-full border px-3 py-1 ${isFallbackMode ? 'border-[#FFD700]/25 bg-[#FFD700]/10 text-[#FFD700]' : 'border-emerald-400/25 bg-emerald-400/10 text-emerald-200'}`}><ShieldAlert size={13} className="inline" /> المصدر: {isFallbackMode ? 'football-data fallback' : 'iSports primary'}</span>
             <span className="rounded-full border border-white/10 bg-black/30 px-3 py-1 text-gray-300"><Clock size={13} className="inline" /> إحصائيات: {stats?.updatedAt ? new Date(stats.updatedAt).toLocaleTimeString('ar-EG') : '—'}</span>
             <span className="rounded-full border border-white/10 bg-black/30 px-3 py-1 text-gray-300"><Activity size={13} className="inline" /> أحداث: {eventsUpdatedAt ? new Date(eventsUpdatedAt).toLocaleTimeString('ar-EG') : '—'}</span>
           </div>
         </div>
       </div>
+
+      {isFallbackMode && (
+        <div className="mx-4 mt-4 rounded-2xl border border-[#FFD700]/20 bg-[#FFD700]/10 p-3 text-xs font-bold leading-6 text-[#FFD700]"><AlertTriangle size={15} className="inline" /> تم إيقاف iSports مؤقتًا بسبب حد الطلبات. يتم الاعتماد الآن على football-data.org للنتيجة والحالة حتى لو كان هناك تأخير. {sourceStatus?.blockedUntil ? `ينتهي الحظر تقريبًا: ${new Date(sourceStatus.blockedUntil).toLocaleString('ar-EG')}` : ''}</div>
+      )}
 
       {!hasStats && (
         <div className="mx-4 mt-4 rounded-2xl border border-[#FFD700]/20 bg-[#FFD700]/10 p-3 text-xs font-bold leading-6 text-[#FFD700]"><AlertTriangle size={15} className="inline" /> لا توجد أرقام إحصائية محفوظة بعد. سيتم عرض النتيجة والأحداث المتاحة فقط حتى وصول أول Snapshot.</div>
@@ -269,7 +284,7 @@ export default function InternalAnimationPlayer({ matchId }: { matchId: string }
       </div>
 
       <div className="border-t border-white/10 bg-black/25 p-3 text-[11px] font-bold leading-5 text-gray-400">
-        <span className="inline-flex items-center gap-2 text-emerald-200"><ShieldAlert size={14} /> وضع داخلي موفر:</span> عدد المشاهدين لا يطلب iSports. الزوار يقرأون بيانات محفوظة، و iSports يبقى مصدر مزامنة محدود وخيار عرض خارجي فقط.
+        <span className="inline-flex items-center gap-2 text-emerald-200"><ShieldAlert size={14} /> وضع داخلي موفر:</span> عدد المشاهدين لا يطلب iSports. الزوار يقرأون بيانات محفوظة، و iSports يعمل كمصدر أساسي منخفض الطلبات مع fallback من football-data.org عند انتهاء الحد.
       </div>
     </section>
   );
