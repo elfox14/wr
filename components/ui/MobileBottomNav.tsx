@@ -2,14 +2,14 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { BarChart3, BookOpen, Brain, Briefcase, Home } from 'lucide-react';
+import { BarChart3, Home, LineChart, Newspaper, Radio } from 'lucide-react';
 
 const mobileNavItems = [
   { name: 'الرئيسية', href: '/', icon: Home },
-  { name: 'التحليل', href: '/team-intelligence', icon: Brain },
-  { name: 'السوق', href: '/market', icon: BarChart3 },
-  { name: 'المنهجية', href: '/methodology', icon: BookOpen },
-  { name: 'محفظتي', href: '/portfolio', icon: Briefcase },
+  { name: 'مباشر', href: '/animation-live', icon: Radio },
+  { name: 'الأخبار', href: '/articles', icon: Newspaper },
+  { name: 'التحليل', href: '/team-intelligence', icon: LineChart },
+  { name: 'البورصة', href: '/market', icon: BarChart3 },
 ];
 
 function isActivePath(pathname: string | null, href: string) {
