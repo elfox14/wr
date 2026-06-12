@@ -5,6 +5,24 @@ import { renderMarketNews } from '@/lib/market-news/render';
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
+type TickerItem = {
+  id: string;
+  type: string;
+  title: string;
+  body?: string;
+  assetId?: string;
+  assetName?: string;
+  assetImage?: string;
+  marketPrice?: number;
+  changePercent?: number;
+  matchId?: string;
+  href?: string;
+  timestamp: string;
+  source: string;
+  severity?: string;
+  priority: number;
+};
+
 function toNumber(value: unknown, fallback = 0) {
   const n = Number(value);
   return Number.isFinite(n) ? n : fallback;
@@ -30,6 +48,18 @@ const noStoreHeaders = {
   'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
 };
 
+function sortTickerItems(items: TickerItem[]) {
+  return items.sort((a, b) => {
+    if (b.priority !== a.priority) return b.priority - a.priority;
+    return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
+  });
+}
+
+function stripInternalFields(item: TickerItem) {
+  const { priority, ...publicItem } = item;
+  return publicItem;
+}
+
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -38,10 +68,12 @@ export async function GET(request: Request) {
     const liveWindowStart = new Date(now.getTime() - 5 * 60 * 60 * 1000);
     const liveWindowEnd = new Date(now.getTime() + 3 * 60 * 60 * 1000);
     const finishedWindowStart = new Date(now.getTime() - 8 * 60 * 60 * 1000);
+    const newsWindowStart = new Date(now.getTime() - 24 * 60 * 60 * 1000);
     const upcomingWindow = new Date(now.getTime() + 6 * 60 * 60 * 1000);
 
     const [marketNews, priceHistory, liveMatches, finishedMatches, upcomingMatches] = await Promise.all([
       prisma.marketNews.findMany({
+        where: { publishedAt: { gte: newsWindowStart } },
         orderBy: { publishedAt: 'desc' },
         take: 12,
         include: {
@@ -49,6 +81,7 @@ export async function GET(request: Request) {
         },
       }),
       prisma.priceHistory.findMany({
+        where: { timestamp: { gte: newsWindowStart } },
         orderBy: { timestamp: 'desc' },
         take: 16,
         include: {
@@ -84,16 +117,43 @@ export async function GET(request: Request) {
       }),
     ]);
 
-    const items: any[] = [];
+    const items: TickerItem[] = [];
     const seenPriceAssetIds = new Set<string>();
+
+    for (const match of liveMatches) {
+      items.push({
+        id: `match-live-${match.id}`,
+        type: 'MATCH_EVENT',
+        title: `${matchStatusLabel(match.status)}: ${match.homeTeam?.name || 'الفريق الأول'} ${scoreLabel(match)} ${match.awayTeam?.name || 'الفريق الثاني'}`,
+        matchId: match.id,
+        href: '/live',
+        timestamp: now.toISOString(),
+        source: 'live_match',
+        priority: 100,
+      });
+    }
+
+    for (const match of finishedMatches) {
+      items.push({
+        id: `match-finished-${match.id}`,
+        type: 'MATCH_EVENT',
+        title: `${matchStatusLabel(match.status)}: ${match.homeTeam?.name || 'الفريق الأول'} ${scoreLabel(match)} ${match.awayTeam?.name || 'الفريق الثاني'}`,
+        matchId: match.id,
+        href: '/live',
+        timestamp: now.toISOString(),
+        source: 'finished_match',
+        priority: 90,
+      });
+    }
 
     for (const item of marketNews) {
       const rendered = renderMarketNews(item, 'ar');
       const change = toNumber(item.changePercent, 0);
       const priceAfter = item.priceAfter == null ? null : Math.round(toNumber(item.priceAfter));
+      const isMatchEvent = item.eventType?.includes('goal') || item.eventType?.includes('match');
       items.push({
         id: `news-${item.id}`,
-        type: item.eventType?.includes('goal') || item.eventType?.includes('match') ? 'MATCH_EVENT' : change >= 0 ? 'PRICE_UP' : 'PRICE_DOWN',
+        type: isMatchEvent ? 'MATCH_EVENT' : change >= 0 ? 'PRICE_UP' : 'PRICE_DOWN',
         title: rendered.title,
         body: rendered.body,
         assetId: item.asset?.id,
@@ -105,6 +165,7 @@ export async function GET(request: Request) {
         timestamp: item.publishedAt.toISOString(),
         source: 'market_news',
         severity: item.severity,
+        priority: isMatchEvent ? 80 : 70,
       });
     }
 
@@ -125,30 +186,7 @@ export async function GET(request: Request) {
         href: `/asset/${entry.asset.id}`,
         timestamp: entry.timestamp.toISOString(),
         source: 'price_history',
-      });
-    }
-
-    for (const match of liveMatches) {
-      items.push({
-        id: `match-live-${match.id}`,
-        type: 'MATCH_EVENT',
-        title: `${matchStatusLabel(match.status)}: ${match.homeTeam?.name || 'الفريق الأول'} ${scoreLabel(match)} ${match.awayTeam?.name || 'الفريق الثاني'}`,
-        matchId: match.id,
-        href: '/live',
-        timestamp: now.toISOString(),
-        source: 'live_match',
-      });
-    }
-
-    for (const match of finishedMatches) {
-      items.push({
-        id: `match-finished-${match.id}`,
-        type: 'MATCH_EVENT',
-        title: `${matchStatusLabel(match.status)}: ${match.homeTeam?.name || 'الفريق الأول'} ${scoreLabel(match)} ${match.awayTeam?.name || 'الفريق الثاني'}`,
-        matchId: match.id,
-        href: '/live',
-        timestamp: now.toISOString(),
-        source: 'finished_match',
+        priority: 60,
       });
     }
 
@@ -161,15 +199,22 @@ export async function GET(request: Request) {
         href: '/live',
         timestamp: match.matchDate.toISOString(),
         source: 'upcoming_match',
+        priority: 40,
       });
     }
-
-    items.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
     return NextResponse.json({
       success: true,
       updatedAt: now.toISOString(),
-      items: items.slice(0, limit),
+      responseMode: 'prioritized',
+      counts: {
+        live: liveMatches.length,
+        finished: finishedMatches.length,
+        news: marketNews.length,
+        priceMovers: seenPriceAssetIds.size,
+        upcoming: upcomingMatches.length,
+      },
+      items: sortTickerItems(items).slice(0, limit).map(stripInternalFields),
     }, { headers: noStoreHeaders });
   } catch (error: any) {
     console.error('Live ticker error:', error);
