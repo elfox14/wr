@@ -4,70 +4,183 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useStore } from '@/lib/store';
 import { AssetImage } from '@/components/ui/AssetImage';
-import { ArrowLeft, Calendar, Clock, Globe, Radio, ShieldCheck, Users, Wallet } from 'lucide-react';
+import {
+  ArrowLeft,
+  BarChart3,
+  Calendar,
+  CheckCircle2,
+  Clock,
+  FileText,
+  Globe,
+  LineChart,
+  Newspaper,
+  Radio,
+  ShieldCheck,
+  Sparkles,
+  Trophy,
+  Users,
+  Wallet,
+} from 'lucide-react';
 
-type AcademyArticle = { id: string; title: string; excerpt: string; category: string; readingTime?: string; level?: string; imageUrl?: string; date?: string };
+type AcademyArticle = {
+  id: string;
+  title: string;
+  excerpt: string;
+  category: string;
+  readingTime?: string;
+  level?: string;
+  imageUrl?: string;
+  date?: string;
+};
+
+type HomeClientProps = {
+  initialAssets: any[];
+  usersCount?: number;
+  tradeVolume?: number;
+  executedTrades?: number;
+  upcomingMatches?: any[];
+  assetsCount?: number;
+  playersCount?: number;
+  teamsCount?: number;
+  upcomingMatchesCount?: number;
+  recentTransactions?: any[];
+  mostTradedAssets?: any[];
+  topDemandAssets?: any[];
+  topMomentumAssets?: any[];
+  undervaluedAssets?: any[];
+  academyArticles?: AcademyArticle[];
+};
 
 function normalizeGroupKey(value?: string | null): string {
   if (!value) return 'غير محددة';
   return value.replace('Group', '').replace('المجموعة', '').trim().toUpperCase();
 }
-function groupHref(value?: string | null): string { return `/groups#group-${encodeURIComponent(normalizeGroupKey(value))}`; }
-function getAnimationMatchId(match: any) { return match?.animationMatchId || ''; }
-function getAnimationHref(match: any) { const id = getAnimationMatchId(match); return id ? `/animation-live/player?matchId=${encodeURIComponent(String(id))}&lang=en&statsPanel=simple&teamPanel=1` : '/animation-live'; }
-function formatMatchDate(value?: string | null) { return value ? new Date(value).toLocaleString('ar-EG') : 'غير محدد'; }
-function formatMatchTime(value?: string | null) { return value ? new Date(value).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }) : 'غير محدد'; }
-function sortMatches(matches: any[]) { return [...matches].sort((a, b) => new Date(a?.matchDate || 0).getTime() - new Date(b?.matchDate || 0).getTime()); }
+
+function groupHref(value?: string | null) {
+  return `/groups#group-${encodeURIComponent(normalizeGroupKey(value))}`;
+}
+
+function getAnimationMatchId(match: any) {
+  return match?.animationMatchId || '';
+}
+
+function getAnimationHref(match: any) {
+  const id = getAnimationMatchId(match);
+  return id ? `/animation-live/player?matchId=${encodeURIComponent(String(id))}&lang=en&statsPanel=simple&teamPanel=1` : '/animation-live';
+}
+
+function safeDate(value?: string | null) {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function formatMatchDate(value?: string | null) {
+  const date = safeDate(value);
+  return date ? date.toLocaleString('ar-EG') : 'غير محدد';
+}
+
+function formatNumber(value?: number | null) {
+  return new Intl.NumberFormat('ar-EG').format(Number(value || 0));
+}
+
+function sortMatches(matches: any[]) {
+  return [...matches].sort((a, b) => new Date(a?.matchDate || 0).getTime() - new Date(b?.matchDate || 0).getTime());
+}
+
 function isMatchLive(match: any, now?: number) {
   if (match?.isLiveNow) return true;
   const status = String(match?.displayStatus || match?.status || '').toUpperCase();
   if (status === 'IN_PLAY' || status === 'LIVE' || status === 'HT') return true;
+
   if (now && status === 'SCHEDULED' && match?.matchDate) {
     const diffMinutes = Math.floor((now - new Date(match.matchDate).getTime()) / 60000);
     return diffMinutes >= 0 && diffMinutes <= 135;
   }
+
   return false;
 }
+
 function pickTopMatches(matches: any[], now: number) {
   const sorted = sortMatches(matches);
-  const live = sorted.filter((m) => isMatchLive(m, now));
-  const upcoming = sorted.filter((m) => !isMatchLive(m, now) && m.status === 'SCHEDULED' && new Date(m.matchDate).getTime() > now);
-  const others = sorted.filter((m) => !live.includes(m) && !upcoming.includes(m));
-  return [...live, ...upcoming, ...others].slice(0, 2);
+  const live = sorted.filter((match) => isMatchLive(match, now));
+  const upcoming = sorted.filter((match) => !isMatchLive(match, now) && match.status === 'SCHEDULED' && new Date(match.matchDate).getTime() > now);
+  const others = sorted.filter((match) => !live.includes(match) && !upcoming.includes(match));
+  return [...live, ...upcoming, ...others].slice(0, 4);
 }
-function getCountdownArray(matchDate: string | null | undefined, now: number) {
-  if (!matchDate) return null;
-  const diff = new Date(matchDate).getTime() - now;
-  if (diff <= 0) return null;
-  const totalSeconds = Math.floor(diff / 1000);
-  return [
-    { label: 'يوم', value: Math.floor(totalSeconds / 86400) },
-    { label: 'ساعة', value: Math.floor((totalSeconds % 86400) / 3600) },
-    { label: 'دقيقة', value: Math.floor((totalSeconds % 3600) / 60) },
-    { label: 'ثانية', value: totalSeconds % 60 },
-  ];
-}
+
 function liveMinuteLabel(match: any, now: number) {
   if (match?.liveLabel) return match.liveLabel;
   if (match?.minute) return `الدقيقة ${match.minute}`;
+
   if (match?.matchDate) {
     const minute = Math.floor((now - new Date(match.matchDate).getTime()) / 60000) + 1;
     if (minute >= 46 && minute <= 65) return 'استراحة بين الشوطين';
     if (minute > 65 && minute <= 135) return 'الشوط الثاني جارٍ';
     if (minute >= 1 && minute <= 45) return `الدقيقة ${minute}`;
   }
+
   return 'جارية الآن';
 }
 
-export default function HomeClient({ initialAssets, upcomingMatches = [], assetsCount = 0, playersCount = 0, teamsCount = 0, upcomingMatchesCount = 0, academyArticles = [] }: { initialAssets: any[]; usersCount?: number; tradeVolume?: number; executedTrades?: number; upcomingMatches?: any[]; assetsCount?: number; playersCount?: number; teamsCount?: number; upcomingMatchesCount?: number; recentTransactions?: any[]; mostTradedAssets?: any[]; topDemandAssets?: any[]; topMomentumAssets?: any[]; undervaluedAssets?: any[]; academyArticles?: AcademyArticle[] }) {
-  const [now, setNow] = useState(() => Date.now());
-  const [liveMatches, setLiveMatches] = useState<any[]>(() => Array.isArray(upcomingMatches) ? upcomingMatches : []);
+function statusLabel(match: any, now: number) {
+  const status = String(match?.displayStatus || match?.status || '').toUpperCase();
+  if (status === 'FINISHED') return 'انتهت';
+  if (isMatchLive(match, now)) return liveMinuteLabel(match, now);
+  return formatMatchDate(match?.matchDate);
+}
 
-  useEffect(() => { useStore.setState({ assets: initialAssets, loading: false }); }, [initialAssets]);
-  useEffect(() => { setLiveMatches(Array.isArray(upcomingMatches) ? upcomingMatches : []); }, [upcomingMatches]);
-  useEffect(() => { const timer = window.setInterval(() => setNow(Date.now()), 1000); return () => window.clearInterval(timer); }, []);
+function getAssetPrice(asset: any) {
+  const raw = asset?.marketPrice ?? asset?.currentPrice ?? asset?.current_price ?? asset?.price ?? asset?.fairValue ?? 0;
+  const value = Number(raw);
+  return Number.isFinite(value) && value > 0 ? value : 0;
+}
+
+function getAssetChange(asset: any) {
+  const raw = asset?.priceChange24h ?? asset?.change24h ?? asset?.priceChange ?? asset?.momentumChange ?? asset?.momentum ?? 0;
+  const value = Number(raw);
+  return Number.isFinite(value) ? value : 0;
+}
+
+function formatAssetPrice(asset: any) {
+  const value = getAssetPrice(asset);
+  return value ? value.toLocaleString('ar-EG', { maximumFractionDigits: 2 }) : 'غير متوفر';
+}
+
+function changeBadge(change: number) {
+  if (change > 0) return `▲ ${change.toLocaleString('ar-EG', { maximumFractionDigits: 1 })}%`;
+  if (change < 0) return `▼ ${Math.abs(change).toLocaleString('ar-EG', { maximumFractionDigits: 1 })}%`;
+  return 'مستقر';
+}
+
+export default function HomeClient({
+  initialAssets,
+  upcomingMatches = [],
+  assetsCount = 0,
+  playersCount = 0,
+  teamsCount = 0,
+  upcomingMatchesCount = 0,
+  academyArticles = [],
+}: HomeClientProps) {
+  const [now, setNow] = useState(() => Date.now());
+  const [liveMatches, setLiveMatches] = useState<any[]>(() => (Array.isArray(upcomingMatches) ? upcomingMatches : []));
+
+  useEffect(() => {
+    useStore.setState({ assets: initialAssets, loading: false });
+  }, [initialAssets]);
+
+  useEffect(() => {
+    setLiveMatches(Array.isArray(upcomingMatches) ? upcomingMatches : []);
+  }, [upcomingMatches]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
+
     const refreshLiveCard = async () => {
       try {
         const response = await fetch('/api/matches/live-card', { cache: 'no-store' });
@@ -76,52 +189,403 @@ export default function HomeClient({ initialAssets, upcomingMatches = [], assets
         if (!cancelled && Array.isArray(data?.matches)) setLiveMatches(data.matches);
       } catch {}
     };
+
     refreshLiveCard();
     const timer = window.setInterval(refreshLiveCard, 15000);
-    return () => { cancelled = true; window.clearInterval(timer); };
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
   }, []);
 
   const safeAssets = Array.isArray(initialAssets) ? initialAssets : [];
-  const safeMatches = Array.isArray(liveMatches) && liveMatches.length > 0 ? liveMatches : (Array.isArray(upcomingMatches) ? upcomingMatches : []);
+  const safeMatches = Array.isArray(liveMatches) && liveMatches.length > 0 ? liveMatches : Array.isArray(upcomingMatches) ? upcomingMatches : [];
   const topMatches = pickTopMatches(safeMatches, now);
+  const tickerMatch = topMatches[0] || null;
   const hasLiveMatch = topMatches.some((match) => isMatchLive(match, now));
+  const featuredTeams = safeAssets.filter((asset) => asset.type === 'TEAM').slice(0, 4);
+  const featuredPlayers = safeAssets.filter((asset) => asset.type === 'PLAYER').slice(0, 4);
+  const marketMovers = [...safeAssets].sort((a, b) => Math.abs(getAssetChange(b)) - Math.abs(getAssetChange(a))).slice(0, 3);
 
   const findTeamAsset = (team: any) => {
     const teamName = team?.name || team?.teamName || '';
     const teamId = team?.id || team?.teamId;
-    return safeAssets.find((asset) => asset.type === 'TEAM' && ((teamId && (asset.id === teamId || asset.externalId === teamId)) || (teamName && String(asset.name || '').toLowerCase() === String(teamName).toLowerCase())));
+    return safeAssets.find(
+      (asset) =>
+        asset.type === 'TEAM' &&
+        ((teamId && (asset.id === teamId || asset.externalId === teamId)) ||
+          (teamName && String(asset.name || '').toLowerCase() === String(teamName).toLowerCase()))
+    );
   };
-  const getTeamHref = (team: any) => findTeamAsset(team)?.id ? `/asset/${findTeamAsset(team)?.id}` : '/market?type=TEAM';
+
+  const getTeamHref = (team: any) => {
+    const asset = findTeamAsset(team);
+    return asset?.id ? `/asset/${asset.id}` : '/market?type=TEAM';
+  };
+
   const renderMatchTeamLogo = (team: any) => {
     const matchedAsset = findTeamAsset(team);
-    return <Link href={getTeamHref(team)} className="rounded-full transition hover:scale-105 focus:outline-none focus:ring-2 focus:ring-[#0FF0FC]/40" title={`صفحة ${team?.name || matchedAsset?.name || 'المنتخب'}`}><AssetImage image={team?.image || team?.logo || team?.badge || team?.flag || matchedAsset?.image} name={team?.name || team?.teamName || matchedAsset?.name || 'Team'} type="TEAM" width={54} height={54} className="h-14 w-14 rounded-full border border-white/10 bg-black/40 object-cover shadow-[0_0_18px_rgba(15,240,252,0.12)] hover:border-[#0FF0FC]/50" /></Link>;
+    return (
+      <Link href={getTeamHref(team)} className="rounded-full transition hover:scale-105 focus:outline-none focus:ring-2 focus:ring-[#0FF0FC]/40" title={`صفحة ${team?.name || matchedAsset?.name || 'المنتخب'}`}>
+        <AssetImage image={team?.image || team?.logo || team?.badge || team?.flag || matchedAsset?.image} name={team?.name || team?.teamName || matchedAsset?.name || 'Team'} type="TEAM" width={54} height={54} className="h-14 w-14 rounded-full border border-white/10 bg-black/40 object-cover shadow-[0_0_18px_rgba(15,240,252,0.12)] hover:border-[#0FF0FC]/50" />
+      </Link>
+    );
   };
 
-  const quickStats = [{ label: 'منتخب', value: teamsCount || 0, icon: Globe }, { label: 'لاعب', value: playersCount || 0, icon: Users }, { label: 'أصل', value: assetsCount || 0, icon: Wallet }, { label: 'مباراة', value: upcomingMatchesCount || 0, icon: Calendar }];
-  const gatewayCards = [
-    { title: 'المنتخبات', text: 'صفحات مختصرة لكل منتخب: بطاقة، مجموعة، نجوم، نقاط قوة وضعف.', href: '/market?type=TEAM', action: 'استكشف المنتخبات', tone: 'border-emerald-400/20 bg-emerald-400/[0.045] text-emerald-300' },
-    { title: 'اللاعبون', text: 'تقييمات وأسعار افتراضية ومقارنة سريعة بين أبرز الأسماء.', href: '/market?type=PLAYER', action: 'تقييمات اللاعبين', tone: 'border-[#0FF0FC]/20 bg-[#0FF0FC]/[0.045] text-[#0FF0FC]' },
-    { title: 'التحليل الكروي', text: 'أداء، أسلوب لعب، زخم، مؤشرات فنية وملخصات قابلة للتحويل لإنفوجرافيك.', href: '/team-intelligence', action: 'افتح التحليل', tone: 'border-violet-400/20 bg-violet-400/[0.045] text-violet-300' },
-    { title: 'البورصة الافتراضية', text: 'سوق تعليمي افتراضي بالكامل مبني على الأداء والطلب داخل المنصة.', href: '/market', action: 'راقب السوق', tone: 'border-[#FFD700]/20 bg-[#FFD700]/[0.045] text-[#FFD700]' },
+  const renderAssetCard = (asset: any, label: string) => (
+    <Link key={asset.id || asset.name} href={asset?.id ? `/asset/${asset.id}` : '/market'} className="flex items-center gap-3 rounded-2xl border border-white/8 bg-black/25 p-3 transition hover:border-[#0FF0FC]/25 hover:bg-white/[0.055]">
+      <AssetImage image={asset?.image} name={asset?.name || label} type={asset?.type || 'TEAM'} width={42} height={42} className="h-11 w-11 rounded-full border border-white/10 bg-black/40 object-cover" />
+      <div className="min-w-0">
+        <div className="truncate text-sm font-black text-white">{asset?.name || label}</div>
+        <div className="mt-1 text-[11px] font-bold text-gray-500">{label}</div>
+      </div>
+    </Link>
+  );
+
+  const quickStats = [
+    { label: 'منتخب', value: teamsCount || 0, icon: Globe },
+    { label: 'لاعب', value: playersCount || 0, icon: Users },
+    { label: 'أصل افتراضي', value: assetsCount || 0, icon: Wallet },
+    { label: 'مباراة', value: upcomingMatchesCount || 0, icon: Calendar },
   ];
 
-  return <main className="mx-auto max-w-7xl space-y-7 px-4 py-7 sm:px-6 lg:px-8">
-    <section className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(15,240,252,0.18),transparent_28%),radial-gradient(circle_at_bottom_left,rgba(255,215,0,0.12),transparent_24%),linear-gradient(135deg,rgba(255,255,255,0.055),rgba(255,255,255,0.015))] p-5 shadow-anti-gravity md:p-7">
-      <div className="pointer-events-none absolute inset-0 opacity-16 [background-image:linear-gradient(rgba(255,255,255,.05)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.05)_1px,transparent_1px)] [background-size:44px_44px]" />
-      <div className="relative grid gap-5 lg:grid-cols-[1.02fr_0.98fr] lg:items-stretch"><div className="flex flex-col justify-center"><p className="mb-4 inline-flex w-fit rounded-full border border-[#0FF0FC]/25 bg-[#0FF0FC]/10 px-4 py-2 text-xs font-black text-[#0FF0FC]">بورصة إم سي للمونديال</p><h1 className="max-w-3xl text-3xl font-black leading-tight text-white md:text-5xl">منصة تحليلات وإحصائيات رياضية مع تجربة تداول افتراضية للمونديال</h1><p className="mt-4 max-w-3xl text-sm leading-7 text-gray-300 md:text-base">تابع بيانات المنتخبات واللاعبين، اقرأ التحليلات الكروية، وجرّب سوق بورصة المونديال بأرصدة افتراضية فقط لفهم حركة الأسعار والزخم بدون أي معاملات مالية حقيقية.</p></div>
-        <div className="rounded-[1.6rem] border border-white/10 bg-black/40 p-5 backdrop-blur-xl"><div className="mb-4 flex items-center justify-between gap-3"><div><p className="text-xs font-black text-gray-500">{hasLiveMatch ? 'مباشر الآن' : 'المباريات القادمة'}</p><h2 className="mt-1 text-xl font-black text-white">{hasLiveMatch ? 'مباراة جارية الآن' : (topMatches.length > 0 ? 'المباريات القادمة' : 'جدول المباريات')}</h2></div><ShieldCheck className={hasLiveMatch ? 'text-red-400' : 'text-[#0FF0FC]'} size={30} /></div>
-          {topMatches.length > 0 ? <div className="flex flex-col gap-4">{topMatches.map(match => {
-            const matchGroup = normalizeGroupKey(match?.groupPhase || match?.group || match?.homeTeam?.group || match?.awayTeam?.group);
-            const isLive = isMatchLive(match, now) || match.status === 'FINISHED';
-            const isCurrentlyLive = isMatchLive(match, now);
-            const animationHref = getAnimationHref(match);
-            const hasAnimation = Boolean(getAnimationMatchId(match));
-            const countdown = getCountdownArray(match.matchDate, now);
-            return <div key={match.id || Math.random()} className={`rounded-2xl border p-4 ${isCurrentlyLive ? 'border-red-500/25 bg-red-500/[0.06]' : 'border-white/10 bg-white/[0.045]'}`}><div className="mb-4 grid grid-cols-[1fr_auto_1fr] items-center gap-3"><div className="flex flex-col items-center gap-2 text-center">{renderMatchTeamLogo(match.homeTeam)}<Link href={getTeamHref(match.homeTeam)} className="text-xs font-black text-white transition hover:text-[#0FF0FC]">{match.homeTeam?.name || 'الفريق الأول'}</Link></div><div className="flex flex-col items-center gap-2"><Link href={groupHref(matchGroup)} className="rounded-full border border-[#0FF0FC]/25 bg-[#0FF0FC]/10 px-3 py-1 text-[10px] font-black text-[#0FF0FC] transition hover:bg-[#0FF0FC]/20 hover:text-white">المجموعة {matchGroup}</Link>{isLive ? <div className="rounded-2xl border border-white/10 bg-black/60 px-5 py-3 text-2xl font-black text-white shadow-inner tabular-nums">{match.homeScore ?? 0} - {match.awayScore ?? 0}</div> : <div className="rounded-full border border-white/10 bg-black/40 px-4 py-2 text-sm font-black text-[#FFD700]">VS</div>}</div><div className="flex flex-col items-center gap-2 text-center">{renderMatchTeamLogo(match.awayTeam)}<Link href={getTeamHref(match.awayTeam)} className="text-xs font-black text-white transition hover:text-[#0FF0FC]">{match.awayTeam?.name || 'الفريق الثاني'}</Link></div></div>{isLive ? <div className="flex items-center justify-center gap-2 text-center text-xs font-bold text-red-400"><div className="h-2 w-2 animate-pulse rounded-full bg-red-500" />{match.status === 'FINISHED' ? 'انتهت المباراة' : liveMinuteLabel(match, now)}</div> : <><div className="flex items-center justify-center gap-2 text-center text-xs font-bold text-gray-400"><Clock size={13} /> {formatMatchDate(match.matchDate)}</div>{countdown ? <div className="mt-3 grid grid-cols-4 gap-2">{countdown.map((item) => <div key={item.label} className="rounded-xl border border-[#0FF0FC]/15 bg-[#0FF0FC]/[0.06] px-2 py-2 text-center"><div className="font-mono text-lg font-black leading-none text-white tabular-nums">{String(item.value).padStart(2, '0')}</div><div className="mt-1 text-[10px] font-bold text-[#0FF0FC]">{item.label}</div></div>)}</div> : <div className="mt-3 rounded-xl border border-[#FFD700]/20 bg-[#FFD700]/10 px-3 py-2 text-center text-xs font-black text-[#FFD700]">موعد المباراة: {formatMatchTime(match.matchDate)}</div>}</>}<Link href={animationHref} className={`mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl px-3 py-2 text-xs font-black transition ${hasAnimation ? 'border border-[#FFD700]/25 bg-[#FFD700]/10 text-[#FFD700] hover:bg-[#FFD700] hover:text-black' : 'border border-[#0FF0FC]/25 bg-[#0FF0FC]/10 text-[#0FF0FC] hover:bg-[#0FF0FC] hover:text-black'}`}><Radio size={14} />{hasAnimation ? 'مشاهدة البث التفاعلي' : 'فتح مركز البث'}</Link></div>})}</div> : <div className="rounded-2xl border border-dashed border-white/10 p-6 text-center text-sm text-gray-500">لم يتم تحميل مباريات بعد.</div>}
-        </div></div>
-    </section>
-    <section className="grid grid-cols-2 gap-3 md:grid-cols-4">{quickStats.map((stat) => { const Icon = stat.icon; return <div key={stat.label} className="rounded-2xl border border-white/8 bg-white/[0.035] p-4"><Icon className="mb-3 text-[#0FF0FC]" size={22} /><div className="text-2xl font-black text-white">{stat.value}</div><div className="text-xs font-bold text-gray-500">{stat.label}</div></div>; })}</section>
-    <section className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">{gatewayCards.map((card) => <Link key={card.title} href={card.href} className={`rounded-[1.4rem] border p-5 transition hover:-translate-y-1 hover:bg-white/[0.06] ${card.tone}`}><h3 className="text-lg font-black text-white">{card.title}</h3><p className="mt-3 min-h-16 text-sm leading-7 text-gray-400">{card.text}</p><div className="mt-4 inline-flex items-center gap-2 text-sm font-black">{card.action}<ArrowLeft size={15} /></div></Link>)}</section>
-    {academyArticles.length > 0 && <section className="rounded-[1.6rem] border border-white/10 bg-white/[0.035] p-5"><div className="mb-4 flex items-center justify-between"><h2 className="text-2xl font-black text-white">أكاديمية المونديال</h2><Link href="/articles" className="text-sm font-black text-[#0FF0FC]">كل المقالات</Link></div><div className="grid gap-4 md:grid-cols-3">{academyArticles.slice(0, 3).map((article) => <Link key={article.id} href={`/article/${article.id}`} className="rounded-2xl border border-white/8 bg-black/30 p-4 transition hover:border-[#0FF0FC]/25"><div className="mb-2 text-[11px] font-black text-[#FFD700]">{article.category}</div><h3 className="line-clamp-2 font-black text-white">{article.title}</h3><p className="mt-2 line-clamp-3 text-sm leading-6 text-gray-400">{article.excerpt}</p></Link>)}</div></section>}
-  </main>;
+  const commandLinks = [
+    { title: 'مباشر', href: '/animation-live', icon: Radio },
+    { title: 'أخبار وتحليل', href: '/articles', icon: Newspaper },
+    { title: 'المنتخبات', href: '/market?type=TEAM', icon: Trophy },
+    { title: 'البورصة', href: '/market', icon: BarChart3 },
+  ];
+
+  const analysisCards = [
+    { title: 'قبل المباراة', text: 'قراءة مبسطة لنقاط القوة والضعف، مع فصل واضح بين المعلومة الموثقة والرأي التحليلي.', href: '/team-intelligence', icon: FileText },
+    { title: 'أثناء المباراة', text: 'مركز مباشر للنتيجة والحالة والدقيقة، مع رابط للبث التفاعلي عند توفره.', href: '/animation-live', icon: Radio },
+    { title: 'بعد المباراة', text: 'تحليل قابل للنشر داخل صفحات المنتخب بدون أرقام غير موثقة أو توقعات تسويقية.', href: '/team-intelligence', icon: LineChart },
+  ];
+
+  const groupCards = [
+    { title: 'ترتيب المجموعات', text: 'مدخل سريع لفهم موقف كل منتخب داخل مجموعته.', href: '/groups' },
+    { title: 'صفحات المنتخبات', text: 'بطاقة المنتخب، القائمة، التحليل، والمصادر المتاحة.', href: '/market?type=TEAM' },
+    { title: 'مسار البطولة', text: 'انتقل من المباراة إلى المجموعة ثم إلى صفحة المنتخب.', href: '/animation-live' },
+  ];
+
+  return (
+    <main className="mx-auto max-w-7xl space-y-7 px-4 py-7 sm:px-6 lg:px-8">
+      <section className="overflow-hidden rounded-[1.4rem] border border-white/10 bg-black/40">
+        <div className="flex flex-col gap-3 px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex flex-wrap items-center gap-3">
+            <span className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-black ${hasLiveMatch ? 'border-red-500/30 bg-red-500/10 text-red-300' : 'border-[#0FF0FC]/25 bg-[#0FF0FC]/10 text-[#0FF0FC]'}`}>
+              <span className={`h-2 w-2 rounded-full ${hasLiveMatch ? 'animate-pulse bg-red-500' : 'bg-[#0FF0FC]'}`} />
+              {hasLiveMatch ? 'LIVE الآن' : 'مركز كأس العالم'}
+            </span>
+            <div className="text-sm font-bold text-gray-300">
+              {tickerMatch ? (
+                <>
+                  <span className="text-white">{tickerMatch.homeTeam?.name || 'الفريق الأول'}</span>
+                  <span className="mx-2 text-gray-500">×</span>
+                  <span className="text-white">{tickerMatch.awayTeam?.name || 'الفريق الثاني'}</span>
+                  <span className="mx-2 text-gray-500">—</span>
+                  <span className="text-[#FFD700]">{statusLabel(tickerMatch, now)}</span>
+                </>
+              ) : (
+                'تابع المباريات والأخبار والتحليلات من مكان واحد'
+              )}
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {commandLinks.map((item) => {
+              const Icon = item.icon;
+              return (
+                <Link key={item.title} href={item.href} className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.045] px-3 py-1.5 text-xs font-black text-gray-300 transition hover:border-[#0FF0FC]/30 hover:text-[#0FF0FC]">
+                  <Icon size={13} />
+                  {item.title}
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
+      <section className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(15,240,252,0.18),transparent_28%),radial-gradient(circle_at_bottom_left,rgba(255,215,0,0.12),transparent_24%),linear-gradient(135deg,rgba(255,255,255,0.055),rgba(255,255,255,0.015))] p-5 shadow-anti-gravity md:p-7">
+        <div className="pointer-events-none absolute inset-0 opacity-16 [background-image:linear-gradient(rgba(255,255,255,.05)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.05)_1px,transparent_1px)] [background-size:44px_44px]" />
+        <div className="relative grid gap-5 lg:grid-cols-[1.02fr_0.98fr] lg:items-stretch">
+          <div className="flex flex-col justify-center">
+            <p className="mb-4 inline-flex w-fit items-center gap-2 rounded-full border border-[#0FF0FC]/25 bg-[#0FF0FC]/10 px-4 py-2 text-xs font-black text-[#0FF0FC]">
+              <Sparkles size={15} /> World Cup Command Center
+            </p>
+            <h1 className="max-w-4xl text-3xl font-black leading-tight text-white md:text-5xl">
+              كل ما يحدث في كأس العالم… مباشر، موثق، وتحليلي — مع بورصة افتراضية للتفاعل الجماهيري
+            </h1>
+            <p className="mt-4 max-w-3xl text-sm leading-7 text-gray-300 md:text-base">
+              ابدأ من المباراة والنتيجة والخبر، ثم انتقل للتحليل الكروي وصفحات المنتخبات. البورصة هنا طبقة ترفيهية افتراضية في النهاية، وليست توصية مالية أو مراهنة.
+            </p>
+            <div className="mt-5 grid gap-2 sm:grid-cols-3">
+              {['مباشر أولًا', 'مصادر موثقة', 'تحليل منفصل عن الترفيه'].map((item) => (
+                <div key={item} className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-black/30 px-3 py-2 text-xs font-black text-gray-200">
+                  <CheckCircle2 size={15} className="text-[#0FF0FC]" />
+                  {item}
+                </div>
+              ))}
+            </div>
+            <div className="mt-6 flex flex-wrap gap-3">
+              <Link href="/animation-live" className="inline-flex items-center gap-2 rounded-2xl bg-[#0FF0FC] px-5 py-3 text-sm font-black text-black transition hover:bg-[#70f7ff]">
+                <Radio size={18} /> مركز المباريات
+              </Link>
+              <Link href="/articles" className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white/10 px-5 py-3 text-sm font-black text-white transition hover:bg-white/15">
+                <Newspaper size={18} /> آخر الأخبار والتحليل
+              </Link>
+            </div>
+            <div className="mt-5 rounded-2xl border border-[#FFD700]/20 bg-[#FFD700]/10 px-4 py-3 text-xs font-bold leading-6 text-[#FFD700]">
+              قاعدة النشر: أي رقم غير موثق لا يظهر كحقيقة، وأي تقييم افتراضي يبقى منفصلًا عن التحليل الكروي.
+            </div>
+          </div>
+
+          <div className="rounded-[1.6rem] border border-white/10 bg-black/40 p-5 backdrop-blur-xl">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-black text-gray-500">{hasLiveMatch ? 'مباشر الآن' : 'المباريات القادمة'}</p>
+                <h2 className="mt-1 text-xl font-black text-white">{hasLiveMatch ? 'مباراة جارية الآن' : topMatches.length > 0 ? 'أقرب مباراة' : 'جدول المباريات'}</h2>
+              </div>
+              <ShieldCheck className={hasLiveMatch ? 'text-red-400' : 'text-[#0FF0FC]'} size={30} />
+            </div>
+
+            {tickerMatch ? (
+              <div className={`rounded-2xl border p-4 ${isMatchLive(tickerMatch, now) ? 'border-red-500/25 bg-red-500/[0.06]' : 'border-white/10 bg-white/[0.045]'}`}>
+                <div className="mb-4 grid grid-cols-[1fr_auto_1fr] items-center gap-3">
+                  <div className="flex flex-col items-center gap-2 text-center">
+                    {renderMatchTeamLogo(tickerMatch.homeTeam)}
+                    <Link href={getTeamHref(tickerMatch.homeTeam)} className="text-xs font-black text-white transition hover:text-[#0FF0FC]">
+                      {tickerMatch.homeTeam?.name || 'الفريق الأول'}
+                    </Link>
+                  </div>
+                  <div className="flex flex-col items-center gap-2">
+                    <Link href={groupHref(tickerMatch?.groupPhase || tickerMatch?.group || tickerMatch?.homeTeam?.group || tickerMatch?.awayTeam?.group)} className="rounded-full border border-[#0FF0FC]/25 bg-[#0FF0FC]/10 px-3 py-1 text-[10px] font-black text-[#0FF0FC] transition hover:bg-[#0FF0FC]/20 hover:text-white">
+                      المجموعة {normalizeGroupKey(tickerMatch?.groupPhase || tickerMatch?.group || tickerMatch?.homeTeam?.group || tickerMatch?.awayTeam?.group)}
+                    </Link>
+                    {isMatchLive(tickerMatch, now) || String(tickerMatch.status).toUpperCase() === 'FINISHED' ? (
+                      <div className="rounded-2xl border border-white/10 bg-black/60 px-5 py-3 text-2xl font-black text-white shadow-inner tabular-nums">
+                        {tickerMatch.homeScore ?? 0} - {tickerMatch.awayScore ?? 0}
+                      </div>
+                    ) : (
+                      <div className="rounded-full border border-white/10 bg-black/40 px-4 py-2 text-sm font-black text-[#FFD700]">VS</div>
+                    )}
+                  </div>
+                  <div className="flex flex-col items-center gap-2 text-center">
+                    {renderMatchTeamLogo(tickerMatch.awayTeam)}
+                    <Link href={getTeamHref(tickerMatch.awayTeam)} className="text-xs font-black text-white transition hover:text-[#0FF0FC]">
+                      {tickerMatch.awayTeam?.name || 'الفريق الثاني'}
+                    </Link>
+                  </div>
+                </div>
+                <div className="flex items-center justify-center gap-2 text-center text-xs font-bold text-gray-300">
+                  <Clock size={13} />
+                  {statusLabel(tickerMatch, now)}
+                </div>
+                <Link href={getAnimationHref(tickerMatch)} className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-[#FFD700]/25 bg-[#FFD700]/10 px-3 py-2 text-xs font-black text-[#FFD700] transition hover:bg-[#FFD700] hover:text-black">
+                  <Radio size={14} />
+                  {getAnimationMatchId(tickerMatch) ? 'مشاهدة البث التفاعلي' : 'فتح مركز البث'}
+                </Link>
+              </div>
+            ) : (
+              <div className="rounded-2xl border border-dashed border-white/10 p-6 text-center text-sm text-gray-500">لم يتم تحميل مباريات بعد.</div>
+            )}
+          </div>
+        </div>
+      </section>
+
+      <section className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        {quickStats.map((stat) => {
+          const Icon = stat.icon;
+          return (
+            <div key={stat.label} className="rounded-2xl border border-white/8 bg-white/[0.035] p-4">
+              <Icon className="mb-3 text-[#0FF0FC]" size={22} />
+              <div className="text-2xl font-black text-white">{formatNumber(stat.value)}</div>
+              <div className="text-xs font-bold text-gray-500">{stat.label}</div>
+            </div>
+          );
+        })}
+      </section>
+
+      <section className="rounded-[1.6rem] border border-white/10 bg-white/[0.035] p-5">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-xs font-black text-[#0FF0FC]">Match Center</p>
+            <h2 className="mt-1 text-2xl font-black text-white">مركز مباريات اليوم</h2>
+          </div>
+          <Link href="/animation-live" className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/30 px-4 py-2 text-xs font-black text-gray-300 transition hover:text-[#0FF0FC]">
+            كل المباريات <ArrowLeft size={14} />
+          </Link>
+        </div>
+        {topMatches.length > 0 ? (
+          <div className="grid gap-3 lg:grid-cols-2">
+            {topMatches.map((match, index) => {
+              const matchGroup = normalizeGroupKey(match?.groupPhase || match?.group || match?.homeTeam?.group || match?.awayTeam?.group);
+              const isCurrentlyLive = isMatchLive(match, now);
+              const isFinished = String(match?.status || '').toUpperCase() === 'FINISHED';
+              return (
+                <div key={match.id || `${match.homeTeam?.name}-${match.awayTeam?.name}-${index}`} className={`rounded-2xl border p-4 ${isCurrentlyLive ? 'border-red-500/25 bg-red-500/[0.06]' : 'border-white/10 bg-black/25'}`}>
+                  <div className="mb-4 flex items-center justify-between gap-3">
+                    <Link href={groupHref(matchGroup)} className="rounded-full border border-[#0FF0FC]/20 bg-[#0FF0FC]/10 px-3 py-1 text-[10px] font-black text-[#0FF0FC]">
+                      المجموعة {matchGroup}
+                    </Link>
+                    <span className={`rounded-full px-3 py-1 text-[10px] font-black ${isCurrentlyLive ? 'bg-red-500/10 text-red-300' : 'bg-white/8 text-gray-400'}`}>
+                      {isFinished ? 'انتهت' : isCurrentlyLive ? 'مباشر' : 'قادمة'}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
+                    <div className="flex items-center gap-2">
+                      {renderMatchTeamLogo(match.homeTeam)}
+                      <Link href={getTeamHref(match.homeTeam)} className="text-sm font-black text-white transition hover:text-[#0FF0FC]">
+                        {match.homeTeam?.name || 'الفريق الأول'}
+                      </Link>
+                    </div>
+                    <div className="rounded-2xl border border-white/10 bg-black/50 px-4 py-2 text-center text-lg font-black text-white tabular-nums">
+                      {isCurrentlyLive || isFinished ? `${match.homeScore ?? 0} - ${match.awayScore ?? 0}` : 'VS'}
+                    </div>
+                    <div className="flex items-center justify-end gap-2 text-left">
+                      <Link href={getTeamHref(match.awayTeam)} className="text-sm font-black text-white transition hover:text-[#0FF0FC]">
+                        {match.awayTeam?.name || 'الفريق الثاني'}
+                      </Link>
+                      {renderMatchTeamLogo(match.awayTeam)}
+                    </div>
+                  </div>
+                  <div className="mt-4 flex items-center gap-2 text-xs font-bold text-gray-400">
+                    <Clock size={13} />
+                    {statusLabel(match, now)}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="rounded-2xl border border-dashed border-white/10 p-6 text-center text-sm text-gray-500">لا توجد مباريات محملة حاليًا.</div>
+        )}
+      </section>
+
+      <section className="grid gap-4 lg:grid-cols-[0.95fr_1.05fr]">
+        <div className="rounded-[1.6rem] border border-white/10 bg-white/[0.035] p-5">
+          <div className="mb-4 flex items-center justify-between">
+            <div>
+              <p className="text-xs font-black text-[#FFD700]">News Room</p>
+              <h2 className="mt-1 text-2xl font-black text-white">آخر الأخبار والتحليلات</h2>
+            </div>
+            <Newspaper className="text-[#FFD700]" size={26} />
+          </div>
+          {academyArticles.length > 0 ? (
+            <div className="space-y-3">
+              {academyArticles.slice(0, 3).map((article) => (
+                <Link key={article.id} href={`/article/${article.id}`} className="block rounded-2xl border border-white/8 bg-black/25 p-4 transition hover:border-[#FFD700]/25 hover:bg-white/[0.055]">
+                  <div className="mb-2 flex items-center justify-between gap-3">
+                    <span className="rounded-full bg-[#FFD700]/10 px-3 py-1 text-[10px] font-black text-[#FFD700]">{article.category}</span>
+                    {article.readingTime ? <span className="text-[10px] font-bold text-gray-500">{article.readingTime}</span> : null}
+                  </div>
+                  <h3 className="line-clamp-2 font-black text-white">{article.title}</h3>
+                  <p className="mt-2 line-clamp-2 text-sm leading-6 text-gray-400">{article.excerpt}</p>
+                </Link>
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-dashed border-white/10 p-6 text-center text-sm leading-7 text-gray-500">لا توجد أخبار موثقة منشورة بعد. عند إضافة مقالات أو تقارير ستظهر هنا تلقائيًا.</div>
+          )}
+        </div>
+
+        <div className="rounded-[1.6rem] border border-white/10 bg-white/[0.035] p-5">
+          <div className="mb-4 flex items-center justify-between">
+            <div>
+              <p className="text-xs font-black text-[#0FF0FC]">Analysis Desk</p>
+              <h2 className="mt-1 text-2xl font-black text-white">مركز التحليل</h2>
+            </div>
+            <LineChart className="text-[#0FF0FC]" size={26} />
+          </div>
+          <div className="grid gap-3 md:grid-cols-3">
+            {analysisCards.map((card) => {
+              const Icon = card.icon;
+              return (
+                <Link key={card.title} href={card.href} className="rounded-2xl border border-white/8 bg-black/25 p-4 transition hover:border-[#0FF0FC]/25 hover:bg-white/[0.055]">
+                  <Icon className="mb-3 text-[#0FF0FC]" size={23} />
+                  <h3 className="font-black text-white">{card.title}</h3>
+                  <p className="mt-2 text-xs leading-6 text-gray-400">{card.text}</p>
+                </Link>
+              );
+            })}
+          </div>
+          <div className="mt-4 rounded-2xl border border-white/10 bg-black/25 p-4 text-sm leading-7 text-gray-300">
+            التحليل الكروي يبقى منفصلًا عن أسعار البورصة الافتراضية، حتى لا يتحول التقرير إلى توصية شراء أو بيع.
+          </div>
+        </div>
+      </section>
+
+      <section className="grid gap-4 md:grid-cols-3">
+        {groupCards.map((card) => (
+          <Link key={card.title} href={card.href} className="rounded-[1.4rem] border border-white/10 bg-white/[0.035] p-5 transition hover:-translate-y-1 hover:border-[#0FF0FC]/25 hover:bg-white/[0.06]">
+            <h3 className="text-lg font-black text-white">{card.title}</h3>
+            <p className="mt-3 min-h-12 text-sm leading-7 text-gray-400">{card.text}</p>
+            <div className="mt-4 inline-flex items-center gap-2 text-sm font-black text-[#0FF0FC]">
+              افتح القسم <ArrowLeft size={15} />
+            </div>
+          </Link>
+        ))}
+      </section>
+
+      <section className="grid gap-4 lg:grid-cols-2">
+        <div className="rounded-[1.6rem] border border-white/10 bg-white/[0.035] p-5">
+          <div className="mb-4 flex items-center justify-between">
+            <div>
+              <p className="text-xs font-black text-emerald-300">Team Hub</p>
+              <h2 className="mt-1 text-2xl font-black text-white">المنتخبات واللاعبون</h2>
+            </div>
+            <Trophy className="text-emerald-300" size={26} />
+          </div>
+          <div className="grid gap-3 md:grid-cols-2">
+            <div className="space-y-3">
+              <div className="text-xs font-black text-gray-500">منتخبات</div>
+              {featuredTeams.length > 0 ? featuredTeams.map((asset) => renderAssetCard(asset, 'منتخب')) : <div className="rounded-2xl border border-dashed border-white/10 p-4 text-sm text-gray-500">لا توجد منتخبات محملة.</div>}
+            </div>
+            <div className="space-y-3">
+              <div className="text-xs font-black text-gray-500">لاعبون</div>
+              {featuredPlayers.length > 0 ? featuredPlayers.map((asset) => renderAssetCard(asset, 'لاعب')) : <div className="rounded-2xl border border-dashed border-white/10 p-4 text-sm text-gray-500">لا توجد بيانات لاعبين محملة.</div>}
+            </div>
+          </div>
+        </div>
+
+        <div className="rounded-[1.6rem] border border-[#FFD700]/20 bg-[#FFD700]/[0.045] p-5">
+          <div className="mb-4 flex items-center justify-between">
+            <div>
+              <p className="text-xs font-black text-[#FFD700]">Virtual Fan Exchange</p>
+              <h2 className="mt-1 text-2xl font-black text-white">بورصة المونديال الترفيهية</h2>
+            </div>
+            <BarChart3 className="text-[#FFD700]" size={28} />
+          </div>
+          <p className="text-sm leading-7 text-gray-300">
+            أسعار ومؤشرات افتراضية تعكس الأداء والزخم والتفاعل داخل المنصة. الهدف ترفيهي وتعليمي، بدون أموال حقيقية وبدون مراهنات.
+          </p>
+          <div className="mt-4 space-y-3">
+            {marketMovers.length > 0 ? (
+              marketMovers.map((asset) => {
+                const change = getAssetChange(asset);
+                return (
+                  <Link key={asset.id || asset.name} href={asset?.id ? `/asset/${asset.id}` : '/market'} className="flex items-center justify-between gap-3 rounded-2xl border border-white/8 bg-black/25 p-3 transition hover:border-[#FFD700]/30 hover:bg-white/[0.055]">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <AssetImage image={asset?.image} name={asset?.name || 'أصل افتراضي'} type={asset?.type || 'TEAM'} width={42} height={42} className="h-11 w-11 rounded-full border border-white/10 bg-black/40 object-cover" />
+                      <div className="min-w-0">
+                        <div className="truncate text-sm font-black text-white">{asset?.name || 'أصل افتراضي'}</div>
+                        <div className="mt-1 text-[11px] font-bold text-gray-500">السعر الافتراضي: {formatAssetPrice(asset)}</div>
+                      </div>
+                    </div>
+                    <span className={`shrink-0 rounded-full px-3 py-1 text-xs font-black ${change > 0 ? 'bg-emerald-400/10 text-emerald-300' : change < 0 ? 'bg-red-500/10 text-red-300' : 'bg-white/10 text-gray-300'}`}>
+                      {changeBadge(change)}
+                    </span>
+                  </Link>
+                );
+              })
+            ) : (
+              <div className="rounded-2xl border border-dashed border-white/10 p-5 text-center text-sm text-gray-500">لا توجد مؤشرات سوق كافية بعد.</div>
+            )}
+          </div>
+          <Link href="/market" className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-[#FFD700] px-5 py-3 text-sm font-black text-black transition hover:bg-[#ffe766]">
+            ادخل البورصة الافتراضية <ArrowLeft size={16} />
+          </Link>
+        </div>
+      </section>
+    </main>
+  );
 }
