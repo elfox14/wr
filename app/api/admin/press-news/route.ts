@@ -36,13 +36,22 @@ async function ensurePressNewsTable() {
       "status" TEXT NOT NULL DEFAULT 'published',
       "importance" INTEGER NOT NULL DEFAULT 50,
       "tags" JSONB,
+      "relatedTeamId" TEXT,
+      "relatedPlayerId" TEXT,
+      "relatedMatchId" TEXT,
       "publishedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
       "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
       "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
     )
   `);
+  await prisma.$executeRawUnsafe('ALTER TABLE "PressNews" ADD COLUMN IF NOT EXISTS "relatedTeamId" TEXT');
+  await prisma.$executeRawUnsafe('ALTER TABLE "PressNews" ADD COLUMN IF NOT EXISTS "relatedPlayerId" TEXT');
+  await prisma.$executeRawUnsafe('ALTER TABLE "PressNews" ADD COLUMN IF NOT EXISTS "relatedMatchId" TEXT');
   await prisma.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS "PressNews_status_publishedAt_idx" ON "PressNews" ("status", "publishedAt")');
   await prisma.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS "PressNews_category_publishedAt_idx" ON "PressNews" ("category", "publishedAt")');
+  await prisma.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS "PressNews_relatedTeamId_idx" ON "PressNews" ("relatedTeamId")');
+  await prisma.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS "PressNews_relatedPlayerId_idx" ON "PressNews" ("relatedPlayerId")');
+  await prisma.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS "PressNews_relatedMatchId_idx" ON "PressNews" ("relatedMatchId")');
 }
 
 function quoteSql(value: string) {
@@ -53,6 +62,11 @@ function normalizeTags(value: unknown) {
   if (Array.isArray(value)) return value.map((item) => String(item).trim()).filter(Boolean);
   if (typeof value === 'string') return value.split(',').map((item) => item.trim()).filter(Boolean);
   return [];
+}
+
+function nullableString(value: unknown) {
+  const text = String(value || '').trim();
+  return text || null;
 }
 
 function validatePayload(body: any) {
@@ -67,12 +81,15 @@ function validatePayload(body: any) {
     content,
     sourceName,
     category: String(body.category || 'رصد صحفي').trim(),
-    sourceUrl: String(body.sourceUrl || '').trim() || null,
+    sourceUrl: nullableString(body.sourceUrl),
     sourceType: String(body.sourceType || 'newsletter').trim(),
     language: String(body.language || 'ar').trim(),
     status: String(body.status || 'published').trim(),
     importance: Math.max(1, Math.min(100, Number(body.importance || 50))),
     tags: normalizeTags(body.tags),
+    relatedTeamId: nullableString(body.relatedTeamId),
+    relatedPlayerId: nullableString(body.relatedPlayerId),
+    relatedMatchId: nullableString(body.relatedMatchId),
   };
 }
 
@@ -102,10 +119,10 @@ export async function POST(req: Request) {
 
   await prisma.$executeRawUnsafe(
     `INSERT INTO "PressNews" (
-      "id", "title", "body", "category", "sourceName", "sourceUrl", "sourceType", "language", "status", "importance", "tags", "publishedAt", "createdAt", "updatedAt"
-    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb,$12,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)`,
+      "id", "title", "body", "category", "sourceName", "sourceUrl", "sourceType", "language", "status", "importance", "tags", "relatedTeamId", "relatedPlayerId", "relatedMatchId", "publishedAt", "createdAt", "updatedAt"
+    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb,$12,$13,$14,$15,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)`,
     id, payload.title, payload.content, payload.category, payload.sourceName, payload.sourceUrl, payload.sourceType, payload.language,
-    payload.status, payload.importance, JSON.stringify(payload.tags), safePublishedAt
+    payload.status, payload.importance, JSON.stringify(payload.tags), payload.relatedTeamId, payload.relatedPlayerId, payload.relatedMatchId, safePublishedAt
   );
 
   const created = await prisma.$queryRawUnsafe<any[]>(`SELECT * FROM "PressNews" WHERE "id" = ${quoteSql(id)} LIMIT 1`);
@@ -125,10 +142,11 @@ export async function PATCH(req: Request) {
   await prisma.$executeRawUnsafe(
     `UPDATE "PressNews" SET
       "title"=$2, "body"=$3, "category"=$4, "sourceName"=$5, "sourceUrl"=$6,
-      "sourceType"=$7, "language"=$8, "status"=$9, "importance"=$10, "tags"=$11::jsonb, "updatedAt"=CURRENT_TIMESTAMP
+      "sourceType"=$7, "language"=$8, "status"=$9, "importance"=$10, "tags"=$11::jsonb,
+      "relatedTeamId"=$12, "relatedPlayerId"=$13, "relatedMatchId"=$14, "updatedAt"=CURRENT_TIMESTAMP
      WHERE "id"=$1`,
     id, payload.title, payload.content, payload.category, payload.sourceName, payload.sourceUrl, payload.sourceType,
-    payload.language, payload.status, payload.importance, JSON.stringify(payload.tags)
+    payload.language, payload.status, payload.importance, JSON.stringify(payload.tags), payload.relatedTeamId, payload.relatedPlayerId, payload.relatedMatchId
   );
 
   const updated = await prisma.$queryRawUnsafe<any[]>(`SELECT * FROM "PressNews" WHERE "id" = ${quoteSql(id)} LIMIT 1`);
