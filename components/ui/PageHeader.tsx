@@ -18,19 +18,19 @@ export function PageHeader({
   textColor = 'text-primary'
 }: PageHeaderProps) {
   return (
-    <div className="relative mb-6 rounded-3xl border border-white/5 bg-surface/55 px-5 py-4 shadow-card md:px-6 md:py-5">
+    <div className="relative mb-6 w-full max-w-full overflow-hidden rounded-3xl border border-white/5 bg-surface/55 px-4 py-4 shadow-card sm:px-5 md:px-6 md:py-5">
       {/* Compact background glow effect */}
       <div className={`absolute right-8 top-1/2 h-24 w-24 -translate-y-1/2 ${glowColor} rounded-full blur-3xl opacity-70 -z-10`} />
       
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+      <div className="flex min-w-0 flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div className="min-w-0">
-          <div className="mb-2 flex items-center gap-3">
+          <div className="mb-2 flex min-w-0 items-center gap-3">
             {icon && (
               <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-black/25 ${textColor}`}>
-                {icon}
+                <span className="scale-75 md:scale-90">{icon}</span>
               </span>
             )}
-            <h1 className="truncate text-2xl font-black tracking-tight text-white md:text-3xl">
+            <h1 className="min-w-0 text-xl font-black leading-tight tracking-tight text-white sm:text-2xl md:truncate md:text-3xl">
               {title}
             </h1>
           </div>
@@ -42,7 +42,7 @@ export function PageHeader({
         </div>
         
         {children && (
-          <div className="flex w-full items-center justify-center gap-3 md:w-auto md:justify-end">
+          <div className="flex w-full min-w-0 items-center justify-center gap-3 md:w-auto md:justify-end">
             {children}
           </div>
         )}
