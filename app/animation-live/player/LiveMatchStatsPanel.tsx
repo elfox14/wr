@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { Activity, AlertTriangle, Clock, CornerDownRight, ShieldAlert, Target, Zap } from 'lucide-react';
+import { Activity, AlertTriangle, Clock, CornerDownRight, Database, ShieldAlert, Target, Zap } from 'lucide-react';
 
 type Team = { id?: string; name?: string; code?: string; image?: string } | null;
 type Snapshot = Record<string, any> | null;
@@ -11,6 +11,8 @@ type LiveStatsResponse = {
   ok: boolean;
   updatedAt?: string;
   pollingSeconds?: number;
+  providerSyncEnabled?: boolean;
+  hasStats?: boolean;
   match?: {
     id: string;
     animationMatchId?: number;
@@ -23,7 +25,7 @@ type LiveStatsResponse = {
   latest?: Snapshot;
   history?: Snapshot[];
   events?: MatchEvent[];
-  sync?: { status?: string; savedEventsCount?: number; error?: string };
+  sync?: { status?: string; savedEventsCount?: number; error?: string; note?: string; providerStatus?: number };
   error?: string;
 };
 
@@ -73,15 +75,25 @@ function eventIcon(type: string) {
   return '•';
 }
 
+function hasAnyStat(snapshot: Snapshot) {
+  if (!snapshot) return false;
+  return [
+    'homePossession', 'awayPossession', 'homeAttacks', 'awayAttacks',
+    'homeDangerousAttacks', 'awayDangerousAttacks', 'homeShots', 'awayShots',
+    'homeShotsOnTarget', 'awayShotsOnTarget', 'homeShotsOffTarget', 'awayShotsOffTarget',
+    'homeCorners', 'awayCorners', 'homeYellowCards', 'awayYellowCards', 'homeRedCards', 'awayRedCards',
+  ].some((key) => snapshot[key] !== null && snapshot[key] !== undefined);
+}
+
 export default function LiveMatchStatsPanel({ matchId }: { matchId: string }) {
   const [data, setData] = useState<LiveStatsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  async function fetchStats(force = false) {
+  async function fetchStats() {
     if (!matchId) return;
     try {
-      const response = await fetch(`/api/matches/live-stats?matchId=${encodeURIComponent(matchId)}${force ? '&force=1' : ''}`, { cache: 'no-store' });
+      const response = await fetch(`/api/matches/live-stats?matchId=${encodeURIComponent(matchId)}`, { cache: 'no-store' });
       const json = await response.json();
       setData(json);
       setError(json?.ok ? null : json?.error || 'تعذر تحميل الإحصائيات');
@@ -93,15 +105,21 @@ export default function LiveMatchStatsPanel({ matchId }: { matchId: string }) {
   }
 
   useEffect(() => {
-    fetchStats(true);
-    const timer = window.setInterval(() => fetchStats(false), 5_000);
+    fetchStats();
+    const timer = window.setInterval(fetchStats, 5_000);
     return () => window.clearInterval(timer);
   }, [matchId]);
 
   const latest = data?.latest || null;
   const match = data?.match;
   const events = data?.events || [];
-  const statusLabel = data?.sync?.status === 'cached_recent_snapshot' ? 'آخر لقطة محفوظة' : data?.sync?.status === 'saved' ? 'تم تسجيل لقطة جديدة' : data?.sync?.status || 'متابعة مباشرة';
+  const hasStats = Boolean(data?.hasStats || hasAnyStat(latest));
+  const statusLabel = data?.sync?.status === 'database_only' ? 'قراءة من قاعدة البيانات' : data?.sync?.status === 'cached_recent_snapshot' ? 'آخر لقطة محفوظة' : data?.sync?.status === 'saved' ? 'تم تسجيل لقطة جديدة' : data?.sync?.status || 'متابعة مباشرة';
+  const providerWarning = data?.sync?.status === 'failed'
+    ? `مزود الإحصائيات لم يرجع بيانات الآن${data.sync?.providerStatus ? ` (status ${data.sync.providerStatus})` : ''}.`
+    : !hasStats
+      ? 'لا توجد أرقام إحصائية محفوظة لهذه المباراة بعد. قد يكون المزود متوقفًا، الحد اليومي انتهى، أو المباراة في استراحة ولا يرسل التحليل الآن.'
+      : null;
 
   const derived = useMemo(() => {
     const homeScore = statValue(latest, 'homeScore') ?? match?.homeScore ?? 0;
@@ -117,13 +135,19 @@ export default function LiveMatchStatsPanel({ matchId }: { matchId: string }) {
         <div>
           <p className="inline-flex items-center gap-2 rounded-full border border-[#0FF0FC]/25 bg-[#0FF0FC]/10 px-3 py-1 text-[10px] font-black text-[#0FF0FC]"><Activity size={13} /> Live Stats Recorder</p>
           <h2 className="mt-2 text-xl font-black text-white">إحصائيات المباراة الحية</h2>
-          <p className="mt-1 text-xs leading-5 text-gray-400">تحديث كل 5 ثوانٍ مع الاحتفاظ بكل اللقطات القديمة حتى النتيجة النهائية.</p>
+          <p className="mt-1 text-xs leading-5 text-gray-400">الواجهة تقرأ من قاعدة البيانات كل 5 ثوانٍ لحماية عدد طلبات API، والتحديث من iSports يتم مركزيًا عبر cron.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2 text-xs font-black">
           <span className="rounded-full border border-white/10 bg-black/30 px-3 py-1 text-gray-300"><Clock size={13} className="inline" /> {data?.updatedAt ? new Date(data.updatedAt).toLocaleTimeString('ar-EG') : '—'}</span>
-          <span className="rounded-full border border-[#FFD700]/20 bg-[#FFD700]/10 px-3 py-1 text-[#FFD700]">{statusLabel}</span>
+          <span className="rounded-full border border-[#FFD700]/20 bg-[#FFD700]/10 px-3 py-1 text-[#FFD700]"><Database size={13} className="inline" /> {statusLabel}</span>
         </div>
       </div>
+
+      {providerWarning && (
+        <div className="mb-4 rounded-2xl border border-[#FFD700]/20 bg-[#FFD700]/10 p-3 text-xs font-bold leading-6 text-[#FFD700]">
+          <AlertTriangle size={15} className="inline" /> {providerWarning}
+        </div>
+      )}
 
       {loading ? (
         <div className="rounded-2xl border border-dashed border-white/10 p-8 text-center text-sm text-gray-400">جاري تحميل الإحصائيات...</div>
