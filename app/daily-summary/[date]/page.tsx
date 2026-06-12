@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ArrowLeft, CalendarDays, FileText, Image as ImageIcon, Video } from 'lucide-react';
@@ -6,70 +7,9 @@ import prisma from '@/lib/prisma';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
-
-export const metadata: Metadata = {
-  title: 'ملخص يوم محفوظ | MC PRIME Exchange',
-};
-
-function quoteSql(value: string) {
-  return `'${String(value).replace(/'/g, "''")}'`;
-}
-
-async function ensureDailyDigestTable() {
-  await prisma.$executeRawUnsafe(`
-    CREATE TABLE IF NOT EXISTS "DailyDigest" (
-      "id" TEXT PRIMARY KEY,
-      "digestDate" TEXT NOT NULL UNIQUE,
-      "headline" TEXT NOT NULL,
-      "summary" TEXT NOT NULL,
-      "videoScript" TEXT NOT NULL,
-      "facebookPost" TEXT,
-      "youtubeTitle" TEXT,
-      "youtubeDescription" TEXT,
-      "infographicPoints" JSONB,
-      "status" TEXT NOT NULL DEFAULT 'published',
-      "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
-    )
-  `);
-}
-
-function points(value: unknown) {
-  if (Array.isArray(value)) return value;
-  if (typeof value === 'string') {
-    try { const parsed = JSON.parse(value); return Array.isArray(parsed) ? parsed : []; } catch { return []; }
-  }
-  return [];
-}
-
-export default async function DailyDigestDetailPage({ params }: { params: Promise<{ date: string }> }) {
-  const { date } = await params;
-  await ensureDailyDigestTable();
-  const rows = await prisma.$queryRawUnsafe<any[]>(`SELECT * FROM "DailyDigest" WHERE "digestDate" = ${quoteSql(date)} AND "status" = 'published' LIMIT 1`);
-  const item = rows[0];
-  if (!item) notFound();
-  const infographicPoints = points(item.infographicPoints);
-
-  return (
-    <main className="min-h-screen bg-background px-4 py-6 text-white sm:px-6 lg:px-8" dir="rtl">
-      <section className="mx-auto max-w-5xl space-y-6">
-        <Link href="/daily-summary/archive" className="inline-flex items-center gap-2 text-sm font-black text-gray-400 hover:text-white"><ArrowLeft size={16} /> أرشيف الملخصات</Link>
-        <div className="rounded-[2rem] border border-white/10 bg-white/[0.04] p-6 shadow-card">
-          <p className="mb-2 inline-flex items-center gap-2 rounded-full border border-[#0FF0FC]/25 bg-[#0FF0FC]/10 px-3 py-1 text-xs font-black text-[#0FF0FC]"><CalendarDays size={14} /> {item.digestDate}</p>
-          <h1 className="text-3xl font-black leading-tight">{item.headline}</h1>
-          <p className="mt-3 text-sm font-bold leading-7 text-gray-400">{item.summary}</p>
-        </div>
-        <section className="grid gap-5 lg:grid-cols-2">
-          <Panel title="سكريبت الفيديو" icon={<Video size={16} />} text={item.videoScript} />
-          <Panel title="منشور فيسبوك" icon={<FileText size={16} />} text={item.facebookPost || item.summary} />
-          <Panel title="عنوان ووصف يوتيوب" icon={<Video size={16} />} text={`${item.youtubeTitle || item.headline}\n\n${item.youtubeDescription || item.summary}`} />
-          <Panel title="نقاط إنفوجرافيك" icon={<ImageIcon size={16} />} text={infographicPoints.length ? infographicPoints.map((point, index) => `${index + 1}. ${point}`).join('\n') : 'غير متوفر'} />
-        </section>
-      </section>
-    </main>
-  );
-}
-
-function Panel({ title, text, icon }: { title: string; text: string; icon: React.ReactNode }) {
-  return <article className="rounded-2xl border border-white/10 bg-white/[0.035] p-4"><h2 className="mb-3 inline-flex items-center gap-2 text-sm font-black text-white">{icon}{title}</h2><pre className="whitespace-pre-wrap rounded-xl bg-black/30 p-3 text-xs font-bold leading-6 text-gray-300">{text}</pre></article>;
-}
+export const metadata: Metadata = { title: 'ملخص يوم محفوظ | MC PRIME Exchange' };
+function quoteSql(value: string) { return `'${String(value).replace(/'/g, "''")}'`; }
+async function ensureDailyDigestTable() { await prisma.$executeRawUnsafe(`CREATE TABLE IF NOT EXISTS "DailyDigest" ("id" TEXT PRIMARY KEY,"digestDate" TEXT NOT NULL UNIQUE,"headline" TEXT NOT NULL,"summary" TEXT NOT NULL,"videoScript" TEXT NOT NULL,"facebookPost" TEXT,"youtubeTitle" TEXT,"youtubeDescription" TEXT,"infographicPoints" JSONB,"status" TEXT NOT NULL DEFAULT 'published',"createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,"updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP)`); }
+function points(value: unknown) { if (Array.isArray(value)) return value; if (typeof value === 'string') { try { const parsed = JSON.parse(value); return Array.isArray(parsed) ? parsed : []; } catch { return []; } } return []; }
+export default async function DailyDigestDetailPage({ params }: { params: Promise<{ date: string }> }) { const { date } = await params; await ensureDailyDigestTable(); const rows = await prisma.$queryRawUnsafe<any[]>(`SELECT * FROM "DailyDigest" WHERE "digestDate" = ${quoteSql(date)} AND "status" = 'published' LIMIT 1`); const item = rows[0]; if (!item) notFound(); const infographicPoints = points(item.infographicPoints); return <main className="min-h-screen bg-background px-4 py-6 text-white sm:px-6 lg:px-8" dir="rtl"><section className="mx-auto max-w-5xl space-y-6"><Link href="/daily-summary/archive" className="inline-flex items-center gap-2 text-sm font-black text-gray-400 hover:text-white"><ArrowLeft size={16} /> أرشيف الملخصات</Link><div className="rounded-[2rem] border border-white/10 bg-white/[0.04] p-6 shadow-card"><p className="mb-2 inline-flex items-center gap-2 rounded-full border border-[#0FF0FC]/25 bg-[#0FF0FC]/10 px-3 py-1 text-xs font-black text-[#0FF0FC]"><CalendarDays size={14} /> {item.digestDate}</p><h1 className="text-3xl font-black leading-tight">{item.headline}</h1><p className="mt-3 text-sm font-bold leading-7 text-gray-400">{item.summary}</p></div><section className="grid gap-5 lg:grid-cols-2"><Panel title="سكريبت الفيديو" icon={<Video size={16} />} text={item.videoScript} /><Panel title="منشور فيسبوك" icon={<FileText size={16} />} text={item.facebookPost || item.summary} /><Panel title="عنوان ووصف يوتيوب" icon={<Video size={16} />} text={`${item.youtubeTitle || item.headline}\n\n${item.youtubeDescription || item.summary}`} /><Panel title="نقاط إنفوجرافيك" icon={<ImageIcon size={16} />} text={infographicPoints.length ? infographicPoints.map((point, index) => `${index + 1}. ${point}`).join('\n') : 'غير متوفر'} /></section></section></main>; }
+function Panel({ title, text, icon }: { title: string; text: string; icon: ReactNode }) { return <article className="rounded-2xl border border-white/10 bg-white/[0.035] p-4"><h2 className="mb-3 inline-flex items-center gap-2 text-sm font-black text-white">{icon}{title}</h2><pre className="whitespace-pre-wrap rounded-xl bg-black/30 p-3 text-xs font-bold leading-6 text-gray-300">{text}</pre></article>; }
