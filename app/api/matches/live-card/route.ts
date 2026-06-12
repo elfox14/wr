@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { footballFetchFromProvider } from '@/lib/apiFootball';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -19,26 +20,80 @@ const MATCH_SELECT = {
   awayTeam: { select: TEAM_SELECT },
 };
 
+function dateKey(date = new Date()) {
+  return date.toISOString().slice(0, 10);
+}
+
 function minutesFromKickoff(matchDate: Date, now: Date) {
   return Math.floor((now.getTime() - matchDate.getTime()) / 60_000) + 1;
 }
 
-function decorateMatch(match: any, now: Date) {
+function rawStatus(value: any) {
+  return String(value?.fixture?.status?.short || value?.fixture?.status?.long || value?.status || '').toUpperCase();
+}
+
+function isHalftimeStatus(status: string) {
+  return ['HT', 'HALFTIME', 'HALF_TIME', 'HALF-TIME'].includes(status);
+}
+
+function isProviderLiveStatus(status: string) {
+  return ['1H', '2H', 'ET', 'BT', 'P', 'LIVE', 'IN_PLAY'].includes(status) || isHalftimeStatus(status);
+}
+
+function providerMinute(value: any) {
+  const raw = value?.fixture?.status?.elapsed ?? value?.fixture?.status?.minute ?? value?.minute ?? value?.elapsed;
+  const n = Number(raw);
+  return Number.isFinite(n) ? Math.max(1, Math.min(135, Math.round(n))) : null;
+}
+
+async function fetchAnimationLiveState() {
+  try {
+    const data: any = await footballFetchFromProvider('ISPORTS', '/livescores', { date: dateKey(), live: 'all' });
+    const fixtures = Array.isArray(data?.response) ? data.response : Array.isArray(data) ? data : [];
+    const map = new Map<number, any>();
+    for (const fixture of fixtures) {
+      const id = Number(fixture?.fixture?.id);
+      if (Number.isFinite(id)) {
+        map.set(id, {
+          status: rawStatus(fixture),
+          minute: providerMinute(fixture),
+          homeScore: Number.isFinite(Number(fixture?.goals?.home)) ? Number(fixture.goals.home) : null,
+          awayScore: Number.isFinite(Number(fixture?.goals?.away)) ? Number(fixture.goals.away) : null,
+        });
+      }
+    }
+    return map;
+  } catch (error: any) {
+    console.warn('live-card provider status failed:', error?.message || error);
+    return new Map<number, any>();
+  }
+}
+
+function decorateMatch(match: any, now: Date, providerState?: any) {
   const matchDate = new Date(match.matchDate);
   const minute = minutesFromKickoff(matchDate, now);
-  const status = String(match.status || '').toUpperCase();
-  const isDbLive = status === 'IN_PLAY' || status === 'LIVE';
-  const isRecentlyStarted = status === 'SCHEDULED' && minute >= 1 && minute <= 135;
-  const isLiveNow = isDbLive || isRecentlyStarted;
-  const isFinished = status === 'FINISHED';
+  const dbStatus = String(match.status || '').toUpperCase();
+  const providerStatus = String(providerState?.status || '').toUpperCase();
+  const effectiveStatus = providerStatus || dbStatus;
+  const isHalfTime = isHalftimeStatus(effectiveStatus);
+  const isDbLive = dbStatus === 'IN_PLAY' || dbStatus === 'LIVE' || dbStatus === 'HT';
+  const isProviderLive = isProviderLiveStatus(providerStatus);
+  const isRecentlyStarted = !providerStatus && dbStatus === 'SCHEDULED' && minute >= 1 && minute <= 135;
+  const isLiveNow = isDbLive || isProviderLive || isRecentlyStarted;
+  const isFinished = dbStatus === 'FINISHED' || ['FT', 'AET', 'PEN', 'FINISHED'].includes(effectiveStatus);
+  const displayMinute = providerState?.minute || (isRecentlyStarted ? Math.max(1, Math.min(135, minute)) : null);
 
   return {
     ...match,
+    status: isHalfTime ? 'HT' : (isProviderLive ? 'IN_PLAY' : match.status),
+    homeScore: providerState?.homeScore ?? match.homeScore,
+    awayScore: providerState?.awayScore ?? match.awayScore,
     isLiveNow,
+    isHalfTime,
     isLikelyLiveByTime: isRecentlyStarted,
-    displayStatus: isLiveNow ? 'IN_PLAY' : match.status,
-    minute: isLiveNow ? Math.max(1, Math.min(135, minute)) : null,
-    liveLabel: isLiveNow ? `الدقيقة ${Math.max(1, Math.min(135, minute))}` : (isFinished ? 'انتهت المباراة' : null),
+    displayStatus: isHalfTime ? 'HT' : (isLiveNow ? 'IN_PLAY' : match.status),
+    minute: isHalfTime ? null : displayMinute,
+    liveLabel: isHalfTime ? 'استراحة بين الشوطين' : (isLiveNow ? (displayMinute ? `الدقيقة ${displayMinute}` : 'جارية الآن') : (isFinished ? 'انتهت المباراة' : null)),
   };
 }
 
@@ -58,10 +113,10 @@ export async function GET() {
   const upcomingUntil = new Date(now.getTime() + 24 * 60 * 60 * 1000);
   const recentSince = new Date(now.getTime() - 6 * 60 * 60 * 1000);
 
-  const [windowMatches, recentlyFinished] = await Promise.all([
+  const [windowMatches, recentlyFinished, providerStates] = await Promise.all([
     prisma.match.findMany({
       where: {
-        status: { in: ['SCHEDULED', 'IN_PLAY', 'LIVE'] },
+        status: { in: ['SCHEDULED', 'IN_PLAY', 'LIVE', 'HT'] },
         matchDate: { gte: liveWindowStart, lte: upcomingUntil },
       },
       orderBy: { matchDate: 'asc' },
@@ -74,10 +129,11 @@ export async function GET() {
       take: 4,
       select: MATCH_SELECT,
     }),
+    fetchAnimationLiveState(),
   ]);
 
-  const decoratedWindow = windowMatches.map((match) => decorateMatch(match, now));
-  const decoratedFinished = recentlyFinished.map((match) => decorateMatch(match, now));
+  const decoratedWindow = windowMatches.map((match) => decorateMatch(match, now, match.animationMatchId ? providerStates.get(Number(match.animationMatchId)) : null));
+  const decoratedFinished = recentlyFinished.map((match) => decorateMatch(match, now, match.animationMatchId ? providerStates.get(Number(match.animationMatchId)) : null));
 
   const live = decoratedWindow.filter((match) => match.isLiveNow);
   const upcoming = decoratedWindow.filter((match) => !match.isLiveNow && match.status === 'SCHEDULED' && new Date(match.matchDate).getTime() > now.getTime());
@@ -95,7 +151,7 @@ export async function GET() {
       upcomingCount: upcoming.length,
       recentlyFinishedCount: decoratedFinished.length,
       recentFinishedWindowHours: 6,
-      liveDetection: 'status_or_match_time_window',
+      liveDetection: 'animation_provider_status_then_time_window',
       selectionMode: 'one_live_plus_one_next',
       updatedEverySeconds: 15,
     },
