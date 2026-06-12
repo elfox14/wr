@@ -4,6 +4,10 @@ import prisma from '@/lib/prisma';
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
+type CacheEntry = { createdAt: number; payload: any };
+const CACHE_TTL_MS = 30_000;
+let healthCache: CacheEntry | null = null;
+
 function secrets() {
   return [process.env.ADMIN_API_SECRET, process.env.CRON_SECRET].map((value) => String(value || '').trim()).filter(Boolean);
 }
@@ -30,12 +34,21 @@ function toNumber(value: unknown, fallback = 0) {
   return Number.isFinite(n) ? n : fallback;
 }
 
+function response(payload: any, fromCache = false) {
+  return NextResponse.json({ ...payload, fromCache }, { headers: { 'Cache-Control': 'private, max-age=0, no-cache, must-revalidate' } });
+}
+
 export async function GET(req: Request) {
   if (!isAuthorized(req)) {
     return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401, headers: { 'Cache-Control': 'no-store' } });
   }
 
   try {
+    const nowMs = Date.now();
+    if (healthCache && nowMs - healthCache.createdAt < CACHE_TTL_MS) {
+      return response(healthCache.payload, true);
+    }
+
     const now = new Date();
     const hourAgo = new Date(now.getTime() - 60 * 60 * 1000);
     const dayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
@@ -88,9 +101,10 @@ export async function GET(req: Request) {
     if (liveMatches > 0 && priceHistoryLastHour === 0) blockers.push('Live matches exist but no price history was created in the last hour.');
     if (marketNewsLast24h === 0) blockers.push('No market news in the last 24 hours. This can be normal if no goals or trading events happened.');
 
-    return NextResponse.json({
+    const payload = {
       ok: true,
       updatedAt: now.toISOString(),
+      cacheSeconds: Math.round(CACHE_TTL_MS / 1000),
       environment: {
         cronBaseUrl: process.env.CRON_BASE_URL || process.env.NEXT_PUBLIC_SITE_URL || null,
         apiFootballCronEnabled: process.env.ENABLE_API_FOOTBALL_CRON === 'true',
@@ -135,7 +149,10 @@ export async function GET(req: Request) {
         'Do not enable API-Football cron while the daily limit is 100 requests.',
         'Use /live for public monitoring and this page for admin health checks.',
       ],
-    }, { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate' } });
+    };
+
+    healthCache = { createdAt: nowMs, payload };
+    return response(payload, false);
   } catch (error: any) {
     console.error('live-health error:', error);
     return NextResponse.json({ ok: false, error: error?.message || 'Internal Server Error' }, { status: 500 });
