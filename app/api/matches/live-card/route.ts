@@ -42,6 +42,16 @@ function decorateMatch(match: any, now: Date) {
   };
 }
 
+function uniqueById(matches: any[]) {
+  const seen = new Set<string>();
+  return matches.filter((match) => {
+    const id = String(match?.id || match?.animationMatchId || '');
+    if (!id || seen.has(id)) return false;
+    seen.add(id);
+    return true;
+  });
+}
+
 export async function GET() {
   const now = new Date();
   const liveWindowStart = new Date(now.getTime() - 3 * 60 * 60 * 1000);
@@ -72,7 +82,11 @@ export async function GET() {
   const live = decoratedWindow.filter((match) => match.isLiveNow);
   const upcoming = decoratedWindow.filter((match) => !match.isLiveNow && match.status === 'SCHEDULED' && new Date(match.matchDate).getTime() > now.getTime());
   const other = decoratedWindow.filter((match) => !live.includes(match) && !upcoming.includes(match));
-  const matches = [...live, ...upcoming, ...decoratedFinished, ...other].slice(0, 8);
+
+  const primaryLive = live[0] ? [live[0]] : [];
+  const nextAfterLive = upcoming.filter((match) => !primaryLive.some((liveMatch) => liveMatch.id === match.id))[0];
+  const fallbackSecond = [...decoratedFinished, ...other].filter((match) => !primaryLive.some((liveMatch) => liveMatch.id === match.id))[0];
+  const matches = uniqueById([...primaryLive, ...(nextAfterLive ? [nextAfterLive] : []), ...(primaryLive.length === 0 ? upcoming.slice(0, 2) : []), ...(nextAfterLive ? [] : fallbackSecond ? [fallbackSecond] : [])]).slice(0, 2);
 
   return NextResponse.json({
     matches,
@@ -82,6 +96,7 @@ export async function GET() {
       recentlyFinishedCount: decoratedFinished.length,
       recentFinishedWindowHours: 6,
       liveDetection: 'status_or_match_time_window',
+      selectionMode: 'one_live_plus_one_next',
       updatedEverySeconds: 15,
     },
     updatedAt: now.toISOString(),
