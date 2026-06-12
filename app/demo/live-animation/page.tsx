@@ -81,14 +81,6 @@ function extractYouTubeEmbedUrl(value: string): string | null {
   return null;
 }
 
-function getEventStatPatch(event: DemoEvent): Partial<MatchStats> {
-  if (event.type === "goal") {
-    return { score: { home: event.team === "home" ? 1 : 0, away: event.team === "away" ? 1 : 0 } };
-  }
-
-  return {};
-}
-
 export default function LiveAnimationDemoPage() {
   const [videoUrl, setVideoUrl] = useState("");
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -165,10 +157,10 @@ export default function LiveAnimationDemoPage() {
                 صفحة تجريبية — Live Vision Animation MVP
               </p>
               <h1 className="text-3xl font-black tracking-tight sm:text-4xl">
-                تحويل مباراة جارية إلى بيانات وأنيميشن تقديري
+                المحاكاة تعمل بدون فيديو — والفيديو اختياري للعرض فقط
               </h1>
               <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-300 sm:text-base">
-                هذه الصفحة تعرض النسخة العملية الأولى: مصدر فيديو للعرض، محرك أحداث تجريبي، ملعب 2D، Timeline، وإحصائيات تتغير من خلال Delta Logic. التحليل الحقيقي لفريمات YouTube يحتاج Worker/خادم مسموح له بالوصول للفيديو وليس iframe فقط.
+                المحرك التجريبي يولد أحداثًا وإحصائيات تلقائيًا حتى لو لم تضف رابط فيديو. عند إضافة رابط YouTube سيظهر الفيديو بجانب الملعب فقط، أما تحليل الفريمات الحقيقي فيحتاج Backend Worker منفصل.
               </p>
             </div>
 
@@ -186,18 +178,18 @@ export default function LiveAnimationDemoPage() {
           <section className="rounded-3xl border border-white/10 bg-white/[0.04] p-4 shadow-xl">
             <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <h2 className="text-xl font-black">مصدر الفيديو</h2>
-                <p className="text-sm text-slate-400">ضع رابط YouTube لعرضه بجانب الأنيميشن التجريبي.</p>
+                <h2 className="text-xl font-black">مصدر الفيديو الاختياري</h2>
+                <p className="text-sm text-slate-400">اتركه فارغًا لتشغيل المحاكاة فقط، أو ضع رابط YouTube لعرضه بجانب الأنيميشن.</p>
               </div>
-              <span className="rounded-full bg-amber-400/10 px-3 py-1 text-xs font-bold text-amber-200">
-                عرض فقط — ليس Frame Capture فعليًا
+              <span className="rounded-full bg-emerald-400/10 px-3 py-1 text-xs font-bold text-emerald-200">
+                المحاكاة لا تحتاج فيديو
               </span>
             </div>
 
             <input
               value={videoUrl}
               onChange={(event) => setVideoUrl(event.target.value)}
-              placeholder="مثال: https://www.youtube.com/watch?v=VIDEO_ID"
+              placeholder="اختياري: https://www.youtube.com/watch?v=VIDEO_ID"
               className="mb-4 w-full rounded-2xl border border-white/10 bg-slate-950/80 px-4 py-3 text-right text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-emerald-400/60"
             />
 
@@ -211,10 +203,22 @@ export default function LiveAnimationDemoPage() {
                   allowFullScreen
                 />
               ) : (
-                <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center">
-                  <div className="text-5xl">▶️</div>
-                  <p className="max-w-md text-sm leading-7 text-slate-300">
-                    عند وضع رابط YouTube سيظهر هنا. لا يمكن للمتصفح استخراج الفريمات من iframe بسبب قيود المتصفح وحقوق المصدر؛ التحليل الحقيقي يتم عبر خدمة Backend/Worker.
+                <div className="relative flex h-full flex-col items-center justify-center gap-4 overflow-hidden p-8 text-center">
+                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(16,185,129,0.22),transparent_45%)]" />
+                  <div className="relative rounded-full border border-emerald-300/30 bg-emerald-400/10 px-4 py-2 text-xs font-black text-emerald-100">
+                    DEMO MODE شغال الآن
+                  </div>
+                  <div className="relative flex h-20 items-end gap-2">
+                    {Array.from({ length: 18 }).map((_, index) => (
+                      <span
+                        key={index}
+                        className="w-2 rounded-t-full bg-emerald-300/70 transition-all duration-700"
+                        style={{ height: `${24 + ((index * 17 + currentIndex * 9) % 56)}px` }}
+                      />
+                    ))}
+                  </div>
+                  <p className="relative max-w-md text-sm leading-7 text-slate-300">
+                    المحاكاة تعمل من بيانات Events تجريبية بدون فيديو. الفيديو هنا اختياري للعرض فقط، وليس شرطًا لتحريك الملعب أو تحديث الإحصائيات.
                   </p>
                 </div>
               )}
@@ -294,7 +298,7 @@ export default function LiveAnimationDemoPage() {
             <h3 className="mb-4 text-lg font-black">Timeline الأحداث</h3>
             <div className="max-h-80 space-y-3 overflow-auto pr-1">
               {events.length === 0 ? (
-                <p className="text-sm text-slate-400">تبدأ الأحداث عند تشغيل المحاكاة.</p>
+                <p className="text-sm text-slate-400">تبدأ الأحداث تلقائيًا بعد لحظات عند تشغيل المحاكاة.</p>
               ) : (
                 events.map((event) => (
                   <div key={event.id} className="rounded-2xl border border-white/10 bg-slate-950/70 p-3">
