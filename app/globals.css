@@ -20,7 +20,7 @@
   
   --shadow-anti-gravity: 0 15px 35px -5px rgba(15, 240, 252, 0.15), 0 5px 15px rgba(0,0,0,0.5);
   --shadow-anti-gravity-hover: 0 25px 45px -5px rgba(15, 240, 252, 0.3), 0 10px 20px rgba(0,0,0,0.7);
-  --animate-marquee: marquee 90s linear infinite;
+  --animate-marquee: marquee 150s linear infinite;
 
   @keyframes marquee {
     0% { transform: translateX(100%); }
@@ -177,44 +177,4 @@ article p.text-xs.leading-6.text-gray-400::selection {
     scrollbar-width: thin;
     scrollbar-color: rgba(255,255,255,0.18) transparent;
   }
-
-  article p.text-xs.leading-6.text-gray-400::-webkit-scrollbar {
-    width: 5px;
-  }
-
-  article p.text-xs.leading-6.text-gray-400::-webkit-scrollbar-thumb {
-    background: rgba(255,255,255,0.18);
-    border-radius: 999px;
-  }
 }
-
-/* ─── Bento Grid Layout ─── */
-.home-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  grid-template-rows: auto;
-  grid-template-areas:
-    "ticker         ticker         ticker         ticker"
-    "hero           hero           topMover       buyChance"
-    "marketStats    marketStats    howItWorks     howItWorks"
-    "featuredArticle featuredArticle whyUs         leaderboard"
-    "cta            cta            cta            cta"
-    "siteFooter     siteFooter     siteFooter     siteFooter";
-  gap: 16px;
-  max-width: 1400px;
-  margin: 0 auto;
-  padding: 0 16px 40px;
-}
-
-.home-grid > * {
-  background: var(--color-surface);
-  border: 1px solid rgba(255,255,255,0.06);
-  border-radius: 20px;
-  overflow: hidden;
-}
-
-.bento-ticker         { grid-area: ticker; background: transparent !important; border: none !important; border-radius: 0 !important; padding: 0 !important; }
-.bento-hero           { grid-area: hero; min-height: 320px; }
-.bento-top-mover      { grid-area: topMover; }
-.bento-buy-chance     { grid-area: buyChance; }
-.bento-market-stats   { grid-area: marketStats; }
