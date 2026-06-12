@@ -25,7 +25,7 @@ function categoryFromEvent(eventType?: string | null) {
   return 'المنصة';
 }
 
-const pressDigest = [
+const fallbackPressDigest = [
   {
     id: 'athletic-opening-red-cards',
     label: 'The Athletic FC',
@@ -34,6 +34,7 @@ const pressDigest = [
     body: 'النشرة وصفت مباراة الافتتاح بأنها مرشحة لتكون أكثر افتتاحية خشونة في تاريخ كأس العالم، مع ثلاث بطاقات حمراء، وفوز المكسيك 2-0 على جنوب أفريقيا.',
     source: 'World Cup\'s dirtiest-ever opening game',
     href: '/news#athletic-opening-red-cards',
+    publishedAt: new Date(),
   },
   {
     id: 'athletic-jimenez-return',
@@ -43,6 +44,7 @@ const pressDigest = [
     body: 'النشرة أبرزت قصة خيمينيز بعد كسر الجمجمة في 2020، وذكرت هدفه في الدقيقة 67 ضد جنوب أفريقيا ضمن فوز المكسيك.',
     source: 'The Athletic FC newsletter',
     href: '/news#athletic-jimenez-return',
+    publishedAt: new Date(),
   },
   {
     id: 'athletic-korea-czechia',
@@ -52,6 +54,7 @@ const pressDigest = [
     body: 'النشرة أشارت إلى ثلاثة محاور من مباراة كوريا والتشيك: مقاعد فارغة في المدرجات، خطورة الكرات الثابتة للتشيك، ودور Hwang In-beom في عودة كوريا.',
     source: 'The Athletic FC newsletter',
     href: '/news#athletic-korea-czechia',
+    publishedAt: new Date(),
   },
   {
     id: 'athletic-injuries-roundup',
@@ -61,8 +64,58 @@ const pressDigest = [
     body: 'الرصد الصحفي ذكر غياب ألفونسو ديفيز عن افتتاح كندا ضد البوسنة، وغياب واتارو إندو عن البطولة بالكامل مع إعلان اعتزاله الدولي.',
     source: 'The Athletic FC newsletter',
     href: '/news#athletic-injuries-roundup',
+    publishedAt: new Date(),
   },
 ];
+
+async function ensurePressNewsTable() {
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "PressNews" (
+      "id" TEXT PRIMARY KEY,
+      "title" TEXT NOT NULL,
+      "body" TEXT NOT NULL,
+      "category" TEXT NOT NULL DEFAULT 'رصد صحفي',
+      "sourceName" TEXT NOT NULL,
+      "sourceUrl" TEXT,
+      "sourceType" TEXT NOT NULL DEFAULT 'newsletter',
+      "language" TEXT NOT NULL DEFAULT 'ar',
+      "status" TEXT NOT NULL DEFAULT 'published',
+      "importance" INTEGER NOT NULL DEFAULT 50,
+      "tags" JSONB,
+      "publishedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+  await prisma.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS "PressNews_status_publishedAt_idx" ON "PressNews" ("status", "publishedAt")');
+}
+
+async function getPressNews() {
+  try {
+    await ensurePressNewsTable();
+    const rows = await prisma.$queryRawUnsafe<any[]>(`
+      SELECT * FROM "PressNews"
+      WHERE "status" = 'published'
+      ORDER BY "publishedAt" DESC, "importance" DESC
+      LIMIT 24
+    `);
+    if (!rows.length) return fallbackPressDigest;
+    return rows.map((item) => ({
+      id: item.id,
+      label: item.sourceName,
+      category: item.category,
+      title: item.title,
+      body: item.body,
+      source: item.sourceName,
+      sourceUrl: item.sourceUrl,
+      href: item.sourceUrl || `/news#${item.id}`,
+      publishedAt: item.publishedAt,
+    }));
+  } catch (error) {
+    console.error('news page press news error:', error);
+    return fallbackPressDigest;
+  }
+}
 
 async function getMarketNews() {
   try {
@@ -94,17 +147,18 @@ async function getMarketNews() {
 }
 
 function PressCard({ item, featured = false }: { item: any; featured?: boolean }) {
+  const external = item.href && String(item.href).startsWith('http');
   return (
     <article id={item.id} className={`rounded-[1.5rem] border p-5 shadow-card ${featured ? 'border-[#FFD700]/25 bg-[#FFD700]/[0.055]' : 'border-white/8 bg-white/[0.04]'}`}>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-[11px] font-black">
         <span className="rounded-full border border-[#0FF0FC]/20 bg-[#0FF0FC]/10 px-3 py-1 text-[#0FF0FC]">{item.category}</span>
-        <span className="text-gray-500">{item.label}</span>
+        <span className="text-gray-500">{item.label} · {formatDate(item.publishedAt || new Date())}</span>
       </div>
       <h3 className={`${featured ? 'text-2xl md:text-3xl' : 'text-lg'} font-black leading-tight text-white`}>{item.title}</h3>
       <p className="mt-3 text-sm font-bold leading-7 text-gray-400">{item.body}</p>
       <div className="mt-4 flex items-center justify-between gap-3 border-t border-white/8 pt-3 text-[11px] font-bold text-gray-500">
         <span>المصدر: {item.source}</span>
-        <Link href={item.href} className="inline-flex items-center gap-1 text-[#FFD700]">تفاصيل <ArrowLeft size={13} /></Link>
+        <Link href={item.href} target={external ? '_blank' : undefined} rel={external ? 'noopener noreferrer' : undefined} className="inline-flex items-center gap-1 text-[#FFD700]">تفاصيل <ArrowLeft size={13} /></Link>
       </div>
     </article>
   );
@@ -134,9 +188,9 @@ function MarketNewsCard({ item }: { item: any }) {
 }
 
 export default async function NewsPage() {
-  const marketNews = await getMarketNews();
-  const featured = pressDigest[0];
-  const restPress = pressDigest.slice(1);
+  const [marketNews, pressNews] = await Promise.all([getMarketNews(), getPressNews()]);
+  const featured = pressNews[0];
+  const restPress = pressNews.slice(1);
 
   return (
     <main className="min-h-screen bg-background px-4 py-6 text-white sm:px-6 lg:px-8" dir="rtl">
@@ -149,7 +203,7 @@ export default async function NewsPage() {
               <p className="mt-3 max-w-3xl text-sm font-bold leading-7 text-gray-400">صفحة تجمع أخبار السوق الافتراضي، أخبار المباريات، والرصد الصحفي من النشرات الخارجية مثل The Athletic FC مع فصل واضح بين الخبر والتحليل والتداول.</p>
             </div>
             <div className="grid grid-cols-3 gap-2 text-center text-xs font-black">
-              <div className="rounded-2xl border border-white/10 bg-black/25 px-4 py-3"><div className="text-2xl text-[#FFD700]">{pressDigest.length}</div><div className="text-gray-500">رصد صحفي</div></div>
+              <div className="rounded-2xl border border-white/10 bg-black/25 px-4 py-3"><div className="text-2xl text-[#FFD700]">{pressNews.length}</div><div className="text-gray-500">رصد صحفي</div></div>
               <div className="rounded-2xl border border-white/10 bg-black/25 px-4 py-3"><div className="text-2xl text-[#0FF0FC]">{marketNews.length}</div><div className="text-gray-500">أخبار سوق</div></div>
               <div className="rounded-2xl border border-white/10 bg-black/25 px-4 py-3"><div className="text-2xl text-emerald-300">Live</div><div className="text-gray-500">تحديث</div></div>
             </div>
@@ -157,7 +211,7 @@ export default async function NewsPage() {
         </div>
 
         <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
-          <PressCard item={featured} featured />
+          {featured ? <PressCard item={featured} featured /> : null}
           <aside className="rounded-[1.5rem] border border-emerald-400/20 bg-emerald-400/10 p-5">
             <div className="mb-3 flex items-center gap-2 text-sm font-black text-emerald-200"><ShieldCheck size={17} /> قواعد النشر داخل المنصة</div>
             <ul className="space-y-3 text-sm font-bold leading-7 text-emerald-50/85">
@@ -171,7 +225,7 @@ export default async function NewsPage() {
         <section>
           <div className="mb-4 flex items-center justify-between gap-3">
             <h2 className="flex items-center gap-2 text-2xl font-black"><Radio className="text-[#FFD700]" /> رصد صحفي</h2>
-            <span className="text-xs font-bold text-gray-500">مستوحى من النشرات التي تصل إلى بريد المنصة</span>
+            <span className="text-xs font-bold text-gray-500">يمكن إضافة أخبار جديدة من لوحة الإدارة</span>
           </div>
           <div className="grid gap-4 md:grid-cols-3">
             {restPress.map((item) => <PressCard key={item.id} item={item} />)}
