@@ -5,6 +5,7 @@ import { groupCWorldCupReports } from './groupCWorldCupReports';
 import { groupDWorldCupReports } from './groupDWorldCupReports';
 import { groupEWorldCupReports } from './groupEWorldCupReports';
 import { groupFToLWorldCupReports } from './groupFToLWorldCupReports';
+import { normalizeTeamReportBody } from './teamReportFormat';
 
 export type TeamIntelligenceSeedReport = {
   teamCodes: string[];
@@ -200,13 +201,21 @@ async function createReportForTeam(prisma: PrismaClient, team: SeedTeam, report:
   if (existing) return false;
 
   const metrics: Prisma.NullableJsonNullValueInput | Prisma.InputJsonValue = report.metrics ?? Prisma.JsonNull;
+  const normalized = normalizeTeamReportBody({
+    teamName: team.name,
+    title: report.title,
+    summary: report.summary,
+    body: report.body,
+    sourceName: report.sourceName,
+    sourceUrl: report.sourceUrl,
+  });
 
   await prisma.teamIntelligenceReport.create({
     data: {
       teamId: team.id,
       title: report.title,
       summary: report.summary,
-      body: report.body,
+      body: normalized.body,
       reportType: 'TEAM_PROFILE',
       language: 'ar',
       sourceName: report.sourceName,
@@ -215,7 +224,7 @@ async function createReportForTeam(prisma: PrismaClient, team: SeedTeam, report:
       confidence: report.confidence,
       provider: report.provider,
       metrics,
-      tacticalTags: report.tacticalTags,
+      tacticalTags: normalized.changed ? [...report.tacticalTags, 'normalized-card-format'] : report.tacticalTags,
       strengths: report.strengths,
       weaknesses: report.weaknesses,
       lastCheckedAt: new Date(),
