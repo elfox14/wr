@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import AdminShell from './AdminShell';
-import { Activity, ArrowLeft, BarChart3, Database, FileText, RefreshCcw, ShieldAlert, Trophy, Users } from 'lucide-react';
+import { Activity, ArrowLeft, BarChart3, CalendarDays, Database, FileText, Newspaper, RefreshCcw, ShieldAlert, Sparkles, Trophy, Users } from 'lucide-react';
 
 const modules = [
   {
@@ -25,6 +25,20 @@ const modules = [
     tag: 'ذكاء المنتخبات',
   },
   {
+    href: '/admin/news',
+    title: 'إدارة الأخبار والمحتوى',
+    description: 'حوّل الإيميلات والنشرات إلى خبر منشور، ثم إلى منشور فيسبوك وسكربت فيديو ونقاط إنفوجرافيك.',
+    icon: Newspaper,
+    tag: 'غرفة الأخبار',
+  },
+  {
+    href: '/daily-summary',
+    title: 'ملخص اليوم',
+    description: 'لقطة يومية للنتائج، الرصد الصحفي، أخبار السوق، وسكربت سريع قابل للنشر.',
+    icon: Sparkles,
+    tag: 'محتوى يومي',
+  },
+  {
     href: '/portfolio',
     title: 'فحص تجربة المستخدم',
     description: 'راجع شكل المحفظة والأسعار بعد جلب الأصول وتحديث السوق.',
@@ -37,7 +51,7 @@ const quickChecks = [
   { label: 'البيئة والأسرار', value: 'DATABASE / NEXTAUTH / CRON', icon: ShieldAlert },
   { label: 'بيانات البطولة', value: '48 منتخب • 1244 لاعب مستهدف', icon: Trophy },
   { label: 'دورة السوق', value: 'LIVE + مزامنة مستمرة', icon: RefreshCcw },
-  { label: 'الأصول', value: 'Teams / Players / Matches', icon: Users },
+  { label: 'المحتوى اليومي', value: 'News / Summary / Social Pack', icon: CalendarDays },
 ];
 
 export default function AdminHomeDashboard() {
