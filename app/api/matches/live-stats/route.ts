@@ -32,8 +32,8 @@ function shouldSync(match: any, latest: any, force: boolean) {
   const capturedAt = new Date(latest.capturedAt).getTime();
   if (!Number.isFinite(capturedAt)) return true;
   const ageMs = Date.now() - capturedAt;
-  if (isLiveLike(match.status) || isFinished(match.status)) return ageMs >= 4_800;
-  return ageMs >= 30_000;
+  if (isLiveLike(match.status) || isFinished(match.status)) return ageMs >= 300_000;
+  return ageMs >= 300_000;
 }
 
 function hasAnyStat(snapshot: any) {
@@ -85,14 +85,7 @@ export async function GET(request: Request) {
       syncResult = allowProviderSync ? { status: 'cached_recent_snapshot' } : { status: 'database_only', note: 'UI polling reads stored snapshots only to protect API quota. Provider sync is handled by cron.' };
     }
 
-    const [historyRows, events] = await Promise.all([
-      getSnapshotHistory(match.id, 80),
-      prisma.matchEvent.findMany({
-        where: { matchId: match.id },
-        orderBy: [{ minute: 'desc' }, { createdAt: 'desc' }],
-        take: 50,
-      }),
-    ]);
+    const historyRows = await getSnapshotHistory(match.id, 80);
 
     const latestPublic = publicSnapshot(latest);
     const latestHomeScore = latestPublic?.homeScore ?? match.homeScore;
@@ -102,7 +95,7 @@ export async function GET(request: Request) {
     return NextResponse.json({
       ok: true,
       updatedAt: now.toISOString(),
-      pollingSeconds: 5,
+      pollingSeconds: 300,
       providerSyncEnabled: allowProviderSync,
       hasStats,
       sync: syncResult,
@@ -118,18 +111,6 @@ export async function GET(request: Request) {
       },
       latest: latestPublic,
       history: historyRows.map(publicSnapshot).reverse(),
-      events: events.map((event) => ({
-        id: event.id,
-        minute: event.minute,
-        type: event.type,
-        teamId: event.teamId,
-        playerId: event.playerId,
-        playerName: event.playerName,
-        detail: event.detail,
-        sourceName: event.sourceName,
-        createdAt: toIso(event.createdAt),
-        updatedAt: toIso(event.updatedAt),
-      })),
     }, { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } });
   } catch (error: any) {
     console.error('live-stats endpoint error:', error);
