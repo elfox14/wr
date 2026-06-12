@@ -2,11 +2,11 @@
   "crons": [
     {
       "path": "/api/cron/live-market-sync",
-      "schedule": "* * * * *"
+      "schedule": "*/5 * * * *"
     },
     {
       "path": "/api/cron/live-match-stats-sync",
-      "schedule": "* * * * *"
+      "schedule": "*/5 * * * *"
     },
     {
       "path": "/api/cron/football-auto-sync",
