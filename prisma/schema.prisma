@@ -332,22 +332,28 @@ model MarketNews {
 }
 
 model PressNews {
-  id          String   @id @default(cuid())
-  title       String
-  body        String
-  category    String   @default("رصد صحفي")
-  sourceName  String
-  sourceUrl   String?
-  sourceType  String   @default("newsletter")
-  language    String   @default("ar")
-  status      String   @default("published")
-  importance  Int      @default(50)
-  tags        Json?
-  publishedAt DateTime @default(now())
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id              String   @id @default(cuid())
+  title           String
+  body            String
+  category        String   @default("رصد صحفي")
+  sourceName      String
+  sourceUrl       String?
+  sourceType      String   @default("newsletter")
+  language        String   @default("ar")
+  status          String   @default("published")
+  importance      Int      @default(50)
+  tags            Json?
+  relatedTeamId   String?
+  relatedPlayerId String?
+  relatedMatchId  String?
+  publishedAt     DateTime @default(now())
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
   @@index([status, publishedAt])
   @@index([category, publishedAt])
+  @@index([relatedTeamId])
+  @@index([relatedPlayerId])
+  @@index([relatedMatchId])
 }
 
 model CaptainSelection {
