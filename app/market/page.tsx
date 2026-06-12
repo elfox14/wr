@@ -58,19 +58,21 @@ export default async function MarketPage() {
   const nextMatchDate = nextMatch ? nextMatch.matchDate.toISOString() : null;
 
   return (
-    <>
-      <section className="mx-auto max-w-[1500px] px-4 pt-6 sm:px-6 lg:px-8">
-        <div className="mb-5 flex flex-col gap-3 rounded-[1.5rem] border border-[#0FF0FC]/15 bg-[#0FF0FC]/5 p-4 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <div className="mb-1 inline-flex items-center gap-2 rounded-xl border border-[#0FF0FC]/20 bg-black/25 px-3 py-1 text-xs font-black text-[#0FF0FC]"><Brain size={14} /> Market Intelligence</div>
-            <h1 className="text-xl font-black text-white lg:text-2xl">اقرأ السوق بعد التحليل ومنهجية التسعير</h1>
-            <p className="mt-1 text-xs leading-6 text-gray-400 lg:text-sm">السوق هنا تطبيق عملي للتحليل: راجع التقارير، افهم القيمة العادلة والزخم والطلب، ثم تابع الفرص الافتراضية.</p>
+    <div className="market-page w-full max-w-full overflow-x-hidden">
+      <section className="mx-auto w-full max-w-[1500px] overflow-hidden px-3 pt-4 sm:px-6 sm:pt-6 lg:px-8">
+        <div className="mb-5 flex w-full max-w-full flex-col gap-3 overflow-hidden rounded-[1.35rem] border border-[#0FF0FC]/15 bg-[#0FF0FC]/5 p-4 sm:rounded-[1.5rem] lg:flex-row lg:items-center lg:justify-between">
+          <div className="min-w-0">
+            <div className="mb-2 inline-flex max-w-full items-center gap-2 rounded-xl border border-[#0FF0FC]/20 bg-black/25 px-3 py-1 text-[11px] font-black text-[#0FF0FC] sm:text-xs">
+              <Brain size={14} className="shrink-0" /> Market Intelligence
+            </div>
+            <h1 className="max-w-full text-balance text-xl font-black leading-tight text-white sm:text-2xl">اقرأ السوق بعد التحليل ومنهجية التسعير</h1>
+            <p className="mt-2 max-w-full text-xs leading-6 text-gray-400 sm:text-sm">السوق هنا تطبيق عملي للتحليل: راجع التقارير، افهم القيمة العادلة والزخم والطلب، ثم تابع الفرص الافتراضية.</p>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <Link href="/team-intelligence" className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#0FF0FC] px-4 py-3 text-sm font-black text-black transition hover:scale-[1.02] active:scale-[0.98]">
+          <div className="grid w-full min-w-0 grid-cols-1 gap-2 sm:w-auto sm:grid-cols-2 lg:flex lg:flex-wrap">
+            <Link href="/team-intelligence" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-[#0FF0FC] px-4 py-3 text-sm font-black text-black transition active:scale-[0.98] hover:scale-[1.02]">
               مركز التحليل <ArrowRight size={16} />
             </Link>
-            <Link href="/methodology" className="inline-flex items-center justify-center gap-2 rounded-2xl border border-[#FFD700]/25 bg-[#FFD700]/10 px-4 py-3 text-sm font-black text-[#FFD700] transition hover:bg-[#FFD700]/15">
+            <Link href="/methodology" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-[#FFD700]/25 bg-[#FFD700]/10 px-4 py-3 text-sm font-black text-[#FFD700] transition active:scale-[0.98] hover:bg-[#FFD700]/15">
               منهجية التسعير <BookOpen size={16} />
             </Link>
           </div>
@@ -89,6 +91,6 @@ export default async function MarketPage() {
         nextMatch={nextMatch}
         recentNews={recentNews}
       />
-    </>
+    </div>
   );
 }
