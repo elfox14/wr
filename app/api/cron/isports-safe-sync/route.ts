@@ -13,6 +13,19 @@ function reasonFrom(error: any) {
   return error?.message || 'iSports daily limit reached';
 }
 
+function hasKey(req: Request, url: URL) {
+  const valid = [process.env.CRON_SECRET, process.env.ADMIN_API_SECRET].map((v) => String(v || '').trim()).filter(Boolean);
+  if (valid.length === 0) return true;
+  const candidates = [
+    url.searchParams.get('key')?.trim() || '',
+    url.searchParams.get('cronSecret')?.trim() || '',
+    url.searchParams.get('adminSecret')?.trim() || '',
+    req.headers.get('x-cron-secret')?.trim() || '',
+    req.headers.get('x-admin-secret')?.trim() || '',
+  ];
+  return candidates.some((value) => value && valid.includes(value));
+}
+
 async function fallback(match: any, reason: string, debug: boolean) {
   try {
     return await syncFootballDataFallbackForMatch(match, { reason, debug });
@@ -23,6 +36,8 @@ async function fallback(match: any, reason: string, debug: boolean) {
 
 export async function GET(req: Request) {
   const url = new URL(req.url);
+  if (!hasKey(req, url)) return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
+
   const debug = url.searchParams.get('debug') === 'true';
   const singleMatchId = Number(url.searchParams.get('matchId') || 0);
   const hasSingleMatchId = Boolean(singleMatchId && Number.isFinite(singleMatchId));
