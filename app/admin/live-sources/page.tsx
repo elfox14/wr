@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import type { ReactNode } from 'react';
 import { AlertTriangle, CheckCircle2, Clock, Database, Radio, ShieldAlert } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
@@ -9,8 +10,16 @@ export const metadata: Metadata = {
   description: 'مراقبة حالة iSports و football-data.org ومصدر بيانات الأنيميشن الداخلي.',
 };
 
+function getBaseUrl() {
+  const publicUrl = String(process.env.NEXT_PUBLIC_SITE_URL || '').trim().replace(/\/$/, '');
+  if (publicUrl) return publicUrl;
+  const vercelUrl = String(process.env.VERCEL_URL || '').trim().replace(/\/$/, '');
+  if (vercelUrl) return `https://${vercelUrl}`;
+  return 'http://localhost:3000';
+}
+
 async function loadStatus() {
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000';
+  const baseUrl = getBaseUrl();
   const key = process.env.ADMIN_API_SECRET || process.env.CRON_SECRET || '';
   const url = `${baseUrl}/api/admin/live-sources/status${key ? `?key=${encodeURIComponent(key)}` : ''}`;
   const response = await fetch(url, { cache: 'no-store' });
@@ -25,7 +34,7 @@ function formatDate(value?: string | null) {
   return date.toLocaleString('ar-EG');
 }
 
-function StatusBadge({ active, children }: { active: boolean; children: React.ReactNode }) {
+function StatusBadge({ active, children }: { active: boolean; children: ReactNode }) {
   return <span className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-black ${active ? 'border-emerald-400/25 bg-emerald-400/10 text-emerald-200' : 'border-[#FFD700]/25 bg-[#FFD700]/10 text-[#FFD700]'}`}>{active ? <CheckCircle2 size={14} /> : <AlertTriangle size={14} />}{children}</span>;
 }
 
@@ -100,7 +109,7 @@ export default async function LiveSourcesAdminPage() {
   );
 }
 
-function Panel({ title, children }: { title: string; children: React.ReactNode }) {
+function Panel({ title, children }: { title: string; children: ReactNode }) {
   return <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-4"><h2 className="mb-3 text-lg font-black text-white">{title}</h2><div className="space-y-2">{children}</div></section>;
 }
 
