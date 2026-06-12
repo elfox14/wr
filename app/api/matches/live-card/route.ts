@@ -87,7 +87,7 @@ function decorateMatch(match: any, now: Date, providerState?: any) {
   const isFinished = dbStatus === 'FINISHED' || ['FT', 'AET', 'PEN', 'FINISHED'].includes(effectiveStatus);
   const localFirstHalfMinute = isLikelyLiveByTime && localMinute <= 45 ? Math.max(1, localMinute) : null;
   const displayMinute = isHalfTime ? null : (providerHasMinute ? providerState.minute : localFirstHalfMinute);
-  const fallbackLabel = isLikelyLiveByTime && localMinute > 65 ? 'جارية الآن' : null;
+  const fallbackLabel = isLikelyLiveByTime && localMinute > 65 ? 'الشوط الثاني جارٍ' : null;
 
   return {
     ...match,
