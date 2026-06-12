@@ -116,14 +116,20 @@ export async function POST() {
   return NextResponse.json(await repairReports());
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   if (!(await isAdmin())) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
+  const url = new URL(request.url);
+  if (url.searchParams.get('run') === '1') {
+    return NextResponse.json(await repairReports());
+  }
+
   return NextResponse.json({
     ok: true,
-    message: 'Use POST to repair existing MC_PRIME_CURATED team reports so their bodies follow the new card format.',
+    message: 'Use POST or open ?run=1 to repair existing MC_PRIME_CURATED team reports so their bodies follow the new card format.',
     endpoint: '/api/admin/repair-team-report-format',
+    browserRunEndpoint: '/api/admin/repair-team-report-format?run=1',
   });
 }
