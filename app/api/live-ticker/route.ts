@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { renderMarketNews } from '@/lib/market-news/render';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 function toNumber(value: unknown, fallback = 0) {
   const n = Number(value);
   return Number.isFinite(n) ? n : fallback;
@@ -23,14 +26,21 @@ function scoreLabel(match: any) {
   return `${toNumber(match.homeScore)} - ${toNumber(match.awayScore)}`;
 }
 
+const noStoreHeaders = {
+  'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+};
+
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const limit = Math.min(Math.max(parseInt(searchParams.get('limit') || '24', 10), 6), 60);
     const now = new Date();
+    const liveWindowStart = new Date(now.getTime() - 5 * 60 * 60 * 1000);
+    const liveWindowEnd = new Date(now.getTime() + 3 * 60 * 60 * 1000);
+    const finishedWindowStart = new Date(now.getTime() - 8 * 60 * 60 * 1000);
     const upcomingWindow = new Date(now.getTime() + 6 * 60 * 60 * 1000);
 
-    const [marketNews, priceHistory, liveMatches, upcomingMatches] = await Promise.all([
+    const [marketNews, priceHistory, liveMatches, finishedMatches, upcomingMatches] = await Promise.all([
       prisma.marketNews.findMany({
         orderBy: { publishedAt: 'desc' },
         take: 12,
@@ -46,9 +56,21 @@ export async function GET(request: Request) {
         },
       }),
       prisma.match.findMany({
-        where: { status: { in: ['IN_PLAY', 'LIVE'] } },
+        where: {
+          status: { in: ['IN_PLAY', 'LIVE'] },
+          matchDate: { gte: liveWindowStart, lte: liveWindowEnd },
+        },
         orderBy: { matchDate: 'asc' },
         take: 8,
+        include: { homeTeam: true, awayTeam: true },
+      }),
+      prisma.match.findMany({
+        where: {
+          status: 'FINISHED',
+          matchDate: { gte: finishedWindowStart, lte: now },
+        },
+        orderBy: { matchDate: 'desc' },
+        take: 6,
         include: { homeTeam: true, awayTeam: true },
       }),
       prisma.match.findMany({
@@ -112,9 +134,21 @@ export async function GET(request: Request) {
         type: 'MATCH_EVENT',
         title: `${matchStatusLabel(match.status)}: ${match.homeTeam?.name || 'الفريق الأول'} ${scoreLabel(match)} ${match.awayTeam?.name || 'الفريق الثاني'}`,
         matchId: match.id,
-        href: '/matches',
+        href: '/live',
         timestamp: now.toISOString(),
         source: 'live_match',
+      });
+    }
+
+    for (const match of finishedMatches) {
+      items.push({
+        id: `match-finished-${match.id}`,
+        type: 'MATCH_EVENT',
+        title: `${matchStatusLabel(match.status)}: ${match.homeTeam?.name || 'الفريق الأول'} ${scoreLabel(match)} ${match.awayTeam?.name || 'الفريق الثاني'}`,
+        matchId: match.id,
+        href: '/live',
+        timestamp: now.toISOString(),
+        source: 'finished_match',
       });
     }
 
@@ -124,7 +158,7 @@ export async function GET(request: Request) {
         type: 'MATCH_EVENT',
         title: `مباراة قريبة: ${match.homeTeam?.name || 'الفريق الأول'} ضد ${match.awayTeam?.name || 'الفريق الثاني'} — ${new Date(match.matchDate).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}`,
         matchId: match.id,
-        href: '/matches',
+        href: '/live',
         timestamp: match.matchDate.toISOString(),
         source: 'upcoming_match',
       });
@@ -136,9 +170,9 @@ export async function GET(request: Request) {
       success: true,
       updatedAt: now.toISOString(),
       items: items.slice(0, limit),
-    });
+    }, { headers: noStoreHeaders });
   } catch (error: any) {
     console.error('Live ticker error:', error);
-    return NextResponse.json({ error: error.message || 'Failed to fetch live ticker' }, { status: 500 });
+    return NextResponse.json({ error: error.message || 'Failed to fetch live ticker' }, { status: 500, headers: noStoreHeaders });
   }
 }
