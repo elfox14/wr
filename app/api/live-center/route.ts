@@ -29,6 +29,12 @@ function toNumber(value: unknown, fallback = 0) {
   return Number.isFinite(n) ? n : fallback;
 }
 
+function nullableNumber(value: unknown) {
+  if (value === null || value === undefined || value === '') return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
 function categoryFromEvent(eventType?: string | null) {
   const value = String(eventType || '').toLowerCase();
   if (value.includes('goal') || value.includes('match') || value.includes('fixture')) return 'match';
@@ -36,7 +42,80 @@ function categoryFromEvent(eventType?: string | null) {
   return 'platform';
 }
 
-function formatMatch(match: any) {
+function quoteSql(value: string) {
+  return `'${String(value).replace(/'/g, "''")}'`;
+}
+
+async function fetchLatestStatsForMatches(matchIds: string[]) {
+  if (!matchIds.length) return new Map<string, any>();
+  try {
+    const idList = matchIds.map(quoteSql).join(',');
+    const rows = await prisma.$queryRawUnsafe<any[]>(`
+      SELECT DISTINCT ON ("matchId")
+        "id", "matchId", "provider", "providerMatchId", "minute",
+        "homePossession", "awayPossession", "homeAttacks", "awayAttacks",
+        "homeDangerousAttacks", "awayDangerousAttacks", "homeShots", "awayShots",
+        "homeShotsOnTarget", "awayShotsOnTarget", "homeShotsOffTarget", "awayShotsOffTarget",
+        "homeScore", "awayScore", "capturedAt"
+      FROM "MatchStatsSnapshot"
+      WHERE "matchId" IN (${idList})
+      ORDER BY "matchId", "capturedAt" DESC
+    `);
+    return new Map(rows.map((row) => [row.matchId, row]));
+  } catch (error: any) {
+    if (String(error?.message || '').includes('MatchStatsSnapshot')) return new Map<string, any>();
+    console.warn('live-center stats lookup failed:', error?.message || error);
+    return new Map<string, any>();
+  }
+}
+
+function formatLiveStats(row?: any) {
+  if (!row) return null;
+  const homeDangerousAttacks = nullableNumber(row.homeDangerousAttacks);
+  const awayDangerousAttacks = nullableNumber(row.awayDangerousAttacks);
+  const homeShots = nullableNumber(row.homeShots);
+  const awayShots = nullableNumber(row.awayShots);
+  const homeShotsOnTarget = nullableNumber(row.homeShotsOnTarget);
+  const awayShotsOnTarget = nullableNumber(row.awayShotsOnTarget);
+  const homePossession = nullableNumber(row.homePossession);
+  const awayPossession = nullableNumber(row.awayPossession);
+  const momentum = Math.round((
+    ((homePossession ?? 50) - (awayPossession ?? 50)) * 0.15 +
+    ((homeDangerousAttacks ?? 0) - (awayDangerousAttacks ?? 0)) * 1.5 +
+    ((homeShots ?? 0) - (awayShots ?? 0)) * 1.2 +
+    ((homeShotsOnTarget ?? 0) - (awayShotsOnTarget ?? 0)) * 2
+  ) * 10) / 10;
+
+  return {
+    id: row.id,
+    provider: row.provider || 'ISPORTS',
+    providerMatchId: nullableNumber(row.providerMatchId),
+    minute: nullableNumber(row.minute),
+    capturedAt: row.capturedAt instanceof Date ? row.capturedAt.toISOString() : row.capturedAt,
+    dataStatus: 'live_unofficial',
+    momentum,
+    home: {
+      possession: homePossession,
+      attacks: nullableNumber(row.homeAttacks),
+      dangerousAttacks: homeDangerousAttacks,
+      shots: homeShots,
+      shotsOnTarget: homeShotsOnTarget,
+      shotsOffTarget: nullableNumber(row.homeShotsOffTarget),
+      score: nullableNumber(row.homeScore),
+    },
+    away: {
+      possession: awayPossession,
+      attacks: nullableNumber(row.awayAttacks),
+      dangerousAttacks: awayDangerousAttacks,
+      shots: awayShots,
+      shotsOnTarget: awayShotsOnTarget,
+      shotsOffTarget: nullableNumber(row.awayShotsOffTarget),
+      score: nullableNumber(row.awayScore),
+    },
+  };
+}
+
+function formatMatch(match: any, statsMap: Map<string, any>) {
   return {
     id: match.id,
     externalId: match.externalId,
@@ -49,6 +128,7 @@ function formatMatch(match: any) {
     stage: match.stage,
     homeTeam: match.homeTeam ? { id: match.homeTeam.id, name: match.homeTeam.name, code: match.homeTeam.code, image: match.homeTeam.image, price: Math.round(toNumber(match.homeTeam.marketPrice ?? match.homeTeam.current_price)), change: toNumber(match.homeTeam.change) } : null,
     awayTeam: match.awayTeam ? { id: match.awayTeam.id, name: match.awayTeam.name, code: match.awayTeam.code, image: match.awayTeam.image, price: Math.round(toNumber(match.awayTeam.marketPrice ?? match.awayTeam.current_price)), change: toNumber(match.awayTeam.change) } : null,
+    liveStats: formatLiveStats(statsMap.get(match.id)),
   };
 }
 
@@ -103,6 +183,8 @@ export async function GET() {
       prisma.match.count({ where: { animationMatchId: null, matchDate: { gte: dayStart, lte: nearUntil } } }),
     ]);
 
+    const statsMap = await fetchLatestStatsForMatches([...liveMatches, ...upcomingMatches, ...recentMatches].map((match) => match.id));
+
     const news = newsRows.map((item) => {
       const rendered = renderMarketNews(item, 'ar');
       const category = categoryFromEvent(item.eventType);
@@ -143,9 +225,9 @@ export async function GET() {
         providerMode: 'iSports-first / API-Football protected',
       },
       matches: {
-        live: liveMatches.map(formatMatch),
-        upcoming: upcomingMatches.map(formatMatch),
-        recent: recentMatches.map(formatMatch),
+        live: liveMatches.map((match) => formatMatch(match, statsMap)),
+        upcoming: upcomingMatches.map((match) => formatMatch(match, statsMap)),
+        recent: recentMatches.map((match) => formatMatch(match, statsMap)),
       },
       news: {
         latest: news,
