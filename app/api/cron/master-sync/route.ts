@@ -192,6 +192,54 @@ function skippedStep(name: string, path: string, reason: string): StepResult {
   return { name, path, ok: true, status: 200, skipped: true, reason };
 }
 
+function countArray(value: unknown) {
+  return Array.isArray(value) ? value.length : undefined;
+}
+
+function summarizePayload(payload: any) {
+  if (!payload || typeof payload !== 'object') {
+    return typeof payload === 'string' ? { text: payload.slice(0, 220) } : null;
+  }
+  const errors = Array.isArray(payload.errors) ? payload.errors : [];
+  const processed = Array.isArray(payload.processed) ? payload.processed : [];
+  return {
+    ok: payload.ok ?? payload.success ?? null,
+    mode: payload.mode,
+    provider: payload.provider,
+    providerUsed: payload.providerUsed,
+    providerFallbackAllowed: payload.providerFallbackAllowed,
+    skippedProviderFetch: payload.skippedProviderFetch,
+    fromThrottleCache: payload.fromThrottleCache,
+    externalRequestsUsed: payload.externalRequestsUsed,
+    fixturesFetched: payload.fixturesFetched,
+    processedCount: countArray(payload.processed),
+    errorsCount: countArray(payload.errors),
+    message: payload.message,
+    firstProcessedStatus: processed[0]?.status,
+    firstProcessedScore: processed[0]?.score,
+    firstError: errors[0]?.message || errors[0]?.payload || errors[0] || payload.error,
+  };
+}
+
+function compactStep(step: StepResult) {
+  return {
+    name: step.name,
+    path: step.path,
+    ok: step.ok,
+    status: step.status,
+    skipped: step.skipped,
+    reason: step.reason,
+    durationMs: step.durationMs,
+    targetUrl: step.targetUrl,
+    payloadSummary: summarizePayload(step.payload),
+  };
+}
+
+function shouldReturnVerbose(req: Request) {
+  const url = new URL(req.url);
+  return url.searchParams.get('verbose') === 'true' || url.searchParams.get('full') === 'true';
+}
+
 export async function GET(req: Request) {
   const auth = getAuth(req);
   if (!auth.valid) {
@@ -205,6 +253,7 @@ export async function GET(req: Request) {
   const forceAnimation = url.searchParams.get('forceAnimation') === 'true';
   const forceDemand = url.searchParams.get('forceDemand') === 'true';
   const allowApiFootballFallback = url.searchParams.get('allowApiFootballFallback') === 'true' || url.searchParams.get('providerFallback') === 'true';
+  const verbose = shouldReturnVerbose(req);
   const startedAt = new Date();
   const steps: StepResult[] = [];
   const syncWindow = await getSyncWindow(req);
@@ -257,6 +306,7 @@ export async function GET(req: Request) {
   return NextResponse.json({
     ok,
     mode: 'budget_aware_master_sync',
+    responseMode: verbose ? 'verbose' : 'compact',
     authMethod: auth.method,
     baseUrl: baseUrl.replace(/(cronSecret|adminSecret|key)=([^&]+)/g, '$1=***'),
     startedAt: startedAt.toISOString(),
@@ -275,7 +325,8 @@ export async function GET(req: Request) {
       liveFallbackDefault: 'disabled unless allowApiFootballFallback=true is passed',
       dailyLimitTarget: 100,
     },
-    steps,
+    steps: verbose ? steps : steps.map(compactStep),
+    hint: verbose ? undefined : 'Compact output is enabled by default for cron-job.org. Add verbose=true manually when you need full downstream payloads.',
   }, {
     status: ok ? 200 : 207,
     headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate' },
