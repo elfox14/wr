@@ -358,6 +358,39 @@ model PressNews {
   @@index([relatedMatchId])
 }
 
+model DailyDigest {
+  id                String   @id @default(cuid())
+  digestDate        String   @unique
+  headline          String
+  summary           String
+  videoScript       String
+  facebookPost      String?
+  youtubeTitle      String?
+  youtubeDescription String?
+  infographicPoints Json?
+  status            String   @default("published")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  @@index([digestDate])
+}
+
+model MatchDigest {
+  id                String   @id @default(cuid())
+  matchId           String   @unique
+  matchTitle        String
+  scoreLine         String
+  statusLabel       String
+  summary           String
+  turningPoint      String?
+  videoScript       String
+  facebookPost      String?
+  infographicPoints Json?
+  status            String   @default("published")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  @@index([matchId])
+}
+
 model CaptainSelection {
   id        String   @id @default(cuid())
   userId    String   @unique
