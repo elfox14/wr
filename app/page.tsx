@@ -3,7 +3,14 @@ import { getAssets } from '@/lib/store-server';
 import { getAllArticles } from '@/lib/articles';
 import prisma from '@/lib/prisma';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export default async function Home() {
+  const now = new Date();
+  const liveWindowStart = new Date(now.getTime() - 3 * 60 * 60 * 1000);
+  const upcomingUntil = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+
   const assets = await getAssets();
   const academyArticles = getAllArticles().slice(0, 4).map((article) => ({
     id: article.id,
@@ -20,11 +27,17 @@ export default async function Home() {
   const playersCount = await prisma.asset.count({ where: { type: 'PLAYER' } });
   const teamsCount = await prisma.asset.count({ where: { type: 'TEAM' } });
   const upcomingMatchesCount = await prisma.match.count({
-    where: { status: { in: ['SCHEDULED', 'IN_PLAY', 'LIVE'] } },
+    where: {
+      status: { in: ['SCHEDULED', 'IN_PLAY', 'LIVE', 'HT'] },
+      matchDate: { gte: liveWindowStart, lte: upcomingUntil },
+    },
   });
 
   const upcomingMatchesRaw = await prisma.match.findMany({
-    where: { status: { in: ['SCHEDULED', 'IN_PLAY', 'LIVE'] } },
+    where: {
+      status: { in: ['SCHEDULED', 'IN_PLAY', 'LIVE', 'HT'] },
+      matchDate: { gte: liveWindowStart, lte: upcomingUntil },
+    },
     orderBy: { matchDate: 'asc' },
     take: 5,
     include: { homeTeam: true, awayTeam: true },
