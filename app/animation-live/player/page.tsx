@@ -2,13 +2,14 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ArrowRight, Expand, Radio, ShieldCheck } from 'lucide-react';
 import AnimationIframe from './AnimationIframe';
+import LiveMatchStatsPanel from './LiveMatchStatsPanel';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 export const metadata: Metadata = {
   title: 'مشغل البث الأنيميشن | MC PRIME Exchange',
-  description: 'مشغل Football Animation Live داخل منصة بورصة المونديال.',
+  description: 'مشغل Football Animation Live مع تسجيل الإحصائيات الحية داخل منصة بورصة المونديال.',
 };
 
 const allowedLanguages = new Set(['en', 'th', 'vi', 'id']);
@@ -20,7 +21,6 @@ function getSingleValue(value?: string | string[]) {
 
 export default async function AnimationLivePlayerPage({ searchParams }: { searchParams?: Promise<Record<string, string | string[] | undefined>> }) {
   const params = (await searchParams) || {};
-  const accessKey = process.env.ISPORTS_ANIMATION_ACCESS_KEY || process.env.NEXT_PUBLIC_ISPORTS_ANIMATION_ACCESS_KEY || process.env.ISPORTS_API_KEY || '';
   const matchId = getSingleValue(params.matchId) || '';
   const requestedLang = getSingleValue(params.lang) || 'en';
   const lang = allowedLanguages.has(requestedLang) ? requestedLang : 'en';
@@ -28,16 +28,16 @@ export default async function AnimationLivePlayerPage({ searchParams }: { search
   const statsPanel = allowedStatsPanel.has(requestedStatsPanel) ? requestedStatsPanel : 'simple';
   const teamPanel = getSingleValue(params.teamPanel) === '0' ? '' : '1';
 
-  const iframeUrl = matchId && accessKey ? new URL('https://www.isportslive8.com/football/detail.html') : new URL('https://www.isportslive8.com/');
-  if (matchId && accessKey) {
+  const iframeUrl = matchId ? new URL('https://www.isportslive8.com/football/pc.html') : new URL('https://www.isportslive8.com/');
+  if (matchId) {
     iframeUrl.searchParams.set('matchId', matchId);
-    iframeUrl.searchParams.set('accessKey', accessKey);
     iframeUrl.searchParams.set('lang', lang);
+    iframeUrl.searchParams.set('v', '1');
     iframeUrl.searchParams.set('statsPanel', statsPanel);
     if (teamPanel) iframeUrl.searchParams.set('teamPanel', teamPanel);
   }
   const iframeUrlString = iframeUrl.toString();
-  const isLinkedMatch = Boolean(matchId && accessKey);
+  const isLinkedMatch = Boolean(matchId);
 
   return (
     <main className="min-h-screen bg-background px-3 py-3 text-white sm:px-5 lg:px-8">
@@ -56,7 +56,10 @@ export default async function AnimationLivePlayerPage({ searchParams }: { search
         </div>
 
         {isLinkedMatch ? (
-          <AnimationIframe src={iframeUrlString} matchId={matchId} lang={lang} statsPanel={statsPanel} teamPanel={teamPanel} />
+          <>
+            <AnimationIframe src={iframeUrlString} matchId={matchId} lang={lang} statsPanel={statsPanel} teamPanel={teamPanel} />
+            <LiveMatchStatsPanel matchId={matchId} />
+          </>
         ) : (
           <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.03] p-10 text-center text-sm text-gray-400">
             <Radio className="mx-auto mb-4 text-gray-500" size={48} />
@@ -68,7 +71,7 @@ export default async function AnimationLivePlayerPage({ searchParams }: { search
           </div>
         )}
 
-        <div className="rounded-2xl border border-emerald-400/20 bg-emerald-400/10 px-3 py-2 text-[11px] font-bold leading-5 text-emerald-100"><span className="inline-flex items-center gap-2"><ShieldCheck size={14} /> مهم:</span> هذا تكامل عرض فقط داخل المنصة. كل الأرصدة Virtual Credits فقط.</div>
+        <div className="rounded-2xl border border-emerald-400/20 bg-emerald-400/10 px-3 py-2 text-[11px] font-bold leading-5 text-emerald-100"><span className="inline-flex items-center gap-2"><ShieldCheck size={14} /> مهم:</span> البث يعرض أنيميشن المباراة، ولوحة الإحصائيات تحفظ لقطات دورية كل 5 ثوانٍ أثناء المباراة ولا تحذف القديم.</div>
       </section>
     </main>
   );
