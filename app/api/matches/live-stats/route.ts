@@ -21,6 +21,10 @@ function isLiveLike(status?: string | null) {
   return ['IN_PLAY', 'LIVE', 'HT'].includes(value);
 }
 
+function isFinished(status?: string | null) {
+  return String(status || '').toUpperCase() === 'FINISHED';
+}
+
 function shouldSync(match: any, latest: any, force: boolean) {
   if (force) return true;
   if (!match?.animationMatchId) return false;
@@ -28,8 +32,7 @@ function shouldSync(match: any, latest: any, force: boolean) {
   const capturedAt = new Date(latest.capturedAt).getTime();
   if (!Number.isFinite(capturedAt)) return true;
   const ageMs = Date.now() - capturedAt;
-  if (isLiveLike(match.status)) return ageMs >= 4_800;
-  if (String(match.status || '').toUpperCase() === 'FINISHED') return ageMs >= 120_000;
+  if (isLiveLike(match.status) || isFinished(match.status)) return ageMs >= 4_800;
   return ageMs >= 30_000;
 }
 
@@ -87,7 +90,7 @@ export async function GET(request: Request) {
     return NextResponse.json({
       ok: true,
       updatedAt: now.toISOString(),
-      pollingSeconds: isLiveLike(match.status) ? 5 : 30,
+      pollingSeconds: isLiveLike(match.status) || isFinished(match.status) ? 5 : 30,
       sync: syncResult,
       match: {
         id: match.id,
