@@ -8,7 +8,6 @@ import {
   ArrowLeft,
   BarChart3,
   Calendar,
-  CheckCircle2,
   Clock,
   FileText,
   Globe,
@@ -153,6 +152,22 @@ function changeBadge(change: number) {
   return 'مستقر';
 }
 
+function shuffleTeams(teams: any[]) {
+  return [...teams].sort(() => Math.random() - 0.5).slice(0, 4);
+}
+
+function teamQuickSummary(team: any) {
+  const group = team?.group ? `المجموعة ${team.group}` : 'المجموعة غير محددة';
+  const momentum = Number(team?.momentum ?? 0);
+  const demand = Number(team?.marketDemand ?? 0);
+  const risk = Number(team?.volatilityScore ?? 0);
+  const rank = team?.fifaRank ? `تصنيف FIFA: ${team.fifaRank}.` : 'تصنيف FIFA غير متوفر.';
+  const momentumText = momentum >= 70 ? 'زخم افتراضي مرتفع داخل المنصة' : momentum >= 45 ? 'زخم افتراضي متوسط يحتاج متابعة' : 'زخم افتراضي هادئ حاليًا';
+  const demandText = demand >= 70 ? 'طلب جماهيري قوي' : demand >= 45 ? 'طلب جماهيري متوسط' : 'طلب جماهيري محدود';
+  const riskText = risk >= 70 ? 'مخاطرة مرتفعة' : risk >= 45 ? 'مخاطرة متوسطة' : 'مخاطرة منخفضة';
+  return `${group}. ${rank} ${momentumText}، ${demandText}، و${riskText}.`;
+}
+
 export default function HomeClient({
   initialAssets,
   upcomingMatches = [],
@@ -164,6 +179,7 @@ export default function HomeClient({
 }: HomeClientProps) {
   const [now, setNow] = useState(() => Date.now());
   const [liveMatches, setLiveMatches] = useState<any[]>(() => (Array.isArray(upcomingMatches) ? upcomingMatches : []));
+  const [spotlightTeams, setSpotlightTeams] = useState<any[]>([]);
 
   useEffect(() => {
     useStore.setState({ assets: initialAssets, loading: false });
@@ -203,9 +219,14 @@ export default function HomeClient({
   const topMatches = pickTopMatches(safeMatches, now);
   const tickerMatch = topMatches[0] || null;
   const hasLiveMatch = topMatches.some((match) => isMatchLive(match, now));
-  const featuredTeams = safeAssets.filter((asset) => asset.type === 'TEAM').slice(0, 4);
+  const allTeams = safeAssets.filter((asset) => asset.type === 'TEAM');
+  const featuredTeams = allTeams.slice(0, 4);
   const featuredPlayers = safeAssets.filter((asset) => asset.type === 'PLAYER').slice(0, 4);
   const marketMovers = [...safeAssets].sort((a, b) => Math.abs(getAssetChange(b)) - Math.abs(getAssetChange(a))).slice(0, 3);
+
+  useEffect(() => {
+    setSpotlightTeams(shuffleTeams(allTeams));
+  }, [initialAssets]);
 
   const findTeamAsset = (team: any) => {
     const teamName = team?.name || team?.teamName || '';
@@ -242,11 +263,11 @@ export default function HomeClient({
     </Link>
   );
 
-  const quickStats = [
-    { label: 'منتخب', value: teamsCount || 0, icon: Globe },
-    { label: 'لاعب', value: playersCount || 0, icon: Users },
-    { label: 'أصل افتراضي', value: assetsCount || 0, icon: Wallet },
-    { label: 'مباراة', value: upcomingMatchesCount || 0, icon: Calendar },
+  const heroStats = [
+    { label: 'منتخب', value: 48, icon: Globe },
+    { label: 'لاعب', value: 1249, icon: Users },
+    { label: 'أصل افتراضي', value: 1297, icon: Wallet },
+    { label: 'مباراة', value: 71, icon: Calendar },
   ];
 
   const commandLinks = [
@@ -257,7 +278,7 @@ export default function HomeClient({
   ];
 
   const mobileQuickActions = [
-    { title: 'المباريات', subtitle: 'نتائج ومواعيد', href: '#matches', icon: Radio, tone: 'border-red-400/25 bg-red-500/10 text-red-300' },
+    { title: 'المباريات', subtitle: 'نتائج ومواعيد', href: '/animation-live', icon: Radio, tone: 'border-red-400/25 bg-red-500/10 text-red-300' },
     { title: 'الأخبار', subtitle: 'موثق وسريع', href: '#news', icon: Newspaper, tone: 'border-[#FFD700]/25 bg-[#FFD700]/10 text-[#FFD700]' },
     { title: 'التحليل', subtitle: 'قبل وبعد', href: '#analysis', icon: LineChart, tone: 'border-[#0FF0FC]/25 bg-[#0FF0FC]/10 text-[#0FF0FC]' },
     { title: 'المنتخبات', subtitle: 'بطاقات وقوائم', href: '#teams', icon: Trophy, tone: 'border-emerald-400/25 bg-emerald-400/10 text-emerald-300' },
@@ -328,28 +349,32 @@ export default function HomeClient({
         </div>
       </section>
 
-      <section className="relative overflow-hidden rounded-[1.65rem] border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(15,240,252,0.18),transparent_28%),radial-gradient(circle_at_bottom_left,rgba(255,215,0,0.12),transparent_24%),linear-gradient(135deg,rgba(255,255,255,0.055),rgba(255,255,255,0.015))] p-4 shadow-anti-gravity sm:p-5 md:p-7">
+      <section className="relative overflow-hidden rounded-[1.65rem] border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(15,240,252,0.18),transparent_28%),radial-gradient(circle_at_bottom_left,rgba(255,215,0,0.12),transparent_24%),linear-gradient(135deg,rgba(255,255,255,0.055),rgba(255,255,255,0.015))] p-4 shadow-anti-gravity sm:p-5 md:p-6">
         <div className="pointer-events-none absolute inset-0 opacity-16 [background-image:linear-gradient(rgba(255,255,255,.05)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.05)_1px,transparent_1px)] [background-size:44px_44px]" />
         <div className="relative grid gap-5 lg:grid-cols-[1.02fr_0.98fr] lg:items-stretch">
           <div className="flex flex-col justify-center">
-            <p className="mb-4 inline-flex w-fit items-center gap-2 rounded-full border border-[#0FF0FC]/25 bg-[#0FF0FC]/10 px-4 py-2 text-[11px] font-black text-[#0FF0FC] sm:text-xs">
-              <Sparkles size={15} /> World Cup Command Center
+            <p className="mb-3 inline-flex w-fit items-center gap-2 rounded-full border border-[#0FF0FC]/25 bg-[#0FF0FC]/10 px-4 py-2 text-[11px] font-black text-[#0FF0FC] sm:text-xs">
+              <Sparkles size={15} /> كأس العالم مع MC PRIME
             </p>
-            <h1 className="max-w-4xl text-[1.72rem] font-black leading-tight text-white sm:text-3xl md:text-5xl">
+            <h1 className="max-w-4xl text-2xl font-black leading-tight text-white sm:text-3xl md:text-4xl">
               كل ما يحدث في كأس العالم… مباشر، موثق، وتحليلي — مع بورصة افتراضية للتفاعل الجماهيري
             </h1>
-            <p className="mt-4 max-w-3xl text-sm leading-7 text-gray-300 md:text-base">
+            <p className="mt-3 max-w-3xl text-xs leading-6 text-gray-300 sm:text-sm md:text-[15px]">
               ابدأ من المباراة والنتيجة والخبر، ثم انتقل للتحليل الكروي وصفحات المنتخبات. البورصة هنا طبقة ترفيهية افتراضية في النهاية، وليست توصية مالية أو مراهنة.
             </p>
-            <div className="mt-5 grid gap-2 sm:grid-cols-3">
-              {['مباشر أولًا', 'مصادر موثقة', 'تحليل منفصل عن الترفيه'].map((item) => (
-                <div key={item} className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-black/30 px-3 py-2 text-xs font-black text-gray-200">
-                  <CheckCircle2 size={15} className="text-[#0FF0FC]" />
-                  {item}
-                </div>
-              ))}
+            <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-4">
+              {heroStats.map((stat) => {
+                const Icon = stat.icon;
+                return (
+                  <div key={stat.label} className="rounded-2xl border border-[#FFD700]/20 bg-black/30 p-3">
+                    <Icon className="mb-2 text-[#FFD700]" size={18} />
+                    <div className="text-xl font-black text-white sm:text-2xl">{formatNumber(stat.value)}</div>
+                    <div className="text-[11px] font-bold text-gray-400">{stat.label}</div>
+                  </div>
+                );
+              })}
             </div>
-            <div className="mt-6 grid grid-cols-2 gap-3 sm:flex sm:flex-wrap">
+            <div className="mt-5 grid grid-cols-2 gap-3 sm:flex sm:flex-wrap">
               <Link href="/animation-live" className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#0FF0FC] px-4 py-3 text-xs font-black text-black transition active:scale-95 hover:bg-[#70f7ff] sm:px-5 sm:text-sm">
                 <Radio size={18} /> مركز المباريات
               </Link>
@@ -357,16 +382,13 @@ export default function HomeClient({
                 <Newspaper size={18} /> الأخبار والتحليل
               </Link>
             </div>
-            <div className="mt-5 rounded-2xl border border-[#FFD700]/20 bg-[#FFD700]/10 px-4 py-3 text-xs font-bold leading-6 text-[#FFD700]">
-              قاعدة النشر: أي رقم غير موثق لا يظهر كحقيقة، وأي تقييم افتراضي يبقى منفصلًا عن التحليل الكروي.
-            </div>
           </div>
 
           <div className="rounded-[1.35rem] border border-white/10 bg-black/40 p-4 backdrop-blur-xl sm:rounded-[1.6rem] sm:p-5">
             <div className="mb-4 flex items-center justify-between gap-3">
               <div>
-                <p className="text-xs font-black text-gray-500">{hasLiveMatch ? 'مباشر الآن' : 'المباريات القادمة'}</p>
-                <h2 className="mt-1 text-lg font-black text-white sm:text-xl">{hasLiveMatch ? 'مباراة جارية الآن' : topMatches.length > 0 ? 'أقرب مباراة' : 'جدول المباريات'}</h2>
+                <p className="text-xs font-black text-gray-500">{hasLiveMatch ? 'مباراة جارية الآن' : 'مباريات اليوم'}</p>
+                <h2 className="mt-1 text-lg font-black text-white sm:text-xl">مباريات اليوم</h2>
               </div>
               <ShieldCheck className={hasLiveMatch ? 'text-red-400' : 'text-[#0FF0FC]'} size={30} />
             </div>
@@ -413,75 +435,6 @@ export default function HomeClient({
             )}
           </div>
         </div>
-      </section>
-
-      <section className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        {quickStats.map((stat) => {
-          const Icon = stat.icon;
-          return (
-            <div key={stat.label} className="rounded-2xl border border-white/8 bg-white/[0.035] p-3 sm:p-4">
-              <Icon className="mb-3 text-[#0FF0FC]" size={22} />
-              <div className="text-xl font-black text-white sm:text-2xl">{formatNumber(stat.value)}</div>
-              <div className="text-xs font-bold text-gray-500">{stat.label}</div>
-            </div>
-          );
-        })}
-      </section>
-
-      <section id="matches" className="scroll-mt-24 rounded-[1.6rem] border border-white/10 bg-white/[0.035] p-4 sm:p-5">
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <p className="text-xs font-black text-[#0FF0FC]">Match Center</p>
-            <h2 className="mt-1 text-xl font-black text-white sm:text-2xl">مركز مباريات اليوم</h2>
-          </div>
-          <Link href="/animation-live" className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/30 px-4 py-2 text-xs font-black text-gray-300 transition active:scale-95 hover:text-[#0FF0FC]">
-            كل المباريات <ArrowLeft size={14} />
-          </Link>
-        </div>
-        {topMatches.length > 0 ? (
-          <div className="flex snap-x gap-3 overflow-x-auto pb-2 lg:grid lg:grid-cols-2 lg:overflow-visible lg:pb-0">
-            {topMatches.map((match, index) => {
-              const matchGroup = normalizeGroupKey(match?.groupPhase || match?.group || match?.homeTeam?.group || match?.awayTeam?.group);
-              const isCurrentlyLive = isMatchLive(match, now);
-              const isFinished = String(match?.status || '').toUpperCase() === 'FINISHED';
-              return (
-                <div key={match.id || `${match.homeTeam?.name}-${match.awayTeam?.name}-${index}`} className={`min-w-[82vw] snap-start rounded-2xl border p-4 lg:min-w-0 ${isCurrentlyLive ? 'border-red-500/25 bg-red-500/[0.06]' : 'border-white/10 bg-black/25'}`}>
-                  <div className="mb-4 flex items-center justify-between gap-3">
-                    <Link href={groupHref(matchGroup)} className="rounded-full border border-[#0FF0FC]/20 bg-[#0FF0FC]/10 px-3 py-1 text-[10px] font-black text-[#0FF0FC]">
-                      المجموعة {matchGroup}
-                    </Link>
-                    <span className={`rounded-full px-3 py-1 text-[10px] font-black ${isCurrentlyLive ? 'bg-red-500/10 text-red-300' : 'bg-white/8 text-gray-400'}`}>
-                      {isFinished ? 'انتهت' : isCurrentlyLive ? 'مباشر' : 'قادمة'}
-                    </span>
-                  </div>
-                  <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 sm:gap-3">
-                    <div className="flex flex-col items-center gap-2 text-center sm:flex-row sm:text-start">
-                      {renderMatchTeamLogo(match.homeTeam)}
-                      <Link href={getTeamHref(match.homeTeam)} className="line-clamp-1 text-xs font-black text-white transition hover:text-[#0FF0FC] sm:text-sm">
-                        {match.homeTeam?.name || 'الفريق الأول'}
-                      </Link>
-                    </div>
-                    <div className="rounded-2xl border border-white/10 bg-black/50 px-3 py-2 text-center text-base font-black text-white tabular-nums sm:px-4 sm:text-lg">
-                      {isCurrentlyLive || isFinished ? `${match.homeScore ?? 0} - ${match.awayScore ?? 0}` : 'VS'}
-                    </div>
-                    <div className="flex flex-col items-center gap-2 text-center sm:flex-row sm:justify-end sm:text-left">
-                      <Link href={getTeamHref(match.awayTeam)} className="line-clamp-1 text-xs font-black text-white transition hover:text-[#0FF0FC] sm:text-sm">
-                        {match.awayTeam?.name || 'الفريق الثاني'}
-                      </Link>
-                      {renderMatchTeamLogo(match.awayTeam)}
-                    </div>
-                  </div>
-                  <div className="mt-4 flex items-center gap-2 text-xs font-bold text-gray-400">
-                    <Clock size={13} />
-                    {statusLabel(match, now)}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          <div className="rounded-2xl border border-dashed border-white/10 p-6 text-center text-sm text-gray-500">لا توجد مباريات محملة حاليًا.</div>
-        )}
       </section>
 
       <section className="grid gap-4 lg:grid-cols-[0.95fr_1.05fr]">
@@ -531,8 +484,25 @@ export default function HomeClient({
               );
             })}
           </div>
-          <div className="mt-4 rounded-2xl border border-white/10 bg-black/25 p-4 text-sm leading-7 text-gray-300">
-            التحليل الكروي يبقى منفصلًا عن أسعار البورصة الافتراضية، حتى لا يتحول التقرير إلى توصية شراء أو بيع.
+          <div className="mt-4 rounded-2xl border border-white/10 bg-black/25 p-4">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <div>
+                <p className="text-[11px] font-black text-[#0FF0FC]">Team Spotlight</p>
+                <h3 className="text-sm font-black text-white">تحليل مختصر لمنتخبات مختارة عشوائيًا</h3>
+              </div>
+              <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[10px] font-black text-gray-400">يتغير مع تحديث الصفحة</span>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {(spotlightTeams.length > 0 ? spotlightTeams : featuredTeams).slice(0, 4).map((team) => (
+                <Link key={team.id || team.name} href={team?.id ? `/asset/${team.id}` : '/market?type=TEAM'} className="flex gap-3 rounded-2xl border border-white/8 bg-black/25 p-3 transition active:scale-[0.98] hover:border-[#0FF0FC]/25 hover:bg-white/[0.055]">
+                  <AssetImage image={team?.image} name={team?.name || 'منتخب'} type="TEAM" width={42} height={42} className="h-11 w-11 shrink-0 rounded-full border border-white/10 bg-black/40 object-cover" />
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-black text-white">{team?.name || 'منتخب'}</div>
+                    <p className="mt-1 text-[11px] leading-5 text-gray-400">{teamQuickSummary(team)}</p>
+                  </div>
+                </Link>
+              ))}
+            </div>
           </div>
         </div>
       </section>
