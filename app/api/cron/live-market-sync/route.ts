@@ -10,6 +10,19 @@ const LIVE_STATUSES = new Set(['1H', 'HT', '2H', 'ET', 'BT', 'P', 'LIVE', 'IN_PL
 const FINISHED_STATUSES = new Set(['FT', 'AET', 'PEN', 'FINISHED', 'ENDED', '-1']);
 const UPCOMING_STATUSES = new Set(['NS', 'TBD', 'SCHEDULED', '0']);
 
+const TEAM_SELECT = {
+  id: true,
+  name: true,
+  code: true,
+  current_price: true,
+  high_price: true,
+  low_price: true,
+  marketPrice: true,
+  volatilityScore: true,
+  apiFootballId: true,
+  isportsId: true,
+};
+
 function normalizeStatus(status?: string | null) {
   const value = String(status || '').toUpperCase();
   if (LIVE_STATUSES.has(value)) return 'IN_PLAY';
@@ -109,26 +122,26 @@ async function hasPotentialLiveWindow() {
 async function findTeamAsset(providerId?: number | string | null, name?: string | null) {
   const providerNumber = providerId == null ? null : Number(providerId);
   if (providerNumber && Number.isFinite(providerNumber)) {
-    const byIsportsId = await prisma.asset.findFirst({ where: { type: 'TEAM', isportsId: providerNumber } });
+    const byIsportsId = await prisma.asset.findFirst({ where: { type: 'TEAM', isportsId: providerNumber }, select: TEAM_SELECT });
     if (byIsportsId) return byIsportsId;
-    const byApiId = await prisma.asset.findFirst({ where: { type: 'TEAM', apiFootballId: providerNumber } });
+    const byApiId = await prisma.asset.findFirst({ where: { type: 'TEAM', apiFootballId: providerNumber }, select: TEAM_SELECT });
     if (byApiId) return byApiId;
   }
   const normalizedName = normalizeTeamName(name);
   if (!normalizedName || normalizedName.length < 3) return null;
-  const teams = await prisma.asset.findMany({ where: { type: 'TEAM' }, take: 500 });
+  const teams = await prisma.asset.findMany({ where: { type: 'TEAM' }, select: TEAM_SELECT, take: 500 });
   return teams.find((team) => normalizeTeamName(team.name) === normalizedName) || teams.find((team) => normalizeTeamName(team.code) === normalizedName) || null;
 }
 
 async function applyLiveTeamPriceEvent(params: { assetId: string; fixtureId: number; localeGroupKey: string; eventType: string; multiplier: number; titleAr: string; bodyAr: string }) {
-  const existingNews = await prisma.marketNews.findFirst({ where: { localeGroupKey: params.localeGroupKey } });
+  const existingNews = await prisma.marketNews.findFirst({ where: { localeGroupKey: params.localeGroupKey }, select: { id: true } });
   if (existingNews) return { status: 'already_processed', localeGroupKey: params.localeGroupKey };
-  const asset = await prisma.asset.findUnique({ where: { id: params.assetId } });
+  const asset = await prisma.asset.findUnique({ where: { id: params.assetId }, select: TEAM_SELECT });
   if (!asset) return { status: 'asset_not_found', assetId: params.assetId };
   const currentPrice = Math.max(1, Math.round(Number(asset.marketPrice || asset.current_price || 1)));
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const firstPriceToday = await prisma.priceHistory.findFirst({ where: { assetId: asset.id, timestamp: { gte: today } }, orderBy: { timestamp: 'asc' } });
+  const firstPriceToday = await prisma.priceHistory.findFirst({ where: { assetId: asset.id, timestamp: { gte: today } }, orderBy: { timestamp: 'asc' }, select: { price: true } });
   const startPrice = firstPriceToday?.price || currentPrice;
   const risk = Math.max(0, Math.min(100, Number(asset.volatilityScore ?? 50))) / 100;
   const requestedPrice = Math.max(1, Math.round(currentPrice * params.multiplier));
@@ -142,18 +155,19 @@ async function applyLiveTeamPriceEvent(params: { assetId: string; fixtureId: num
 }
 
 async function findExistingMatch(externalId: string, animationMatchId?: number) {
+  const select = { id: true, externalId: true, animationMatchId: true, homeTeamId: true, awayTeamId: true, matchDate: true, status: true, homeScore: true, awayScore: true, groupPhase: true, stage: true };
   if (animationMatchId) {
-    const byAnimation = await prisma.match.findFirst({ where: { animationMatchId } });
+    const byAnimation = await prisma.match.findFirst({ where: { animationMatchId }, select });
     if (byAnimation) return byAnimation;
   }
-  return prisma.match.findUnique({ where: { externalId } });
+  return prisma.match.findUnique({ where: { externalId }, select });
 }
 
 async function getLinkedMatchTeams(previousMatch: any) {
   if (!previousMatch?.homeTeamId || !previousMatch?.awayTeamId) return { homeTeam: null, awayTeam: null };
   const [homeTeam, awayTeam] = await Promise.all([
-    prisma.asset.findUnique({ where: { id: previousMatch.homeTeamId } }),
-    prisma.asset.findUnique({ where: { id: previousMatch.awayTeamId } }),
+    prisma.asset.findUnique({ where: { id: previousMatch.homeTeamId }, select: TEAM_SELECT }),
+    prisma.asset.findUnique({ where: { id: previousMatch.awayTeamId }, select: TEAM_SELECT }),
   ]);
   return { homeTeam, awayTeam };
 }
@@ -197,53 +211,49 @@ async function processLiveFixture(fixture: any, providerSource?: string) {
   const homeTeam = linkedTeams.homeTeam || providerHomeTeam;
   const awayTeam = linkedTeams.awayTeam || providerAwayTeam;
 
-  if (!homeTeam || !awayTeam || homeTeam.id === awayTeam.id) {
-    return {
-      status: 'skipped_team_not_matched',
-      fixtureId,
-      providerSource,
-      homeMatched: Boolean(homeTeam),
-      awayMatched: Boolean(awayTeam),
-      usedManualLink: Boolean(linkedTeams.homeTeam || linkedTeams.awayTeam),
-      providerHome: home.name,
-      providerAway: away.name,
-    };
-  }
+  if (!homeTeam || !awayTeam) return { status: 'skipped_unmatched_teams', fixtureId, animationMatchId, providerSource, providerHome: home.name, providerAway: away.name, homeMatched: Boolean(homeTeam), awayMatched: Boolean(awayTeam), usedManualLink: Boolean(linkedTeams.homeTeam || linkedTeams.awayTeam) };
 
-  const rawStatus = fixture.fixture?.status?.short || fixture.fixture?.status?.long;
-  const status = normalizeStatus(rawStatus);
-  const matchDate = parseProviderDate(fixture.fixture?.date || fixture.fixture?.timestamp || fixture.raw?.matchTime || fixture.raw?.match_time || fixture.raw?.time);
+  const status = normalizeStatus(fixture.fixture?.status?.short || fixture.fixture?.status?.long);
   const homeScore = toScore(fixture.goals?.home);
   const awayScore = toScore(fixture.goals?.away);
-  const previousHomeScore = previousMatch?.homeScore ?? 0;
-  const previousAwayScore = previousMatch?.awayScore ?? 0;
+  const matchDate = parseProviderDate(fixture.fixture?.date || fixture.fixture?.timestamp);
   await saveProviderMatch({ previousMatch, externalId, animationMatchId, homeTeamId: homeTeam.id, awayTeamId: awayTeam.id, matchDate, status, homeScore, awayScore, groupPhase: fixture.league?.round || fixture.league?.name || null });
-  const priceUpdates = (status === 'IN_PLAY' || status === 'FINISHED') ? await processGoalEvents({ fixtureId, homeScore, awayScore, homeTeam, awayTeam }) : [];
-  return { status: 'live_fixture_processed', providerSource, fixtureId, animationMatchId: animationMatchId || null, matchStatus: status, homeTeam: homeTeam.name, awayTeam: awayTeam.name, usedManualLink: Boolean(linkedTeams.homeTeam || linkedTeams.awayTeam), previousScore: `${previousHomeScore}-${previousAwayScore}`, currentScore: `${homeScore}-${awayScore}`, priceUpdates };
+
+  const priceUpdates = status === 'IN_PLAY' || status === 'FINISHED' ? await processGoalEvents({ fixtureId, homeScore, awayScore, homeTeam, awayTeam }) : [];
+  return { status: 'live_fixture_processed', fixtureId, animationMatchId, providerSource, matchStatus: status, homeTeam: homeTeam.name, awayTeam: awayTeam.name, usedManualLink: Boolean(linkedTeams.homeTeam || linkedTeams.awayTeam), score: `${homeScore}-${awayScore}`, priceUpdates };
+}
+
+function pickFixtures(payload: any) {
+  if (Array.isArray(payload?.response)) return payload.response;
+  if (Array.isArray(payload)) return payload;
+  return [];
 }
 
 export async function GET(req: Request) {
   const auth = getCronAuth(req);
-  if (!auth.valid) return NextResponse.json({ error: 'Unauthorized', hint: 'Use Authorization bearer token, x-cron-secret, x-admin-secret, or private query secret for testing.' }, { status: 401, headers: { 'Cache-Control': 'no-store' } });
-  const summary: any = { success: true, mode: 'isports_first_live_market_sync', providerPriority: ['ISPORTS', 'API_FOOTBALL'], providerUsed: null, authMethod: auth.method, externalRequestsUsed: 0, skippedProviderFetch: false, fixturesFetched: 0, processed: [], errors: [] };
-  const shouldFetchLive = await hasPotentialLiveWindow();
-  if (!shouldFetchLive) {
-    summary.skippedProviderFetch = true;
-    summary.reason = 'No local match today or within the extended live recovery window, so no provider request was used.';
-    return NextResponse.json(summary, { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate' } });
-  }
-  try {
-    const payload = await apiFootballFetch<{ response?: any[]; _provider?: string }>('/livescores', { live: 'all', date: dateKey() });
-    const providerSource = payload._provider || 'UNKNOWN';
-    const fixtures = payload.response || [];
-    summary.providerUsed = providerSource;
-    summary.externalRequestsUsed = 1;
-    summary.fixturesFetched = fixtures.length;
-    for (const fixture of fixtures) summary.processed.push(await processLiveFixture(fixture, providerSource));
-  } catch (error: any) {
-    summary.errors.push({ message: error.message || 'Failed to run iSports-first live market sync', provider: error.provider || null, details: error.payload || null });
-  }
-  return NextResponse.json(summary, { status: summary.errors.length ? 207 : 200, headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate' } });
-}
+  if (!auth.valid) return NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers: { 'Cache-Control': 'no-store' } });
 
-export async function POST(req: Request) { return GET(req); }
+  const startedAt = new Date();
+  const url = new URL(req.url);
+  const force = url.searchParams.get('force') === 'true' || url.searchParams.get('forceLive') === 'true';
+  const shouldFetch = force || await hasPotentialLiveWindow();
+  const processed: any[] = [];
+  const errors: any[] = [];
+
+  if (!shouldFetch) {
+    return NextResponse.json({ success: true, skippedProviderFetch: true, reason: 'No local live/today/nearby matches found; protected external API budget.', processed, errors, startedAt: startedAt.toISOString(), finishedAt: new Date().toISOString() }, { headers: { 'Cache-Control': 'no-store' } });
+  }
+
+  try {
+    const date = url.searchParams.get('date') || dateKey();
+    const data: any = await apiFootballFetch('/livescores', { date, live: 'all' });
+    const fixtures = pickFixtures(data);
+    for (const fixture of fixtures) {
+      processed.push(await processLiveFixture(fixture, data?._provider));
+    }
+    return NextResponse.json({ success: true, mode: 'isports_first_live_market_sync', authMethod: auth.method, providerPriority: ['ISPORTS', 'API_FOOTBALL'], providerUsed: data?._provider, externalRequestsUsed: 1, skippedProviderFetch: false, fixturesFetched: fixtures.length, processed, errors, startedAt: startedAt.toISOString(), finishedAt: new Date().toISOString() }, { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate' } });
+  } catch (error: any) {
+    errors.push({ message: error?.message || 'live sync failed', status: error?.status, provider: error?.provider, payload: error?.payload });
+    return NextResponse.json({ success: false, mode: 'isports_first_live_market_sync', errors, processed, startedAt: startedAt.toISOString(), finishedAt: new Date().toISOString() }, { status: 500, headers: { 'Cache-Control': 'no-store' } });
+  }
+}
