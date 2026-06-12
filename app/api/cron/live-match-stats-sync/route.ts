@@ -256,16 +256,39 @@ export async function GET(req: Request) {
     const url = new URL(req.url);
     const debug = url.searchParams.get('debug') === 'true';
     const singleMatchId = Number(url.searchParams.get('matchId') || 0);
+    const hasSingleMatchId = Boolean(singleMatchId && Number.isFinite(singleMatchId));
 
     const matches = await prisma.match.findMany({
-      where: {
-        animationMatchId: singleMatchId && Number.isFinite(singleMatchId) ? singleMatchId : { not: null },
-        status: { in: ['IN_PLAY', 'LIVE'] },
-      },
+      where: hasSingleMatchId
+        ? { animationMatchId: singleMatchId }
+        : { animationMatchId: { not: null }, status: { in: ['IN_PLAY', 'LIVE'] } },
       orderBy: { matchDate: 'asc' },
-      take: singleMatchId ? 1 : 12,
-      select: { id: true, animationMatchId: true, homeScore: true, awayScore: true, homeTeam: { select: { name: true } }, awayTeam: { select: { name: true } } },
+      take: hasSingleMatchId ? 1 : 12,
+      select: { id: true, animationMatchId: true, status: true, homeScore: true, awayScore: true, homeTeam: { select: { name: true } }, awayTeam: { select: { name: true } } },
     });
+
+    if (hasSingleMatchId && matches.length === 0) {
+      try {
+        const raw = await footballFetchFromProvider('ISPORTS', '/analysis', { fixture: singleMatchId });
+        const stats = normalizeStats(raw);
+        return NextResponse.json({
+          ok: true,
+          authMethod: auth.method,
+          count: 1,
+          linkedInDatabase: false,
+          message: 'iSports analysis fetched directly, but this matchId is not linked to a Match row yet.',
+          processed: [{ providerMatchId: singleMatchId, status: hasUsefulStats(stats) ? 'direct_debug_mapped' : 'direct_debug_unmapped', stats, ...(debug ? { raw } : {}) }],
+        }, { headers: { 'Cache-Control': 'no-store' } });
+      } catch (error: any) {
+        return NextResponse.json({
+          ok: true,
+          authMethod: auth.method,
+          count: 1,
+          linkedInDatabase: false,
+          processed: [{ providerMatchId: singleMatchId, status: 'direct_fetch_failed', error: error?.message || 'Unknown error' }],
+        }, { headers: { 'Cache-Control': 'no-store' } });
+      }
+    }
 
     const processed = [];
     for (const match of matches) {
@@ -276,17 +299,17 @@ export async function GET(req: Request) {
         if (stats.homeScore === null) stats.homeScore = match.homeScore;
         if (stats.awayScore === null) stats.awayScore = match.awayScore;
         if (!hasUsefulStats(stats) && !debug) {
-          processed.push({ matchId: match.id, providerMatchId: match.animationMatchId, status: 'no_mapped_stats' });
+          processed.push({ matchId: match.id, providerMatchId: match.animationMatchId, status: 'no_mapped_stats', matchStatus: match.status });
           continue;
         }
         const snapshotId = await saveSnapshot(match, match.animationMatchId, stats, raw);
-        processed.push({ matchId: match.id, providerMatchId: match.animationMatchId, status: 'saved', snapshotId, stats, ...(debug ? { raw } : {}) });
+        processed.push({ matchId: match.id, providerMatchId: match.animationMatchId, status: 'saved', matchStatus: match.status, snapshotId, stats, ...(debug ? { raw } : {}) });
       } catch (error: any) {
-        processed.push({ matchId: match.id, providerMatchId: match.animationMatchId, status: 'failed', error: error?.message || 'Unknown error' });
+        processed.push({ matchId: match.id, providerMatchId: match.animationMatchId, status: 'failed', matchStatus: match.status, error: error?.message || 'Unknown error' });
       }
     }
 
-    return NextResponse.json({ ok: true, authMethod: auth.method, count: processed.length, processed }, { headers: { 'Cache-Control': 'no-store' } });
+    return NextResponse.json({ ok: true, authMethod: auth.method, count: processed.length, linkedInDatabase: matches.length > 0, processed }, { headers: { 'Cache-Control': 'no-store' } });
   } catch (error: any) {
     console.error('live-match-stats-sync error:', error);
     return NextResponse.json({ ok: false, error: error?.message || 'Internal Server Error' }, { status: 500 });
