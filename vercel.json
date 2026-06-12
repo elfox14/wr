@@ -13,6 +13,10 @@
       "schedule": "*/5 * * * *"
     },
     {
+      "path": "/api/cron/expire-stale-matches",
+      "schedule": "*/15 * * * *"
+    },
+    {
       "path": "/api/admin/auto-import-sports-reference",
       "schedule": "0 4 * * *"
     }
