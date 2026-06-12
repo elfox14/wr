@@ -9,6 +9,12 @@ export const revalidate = 0;
 const LIVE_STATUSES = new Set(['1H', 'HT', '2H', 'ET', 'BT', 'P', 'LIVE', 'IN_PLAY']);
 const FINISHED_STATUSES = new Set(['FT', 'AET', 'PEN', 'FINISHED', 'ENDED', '-1']);
 const UPCOMING_STATUSES = new Set(['NS', 'TBD', 'SCHEDULED', '0']);
+const ISPORTS_MIN_INTERVAL_MS = Math.max(60, Number(process.env.ISPORTS_LIVE_MIN_INTERVAL_SECONDS || 180)) * 1000;
+const API_FOOTBALL_FALLBACK_ENABLED = process.env.ALLOW_API_FOOTBALL_LIVE_FALLBACK === 'true';
+
+let lastProviderFetchAt = 0;
+let lastProviderPayload: any = null;
+let lastProviderUsed = '';
 
 const TEAM_SELECT = {
   id: true,
@@ -111,14 +117,36 @@ function parseProviderDate(value: any) {
 }
 
 function shouldAllowApiFootballFallback(url: URL) {
+  if (!API_FOOTBALL_FALLBACK_ENABLED) return false;
   if (url.searchParams.get('allowApiFootballFallback') === 'true') return true;
   if (url.searchParams.get('providerFallback') === 'true') return true;
-  return process.env.ALLOW_API_FOOTBALL_LIVE_FALLBACK === 'true';
+  return false;
 }
 
 async function fetchLiveScores(url: URL, date: string) {
-  if (shouldAllowApiFootballFallback(url)) return apiFootballFetch('/livescores', { date, live: 'all' });
-  return footballFetchFromProvider('ISPORTS', '/livescores', { date, live: 'all' });
+  const now = Date.now();
+  const forceProviderFetch = url.searchParams.get('forceProviderFetch') === 'true';
+  const allowFallback = shouldAllowApiFootballFallback(url);
+  const throttleActive = !forceProviderFetch && !allowFallback && lastProviderPayload && now - lastProviderFetchAt < ISPORTS_MIN_INTERVAL_MS;
+
+  if (throttleActive) {
+    return {
+      ...lastProviderPayload,
+      _provider: lastProviderUsed || lastProviderPayload?._provider || 'ISPORTS',
+      _fromLocalThrottleCache: true,
+      _throttleAgeSeconds: Math.round((now - lastProviderFetchAt) / 1000),
+      _minIntervalSeconds: Math.round(ISPORTS_MIN_INTERVAL_MS / 1000),
+    };
+  }
+
+  const payload = allowFallback
+    ? await apiFootballFetch('/livescores', { date, live: 'all' })
+    : await footballFetchFromProvider('ISPORTS', '/livescores', { date, live: 'all' });
+
+  lastProviderFetchAt = now;
+  lastProviderPayload = payload;
+  lastProviderUsed = payload?._provider || (allowFallback ? 'API_FOOTBALL' : 'ISPORTS');
+  return payload;
 }
 
 async function hasPotentialLiveWindow() {
@@ -287,9 +315,10 @@ export async function GET(req: Request) {
     for (const fixture of fixtures) {
       processed.push(await processLiveFixture(fixture, data?._provider));
     }
-    return NextResponse.json({ success: true, mode: 'isports_only_live_market_sync', authMethod: auth.method, providerPriority: allowApiFootballFallback ? ['ISPORTS', 'API_FOOTBALL'] : ['ISPORTS'], providerFallbackAllowed: allowApiFootballFallback, providerUsed: data?._provider, externalRequestsUsed: 1, skippedProviderFetch: false, fixturesFetched: fixtures.length, processed, errors, startedAt: startedAt.toISOString(), finishedAt: new Date().toISOString() }, { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate' } });
+    const fromThrottleCache = Boolean(data?._fromLocalThrottleCache);
+    return NextResponse.json({ success: true, mode: 'isports_budget_guard_live_market_sync', authMethod: auth.method, providerPriority: allowApiFootballFallback ? ['ISPORTS', 'API_FOOTBALL'] : ['ISPORTS'], providerFallbackAllowed: allowApiFootballFallback, providerUsed: data?._provider, externalRequestsUsed: fromThrottleCache ? 0 : 1, skippedProviderFetch: false, fromThrottleCache, throttle: { minIntervalSeconds: Math.round(ISPORTS_MIN_INTERVAL_MS / 1000), ageSeconds: data?._throttleAgeSeconds ?? 0, forceProviderFetchAllowed: true }, fixturesFetched: fixtures.length, processed, errors, startedAt: startedAt.toISOString(), finishedAt: new Date().toISOString() }, { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate' } });
   } catch (error: any) {
     errors.push({ message: error?.message || 'live sync failed', status: error?.status, provider: error?.provider, payload: error?.payload, apiFootballFallbackAllowed: allowApiFootballFallback });
-    return NextResponse.json({ success: false, mode: 'isports_only_live_market_sync', providerFallbackAllowed: allowApiFootballFallback, errors, processed, startedAt: startedAt.toISOString(), finishedAt: new Date().toISOString() }, { status: 500, headers: { 'Cache-Control': 'no-store' } });
+    return NextResponse.json({ success: false, mode: 'isports_budget_guard_live_market_sync', providerFallbackAllowed: allowApiFootballFallback, errors, processed, startedAt: startedAt.toISOString(), finishedAt: new Date().toISOString() }, { status: 500, headers: { 'Cache-Control': 'no-store' } });
   }
 }
