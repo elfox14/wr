@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Activity, AlertTriangle, Clock, CornerDownRight, Database, Goal, Radio, ShieldAlert, Target, Zap } from 'lucide-react';
+import { Activity, AlertTriangle, Clock, Database, Goal, Radio, ShieldAlert } from 'lucide-react';
 
 type Team = { id?: string; name?: string; code?: string; image?: string } | null;
 type Snapshot = Record<string, any> | null;
