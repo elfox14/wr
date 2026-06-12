@@ -45,7 +45,7 @@ export const WORLD_CUP_2026_GROUPS = {
     { name: 'إسبانيا', codes: ['ESP'] },
     { name: 'الرأس الأخضر', codes: ['CPV', 'CV'] },
     { name: 'السعودية', codes: ['KSA', 'SA'] },
-    { name: 'أوروغواي', codes: ['URU'] },
+    { name: 'أوروغواي', codes: ['URU', 'UY', 'UR', 'URY', 'URUGUAY'] },
   ] },
   I: { arName: 'التاسعة', teams: [
     { name: 'فرنسا', codes: ['FRA'] },
