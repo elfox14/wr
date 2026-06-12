@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { Activity, ArrowLeft, CalendarDays, ExternalLink, Newspaper, Radio, ShieldCheck, Sparkles, TrendingUp } from 'lucide-react';
+import { Activity, ArrowLeft, CalendarDays, ExternalLink, Newspaper, Radio, ShieldCheck, TrendingUp } from 'lucide-react';
 import prisma from '@/lib/prisma';
 import { renderMarketNews } from '@/lib/market-news/render';
 
@@ -8,8 +8,8 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 export const metadata: Metadata = {
-  title: 'الأخبار والرصد الصحفي | MC PRIME Exchange',
-  description: 'صفحة أخبار بورصة المونديال: رصد صحفي، أخبار المباريات، وتحركات السوق الافتراضي.',
+  title: 'غرفة أخبار المونديال | MC PRIME Exchange',
+  description: 'غرفة أخبار بورصة المونديال: رصد صحفي، أخبار المباريات، وتحركات السوق الافتراضي.',
 };
 
 function formatDate(value: Date | string) {
@@ -193,28 +193,14 @@ export default async function NewsPage() {
   const restPress = pressNews.slice(1);
 
   return (
-    <main className="min-h-screen bg-background px-4 py-6 text-white sm:px-6 lg:px-8" dir="rtl">
-      <section className="mx-auto max-w-7xl space-y-6">
-        <div className="rounded-[2rem] border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(15,240,252,0.18),transparent_28%),radial-gradient(circle_at_bottom_left,rgba(255,215,0,0.12),transparent_26%),linear-gradient(135deg,rgba(255,255,255,0.055),rgba(255,255,255,0.015))] p-5 shadow-anti-gravity md:p-7">
-          <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-            <div>
-              <p className="mb-3 inline-flex items-center gap-2 rounded-full border border-[#0FF0FC]/25 bg-[#0FF0FC]/10 px-4 py-2 text-xs font-black text-[#0FF0FC]"><Newspaper size={14} /> غرفة أخبار المونديال</p>
-              <h1 className="text-3xl font-black leading-tight md:text-5xl">الأخبار والرصد الصحفي</h1>
-              <p className="mt-3 max-w-3xl text-sm font-bold leading-7 text-gray-400">صفحة تجمع أخبار السوق الافتراضي، أخبار المباريات، والرصد الصحفي من النشرات الخارجية مثل The Athletic FC مع فصل واضح بين الخبر والتحليل والتداول.</p>
-              <div className="mt-5 flex flex-wrap gap-3">
-                <Link href="/daily-summary" className="inline-flex items-center gap-2 rounded-2xl border border-[#FFD700]/25 bg-[#FFD700]/10 px-4 py-3 text-sm font-black text-[#FFD700] transition hover:bg-[#FFD700] hover:text-black">
-                  <Sparkles size={16} /> ملخص اليوم
-                </Link>
-                <Link href="/admin/news" className="inline-flex items-center gap-2 rounded-2xl border border-[#0FF0FC]/25 bg-[#0FF0FC]/10 px-4 py-3 text-sm font-black text-[#0FF0FC] transition hover:bg-[#0FF0FC] hover:text-black">
-                  <Newspaper size={16} /> إضافة خبر
-                </Link>
-              </div>
-            </div>
-            <div className="grid grid-cols-3 gap-2 text-center text-xs font-black">
-              <div className="rounded-2xl border border-white/10 bg-black/25 px-4 py-3"><div className="text-2xl text-[#FFD700]">{pressNews.length}</div><div className="text-gray-500">رصد صحفي</div></div>
-              <div className="rounded-2xl border border-white/10 bg-black/25 px-4 py-3"><div className="text-2xl text-[#0FF0FC]">{marketNews.length}</div><div className="text-gray-500">أخبار سوق</div></div>
-              <div className="rounded-2xl border border-white/10 bg-black/25 px-4 py-3"><div className="text-2xl text-emerald-300">Live</div><div className="text-gray-500">تحديث</div></div>
-            </div>
+    <main className="min-h-screen bg-background px-4 py-5 text-white sm:px-6 lg:px-8" dir="rtl">
+      <section className="mx-auto max-w-7xl space-y-5">
+        <div className="rounded-[1.25rem] border border-white/10 bg-[linear-gradient(135deg,rgba(15,240,252,0.09),rgba(255,255,255,0.02))] px-4 py-3 shadow-card md:px-5 md:py-4">
+          <div className="flex items-center gap-3">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[#0FF0FC]/20 bg-[#0FF0FC]/10 text-[#0FF0FC]">
+              <Newspaper size={18} />
+            </span>
+            <h1 className="text-xl font-black leading-tight text-white md:text-2xl">غرفة أخبار المونديال</h1>
           </div>
         </div>
 
