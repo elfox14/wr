@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 type TeamKey = "home" | "away";
 
@@ -24,7 +24,15 @@ type DemoEvent = {
   x: number;
   y: number;
   confidence: number;
-  source: "video-inference-demo" | "ocr-demo" | "operator-review";
+  source: "frame-capture-demo" | "youtube-preview-only" | "operator-review";
+};
+
+type FrameMetrics = {
+  brightness: number;
+  motion: number;
+  centerX: number;
+  centerY: number;
+  greenShare: number;
 };
 
 const teamNames: Record<TeamKey, string> = {
@@ -42,15 +50,8 @@ const initialStats: MatchStats = {
   score: { home: 0, away: 0 },
 };
 
-const demoEvents: Array<Omit<DemoEvent, "id" | "minute" | "second">> = [
-  { team: "home", label: "استنتاج من الفيديو: هجمة منظمة", type: "attack", x: 62, y: 34, confidence: 0.68, source: "video-inference-demo" },
-  { team: "home", label: "استنتاج من الفيديو: هجمة خطيرة من اليمين", type: "danger", x: 78, y: 24, confidence: 0.73, source: "video-inference-demo" },
-  { team: "home", label: "استنتاج من الفيديو: تسديدة خارج المرمى", type: "shot", x: 86, y: 48, confidence: 0.71, source: "video-inference-demo" },
-  { team: "away", label: "استنتاج من الفيديو: انتقال سريع", type: "attack", x: 38, y: 65, confidence: 0.64, source: "video-inference-demo" },
-  { team: "away", label: "مراجعة مشغل: ركنية", type: "corner", x: 6, y: 8, confidence: 0.82, source: "operator-review" },
-  { team: "home", label: "استنتاج من الفيديو: تسديدة على المرمى", type: "target", x: 91, y: 50, confidence: 0.78, source: "video-inference-demo" },
-  { team: "home", label: "مراجعة مشغل: هدف تجريبي", type: "goal", x: 97, y: 50, confidence: 0.9, source: "operator-review" },
-];
+const canvasWidth = 96;
+const canvasHeight = 54;
 
 function extractYouTubeEmbedUrl(value: string): string | null {
   if (!value.trim()) return null;
@@ -81,17 +82,96 @@ function extractYouTubeEmbedUrl(value: string): string | null {
   return null;
 }
 
+function applyEventToStats(previous: MatchStats, generated: DemoEvent): MatchStats {
+  const next: MatchStats = JSON.parse(JSON.stringify(previous));
+  const team = generated.team;
+
+  if (["attack", "danger", "shot", "target", "corner", "goal"].includes(generated.type)) {
+    next.attacks[team] += 1;
+  }
+  if (["danger", "shot", "target", "goal"].includes(generated.type)) {
+    next.dangerousAttacks[team] += 1;
+  }
+  if (["shot", "target", "goal"].includes(generated.type)) {
+    next.shots[team] += 1;
+  }
+  if (["target", "goal"].includes(generated.type)) {
+    next.onTarget[team] += 1;
+  }
+  if (generated.type === "corner") {
+    next.corners[team] += 1;
+  }
+  if (generated.type === "goal") {
+    next.score[team] += 1;
+  }
+
+  const drift = generated.team === "home" ? 1 : -1;
+  next.possession.home = Math.min(72, Math.max(28, next.possession.home + drift));
+  next.possession.away = 100 - next.possession.home;
+
+  return next;
+}
+
+function buildEventFromMetrics(metrics: FrameMetrics, index: number, currentTime: number): DemoEvent {
+  const team: TeamKey = metrics.centerX >= 50 ? "home" : "away";
+  const confidence = Math.min(0.88, Math.max(0.38, 0.38 + metrics.motion / 90 + metrics.greenShare / 4));
+
+  let type: DemoEvent["type"] = "attack";
+  let label = "Frame Capture: هجمة عادية من حركة الفيديو";
+
+  if (metrics.motion > 42 && metrics.brightness > 112) {
+    type = "target";
+    label = "Frame Capture: احتمال تسديدة على المرمى";
+  } else if (metrics.motion > 30) {
+    type = "shot";
+    label = "Frame Capture: احتمال تسديدة";
+  } else if (metrics.motion > 18 || metrics.greenShare > 0.36) {
+    type = "danger";
+    label = "Frame Capture: ضغط أو هجمة خطيرة";
+  }
+
+  const minute = Math.max(0, Math.floor(currentTime / 60));
+  const second = Math.max(0, Math.floor(currentTime % 60));
+
+  return {
+    id: Date.now() + index,
+    minute,
+    second,
+    team,
+    label,
+    type,
+    x: Math.min(96, Math.max(4, metrics.centerX)),
+    y: Math.min(88, Math.max(12, metrics.centerY)),
+    confidence,
+    source: "frame-capture-demo",
+  };
+}
+
 export default function LiveAnimationDemoPage() {
-  const [videoUrl, setVideoUrl] = useState("");
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const previousFrameRef = useRef<Uint8ClampedArray | null>(null);
+
+  const [youtubeUrl, setYoutubeUrl] = useState("");
+  const [localVideoUrl, setLocalVideoUrl] = useState<string | null>(null);
+  const [localVideoName, setLocalVideoName] = useState("");
   const [currentIndex, setCurrentIndex] = useState(0);
   const [events, setEvents] = useState<DemoEvent[]>([]);
   const [stats, setStats] = useState<MatchStats>(initialStats);
   const [isPlaying, setIsPlaying] = useState(false);
   const [analysisStarted, setAnalysisStarted] = useState(false);
 
-  const embedUrl = useMemo(() => extractYouTubeEmbedUrl(videoUrl), [videoUrl]);
-  const canAnalyze = Boolean(embedUrl);
+  const embedUrl = useMemo(() => extractYouTubeEmbedUrl(youtubeUrl), [youtubeUrl]);
+  const canAnalyze = Boolean(localVideoUrl);
   const activeEvent = events[0];
+
+  useEffect(() => {
+    return () => {
+      if (localVideoUrl) {
+        URL.revokeObjectURL(localVideoUrl);
+      }
+    };
+  }, [localVideoUrl]);
 
   function resetAnalysis() {
     setCurrentIndex(0);
@@ -99,23 +179,112 @@ export default function LiveAnimationDemoPage() {
     setStats(initialStats);
     setIsPlaying(false);
     setAnalysisStarted(false);
+    previousFrameRef.current = null;
   }
 
-  function handleVideoUrlChange(value: string) {
-    setVideoUrl(value);
+  function handleLocalVideoChange(file: File | undefined) {
     resetAnalysis();
+
+    if (localVideoUrl) {
+      URL.revokeObjectURL(localVideoUrl);
+    }
+
+    if (!file) {
+      setLocalVideoUrl(null);
+      setLocalVideoName("");
+      return;
+    }
+
+    const nextUrl = URL.createObjectURL(file);
+    setLocalVideoUrl(nextUrl);
+    setLocalVideoName(file.name);
+  }
+
+  function captureFrameMetrics(): FrameMetrics | null {
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    if (!video || !canvas || video.readyState < 2) return null;
+
+    canvas.width = canvasWidth;
+    canvas.height = canvasHeight;
+
+    const context = canvas.getContext("2d", { willReadFrequently: true });
+    if (!context) return null;
+
+    context.drawImage(video, 0, 0, canvasWidth, canvasHeight);
+    const imageData = context.getImageData(0, 0, canvasWidth, canvasHeight);
+    const data = imageData.data;
+    const previousFrame = previousFrameRef.current;
+
+    let brightnessSum = 0;
+    let greenSum = 0;
+    let motionSum = 0;
+    let weightSum = 0;
+    let xWeighted = 0;
+    let yWeighted = 0;
+    let samples = 0;
+
+    for (let i = 0; i < data.length; i += 16) {
+      const r = data[i] ?? 0;
+      const g = data[i + 1] ?? 0;
+      const b = data[i + 2] ?? 0;
+      const brightness = (r + g + b) / 3;
+      const greenWeight = Math.max(0, g - (r + b) / 2);
+      const pixelIndex = i / 4;
+      const x = pixelIndex % canvasWidth;
+      const y = Math.floor(pixelIndex / canvasWidth);
+      const weight = brightness * 0.12 + greenWeight;
+
+      brightnessSum += brightness;
+      greenSum += g;
+      weightSum += weight;
+      xWeighted += x * weight;
+      yWeighted += y * weight;
+
+      if (previousFrame) {
+        motionSum += Math.abs(r - (previousFrame[i] ?? 0));
+        motionSum += Math.abs(g - (previousFrame[i + 1] ?? 0));
+        motionSum += Math.abs(b - (previousFrame[i + 2] ?? 0));
+      }
+
+      samples += 1;
+    }
+
+    previousFrameRef.current = new Uint8ClampedArray(data);
+
+    const centerX = weightSum > 0 ? (xWeighted / weightSum / canvasWidth) * 100 : 50;
+    const centerY = weightSum > 0 ? (yWeighted / weightSum / canvasHeight) * 100 : 50;
+
+    return {
+      brightness: samples > 0 ? brightnessSum / samples : 0,
+      motion: previousFrame && samples > 0 ? motionSum / (samples * 3) : 0,
+      centerX,
+      centerY,
+      greenShare: samples > 0 ? greenSum / (samples * 255) : 0,
+    };
   }
 
   function handleMainButtonClick() {
     if (!canAnalyze) return;
 
+    const video = videoRef.current;
+
     if (!analysisStarted) {
       setAnalysisStarted(true);
       setIsPlaying(true);
+      void video?.play().catch(() => undefined);
       return;
     }
 
-    setIsPlaying((value) => !value);
+    setIsPlaying((value) => {
+      const nextValue = !value;
+      if (nextValue) {
+        void video?.play().catch(() => undefined);
+      } else {
+        video?.pause();
+      }
+      return nextValue;
+    });
   }
 
   useEffect(() => {
@@ -123,44 +292,14 @@ export default function LiveAnimationDemoPage() {
 
     const timer = window.setInterval(() => {
       setCurrentIndex((index) => {
-        const nextIndex = index % demoEvents.length;
-        const generated: DemoEvent = {
-          ...demoEvents[nextIndex],
-          id: Date.now() + index,
-          minute: 18 + Math.floor(index / 3),
-          second: (index * 12) % 60,
-        };
+        const metrics = captureFrameMetrics();
+        const video = videoRef.current;
+        if (!metrics || !video) return index;
+
+        const generated = buildEventFromMetrics(metrics, index, video.currentTime);
 
         setEvents((previous) => [generated, ...previous].slice(0, 8));
-        setStats((previous) => {
-          const next: MatchStats = JSON.parse(JSON.stringify(previous));
-          const team = generated.team;
-
-          if (["attack", "danger", "shot", "target", "corner", "goal"].includes(generated.type)) {
-            next.attacks[team] += 1;
-          }
-          if (["danger", "shot", "target", "goal"].includes(generated.type)) {
-            next.dangerousAttacks[team] += 1;
-          }
-          if (["shot", "target", "goal"].includes(generated.type)) {
-            next.shots[team] += 1;
-          }
-          if (["target", "goal"].includes(generated.type)) {
-            next.onTarget[team] += 1;
-          }
-          if (generated.type === "corner") {
-            next.corners[team] += 1;
-          }
-          if (generated.type === "goal") {
-            next.score[team] += 1;
-          }
-
-          const drift = generated.team === "home" ? 1 : -1;
-          next.possession.home = Math.min(72, Math.max(28, next.possession.home + drift));
-          next.possession.away = 100 - next.possession.home;
-
-          return next;
-        });
+        setStats((previous) => applyEventToStats(previous, generated));
 
         return index + 1;
       });
@@ -175,9 +314,9 @@ export default function LiveAnimationDemoPage() {
   const homeMomentumWidth = Math.round((momentumHome / totalMomentum) * 100);
 
   const buttonLabel = !canAnalyze
-    ? "أضف رابط فيديو أولًا"
+    ? "ارفع ملف فيديو أولًا"
     : !analysisStarted
-      ? "ابدأ تحويل الفيديو إلى أنيميشن"
+      ? "ابدأ التقاط الفريمات وتحويلها"
       : isPlaying
         ? "إيقاف التحويل مؤقتًا"
         : "استكمال التحويل";
@@ -189,13 +328,13 @@ export default function LiveAnimationDemoPage() {
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div>
               <p className="mb-3 inline-flex rounded-full border border-emerald-400/30 bg-emerald-400/10 px-3 py-1 text-sm font-bold text-emerald-200">
-                صفحة تجريبية — Video To Animation MVP
+                صفحة تجريبية — Frame Capture To Animation MVP
               </p>
               <h1 className="text-3xl font-black tracking-tight sm:text-4xl">
-                التحويل يبدأ بعد إضافة الفيديو فقط
+                التحويل الحقيقي التجريبي يعمل من ملف فيديو مرفوع
               </h1>
               <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-300 sm:text-base">
-                ضع رابط YouTube، ثم اضغط زر بدء التحويل. في هذه النسخة تتحرك البيانات كـ Demo يحاكي ناتج تحليل الفيديو. التحويل الحقيقي من الفريمات يحتاج Backend Worker يقرأ الفيديو المصرح به ثم يرسل Events إلى قاعدة البيانات.
+                YouTube داخل iframe للمعاينة فقط ولا يمكن قراءة فريماته من المتصفح. ارفع ملف فيديو من جهازك، ثم اضغط بدء التحويل ليقوم المتصفح بالتقاط فريمات فعلية من الفيديو وتحويلها إلى Events تجريبية تحرك الملعب.
               </p>
             </div>
 
@@ -214,26 +353,56 @@ export default function LiveAnimationDemoPage() {
           <section className="rounded-3xl border border-white/10 bg-white/[0.04] p-4 shadow-xl">
             <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <h2 className="text-xl font-black">مصدر الفيديو</h2>
-                <p className="text-sm text-slate-400">ضع رابط YouTube ثم ابدأ التحويل. بدون رابط لن تبدأ المحاكاة.</p>
+                <h2 className="text-xl font-black">مصدر الفيديو للتحليل</h2>
+                <p className="text-sm text-slate-400">ارفع MP4 أو WebM للتحليل داخل المتصفح. رابط YouTube يظهر كمعاينة فقط.</p>
               </div>
               <span className={`rounded-full px-3 py-1 text-xs font-bold ${analysisStarted ? "bg-emerald-400/10 text-emerald-200" : "bg-amber-400/10 text-amber-200"}`}>
-                {analysisStarted ? "تحويل الفيديو يعمل" : "في انتظار رابط فيديو"}
+                {analysisStarted ? "Frame Capture يعمل" : "في انتظار ملف فيديو"}
               </span>
             </div>
 
-            <input
-              value={videoUrl}
-              onChange={(event) => handleVideoUrlChange(event.target.value)}
-              placeholder="مطلوب: https://www.youtube.com/watch?v=VIDEO_ID"
-              className="mb-4 w-full rounded-2xl border border-white/10 bg-slate-950/80 px-4 py-3 text-right text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-emerald-400/60"
-            />
+            <label className="mb-4 flex cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-emerald-300/30 bg-emerald-400/5 px-4 py-5 text-center transition hover:border-emerald-300/60 hover:bg-emerald-400/10">
+              <span className="text-sm font-black text-emerald-100">ارفع فيديو للتحويل الفعلي التجريبي</span>
+              <span className="mt-1 text-xs text-slate-400">MP4 / WebM / MOV حسب دعم المتصفح</span>
+              <input
+                type="file"
+                accept="video/*"
+                className="hidden"
+                onChange={(event) => handleLocalVideoChange(event.target.files?.[0])}
+              />
+            </label>
+
+            {localVideoName && (
+              <div className="mb-4 rounded-2xl border border-emerald-400/20 bg-emerald-400/10 px-4 py-3 text-sm text-emerald-100">
+                الملف المحدد: {localVideoName}
+              </div>
+            )}
+
+            <div className="mb-4">
+              <label className="mb-2 block text-sm font-bold text-slate-300">رابط YouTube للمعاينة فقط</label>
+              <input
+                value={youtubeUrl}
+                onChange={(event) => setYoutubeUrl(event.target.value)}
+                placeholder="اختياري للعرض فقط: https://www.youtube.com/watch?v=VIDEO_ID"
+                className="w-full rounded-2xl border border-white/10 bg-slate-950/80 px-4 py-3 text-right text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-emerald-400/60"
+              />
+            </div>
 
             <div className="aspect-video overflow-hidden rounded-2xl border border-white/10 bg-slate-900">
-              {embedUrl ? (
+              {localVideoUrl ? (
+                <video
+                  ref={videoRef}
+                  src={localVideoUrl}
+                  className="h-full w-full bg-black object-contain"
+                  controls
+                  muted
+                  playsInline
+                  onEnded={() => setIsPlaying(false)}
+                />
+              ) : embedUrl ? (
                 <iframe
                   src={embedUrl}
-                  title="YouTube match source"
+                  title="YouTube preview source"
                   className="h-full w-full"
                   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                   allowFullScreen
@@ -242,26 +411,28 @@ export default function LiveAnimationDemoPage() {
                 <div className="relative flex h-full flex-col items-center justify-center gap-4 overflow-hidden p-8 text-center">
                   <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(245,158,11,0.2),transparent_45%)]" />
                   <div className="relative rounded-full border border-amber-300/30 bg-amber-400/10 px-4 py-2 text-xs font-black text-amber-100">
-                    أضف رابط فيديو للبدء
+                    ارفع ملف فيديو للبدء
                   </div>
                   <p className="relative max-w-md text-sm leading-7 text-slate-300">
-                    لن تتحرك الإحصائيات أو الملعب الآن. بعد إدخال الفيديو والضغط على زر التحويل، يبدأ النظام في توليد Events تجريبية كأنها ناتجة من تحليل الفيديو.
+                    لن تتحرك الإحصائيات أو الملعب الآن. ارفع فيديو من جهازك ثم اضغط زر التقاط الفريمات وتحويلها.
                   </p>
                 </div>
               )}
             </div>
 
+            <canvas ref={canvasRef} className="hidden" width={canvasWidth} height={canvasHeight} />
+
             <div className="mt-4 rounded-2xl border border-amber-400/20 bg-amber-400/10 p-4 text-sm leading-7 text-amber-100">
-              ملاحظة مهمة: YouTube داخل iframe لا يسمح للمتصفح باستخراج الفريمات مباشرة. لذلك هذه الصفحة تعرض شكل المنتج النهائي، أما التحليل الحقيقي يحتاج خدمة Backend/Worker متصلة بمصدر فيديو مسموح قانونيًا.
+              هذا ليس نموذج ذكاء اصطناعي احترافي بعد؛ هو Proof of Concept يلتقط فريمات فعلية من الفيديو المرفوع ويستخرج مؤشرات بسيطة مثل الحركة ومركز النشاط ثم يحولها إلى أحداث. YouTube يحتاج Backend Worker أو مصدر فيديو مسموح للوصول للفريمات.
             </div>
           </section>
 
           <section className="rounded-3xl border border-white/10 bg-white/[0.04] p-4 shadow-xl">
             <div className="mb-4 flex items-center justify-between">
               <div>
-                <h2 className="text-xl font-black">ملعب 2D مولّد من الفيديو</h2>
+                <h2 className="text-xl font-black">ملعب 2D مولّد من الفريمات</h2>
                 <p className="text-sm text-slate-400">
-                  {analysisStarted ? "الكرة تتحرك حسب Events مستنتجة من الفيديو التجريبي." : "سيبدأ التحريك بعد إدخال الفيديو والضغط على بدء التحويل."}
+                  {analysisStarted ? "الكرة تتحرك حسب مؤشرات مستخرجة من فريمات الفيديو." : "سيبدأ التحريك بعد رفع الفيديو والضغط على بدء التحويل."}
                 </p>
               </div>
               <div className="rounded-2xl bg-slate-900 px-4 py-2 text-center">
@@ -290,7 +461,7 @@ export default function LiveAnimationDemoPage() {
               {!analysisStarted && (
                 <div className="absolute inset-0 flex items-center justify-center bg-slate-950/40 p-6 text-center">
                   <div className="rounded-3xl border border-white/10 bg-slate-950/90 p-5 text-sm leading-7 text-slate-300">
-                    الملعب جاهز. أضف الفيديو ثم اضغط بدء التحويل ليبدأ توليد الأنيميشن.
+                    الملعب جاهز. ارفع فيديو من جهازك ثم اضغط بدء التحويل ليبدأ التقاط الفريمات.
                   </div>
                 </div>
               )}
@@ -310,7 +481,7 @@ export default function LiveAnimationDemoPage() {
 
         <div className="mt-6 grid gap-6 lg:grid-cols-3">
           <section className="rounded-3xl border border-white/10 bg-white/[0.04] p-5">
-            <h3 className="mb-4 text-lg font-black">إحصائيات مستخرجة من الفيديو</h3>
+            <h3 className="mb-4 text-lg font-black">إحصائيات من فريمات الفيديو</h3>
             <div className="space-y-4 text-sm">
               <StatRow label="الاستحواذ" home={stats.possession.home} away={stats.possession.away} suffix="%" />
               <StatRow label="الهجمات" home={stats.attacks.home} away={stats.attacks.away} />
@@ -331,7 +502,7 @@ export default function LiveAnimationDemoPage() {
               <span>{teamNames.away}: {100 - homeMomentumWidth}%</span>
             </div>
             <div className="mt-5 rounded-2xl border border-amber-400/20 bg-amber-400/10 p-4 text-sm leading-7 text-amber-100">
-              الزخم هنا محسوب تجريبيًا من Events الفيديو: الهجمات الخطيرة + التسديدات + التسديدات على المرمى. النسخة الحقيقية ستخزن هذه الأحداث في قاعدة البيانات.
+              الزخم هنا محسوب تجريبيًا من Events ناتجة من فريمات الفيديو المرفوع: الهجمات الخطيرة + التسديدات + التسديدات على المرمى.
             </div>
           </section>
 
@@ -339,7 +510,7 @@ export default function LiveAnimationDemoPage() {
             <h3 className="mb-4 text-lg font-black">Timeline التحويل</h3>
             <div className="max-h-80 space-y-3 overflow-auto pr-1">
               {events.length === 0 ? (
-                <p className="text-sm text-slate-400">لم يبدأ التحويل بعد. أضف الفيديو واضغط زر بدء التحويل.</p>
+                <p className="text-sm text-slate-400">لم يبدأ التحويل بعد. ارفع فيديو من جهازك واضغط زر بدء التحويل.</p>
               ) : (
                 events.map((event) => (
                   <div key={event.id} className="rounded-2xl border border-white/10 bg-slate-950/70 p-3">
@@ -360,11 +531,11 @@ export default function LiveAnimationDemoPage() {
         </div>
 
         <section className="mt-6 rounded-3xl border border-white/10 bg-white/[0.04] p-5">
-          <h3 className="mb-4 text-lg font-black">ما المطلوب للنسخة الحقيقية؟</h3>
+          <h3 className="mb-4 text-lg font-black">ما المطلوب للنسخة الحقيقية المتقدمة؟</h3>
           <div className="grid gap-3 text-sm leading-7 text-slate-300 md:grid-cols-4">
-            <PipelineCard title="1) Video Worker" text="يستقبل فيديو مسموح قانونيًا، أو ملف فيديو مرفوع، أو stream داخلي وليس iframe فقط." />
-            <PipelineCard title="2) Frame Capture" text="يلتقط فريمات كل ثانية أو 5-10 فريم/ثانية عند الهجمات المهمة." />
-            <PipelineCard title="3) OCR + Vision" text="يقرأ النتيجة والدقيقة، ثم يكشف الكرة واللاعبين واتجاه اللعب." />
+            <PipelineCard title="1) Backend Worker" text="يستقبل فيديو مسموح قانونيًا أو stream داخلي، وليس iframe YouTube." />
+            <PipelineCard title="2) Frame Capture" text="يلتقط فريمات كل ثانية أو 5-10 فريم/ثانية أثناء الهجمات المهمة." />
+            <PipelineCard title="3) CV Model" text="يستخدم نموذج رؤية لاكتشاف الكرة واللاعبين والملعب بدل المؤشرات البسيطة الحالية." />
             <PipelineCard title="4) Events API" text="يرسل الأحداث والإحصائيات إلى قاعدة البيانات ثم يحرك ملعب 2D للمستخدم." />
           </div>
         </section>
