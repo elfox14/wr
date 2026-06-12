@@ -24,7 +24,7 @@ type DemoEvent = {
   x: number;
   y: number;
   confidence: number;
-  source: "stats-delta" | "vision-placeholder" | "operator";
+  source: "video-inference-demo" | "ocr-demo" | "operator-review";
 };
 
 const teamNames: Record<TeamKey, string> = {
@@ -33,23 +33,23 @@ const teamNames: Record<TeamKey, string> = {
 };
 
 const initialStats: MatchStats = {
-  possession: { home: 56, away: 44 },
-  attacks: { home: 12, away: 9 },
-  dangerousAttacks: { home: 5, away: 3 },
-  shots: { home: 2, away: 1 },
-  onTarget: { home: 1, away: 0 },
-  corners: { home: 1, away: 0 },
+  possession: { home: 50, away: 50 },
+  attacks: { home: 0, away: 0 },
+  dangerousAttacks: { home: 0, away: 0 },
+  shots: { home: 0, away: 0 },
+  onTarget: { home: 0, away: 0 },
+  corners: { home: 0, away: 0 },
   score: { home: 0, away: 0 },
 };
 
 const demoEvents: Array<Omit<DemoEvent, "id" | "minute" | "second">> = [
-  { team: "home", label: "هجمة منظمة", type: "attack", x: 62, y: 34, confidence: 0.68, source: "stats-delta" },
-  { team: "home", label: "هجمة خطيرة من اليمين", type: "danger", x: 78, y: 24, confidence: 0.73, source: "vision-placeholder" },
-  { team: "home", label: "تسديدة خارج المرمى", type: "shot", x: 86, y: 48, confidence: 0.71, source: "stats-delta" },
-  { team: "away", label: "انتقال سريع", type: "attack", x: 38, y: 65, confidence: 0.64, source: "stats-delta" },
-  { team: "away", label: "ركنية", type: "corner", x: 6, y: 8, confidence: 0.82, source: "operator" },
-  { team: "home", label: "تسديدة على المرمى", type: "target", x: 91, y: 50, confidence: 0.78, source: "stats-delta" },
-  { team: "home", label: "هدف تجريبي", type: "goal", x: 97, y: 50, confidence: 0.9, source: "operator" },
+  { team: "home", label: "استنتاج من الفيديو: هجمة منظمة", type: "attack", x: 62, y: 34, confidence: 0.68, source: "video-inference-demo" },
+  { team: "home", label: "استنتاج من الفيديو: هجمة خطيرة من اليمين", type: "danger", x: 78, y: 24, confidence: 0.73, source: "video-inference-demo" },
+  { team: "home", label: "استنتاج من الفيديو: تسديدة خارج المرمى", type: "shot", x: 86, y: 48, confidence: 0.71, source: "video-inference-demo" },
+  { team: "away", label: "استنتاج من الفيديو: انتقال سريع", type: "attack", x: 38, y: 65, confidence: 0.64, source: "video-inference-demo" },
+  { team: "away", label: "مراجعة مشغل: ركنية", type: "corner", x: 6, y: 8, confidence: 0.82, source: "operator-review" },
+  { team: "home", label: "استنتاج من الفيديو: تسديدة على المرمى", type: "target", x: 91, y: 50, confidence: 0.78, source: "video-inference-demo" },
+  { team: "home", label: "مراجعة مشغل: هدف تجريبي", type: "goal", x: 97, y: 50, confidence: 0.9, source: "operator-review" },
 ];
 
 function extractYouTubeEmbedUrl(value: string): string | null {
@@ -86,20 +86,47 @@ export default function LiveAnimationDemoPage() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [events, setEvents] = useState<DemoEvent[]>([]);
   const [stats, setStats] = useState<MatchStats>(initialStats);
-  const [isPlaying, setIsPlaying] = useState(true);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [analysisStarted, setAnalysisStarted] = useState(false);
 
   const embedUrl = useMemo(() => extractYouTubeEmbedUrl(videoUrl), [videoUrl]);
+  const canAnalyze = Boolean(embedUrl);
   const activeEvent = events[0];
 
+  function resetAnalysis() {
+    setCurrentIndex(0);
+    setEvents([]);
+    setStats(initialStats);
+    setIsPlaying(false);
+    setAnalysisStarted(false);
+  }
+
+  function handleVideoUrlChange(value: string) {
+    setVideoUrl(value);
+    resetAnalysis();
+  }
+
+  function handleMainButtonClick() {
+    if (!canAnalyze) return;
+
+    if (!analysisStarted) {
+      setAnalysisStarted(true);
+      setIsPlaying(true);
+      return;
+    }
+
+    setIsPlaying((value) => !value);
+  }
+
   useEffect(() => {
-    if (!isPlaying) return;
+    if (!analysisStarted || !isPlaying || !canAnalyze) return;
 
     const timer = window.setInterval(() => {
       setCurrentIndex((index) => {
         const nextIndex = index % demoEvents.length;
         const generated: DemoEvent = {
           ...demoEvents[nextIndex],
-          id: Date.now(),
+          id: Date.now() + index,
           minute: 18 + Math.floor(index / 3),
           second: (index * 12) % 60,
         };
@@ -140,12 +167,20 @@ export default function LiveAnimationDemoPage() {
     }, 1400);
 
     return () => window.clearInterval(timer);
-  }, [isPlaying]);
+  }, [analysisStarted, canAnalyze, isPlaying]);
 
   const momentumHome = Math.min(100, Math.round((stats.dangerousAttacks.home * 3 + stats.shots.home * 4 + stats.onTarget.home * 5) / 2));
   const momentumAway = Math.min(100, Math.round((stats.dangerousAttacks.away * 3 + stats.shots.away * 4 + stats.onTarget.away * 5) / 2));
   const totalMomentum = Math.max(momentumHome + momentumAway, 1);
   const homeMomentumWidth = Math.round((momentumHome / totalMomentum) * 100);
+
+  const buttonLabel = !canAnalyze
+    ? "أضف رابط فيديو أولًا"
+    : !analysisStarted
+      ? "ابدأ تحويل الفيديو إلى أنيميشن"
+      : isPlaying
+        ? "إيقاف التحويل مؤقتًا"
+        : "استكمال التحويل";
 
   return (
     <main className="min-h-screen bg-slate-950 text-white">
@@ -154,22 +189,23 @@ export default function LiveAnimationDemoPage() {
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div>
               <p className="mb-3 inline-flex rounded-full border border-emerald-400/30 bg-emerald-400/10 px-3 py-1 text-sm font-bold text-emerald-200">
-                صفحة تجريبية — Live Vision Animation MVP
+                صفحة تجريبية — Video To Animation MVP
               </p>
               <h1 className="text-3xl font-black tracking-tight sm:text-4xl">
-                المحاكاة تعمل بدون فيديو — والفيديو اختياري للعرض فقط
+                التحويل يبدأ بعد إضافة الفيديو فقط
               </h1>
               <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-300 sm:text-base">
-                المحرك التجريبي يولد أحداثًا وإحصائيات تلقائيًا حتى لو لم تضف رابط فيديو. عند إضافة رابط YouTube سيظهر الفيديو بجانب الملعب فقط، أما تحليل الفريمات الحقيقي فيحتاج Backend Worker منفصل.
+                ضع رابط YouTube، ثم اضغط زر بدء التحويل. في هذه النسخة تتحرك البيانات كـ Demo يحاكي ناتج تحليل الفيديو. التحويل الحقيقي من الفريمات يحتاج Backend Worker يقرأ الفيديو المصرح به ثم يرسل Events إلى قاعدة البيانات.
               </p>
             </div>
 
             <button
               type="button"
-              onClick={() => setIsPlaying((value) => !value)}
-              className="rounded-2xl border border-white/10 bg-white px-5 py-3 text-sm font-black text-slate-950 transition hover:bg-emerald-100"
+              onClick={handleMainButtonClick}
+              disabled={!canAnalyze}
+              className="rounded-2xl border border-white/10 bg-white px-5 py-3 text-sm font-black text-slate-950 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-400"
             >
-              {isPlaying ? "إيقاف المحاكاة" : "تشغيل المحاكاة"}
+              {buttonLabel}
             </button>
           </div>
         </div>
@@ -178,18 +214,18 @@ export default function LiveAnimationDemoPage() {
           <section className="rounded-3xl border border-white/10 bg-white/[0.04] p-4 shadow-xl">
             <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <h2 className="text-xl font-black">مصدر الفيديو الاختياري</h2>
-                <p className="text-sm text-slate-400">اتركه فارغًا لتشغيل المحاكاة فقط، أو ضع رابط YouTube لعرضه بجانب الأنيميشن.</p>
+                <h2 className="text-xl font-black">مصدر الفيديو</h2>
+                <p className="text-sm text-slate-400">ضع رابط YouTube ثم ابدأ التحويل. بدون رابط لن تبدأ المحاكاة.</p>
               </div>
-              <span className="rounded-full bg-emerald-400/10 px-3 py-1 text-xs font-bold text-emerald-200">
-                المحاكاة لا تحتاج فيديو
+              <span className={`rounded-full px-3 py-1 text-xs font-bold ${analysisStarted ? "bg-emerald-400/10 text-emerald-200" : "bg-amber-400/10 text-amber-200"}`}>
+                {analysisStarted ? "تحويل الفيديو يعمل" : "في انتظار رابط فيديو"}
               </span>
             </div>
 
             <input
               value={videoUrl}
-              onChange={(event) => setVideoUrl(event.target.value)}
-              placeholder="اختياري: https://www.youtube.com/watch?v=VIDEO_ID"
+              onChange={(event) => handleVideoUrlChange(event.target.value)}
+              placeholder="مطلوب: https://www.youtube.com/watch?v=VIDEO_ID"
               className="mb-4 w-full rounded-2xl border border-white/10 bg-slate-950/80 px-4 py-3 text-right text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-emerald-400/60"
             />
 
@@ -204,32 +240,29 @@ export default function LiveAnimationDemoPage() {
                 />
               ) : (
                 <div className="relative flex h-full flex-col items-center justify-center gap-4 overflow-hidden p-8 text-center">
-                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(16,185,129,0.22),transparent_45%)]" />
-                  <div className="relative rounded-full border border-emerald-300/30 bg-emerald-400/10 px-4 py-2 text-xs font-black text-emerald-100">
-                    DEMO MODE شغال الآن
-                  </div>
-                  <div className="relative flex h-20 items-end gap-2">
-                    {Array.from({ length: 18 }).map((_, index) => (
-                      <span
-                        key={index}
-                        className="w-2 rounded-t-full bg-emerald-300/70 transition-all duration-700"
-                        style={{ height: `${24 + ((index * 17 + currentIndex * 9) % 56)}px` }}
-                      />
-                    ))}
+                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(245,158,11,0.2),transparent_45%)]" />
+                  <div className="relative rounded-full border border-amber-300/30 bg-amber-400/10 px-4 py-2 text-xs font-black text-amber-100">
+                    أضف رابط فيديو للبدء
                   </div>
                   <p className="relative max-w-md text-sm leading-7 text-slate-300">
-                    المحاكاة تعمل من بيانات Events تجريبية بدون فيديو. الفيديو هنا اختياري للعرض فقط، وليس شرطًا لتحريك الملعب أو تحديث الإحصائيات.
+                    لن تتحرك الإحصائيات أو الملعب الآن. بعد إدخال الفيديو والضغط على زر التحويل، يبدأ النظام في توليد Events تجريبية كأنها ناتجة من تحليل الفيديو.
                   </p>
                 </div>
               )}
+            </div>
+
+            <div className="mt-4 rounded-2xl border border-amber-400/20 bg-amber-400/10 p-4 text-sm leading-7 text-amber-100">
+              ملاحظة مهمة: YouTube داخل iframe لا يسمح للمتصفح باستخراج الفريمات مباشرة. لذلك هذه الصفحة تعرض شكل المنتج النهائي، أما التحليل الحقيقي يحتاج خدمة Backend/Worker متصلة بمصدر فيديو مسموح قانونيًا.
             </div>
           </section>
 
           <section className="rounded-3xl border border-white/10 bg-white/[0.04] p-4 shadow-xl">
             <div className="mb-4 flex items-center justify-between">
               <div>
-                <h2 className="text-xl font-black">ملعب 2D مولّد من البيانات</h2>
-                <p className="text-sm text-slate-400">الكرة تتحرك حسب آخر Event مستنتج.</p>
+                <h2 className="text-xl font-black">ملعب 2D مولّد من الفيديو</h2>
+                <p className="text-sm text-slate-400">
+                  {analysisStarted ? "الكرة تتحرك حسب Events مستنتجة من الفيديو التجريبي." : "سيبدأ التحريك بعد إدخال الفيديو والضغط على بدء التحويل."}
+                </p>
               </div>
               <div className="rounded-2xl bg-slate-900 px-4 py-2 text-center">
                 <p className="text-xs text-slate-400">النتيجة</p>
@@ -239,7 +272,7 @@ export default function LiveAnimationDemoPage() {
               </div>
             </div>
 
-            <div className="relative aspect-[16/10] overflow-hidden rounded-3xl border border-emerald-300/20 bg-emerald-950/70">
+            <div className={`relative aspect-[16/10] overflow-hidden rounded-3xl border border-emerald-300/20 bg-emerald-950/70 ${!analysisStarted ? "opacity-70" : ""}`}>
               <div className="absolute inset-4 rounded-2xl border-2 border-emerald-200/35" />
               <div className="absolute left-1/2 top-4 h-[calc(100%-2rem)] w-px -translate-x-1/2 bg-emerald-200/25" />
               <div className="absolute left-1/2 top-1/2 h-24 w-24 -translate-x-1/2 -translate-y-1/2 rounded-full border border-emerald-200/25" />
@@ -254,7 +287,15 @@ export default function LiveAnimationDemoPage() {
                 }}
               />
 
-              {activeEvent && (
+              {!analysisStarted && (
+                <div className="absolute inset-0 flex items-center justify-center bg-slate-950/40 p-6 text-center">
+                  <div className="rounded-3xl border border-white/10 bg-slate-950/90 p-5 text-sm leading-7 text-slate-300">
+                    الملعب جاهز. أضف الفيديو ثم اضغط بدء التحويل ليبدأ توليد الأنيميشن.
+                  </div>
+                </div>
+              )}
+
+              {activeEvent && analysisStarted && (
                 <div
                   className="absolute -translate-x-1/2 rounded-2xl border border-white/10 bg-slate-950/90 px-3 py-2 text-center text-xs font-bold shadow-xl transition-all duration-700"
                   style={{ left: `${activeEvent.x}%`, top: `${Math.max(8, activeEvent.y - 14)}%` }}
@@ -269,7 +310,7 @@ export default function LiveAnimationDemoPage() {
 
         <div className="mt-6 grid gap-6 lg:grid-cols-3">
           <section className="rounded-3xl border border-white/10 bg-white/[0.04] p-5">
-            <h3 className="mb-4 text-lg font-black">إحصائيات مباشرة تجريبية</h3>
+            <h3 className="mb-4 text-lg font-black">إحصائيات مستخرجة من الفيديو</h3>
             <div className="space-y-4 text-sm">
               <StatRow label="الاستحواذ" home={stats.possession.home} away={stats.possession.away} suffix="%" />
               <StatRow label="الهجمات" home={stats.attacks.home} away={stats.attacks.away} />
@@ -281,7 +322,7 @@ export default function LiveAnimationDemoPage() {
           </section>
 
           <section className="rounded-3xl border border-white/10 bg-white/[0.04] p-5">
-            <h3 className="mb-4 text-lg font-black">زخم المباراة</h3>
+            <h3 className="mb-4 text-lg font-black">زخم المباراة من الفيديو</h3>
             <div className="overflow-hidden rounded-full bg-slate-800">
               <div className="h-4 rounded-full bg-emerald-300 transition-all duration-700" style={{ width: `${homeMomentumWidth}%` }} />
             </div>
@@ -290,15 +331,15 @@ export default function LiveAnimationDemoPage() {
               <span>{teamNames.away}: {100 - homeMomentumWidth}%</span>
             </div>
             <div className="mt-5 rounded-2xl border border-amber-400/20 bg-amber-400/10 p-4 text-sm leading-7 text-amber-100">
-              هذا الزخم محسوب من: الهجمات الخطيرة + التسديدات + التسديدات على المرمى. في النسخة الحقيقية سنضيف مصدر الإحصائيات ونتائج AI Vision ومراجعة المشغل.
+              الزخم هنا محسوب تجريبيًا من Events الفيديو: الهجمات الخطيرة + التسديدات + التسديدات على المرمى. النسخة الحقيقية ستخزن هذه الأحداث في قاعدة البيانات.
             </div>
           </section>
 
           <section className="rounded-3xl border border-white/10 bg-white/[0.04] p-5">
-            <h3 className="mb-4 text-lg font-black">Timeline الأحداث</h3>
+            <h3 className="mb-4 text-lg font-black">Timeline التحويل</h3>
             <div className="max-h-80 space-y-3 overflow-auto pr-1">
               {events.length === 0 ? (
-                <p className="text-sm text-slate-400">تبدأ الأحداث تلقائيًا بعد لحظات عند تشغيل المحاكاة.</p>
+                <p className="text-sm text-slate-400">لم يبدأ التحويل بعد. أضف الفيديو واضغط زر بدء التحويل.</p>
               ) : (
                 events.map((event) => (
                   <div key={event.id} className="rounded-2xl border border-white/10 bg-slate-950/70 p-3">
@@ -319,12 +360,12 @@ export default function LiveAnimationDemoPage() {
         </div>
 
         <section className="mt-6 rounded-3xl border border-white/10 bg-white/[0.04] p-5">
-          <h3 className="mb-4 text-lg font-black">المرحلة التالية لتحويل الفيديو إلى بيانات حقيقية</h3>
+          <h3 className="mb-4 text-lg font-black">ما المطلوب للنسخة الحقيقية؟</h3>
           <div className="grid gap-3 text-sm leading-7 text-slate-300 md:grid-cols-4">
-            <PipelineCard title="1) Frame Worker" text="يلتقط فريمات من مصدر مسموح قانونيًا كل ثانية أو بمعدل أعلى أثناء الهجمة." />
-            <PipelineCard title="2) OCR" text="يقرأ الدقيقة والنتيجة وأسماء الفرق والإحصائيات الظاهرة على الشاشة." />
-            <PipelineCard title="3) Vision + Classifier" text="يكشف الكرة واللاعبين واتجاه اللعب ثم يحوّل المشهد إلى Event بثقة محددة." />
-            <PipelineCard title="4) Reviewer" text="لوحة مشغل مباشر تؤكد أو تصحح الحدث قبل نشره للزوار." />
+            <PipelineCard title="1) Video Worker" text="يستقبل فيديو مسموح قانونيًا، أو ملف فيديو مرفوع، أو stream داخلي وليس iframe فقط." />
+            <PipelineCard title="2) Frame Capture" text="يلتقط فريمات كل ثانية أو 5-10 فريم/ثانية عند الهجمات المهمة." />
+            <PipelineCard title="3) OCR + Vision" text="يقرأ النتيجة والدقيقة، ثم يكشف الكرة واللاعبين واتجاه اللعب." />
+            <PipelineCard title="4) Events API" text="يرسل الأحداث والإحصائيات إلى قاعدة البيانات ثم يحرك ملعب 2D للمستخدم." />
           </div>
         </section>
       </section>
