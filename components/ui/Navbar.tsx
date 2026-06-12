@@ -6,12 +6,12 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { signOut, useSession } from 'next-auth/react';
-import { BookOpen, Briefcase, CalendarDays, ChevronDown, Coins, FileText, Gift, LogOut, Menu, Newspaper, Radio, Shield, ShieldAlert, Trophy, User as UserIcon, Users, X, TrendingUp } from 'lucide-react';
+import { BookOpen, Briefcase, CalendarDays, ChevronDown, FileText, Gift, LogOut, Menu, Newspaper, Radio, Shield, ShieldAlert, Trophy, User as UserIcon, Users, X, TrendingUp } from 'lucide-react';
 import { useStore } from '@/lib/store';
 import { InsufficientFundsModal } from './InsufficientFundsModal';
 
 const adminEmails = new Set(['worldcup@mcprim.com', 'elfox14usa@gmail.com']);
-const slogan = 'المونديال لحظة بلحظة: أخبار موثقة، تحليل كروي، ومباريات مباشرة';
+const slogan = 'المونديال لحظة بلحظة — مباشر وتحليل موثق';
 
 export function Navbar() {
   const { data: session, status } = useSession();
@@ -65,26 +65,25 @@ export function Navbar() {
   };
 
   const isExchangeActive = pathname === '/market' || pathname === '/portfolio' || pathname === '/rewards' || pathname === '/methodology';
-
   const closeMobileMenu = () => setIsMobileMenuOpen(false);
 
   return (
     <>
       <nav className="fixed top-0 z-50 w-full border-b border-white/10 bg-black/80 shadow-[0_8px_30px_rgba(0,0,0,0.35)] backdrop-blur-xl">
         <div className="mx-auto max-w-[1400px] px-4 sm:px-6 lg:px-8">
-          <div className="flex h-16 items-center justify-between lg:h-20">
-            <Link href="/" className="group flex min-w-0 items-center gap-3">
-              <Image src="/brand/logo-horizontal.png" alt="MC PRIME Exchange" width={220} height={48} className="h-10 w-auto shrink-0 object-contain transition-transform duration-300 group-hover:scale-105 lg:h-12" priority />
-              <span className="hidden max-w-[300px] border-r border-white/10 pr-3 text-[11px] font-bold leading-5 text-gray-300 xl:block">
+          <div className="flex h-16 items-center justify-between gap-3 lg:h-20">
+            <Link href="/" className="group flex flex-none items-center gap-3 overflow-hidden">
+              <Image src="/brand/logo-horizontal.png" alt="MC PRIME Exchange" width={178} height={42} className="h-8 w-auto shrink-0 object-contain transition-transform duration-300 group-hover:scale-105 lg:h-10" priority />
+              <span className="hidden whitespace-nowrap rounded-full border border-[#0FF0FC]/20 bg-[#0FF0FC]/10 px-3 py-1 text-[10px] font-black leading-none text-[#0FF0FC] 2xl:inline-flex">
                 {slogan}
               </span>
             </Link>
 
-            <div className="hidden flex-1 items-center justify-center gap-2 px-6 lg:flex">
+            <div className="hidden min-w-0 flex-1 items-center justify-center gap-1 px-3 lg:flex xl:gap-2 xl:px-5">
               {navLinks.map((link) => {
                 const isActive = isLinkActive(link);
                 return (
-                  <Link key={link.href} href={link.href} className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-bold transition-all duration-300 ${isActive ? 'border-[#0FF0FC]/20 bg-[#0FF0FC]/10 text-[#0FF0FC] shadow-[0_0_10px_rgba(15,240,252,0.1)]' : 'border-transparent text-gray-400 hover:bg-white/5 hover:text-white'}`}>
+                  <Link key={link.href} href={link.href} className={`flex items-center gap-2 rounded-xl border px-2.5 py-2 text-sm font-bold transition-all duration-300 xl:px-3 ${isActive ? 'border-[#0FF0FC]/20 bg-[#0FF0FC]/10 text-[#0FF0FC] shadow-[0_0_10px_rgba(15,240,252,0.1)]' : 'border-transparent text-gray-400 hover:bg-white/5 hover:text-white'}`}>
                     {link.icon}
                     {link.name}
                   </Link>
@@ -92,7 +91,7 @@ export function Navbar() {
               })}
 
               <div className="relative" ref={exchangeMenuRef}>
-                <button onClick={() => setIsExchangeMenuOpen(!isExchangeMenuOpen)} className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-bold transition-all duration-300 ${isExchangeActive ? 'border-[#FFD700]/25 bg-[#FFD700]/10 text-[#FFD700]' : 'border-transparent text-gray-400 hover:bg-white/5 hover:text-white'}`}>
+                <button onClick={() => setIsExchangeMenuOpen(!isExchangeMenuOpen)} className={`flex items-center gap-2 rounded-xl border px-2.5 py-2 text-sm font-bold transition-all duration-300 xl:px-3 ${isExchangeActive ? 'border-[#FFD700]/25 bg-[#FFD700]/10 text-[#FFD700]' : 'border-transparent text-gray-400 hover:bg-white/5 hover:text-white'}`}>
                   <TrendingUp size={16} />
                   البورصة
                   <ChevronDown size={14} className={`transition-transform ${isExchangeMenuOpen ? 'rotate-180' : ''}`} />
@@ -110,18 +109,18 @@ export function Navbar() {
               </div>
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex flex-none items-center gap-3">
               {status === 'loading' ? (
                 <div className="h-10 w-32 animate-pulse rounded-full bg-white/5" />
               ) : session ? (
                 <div className="hidden items-center gap-3 lg:flex">
-                  <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 transition-colors hover:bg-white/10">
+                  <div className="hidden items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 transition-colors hover:bg-white/10 xl:flex">
                     <span className="text-xs font-bold text-gray-400">رصيدك:</span>
                     <span className="font-mono text-sm font-bold text-[#FFD700]">{userStats ? userStats.balance.toLocaleString() : '...'} ¢</span>
                   </div>
                   <div className="relative" ref={userMenuRef}>
                     <button onClick={() => setIsUserMenuOpen(!isUserMenuOpen)} className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 p-1.5 pr-3 transition-all hover:bg-white/10">
-                      <span className="max-w-[80px] truncate text-xs font-bold text-white">{session.user?.name?.split(' ')[0] || session.user?.email?.split('@')[0]}</span>
+                      <span className="hidden max-w-[80px] truncate text-xs font-bold text-white xl:block">{session.user?.name?.split(' ')[0] || session.user?.email?.split('@')[0]}</span>
                       <div className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-gradient-to-tr from-[#0FF0FC] to-[#FFD700]"><UserIcon size={14} className="text-black" /></div>
                       <ChevronDown size={14} className={`text-gray-400 transition-transform ${isUserMenuOpen ? 'rotate-180' : ''}`} />
                     </button>
