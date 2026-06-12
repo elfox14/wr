@@ -4,6 +4,7 @@ import { groupBWorldCupReports } from './groupBWorldCupReports';
 import { groupCWorldCupReports } from './groupCWorldCupReports';
 import { groupDWorldCupReports } from './groupDWorldCupReports';
 import { groupEWorldCupReports } from './groupEWorldCupReports';
+import { groupFToLWorldCupReports } from './groupFToLWorldCupReports';
 
 export type TeamIntelligenceSeedReport = {
   teamCodes: string[];
@@ -142,6 +143,7 @@ export const teamIntelligenceSeedReports: TeamIntelligenceSeedReport[] = [
   ...groupCWorldCupReports,
   ...groupDWorldCupReports,
   ...groupEWorldCupReports,
+  ...groupFToLWorldCupReports,
   ...editorialSeedReports,
 ];
 
