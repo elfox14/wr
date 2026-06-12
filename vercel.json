@@ -5,7 +5,7 @@
       "schedule": "*/5 * * * *"
     },
     {
-      "path": "/api/cron/live-match-stats-sync",
+      "path": "/api/cron/isports-safe-sync",
       "schedule": "*/5 * * * *"
     },
     {
