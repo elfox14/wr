@@ -35,6 +35,10 @@ function nullableNumber(value: unknown) {
   return Number.isFinite(n) ? n : null;
 }
 
+function pickScore(snapshotValue: unknown, matchValue: unknown) {
+  return nullableNumber(snapshotValue) ?? nullableNumber(matchValue) ?? 0;
+}
+
 function categoryFromEvent(eventType?: string | null) {
   const value = String(eventType || '').toLowerCase();
   if (value.includes('goal') || value.includes('match') || value.includes('fixture')) return 'match';
@@ -116,19 +120,25 @@ function formatLiveStats(row?: any) {
 }
 
 function formatMatch(match: any, statsMap: Map<string, any>) {
+  const statsRow = statsMap.get(match.id);
+  const liveStats = formatLiveStats(statsRow);
+  const homeScore = pickScore(statsRow?.homeScore, match.homeScore);
+  const awayScore = pickScore(statsRow?.awayScore, match.awayScore);
+
   return {
     id: match.id,
     externalId: match.externalId,
     animationMatchId: match.animationMatchId,
     status: match.status,
     matchDate: match.matchDate.toISOString(),
-    homeScore: toNumber(match.homeScore),
-    awayScore: toNumber(match.awayScore),
+    homeScore,
+    awayScore,
+    scoreSource: liveStats ? 'snapshot' : 'match',
     groupPhase: match.groupPhase,
     stage: match.stage,
     homeTeam: match.homeTeam ? { id: match.homeTeam.id, name: match.homeTeam.name, code: match.homeTeam.code, image: match.homeTeam.image, price: Math.round(toNumber(match.homeTeam.marketPrice ?? match.homeTeam.current_price)), change: toNumber(match.homeTeam.change) } : null,
     awayTeam: match.awayTeam ? { id: match.awayTeam.id, name: match.awayTeam.name, code: match.awayTeam.code, image: match.awayTeam.image, price: Math.round(toNumber(match.awayTeam.marketPrice ?? match.awayTeam.current_price)), change: toNumber(match.awayTeam.change) } : null,
-    liveStats: formatLiveStats(statsMap.get(match.id)),
+    liveStats,
   };
 }
 
@@ -222,7 +232,7 @@ export async function GET() {
         recentCount: recentMatches.length,
         linkedMatches,
         unlinkedNearMatches,
-        providerMode: 'iSports-first / API-Football protected',
+        providerMode: 'iSports-first / latest-score-snapshot fallback / API-Football protected',
       },
       matches: {
         live: liveMatches.map((match) => formatMatch(match, statsMap)),
