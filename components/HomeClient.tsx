@@ -271,7 +271,7 @@ export default function HomeClient({
   ];
 
   const commandLinks = [
-    { title: 'مباشر', href: '/animation-live', icon: Radio },
+    { title: 'بث انيميشن', href: tickerMatch ? getAnimationHref(tickerMatch) : '/animation-live', icon: Radio },
     { title: 'أخبار وتحليل', href: '/articles', icon: Newspaper },
     { title: 'المنتخبات', href: '/market?type=TEAM', icon: Trophy },
     { title: 'البورصة', href: '/market', icon: BarChart3 },
@@ -304,16 +304,19 @@ export default function HomeClient({
           <div className="flex flex-wrap items-center gap-3">
             <span className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-black ${hasLiveMatch ? 'border-red-500/30 bg-red-500/10 text-red-300' : 'border-[#0FF0FC]/25 bg-[#0FF0FC]/10 text-[#0FF0FC]'}`}>
               <span className={`h-2 w-2 rounded-full ${hasLiveMatch ? 'animate-pulse bg-red-500' : 'bg-[#0FF0FC]'}`} />
-              {hasLiveMatch ? 'LIVE الآن' : 'مركز كأس العالم'}
+              {hasLiveMatch ? 'مباشر الآن' : 'مباريات اليوم'}
             </span>
-            <div className="text-sm font-bold text-gray-300">
+            <div className="flex flex-wrap items-center gap-2 text-sm font-bold text-gray-300">
               {tickerMatch ? (
                 <>
                   <span className="text-white">{tickerMatch.homeTeam?.name || 'الفريق الأول'}</span>
-                  <span className="mx-2 text-gray-500">×</span>
+                  <span className="rounded-lg border border-white/15 bg-black/30 px-3 py-1 font-mono font-black text-[#FFD700] tabular-nums">
+                    {isMatchLive(tickerMatch, now) || String(tickerMatch.status).toUpperCase() === 'FINISHED' ? `${tickerMatch.homeScore ?? 0} - ${tickerMatch.awayScore ?? 0}` : 'VS'}
+                  </span>
                   <span className="text-white">{tickerMatch.awayTeam?.name || 'الفريق الثاني'}</span>
-                  <span className="mx-2 text-gray-500">—</span>
-                  <span className="text-[#FFD700]">{statusLabel(tickerMatch, now)}</span>
+                  <Link href={getAnimationHref(tickerMatch)} className="rounded-full border border-[#FFD700]/30 bg-[#FFD700]/10 px-3 py-1 text-xs font-black text-[#FFD700] transition hover:bg-[#FFD700] hover:text-black">
+                    متابعة المباشر
+                  </Link>
                 </>
               ) : (
                 'تابع المباريات والأخبار والتحليلات من مكان واحد'
