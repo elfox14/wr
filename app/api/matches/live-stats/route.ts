@@ -36,6 +36,16 @@ function shouldSync(match: any, latest: any, force: boolean) {
   return ageMs >= 30_000;
 }
 
+function hasAnyStat(snapshot: any) {
+  if (!snapshot) return false;
+  return [
+    'homePossession', 'awayPossession', 'homeAttacks', 'awayAttacks',
+    'homeDangerousAttacks', 'awayDangerousAttacks', 'homeShots', 'awayShots',
+    'homeShotsOnTarget', 'awayShotsOnTarget', 'homeShotsOffTarget', 'awayShotsOffTarget',
+    'homeCorners', 'awayCorners', 'homeYellowCards', 'awayYellowCards', 'homeRedCards', 'awayRedCards',
+  ].some((key) => snapshot[key] !== null && snapshot[key] !== undefined);
+}
+
 export async function GET(request: Request) {
   const now = new Date();
   try {
@@ -44,6 +54,7 @@ export async function GET(request: Request) {
     const providerMatchId = Number(searchParams.get('matchId') || searchParams.get('animationMatchId') || 0);
     const dbMatchId = searchParams.get('dbMatchId') || searchParams.get('id') || '';
     const force = searchParams.get('force') === '1' || searchParams.get('force') === 'true';
+    const allowProviderSync = searchParams.get('sync') === '1' || searchParams.get('sync') === 'true' || force;
 
     if (!providerMatchId && !dbMatchId) {
       return NextResponse.json({ ok: false, error: 'matchId or dbMatchId is required' }, { status: 400, headers: { 'Cache-Control': 'no-store' } });
@@ -63,7 +74,7 @@ export async function GET(request: Request) {
 
     let latest = await getLatestSnapshot(match.id);
     let syncResult: any = null;
-    if (shouldSync(match, latest, force)) {
+    if (allowProviderSync && shouldSync(match, latest, force)) {
       try {
         syncResult = await syncMatchStats(match, { debug: false, force });
         latest = await getLatestSnapshot(match.id);
@@ -71,7 +82,7 @@ export async function GET(request: Request) {
         syncResult = { status: 'failed', ...providerErrorDetails(error) };
       }
     } else {
-      syncResult = { status: 'cached_recent_snapshot' };
+      syncResult = allowProviderSync ? { status: 'cached_recent_snapshot' } : { status: 'database_only', note: 'UI polling reads stored snapshots only to protect API quota. Provider sync is handled by cron.' };
     }
 
     const [historyRows, events] = await Promise.all([
@@ -86,11 +97,14 @@ export async function GET(request: Request) {
     const latestPublic = publicSnapshot(latest);
     const latestHomeScore = latestPublic?.homeScore ?? match.homeScore;
     const latestAwayScore = latestPublic?.awayScore ?? match.awayScore;
+    const hasStats = hasAnyStat(latestPublic);
 
     return NextResponse.json({
       ok: true,
       updatedAt: now.toISOString(),
-      pollingSeconds: isLiveLike(match.status) || isFinished(match.status) ? 5 : 30,
+      pollingSeconds: 5,
+      providerSyncEnabled: allowProviderSync,
+      hasStats,
       sync: syncResult,
       match: {
         id: match.id,
