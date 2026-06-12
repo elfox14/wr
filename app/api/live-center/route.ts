@@ -5,6 +5,25 @@ import { renderMarketNews } from '@/lib/market-news/render';
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
+const TEAM_SELECT = { id: true, name: true, code: true, image: true, marketPrice: true, current_price: true, change: true };
+const MATCH_SELECT = {
+  id: true,
+  externalId: true,
+  animationMatchId: true,
+  status: true,
+  matchDate: true,
+  homeScore: true,
+  awayScore: true,
+  groupPhase: true,
+  stage: true,
+  homeTeam: { select: TEAM_SELECT },
+  awayTeam: { select: TEAM_SELECT },
+};
+
+type CacheEntry = { createdAt: number; payload: any };
+const CACHE_TTL_MS = 12_000;
+let liveCenterCache: CacheEntry | null = null;
+
 function toNumber(value: unknown, fallback = 0) {
   const n = Number(value);
   return Number.isFinite(n) ? n : fallback;
@@ -33,8 +52,17 @@ function formatMatch(match: any) {
   };
 }
 
+function response(payload: any, fromCache = false) {
+  return NextResponse.json({ ...payload, fromCache }, { headers: { 'Cache-Control': 'private, max-age=0, no-cache, must-revalidate' } });
+}
+
 export async function GET() {
   try {
+    const nowMs = Date.now();
+    if (liveCenterCache && nowMs - liveCenterCache.createdAt < CACHE_TTL_MS) {
+      return response(liveCenterCache.payload, true);
+    }
+
     const now = new Date();
     const nearUntil = new Date(now.getTime() + 6 * 60 * 60 * 1000);
     const recentSince = new Date(now.getTime() - 6 * 60 * 60 * 1000);
@@ -46,19 +74,19 @@ export async function GET() {
         where: { status: { in: ['IN_PLAY', 'LIVE'] } },
         orderBy: { matchDate: 'asc' },
         take: 20,
-        include: { homeTeam: true, awayTeam: true },
+        select: MATCH_SELECT,
       }),
       prisma.match.findMany({
         where: { status: 'SCHEDULED', matchDate: { gte: now, lte: nearUntil } },
         orderBy: { matchDate: 'asc' },
         take: 20,
-        include: { homeTeam: true, awayTeam: true },
+        select: MATCH_SELECT,
       }),
       prisma.match.findMany({
         where: { status: 'FINISHED', matchDate: { gte: recentSince, lte: now } },
         orderBy: { matchDate: 'desc' },
         take: 20,
-        include: { homeTeam: true, awayTeam: true },
+        select: MATCH_SELECT,
       }),
       prisma.marketNews.findMany({
         orderBy: { publishedAt: 'desc' },
@@ -69,7 +97,7 @@ export async function GET() {
         where: { type: 'TEAM' },
         orderBy: { change: 'desc' },
         take: 8,
-        select: { id: true, name: true, code: true, image: true, marketPrice: true, current_price: true, change: true },
+        select: TEAM_SELECT,
       }),
       prisma.match.count({ where: { animationMatchId: { not: null } } }),
       prisma.match.count({ where: { animationMatchId: null, matchDate: { gte: dayStart, lte: nearUntil } } }),
@@ -99,11 +127,13 @@ export async function GET() {
 
     const matchNews = news.filter((item) => item.category === 'match');
     const tradingNews = news.filter((item) => item.category === 'trading');
+    const pollingSeconds = liveMatches.length > 0 ? 15 : upcomingMatches.length > 0 ? 45 : 60;
 
-    return NextResponse.json({
+    const payload = {
       ok: true,
       updatedAt: now.toISOString(),
-      pollingSeconds: 20,
+      pollingSeconds,
+      cacheSeconds: Math.round(CACHE_TTL_MS / 1000),
       health: {
         liveCount: liveMatches.length,
         upcomingCount: upcomingMatches.length,
@@ -130,7 +160,10 @@ export async function GET() {
         price: Math.round(toNumber(asset.marketPrice ?? asset.current_price)),
         change: Math.round(toNumber(asset.change) * 10) / 10,
       })),
-    }, { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate' } });
+    };
+
+    liveCenterCache = { createdAt: nowMs, payload };
+    return response(payload, false);
   } catch (error: any) {
     console.error('live-center error:', error);
     return NextResponse.json({ ok: false, error: error?.message || 'Internal Server Error' }, { status: 500 });
