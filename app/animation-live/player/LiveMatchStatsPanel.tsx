@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Activity, AlertTriangle, Clock, CornerDownRight, ShieldAlert, Target, Zap } from 'lucide-react';
 
 type Team = { id?: string; name?: string; code?: string; image?: string } | null;
@@ -184,7 +184,7 @@ export default function LiveMatchStatsPanel({ matchId }: { matchId: string }) {
   );
 }
 
-function StatMini({ icon, label, home, away }: { icon: React.ReactNode; label: string; home: number | null; away: number | null }) {
+function StatMini({ icon, label, home, away }: { icon: ReactNode; label: string; home: number | null; away: number | null }) {
   return (
     <div className="rounded-2xl border border-white/8 bg-black/25 p-3 text-center">
       <div className="mb-2 flex justify-center text-[#FFD700]">{icon}</div>
