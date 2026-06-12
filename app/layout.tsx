@@ -18,31 +18,32 @@ const cairo = Cairo({
 });
 
 const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://worldcup.mcprim.com';
+const bilingualDescription = 'بورصة المونديال من MC PRIME: مباريات كأس العالم مباشرة، أخبار موثقة، تحليل كروي، صفحات منتخبات ولاعبين، وبورصة افتراضية ترفيهية للتفاعل الجماهيري. World Cup Exchange by MC PRIME: live matches, verified news, football analysis, team and player hubs, and a virtual fan exchange experience.';
 
 export const metadata: Metadata = {
   metadataBase: new URL(baseUrl),
   title: {
-    default: "بورصة المونديال | مباشر وتحليل كأس العالم",
-    template: "%s | بورصة المونديال",
+    default: "بورصة المونديال | World Cup Exchange — مباشر وتحليل كأس العالم",
+    template: "%s | بورصة المونديال — World Cup Exchange",
   },
-  description: "كل ما يحدث في كأس العالم: نتائج مباشرة، أخبار موثقة، تحليل كروي، صفحات منتخبات، وبورصة افتراضية للتفاعل الجماهيري.",
-  keywords: ["بورصة المونديال", "كأس العالم", "مباشر كأس العالم", "أخبار كأس العالم", "تحليل كروي", "منتخبات كأس العالم", "سوق رياضي افتراضي", "football intelligence"],
+  description: bilingualDescription,
+  keywords: ["بورصة المونديال", "كأس العالم", "مباشر كأس العالم", "أخبار كأس العالم", "تحليل كروي", "منتخبات كأس العالم", "لاعبو كأس العالم", "سوق رياضي افتراضي", "World Cup Exchange", "live World Cup matches", "football analysis", "football intelligence"],
   authors: [{ name: "MC PRIME Exchange Team" }],
   openGraph: {
-    title: "بورصة المونديال | مباشر وتحليل كأس العالم",
-    description: "منصة متابعة وتحليل كأس العالم: مباشر، أخبار موثقة، تحليل كروي، وبورصة افتراضية للتفاعل الجماهيري.",
+    title: "بورصة المونديال | World Cup Exchange — مباشر وتحليل كأس العالم",
+    description: bilingualDescription,
     url: baseUrl,
-    siteName: "بورصة المونديال",
-    images: [{ url: "/og-image.jpg", width: 1200, height: 630, alt: "بورصة المونديال مباشر وتحليل كأس العالم" }],
+    siteName: "بورصة المونديال | World Cup Exchange",
+    images: [{ url: "/og-image.jpg", width: 1200, height: 630, alt: "بورصة المونديال World Cup Exchange live matches and football analysis" }],
     locale: "ar_EG",
-    alternateLocale: ["ar_SA", "ar_AE", "ar_MA", "ar_QA"],
+    alternateLocale: ["en_US", "ar_SA", "ar_AE", "ar_MA", "ar_QA"],
     type: "website",
   },
-  alternates: { canonical: '/' },
+  alternates: { canonical: '/', languages: { ar: '/', en: '/' } },
   twitter: {
     card: "summary_large_image",
-    title: "بورصة المونديال | مباشر وتحليل كأس العالم",
-    description: "نتائج مباشرة، أخبار موثقة، تحليل كروي، وبورصة افتراضية للتفاعل الجماهيري.",
+    title: "بورصة المونديال | World Cup Exchange",
+    description: bilingualDescription,
     images: ["/og-image.jpg"],
   },
   robots: {
