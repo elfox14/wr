@@ -115,6 +115,15 @@ function shouldRunLiveMarket(req: Request, window: SyncWindow) {
   return window.activeOrNear;
 }
 
+function shouldRunDemandUpdate(req: Request, window: SyncWindow) {
+  const url = new URL(req.url);
+  if (url.searchParams.get('demand') === 'false') return false;
+  if (url.searchParams.get('forceDemand') === 'true') return true;
+  if (!window.activeOrNear) return false;
+  const interval = Math.min(Math.max(Number(url.searchParams.get('demandInterval') || 15), 5), 120);
+  return minuteModulo(interval);
+}
+
 function shouldRunFootballAuto(req: Request, window: SyncWindow) {
   const url = new URL(req.url);
   if (url.searchParams.get('footballAuto') === 'false') return false;
@@ -194,11 +203,13 @@ export async function GET(req: Request) {
   const secret = downstreamSecret();
   const date = url.searchParams.get('date') || '';
   const forceAnimation = url.searchParams.get('forceAnimation') === 'true';
+  const forceDemand = url.searchParams.get('forceDemand') === 'true';
   const startedAt = new Date();
   const steps: StepResult[] = [];
   const syncWindow = await getSyncWindow(req);
   const runAnimation = shouldRunAnimationSync(req, syncWindow);
   const runLive = shouldRunLiveMarket(req, syncWindow);
+  const runDemand = shouldRunDemandUpdate(req, syncWindow);
   const runFootballAuto = shouldRunFootballAuto(req, syncWindow);
 
   if (runAnimation) {
@@ -233,6 +244,12 @@ export async function GET(req: Request) {
     steps.push(skippedStep('live-market-sync', '/api/cron/live-market-sync', 'No live, near, or recently finished local matches.'));
   }
 
+  if (runDemand) {
+    steps.push(await runStep(baseUrl, 'update-demand', '/api/cron/update-demand', secret));
+  } else {
+    steps.push(skippedStep('update-demand', '/api/cron/update-demand', syncWindow.activeOrNear ? 'Runs every 15 minutes by default during live windows. Use forceDemand=true to run now.' : 'No live, near, or recently finished local matches.'));
+  }
+
   const ok = steps.every((step) => step.ok || step.skipped);
 
   return NextResponse.json({
@@ -246,7 +263,9 @@ export async function GET(req: Request) {
     animationSyncRan: runAnimation,
     footballAutoSyncRan: runFootballAuto,
     liveMarketSyncRan: runLive,
+    demandUpdateRan: runDemand,
     forceAnimation,
+    forceDemand,
     apiFootballProtection: {
       enabled: true,
       defaultBehavior: 'football-auto-sync is skipped unless includeFootballAuto=true or ENABLE_API_FOOTBALL_CRON=true',
