@@ -32,6 +32,13 @@ const modules = [
     tag: 'غرفة الأخبار',
   },
   {
+    href: '/admin/match-events',
+    title: 'إدارة أحداث المباراة',
+    description: 'أضف أهدافًا وبطاقات وملاحظات لتظهر في Timeline داخل مركز المباراة.',
+    icon: Trophy,
+    tag: 'الأهداف والبطاقات',
+  },
+  {
     href: '/daily-summary',
     title: 'ملخص اليوم',
     description: 'لقطة يومية للنتائج، الرصد الصحفي، أخبار السوق، وسكربت سريع قابل للنشر.',
