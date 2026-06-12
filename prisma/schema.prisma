@@ -189,7 +189,24 @@ model Match {
   awayScore   Int      @default(0)
   groupPhase  String?
   stage       String   @default("group")
+  events      MatchEvent[]
   @@index([animationMatchId])
+}
+
+model MatchEvent {
+  id         String   @id @default(cuid())
+  matchId    String
+  match      Match    @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  minute     Int?
+  type       String   @default("note")
+  teamId     String?
+  playerName String?
+  detail     String
+  sourceName String?
+  sourceUrl  String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  @@index([matchId, minute])
 }
 
 model PriceHistory {
@@ -312,6 +329,25 @@ model MarketNews {
   publishedAt     DateTime @default(now())
   @@index([assetId, publishedAt])
   @@index([eventType, publishedAt])
+}
+
+model PressNews {
+  id          String   @id @default(cuid())
+  title       String
+  body        String
+  category    String   @default("رصد صحفي")
+  sourceName  String
+  sourceUrl   String?
+  sourceType  String   @default("newsletter")
+  language    String   @default("ar")
+  status      String   @default("published")
+  importance  Int      @default(50)
+  tags        Json?
+  publishedAt DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  @@index([status, publishedAt])
+  @@index([category, publishedAt])
 }
 
 model CaptainSelection {
