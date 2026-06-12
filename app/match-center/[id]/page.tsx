@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { Activity, ArrowLeft, BarChart3, CalendarDays, CheckCircle2, Clock, Newspaper, Radio, Shield, TrendingUp, Users } from 'lucide-react';
+import { Activity, AlertTriangle, ArrowLeft, BarChart3, CheckCircle2, Clock, Flag, Newspaper, Radio, Shield, Timer, TrendingUp, Users } from 'lucide-react';
 import prisma from '@/lib/prisma';
 import { renderMarketNews } from '@/lib/market-news/render';
 
@@ -10,7 +10,7 @@ export const revalidate = 0;
 
 export const metadata: Metadata = {
   title: 'مركز المباراة | MC PRIME Exchange',
-  description: 'مركز المباراة: نتيجة، بث أنيميشن، أخبار مرتبطة، مؤشرات السوق، وأسماء بارزة.',
+  description: 'مركز المباراة: نتيجة، بث أنيميشن، أحداث، أخبار مرتبطة، مؤشرات السوق، وأسماء بارزة.',
 };
 
 function formatDate(value: Date | string) {
@@ -57,6 +57,25 @@ async function ensurePressNewsTable() {
   `);
 }
 
+async function ensureMatchEventTable() {
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "MatchEvent" (
+      "id" TEXT PRIMARY KEY,
+      "matchId" TEXT NOT NULL,
+      "minute" INTEGER,
+      "type" TEXT NOT NULL DEFAULT 'note',
+      "teamId" TEXT,
+      "playerName" TEXT,
+      "detail" TEXT NOT NULL,
+      "sourceName" TEXT,
+      "sourceUrl" TEXT,
+      "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+  await prisma.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS "MatchEvent_matchId_minute_idx" ON "MatchEvent" ("matchId", "minute")');
+}
+
 async function getMatch(id: string) {
   return prisma.match.findUnique({
     where: { id },
@@ -65,6 +84,21 @@ async function getMatch(id: string) {
       awayTeam: { include: { players: true, marketNews: { orderBy: { publishedAt: 'desc' }, take: 5 } } },
     },
   });
+}
+
+async function getMatchEvents(matchId: string) {
+  try {
+    await ensureMatchEventTable();
+    return prisma.$queryRawUnsafe<any[]>(`
+      SELECT * FROM "MatchEvent"
+      WHERE "matchId" = ${quoteSql(matchId)}
+      ORDER BY COALESCE("minute", 999), "createdAt" ASC
+      LIMIT 60
+    `);
+  } catch (error) {
+    console.error('match center events error:', error);
+    return [];
+  }
 }
 
 async function getRelatedPressNews(homeName: string, awayName: string) {
@@ -132,7 +166,7 @@ export default async function MatchCenterPage({ params }: { params: Promise<{ id
   const away = match.awayTeam;
   const status = statusInfo(match.status);
   const StatusIcon = status.icon;
-  const pressNews = await getRelatedPressNews(home.name, away.name);
+  const [pressNews, matchEvents] = await Promise.all([getRelatedPressNews(home.name, away.name), getMatchEvents(match.id)]);
   const marketNews = marketNewsFrom(match);
   const players = topPlayers(match);
   const showScore = String(match.status).toUpperCase() !== 'SCHEDULED';
@@ -171,6 +205,10 @@ export default async function MatchCenterPage({ params }: { params: Promise<{ id
           <MetricCard label="علاوة/خصم المضيف" value={`${homePremium > 0 ? '+' : ''}${homePremium.toFixed(1)}%`} tone={homePremium > 10 ? 'red' : homePremium < -10 ? 'green' : 'cyan'} />
           <MetricCard label="علاوة/خصم الضيف" value={`${awayPremium > 0 ? '+' : ''}${awayPremium.toFixed(1)}%`} tone={awayPremium > 10 ? 'red' : awayPremium < -10 ? 'green' : 'cyan'} />
         </section>
+
+        <Panel title="Timeline أحداث المباراة" icon={<Timer className="text-[#FFD700]" />} action={<span className="text-xs font-black text-gray-500">أهداف / بطاقات / ملاحظات</span>}>
+          {matchEvents.length ? <div className="space-y-3">{matchEvents.map((event) => <MatchEventCard key={event.id} event={event} home={home} away={away} />)}</div> : <EmptyText text="لا توجد أحداث مسجلة بعد. سيتم إضافة لوحة إدارة للأهداف والبطاقات في الخطوة التالية." />}
+        </Panel>
 
         <section className="grid gap-6 lg:grid-cols-[1fr_0.9fr]">
           <Panel title="الرصد الصحفي المرتبط" icon={<Newspaper className="text-[#FFD700]" />} action={<Link href="/news" className="text-xs font-black text-[#0FF0FC]">غرفة الأخبار</Link>}>
@@ -235,6 +273,18 @@ function Panel({ title, icon, children, action }: { title: string; icon: React.R
 
 function ComparisonRow({ label, left, right }: { label: string; left: any; right: any }) {
   return <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 rounded-2xl border border-white/8 bg-black/25 p-3 text-center"><span className="font-mono font-black text-white">{left}</span><span className="text-xs font-black text-gray-500">{label}</span><span className="font-mono font-black text-white">{right}</span></div>;
+}
+
+function eventIcon(type: string) {
+  const value = String(type || '').toLowerCase();
+  if (value.includes('goal')) return <Flag size={15} className="text-emerald-300" />;
+  if (value.includes('red') || value.includes('yellow') || value.includes('card')) return <AlertTriangle size={15} className="text-[#FFD700]" />;
+  return <Activity size={15} className="text-[#0FF0FC]" />;
+}
+
+function MatchEventCard({ event, home, away }: { event: any; home: any; away: any }) {
+  const teamName = event.teamId === home.id ? home.name : event.teamId === away.id ? away.name : 'حدث عام';
+  return <article className="grid grid-cols-[70px_1fr] gap-3 rounded-2xl border border-white/8 bg-black/25 p-4"><div className="text-center"><div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04]">{eventIcon(event.type)}</div><p className="font-mono text-sm font-black text-[#FFD700]">{event.minute ? `${event.minute}'` : '--'}</p></div><div><div className="mb-1 flex flex-wrap items-center gap-2 text-[11px] font-black text-gray-500"><span>{teamName}</span><span>·</span><span>{event.type}</span>{event.sourceName && <><span>·</span><span>{event.sourceName}</span></>}</div>{event.playerName && <p className="text-sm font-black text-white">{event.playerName}</p>}<p className="mt-1 text-sm font-bold leading-6 text-gray-400">{event.detail}</p></div></article>;
 }
 
 function PressNewsCard({ item }: { item: any }) {
