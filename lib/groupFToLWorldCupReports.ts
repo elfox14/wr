@@ -43,7 +43,7 @@ const GROUPS: GroupReportConfig[] = [
       { arName: 'إسبانيا', codes: ['ESP', 'ES', 'SPAIN', 'ESPAÑA'] },
       { arName: 'الرأس الأخضر', codes: ['CPV', 'CV', 'CAPE VERDE', 'CABO VERDE'] },
       { arName: 'السعودية', codes: ['KSA', 'SA', 'SAUDI ARABIA'] },
-      { arName: 'أوروغواي', codes: ['URU', 'UY', 'URUGUAY'] },
+      { arName: 'أوروغواي', codes: ['URU', 'UY', 'UR', 'URY', 'URUGUAY', 'أوروغواي', 'اوروجواي'] },
     ],
   },
   {
