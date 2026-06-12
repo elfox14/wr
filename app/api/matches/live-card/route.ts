@@ -71,17 +71,23 @@ async function fetchAnimationLiveState() {
 
 function decorateMatch(match: any, now: Date, providerState?: any) {
   const matchDate = new Date(match.matchDate);
-  const minute = minutesFromKickoff(matchDate, now);
+  const localMinute = minutesFromKickoff(matchDate, now);
   const dbStatus = String(match.status || '').toUpperCase();
   const providerStatus = String(providerState?.status || '').toUpperCase();
   const effectiveStatus = providerStatus || dbStatus;
-  const isHalfTime = isHalftimeStatus(effectiveStatus);
+  const providerHasState = Boolean(providerStatus);
+  const providerHasMinute = providerState?.minute != null;
+  const isHalfTimeFromProvider = isHalftimeStatus(effectiveStatus);
+  const isLocalHalftimeFallback = !providerHasState && dbStatus === 'SCHEDULED' && localMinute >= 46 && localMinute <= 65;
+  const isHalfTime = isHalfTimeFromProvider || isLocalHalftimeFallback;
   const isDbLive = dbStatus === 'IN_PLAY' || dbStatus === 'LIVE' || dbStatus === 'HT';
   const isProviderLive = isProviderLiveStatus(providerStatus);
-  const isRecentlyStarted = !providerStatus && dbStatus === 'SCHEDULED' && minute >= 1 && minute <= 135;
-  const isLiveNow = isDbLive || isProviderLive || isRecentlyStarted;
+  const isLikelyLiveByTime = !providerHasState && dbStatus === 'SCHEDULED' && localMinute >= 1 && localMinute <= 135;
+  const isLiveNow = isDbLive || isProviderLive || isLikelyLiveByTime;
   const isFinished = dbStatus === 'FINISHED' || ['FT', 'AET', 'PEN', 'FINISHED'].includes(effectiveStatus);
-  const displayMinute = providerState?.minute || (isRecentlyStarted ? Math.max(1, Math.min(135, minute)) : null);
+  const localFirstHalfMinute = isLikelyLiveByTime && localMinute <= 45 ? Math.max(1, localMinute) : null;
+  const displayMinute = isHalfTime ? null : (providerHasMinute ? providerState.minute : localFirstHalfMinute);
+  const fallbackLabel = isLikelyLiveByTime && localMinute > 65 ? 'جارية الآن' : null;
 
   return {
     ...match,
@@ -90,10 +96,10 @@ function decorateMatch(match: any, now: Date, providerState?: any) {
     awayScore: providerState?.awayScore ?? match.awayScore,
     isLiveNow,
     isHalfTime,
-    isLikelyLiveByTime: isRecentlyStarted,
+    isLikelyLiveByTime,
     displayStatus: isHalfTime ? 'HT' : (isLiveNow ? 'IN_PLAY' : match.status),
-    minute: isHalfTime ? null : displayMinute,
-    liveLabel: isHalfTime ? 'استراحة بين الشوطين' : (isLiveNow ? (displayMinute ? `الدقيقة ${displayMinute}` : 'جارية الآن') : (isFinished ? 'انتهت المباراة' : null)),
+    minute: displayMinute,
+    liveLabel: isHalfTime ? 'استراحة بين الشوطين' : (isLiveNow ? (displayMinute ? `الدقيقة ${displayMinute}` : (fallbackLabel || 'جارية الآن')) : (isFinished ? 'انتهت المباراة' : null)),
   };
 }
 
@@ -151,7 +157,7 @@ export async function GET() {
       upcomingCount: upcoming.length,
       recentlyFinishedCount: decoratedFinished.length,
       recentFinishedWindowHours: 6,
-      liveDetection: 'animation_provider_status_then_time_window',
+      liveDetection: 'animation_provider_status_then_safe_time_window',
       selectionMode: 'one_live_plus_one_next',
       updatedEverySeconds: 15,
     },
