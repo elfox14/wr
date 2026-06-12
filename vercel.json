@@ -5,6 +5,10 @@
       "schedule": "* * * * *"
     },
     {
+      "path": "/api/cron/live-match-stats-sync",
+      "schedule": "* * * * *"
+    },
+    {
       "path": "/api/cron/football-auto-sync",
       "schedule": "*/5 * * * *"
     },
