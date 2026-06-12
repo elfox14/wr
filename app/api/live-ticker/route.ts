@@ -1,32 +1,20 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { renderMarketNews } from '@/lib/market-news/render';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 type TickerItem = {
   id: string;
-  type: string;
+  type: 'MATCH_EVENT' | 'FALLBACK';
   title: string;
   body?: string;
-  assetId?: string;
-  assetName?: string;
-  assetImage?: string;
-  marketPrice?: number;
-  changePercent?: number;
   matchId?: string;
   href?: string;
   timestamp: string;
-  source: string;
-  severity?: string;
+  source: 'live_match' | 'finished_match' | 'upcoming_match' | 'match_event' | 'fallback';
   priority: number;
 };
-
-function toNumber(value: unknown, fallback = 0) {
-  const n = Number(value);
-  return Number.isFinite(n) ? n : fallback;
-}
 
 function nullableNumber(value: unknown) {
   if (value === null || value === undefined || value === '') return null;
@@ -34,14 +22,9 @@ function nullableNumber(value: unknown) {
   return Number.isFinite(n) ? n : null;
 }
 
-function formatSignedPercent(value: number) {
-  const rounded = Math.round(value * 10) / 10;
-  return `${rounded > 0 ? '+' : ''}${rounded}%`;
-}
-
 function matchStatusLabel(status?: string | null) {
   const value = String(status || '').toUpperCase();
-  if (value === 'IN_PLAY' || value === 'LIVE') return 'مباشر الآن';
+  if (value === 'IN_PLAY' || value === 'LIVE' || value === 'HT') return 'مباشر الآن';
   if (value === 'FINISHED') return 'انتهت';
   return 'قادمة';
 }
@@ -54,6 +37,33 @@ function scoreLabel(match: any, scoreSnapshot?: any) {
   const homeScore = nullableNumber(scoreSnapshot?.homeScore) ?? nullableNumber(match.homeScore) ?? 0;
   const awayScore = nullableNumber(scoreSnapshot?.awayScore) ?? nullableNumber(match.awayScore) ?? 0;
   return `${homeScore} - ${awayScore}`;
+}
+
+function matchTitle(match: any, scoreSnapshot?: any) {
+  return `${match.homeTeam?.name || 'الفريق الأول'} ${scoreLabel(match, scoreSnapshot)} ${match.awayTeam?.name || 'الفريق الثاني'}`;
+}
+
+function animationHref(match: any) {
+  const id = match?.animationMatchId;
+  return id ? `/animation-live/player?matchId=${encodeURIComponent(String(id))}&lang=en&statsPanel=simple&teamPanel=1` : '/animation-live';
+}
+
+function eventLabel(event: any) {
+  const type = String(event?.type || '').toLowerCase();
+  if (type.includes('goal')) return 'هدف';
+  if (type.includes('card') || type.includes('yellow') || type.includes('red')) return 'بطاقة';
+  if (type.includes('sub')) return 'تبديل';
+  if (type.includes('var')) return 'VAR';
+  return 'حدث مباراة';
+}
+
+function eventTitle(event: any, scoreSnapshot?: any) {
+  const minute = event?.minute ? `د${event.minute} — ` : '';
+  const match = event?.match;
+  const score = match ? matchTitle(match, scoreSnapshot) : '';
+  const detail = event?.detail || eventLabel(event);
+  const player = event?.playerName ? ` — ${event.playerName}` : '';
+  return `${minute}${eventLabel(event)}: ${detail}${player}${score ? ` — ${score}` : ''}`;
 }
 
 async function fetchLatestScoreSnapshots(matchIds: string[]) {
@@ -92,6 +102,29 @@ function stripInternalFields(item: TickerItem) {
   return publicItem;
 }
 
+function fallbackMatchItems(now: Date): TickerItem[] {
+  return [
+    {
+      id: 'fallback-match-1',
+      type: 'FALLBACK',
+      title: 'شريط المباريات يعرض الأهداف، الأحداث، والنتائج فقط.',
+      href: '/animation-live',
+      timestamp: now.toISOString(),
+      source: 'fallback',
+      priority: 1,
+    },
+    {
+      id: 'fallback-match-2',
+      type: 'FALLBACK',
+      title: 'لا توجد أحداث مباشرة متاحة الآن — تابع بث الانيميشن عند بدء المباريات.',
+      href: '/animation-live',
+      timestamp: now.toISOString(),
+      source: 'fallback',
+      priority: 1,
+    },
+  ];
+}
+
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -100,29 +133,13 @@ export async function GET(request: Request) {
     const liveWindowStart = new Date(now.getTime() - 5 * 60 * 60 * 1000);
     const liveWindowEnd = new Date(now.getTime() + 3 * 60 * 60 * 1000);
     const finishedWindowStart = new Date(now.getTime() - 8 * 60 * 60 * 1000);
-    const newsWindowStart = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    const eventsWindowStart = new Date(now.getTime() - 12 * 60 * 60 * 1000);
     const upcomingWindow = new Date(now.getTime() + 6 * 60 * 60 * 1000);
 
-    const [marketNews, priceHistory, liveMatches, finishedMatches, upcomingMatches] = await Promise.all([
-      prisma.marketNews.findMany({
-        where: { publishedAt: { gte: newsWindowStart } },
-        orderBy: { publishedAt: 'desc' },
-        take: 12,
-        include: {
-          asset: { select: { id: true, name: true, code: true, image: true, marketPrice: true, current_price: true } },
-        },
-      }),
-      prisma.priceHistory.findMany({
-        where: { timestamp: { gte: newsWindowStart } },
-        orderBy: { timestamp: 'desc' },
-        take: 16,
-        include: {
-          asset: { select: { id: true, name: true, code: true, image: true, marketPrice: true, current_price: true, change: true } },
-        },
-      }),
+    const [liveMatches, finishedMatches, upcomingMatches, recentEvents] = await Promise.all([
       prisma.match.findMany({
         where: {
-          status: { in: ['IN_PLAY', 'LIVE'] },
+          status: { in: ['IN_PLAY', 'LIVE', 'HT'] },
           matchDate: { gte: liveWindowStart, lte: liveWindowEnd },
         },
         orderBy: { matchDate: 'asc' },
@@ -135,34 +152,59 @@ export async function GET(request: Request) {
           matchDate: { gte: finishedWindowStart, lte: now },
         },
         orderBy: { matchDate: 'desc' },
-        take: 6,
+        take: 8,
         include: { homeTeam: true, awayTeam: true },
       }),
       prisma.match.findMany({
         where: {
-          status: { in: ['SCHEDULED'] },
+          status: 'SCHEDULED',
           matchDate: { gte: now, lte: upcomingWindow },
         },
         orderBy: { matchDate: 'asc' },
-        take: 6,
+        take: 8,
         include: { homeTeam: true, awayTeam: true },
+      }),
+      prisma.matchEvent.findMany({
+        where: { createdAt: { gte: eventsWindowStart } },
+        orderBy: [{ minute: 'desc' }, { createdAt: 'desc' }],
+        take: 20,
+        include: { match: { include: { homeTeam: true, awayTeam: true } } },
       }),
     ]);
 
-    const scoreSnapshots = await fetchLatestScoreSnapshots([...liveMatches, ...finishedMatches].map((match) => match.id));
+    const relatedMatchIds = [
+      ...liveMatches,
+      ...finishedMatches,
+      ...recentEvents.map((event) => event.match).filter(Boolean),
+    ].map((match: any) => match.id);
+    const scoreSnapshots = await fetchLatestScoreSnapshots(Array.from(new Set(relatedMatchIds)));
     const items: TickerItem[] = [];
-    const seenPriceAssetIds = new Set<string>();
 
     for (const match of liveMatches) {
       items.push({
         id: `match-live-${match.id}`,
         type: 'MATCH_EVENT',
-        title: `${matchStatusLabel(match.status)}: ${match.homeTeam?.name || 'الفريق الأول'} ${scoreLabel(match, scoreSnapshots.get(match.id))} ${match.awayTeam?.name || 'الفريق الثاني'}`,
+        title: `${matchStatusLabel(match.status)}: ${matchTitle(match, scoreSnapshots.get(match.id))}`,
         matchId: match.id,
-        href: '/live',
+        href: animationHref(match),
         timestamp: now.toISOString(),
         source: 'live_match',
         priority: 100,
+      });
+    }
+
+    for (const event of recentEvents) {
+      const match = event.match;
+      items.push({
+        id: `match-event-${event.id}`,
+        type: 'MATCH_EVENT',
+        title: eventTitle(event, match ? scoreSnapshots.get(match.id) : null),
+        body: event.detail,
+        matchId: event.matchId,
+        href: match ? animationHref(match) : '/animation-live',
+        timestamp: (event.updatedAt || event.createdAt || now).toISOString(),
+        source: 'match_event',
+        priority: String(event.type || '').toLowerCase().includes('goal') ? 95 : 85,
       });
     }
 
@@ -170,56 +212,12 @@ export async function GET(request: Request) {
       items.push({
         id: `match-finished-${match.id}`,
         type: 'MATCH_EVENT',
-        title: `${matchStatusLabel(match.status)}: ${match.homeTeam?.name || 'الفريق الأول'} ${scoreLabel(match, scoreSnapshots.get(match.id))} ${match.awayTeam?.name || 'الفريق الثاني'}`,
+        title: `${matchStatusLabel(match.status)}: ${matchTitle(match, scoreSnapshots.get(match.id))}`,
         matchId: match.id,
-        href: '/live',
+        href: animationHref(match),
         timestamp: now.toISOString(),
         source: 'finished_match',
-        priority: 90,
-      });
-    }
-
-    for (const item of marketNews) {
-      const rendered = renderMarketNews(item, 'ar');
-      const change = toNumber(item.changePercent, 0);
-      const priceAfter = item.priceAfter == null ? null : Math.round(toNumber(item.priceAfter));
-      const isMatchEvent = item.eventType?.includes('goal') || item.eventType?.includes('match');
-      items.push({
-        id: `news-${item.id}`,
-        type: isMatchEvent ? 'MATCH_EVENT' : change >= 0 ? 'PRICE_UP' : 'PRICE_DOWN',
-        title: rendered.title,
-        body: rendered.body,
-        assetId: item.asset?.id,
-        assetName: item.asset?.name,
-        assetImage: item.asset?.image,
-        marketPrice: priceAfter ?? Math.round(toNumber(item.asset?.marketPrice ?? item.asset?.current_price)),
-        changePercent: change,
-        href: item.asset?.id ? `/asset/${item.asset.id}` : '/market',
-        timestamp: item.publishedAt.toISOString(),
-        source: 'market_news',
-        severity: item.severity,
-        priority: isMatchEvent ? 80 : 70,
-      });
-    }
-
-    for (const entry of priceHistory) {
-      if (!entry.asset || seenPriceAssetIds.has(entry.asset.id)) continue;
-      seenPriceAssetIds.add(entry.asset.id);
-      const change = toNumber(entry.asset.change, 0);
-      if (Math.abs(change) < 0.1) continue;
-      items.push({
-        id: `price-${entry.id}`,
-        type: change >= 0 ? 'PRICE_UP' : 'PRICE_DOWN',
-        title: `${entry.asset.name} ${change >= 0 ? 'صعد' : 'تراجع'} ${formatSignedPercent(change)} — آخر سعر ${Math.round(toNumber(entry.price))}¢`,
-        assetId: entry.asset.id,
-        assetName: entry.asset.name,
-        assetImage: entry.asset.image,
-        marketPrice: Math.round(toNumber(entry.price)),
-        changePercent: change,
-        href: `/asset/${entry.asset.id}`,
-        timestamp: entry.timestamp.toISOString(),
-        source: 'price_history',
-        priority: 60,
+        priority: 80,
       });
     }
 
@@ -229,29 +227,35 @@ export async function GET(request: Request) {
         type: 'MATCH_EVENT',
         title: `مباراة قريبة: ${match.homeTeam?.name || 'الفريق الأول'} ضد ${match.awayTeam?.name || 'الفريق الثاني'} — ${new Date(match.matchDate).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}`,
         matchId: match.id,
-        href: '/live',
+        href: animationHref(match),
         timestamp: match.matchDate.toISOString(),
         source: 'upcoming_match',
         priority: 40,
       });
     }
 
+    const sortedItems = sortTickerItems(items);
     return NextResponse.json({
       success: true,
       updatedAt: now.toISOString(),
-      responseMode: 'prioritized',
+      responseMode: 'matches_only',
       scoreSource: 'latest_snapshot_then_match',
       counts: {
         live: liveMatches.length,
+        events: recentEvents.length,
         finished: finishedMatches.length,
-        news: marketNews.length,
-        priceMovers: seenPriceAssetIds.size,
         upcoming: upcomingMatches.length,
       },
-      items: sortTickerItems(items).slice(0, limit).map(stripInternalFields),
+      items: (sortedItems.length ? sortedItems : fallbackMatchItems(now)).slice(0, limit).map(stripInternalFields),
     }, { headers: noStoreHeaders });
   } catch (error: any) {
     console.error('Live ticker error:', error);
-    return NextResponse.json({ error: error.message || 'Failed to fetch live ticker' }, { status: 500, headers: noStoreHeaders });
+    const now = new Date();
+    return NextResponse.json({
+      success: false,
+      error: error.message || 'Failed to fetch live ticker',
+      responseMode: 'matches_only',
+      items: fallbackMatchItems(now).map(stripInternalFields),
+    }, { status: 200, headers: noStoreHeaders });
   }
 }
