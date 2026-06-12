@@ -41,7 +41,7 @@ function getCronAuth(req: Request) {
 function aliasTeamName(value: string) {
   if (value === 'south korea' || value === 'korea republic' || value === 'republic of korea') return 'korea republic';
   if (value === 'czech republic' || value === 'czechia') return 'czechia';
-  if (value === 'bosnia h' || value === 'bosnia herzegovina' || value === 'bosnia and herzegovina') return 'bosnia h';
+  if (value === 'bosnia h' || value === 'bosnia herzegovina' || value === 'bosnia and herzegovina' || value === 'bosnia & herzegovina') return 'bosnia h';
   if (value === 'united states' || value === 'united states of america' || value === 'usa') return 'usa';
   if (value === 'turkiye') return 'turkey';
   return value;
@@ -49,6 +49,7 @@ function aliasTeamName(value: string) {
 
 function normalizeTeamName(name?: string | null) {
   const normalized = normalizeName(name || '')
+    .replace(/&/g, ' and ')
     .replace(/\bfootball club\b/g, '')
     .replace(/\bfc\b/g, '')
     .replace(/\bnational team\b/g, '')
@@ -148,6 +149,15 @@ async function findExistingMatch(externalId: string, animationMatchId?: number) 
   return prisma.match.findUnique({ where: { externalId } });
 }
 
+async function getLinkedMatchTeams(previousMatch: any) {
+  if (!previousMatch?.homeTeamId || !previousMatch?.awayTeamId) return { homeTeam: null, awayTeam: null };
+  const [homeTeam, awayTeam] = await Promise.all([
+    prisma.asset.findUnique({ where: { id: previousMatch.homeTeamId } }),
+    prisma.asset.findUnique({ where: { id: previousMatch.awayTeamId } }),
+  ]);
+  return { homeTeam, awayTeam };
+}
+
 async function saveProviderMatch(params: { previousMatch: any; externalId: string; animationMatchId?: number; homeTeamId: string; awayTeamId: string; matchDate: Date; status: string; homeScore: number; awayScore: number; groupPhase?: string | null }) {
   if (params.previousMatch) {
     return prisma.match.update({
@@ -176,22 +186,40 @@ async function processLiveFixture(fixture: any, providerSource?: string) {
   const home = fixture.teams?.home || {};
   const away = fixture.teams?.away || {};
   if (!fixtureId || !home.name || !away.name) return { status: 'skipped_missing_fixture_data', fixtureId, providerSource };
-  const [homeTeam, awayTeam] = await Promise.all([findTeamAsset(home.id, home.name), findTeamAsset(away.id, away.name)]);
-  if (!homeTeam || !awayTeam || homeTeam.id === awayTeam.id) return { status: 'skipped_team_not_matched', fixtureId, providerSource, homeMatched: Boolean(homeTeam), awayMatched: Boolean(awayTeam), providerHome: home.name, providerAway: away.name };
+
   const externalId = String(fixtureId);
+  const isISports = providerSource === 'ISPORTS';
+  const animationMatchId = isISports && Number.isFinite(fixtureId) ? fixtureId : undefined;
+  const previousMatch = await findExistingMatch(externalId, animationMatchId);
+  const linkedTeams = await getLinkedMatchTeams(previousMatch);
+
+  const [providerHomeTeam, providerAwayTeam] = await Promise.all([findTeamAsset(home.id, home.name), findTeamAsset(away.id, away.name)]);
+  const homeTeam = linkedTeams.homeTeam || providerHomeTeam;
+  const awayTeam = linkedTeams.awayTeam || providerAwayTeam;
+
+  if (!homeTeam || !awayTeam || homeTeam.id === awayTeam.id) {
+    return {
+      status: 'skipped_team_not_matched',
+      fixtureId,
+      providerSource,
+      homeMatched: Boolean(homeTeam),
+      awayMatched: Boolean(awayTeam),
+      usedManualLink: Boolean(linkedTeams.homeTeam || linkedTeams.awayTeam),
+      providerHome: home.name,
+      providerAway: away.name,
+    };
+  }
+
   const rawStatus = fixture.fixture?.status?.short || fixture.fixture?.status?.long;
   const status = normalizeStatus(rawStatus);
   const matchDate = parseProviderDate(fixture.fixture?.date || fixture.fixture?.timestamp || fixture.raw?.matchTime || fixture.raw?.match_time || fixture.raw?.time);
   const homeScore = toScore(fixture.goals?.home);
   const awayScore = toScore(fixture.goals?.away);
-  const isISports = providerSource === 'ISPORTS';
-  const animationMatchId = isISports && Number.isFinite(fixtureId) ? fixtureId : undefined;
-  const previousMatch = await findExistingMatch(externalId, animationMatchId);
   const previousHomeScore = previousMatch?.homeScore ?? 0;
   const previousAwayScore = previousMatch?.awayScore ?? 0;
   await saveProviderMatch({ previousMatch, externalId, animationMatchId, homeTeamId: homeTeam.id, awayTeamId: awayTeam.id, matchDate, status, homeScore, awayScore, groupPhase: fixture.league?.round || fixture.league?.name || null });
   const priceUpdates = (status === 'IN_PLAY' || status === 'FINISHED') ? await processGoalEvents({ fixtureId, homeScore, awayScore, homeTeam, awayTeam }) : [];
-  return { status: 'live_fixture_processed', providerSource, fixtureId, animationMatchId: animationMatchId || null, matchStatus: status, homeTeam: homeTeam.name, awayTeam: awayTeam.name, previousScore: `${previousHomeScore}-${previousAwayScore}`, currentScore: `${homeScore}-${awayScore}`, priceUpdates };
+  return { status: 'live_fixture_processed', providerSource, fixtureId, animationMatchId: animationMatchId || null, matchStatus: status, homeTeam: homeTeam.name, awayTeam: awayTeam.name, usedManualLink: Boolean(linkedTeams.homeTeam || linkedTeams.awayTeam), previousScore: `${previousHomeScore}-${previousAwayScore}`, currentScore: `${homeScore}-${awayScore}`, priceUpdates };
 }
 
 export async function GET(req: Request) {
