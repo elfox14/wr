@@ -204,6 +204,7 @@ export async function GET(req: Request) {
   const date = url.searchParams.get('date') || '';
   const forceAnimation = url.searchParams.get('forceAnimation') === 'true';
   const forceDemand = url.searchParams.get('forceDemand') === 'true';
+  const allowApiFootballFallback = url.searchParams.get('allowApiFootballFallback') === 'true' || url.searchParams.get('providerFallback') === 'true';
   const startedAt = new Date();
   const steps: StepResult[] = [];
   const syncWindow = await getSyncWindow(req);
@@ -239,6 +240,7 @@ export async function GET(req: Request) {
   if (runLive) {
     steps.push(await runStep(baseUrl, 'live-market-sync', '/api/cron/live-market-sync', secret, {
       ...(date ? { date } : {}),
+      ...(allowApiFootballFallback ? { allowApiFootballFallback: 'true' } : {}),
     }));
   } else {
     steps.push(skippedStep('live-market-sync', '/api/cron/live-market-sync', 'No live, near, or recently finished local matches.'));
@@ -266,9 +268,11 @@ export async function GET(req: Request) {
     demandUpdateRan: runDemand,
     forceAnimation,
     forceDemand,
+    allowApiFootballFallback,
     apiFootballProtection: {
       enabled: true,
       defaultBehavior: 'football-auto-sync is skipped unless includeFootballAuto=true or ENABLE_API_FOOTBALL_CRON=true',
+      liveFallbackDefault: 'disabled unless allowApiFootballFallback=true is passed',
       dailyLimitTarget: 100,
     },
     steps,
