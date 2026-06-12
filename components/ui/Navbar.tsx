@@ -22,6 +22,7 @@ import {
   ShieldAlert,
   BookOpen,
   Brain,
+  Newspaper,
   Shield
 } from 'lucide-react';
 import { useStore } from '@/lib/store';
@@ -57,6 +58,7 @@ export function Navbar() {
 
   const navLinks = [
     { name: 'مركز التحليل', href: '/team-intelligence', icon: <Brain size={16} /> },
+    { name: 'الأخبار', href: '/news', icon: <Newspaper size={16} /> },
     { name: 'المجموعات', href: '/groups', icon: <Trophy size={16} /> },
     { name: 'المنتخبات', href: '/market?type=TEAM', icon: <Shield size={16} />, activeType: 'TEAM' },
     { name: 'اللاعبون', href: '/market?type=PLAYER', icon: <Users size={16} />, activeType: 'PLAYER' },
@@ -160,6 +162,9 @@ export function Navbar() {
                         <Link href="/portfolio" className="flex items-center gap-3 px-3 py-2.5 text-sm text-gray-300 hover:text-white hover:bg-white/5 rounded-xl transition-colors">
                           <Briefcase size={16} /> محفظتي
                         </Link>
+                        <Link href="/news" className="flex items-center gap-3 px-3 py-2.5 text-sm text-[#0FF0FC] hover:bg-[#0FF0FC]/10 rounded-xl transition-colors font-bold">
+                          <Newspaper size={16} /> الأخبار
+                        </Link>
                         <Link href="/team-intelligence" className="flex items-center gap-3 px-3 py-2.5 text-sm text-gray-300 hover:text-white hover:bg-white/5 rounded-xl transition-colors">
                           <Shield size={16} /> مركز التحليل
                         </Link>
@@ -219,61 +224,30 @@ export function Navbar() {
                   </Link>
                 </div>
               )}
-
+              
               <button 
-                className="lg:hidden p-2 text-gray-400 hover:text-white rounded-lg hover:bg-white/10 transition-colors"
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                className="lg:hidden p-2 text-gray-400 hover:text-white hover:bg-white/5 rounded-lg transition-colors"
               >
-                {isMobileMenuOpen ? <X size={26} /> : <Menu size={26} />}
+                {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
               </button>
             </div>
           </div>
         </div>
 
-        <div 
-          className={`lg:hidden fixed inset-x-0 top-[64px] h-[calc(100vh-64px)] bg-[#0a0a0a]/95 backdrop-blur-xl border-t border-white/10 transition-all duration-300 overflow-y-auto ${
-            isMobileMenuOpen ? 'translate-y-0 opacity-100' : '-translate-y-full opacity-0 pointer-events-none'
-          }`}
-        >
-          <div className="p-4 flex flex-col min-h-full">
-            {session && (
-              <div className="bg-white/5 border border-white/10 rounded-2xl p-4 mb-6">
-                <div className="flex items-center gap-4 mb-4 pb-4 border-b border-white/5">
-                  <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-[#0FF0FC] to-[#FFD700] flex items-center justify-center overflow-hidden">
-                     <UserIcon size={24} className="text-black" />
-                  </div>
-                  <div>
-                    <p className="font-bold text-white">{session.user?.name}</p>
-                    <p className="text-xs text-gray-400">{session.user?.email}</p>
-                  </div>
-                </div>
-                
-                <div className="flex items-center justify-between bg-black/50 p-3 rounded-xl mb-4">
-                  <span className="text-sm text-gray-400">الرصيد المتاح:</span>
-                  <span className="font-mono font-black text-[#FFD700] text-lg">
-                    {userStats ? userStats.balance.toLocaleString() : '...'} ¢
-                  </span>
-                </div>
-
-                <Link href="/rewards" className="w-full bg-[#FFD700]/10 border border-[#FFD700]/30 text-[#FFD700] hover:bg-[#FFD700] hover:text-black py-3 rounded-xl font-black text-sm flex items-center justify-center gap-2 transition-all">
-                  <Coins size={18} />
-                  اكسب كوينز
-                </Link>
-              </div>
-            )}
-
-            <div className="space-y-2 mb-6 flex-1">
+        {isMobileMenuOpen && (
+          <div className="lg:hidden border-t border-white/10 bg-black/95 backdrop-blur-xl">
+            <div className="px-4 py-4 space-y-2">
               {navLinks.map((link) => {
                 const isActive = isLinkActive(link);
                 return (
                   <Link
                     key={link.href}
                     href={link.href}
-                    className={`flex items-center gap-3 px-4 py-4 rounded-xl text-base font-bold transition-colors ${
-                      isActive
-                        ? 'bg-[#0FF0FC]/10 border border-[#0FF0FC]/20 text-[#0FF0FC]'
-                        : 'text-gray-300 hover:bg-white/5 hover:text-white border border-transparent'
-                    }`}
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className={`flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-colors
+                      ${isActive ? 'bg-[#0FF0FC]/10 text-[#0FF0FC] border border-[#0FF0FC]/20' : 'text-gray-300 hover:bg-white/5 hover:text-white'}
+                    `}
                   >
                     {link.icon}
                     {link.name}
@@ -281,59 +255,41 @@ export function Navbar() {
                 );
               })}
               {session && (
-                <Link
-                  href="/leagues"
-                  className={`flex items-center gap-3 px-4 py-4 rounded-xl text-base font-bold transition-colors ${
-                    pathname?.startsWith('/leagues')
-                      ? 'bg-[#0FF0FC]/10 border border-[#0FF0FC]/20 text-[#0FF0FC]'
-                      : 'text-gray-300 hover:bg-white/5 hover:text-white border border-transparent'
-                  }`}
-                >
-                  <Trophy size={18} />
-                  دورياتي
-                </Link>
-              )}
-              {isAdminUser && (
-                <Link
-                  href="/admin/team-intelligence"
-                  className={`flex items-center gap-3 px-4 py-4 rounded-xl text-base font-bold transition-colors ${
-                    pathname?.startsWith('/admin/team-intelligence')
-                      ? 'bg-[#0FF0FC]/10 border border-[#0FF0FC]/20 text-[#0FF0FC]'
-                      : 'text-primary hover:bg-primary/10 hover:text-white border border-transparent'
-                  }`}
-                >
-                  <Shield size={18} />
-                  إدارة تقارير المنتخبات
-                </Link>
+                <>
+                  <div className="px-4 py-3 bg-white/5 rounded-xl border border-white/10">
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-400 text-sm">الرصيد</span>
+                      <span className="font-mono font-bold text-[#FFD700]">
+                        {userStats ? userStats.balance.toLocaleString() : '...'} ¢
+                      </span>
+                    </div>
+                  </div>
+                  <Link href="/rewards" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-3 px-4 py-3 rounded-xl font-bold text-[#FFD700] bg-[#FFD700]/10 border border-[#FFD700]/20">
+                    <Gift size={16} /> اكسب كوينز
+                  </Link>
+                  {isAdminUser && (
+                    <Link href="/admin" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-3 px-4 py-3 rounded-xl font-bold text-red-400 bg-red-500/10 border border-red-500/20">
+                      <ShieldAlert size={16} /> الإدارة
+                    </Link>
+                  )}
+                  <button 
+                    onClick={() => signOut({ callbackUrl: '/' })}
+                    className="w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold text-gray-400 hover:text-red-500 hover:bg-red-500/10"
+                  >
+                    <LogOut size={16} /> تسجيل الخروج
+                  </button>
+                </>
               )}
             </div>
-            
-            {session ? (
-              <button 
-                onClick={() => signOut({ callbackUrl: '/' })}
-                className="w-full flex items-center justify-center gap-2 bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white py-4 rounded-xl font-bold text-base transition-colors mt-auto"
-              >
-                <LogOut size={20} /> تسجيل الخروج
-              </button>
-            ) : (
-              <div className="grid grid-cols-2 gap-3 mt-auto">
-                <Link href="/login" className="flex justify-center bg-white/5 text-white py-4 rounded-xl font-bold text-sm">
-                  تسجيل الدخول
-                </Link>
-                <Link href="/register" className="flex justify-center bg-[#0FF0FC] text-black py-4 rounded-xl font-black text-sm">
-                  إنشاء حساب
-                </Link>
-              </div>
-            )}
           </div>
-        </div>
+        )}
       </nav>
-      
+
       <div className="h-16 lg:h-20" />
-      
+
       <InsufficientFundsModal 
-        isOpen={showInsufficientFundsModal} 
-        onClose={() => setShowInsufficientFundsModal(false)} 
+        isOpen={showInsufficientFundsModal}
+        onClose={() => setShowInsufficientFundsModal(false)}
       />
     </>
   );
