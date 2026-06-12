@@ -15,16 +15,16 @@ type PressNewsItem = {
   status: string;
   importance: number;
   tags?: string[] | null;
+  relatedTeamId?: string | null;
+  relatedPlayerId?: string | null;
+  relatedMatchId?: string | null;
   publishedAt: string;
 };
 
-type ContentPack = {
-  facebookPost: string;
-  tiktokScript: string;
-  youtubeTitle: string;
-  youtubeDescription: string;
-  infographicPoints: string[];
-};
+type RelationAsset = { id: string; name: string; code?: string; type?: string; teamId?: string | null };
+type RelationMatch = { id: string; matchDate: string; homeTeam?: RelationAsset; awayTeam?: RelationAsset };
+type Relations = { teams: RelationAsset[]; players: RelationAsset[]; matches: RelationMatch[] };
+type ContentPack = { facebookPost: string; tiktokScript: string; youtubeTitle: string; youtubeDescription: string; infographicPoints: string[] };
 
 const initialForm = {
   title: '',
@@ -36,24 +36,14 @@ const initialForm = {
   status: 'published',
   importance: 70,
   tags: '',
+  relatedTeamId: '',
+  relatedPlayerId: '',
+  relatedMatchId: '',
 };
 
 function cleanEmailText(value: string) {
-  return value
-    .replace(/=0A/g, '\n')
-    .replace(/=E2=80=99/g, '’')
-    .replace(/=E2=80=94/g, '—')
-    .replace(/=E2=80=98/g, '‘')
-    .replace(/=E2=80=9C/g, '“')
-    .replace(/=E2=80=9D/g, '”')
-    .replace(/=C2=A3/g, '£')
-    .replace(/=\r?\n/g, '')
-    .replace(/https?:\/\/\S+/g, '')
-    .replace(/<[^>]+>/g, '')
-    .replace(/\s+/g, ' ')
-    .trim();
+  return value.replace(/=0A/g, '\n').replace(/=E2=80=99/g, '’').replace(/=E2=80=94/g, '—').replace(/=E2=80=98/g, '‘').replace(/=E2=80=9C/g, '“').replace(/=E2=80=9D/g, '”').replace(/=C2=A3/g, '£').replace(/=\r?\n/g, '').replace(/https?:\/\/\S+/g, '').replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
 }
-
 function inferCategory(text: string) {
   const lower = text.toLowerCase();
   if (/(injury|injuries|miss|out of|إصابة|غياب)/i.test(lower)) return 'إصابات';
@@ -62,22 +52,11 @@ function inferCategory(text: string) {
   if (/(price|market|trading|سوق|سعر)/i.test(lower)) return 'السوق';
   return 'رصد صحفي';
 }
-
-function pickSource(text: string) {
-  if (/the athletic/i.test(text)) return 'The Athletic FC';
-  if (/fifa/i.test(text)) return 'FIFA';
-  if (/bbc/i.test(text)) return 'BBC Sport';
-  if (/fox/i.test(text)) return 'FOX Soccer';
-  return 'مصدر صحفي';
-}
-
-function sentenceSplit(text: string) {
-  return text
-    .split(/(?<=[.!؟])\s+/)
-    .map((s) => s.trim())
-    .filter((s) => s.length > 35 && s.length < 280)
-    .filter((s) => !/unsubscribe|manage preferences|view online|copyright|all rights reserved/i.test(s));
-}
+function pickSource(text: string) { if (/the athletic/i.test(text)) return 'The Athletic FC'; if (/fifa/i.test(text)) return 'FIFA'; if (/bbc/i.test(text)) return 'BBC Sport'; if (/fox/i.test(text)) return 'FOX Soccer'; return 'مصدر صحفي'; }
+function sentenceSplit(text: string) { return text.split(/(?<=[.!؟])\s+/).map((s) => s.trim()).filter((s) => s.length > 35 && s.length < 280).filter((s) => !/unsubscribe|manage preferences|view online|copyright|all rights reserved/i.test(s)); }
+function trimmed(value: string, max = 180) { return value && value.length > max ? `${value.slice(0, max - 3).trim()}...` : value; }
+function tagsToString(value: unknown) { if (Array.isArray(value)) return value.join(', '); if (typeof value === 'string') return value; return ''; }
+async function copyText(text: string) { if (text) await navigator.clipboard?.writeText(text); }
 
 function generateDraftFromEmail(raw: string) {
   const text = cleanEmailText(raw);
@@ -85,7 +64,6 @@ function generateDraftFromEmail(raw: string) {
   const tags = new Set<string>();
   let title = '';
   let body = '';
-
   if (lower.includes('mexico') && lower.includes('south africa') && lower.includes('red card')) {
     title = 'افتتاحية عنيفة: ثلاث بطاقات حمراء في Mexico 2-0 South Africa';
     body = 'رصد صحفي من النشرة يشير إلى أن مباراة افتتاح كأس العالم بين المكسيك وجنوب أفريقيا خرجت بثلاث بطاقات حمراء وفوز مكسيكي 2-0، ما يجعلها مادة بارزة للمتابعة من زاوية الانضباط وتأثير الغيابات.';
@@ -106,60 +84,26 @@ function generateDraftFromEmail(raw: string) {
     const sentences = sentenceSplit(text);
     const first = sentences[0] || text.slice(0, 160);
     title = first.length > 92 ? `${first.slice(0, 89).trim()}...` : first;
-    body = sentences.slice(0, 3).join(' ');
-    if (body.length < 80) body = text.slice(0, 420);
+    body = sentences.slice(0, 3).join(' ') || text.slice(0, 420);
   }
-
-  ['Mexico', 'South Africa', 'South Korea', 'Czech Republic', 'Canada', 'Bosnia', 'USMNT', 'Paraguay', 'Japan', 'Raul Jimenez', 'Hwang In-beom', 'Alphonso Davies', 'Wataru Endo'].forEach((name) => {
-    if (lower.includes(name.toLowerCase())) tags.add(name);
-  });
-
-  return {
-    title,
-    body,
-    category: inferCategory(text),
-    sourceName: pickSource(text),
-    sourceType: 'newsletter',
-    status: 'published',
-    importance: lower.includes('opening') || lower.includes('red card') ? 85 : 70,
-    tags: Array.from(tags).join(', '),
-  };
-}
-
-function trimmed(value: string, max = 180) {
-  if (!value) return '';
-  return value.length > max ? `${value.slice(0, max - 3).trim()}...` : value;
+  ['Mexico', 'South Africa', 'South Korea', 'Czech Republic', 'Canada', 'Bosnia', 'USMNT', 'Paraguay', 'Japan', 'Raul Jimenez', 'Hwang In-beom', 'Alphonso Davies', 'Wataru Endo'].forEach((name) => { if (lower.includes(name.toLowerCase())) tags.add(name); });
+  return { title, body, category: inferCategory(text), sourceName: pickSource(text), sourceType: 'newsletter', status: 'published', importance: lower.includes('opening') || lower.includes('red card') ? 85 : 70, tags: Array.from(tags).join(', ') };
 }
 
 function generateContentPack(form: typeof initialForm): ContentPack {
-  const title = form.title.trim();
-  const body = form.body.trim();
-  const source = form.sourceName.trim() || 'مصدر صحفي';
+  const title = form.title.trim(); const body = form.body.trim(); const source = form.sourceName.trim() || 'مصدر صحفي';
   const tags = form.tags.split(',').map((item) => item.trim()).filter(Boolean).slice(0, 5);
   const hashtagLine = ['#بورصة_المونديال', '#كأس_العالم', ...tags.map((tag) => `#${tag.replace(/\s+/g, '_')}`)].slice(0, 8).join(' ');
   const shortBody = trimmed(body, 230);
-  return {
-    facebookPost: `${title}\n\n${shortBody}\n\nالمصدر: ${source}\nملاحظة: هذا رصد صحفي وتحليل كروي، وليس توصية تداول.\n\n${hashtagLine}`,
-    tiktokScript: `افتتاحية قوية للفيديو:\nهل هذا الخبر يغير قراءة المشهد في كأس العالم؟\n\nالخبر باختصار: ${title}.\n${trimmed(body, 260)}\n\nزاوية التحليل: نتابع التأثير الكروي أولًا، ثم نراقب إن كان سيظهر أثر افتراضي على زخم المنتخب أو اللاعب داخل بورصة المونديال.\n\nالخاتمة: تابعونا لتحديثات أسرع وتحليل بدون مبالغة.`,
-    youtubeTitle: trimmed(`${title} | تحليل ورصد صحفي من بورصة المونديال`, 90),
-    youtubeDescription: `${shortBody}\n\nفي هذا الفيديو/الملخص نراجع الخبر من زاوية كروية فقط، مع فصل واضح عن أي حركة في السوق الافتراضي.\n\nالمصدر: ${source}\n\n${hashtagLine}`,
-    infographicPoints: [title, `المصدر: ${source}`, `التصنيف: ${form.category}`, trimmed(body, 110), 'لا توجد توصية شراء أو بيع — رصد وتحليل فقط.'],
-  };
+  return { facebookPost: `${title}\n\n${shortBody}\n\nالمصدر: ${source}\nملاحظة: هذا رصد صحفي وتحليل كروي، وليس توصية تداول.\n\n${hashtagLine}`, tiktokScript: `افتتاحية قوية للفيديو:\nهل هذا الخبر يغير قراءة المشهد في كأس العالم؟\n\nالخبر باختصار: ${title}.\n${trimmed(body, 260)}\n\nزاوية التحليل: نتابع التأثير الكروي أولًا، ثم نراقب إن كان سيظهر أثر افتراضي داخل بورصة المونديال.\n\nالخاتمة: تابعونا لتحديثات أسرع وتحليل بدون مبالغة.`, youtubeTitle: trimmed(`${title} | تحليل ورصد صحفي من بورصة المونديال`, 90), youtubeDescription: `${shortBody}\n\nفي هذا الفيديو/الملخص نراجع الخبر من زاوية كروية فقط، مع فصل واضح عن أي حركة في السوق الافتراضي.\n\nالمصدر: ${source}\n\n${hashtagLine}`, infographicPoints: [title, `المصدر: ${source}`, `التصنيف: ${form.category}`, trimmed(body, 110), 'لا توجد توصية شراء أو بيع — رصد وتحليل فقط.'] };
 }
 
-async function copyText(text: string) {
-  if (!text) return;
-  await navigator.clipboard?.writeText(text);
-}
-
-function tagsToString(value: unknown) {
-  if (Array.isArray(value)) return value.join(', ');
-  if (typeof value === 'string') return value;
-  return '';
-}
+function matchLabel(match: RelationMatch) { return `${match.homeTeam?.name || 'الفريق الأول'} ضد ${match.awayTeam?.name || 'الفريق الثاني'}`; }
+function formatDate(value: string) { const date = new Date(value); return Number.isFinite(date.getTime()) ? date.toLocaleString('ar-EG', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'غير محدد'; }
 
 export default function AdminPressNewsClient() {
   const [items, setItems] = useState<PressNewsItem[]>([]);
+  const [relations, setRelations] = useState<Relations>({ teams: [], players: [], matches: [] });
   const [form, setForm] = useState(initialForm);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [emailText, setEmailText] = useState('');
@@ -170,108 +114,38 @@ export default function AdminPressNewsClient() {
   const [error, setError] = useState<string | null>(null);
   const emailTextLength = useMemo(() => emailText.trim().length, [emailText]);
 
-  async function loadItems() {
-    try {
-      setLoading(true);
-      const res = await fetch('/api/admin/press-news', { cache: 'no-store' });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'فشل تحميل الأخبار');
-      setItems(Array.isArray(data.items) ? data.items : []);
-    } catch (err: any) {
-      setError(err?.message || 'فشل تحميل الأخبار');
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  useEffect(() => { loadItems(); }, []);
-
-  function generateFromEmail() {
-    setError(null); setMessage(null);
-    if (emailTextLength < 80) { setError('الصق نص الإيميل أولًا، يجب أن يكون النص أطول من 80 حرفًا.'); return; }
-    setForm((current) => ({ ...current, ...generateDraftFromEmail(emailText) }));
-    setEditingId(null); setContentPack(null);
-    setMessage('تم توليد مسودة خبر من نص الإيميل. راجعها وعدّلها قبل النشر.');
-  }
-
-  function generateContent() {
-    setError(null); setMessage(null);
-    if (!form.title.trim() || !form.body.trim()) { setError('اكتب أو ولّد عنوان الخبر ونصه أولًا قبل تحويله إلى محتوى.'); return; }
-    setContentPack(generateContentPack(form));
-    setMessage('تم توليد باقة محتوى من الخبر. يمكنك النسخ والنشر بعد المراجعة.');
-  }
-
-  function startEdit(item: PressNewsItem) {
-    setEditingId(item.id);
-    setForm({
-      title: item.title || '', body: item.body || '', category: item.category || 'رصد صحفي', sourceName: item.sourceName || 'مصدر صحفي',
-      sourceUrl: item.sourceUrl || '', sourceType: item.sourceType || 'newsletter', status: item.status || 'published',
-      importance: Number(item.importance || 50), tags: tagsToString(item.tags),
-    });
-    setContentPack(null);
-    setMessage('وضع التعديل مفعل. عدّل الخبر ثم اضغط حفظ التعديل.');
-  }
-
-  function cancelEdit() {
-    setEditingId(null); setForm(initialForm); setContentPack(null); setMessage(null);
-  }
-
-  async function submit(event: React.FormEvent) {
-    event.preventDefault(); setSaving(true); setError(null); setMessage(null);
-    try {
-      const res = await fetch('/api/admin/press-news', { method: editingId ? 'PATCH' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...form, id: editingId }) });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'فشل حفظ الخبر');
-      setMessage(editingId ? 'تم تعديل الخبر بنجاح.' : 'تم نشر الخبر بنجاح في صفحة الأخبار.');
-      setForm(initialForm); setEmailText(''); setEditingId(null); setContentPack(null);
-      await loadItems();
-    } catch (err: any) { setError(err?.message || 'فشل حفظ الخبر'); } finally { setSaving(false); }
-  }
-
-  async function deleteItem(id: string) {
-    setError(null); setMessage(null);
-    try {
-      const res = await fetch(`/api/admin/press-news?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'فشل حذف الخبر');
-      if (editingId === id) cancelEdit();
-      setMessage('تم حذف الخبر.');
-      await loadItems();
-    } catch (err: any) { setError(err?.message || 'فشل حذف الخبر'); }
-  }
+  async function loadItems() { try { setLoading(true); const res = await fetch('/api/admin/press-news', { cache: 'no-store' }); const data = await res.json(); if (!res.ok) throw new Error(data.error || 'فشل تحميل الأخبار'); setItems(Array.isArray(data.items) ? data.items : []); } catch (err: any) { setError(err?.message || 'فشل تحميل الأخبار'); } finally { setLoading(false); } }
+  async function loadRelations() { try { const res = await fetch('/api/admin/press-news-relations', { cache: 'no-store' }); const data = await res.json(); if (res.ok) setRelations({ teams: data.teams || [], players: data.players || [], matches: data.matches || [] }); } catch {} }
+  useEffect(() => { loadItems(); loadRelations(); }, []);
 
   function updateField(field: string, value: any) { setForm((current) => ({ ...current, [field]: value })); setContentPack(null); }
+  function generateFromEmail() { setError(null); setMessage(null); if (emailTextLength < 80) { setError('الصق نص الإيميل أولًا، يجب أن يكون النص أطول من 80 حرفًا.'); return; } setForm((current) => ({ ...current, ...generateDraftFromEmail(emailText) })); setEditingId(null); setContentPack(null); setMessage('تم توليد مسودة خبر من نص الإيميل. راجعها وعدّلها قبل النشر.'); }
+  function generateContent() { setError(null); setMessage(null); if (!form.title.trim() || !form.body.trim()) { setError('اكتب أو ولّد عنوان الخبر ونصه أولًا قبل تحويله إلى محتوى.'); return; } setContentPack(generateContentPack(form)); setMessage('تم توليد باقة محتوى من الخبر. يمكنك النسخ والنشر بعد المراجعة.'); }
+  function startEdit(item: PressNewsItem) { setEditingId(item.id); setForm({ title: item.title || '', body: item.body || '', category: item.category || 'رصد صحفي', sourceName: item.sourceName || 'مصدر صحفي', sourceUrl: item.sourceUrl || '', sourceType: item.sourceType || 'newsletter', status: item.status || 'published', importance: Number(item.importance || 50), tags: tagsToString(item.tags), relatedTeamId: item.relatedTeamId || '', relatedPlayerId: item.relatedPlayerId || '', relatedMatchId: item.relatedMatchId || '' }); setContentPack(null); setMessage('وضع التعديل مفعل. عدّل الخبر ثم اضغط حفظ التعديل.'); }
+  function cancelEdit() { setEditingId(null); setForm(initialForm); setContentPack(null); setMessage(null); }
+  async function submit(event: React.FormEvent) { event.preventDefault(); setSaving(true); setError(null); setMessage(null); try { const res = await fetch('/api/admin/press-news', { method: editingId ? 'PATCH' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...form, id: editingId }) }); const data = await res.json(); if (!res.ok) throw new Error(data.error || 'فشل حفظ الخبر'); setMessage(editingId ? 'تم تعديل الخبر بنجاح.' : 'تم نشر الخبر بنجاح في صفحة الأخبار.'); setForm(initialForm); setEmailText(''); setEditingId(null); setContentPack(null); await loadItems(); } catch (err: any) { setError(err?.message || 'فشل حفظ الخبر'); } finally { setSaving(false); } }
+  async function deleteItem(id: string) { setError(null); setMessage(null); try { const res = await fetch(`/api/admin/press-news?id=${encodeURIComponent(id)}`, { method: 'DELETE' }); const data = await res.json(); if (!res.ok) throw new Error(data.error || 'فشل حذف الخبر'); if (editingId === id) cancelEdit(); setMessage('تم حذف الخبر.'); await loadItems(); } catch (err: any) { setError(err?.message || 'فشل حذف الخبر'); } }
 
-  return (
-    <main className="min-h-screen bg-background px-4 py-6 text-white sm:px-6 lg:px-8" dir="rtl">
-      <section className="mx-auto max-w-6xl space-y-6">
-        <div className="rounded-[2rem] border border-white/10 bg-white/[0.04] p-5 shadow-card md:p-6"><div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between"><div><p className="mb-2 inline-flex items-center gap-2 rounded-full border border-[#0FF0FC]/25 bg-[#0FF0FC]/10 px-3 py-1 text-xs font-black text-[#0FF0FC]"><Newspaper size={14} /> إدارة الأخبار</p><h1 className="text-3xl font-black">{editingId ? 'تعديل خبر صحفي' : 'إضافة خبر صحفي'}</h1><p className="mt-2 text-sm font-bold leading-7 text-gray-400">الصق نص الإيميل، ولّد مسودة خبر، ثم حوّلها إلى محتوى وانشرها بعد المراجعة.</p></div><Link href="/news" className="inline-flex items-center justify-center gap-2 rounded-2xl border border-[#FFD700]/25 bg-[#FFD700]/10 px-4 py-3 text-sm font-black text-[#FFD700] hover:bg-[#FFD700] hover:text-black">عرض الأخبار <ArrowLeft size={15} /></Link></div></div>
-        {message && <div className="rounded-2xl border border-emerald-400/20 bg-emerald-400/10 p-4 text-sm font-bold text-emerald-200">{message}</div>}
-        {error && <div className="rounded-2xl border border-red-400/20 bg-red-400/10 p-4 text-sm font-bold text-red-200">{error}</div>}
-
-        <section className="rounded-[2rem] border border-[#FFD700]/15 bg-[#FFD700]/[0.035] p-5 md:p-6"><div className="mb-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between"><div><h2 className="flex items-center gap-2 text-xl font-black"><Mail className="text-[#FFD700]" size={20} /> توليد مسودة من نص الإيميل</h2><p className="mt-1 text-xs font-bold text-gray-500">اكتب ملخصًا محررًا ولا تنقل النص الأصلي كاملًا.</p></div><button type="button" onClick={generateFromEmail} className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#FFD700] px-4 py-3 text-sm font-black text-black transition hover:bg-[#0FF0FC]"><Sparkles size={16} /> توليد مسودة</button></div><textarea value={emailText} onChange={(event) => setEmailText(event.target.value)} rows={8} className="w-full rounded-2xl border border-white/10 bg-black/35 px-4 py-3 text-sm font-bold leading-7 text-white outline-none focus:border-[#FFD700]/50" placeholder="الصق هنا نص الإيميل أو الجزء المهم منه..." /><div className="mt-2 text-[11px] font-bold text-gray-500">عدد الأحرف: {emailTextLength}</div></section>
-
-        <form onSubmit={submit} className="grid gap-5 rounded-[2rem] border border-white/10 bg-white/[0.035] p-5 md:grid-cols-2 md:p-6">
-          {editingId && <div className="md:col-span-2 flex items-center justify-between gap-3 rounded-2xl border border-[#FFD700]/20 bg-[#FFD700]/10 p-4 text-sm font-black text-[#FFD700]"><span>تعديل خبر موجود</span><button type="button" onClick={cancelEdit} className="inline-flex items-center gap-1 rounded-xl bg-black/25 px-3 py-2 text-xs"><X size={13} /> إلغاء</button></div>}
-          <label className="md:col-span-2"><span className="mb-2 block text-xs font-black text-gray-400">عنوان الخبر</span><input value={form.title} onChange={(event) => updateField('title', event.target.value)} className="w-full rounded-2xl border border-white/10 bg-black/35 px-4 py-3 text-sm font-bold text-white outline-none focus:border-[#0FF0FC]/50" /></label>
-          <label className="md:col-span-2"><span className="mb-2 block text-xs font-black text-gray-400">نص الخبر المختصر</span><textarea value={form.body} onChange={(event) => updateField('body', event.target.value)} rows={7} className="w-full rounded-2xl border border-white/10 bg-black/35 px-4 py-3 text-sm font-bold leading-7 text-white outline-none focus:border-[#0FF0FC]/50" /></label>
-          <label><span className="mb-2 block text-xs font-black text-gray-400">التصنيف</span><select value={form.category} onChange={(event) => updateField('category', event.target.value)} className="w-full rounded-2xl border border-white/10 bg-black/35 px-4 py-3 text-sm font-bold text-white outline-none focus:border-[#0FF0FC]/50"><option>رصد صحفي</option><option>مباريات</option><option>لاعبون</option><option>إصابات</option><option>منتخبات</option><option>السوق</option></select></label>
-          <label><span className="mb-2 block text-xs font-black text-gray-400">الحالة</span><select value={form.status} onChange={(event) => updateField('status', event.target.value)} className="w-full rounded-2xl border border-white/10 bg-black/35 px-4 py-3 text-sm font-bold text-white outline-none focus:border-[#0FF0FC]/50"><option value="published">منشور</option><option value="draft">مسودة</option><option value="archived">مؤرشف</option></select></label>
-          <label><span className="mb-2 block text-xs font-black text-gray-400">اسم المصدر</span><input value={form.sourceName} onChange={(event) => updateField('sourceName', event.target.value)} className="w-full rounded-2xl border border-white/10 bg-black/35 px-4 py-3 text-sm font-bold text-white outline-none focus:border-[#0FF0FC]/50" /></label>
-          <label><span className="mb-2 block text-xs font-black text-gray-400">رابط المصدر اختياري</span><input value={form.sourceUrl} onChange={(event) => updateField('sourceUrl', event.target.value)} className="w-full rounded-2xl border border-white/10 bg-black/35 px-4 py-3 text-sm font-bold text-white outline-none focus:border-[#0FF0FC]/50" /></label>
-          <label><span className="mb-2 block text-xs font-black text-gray-400">الأهمية من 1 إلى 100</span><input type="number" min={1} max={100} value={form.importance} onChange={(event) => updateField('importance', Number(event.target.value))} className="w-full rounded-2xl border border-white/10 bg-black/35 px-4 py-3 text-sm font-bold text-white outline-none focus:border-[#0FF0FC]/50" /></label>
-          <label className="md:col-span-2"><span className="mb-2 block text-xs font-black text-gray-400">وسوم اختيارية، مفصولة بفواصل</span><input value={form.tags} onChange={(event) => updateField('tags', event.target.value)} className="w-full rounded-2xl border border-white/10 bg-black/35 px-4 py-3 text-sm font-bold text-white outline-none focus:border-[#0FF0FC]/50" /></label>
-          <div className="md:col-span-2 grid gap-3 md:grid-cols-2"><button type="button" onClick={generateContent} className="inline-flex items-center justify-center gap-2 rounded-2xl border border-[#FFD700]/25 bg-[#FFD700]/10 px-5 py-3 text-sm font-black text-[#FFD700] transition hover:bg-[#FFD700] hover:text-black"><FileText size={16} /> تحويل الخبر إلى محتوى</button><button disabled={saving} className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#0FF0FC] px-5 py-3 text-sm font-black text-black transition hover:bg-[#FFD700] disabled:opacity-60">{saving ? <Loader2 className="animate-spin" size={16} /> : <Save size={16} />} {editingId ? 'حفظ التعديل' : 'نشر الخبر'}</button></div>
-        </form>
-
-        {contentPack && <section className="rounded-[2rem] border border-[#0FF0FC]/15 bg-[#0FF0FC]/[0.035] p-5 md:p-6"><div className="mb-4 flex items-center gap-2 text-xl font-black"><Sparkles className="text-[#0FF0FC]" /> باقة محتوى جاهزة للمراجعة</div><div className="grid gap-4 lg:grid-cols-2"><ContentBox title="منشور فيسبوك" icon={<FileText size={16} />} text={contentPack.facebookPost} /><ContentBox title="سكريبت تيك توك / ريلز" icon={<Video size={16} />} text={contentPack.tiktokScript} /><ContentBox title="عنوان ووصف يوتيوب" icon={<Video size={16} />} text={`${contentPack.youtubeTitle}\n\n${contentPack.youtubeDescription}`} /><ContentBox title="نقاط إنفوجرافيك" icon={<ImageIcon size={16} />} text={contentPack.infographicPoints.map((point, index) => `${index + 1}. ${point}`).join('\n')} /></div></section>}
-
-        <section className="rounded-[2rem] border border-white/10 bg-white/[0.035] p-5 md:p-6"><div className="mb-4 flex items-center gap-2 text-xl font-black"><Plus className="text-[#FFD700]" /> آخر الأخبار المضافة</div>{loading ? <div className="p-8 text-center text-gray-500">جاري التحميل...</div> : items.length ? <div className="space-y-3">{items.slice(0, 12).map((item) => <article key={item.id} className="rounded-2xl border border-white/8 bg-black/25 p-4"><div className="mb-2 flex flex-wrap items-center justify-between gap-3 text-[11px] font-black text-gray-500"><span>{item.category} · {item.sourceName} · {item.status}</span><span>{new Date(item.publishedAt).toLocaleString('ar-EG')}</span></div><h3 className="font-black text-white">{item.title}</h3><p className="mt-2 line-clamp-2 text-sm font-bold leading-6 text-gray-500">{item.body}</p><div className="mt-3 flex gap-2"><button type="button" onClick={() => startEdit(item)} className="inline-flex items-center gap-2 rounded-xl border border-[#0FF0FC]/20 bg-[#0FF0FC]/10 px-3 py-2 text-xs font-black text-[#0FF0FC] hover:bg-[#0FF0FC] hover:text-black"><Pencil size={14} /> تعديل</button><button type="button" onClick={() => deleteItem(item.id)} className="inline-flex items-center gap-2 rounded-xl border border-red-400/20 bg-red-400/10 px-3 py-2 text-xs font-black text-red-300 hover:bg-red-400 hover:text-black"><Trash2 size={14} /> حذف</button></div></article>)}</div> : <div className="p-8 text-center text-gray-500">لا توجد أخبار مضافة بعد.</div>}</section>
-      </section>
-    </main>
-  );
+  return <main className="min-h-screen bg-background px-4 py-6 text-white sm:px-6 lg:px-8" dir="rtl"><section className="mx-auto max-w-6xl space-y-6">
+    <div className="rounded-[2rem] border border-white/10 bg-white/[0.04] p-5 shadow-card md:p-6"><div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between"><div><p className="mb-2 inline-flex items-center gap-2 rounded-full border border-[#0FF0FC]/25 bg-[#0FF0FC]/10 px-3 py-1 text-xs font-black text-[#0FF0FC]"><Newspaper size={14} /> إدارة الأخبار</p><h1 className="text-3xl font-black">{editingId ? 'تعديل خبر صحفي' : 'إضافة خبر صحفي'}</h1><p className="mt-2 text-sm font-bold leading-7 text-gray-400">الصق نص الإيميل، ولّد مسودة خبر، اربطه بمنتخب/لاعب/مباراة، ثم انشره بعد المراجعة.</p></div><Link href="/news" className="inline-flex items-center justify-center gap-2 rounded-2xl border border-[#FFD700]/25 bg-[#FFD700]/10 px-4 py-3 text-sm font-black text-[#FFD700] hover:bg-[#FFD700] hover:text-black">عرض الأخبار <ArrowLeft size={15} /></Link></div></div>
+    {message && <div className="rounded-2xl border border-emerald-400/20 bg-emerald-400/10 p-4 text-sm font-bold text-emerald-200">{message}</div>}{error && <div className="rounded-2xl border border-red-400/20 bg-red-400/10 p-4 text-sm font-bold text-red-200">{error}</div>}
+    <section className="rounded-[2rem] border border-[#FFD700]/15 bg-[#FFD700]/[0.035] p-5 md:p-6"><div className="mb-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between"><div><h2 className="flex items-center gap-2 text-xl font-black"><Mail className="text-[#FFD700]" size={20} /> توليد مسودة من نص الإيميل</h2><p className="mt-1 text-xs font-bold text-gray-500">اكتب ملخصًا محررًا ولا تنقل النص الأصلي كاملًا.</p></div><button type="button" onClick={generateFromEmail} className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#FFD700] px-4 py-3 text-sm font-black text-black transition hover:bg-[#0FF0FC]"><Sparkles size={16} /> توليد مسودة</button></div><textarea value={emailText} onChange={(event) => setEmailText(event.target.value)} rows={8} className="w-full rounded-2xl border border-white/10 bg-black/35 px-4 py-3 text-sm font-bold leading-7 text-white outline-none focus:border-[#FFD700]/50" placeholder="الصق هنا نص الإيميل أو الجزء المهم منه..." /><div className="mt-2 text-[11px] font-bold text-gray-500">عدد الأحرف: {emailTextLength}</div></section>
+    <form onSubmit={submit} className="grid gap-5 rounded-[2rem] border border-white/10 bg-white/[0.035] p-5 md:grid-cols-2 md:p-6">{editingId && <div className="md:col-span-2 flex items-center justify-between gap-3 rounded-2xl border border-[#FFD700]/20 bg-[#FFD700]/10 p-4 text-sm font-black text-[#FFD700]"><span>تعديل خبر موجود</span><button type="button" onClick={cancelEdit} className="inline-flex items-center gap-1 rounded-xl bg-black/25 px-3 py-2 text-xs"><X size={13} /> إلغاء</button></div>}
+      <label className="md:col-span-2"><span className="mb-2 block text-xs font-black text-gray-400">عنوان الخبر</span><input value={form.title} onChange={(event) => updateField('title', event.target.value)} className="w-full rounded-2xl border border-white/10 bg-black/35 px-4 py-3 text-sm font-bold text-white outline-none focus:border-[#0FF0FC]/50" /></label>
+      <label className="md:col-span-2"><span className="mb-2 block text-xs font-black text-gray-400">نص الخبر المختصر</span><textarea value={form.body} onChange={(event) => updateField('body', event.target.value)} rows={7} className="w-full rounded-2xl border border-white/10 bg-black/35 px-4 py-3 text-sm font-bold leading-7 text-white outline-none focus:border-[#0FF0FC]/50" /></label>
+      <label><span className="mb-2 block text-xs font-black text-gray-400">التصنيف</span><select value={form.category} onChange={(event) => updateField('category', event.target.value)} className="w-full rounded-2xl border border-white/10 bg-black/35 px-4 py-3 text-sm font-bold text-white outline-none focus:border-[#0FF0FC]/50"><option>رصد صحفي</option><option>مباريات</option><option>لاعبون</option><option>إصابات</option><option>منتخبات</option><option>السوق</option></select></label>
+      <label><span className="mb-2 block text-xs font-black text-gray-400">الحالة</span><select value={form.status} onChange={(event) => updateField('status', event.target.value)} className="w-full rounded-2xl border border-white/10 bg-black/35 px-4 py-3 text-sm font-bold text-white outline-none focus:border-[#0FF0FC]/50"><option value="published">منشور</option><option value="draft">مسودة</option><option value="archived">مؤرشف</option></select></label>
+      <label><span className="mb-2 block text-xs font-black text-gray-400">اسم المصدر</span><input value={form.sourceName} onChange={(event) => updateField('sourceName', event.target.value)} className="w-full rounded-2xl border border-white/10 bg-black/35 px-4 py-3 text-sm font-bold text-white outline-none focus:border-[#0FF0FC]/50" /></label>
+      <label><span className="mb-2 block text-xs font-black text-gray-400">رابط المصدر اختياري</span><input value={form.sourceUrl} onChange={(event) => updateField('sourceUrl', event.target.value)} className="w-full rounded-2xl border border-white/10 bg-black/35 px-4 py-3 text-sm font-bold text-white outline-none focus:border-[#0FF0FC]/50" /></label>
+      <label><span className="mb-2 block text-xs font-black text-gray-400">ربط بمنتخب</span><select value={form.relatedTeamId} onChange={(event) => updateField('relatedTeamId', event.target.value)} className="w-full rounded-2xl border border-white/10 bg-black/35 px-4 py-3 text-sm font-bold text-white outline-none focus:border-[#0FF0FC]/50"><option value="">بدون ربط</option>{relations.teams.map((team) => <option key={team.id} value={team.id}>{team.name} {team.code ? `(${team.code})` : ''}</option>)}</select></label>
+      <label><span className="mb-2 block text-xs font-black text-gray-400">ربط بلاعب</span><select value={form.relatedPlayerId} onChange={(event) => updateField('relatedPlayerId', event.target.value)} className="w-full rounded-2xl border border-white/10 bg-black/35 px-4 py-3 text-sm font-bold text-white outline-none focus:border-[#0FF0FC]/50"><option value="">بدون ربط</option>{relations.players.map((player) => <option key={player.id} value={player.id}>{player.name}</option>)}</select></label>
+      <label className="md:col-span-2"><span className="mb-2 block text-xs font-black text-gray-400">ربط بمباراة</span><select value={form.relatedMatchId} onChange={(event) => updateField('relatedMatchId', event.target.value)} className="w-full rounded-2xl border border-white/10 bg-black/35 px-4 py-3 text-sm font-bold text-white outline-none focus:border-[#0FF0FC]/50"><option value="">بدون ربط</option>{relations.matches.map((match) => <option key={match.id} value={match.id}>{matchLabel(match)} — {formatDate(match.matchDate)}</option>)}</select></label>
+      <label><span className="mb-2 block text-xs font-black text-gray-400">الأهمية من 1 إلى 100</span><input type="number" min={1} max={100} value={form.importance} onChange={(event) => updateField('importance', Number(event.target.value))} className="w-full rounded-2xl border border-white/10 bg-black/35 px-4 py-3 text-sm font-bold text-white outline-none focus:border-[#0FF0FC]/50" /></label>
+      <label><span className="mb-2 block text-xs font-black text-gray-400">وسوم مفصولة بفواصل</span><input value={form.tags} onChange={(event) => updateField('tags', event.target.value)} className="w-full rounded-2xl border border-white/10 bg-black/35 px-4 py-3 text-sm font-bold text-white outline-none focus:border-[#0FF0FC]/50" /></label>
+      <div className="md:col-span-2 grid gap-3 md:grid-cols-2"><button type="button" onClick={generateContent} className="inline-flex items-center justify-center gap-2 rounded-2xl border border-[#FFD700]/25 bg-[#FFD700]/10 px-5 py-3 text-sm font-black text-[#FFD700] transition hover:bg-[#FFD700] hover:text-black"><FileText size={16} /> تحويل الخبر إلى محتوى</button><button disabled={saving} className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#0FF0FC] px-5 py-3 text-sm font-black text-black transition hover:bg-[#FFD700] disabled:opacity-60">{saving ? <Loader2 className="animate-spin" size={16} /> : <Save size={16} />} {editingId ? 'حفظ التعديل' : 'نشر الخبر'}</button></div>
+    </form>
+    {contentPack && <section className="rounded-[2rem] border border-[#0FF0FC]/15 bg-[#0FF0FC]/[0.035] p-5 md:p-6"><div className="mb-4 flex items-center gap-2 text-xl font-black"><Sparkles className="text-[#0FF0FC]" /> باقة محتوى جاهزة للمراجعة</div><div className="grid gap-4 lg:grid-cols-2"><ContentBox title="منشور فيسبوك" icon={<FileText size={16} />} text={contentPack.facebookPost} /><ContentBox title="سكريبت تيك توك / ريلز" icon={<Video size={16} />} text={contentPack.tiktokScript} /><ContentBox title="عنوان ووصف يوتيوب" icon={<Video size={16} />} text={`${contentPack.youtubeTitle}\n\n${contentPack.youtubeDescription}`} /><ContentBox title="نقاط إنفوجرافيك" icon={<ImageIcon size={16} />} text={contentPack.infographicPoints.map((point, index) => `${index + 1}. ${point}`).join('\n')} /></div></section>}
+    <section className="rounded-[2rem] border border-white/10 bg-white/[0.035] p-5 md:p-6"><div className="mb-4 flex items-center gap-2 text-xl font-black"><Plus className="text-[#FFD700]" /> آخر الأخبار المضافة</div>{loading ? <div className="p-8 text-center text-gray-500">جاري التحميل...</div> : items.length ? <div className="space-y-3">{items.slice(0, 12).map((item) => <article key={item.id} className="rounded-2xl border border-white/8 bg-black/25 p-4"><div className="mb-2 flex flex-wrap items-center justify-between gap-3 text-[11px] font-black text-gray-500"><span>{item.category} · {item.sourceName} · {item.status}</span><span>{new Date(item.publishedAt).toLocaleString('ar-EG')}</span></div><h3 className="font-black text-white">{item.title}</h3><p className="mt-2 line-clamp-2 text-sm font-bold leading-6 text-gray-500">{item.body}</p><div className="mt-2 flex flex-wrap gap-2 text-[10px] font-black text-gray-500">{item.relatedTeamId && <span>منتخب مرتبط</span>}{item.relatedPlayerId && <span>لاعب مرتبط</span>}{item.relatedMatchId && <span>مباراة مرتبطة</span>}</div><div className="mt-3 flex gap-2"><button type="button" onClick={() => startEdit(item)} className="inline-flex items-center gap-2 rounded-xl border border-[#0FF0FC]/20 bg-[#0FF0FC]/10 px-3 py-2 text-xs font-black text-[#0FF0FC] hover:bg-[#0FF0FC] hover:text-black"><Pencil size={14} /> تعديل</button><button type="button" onClick={() => deleteItem(item.id)} className="inline-flex items-center gap-2 rounded-xl border border-red-400/20 bg-red-400/10 px-3 py-2 text-xs font-black text-red-300 hover:bg-red-400 hover:text-black"><Trash2 size={14} /> حذف</button></div></article>)}</div> : <div className="p-8 text-center text-gray-500">لا توجد أخبار مضافة بعد.</div>}</section>
+  </section></main>;
 }
-
-function ContentBox({ title, text, icon }: { title: string; text: string; icon: React.ReactNode }) {
-  return <article className="rounded-2xl border border-white/10 bg-black/25 p-4"><div className="mb-3 flex items-center justify-between gap-3"><h3 className="inline-flex items-center gap-2 text-sm font-black text-white">{icon}{title}</h3><button type="button" onClick={() => copyText(text)} className="inline-flex items-center gap-1 rounded-xl border border-white/10 px-3 py-2 text-[11px] font-black text-gray-400 transition hover:border-[#0FF0FC]/30 hover:text-[#0FF0FC]"><Copy size={13} /> نسخ</button></div><pre className="max-h-72 overflow-auto whitespace-pre-wrap rounded-xl bg-black/35 p-3 text-xs font-bold leading-6 text-gray-300">{text}</pre></article>;
-}
+function ContentBox({ title, text, icon }: { title: string; text: string; icon: React.ReactNode }) { return <article className="rounded-2xl border border-white/10 bg-black/25 p-4"><div className="mb-3 flex items-center justify-between gap-3"><h3 className="inline-flex items-center gap-2 text-sm font-black text-white">{icon}{title}</h3><button type="button" onClick={() => copyText(text)} className="inline-flex items-center gap-1 rounded-xl border border-white/10 px-3 py-2 text-[11px] font-black text-gray-400 transition hover:border-[#0FF0FC]/30 hover:text-[#0FF0FC]"><Copy size={13} /> نسخ</button></div><pre className="max-h-72 overflow-auto whitespace-pre-wrap rounded-xl bg-black/35 p-3 text-xs font-bold leading-6 text-gray-300">{text}</pre></article>; }
