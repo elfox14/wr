@@ -18,6 +18,40 @@ function getMatchWindow() {
   return { now, start, end };
 }
 
+function dayHourKey(value: Date | string) {
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return 'unknown-time';
+  date.setMinutes(0, 0, 0);
+  return date.toISOString();
+}
+
+function teamsKey(match: any) {
+  const ids = [match.homeTeamId || match.homeTeam?.id, match.awayTeamId || match.awayTeam?.id].filter(Boolean).map(String).sort();
+  return ids.length === 2 ? ids.join(':') : `${match.homeTeam?.name || 'home'}:${match.awayTeam?.name || 'away'}`.toLowerCase();
+}
+
+function duplicateFamilyKey(match: any) {
+  return `teams:${teamsKey(match)}:${dayHourKey(match.matchDate)}`;
+}
+
+function rankMatch(match: any, now = new Date()) {
+  const status = String(match.status || '').toUpperCase();
+  const statusRank = isLiveByTime(match, now) || status === 'HT' ? 50 : status === 'FINISHED' ? 30 : 10;
+  const animationRank = match.animationMatchId ? 20 : 0;
+  const externalRank = match.externalId ? 5 : 0;
+  return statusRank + animationRank + externalRank;
+}
+
+function dedupeMatches(matches: any[], now = new Date()) {
+  const byFamily = new Map<string, any>();
+  for (const match of matches) {
+    const key = duplicateFamilyKey(match);
+    const previous = byFamily.get(key);
+    if (!previous || rankMatch(match, now) > rankMatch(previous, now)) byFamily.set(key, match);
+  }
+  return Array.from(byFamily.values());
+}
+
 function teamImage(team: any) {
   return team?.image || team?.logo || team?.badge || team?.flag || '';
 }
@@ -37,7 +71,7 @@ function getLiveMinute(match: any, now = new Date()) {
 
 function isLiveByTime(match: any, now = new Date()) {
   const status = String(match.status || '').toUpperCase();
-  if (status === 'LIVE' || status === 'IN_PLAY') return true;
+  if (status === 'LIVE' || status === 'IN_PLAY' || status === 'HT') return true;
   if (status !== 'SCHEDULED') return false;
   const minute = Math.floor((now.getTime() - new Date(match.matchDate).getTime()) / 60_000) + 1;
   return minute >= 1 && minute <= 135;
@@ -45,7 +79,13 @@ function isLiveByTime(match: any, now = new Date()) {
 
 function statusLabel(match: any, now = new Date()) {
   const normalized = String(match.status || '').toUpperCase();
-  if (isLiveByTime(match, now)) return `مباشر الآن - الدقيقة ${getLiveMinute(match, now)}`;
+  if (normalized === 'HT') return 'استراحة بين الشوطين';
+  if (isLiveByTime(match, now)) {
+    const minute = getLiveMinute(match, now);
+    if (minute >= 46 && minute <= 65) return 'استراحة بين الشوطين';
+    if (minute > 65) return 'الشوط الثاني جارٍ';
+    return `مباشر الآن - الدقيقة ${minute}`;
+  }
   if (normalized === 'FINISHED') return 'انتهت';
   return 'لم تبدأ';
 }
@@ -101,13 +141,13 @@ async function getVisibleMatches() {
   const matches = await prisma.match.findMany({
     where: {
       matchDate: { gte: start, lte: end },
-      status: { in: ['SCHEDULED', 'IN_PLAY', 'LIVE', 'FINISHED'] },
+      status: { in: ['SCHEDULED', 'IN_PLAY', 'LIVE', 'HT', 'FINISHED'] },
     },
     orderBy: { matchDate: 'asc' },
     include: { homeTeam: true, awayTeam: true },
   });
 
-  return matches.sort((a: any, b: any) => {
+  return dedupeMatches(matches, now).sort((a: any, b: any) => {
     const aLive = isLiveByTime(a, now) ? 0 : 1;
     const bLive = isLiveByTime(b, now) ? 0 : 1;
     if (aLive !== bLive) return aLive - bLive;
@@ -128,7 +168,7 @@ export default async function AnimationLivePage() {
             <div>
               <p className="mb-2 inline-flex items-center gap-2 rounded-full border border-[#0FF0FC]/25 bg-[#0FF0FC]/10 px-3 py-1 text-[11px] font-black text-[#0FF0FC]"><Radio size={13} /> Football Animation Live</p>
               <h1 className="text-2xl font-black md:text-4xl">البث الأنيميشن - المباريات الحالية والقريبة</h1>
-              <p className="mt-2 text-sm font-bold text-gray-400">يعرض المباراة الجارية حتى لو لم تتحدث حالتها بعد، ويظهر النتيجة والدقيقة المحسوبة.</p>
+              <p className="mt-2 text-sm font-bold text-gray-400">يعرض المباراة الجارية حتى لو لم تتحدث حالتها بعد، ويظهر النتيجة وحالة المباراة بدون تكرار.</p>
             </div>
             <Link href="/broadcast" className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-xs font-black text-white hover:border-[#0FF0FC]/40 hover:text-[#0FF0FC]"><Tv size={15} /> شاشة البث</Link>
           </div>
