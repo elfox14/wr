@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { AlertTriangle, CheckCircle2, Clock, KeyRound, RefreshCw, Shield, XCircle } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Clock, KeyRound, Play, RefreshCw, Shield, XCircle } from 'lucide-react';
 
 type HealthPayload = {
   ok: boolean;
@@ -14,6 +14,8 @@ type HealthPayload = {
   blockers: string[];
   recommendations: string[];
 };
+
+type ActionState = { label: string; loading: boolean; result: string | null };
 
 function formatDate(value?: string) {
   if (!value) return '';
@@ -32,6 +34,7 @@ export default function LiveHealthPage() {
   const [data, setData] = useState<HealthPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [action, setAction] = useState<ActionState>({ label: '', loading: false, result: null });
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -62,6 +65,28 @@ export default function LiveHealthPage() {
     }
   }
 
+  async function runMasterSync(label: string, params: Record<string, string> = {}) {
+    if (!secret) {
+      setError('ضع السر أولاً قبل تشغيل المزامنة.');
+      return;
+    }
+    setAction({ label, loading: true, result: null });
+    try {
+      const url = new URL('/api/cron/master-sync', window.location.origin);
+      url.searchParams.set('cronSecret', secret);
+      Object.entries(params).forEach(([key, value]) => url.searchParams.set(key, value));
+      const res = await fetch(url.toString(), { cache: 'no-store' });
+      const json = await res.json().catch(() => null);
+      if (!res.ok && res.status !== 207) throw new Error(json?.error || `HTTP ${res.status}`);
+      const summary = json?.ok ? 'تم التشغيل بنجاح' : 'تم التشغيل مع ملاحظات';
+      const ran = [json?.animationSyncRan ? 'Animation' : null, json?.liveMarketSyncRan ? 'Live' : null, json?.footballAutoSyncRan ? 'FootballAuto' : null].filter(Boolean).join(' + ') || 'كل الخطوات skipped';
+      setAction({ label, loading: false, result: `${summary}: ${ran}` });
+      await load(secret);
+    } catch (err: any) {
+      setAction({ label, loading: false, result: err?.message || 'فشل تشغيل المزامنة' });
+    }
+  }
+
   useEffect(() => {
     if (!secret) return;
     const timer = setInterval(() => load(secret), 30_000);
@@ -88,6 +113,17 @@ export default function LiveHealthPage() {
             <input value={secret} onChange={(e) => setSecret(e.target.value)} type="password" className="min-w-0 flex-1 rounded-2xl border border-white/10 bg-black px-4 py-3 text-sm outline-none focus:border-[#0FF0FC]/50" placeholder="ضع السر هنا" />
             <button onClick={() => load()} className="rounded-2xl bg-[#0FF0FC] px-5 py-3 text-sm font-black text-black">دخول</button>
           </div>
+        </section>
+
+        <section className="mb-8 rounded-3xl border border-white/5 bg-[#111] p-4">
+          <div className="mb-3 flex items-center gap-2 text-sm font-black text-white"><Play size={16} className="text-[#00FF88]" /> تشغيل يدوي سريع</div>
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+            <button disabled={action.loading} onClick={() => runMasterSync('Master Sync')} className="rounded-2xl border border-[#0FF0FC]/20 bg-[#0FF0FC]/10 px-4 py-3 text-sm font-black text-[#0FF0FC] disabled:opacity-50">تشغيل Master Sync</button>
+            <button disabled={action.loading} onClick={() => runMasterSync('Force Animation', { forceAnimation: 'true' })} className="rounded-2xl border border-[#FFD700]/20 bg-[#FFD700]/10 px-4 py-3 text-sm font-black text-[#FFD700] disabled:opacity-50">ربط Animation الآن</button>
+            <button disabled={action.loading} onClick={() => runMasterSync('Force Live', { forceLive: 'true' })} className="rounded-2xl border border-[#00FF88]/20 bg-[#00FF88]/10 px-4 py-3 text-sm font-black text-[#00FF88] disabled:opacity-50">تحديث Live الآن</button>
+          </div>
+          {action.loading && <div className="mt-3 rounded-2xl bg-black/30 p-3 text-sm text-gray-400">جاري تنفيذ: {action.label}...</div>}
+          {action.result && <div className="mt-3 rounded-2xl border border-white/5 bg-black/30 p-3 text-sm text-gray-300">{action.label}: {action.result}</div>}
         </section>
 
         {error && <div className="mb-6 flex items-center gap-2 rounded-2xl border border-red-500/20 bg-red-500/10 p-4 text-sm text-red-200"><XCircle size={16} /> {error}</div>}
