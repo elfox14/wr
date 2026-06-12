@@ -250,6 +250,10 @@ async function fetchFromProvider<T>(provider: Provider, path: string, params: Ap
   throw lastError || new ApiFootballError(`${provider} request failed for all keys`, undefined, undefined, undefined, provider);
 }
 
+export async function footballFetchFromProvider<T = any>(provider: Provider, path: string, params: ApiFootballParams = {}): Promise<T> {
+  return fetchFromProvider<T>(provider, path, params);
+}
+
 export async function apiFootballFetch<T = any>(path: string, params: ApiFootballParams = {}): Promise<T> {
   const providers = getProviderOrder();
   if (providers.length === 0) throw new ApiFootballError('API_FOOTBALL_KEY/API_FOOTBALL_KEYS or ISPORTS_API_KEY/ISPORTS_API_KEYS is missing');
