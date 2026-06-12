@@ -7,10 +7,7 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 type AdminSession = {
-  user?: {
-    email?: string | null;
-    role?: string | null;
-  };
+  user?: { email?: string | null; role?: string | null };
 } | null;
 
 function isAdmin(session: AdminSession) {
@@ -48,6 +45,21 @@ async function requireAdmin() {
   return { session };
 }
 
+function normalizeEventPayload(body: any) {
+  const matchId = String(body.matchId || '').trim();
+  const type = String(body.type || 'note').trim();
+  const detail = String(body.detail || '').trim();
+  const teamId = String(body.teamId || '').trim() || null;
+  const playerName = String(body.playerName || '').trim() || null;
+  const sourceName = String(body.sourceName || '').trim() || null;
+  const sourceUrl = String(body.sourceUrl || '').trim() || null;
+  const minuteRaw = body.minute === '' || body.minute === null || typeof body.minute === 'undefined' ? null : Number(body.minute);
+  const minute = Number.isFinite(minuteRaw as number) ? Math.max(0, Math.min(130, Number(minuteRaw))) : null;
+  if (!matchId) return { error: 'اختر المباراة أولًا' };
+  if (!detail || detail.length < 4) return { error: 'تفاصيل الحدث قصيرة جدًا' };
+  return { matchId, type, detail, teamId, playerName, sourceName, sourceUrl, minute };
+}
+
 export async function GET(req: Request) {
   const guard = await requireAdmin();
   if (guard.error) return guard.error;
@@ -73,20 +85,10 @@ export async function POST(req: Request) {
 
   await ensureMatchEventTable();
   const body = await req.json().catch(() => ({}));
-  const matchId = String(body.matchId || '').trim();
-  const type = String(body.type || 'note').trim();
-  const detail = String(body.detail || '').trim();
-  const teamId = String(body.teamId || '').trim() || null;
-  const playerName = String(body.playerName || '').trim() || null;
-  const sourceName = String(body.sourceName || '').trim() || null;
-  const sourceUrl = String(body.sourceUrl || '').trim() || null;
-  const minuteRaw = body.minute === '' || body.minute === null || typeof body.minute === 'undefined' ? null : Number(body.minute);
-  const minute = Number.isFinite(minuteRaw as number) ? Math.max(0, Math.min(130, Number(minuteRaw))) : null;
+  const payload = normalizeEventPayload(body);
+  if ('error' in payload) return NextResponse.json({ error: payload.error }, { status: 400 });
 
-  if (!matchId) return NextResponse.json({ error: 'اختر المباراة أولًا' }, { status: 400 });
-  if (!detail || detail.length < 4) return NextResponse.json({ error: 'تفاصيل الحدث قصيرة جدًا' }, { status: 400 });
-
-  const match = await prisma.match.findUnique({ where: { id: matchId }, select: { id: true } });
+  const match = await prisma.match.findUnique({ where: { id: payload.matchId }, select: { id: true } });
   if (!match) return NextResponse.json({ error: 'المباراة غير موجودة' }, { status: 404 });
 
   const id = `event_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -94,19 +96,34 @@ export async function POST(req: Request) {
     `INSERT INTO "MatchEvent" (
       "id", "matchId", "minute", "type", "teamId", "playerName", "detail", "sourceName", "sourceUrl", "createdAt", "updatedAt"
     ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)`,
-    id,
-    matchId,
-    minute,
-    type,
-    teamId,
-    playerName,
-    detail,
-    sourceName,
-    sourceUrl
+    id, payload.matchId, payload.minute, payload.type, payload.teamId, payload.playerName, payload.detail, payload.sourceName, payload.sourceUrl
   );
 
   const created = await prisma.$queryRawUnsafe<any[]>(`SELECT * FROM "MatchEvent" WHERE "id" = ${quoteSql(id)} LIMIT 1`);
   return NextResponse.json({ ok: true, item: created[0] }, { status: 201, headers: { 'Cache-Control': 'no-store' } });
+}
+
+export async function PATCH(req: Request) {
+  const guard = await requireAdmin();
+  if (guard.error) return guard.error;
+
+  await ensureMatchEventTable();
+  const body = await req.json().catch(() => ({}));
+  const id = String(body.id || '').trim();
+  if (!id) return NextResponse.json({ error: 'id is required' }, { status: 400 });
+  const payload = normalizeEventPayload(body);
+  if ('error' in payload) return NextResponse.json({ error: payload.error }, { status: 400 });
+
+  await prisma.$executeRawUnsafe(
+    `UPDATE "MatchEvent" SET
+      "matchId"=$2, "minute"=$3, "type"=$4, "teamId"=$5, "playerName"=$6,
+      "detail"=$7, "sourceName"=$8, "sourceUrl"=$9, "updatedAt"=CURRENT_TIMESTAMP
+     WHERE "id"=$1`,
+    id, payload.matchId, payload.minute, payload.type, payload.teamId, payload.playerName, payload.detail, payload.sourceName, payload.sourceUrl
+  );
+
+  const updated = await prisma.$queryRawUnsafe<any[]>(`SELECT * FROM "MatchEvent" WHERE "id" = ${quoteSql(id)} LIMIT 1`);
+  return NextResponse.json({ ok: true, item: updated[0] }, { headers: { 'Cache-Control': 'no-store' } });
 }
 
 export async function DELETE(req: Request) {
