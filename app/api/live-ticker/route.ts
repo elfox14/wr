@@ -28,6 +28,12 @@ function toNumber(value: unknown, fallback = 0) {
   return Number.isFinite(n) ? n : fallback;
 }
 
+function nullableNumber(value: unknown) {
+  if (value === null || value === undefined || value === '') return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
 function formatSignedPercent(value: number) {
   const rounded = Math.round(value * 10) / 10;
   return `${rounded > 0 ? '+' : ''}${rounded}%`;
@@ -40,8 +46,34 @@ function matchStatusLabel(status?: string | null) {
   return 'قادمة';
 }
 
-function scoreLabel(match: any) {
-  return `${toNumber(match.homeScore)} - ${toNumber(match.awayScore)}`;
+function quoteSql(value: string) {
+  return `'${String(value).replace(/'/g, "''")}'`;
+}
+
+function scoreLabel(match: any, scoreSnapshot?: any) {
+  const homeScore = nullableNumber(scoreSnapshot?.homeScore) ?? nullableNumber(match.homeScore) ?? 0;
+  const awayScore = nullableNumber(scoreSnapshot?.awayScore) ?? nullableNumber(match.awayScore) ?? 0;
+  return `${homeScore} - ${awayScore}`;
+}
+
+async function fetchLatestScoreSnapshots(matchIds: string[]) {
+  if (!matchIds.length) return new Map<string, any>();
+  try {
+    const idList = matchIds.map(quoteSql).join(',');
+    const rows = await prisma.$queryRawUnsafe<any[]>(`
+      SELECT DISTINCT ON ("matchId")
+        "matchId", "homeScore", "awayScore", "capturedAt"
+      FROM "MatchStatsSnapshot"
+      WHERE "matchId" IN (${idList})
+      ORDER BY "matchId", "capturedAt" DESC
+    `);
+    return new Map(rows.map((row) => [row.matchId, row]));
+  } catch (error: any) {
+    if (!String(error?.message || '').includes('MatchStatsSnapshot')) {
+      console.warn('live ticker score snapshot lookup failed:', error?.message || error);
+    }
+    return new Map<string, any>();
+  }
 }
 
 const noStoreHeaders = {
@@ -117,6 +149,7 @@ export async function GET(request: Request) {
       }),
     ]);
 
+    const scoreSnapshots = await fetchLatestScoreSnapshots([...liveMatches, ...finishedMatches].map((match) => match.id));
     const items: TickerItem[] = [];
     const seenPriceAssetIds = new Set<string>();
 
@@ -124,7 +157,7 @@ export async function GET(request: Request) {
       items.push({
         id: `match-live-${match.id}`,
         type: 'MATCH_EVENT',
-        title: `${matchStatusLabel(match.status)}: ${match.homeTeam?.name || 'الفريق الأول'} ${scoreLabel(match)} ${match.awayTeam?.name || 'الفريق الثاني'}`,
+        title: `${matchStatusLabel(match.status)}: ${match.homeTeam?.name || 'الفريق الأول'} ${scoreLabel(match, scoreSnapshots.get(match.id))} ${match.awayTeam?.name || 'الفريق الثاني'}`,
         matchId: match.id,
         href: '/live',
         timestamp: now.toISOString(),
@@ -137,7 +170,7 @@ export async function GET(request: Request) {
       items.push({
         id: `match-finished-${match.id}`,
         type: 'MATCH_EVENT',
-        title: `${matchStatusLabel(match.status)}: ${match.homeTeam?.name || 'الفريق الأول'} ${scoreLabel(match)} ${match.awayTeam?.name || 'الفريق الثاني'}`,
+        title: `${matchStatusLabel(match.status)}: ${match.homeTeam?.name || 'الفريق الأول'} ${scoreLabel(match, scoreSnapshots.get(match.id))} ${match.awayTeam?.name || 'الفريق الثاني'}`,
         matchId: match.id,
         href: '/live',
         timestamp: now.toISOString(),
@@ -207,6 +240,7 @@ export async function GET(request: Request) {
       success: true,
       updatedAt: now.toISOString(),
       responseMode: 'prioritized',
+      scoreSource: 'latest_snapshot_then_match',
       counts: {
         live: liveMatches.length,
         finished: finishedMatches.length,
