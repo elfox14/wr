@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { Activity, ArrowLeft, CalendarDays, ExternalLink, Newspaper, Radio, ShieldCheck, TrendingUp } from 'lucide-react';
+import { Activity, ArrowLeft, CalendarDays, ExternalLink, Newspaper, Radio, ShieldCheck, Sparkles, TrendingUp } from 'lucide-react';
 import prisma from '@/lib/prisma';
 import { renderMarketNews } from '@/lib/market-news/render';
 
@@ -201,6 +201,14 @@ export default async function NewsPage() {
               <p className="mb-3 inline-flex items-center gap-2 rounded-full border border-[#0FF0FC]/25 bg-[#0FF0FC]/10 px-4 py-2 text-xs font-black text-[#0FF0FC]"><Newspaper size={14} /> غرفة أخبار المونديال</p>
               <h1 className="text-3xl font-black leading-tight md:text-5xl">الأخبار والرصد الصحفي</h1>
               <p className="mt-3 max-w-3xl text-sm font-bold leading-7 text-gray-400">صفحة تجمع أخبار السوق الافتراضي، أخبار المباريات، والرصد الصحفي من النشرات الخارجية مثل The Athletic FC مع فصل واضح بين الخبر والتحليل والتداول.</p>
+              <div className="mt-5 flex flex-wrap gap-3">
+                <Link href="/daily-summary" className="inline-flex items-center gap-2 rounded-2xl border border-[#FFD700]/25 bg-[#FFD700]/10 px-4 py-3 text-sm font-black text-[#FFD700] transition hover:bg-[#FFD700] hover:text-black">
+                  <Sparkles size={16} /> ملخص اليوم
+                </Link>
+                <Link href="/admin/news" className="inline-flex items-center gap-2 rounded-2xl border border-[#0FF0FC]/25 bg-[#0FF0FC]/10 px-4 py-3 text-sm font-black text-[#0FF0FC] transition hover:bg-[#0FF0FC] hover:text-black">
+                  <Newspaper size={16} /> إضافة خبر
+                </Link>
+              </div>
             </div>
             <div className="grid grid-cols-3 gap-2 text-center text-xs font-black">
               <div className="rounded-2xl border border-white/10 bg-black/25 px-4 py-3"><div className="text-2xl text-[#FFD700]">{pressNews.length}</div><div className="text-gray-500">رصد صحفي</div></div>
