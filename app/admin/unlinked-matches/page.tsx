@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { AlertTriangle, ArrowRight, CheckCircle2, KeyRound, Link2, RefreshCw, Shield, XCircle } from 'lucide-react';
+import { AlertTriangle, ArrowRight, CheckCircle2, KeyRound, Link2, RefreshCw, Search, Shield, XCircle } from 'lucide-react';
 
 type Team = { id: string; name: string; code?: string; image?: string };
 type Match = { id: string; externalId?: string | null; animationMatchId?: number | null; status: string; score: string; homeScore: number; awayScore: number; matchDate: string; groupPhase?: string | null; homeTeam: Team | null; awayTeam: Team | null };
@@ -38,6 +38,12 @@ export default function UnlinkedMatchesPage() {
     if (!data) return false;
     return data.environment.cronBaseUrl !== data.environment.cronBaseUrlRecommended;
   }, [data]);
+
+  function candidatesHref(matchId: string) {
+    const params = new URLSearchParams({ id: matchId });
+    if (secret) params.set('key', secret);
+    return `/admin/isports-candidates?${params.toString()}`;
+  }
 
   async function load(keyValue = secret, hoursValue = hours) {
     if (!keyValue) {
@@ -155,7 +161,7 @@ export default function UnlinkedMatchesPage() {
                       </div>
                       <div className="rounded-2xl bg-black px-4 py-2 text-center font-mono text-xl font-black text-[#FFD700]">{match.score}</div>
                     </div>
-                    <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_150px_120px_120px_auto]">
+                    <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_150px_120px_120px_auto_auto]">
                       <input value={state.animationMatchId} onChange={(e) => updateState(match.id, { animationMatchId: e.target.value })} className="rounded-2xl border border-white/10 bg-black px-4 py-3 text-sm outline-none focus:border-[#0FF0FC]/50" placeholder="animationMatchId من iSports" />
                       <select value={state.status} onChange={(e) => updateState(match.id, { status: e.target.value })} className="rounded-2xl border border-white/10 bg-black px-4 py-3 text-sm outline-none focus:border-[#0FF0FC]/50">
                         <option value="SCHEDULED">SCHEDULED</option>
@@ -165,6 +171,7 @@ export default function UnlinkedMatchesPage() {
                       <input value={state.homeScore} onChange={(e) => updateState(match.id, { homeScore: e.target.value })} className="rounded-2xl border border-white/10 bg-black px-4 py-3 text-sm outline-none focus:border-[#0FF0FC]/50" placeholder="Home" />
                       <input value={state.awayScore} onChange={(e) => updateState(match.id, { awayScore: e.target.value })} className="rounded-2xl border border-white/10 bg-black px-4 py-3 text-sm outline-none focus:border-[#0FF0FC]/50" placeholder="Away" />
                       <button disabled={state.loading} onClick={() => linkMatch(match)} className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#FFD700] px-5 py-3 text-sm font-black text-black disabled:opacity-50"><Link2 size={16} /> ربط</button>
+                      <Link href={candidatesHref(match.id)} className="inline-flex items-center justify-center gap-2 rounded-2xl border border-[#0FF0FC]/20 bg-[#0FF0FC]/10 px-5 py-3 text-sm font-black text-[#0FF0FC]"><Search size={16} /> مرشحو iSports</Link>
                     </div>
                     {state.result && <div className="mt-3 rounded-2xl border border-[#00FF88]/20 bg-[#00FF88]/10 p-3 text-sm text-[#00FF88]">{state.result}</div>}
                     {state.error && <div className="mt-3 rounded-2xl border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-200">{state.error}</div>}
