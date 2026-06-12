@@ -17,6 +17,9 @@ function hasAnimation(match: any) { return Boolean(match?.animationMatchId); }
 function getAnimationHref(match: any) { return hasAnimation(match) ? `/animation-live?matchId=${encodeURIComponent(String(match.animationMatchId))}&lang=en&statsPanel=simple&teamPanel=1` : '/matches'; }
 function isLiveStatus(status?: string) { const value = String(status || '').toUpperCase(); return value === 'IN_PLAY' || value === 'LIVE' || value === 'HT'; }
 function isFinished(status?: string) { return String(status || '').toUpperCase() === 'FINISHED'; }
+function startOfDay(value: Date) { const date = new Date(value); date.setHours(0, 0, 0, 0); return date; }
+function addDays(value: Date, days: number) { const date = new Date(value); date.setDate(date.getDate() + days); return date; }
+function isSameDay(value: string | Date, target: Date) { return startOfDay(new Date(value)).getTime() === startOfDay(target).getTime(); }
 
 function TeamLogoLink({ team }: { team: any }) {
   return <Link href={getTeamHref(team)} onClick={(event) => event.stopPropagation()} className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-full border border-white/10 bg-black/50 shadow-lg transition-transform hover:border-primary/50 group-hover:scale-105 md:h-24 md:w-24">{team?.image?.startsWith?.('http') ? <img src={team.image} alt={team.name} className="h-full w-full object-cover" /> : <span className="text-5xl">{team?.image || '⚽'}</span>}</Link>;
@@ -36,7 +39,10 @@ export default function MatchesPage() {
 
   if (loading) return <div className="flex min-h-screen items-center justify-center bg-background"><div className="h-10 w-10 animate-spin rounded-full border-4 border-primary border-t-transparent" /></div>;
 
-  const todayMatchesCount = matches.filter((m) => new Date(m.matchDate).toDateString() === new Date().toDateString()).length;
+  const today = new Date();
+  const yesterday = addDays(today, -1);
+  const tomorrow = addDays(today, 1);
+  const todayMatchesCount = matches.filter((m) => isSameDay(m.matchDate, today)).length;
   const liveMatchesCount = matches.filter((m) => isLiveStatus(m.status)).length;
   const upcomingMatchesCount = matches.filter((m) => String(m.status).toUpperCase() === 'SCHEDULED').length;
   const finishedMatchesCount = matches.filter((m) => isFinished(m.status)).length;
@@ -45,7 +51,9 @@ export default function MatchesPage() {
   const groupOptions = Array.from(new Set(matches.map(getMatchGroup).filter(Boolean))).sort((a, b) => a.localeCompare(b));
 
   let filteredMatches = [...matches];
-  if (activeTab === 'today') filteredMatches = filteredMatches.filter((m) => new Date(m.matchDate).toDateString() === new Date().toDateString());
+  if (activeTab === 'yesterday') filteredMatches = filteredMatches.filter((m) => isSameDay(m.matchDate, yesterday));
+  if (activeTab === 'today') filteredMatches = filteredMatches.filter((m) => isSameDay(m.matchDate, today));
+  if (activeTab === 'tomorrow') filteredMatches = filteredMatches.filter((m) => isSameDay(m.matchDate, tomorrow));
   if (activeTab === 'live') filteredMatches = filteredMatches.filter((m) => isLiveStatus(m.status));
   if (activeTab === 'animation') filteredMatches = filteredMatches.filter((m) => hasAnimation(m));
   if (activeTab === 'upcoming') filteredMatches = filteredMatches.filter((m) => String(m.status).toUpperCase() === 'SCHEDULED');
@@ -69,9 +77,11 @@ export default function MatchesPage() {
       ? <span className="flex items-center gap-1 rounded bg-gray-500/10 px-2 py-1 text-xs font-bold text-gray-400"><CheckCircle2 size={12} /> انتهت</span>
       : <span className="flex items-center gap-1 rounded bg-orange-400/10 px-2 py-1 text-xs font-bold text-orange-300"><Clock size={12} /> قريبًا</span>;
 
+  const tabs = [{ id: 'all', label: 'الكل' }, { id: 'yesterday', label: 'أمس' }, { id: 'today', label: 'اليوم' }, { id: 'tomorrow', label: 'غدًا' }, { id: 'live', label: 'بث مباشر' }, { id: 'animation', label: 'بث أنيميشن فقط' }, { id: 'upcoming', label: 'قادمة' }, { id: 'finished', label: 'انتهت' }, { id: 'groups', label: 'المجموعات' }, { id: 'knockout', label: 'التصفيات' }];
+
   return <div className="min-h-screen bg-background pb-20 text-foreground selection:bg-primary/30"><main className="mx-auto max-w-7xl px-4 py-6"><PageHeader title="مركز المباريات" description="تابع المباريات، فلتر حسب الوقت والمجموعة، وانتقل إلى مركز كل مباراة." icon={<CalendarDays size={22} />} />
     <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-6"><SummaryCard icon={<CalendarDays size={20} />} label="مباريات اليوم" value={todayMatchesCount} /><SummaryCard icon={<Play size={20} />} label="مباشرة الآن" value={liveMatchesCount} accent="text-emerald-300" /><SummaryCard icon={<Clock size={20} />} label="قادمة" value={upcomingMatchesCount} accent="text-orange-300" /><SummaryCard icon={<CheckCircle2 size={20} />} label="انتهت" value={finishedMatchesCount} accent="text-gray-400" /><SummaryCard icon={<Activity size={20} />} label="الأكثر نشاطًا" value={mostActiveMatch ? `${mostActiveMatch.homeTeam?.code} ضد ${mostActiveMatch.awayTeam?.code}` : '-'} small /><SummaryCard icon={<Clock size={20} />} label="المباراة القادمة" value={nextMatch ? new Date(nextMatch.matchDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'} small /></div>
-    <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between"><div className="flex w-full gap-2 overflow-x-auto lg:w-auto">{[{ id: 'all', label: 'الكل' }, { id: 'today', label: 'اليوم' }, { id: 'live', label: 'بث مباشر' }, { id: 'animation', label: 'بث أنيميشن فقط' }, { id: 'upcoming', label: 'قادمة' }, { id: 'finished', label: 'انتهت' }, { id: 'groups', label: 'المجموعات' }, { id: 'knockout', label: 'التصفيات' }].map((tab) => <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`whitespace-nowrap rounded-lg px-4 py-2 text-sm font-bold transition-colors ${activeTab === tab.id ? 'bg-primary text-black' : 'border border-white/5 bg-surface text-gray-400 hover:text-white'}`}>{tab.label}</button>)}</div><div className="flex w-full flex-col gap-2 sm:flex-row lg:w-auto"><label className="flex items-center gap-2 rounded-lg border border-white/10 bg-surface px-3 py-2"><Filter size={16} className="text-primary" /><span className="text-xs font-bold text-gray-500">المجموعة</span><select value={selectedGroup} onChange={(event) => setSelectedGroup(event.target.value)} className="bg-transparent text-sm font-bold text-white focus:outline-none"><option value="all">كل المجموعات</option>{groupOptions.map((group) => <option key={group} value={group}>المجموعة {group}</option>)}</select></label><label className="flex items-center gap-2 rounded-lg border border-white/10 bg-surface px-3 py-2"><Filter size={16} className="text-gray-500" /><span className="text-xs font-bold text-gray-500">الترتيب</span><select value={sortBy} onChange={(event) => setSortBy(event.target.value)} className="bg-transparent text-sm font-bold text-white focus:outline-none"><option value="date">الأهم أولًا</option><option value="closest">الأقرب موعداً</option><option value="demand">الأعلى طلباً</option><option value="momentum">الأعلى زخماً</option></select></label></div></div>
+    <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between"><div className="flex w-full gap-2 overflow-x-auto lg:w-auto">{tabs.map((tab) => <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`whitespace-nowrap rounded-lg px-4 py-2 text-sm font-bold transition-colors ${activeTab === tab.id ? 'bg-primary text-black' : 'border border-white/5 bg-surface text-gray-400 hover:text-white'}`}>{tab.label}</button>)}</div><div className="flex w-full flex-col gap-2 sm:flex-row lg:w-auto"><label className="flex items-center gap-2 rounded-lg border border-white/10 bg-surface px-3 py-2"><Filter size={16} className="text-primary" /><span className="text-xs font-bold text-gray-500">المجموعة</span><select value={selectedGroup} onChange={(event) => setSelectedGroup(event.target.value)} className="bg-transparent text-sm font-bold text-white focus:outline-none"><option value="all">كل المجموعات</option>{groupOptions.map((group) => <option key={group} value={group}>المجموعة {group}</option>)}</select></label><label className="flex items-center gap-2 rounded-lg border border-white/10 bg-surface px-3 py-2"><Filter size={16} className="text-gray-500" /><span className="text-xs font-bold text-gray-500">الترتيب</span><select value={sortBy} onChange={(event) => setSortBy(event.target.value)} className="bg-transparent text-sm font-bold text-white focus:outline-none"><option value="date">الأهم أولًا</option><option value="closest">الأقرب موعداً</option><option value="demand">الأعلى طلباً</option><option value="momentum">الأعلى زخماً</option></select></label></div></div>
     {filteredMatches.length === 0 ? <EmptyMatches /> : <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">{filteredMatches.map((match) => <MatchCard key={match.id} match={match} statusDisplay={statusDisplay} onOpen={() => router.push(`/matches/${match.id}`)} />)}</div>}
   </main></div>;
 }
