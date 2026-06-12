@@ -7,15 +7,19 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 type AdminSession = {
-  user?: {
-    email?: string | null;
-    role?: string | null;
-  };
+  user?: { email?: string | null; role?: string | null };
 } | null;
 
 function isAdmin(session: AdminSession) {
   const email = session?.user?.email || '';
   return session?.user?.role === 'ADMIN' || email === 'worldcup@mcprim.com' || email === 'elfox14usa@gmail.com';
+}
+
+async function requireAdmin() {
+  const session = await getServerSession(authOptions as any) as AdminSession;
+  if (!session?.user) return { error: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) };
+  if (!isAdmin(session)) return { error: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) };
+  return { session };
 }
 
 async function ensurePressNewsTable() {
@@ -51,11 +55,30 @@ function normalizeTags(value: unknown) {
   return [];
 }
 
-export async function GET() {
-  const session = await getServerSession(authOptions as any) as AdminSession;
-  if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  if (!isAdmin(session)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+function validatePayload(body: any) {
+  const title = String(body.title || '').trim();
+  const content = String(body.body || '').trim();
+  const sourceName = String(body.sourceName || '').trim();
+  if (!title || title.length < 8) return { error: 'عنوان الخبر قصير جدًا' };
+  if (!content || content.length < 20) return { error: 'نص الخبر قصير جدًا' };
+  if (!sourceName || sourceName.length < 2) return { error: 'اسم المصدر مطلوب' };
+  return {
+    title,
+    content,
+    sourceName,
+    category: String(body.category || 'رصد صحفي').trim(),
+    sourceUrl: String(body.sourceUrl || '').trim() || null,
+    sourceType: String(body.sourceType || 'newsletter').trim(),
+    language: String(body.language || 'ar').trim(),
+    status: String(body.status || 'published').trim(),
+    importance: Math.max(1, Math.min(100, Number(body.importance || 50))),
+    tags: normalizeTags(body.tags),
+  };
+}
 
+export async function GET() {
+  const guard = await requireAdmin();
+  if (guard.error) return guard.error;
   await ensurePressNewsTable();
   const rows = await prisma.$queryRawUnsafe<any[]>(`
     SELECT * FROM "PressNews"
@@ -66,28 +89,14 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  const session = await getServerSession(authOptions as any) as AdminSession;
-  if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  if (!isAdmin(session)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-
+  const guard = await requireAdmin();
+  if (guard.error) return guard.error;
   await ensurePressNewsTable();
   const body = await req.json().catch(() => ({}));
-  const title = String(body.title || '').trim();
-  const content = String(body.body || '').trim();
-  const sourceName = String(body.sourceName || '').trim();
-
-  if (!title || title.length < 8) return NextResponse.json({ error: 'عنوان الخبر قصير جدًا' }, { status: 400 });
-  if (!content || content.length < 20) return NextResponse.json({ error: 'نص الخبر قصير جدًا' }, { status: 400 });
-  if (!sourceName || sourceName.length < 2) return NextResponse.json({ error: 'اسم المصدر مطلوب' }, { status: 400 });
+  const payload = validatePayload(body);
+  if ('error' in payload) return NextResponse.json({ error: payload.error }, { status: 400 });
 
   const id = `press_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-  const category = String(body.category || 'رصد صحفي').trim();
-  const sourceUrl = String(body.sourceUrl || '').trim() || null;
-  const sourceType = String(body.sourceType || 'newsletter').trim();
-  const language = String(body.language || 'ar').trim();
-  const status = String(body.status || 'published').trim();
-  const importance = Math.max(1, Math.min(100, Number(body.importance || 50)));
-  const tags = normalizeTags(body.tags);
   const publishedAt = body.publishedAt ? new Date(body.publishedAt) : new Date();
   const safePublishedAt = Number.isFinite(publishedAt.getTime()) ? publishedAt : new Date();
 
@@ -95,20 +104,44 @@ export async function POST(req: Request) {
     `INSERT INTO "PressNews" (
       "id", "title", "body", "category", "sourceName", "sourceUrl", "sourceType", "language", "status", "importance", "tags", "publishedAt", "createdAt", "updatedAt"
     ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb,$12,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)`,
-    id,
-    title,
-    content,
-    category,
-    sourceName,
-    sourceUrl,
-    sourceType,
-    language,
-    status,
-    importance,
-    JSON.stringify(tags),
-    safePublishedAt
+    id, payload.title, payload.content, payload.category, payload.sourceName, payload.sourceUrl, payload.sourceType, payload.language,
+    payload.status, payload.importance, JSON.stringify(payload.tags), safePublishedAt
   );
 
   const created = await prisma.$queryRawUnsafe<any[]>(`SELECT * FROM "PressNews" WHERE "id" = ${quoteSql(id)} LIMIT 1`);
   return NextResponse.json({ ok: true, item: created[0] }, { status: 201, headers: { 'Cache-Control': 'no-store' } });
+}
+
+export async function PATCH(req: Request) {
+  const guard = await requireAdmin();
+  if (guard.error) return guard.error;
+  await ensurePressNewsTable();
+  const body = await req.json().catch(() => ({}));
+  const id = String(body.id || '').trim();
+  if (!id) return NextResponse.json({ error: 'id is required' }, { status: 400 });
+  const payload = validatePayload(body);
+  if ('error' in payload) return NextResponse.json({ error: payload.error }, { status: 400 });
+
+  await prisma.$executeRawUnsafe(
+    `UPDATE "PressNews" SET
+      "title"=$2, "body"=$3, "category"=$4, "sourceName"=$5, "sourceUrl"=$6,
+      "sourceType"=$7, "language"=$8, "status"=$9, "importance"=$10, "tags"=$11::jsonb, "updatedAt"=CURRENT_TIMESTAMP
+     WHERE "id"=$1`,
+    id, payload.title, payload.content, payload.category, payload.sourceName, payload.sourceUrl, payload.sourceType,
+    payload.language, payload.status, payload.importance, JSON.stringify(payload.tags)
+  );
+
+  const updated = await prisma.$queryRawUnsafe<any[]>(`SELECT * FROM "PressNews" WHERE "id" = ${quoteSql(id)} LIMIT 1`);
+  return NextResponse.json({ ok: true, item: updated[0] }, { headers: { 'Cache-Control': 'no-store' } });
+}
+
+export async function DELETE(req: Request) {
+  const guard = await requireAdmin();
+  if (guard.error) return guard.error;
+  await ensurePressNewsTable();
+  const url = new URL(req.url);
+  const id = url.searchParams.get('id') || '';
+  if (!id) return NextResponse.json({ error: 'id is required' }, { status: 400 });
+  await prisma.$executeRawUnsafe(`DELETE FROM "PressNews" WHERE "id" = ${quoteSql(id)}`);
+  return NextResponse.json({ ok: true }, { headers: { 'Cache-Control': 'no-store' } });
 }
