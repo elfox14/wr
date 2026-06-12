@@ -10,7 +10,6 @@ import { GlobalTicker } from "@/components/ui/GlobalTicker";
 import { Navbar } from "@/components/ui/Navbar";
 import { Footer } from "@/components/ui/Footer";
 import { MobileBottomNav } from "@/components/ui/MobileBottomNav";
-import { LiveMatchBanner } from "@/components/ui/LiveMatchBanner";
 
 const cairo = Cairo({
   variable: "--font-cairo",
@@ -65,7 +64,6 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
             <Suspense fallback={<div className="h-16 lg:h-20" />}>
               <Navbar />
             </Suspense>
-            <LiveMatchBanner />
             <div className="pb-28 lg:pb-10 min-h-[calc(100vh-100px)]">
               {children}
             </div>
