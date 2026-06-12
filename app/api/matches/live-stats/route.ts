@@ -8,6 +8,7 @@ import {
   publicSnapshot,
   syncMatchStats,
 } from '@/lib/live-match-stats';
+import { getProviderQuotaBlock } from '@/lib/provider-quota-guard';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -74,6 +75,8 @@ export async function GET(request: Request) {
 
     let latest = await getLatestSnapshot(match.id);
     let syncResult: any = null;
+    const quotaBlock = await getProviderQuotaBlock('ISPORTS');
+
     if (allowProviderSync && shouldSync(match, latest, force)) {
       try {
         syncResult = await syncMatchStats(match, { debug: false, force });
@@ -91,6 +94,21 @@ export async function GET(request: Request) {
     const latestHomeScore = latestPublic?.homeScore ?? match.homeScore;
     const latestAwayScore = latestPublic?.awayScore ?? match.awayScore;
     const hasStats = hasAnyStat(latestPublic);
+    const sourceStatus = quotaBlock
+      ? {
+          primary: 'FOOTBALL_DATA',
+          statsProvider: latestPublic?.provider || 'ISPORTS',
+          mode: 'fallback_due_to_isports_quota',
+          isportsBlocked: true,
+          blockedUntil: quotaBlock.blockedUntil instanceof Date ? quotaBlock.blockedUntil.toISOString() : quotaBlock.blockedUntil,
+          reason: quotaBlock.reason,
+        }
+      : {
+          primary: 'ISPORTS',
+          statsProvider: latestPublic?.provider || 'ISPORTS',
+          mode: 'isports_primary',
+          isportsBlocked: false,
+        };
 
     return NextResponse.json({
       ok: true,
@@ -98,6 +116,7 @@ export async function GET(request: Request) {
       pollingSeconds: 300,
       providerSyncEnabled: allowProviderSync,
       hasStats,
+      sourceStatus,
       sync: syncResult,
       match: {
         id: match.id,
