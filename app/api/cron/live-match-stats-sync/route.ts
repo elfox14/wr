@@ -68,6 +68,17 @@ function getCronAuth(req: Request) {
   return matched ? { valid: true, method: matched.method } : { valid: false, method: null };
 }
 
+function providerErrorDetails(error: any, debug = false) {
+  const details: any = {
+    error: error?.message || 'Unknown error',
+  };
+  if (error?.provider) details.provider = error.provider;
+  if (error?.status) details.providerStatus = error.status;
+  if (error?.keyIndex !== undefined) details.keyIndex = error.keyIndex;
+  if (debug && error?.payload !== undefined) details.providerPayload = error.payload;
+  return details;
+}
+
 async function ensureStatsTable() {
   await prisma.$executeRawUnsafe(`
     CREATE TABLE IF NOT EXISTS "MatchStatsSnapshot" (
@@ -285,7 +296,7 @@ export async function GET(req: Request) {
           authMethod: auth.method,
           count: 1,
           linkedInDatabase: false,
-          processed: [{ providerMatchId: singleMatchId, status: 'direct_fetch_failed', error: error?.message || 'Unknown error' }],
+          processed: [{ providerMatchId: singleMatchId, status: 'direct_fetch_failed', ...providerErrorDetails(error, debug) }],
         }, { headers: { 'Cache-Control': 'no-store' } });
       }
     }
@@ -305,7 +316,7 @@ export async function GET(req: Request) {
         const snapshotId = await saveSnapshot(match, match.animationMatchId, stats, raw);
         processed.push({ matchId: match.id, providerMatchId: match.animationMatchId, status: 'saved', matchStatus: match.status, snapshotId, stats, ...(debug ? { raw } : {}) });
       } catch (error: any) {
-        processed.push({ matchId: match.id, providerMatchId: match.animationMatchId, status: 'failed', matchStatus: match.status, error: error?.message || 'Unknown error' });
+        processed.push({ matchId: match.id, providerMatchId: match.animationMatchId, status: 'failed', matchStatus: match.status, ...providerErrorDetails(error, debug) });
       }
     }
 
