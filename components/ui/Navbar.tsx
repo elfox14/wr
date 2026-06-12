@@ -72,8 +72,14 @@ export function Navbar() {
       <nav className="fixed top-0 z-50 w-full border-b border-white/10 bg-black/80 shadow-[0_8px_30px_rgba(0,0,0,0.35)] backdrop-blur-xl">
         <div className="mx-auto max-w-[1400px] px-4 sm:px-6 lg:px-8">
           <div className="flex h-16 items-center justify-between gap-3 lg:h-20">
-            <Link href="/" className="group flex flex-none items-center gap-3 overflow-hidden">
-              <Image src="/brand/logo-horizontal.png" alt="MC PRIME Exchange" width={178} height={42} className="h-8 w-auto shrink-0 object-contain transition-transform duration-300 group-hover:scale-105 lg:h-10" priority />
+            <Link href="/" className="group flex flex-none items-center gap-3 overflow-hidden rounded-2xl px-1 py-1 transition hover:bg-white/[0.03]">
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-[#0FF0FC]/25 bg-black shadow-[0_0_18px_rgba(15,240,252,0.18)]">
+                <Image src="/brand/logo-icon.png" alt="MC PRIME Exchange" width={44} height={44} className="h-10 w-10 object-contain" priority />
+              </span>
+              <span className="hidden min-w-[132px] flex-col leading-none sm:flex">
+                <span className="text-sm font-black tracking-wide text-white">MC PRIME</span>
+                <span className="mt-1 text-[10px] font-black text-[#0FF0FC]">بورصة المونديال</span>
+              </span>
               <span className="hidden whitespace-nowrap rounded-full border border-[#0FF0FC]/20 bg-[#0FF0FC]/10 px-3 py-1 text-[10px] font-black leading-none text-[#0FF0FC] 2xl:inline-flex">
                 {slogan}
               </span>
