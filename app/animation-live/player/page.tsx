@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ArrowRight, Expand, Radio, ShieldCheck } from 'lucide-react';
+import AnimationIframe from './AnimationIframe';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -35,6 +36,7 @@ export default async function AnimationLivePlayerPage({ searchParams }: { search
     iframeUrl.searchParams.set('statsPanel', statsPanel);
     if (teamPanel) iframeUrl.searchParams.set('teamPanel', teamPanel);
   }
+  const iframeUrlString = iframeUrl.toString();
   const isLinkedMatch = Boolean(matchId && accessKey);
 
   return (
@@ -48,21 +50,13 @@ export default async function AnimationLivePlayerPage({ searchParams }: { search
             </div>
             <div className="flex flex-wrap gap-2">
               <Link href="/animation-live" className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-black text-white hover:border-[#0FF0FC]/40 hover:text-[#0FF0FC]"><ArrowRight size={14} /> مباريات اليوم</Link>
-              <Link href={iframeUrl.toString()} target="_blank" rel="noopener noreferrer" className="inline-flex items-center justify-center gap-2 rounded-xl border border-[#FFD700]/25 bg-[#FFD700]/10 px-3 py-2 text-xs font-black text-[#FFD700] hover:bg-[#FFD700] hover:text-black"><Expand size={14} /> تكبير الشاشة</Link>
+              <Link href={iframeUrlString} target="_blank" rel="noopener noreferrer" className="inline-flex items-center justify-center gap-2 rounded-xl border border-[#FFD700]/25 bg-[#FFD700]/10 px-3 py-2 text-xs font-black text-[#FFD700] hover:bg-[#FFD700] hover:text-black"><Expand size={14} /> تكبير الشاشة</Link>
             </div>
           </div>
         </div>
 
         {isLinkedMatch ? (
-          <div className="overflow-hidden rounded-2xl border border-white/10 bg-black shadow-[0_25px_90px_rgba(0,0,0,0.45)]">
-            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 bg-white/[0.035] px-3 py-2 text-[10px] font-black text-gray-300 md:px-4">
-              <span>Match ID: {matchId}</span>
-              <span>Language: {lang}</span>
-              <span>Stats: {statsPanel}</span>
-              <span>Team Panel: {teamPanel || 'default'}</span>
-            </div>
-            <iframe title="Football Animation Live" src={iframeUrl.toString()} className="h-[82vh] w-full border-0 bg-black sm:h-[80vh] lg:h-[78vh]" allow="fullscreen; autoplay; encrypted-media; picture-in-picture" allowFullScreen referrerPolicy="strict-origin-when-cross-origin" />
-          </div>
+          <AnimationIframe src={iframeUrlString} matchId={matchId} lang={lang} statsPanel={statsPanel} teamPanel={teamPanel} />
         ) : (
           <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.03] p-10 text-center text-sm text-gray-400">
             <Radio className="mx-auto mb-4 text-gray-500" size={48} />
