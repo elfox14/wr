@@ -3,16 +3,16 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import AdminMatchEventsClient from '@/components/admin/AdminMatchEventsClient';
 
-type AdminSession = {
-  user?: {
-    email?: string | null;
-    role?: string | null;
-  };
-} | null;
+function getUser(session: unknown) {
+  if (!session || typeof session !== 'object') return null;
+  const value = session as { user?: { email?: string | null; role?: string | null } };
+  return value.user || null;
+}
 
-function isAdmin(session: AdminSession) {
-  const email = session?.user?.email || '';
-  return session?.user?.role === 'ADMIN' || email === 'worldcup@mcprim.com' || email === 'elfox14usa@gmail.com';
+function isAdmin(session: unknown) {
+  const user = getUser(session);
+  const email = user?.email || '';
+  return user?.role === 'ADMIN' || email === 'worldcup@mcprim.com' || email === 'elfox14usa@gmail.com';
 }
 
 export const metadata = {
@@ -20,8 +20,8 @@ export const metadata = {
 };
 
 export default async function AdminMatchEventsPage() {
-  const session = (await getServerSession(authOptions as any)) as AdminSession;
-  if (!session?.user) redirect('/login');
+  const session = await getServerSession(authOptions as any);
+  if (!getUser(session)) redirect('/login');
   if (!isAdmin(session)) redirect('/');
   return <AdminMatchEventsClient />;
 }
