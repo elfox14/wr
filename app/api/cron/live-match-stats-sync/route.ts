@@ -48,11 +48,18 @@ export async function GET(req: Request) {
     const debug = url.searchParams.get('debug') === 'true';
     const singleMatchId = Number(url.searchParams.get('matchId') || 0);
     const hasSingleMatchId = Boolean(singleMatchId && Number.isFinite(singleMatchId));
+    const recentlyFinishedSince = new Date(Date.now() - 3 * 60 * 60 * 1000);
 
     const matches = await prisma.match.findMany({
       where: hasSingleMatchId
         ? { animationMatchId: singleMatchId }
-        : { animationMatchId: { not: null }, status: { in: ['IN_PLAY', 'LIVE', 'HT'] } },
+        : {
+            animationMatchId: { not: null },
+            OR: [
+              { status: { in: ['IN_PLAY', 'LIVE', 'HT'] } },
+              { status: 'FINISHED', matchDate: { gte: recentlyFinishedSince } },
+            ],
+          },
       orderBy: { matchDate: 'asc' },
       take: hasSingleMatchId ? 1 : 12,
       select: {
@@ -111,7 +118,7 @@ export async function GET(req: Request) {
       }
     }
 
-    return NextResponse.json({ ok: true, authMethod: auth.method, count: processed.length, linkedInDatabase: matches.length > 0, pollHintSeconds: 5, processed }, { headers: { 'Cache-Control': 'no-store' } });
+    return NextResponse.json({ ok: true, authMethod: auth.method, count: processed.length, linkedInDatabase: matches.length > 0, pollHintSeconds: 5, finalStatsWindowHours: 3, processed }, { headers: { 'Cache-Control': 'no-store' } });
   } catch (error: any) {
     console.error('live-match-stats-sync error:', error);
     return NextResponse.json({ ok: false, error: error?.message || 'Internal Server Error' }, { status: 500 });
