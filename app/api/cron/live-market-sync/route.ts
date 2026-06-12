@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { apiFootballFetch, normalizeName } from '@/lib/apiFootball';
+import { apiFootballFetch, footballFetchFromProvider, normalizeName } from '@/lib/apiFootball';
 import { applyVolatilityCap } from '@/lib/liveEngine';
 
 export const dynamic = 'force-dynamic';
@@ -31,23 +31,29 @@ function normalizeStatus(status?: string | null) {
   return value || 'SCHEDULED';
 }
 
+function validSecrets() {
+  return [process.env.CRON_SECRET, process.env.ADMIN_API_SECRET].map((value) => String(value || '').trim()).filter(Boolean);
+}
+
 function getCronAuth(req: Request) {
-  const expected = process.env.CRON_SECRET || process.env.ADMIN_API_SECRET;
-  if (!expected) return { valid: true, method: 'no_secret_configured' };
+  const expected = validSecrets();
+  if (expected.length === 0) return { valid: true, method: 'no_secret_configured' };
   const auth = req.headers.get('authorization') || '';
   const bearer = auth.startsWith('Bearer ') ? auth.slice(7).trim() : '';
-  const cronHeader = req.headers.get('x-cron-secret') || '';
-  const adminHeader = req.headers.get('x-admin-secret') || '';
+  const cronHeader = req.headers.get('x-cron-secret')?.trim() || '';
+  const adminHeader = req.headers.get('x-admin-secret')?.trim() || '';
   const { searchParams } = new URL(req.url);
-  const cronQuery = searchParams.get('cronSecret') || '';
-  const adminQuery = searchParams.get('adminSecret') || '';
+  const cronQuery = searchParams.get('cronSecret')?.trim() || '';
+  const adminQuery = searchParams.get('adminSecret')?.trim() || '';
+  const keyQuery = searchParams.get('key')?.trim() || '';
   const matched = [
     { method: 'authorization_bearer', value: bearer },
     { method: 'x-cron-secret', value: cronHeader },
     { method: 'x-admin-secret', value: adminHeader },
     { method: 'cronSecret_query', value: cronQuery },
     { method: 'adminSecret_query', value: adminQuery },
-  ].find((item) => item.value && item.value === expected);
+    { method: 'key_query', value: keyQuery },
+  ].find((item) => item.value && expected.includes(item.value));
   return matched ? { valid: true, method: matched.method } : { valid: false, method: null };
 }
 
@@ -100,6 +106,19 @@ function parseProviderDate(value: any) {
   const normalized = Number.isFinite(numeric) && numeric > 100000 ? (numeric < 10000000000 ? numeric * 1000 : numeric) : value;
   const date = new Date(normalized);
   return Number.isFinite(date.getTime()) ? date : new Date();
+}
+
+function shouldAllowApiFootballFallback(url: URL) {
+  if (url.searchParams.get('allowApiFootballFallback') === 'true') return true;
+  if (url.searchParams.get('providerFallback') === 'true') return true;
+  return process.env.ALLOW_API_FOOTBALL_LIVE_FALLBACK === 'true';
+}
+
+async function fetchLiveScores(url: URL, date: string) {
+  if (shouldAllowApiFootballFallback(url)) {
+    return apiFootballFetch('/livescores', { date, live: 'all' });
+  }
+  return footballFetchFromProvider('ISPORTS', '/livescores', { date, live: 'all' });
 }
 
 async function hasPotentialLiveWindow() {
@@ -236,6 +255,7 @@ export async function GET(req: Request) {
   const startedAt = new Date();
   const url = new URL(req.url);
   const force = url.searchParams.get('force') === 'true' || url.searchParams.get('forceLive') === 'true';
+  const allowApiFootballFallback = shouldAllowApiFootballFallback(url);
   const shouldFetch = force || await hasPotentialLiveWindow();
   const processed: any[] = [];
   const errors: any[] = [];
@@ -246,14 +266,14 @@ export async function GET(req: Request) {
 
   try {
     const date = url.searchParams.get('date') || dateKey();
-    const data: any = await apiFootballFetch('/livescores', { date, live: 'all' });
+    const data: any = await fetchLiveScores(url, date);
     const fixtures = pickFixtures(data);
     for (const fixture of fixtures) {
       processed.push(await processLiveFixture(fixture, data?._provider));
     }
-    return NextResponse.json({ success: true, mode: 'isports_first_live_market_sync', authMethod: auth.method, providerPriority: ['ISPORTS', 'API_FOOTBALL'], providerUsed: data?._provider, externalRequestsUsed: 1, skippedProviderFetch: false, fixturesFetched: fixtures.length, processed, errors, startedAt: startedAt.toISOString(), finishedAt: new Date().toISOString() }, { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate' } });
+    return NextResponse.json({ success: true, mode: 'isports_only_live_market_sync', authMethod: auth.method, providerPriority: allowApiFootballFallback ? ['ISPORTS', 'API_FOOTBALL'] : ['ISPORTS'], providerFallbackAllowed: allowApiFootballFallback, providerUsed: data?._provider, externalRequestsUsed: 1, skippedProviderFetch: false, fixturesFetched: fixtures.length, processed, errors, startedAt: startedAt.toISOString(), finishedAt: new Date().toISOString() }, { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate' } });
   } catch (error: any) {
-    errors.push({ message: error?.message || 'live sync failed', status: error?.status, provider: error?.provider, payload: error?.payload });
-    return NextResponse.json({ success: false, mode: 'isports_first_live_market_sync', errors, processed, startedAt: startedAt.toISOString(), finishedAt: new Date().toISOString() }, { status: 500, headers: { 'Cache-Control': 'no-store' } });
+    errors.push({ message: error?.message || 'live sync failed', status: error?.status, provider: error?.provider, payload: error?.payload, apiFootballFallbackAllowed: allowApiFootballFallback });
+    return NextResponse.json({ success: false, mode: 'isports_only_live_market_sync', providerFallbackAllowed: allowApiFootballFallback, errors, processed, startedAt: startedAt.toISOString(), finishedAt: new Date().toISOString() }, { status: 500, headers: { 'Cache-Control': 'no-store' } });
   }
 }
