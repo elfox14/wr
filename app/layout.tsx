@@ -23,18 +23,18 @@ const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://worldcup.mcprim.com
 export const metadata: Metadata = {
   metadataBase: new URL(baseUrl),
   title: {
-    default: "MC PRIME Exchange | Football Intelligence Exchange",
-    template: "%s | MC PRIME Exchange",
+    default: "بورصة المونديال | مباشر وتحليل كأس العالم",
+    template: "%s | بورصة المونديال",
   },
-  description: "منصة ذكاء كروي وسوق رياضي افتراضي لكأس العالم: تقارير منتخبات، منهجية تسعير، قيمة عادلة، زخم، طلب، ومحفظة بأرصدة افتراضية فقط.",
-  keywords: ["MC PRIME Exchange", "بورصة المونديال", "تحليل كروي", "منهجية التسعير", "سوق رياضي افتراضي", "كأس العالم", "fantasy exchange", "football intelligence"],
+  description: "كل ما يحدث في كأس العالم: نتائج مباشرة، أخبار موثقة، تحليل كروي، صفحات منتخبات، وبورصة افتراضية للتفاعل الجماهيري.",
+  keywords: ["بورصة المونديال", "كأس العالم", "مباشر كأس العالم", "أخبار كأس العالم", "تحليل كروي", "منتخبات كأس العالم", "سوق رياضي افتراضي", "football intelligence"],
   authors: [{ name: "MC PRIME Exchange Team" }],
   openGraph: {
-    title: "MC PRIME Exchange | Football Intelligence Exchange",
-    description: "تحليل كروي أولًا وسوق رياضي افتراضي ثانيًا: اقرأ التقارير، افهم التسعير، ثم راقب المنتخبات واللاعبين بأرصدة افتراضية فقط.",
+    title: "بورصة المونديال | مباشر وتحليل كأس العالم",
+    description: "منصة متابعة وتحليل كأس العالم: مباشر، أخبار موثقة، تحليل كروي، وبورصة افتراضية للتفاعل الجماهيري.",
     url: baseUrl,
-    siteName: "MC PRIME Exchange",
-    images: [{ url: "/og-image.jpg", width: 1200, height: 630, alt: "MC PRIME Exchange Football Intelligence Exchange" }],
+    siteName: "بورصة المونديال",
+    images: [{ url: "/og-image.jpg", width: 1200, height: 630, alt: "بورصة المونديال مباشر وتحليل كأس العالم" }],
     locale: "ar_EG",
     alternateLocale: ["ar_SA", "ar_AE", "ar_MA", "ar_QA"],
     type: "website",
@@ -42,8 +42,8 @@ export const metadata: Metadata = {
   alternates: { canonical: '/' },
   twitter: {
     card: "summary_large_image",
-    title: "MC PRIME Exchange | Football Intelligence Exchange",
-    description: "تقارير منتخبات، منهجية تسعير، قيمة عادلة، وسوق رياضي افتراضي بأرصدة لعب فقط.",
+    title: "بورصة المونديال | مباشر وتحليل كأس العالم",
+    description: "نتائج مباشرة، أخبار موثقة، تحليل كروي، وبورصة افتراضية للتفاعل الجماهيري.",
     images: ["/og-image.jpg"],
   },
   robots: {
