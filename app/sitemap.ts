@@ -4,10 +4,9 @@ import prisma from '@/lib/prisma';
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://worldcup.mcprim.com';
-  
-  // Get all static articles
+
   const articles = getAllArticles();
-  
+
   const articleUrls = articles.map((article) => ({
     url: `${baseUrl}/article/${article.id}`,
     lastModified: new Date(article.date),
@@ -15,26 +14,43 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.8,
   }));
 
-  // Fetch all assets
-  const assets = await prisma.asset.findMany({ select: { id: true } });
+  const assets = await prisma.asset.findMany({ select: { id: true, type: true } });
   const assetUrls = assets.map((asset) => ({
     url: `${baseUrl}/asset/${asset.id}`,
     lastModified: new Date(),
-    changeFrequency: 'daily' as const,
-    priority: 0.8,
+    changeFrequency: asset.type === 'TEAM' ? 'daily' as const : 'weekly' as const,
+    priority: asset.type === 'TEAM' ? 0.85 : 0.75,
   }));
 
-  // Static pages
+  const matches = await prisma.match.findMany({
+    select: { id: true, matchDate: true, status: true },
+    orderBy: { matchDate: 'asc' },
+  });
+  const matchCenterUrls = matches.map((match) => {
+    const status = String(match.status || '').toUpperCase();
+    const isLiveOrUpcoming = status === 'SCHEDULED' || status === 'IN_PLAY' || status === 'LIVE' || status === 'HT';
+    return {
+      url: `${baseUrl}/match-center/${match.id}`,
+      lastModified: new Date(match.matchDate),
+      changeFrequency: isLiveOrUpcoming ? 'hourly' as const : 'weekly' as const,
+      priority: isLiveOrUpcoming ? 0.9 : 0.7,
+    };
+  });
+
   const staticPages = [
     { route: '', freq: 'always', prio: 1 },
     { route: '/articles', freq: 'daily', prio: 0.9 },
+    { route: '/news', freq: 'hourly', prio: 0.85 },
+    { route: '/matches', freq: 'hourly', prio: 0.95 },
+    { route: '/animation-live', freq: 'hourly', prio: 0.8 },
     { route: '/market', freq: 'always', prio: 0.9 },
-    { route: '/groups', freq: 'always', prio: 0.8 },
+    { route: '/market?type=TEAM', freq: 'daily', prio: 0.85 },
+    { route: '/market?type=PLAYER', freq: 'daily', prio: 0.8 },
+    { route: '/groups', freq: 'always', prio: 0.85 },
+    { route: '/methodology', freq: 'weekly', prio: 0.75 },
     { route: '/leaderboard', freq: 'hourly', prio: 0.7 },
-    { route: '/matches', freq: 'daily', prio: 0.8 },
-    { route: '/leagues', freq: 'daily', prio: 0.8 },
-    { route: '/rewards', freq: 'daily', prio: 0.8 },
-    { route: '/news', freq: 'hourly', prio: 0.8 },
+    { route: '/leagues', freq: 'daily', prio: 0.65 },
+    { route: '/rewards', freq: 'daily', prio: 0.65 },
   ].map((page) => ({
     url: `${baseUrl}${page.route}`,
     lastModified: new Date(),
@@ -46,5 +62,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     ...staticPages,
     ...articleUrls,
     ...assetUrls,
+    ...matchCenterUrls,
   ];
 }
