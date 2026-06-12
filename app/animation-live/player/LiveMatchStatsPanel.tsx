@@ -24,10 +24,20 @@ type LiveStatsResponse = {
   };
   latest?: Snapshot;
   history?: Snapshot[];
-  events?: MatchEvent[];
   sync?: { status?: string; savedEventsCount?: number; error?: string; note?: string; providerStatus?: number };
   error?: string;
 };
+
+type LiveEventsResponse = {
+  ok: boolean;
+  updatedAt?: string;
+  pollingSeconds?: number;
+  events?: MatchEvent[];
+  error?: string;
+};
+
+const STATS_POLL_MS = 5 * 60 * 1000;
+const EVENTS_POLL_MS = 30 * 1000;
 
 function statValue(snapshot: Snapshot, key: string) {
   const value = Number(snapshot?.[key]);
@@ -87,8 +97,10 @@ function hasAnyStat(snapshot: Snapshot) {
 
 export default function LiveMatchStatsPanel({ matchId }: { matchId: string }) {
   const [data, setData] = useState<LiveStatsResponse | null>(null);
+  const [events, setEvents] = useState<MatchEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [eventsUpdatedAt, setEventsUpdatedAt] = useState<string | null>(null);
 
   async function fetchStats() {
     if (!matchId) return;
@@ -104,15 +116,33 @@ export default function LiveMatchStatsPanel({ matchId }: { matchId: string }) {
     }
   }
 
+  async function fetchImportantEvents() {
+    if (!matchId) return;
+    try {
+      const response = await fetch(`/api/matches/live-events?matchId=${encodeURIComponent(matchId)}`, { cache: 'no-store' });
+      const json: LiveEventsResponse = await response.json();
+      if (json?.ok) {
+        setEvents(json.events || []);
+        setEventsUpdatedAt(json.updatedAt || new Date().toISOString());
+      }
+    } catch {
+      // keep the latest saved events visible; this endpoint is intentionally lightweight and database-only
+    }
+  }
+
   useEffect(() => {
     fetchStats();
-    const timer = window.setInterval(fetchStats, 5_000);
-    return () => window.clearInterval(timer);
+    fetchImportantEvents();
+    const statsTimer = window.setInterval(fetchStats, STATS_POLL_MS);
+    const eventsTimer = window.setInterval(fetchImportantEvents, EVENTS_POLL_MS);
+    return () => {
+      window.clearInterval(statsTimer);
+      window.clearInterval(eventsTimer);
+    };
   }, [matchId]);
 
   const latest = data?.latest || null;
   const match = data?.match;
-  const events = data?.events || [];
   const hasStats = Boolean(data?.hasStats || hasAnyStat(latest));
   const statusLabel = data?.sync?.status === 'database_only' ? 'قراءة من قاعدة البيانات' : data?.sync?.status === 'cached_recent_snapshot' ? 'آخر لقطة محفوظة' : data?.sync?.status === 'saved' ? 'تم تسجيل لقطة جديدة' : data?.sync?.status || 'متابعة مباشرة';
   const providerWarning = data?.sync?.status === 'failed'
@@ -135,10 +165,11 @@ export default function LiveMatchStatsPanel({ matchId }: { matchId: string }) {
         <div>
           <p className="inline-flex items-center gap-2 rounded-full border border-[#0FF0FC]/25 bg-[#0FF0FC]/10 px-3 py-1 text-[10px] font-black text-[#0FF0FC]"><Activity size={13} /> Live Stats Recorder</p>
           <h2 className="mt-2 text-xl font-black text-white">إحصائيات المباراة الحية</h2>
-          <p className="mt-1 text-xs leading-5 text-gray-400">الواجهة تقرأ من قاعدة البيانات كل 5 ثوانٍ لحماية عدد طلبات API، والتحديث من iSports يتم مركزيًا عبر cron.</p>
+          <p className="mt-1 text-xs leading-5 text-gray-400">الإحصائيات والنتيجة تُقرأ كل 5 دقائق فقط. الأحداث المهمة لها تحديث منفصل أخف من قاعدة البيانات.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2 text-xs font-black">
-          <span className="rounded-full border border-white/10 bg-black/30 px-3 py-1 text-gray-300"><Clock size={13} className="inline" /> {data?.updatedAt ? new Date(data.updatedAt).toLocaleTimeString('ar-EG') : '—'}</span>
+          <span className="rounded-full border border-white/10 bg-black/30 px-3 py-1 text-gray-300"><Clock size={13} className="inline" /> إحصائيات: {data?.updatedAt ? new Date(data.updatedAt).toLocaleTimeString('ar-EG') : '—'}</span>
+          <span className="rounded-full border border-white/10 bg-black/30 px-3 py-1 text-gray-300"><Target size={13} className="inline" /> أحداث: {eventsUpdatedAt ? new Date(eventsUpdatedAt).toLocaleTimeString('ar-EG') : '—'}</span>
           <span className="rounded-full border border-[#FFD700]/20 bg-[#FFD700]/10 px-3 py-1 text-[#FFD700]"><Database size={13} className="inline" /> {statusLabel}</span>
         </div>
       </div>
@@ -187,7 +218,7 @@ export default function LiveMatchStatsPanel({ matchId }: { matchId: string }) {
             <div className="mb-3 flex items-center justify-between gap-2">
               <div>
                 <h3 className="font-black text-white">الأحداث المهمة</h3>
-                <p className="text-xs text-gray-500">أهداف، هجمات خطيرة، كروت، ركنيات، وتسديدات مؤثرة.</p>
+                <p className="text-xs text-gray-500">استثناء سريع وخفيف: أهداف، هجمات خطيرة، كروت، ركنيات، وتسديدات مؤثرة.</p>
               </div>
               <Target className="text-[#FFD700]" size={22} />
             </div>
