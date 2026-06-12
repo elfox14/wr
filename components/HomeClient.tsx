@@ -227,13 +227,13 @@ export default function HomeClient({
     const matchedAsset = findTeamAsset(team);
     return (
       <Link href={getTeamHref(team)} className="rounded-full transition hover:scale-105 focus:outline-none focus:ring-2 focus:ring-[#0FF0FC]/40" title={`صفحة ${team?.name || matchedAsset?.name || 'المنتخب'}`}>
-        <AssetImage image={team?.image || team?.logo || team?.badge || team?.flag || matchedAsset?.image} name={team?.name || team?.teamName || matchedAsset?.name || 'Team'} type="TEAM" width={54} height={54} className="h-14 w-14 rounded-full border border-white/10 bg-black/40 object-cover shadow-[0_0_18px_rgba(15,240,252,0.12)] hover:border-[#0FF0FC]/50" />
+        <AssetImage image={team?.image || team?.logo || team?.badge || team?.flag || matchedAsset?.image} name={team?.name || team?.teamName || matchedAsset?.name || 'Team'} type="TEAM" width={54} height={54} className="h-12 w-12 rounded-full border border-white/10 bg-black/40 object-cover shadow-[0_0_18px_rgba(15,240,252,0.12)] hover:border-[#0FF0FC]/50 sm:h-14 sm:w-14" />
       </Link>
     );
   };
 
   const renderAssetCard = (asset: any, label: string) => (
-    <Link key={asset.id || asset.name} href={asset?.id ? `/asset/${asset.id}` : '/market'} className="flex items-center gap-3 rounded-2xl border border-white/8 bg-black/25 p-3 transition hover:border-[#0FF0FC]/25 hover:bg-white/[0.055]">
+    <Link key={asset.id || asset.name} href={asset?.id ? `/asset/${asset.id}` : '/market'} className="flex items-center gap-3 rounded-2xl border border-white/8 bg-black/25 p-3 transition active:scale-[0.98] hover:border-[#0FF0FC]/25 hover:bg-white/[0.055]">
       <AssetImage image={asset?.image} name={asset?.name || label} type={asset?.type || 'TEAM'} width={42} height={42} className="h-11 w-11 rounded-full border border-white/10 bg-black/40 object-cover" />
       <div className="min-w-0">
         <div className="truncate text-sm font-black text-white">{asset?.name || label}</div>
@@ -256,6 +256,14 @@ export default function HomeClient({
     { title: 'البورصة', href: '/market', icon: BarChart3 },
   ];
 
+  const mobileQuickActions = [
+    { title: 'المباريات', subtitle: 'نتائج ومواعيد', href: '#matches', icon: Radio, tone: 'border-red-400/25 bg-red-500/10 text-red-300' },
+    { title: 'الأخبار', subtitle: 'موثق وسريع', href: '#news', icon: Newspaper, tone: 'border-[#FFD700]/25 bg-[#FFD700]/10 text-[#FFD700]' },
+    { title: 'التحليل', subtitle: 'قبل وبعد', href: '#analysis', icon: LineChart, tone: 'border-[#0FF0FC]/25 bg-[#0FF0FC]/10 text-[#0FF0FC]' },
+    { title: 'المنتخبات', subtitle: 'بطاقات وقوائم', href: '#teams', icon: Trophy, tone: 'border-emerald-400/25 bg-emerald-400/10 text-emerald-300' },
+    { title: 'البورصة', subtitle: 'ترفيه افتراضي', href: '#fan-exchange', icon: BarChart3, tone: 'border-violet-400/25 bg-violet-400/10 text-violet-300' },
+  ];
+
   const analysisCards = [
     { title: 'قبل المباراة', text: 'قراءة مبسطة لنقاط القوة والضعف، مع فصل واضح بين المعلومة الموثقة والرأي التحليلي.', href: '/team-intelligence', icon: FileText },
     { title: 'أثناء المباراة', text: 'مركز مباشر للنتيجة والحالة والدقيقة، مع رابط للبث التفاعلي عند توفره.', href: '/animation-live', icon: Radio },
@@ -269,7 +277,7 @@ export default function HomeClient({
   ];
 
   return (
-    <main className="mx-auto max-w-7xl space-y-7 px-4 py-7 sm:px-6 lg:px-8">
+    <main className="mx-auto max-w-7xl space-y-5 px-4 py-5 sm:px-6 sm:py-7 lg:space-y-7 lg:px-8">
       <section className="overflow-hidden rounded-[1.4rem] border border-white/10 bg-black/40">
         <div className="flex flex-col gap-3 px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex flex-wrap items-center gap-3">
@@ -291,11 +299,11 @@ export default function HomeClient({
               )}
             </div>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="hidden flex-wrap gap-2 sm:flex">
             {commandLinks.map((item) => {
               const Icon = item.icon;
               return (
-                <Link key={item.title} href={item.href} className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.045] px-3 py-1.5 text-xs font-black text-gray-300 transition hover:border-[#0FF0FC]/30 hover:text-[#0FF0FC]">
+                <Link key={item.title} href={item.href} className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.045] px-3 py-1.5 text-xs font-black text-gray-300 transition active:scale-95 hover:border-[#0FF0FC]/30 hover:text-[#0FF0FC]">
                   <Icon size={13} />
                   {item.title}
                 </Link>
@@ -305,14 +313,29 @@ export default function HomeClient({
         </div>
       </section>
 
-      <section className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(15,240,252,0.18),transparent_28%),radial-gradient(circle_at_bottom_left,rgba(255,215,0,0.12),transparent_24%),linear-gradient(135deg,rgba(255,255,255,0.055),rgba(255,255,255,0.015))] p-5 shadow-anti-gravity md:p-7">
+      <section className="lg:hidden -mx-4 overflow-hidden border-y border-white/10 bg-black/45 backdrop-blur-xl">
+        <div className="flex gap-2 overflow-x-auto px-4 py-3">
+          {mobileQuickActions.map((item) => {
+            const Icon = item.icon;
+            return (
+              <Link key={item.href} href={item.href} className={`min-w-[132px] rounded-2xl border p-3 transition active:scale-95 ${item.tone}`}>
+                <Icon size={20} />
+                <div className="mt-3 text-sm font-black text-white">{item.title}</div>
+                <div className="mt-1 text-[11px] font-bold opacity-80">{item.subtitle}</div>
+              </Link>
+            );
+          })}
+        </div>
+      </section>
+
+      <section className="relative overflow-hidden rounded-[1.65rem] border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(15,240,252,0.18),transparent_28%),radial-gradient(circle_at_bottom_left,rgba(255,215,0,0.12),transparent_24%),linear-gradient(135deg,rgba(255,255,255,0.055),rgba(255,255,255,0.015))] p-4 shadow-anti-gravity sm:p-5 md:p-7">
         <div className="pointer-events-none absolute inset-0 opacity-16 [background-image:linear-gradient(rgba(255,255,255,.05)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.05)_1px,transparent_1px)] [background-size:44px_44px]" />
         <div className="relative grid gap-5 lg:grid-cols-[1.02fr_0.98fr] lg:items-stretch">
           <div className="flex flex-col justify-center">
-            <p className="mb-4 inline-flex w-fit items-center gap-2 rounded-full border border-[#0FF0FC]/25 bg-[#0FF0FC]/10 px-4 py-2 text-xs font-black text-[#0FF0FC]">
+            <p className="mb-4 inline-flex w-fit items-center gap-2 rounded-full border border-[#0FF0FC]/25 bg-[#0FF0FC]/10 px-4 py-2 text-[11px] font-black text-[#0FF0FC] sm:text-xs">
               <Sparkles size={15} /> World Cup Command Center
             </p>
-            <h1 className="max-w-4xl text-3xl font-black leading-tight text-white md:text-5xl">
+            <h1 className="max-w-4xl text-[1.72rem] font-black leading-tight text-white sm:text-3xl md:text-5xl">
               كل ما يحدث في كأس العالم… مباشر، موثق، وتحليلي — مع بورصة افتراضية للتفاعل الجماهيري
             </h1>
             <p className="mt-4 max-w-3xl text-sm leading-7 text-gray-300 md:text-base">
@@ -326,12 +349,12 @@ export default function HomeClient({
                 </div>
               ))}
             </div>
-            <div className="mt-6 flex flex-wrap gap-3">
-              <Link href="/animation-live" className="inline-flex items-center gap-2 rounded-2xl bg-[#0FF0FC] px-5 py-3 text-sm font-black text-black transition hover:bg-[#70f7ff]">
+            <div className="mt-6 grid grid-cols-2 gap-3 sm:flex sm:flex-wrap">
+              <Link href="/animation-live" className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#0FF0FC] px-4 py-3 text-xs font-black text-black transition active:scale-95 hover:bg-[#70f7ff] sm:px-5 sm:text-sm">
                 <Radio size={18} /> مركز المباريات
               </Link>
-              <Link href="/articles" className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white/10 px-5 py-3 text-sm font-black text-white transition hover:bg-white/15">
-                <Newspaper size={18} /> آخر الأخبار والتحليل
+              <Link href="/articles" className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-xs font-black text-white transition active:scale-95 hover:bg-white/15 sm:px-5 sm:text-sm">
+                <Newspaper size={18} /> الأخبار والتحليل
               </Link>
             </div>
             <div className="mt-5 rounded-2xl border border-[#FFD700]/20 bg-[#FFD700]/10 px-4 py-3 text-xs font-bold leading-6 text-[#FFD700]">
@@ -339,21 +362,21 @@ export default function HomeClient({
             </div>
           </div>
 
-          <div className="rounded-[1.6rem] border border-white/10 bg-black/40 p-5 backdrop-blur-xl">
+          <div className="rounded-[1.35rem] border border-white/10 bg-black/40 p-4 backdrop-blur-xl sm:rounded-[1.6rem] sm:p-5">
             <div className="mb-4 flex items-center justify-between gap-3">
               <div>
                 <p className="text-xs font-black text-gray-500">{hasLiveMatch ? 'مباشر الآن' : 'المباريات القادمة'}</p>
-                <h2 className="mt-1 text-xl font-black text-white">{hasLiveMatch ? 'مباراة جارية الآن' : topMatches.length > 0 ? 'أقرب مباراة' : 'جدول المباريات'}</h2>
+                <h2 className="mt-1 text-lg font-black text-white sm:text-xl">{hasLiveMatch ? 'مباراة جارية الآن' : topMatches.length > 0 ? 'أقرب مباراة' : 'جدول المباريات'}</h2>
               </div>
               <ShieldCheck className={hasLiveMatch ? 'text-red-400' : 'text-[#0FF0FC]'} size={30} />
             </div>
 
             {tickerMatch ? (
               <div className={`rounded-2xl border p-4 ${isMatchLive(tickerMatch, now) ? 'border-red-500/25 bg-red-500/[0.06]' : 'border-white/10 bg-white/[0.045]'}`}>
-                <div className="mb-4 grid grid-cols-[1fr_auto_1fr] items-center gap-3">
+                <div className="mb-4 grid grid-cols-[1fr_auto_1fr] items-center gap-2 sm:gap-3">
                   <div className="flex flex-col items-center gap-2 text-center">
                     {renderMatchTeamLogo(tickerMatch.homeTeam)}
-                    <Link href={getTeamHref(tickerMatch.homeTeam)} className="text-xs font-black text-white transition hover:text-[#0FF0FC]">
+                    <Link href={getTeamHref(tickerMatch.homeTeam)} className="line-clamp-1 text-[11px] font-black text-white transition hover:text-[#0FF0FC] sm:text-xs">
                       {tickerMatch.homeTeam?.name || 'الفريق الأول'}
                     </Link>
                   </div>
@@ -362,7 +385,7 @@ export default function HomeClient({
                       المجموعة {normalizeGroupKey(tickerMatch?.groupPhase || tickerMatch?.group || tickerMatch?.homeTeam?.group || tickerMatch?.awayTeam?.group)}
                     </Link>
                     {isMatchLive(tickerMatch, now) || String(tickerMatch.status).toUpperCase() === 'FINISHED' ? (
-                      <div className="rounded-2xl border border-white/10 bg-black/60 px-5 py-3 text-2xl font-black text-white shadow-inner tabular-nums">
+                      <div className="rounded-2xl border border-white/10 bg-black/60 px-4 py-3 text-xl font-black text-white shadow-inner tabular-nums sm:px-5 sm:text-2xl">
                         {tickerMatch.homeScore ?? 0} - {tickerMatch.awayScore ?? 0}
                       </div>
                     ) : (
@@ -371,7 +394,7 @@ export default function HomeClient({
                   </div>
                   <div className="flex flex-col items-center gap-2 text-center">
                     {renderMatchTeamLogo(tickerMatch.awayTeam)}
-                    <Link href={getTeamHref(tickerMatch.awayTeam)} className="text-xs font-black text-white transition hover:text-[#0FF0FC]">
+                    <Link href={getTeamHref(tickerMatch.awayTeam)} className="line-clamp-1 text-[11px] font-black text-white transition hover:text-[#0FF0FC] sm:text-xs">
                       {tickerMatch.awayTeam?.name || 'الفريق الثاني'}
                     </Link>
                   </div>
@@ -380,7 +403,7 @@ export default function HomeClient({
                   <Clock size={13} />
                   {statusLabel(tickerMatch, now)}
                 </div>
-                <Link href={getAnimationHref(tickerMatch)} className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-[#FFD700]/25 bg-[#FFD700]/10 px-3 py-2 text-xs font-black text-[#FFD700] transition hover:bg-[#FFD700] hover:text-black">
+                <Link href={getAnimationHref(tickerMatch)} className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-[#FFD700]/25 bg-[#FFD700]/10 px-3 py-2 text-xs font-black text-[#FFD700] transition active:scale-95 hover:bg-[#FFD700] hover:text-black">
                   <Radio size={14} />
                   {getAnimationMatchId(tickerMatch) ? 'مشاهدة البث التفاعلي' : 'فتح مركز البث'}
                 </Link>
@@ -396,33 +419,33 @@ export default function HomeClient({
         {quickStats.map((stat) => {
           const Icon = stat.icon;
           return (
-            <div key={stat.label} className="rounded-2xl border border-white/8 bg-white/[0.035] p-4">
+            <div key={stat.label} className="rounded-2xl border border-white/8 bg-white/[0.035] p-3 sm:p-4">
               <Icon className="mb-3 text-[#0FF0FC]" size={22} />
-              <div className="text-2xl font-black text-white">{formatNumber(stat.value)}</div>
+              <div className="text-xl font-black text-white sm:text-2xl">{formatNumber(stat.value)}</div>
               <div className="text-xs font-bold text-gray-500">{stat.label}</div>
             </div>
           );
         })}
       </section>
 
-      <section className="rounded-[1.6rem] border border-white/10 bg-white/[0.035] p-5">
+      <section id="matches" className="scroll-mt-24 rounded-[1.6rem] border border-white/10 bg-white/[0.035] p-4 sm:p-5">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-xs font-black text-[#0FF0FC]">Match Center</p>
-            <h2 className="mt-1 text-2xl font-black text-white">مركز مباريات اليوم</h2>
+            <h2 className="mt-1 text-xl font-black text-white sm:text-2xl">مركز مباريات اليوم</h2>
           </div>
-          <Link href="/animation-live" className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/30 px-4 py-2 text-xs font-black text-gray-300 transition hover:text-[#0FF0FC]">
+          <Link href="/animation-live" className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/30 px-4 py-2 text-xs font-black text-gray-300 transition active:scale-95 hover:text-[#0FF0FC]">
             كل المباريات <ArrowLeft size={14} />
           </Link>
         </div>
         {topMatches.length > 0 ? (
-          <div className="grid gap-3 lg:grid-cols-2">
+          <div className="flex snap-x gap-3 overflow-x-auto pb-2 lg:grid lg:grid-cols-2 lg:overflow-visible lg:pb-0">
             {topMatches.map((match, index) => {
               const matchGroup = normalizeGroupKey(match?.groupPhase || match?.group || match?.homeTeam?.group || match?.awayTeam?.group);
               const isCurrentlyLive = isMatchLive(match, now);
               const isFinished = String(match?.status || '').toUpperCase() === 'FINISHED';
               return (
-                <div key={match.id || `${match.homeTeam?.name}-${match.awayTeam?.name}-${index}`} className={`rounded-2xl border p-4 ${isCurrentlyLive ? 'border-red-500/25 bg-red-500/[0.06]' : 'border-white/10 bg-black/25'}`}>
+                <div key={match.id || `${match.homeTeam?.name}-${match.awayTeam?.name}-${index}`} className={`min-w-[82vw] snap-start rounded-2xl border p-4 lg:min-w-0 ${isCurrentlyLive ? 'border-red-500/25 bg-red-500/[0.06]' : 'border-white/10 bg-black/25'}`}>
                   <div className="mb-4 flex items-center justify-between gap-3">
                     <Link href={groupHref(matchGroup)} className="rounded-full border border-[#0FF0FC]/20 bg-[#0FF0FC]/10 px-3 py-1 text-[10px] font-black text-[#0FF0FC]">
                       المجموعة {matchGroup}
@@ -431,18 +454,18 @@ export default function HomeClient({
                       {isFinished ? 'انتهت' : isCurrentlyLive ? 'مباشر' : 'قادمة'}
                     </span>
                   </div>
-                  <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
-                    <div className="flex items-center gap-2">
+                  <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 sm:gap-3">
+                    <div className="flex flex-col items-center gap-2 text-center sm:flex-row sm:text-start">
                       {renderMatchTeamLogo(match.homeTeam)}
-                      <Link href={getTeamHref(match.homeTeam)} className="text-sm font-black text-white transition hover:text-[#0FF0FC]">
+                      <Link href={getTeamHref(match.homeTeam)} className="line-clamp-1 text-xs font-black text-white transition hover:text-[#0FF0FC] sm:text-sm">
                         {match.homeTeam?.name || 'الفريق الأول'}
                       </Link>
                     </div>
-                    <div className="rounded-2xl border border-white/10 bg-black/50 px-4 py-2 text-center text-lg font-black text-white tabular-nums">
+                    <div className="rounded-2xl border border-white/10 bg-black/50 px-3 py-2 text-center text-base font-black text-white tabular-nums sm:px-4 sm:text-lg">
                       {isCurrentlyLive || isFinished ? `${match.homeScore ?? 0} - ${match.awayScore ?? 0}` : 'VS'}
                     </div>
-                    <div className="flex items-center justify-end gap-2 text-left">
-                      <Link href={getTeamHref(match.awayTeam)} className="text-sm font-black text-white transition hover:text-[#0FF0FC]">
+                    <div className="flex flex-col items-center gap-2 text-center sm:flex-row sm:justify-end sm:text-left">
+                      <Link href={getTeamHref(match.awayTeam)} className="line-clamp-1 text-xs font-black text-white transition hover:text-[#0FF0FC] sm:text-sm">
                         {match.awayTeam?.name || 'الفريق الثاني'}
                       </Link>
                       {renderMatchTeamLogo(match.awayTeam)}
@@ -462,18 +485,18 @@ export default function HomeClient({
       </section>
 
       <section className="grid gap-4 lg:grid-cols-[0.95fr_1.05fr]">
-        <div className="rounded-[1.6rem] border border-white/10 bg-white/[0.035] p-5">
+        <div id="news" className="scroll-mt-24 rounded-[1.6rem] border border-white/10 bg-white/[0.035] p-4 sm:p-5">
           <div className="mb-4 flex items-center justify-between">
             <div>
               <p className="text-xs font-black text-[#FFD700]">News Room</p>
-              <h2 className="mt-1 text-2xl font-black text-white">آخر الأخبار والتحليلات</h2>
+              <h2 className="mt-1 text-xl font-black text-white sm:text-2xl">آخر الأخبار والتحليلات</h2>
             </div>
             <Newspaper className="text-[#FFD700]" size={26} />
           </div>
           {academyArticles.length > 0 ? (
             <div className="space-y-3">
               {academyArticles.slice(0, 3).map((article) => (
-                <Link key={article.id} href={`/article/${article.id}`} className="block rounded-2xl border border-white/8 bg-black/25 p-4 transition hover:border-[#FFD700]/25 hover:bg-white/[0.055]">
+                <Link key={article.id} href={`/article/${article.id}`} className="block rounded-2xl border border-white/8 bg-black/25 p-4 transition active:scale-[0.98] hover:border-[#FFD700]/25 hover:bg-white/[0.055]">
                   <div className="mb-2 flex items-center justify-between gap-3">
                     <span className="rounded-full bg-[#FFD700]/10 px-3 py-1 text-[10px] font-black text-[#FFD700]">{article.category}</span>
                     {article.readingTime ? <span className="text-[10px] font-bold text-gray-500">{article.readingTime}</span> : null}
@@ -488,11 +511,11 @@ export default function HomeClient({
           )}
         </div>
 
-        <div className="rounded-[1.6rem] border border-white/10 bg-white/[0.035] p-5">
+        <div id="analysis" className="scroll-mt-24 rounded-[1.6rem] border border-white/10 bg-white/[0.035] p-4 sm:p-5">
           <div className="mb-4 flex items-center justify-between">
             <div>
               <p className="text-xs font-black text-[#0FF0FC]">Analysis Desk</p>
-              <h2 className="mt-1 text-2xl font-black text-white">مركز التحليل</h2>
+              <h2 className="mt-1 text-xl font-black text-white sm:text-2xl">مركز التحليل</h2>
             </div>
             <LineChart className="text-[#0FF0FC]" size={26} />
           </div>
@@ -500,7 +523,7 @@ export default function HomeClient({
             {analysisCards.map((card) => {
               const Icon = card.icon;
               return (
-                <Link key={card.title} href={card.href} className="rounded-2xl border border-white/8 bg-black/25 p-4 transition hover:border-[#0FF0FC]/25 hover:bg-white/[0.055]">
+                <Link key={card.title} href={card.href} className="rounded-2xl border border-white/8 bg-black/25 p-4 transition active:scale-[0.98] hover:border-[#0FF0FC]/25 hover:bg-white/[0.055]">
                   <Icon className="mb-3 text-[#0FF0FC]" size={23} />
                   <h3 className="font-black text-white">{card.title}</h3>
                   <p className="mt-2 text-xs leading-6 text-gray-400">{card.text}</p>
@@ -516,7 +539,7 @@ export default function HomeClient({
 
       <section className="grid gap-4 md:grid-cols-3">
         {groupCards.map((card) => (
-          <Link key={card.title} href={card.href} className="rounded-[1.4rem] border border-white/10 bg-white/[0.035] p-5 transition hover:-translate-y-1 hover:border-[#0FF0FC]/25 hover:bg-white/[0.06]">
+          <Link key={card.title} href={card.href} className="rounded-[1.4rem] border border-white/10 bg-white/[0.035] p-5 transition active:scale-[0.98] hover:-translate-y-1 hover:border-[#0FF0FC]/25 hover:bg-white/[0.06]">
             <h3 className="text-lg font-black text-white">{card.title}</h3>
             <p className="mt-3 min-h-12 text-sm leading-7 text-gray-400">{card.text}</p>
             <div className="mt-4 inline-flex items-center gap-2 text-sm font-black text-[#0FF0FC]">
@@ -527,11 +550,11 @@ export default function HomeClient({
       </section>
 
       <section className="grid gap-4 lg:grid-cols-2">
-        <div className="rounded-[1.6rem] border border-white/10 bg-white/[0.035] p-5">
+        <div id="teams" className="scroll-mt-24 rounded-[1.6rem] border border-white/10 bg-white/[0.035] p-4 sm:p-5">
           <div className="mb-4 flex items-center justify-between">
             <div>
               <p className="text-xs font-black text-emerald-300">Team Hub</p>
-              <h2 className="mt-1 text-2xl font-black text-white">المنتخبات واللاعبون</h2>
+              <h2 className="mt-1 text-xl font-black text-white sm:text-2xl">المنتخبات واللاعبون</h2>
             </div>
             <Trophy className="text-emerald-300" size={26} />
           </div>
@@ -547,11 +570,11 @@ export default function HomeClient({
           </div>
         </div>
 
-        <div className="rounded-[1.6rem] border border-[#FFD700]/20 bg-[#FFD700]/[0.045] p-5">
+        <div id="fan-exchange" className="scroll-mt-24 rounded-[1.6rem] border border-[#FFD700]/20 bg-[#FFD700]/[0.045] p-4 sm:p-5">
           <div className="mb-4 flex items-center justify-between">
             <div>
               <p className="text-xs font-black text-[#FFD700]">Virtual Fan Exchange</p>
-              <h2 className="mt-1 text-2xl font-black text-white">بورصة المونديال الترفيهية</h2>
+              <h2 className="mt-1 text-xl font-black text-white sm:text-2xl">بورصة المونديال الترفيهية</h2>
             </div>
             <BarChart3 className="text-[#FFD700]" size={28} />
           </div>
@@ -563,7 +586,7 @@ export default function HomeClient({
               marketMovers.map((asset) => {
                 const change = getAssetChange(asset);
                 return (
-                  <Link key={asset.id || asset.name} href={asset?.id ? `/asset/${asset.id}` : '/market'} className="flex items-center justify-between gap-3 rounded-2xl border border-white/8 bg-black/25 p-3 transition hover:border-[#FFD700]/30 hover:bg-white/[0.055]">
+                  <Link key={asset.id || asset.name} href={asset?.id ? `/asset/${asset.id}` : '/market'} className="flex items-center justify-between gap-3 rounded-2xl border border-white/8 bg-black/25 p-3 transition active:scale-[0.98] hover:border-[#FFD700]/30 hover:bg-white/[0.055]">
                     <div className="flex min-w-0 items-center gap-3">
                       <AssetImage image={asset?.image} name={asset?.name || 'أصل افتراضي'} type={asset?.type || 'TEAM'} width={42} height={42} className="h-11 w-11 rounded-full border border-white/10 bg-black/40 object-cover" />
                       <div className="min-w-0">
@@ -581,7 +604,7 @@ export default function HomeClient({
               <div className="rounded-2xl border border-dashed border-white/10 p-5 text-center text-sm text-gray-500">لا توجد مؤشرات سوق كافية بعد.</div>
             )}
           </div>
-          <Link href="/market" className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-[#FFD700] px-5 py-3 text-sm font-black text-black transition hover:bg-[#ffe766]">
+          <Link href="/market" className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-[#FFD700] px-5 py-3 text-sm font-black text-black transition active:scale-95 hover:bg-[#ffe766]">
             ادخل البورصة الافتراضية <ArrowLeft size={16} />
           </Link>
         </div>
