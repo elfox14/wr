@@ -1,4 +1,4 @@
-import HomeClient from '@/components/HomeClient';
+import HomeClientSports from '@/components/HomeClientSports';
 import { getAssets } from '@/lib/store-server';
 import { getAllArticles } from '@/lib/articles';
 import prisma from '@/lib/prisma';
@@ -36,9 +36,9 @@ export default async function Home() {
   const jsonLd = {
     '@context': 'https://schema.org',
     '@type': 'WebSite',
-    name: 'بورصة المونديال | MC PRIME',
+    name: 'World Cup Exchange | MC PRIME',
     url: baseUrl,
-    description: 'كل ما يحدث في كأس العالم: متابعة مباشرة، أخبار موثقة، تحليل كروي، وبورصة افتراضية للتفاعل الجماهيري.',
+    description: 'Live World Cup matches, verified news, football analysis, and a virtual fan exchange layer.',
   };
 
   const homeClientProps = {
@@ -58,7 +58,7 @@ export default async function Home() {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
 
-      <HomeClient {...homeClientProps} />
+      <HomeClientSports {...homeClientProps} />
     </>
   );
 }
