@@ -36,9 +36,9 @@ export default async function Home() {
   const jsonLd = {
     '@context': 'https://schema.org',
     '@type': 'WebSite',
-    name: 'MC PRIME Exchange',
+    name: 'بورصة المونديال | MC PRIME',
     url: baseUrl,
-    description: 'منصة تداول رياضي افتراضية. تداول أسهم منتخبات ولاعبي كأس العالم افتراضياً، ونافس على صدارة السوق.',
+    description: 'كل ما يحدث في كأس العالم: متابعة مباشرة، أخبار موثقة، تحليل كروي، وبورصة افتراضية للتفاعل الجماهيري.',
   };
 
   const homeClientProps = {
