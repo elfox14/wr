@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { RefreshCw } from 'lucide-react';
 
 type Props = {
@@ -23,7 +23,6 @@ function withReloadToken(src: string, reloadKey: number) {
 
 export default function AnimationIframe({ src, matchId, lang, statsPanel, teamPanel }: Props) {
   const [reloadKey, setReloadKey] = useState(1);
-  const [autoReload, setAutoReload] = useState(true);
   const [lastReloadAt, setLastReloadAt] = useState(() => new Date());
 
   const iframeSrc = useMemo(() => withReloadToken(src, reloadKey), [src, reloadKey]);
@@ -32,14 +31,6 @@ export default function AnimationIframe({ src, matchId, lang, statsPanel, teamPa
     setReloadKey((value) => value + 1);
     setLastReloadAt(new Date());
   }
-
-  useEffect(() => {
-    if (!autoReload) return;
-    const interval = window.setInterval(() => {
-      reloadIframe();
-    }, 90_000);
-    return () => window.clearInterval(interval);
-  }, [autoReload]);
 
   return (
     <div className="overflow-hidden rounded-2xl border border-white/10 bg-black shadow-[0_25px_90px_rgba(0,0,0,0.45)]">
@@ -52,24 +43,18 @@ export default function AnimationIframe({ src, matchId, lang, statsPanel, teamPa
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <span className="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-[9px] text-gray-400">
-            آخر تحديث: {lastReloadAt.toLocaleTimeString('ar-EG')}
+            آخر تحميل للبث: {lastReloadAt.toLocaleTimeString('ar-EG')}
           </span>
-          <label className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-white/10 bg-white/5 px-2 py-1 text-[9px] text-gray-200">
-            <input
-              type="checkbox"
-              checked={autoReload}
-              onChange={(event) => setAutoReload(event.target.checked)}
-              className="h-3 w-3 accent-[#0FF0FC]"
-            />
-            تحديث تلقائي 90ث
-          </label>
+          <span className="rounded-full border border-[#FFD700]/20 bg-[#FFD700]/10 px-2 py-1 text-[9px] text-[#FFD700]">
+            التحديث التلقائي للبث متوقف لحماية الاستهلاك
+          </span>
           <button
             type="button"
             onClick={reloadIframe}
             className="inline-flex items-center gap-1 rounded-full border border-[#0FF0FC]/30 bg-[#0FF0FC]/10 px-3 py-1 text-[10px] font-black text-[#0FF0FC] hover:bg-[#0FF0FC] hover:text-black"
           >
             <RefreshCw size={12} />
-            إعادة تحميل البث
+            إعادة تحميل البث يدويًا
           </button>
         </div>
       </div>
