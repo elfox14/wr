@@ -13,6 +13,11 @@ type TeamAsset = {
   code: string;
 };
 
+type TeamMatch = {
+  team: TeamAsset;
+  matchMethod: string;
+};
+
 function isAdminSession(session: AdminSession) {
   const email = session?.user?.email || '';
   return session?.user?.role === 'ADMIN' || email === 'worldcup@mcprim.com' || email === 'elfox14usa@gmail.com';
@@ -41,7 +46,7 @@ function buildTeamIndexes(teams: TeamAsset[]) {
   return { nameIndex, codeIndex };
 }
 
-function findTeamAsset(draft: { teamName: string; normalizedTeamName: string; teamCode?: string | null }, teams: TeamAsset[], indexes: ReturnType<typeof buildTeamIndexes>) {
+function findTeamAsset(draft: { teamName: string; normalizedTeamName: string; teamCode?: string | null }, teams: TeamAsset[], indexes: ReturnType<typeof buildTeamIndexes>): TeamMatch | null {
   for (const alias of getNameAliases(draft.teamName)) {
     const byName = indexes.nameIndex.get(alias);
     if (byName) return { team: byName, matchMethod: `name:${alias}` };
@@ -112,7 +117,7 @@ export async function POST(req: Request) {
   const indexes = buildTeamIndexes(teams);
   const matched = drafts.map((draft) => ({ draft, match: findTeamAsset(draft, teams, indexes) }));
   const unmatched = matched.filter((item) => !item.match).map((item) => item.draft.teamName);
-  const matchedItems = matched.filter((item): item is { draft: typeof drafts[number]; match: NonNullable<ReturnType<typeof findTeamAsset>> } => Boolean(item.match));
+  const matchedItems = matched.flatMap((item) => (item.match ? [{ draft: item.draft, match: item.match }] : []));
 
   if (parsed.dryRun) {
     return NextResponse.json({
