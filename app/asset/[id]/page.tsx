@@ -14,7 +14,7 @@ import { FootballTechnicalAnalysis } from '@/features/analysis/components/Footba
 import prisma from '@/lib/prisma';
 
 type Props = { params: Promise<{ id: string }> };
-type OfficialLineup = { source: 'ISPORTS' | 'PREDICTED' | 'UNAVAILABLE'; fixtureId?: number | string | null; formation?: string | null; matchLabel?: string | null; starters?: number[]; substitutes?: number[] };
+type OfficialLineup = { source: 'API_FOOTBALL' | 'ISPORTS' | 'PREDICTED' | 'UNAVAILABLE'; fixtureId?: number | string | null; formation?: string | null; matchLabel?: string | null; starters?: number[]; substitutes?: number[] };
 type AssetPageAsset = Prisma.AssetGetPayload<{ include: { team: true; performances: true; intelligenceReports: true; players: { include: { performances: true } }; marketNews: true; homeMatches: { include: { homeTeam: true; awayTeam: true } }; awayMatches: { include: { homeTeam: true; awayTeam: true } } } }>;
 type AssetPagePlayer = AssetPageAsset['players'][number];
 
@@ -67,6 +67,18 @@ async function getRelatedMatchEvents(assetId: string, isTeam: boolean) {
   }
 }
 
+async function getGroupTeams(asset: AssetPageAsset | null) {
+  if (!asset || asset.type !== 'TEAM' || !asset.group) return [];
+  return prisma.asset.findMany({
+    where: { type: 'TEAM', group: asset.group },
+    orderBy: [{ fifaRank: 'asc' }, { name: 'asc' }],
+    include: {
+      homeMatches: { orderBy: { matchDate: 'desc' }, take: 20, include: { homeTeam: true, awayTeam: true } },
+      awayMatches: { orderBy: { matchDate: 'desc' }, take: 20, include: { homeTeam: true, awayTeam: true } },
+    },
+  });
+}
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
   const asset = await prisma.asset.findUnique({ where: { id } });
@@ -98,8 +110,13 @@ export default async function AssetPage({ params }: Props) {
   const isTeam = asset?.type === 'TEAM';
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://mcprime-exchange.com';
   const officialLineup = isTeam ? await getOfficialLineupForTeam() : null;
-  const [relatedPressNews, relatedMatchEvents] = asset ? await Promise.all([getRelatedPressNews(asset.id, asset.name, Boolean(isTeam)), getRelatedMatchEvents(asset.id, Boolean(isTeam))]) : [[], []];
-  const normalizedAsset = asset ? { ...asset, officialLineup, players: asset.players?.map((player: AssetPagePlayer) => ({ ...player, lastPerformanceRating: player.lastPerformanceRating ?? player.performances?.[0]?.internalRating ?? null })) || [] } : null;
+  const [relatedPressNews, relatedMatchEvents, groupTeams] = asset ? await Promise.all([getRelatedPressNews(asset.id, asset.name, Boolean(isTeam)), getRelatedMatchEvents(asset.id, Boolean(isTeam)), getGroupTeams(asset)]) : [[], [], []];
+  const normalizedAsset = asset ? {
+    ...asset,
+    officialLineup,
+    groupTeams,
+    players: asset.players?.map((player: AssetPagePlayer) => ({ ...player, lastPerformanceRating: player.lastPerformanceRating ?? player.performances?.[0]?.internalRating ?? null })) || [],
+  } : null;
   const jsonLd = asset ? { '@context': 'https://schema.org', '@type': isTeam ? 'SportsTeam' : 'Person', name: asset.name, description: isTeam ? `تحليل كروي لمنتخب ${asset.name}: التقارير، قائمة الفريق، مؤشرات الجاهزية، والمباريات.` : `تداول أسهم ${asset.name} في منصة MC PRIME Exchange. السعر المباشر: ${asset.current_price}¢.`, url: `${baseUrl}/asset/${asset.id}` } : null;
 
   return <>{jsonLd && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />}{normalizedAsset && !isTeam && <AssetCommandHeader asset={normalizedAsset} isTeam={isTeam} />}{normalizedAsset && isTeam && <div className="mx-auto mb-4 flex w-full max-w-[1600px] justify-end px-4 pt-4"><Link href={`/admin/team-intelligence?teamId=${normalizedAsset.id}`} className="rounded-2xl border border-primary/30 bg-primary/10 px-4 py-3 text-sm font-black text-primary transition hover:bg-primary hover:text-black">إضافة / تحديث تقرير هذا المنتخب</Link></div>}{normalizedAsset && <AssetRelatedNewsPanel asset={normalizedAsset} pressNews={relatedPressNews} matchEvents={relatedMatchEvents} />}{normalizedAsset && <AssetPageTabs isTeam={isTeam} lineup={isTeam ? <TeamPitchLineup team={normalizedAsset} /> : undefined} trade={isTeam ? <TeamTradePanel assetId={normalizedAsset.id} initialPrice={normalizedAsset.marketPrice ?? normalizedAsset.current_price} fairValue={normalizedAsset.fairValue} change={normalizedAsset.change} /> : undefined} technical={<div id="technical-analysis"><FootballTechnicalAnalysis asset={normalizedAsset} /></div>} overview={isTeam ? <TeamOverviewPanel team={normalizedAsset} /> : undefined} playerOverview={!isTeam ? <PlayerAnalysisPanel asset={normalizedAsset} /> : undefined} market={!isTeam ? <AssetClient /> : undefined} />}{normalizedAsset && !isTeam && <StickyTradeCTA assetId={normalizedAsset.id} assetName={normalizedAsset.name} price={normalizedAsset.marketPrice ?? normalizedAsset.current_price} isTeam={isTeam} />}</>;
