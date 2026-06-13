@@ -87,7 +87,7 @@ export async function GET(req: Request) {
       },
     });
 
-    const guard = await getProviderQuotaBlock('ISPORTS');
+    let guard: any = await getProviderQuotaBlock('ISPORTS');
     const processed = [];
 
     for (const match of matches) {
@@ -99,7 +99,7 @@ export async function GET(req: Request) {
 
       if (guard) {
         const why = guard.reason || 'iSports guard active';
-        processed.push({ matchId: match.id, status: 'isports_guard_active', fallback: await fallback(match, why, debug) });
+        processed.push({ matchId: match.id, status: 'isports_guard_active', blockedUntil: guard.blockedUntil, fallback: await fallback(match, why, debug) });
         continue;
       }
       try {
@@ -109,6 +109,7 @@ export async function GET(req: Request) {
         if (isProviderQuotaError(error)) {
           const why = reasonFrom(error);
           const block = await blockProviderForHours('ISPORTS', 24, why);
+          guard = { active: true, blockedUntil: block.blockedUntil, reason: why };
           processed.push({ matchId: match.id, status: 'isports_limit_reached', blockedUntil: block.blockedUntil, fallback: await fallback(match, why, debug), ...providerErrorDetails(error, debug) });
         } else {
           processed.push({ matchId: match.id, status: 'isports_failed', ...providerErrorDetails(error, debug) });
