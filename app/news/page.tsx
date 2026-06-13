@@ -12,6 +12,8 @@ export const metadata: Metadata = {
   description: 'غرفة أخبار بورصة المونديال: رصد صحفي، أخبار المباريات، وتحركات السوق الافتراضي.',
 };
 
+type NewsTab = 'all' | 'press' | 'market' | 'matches';
+
 function formatDate(value: Date | string) {
   const date = new Date(value);
   if (!Number.isFinite(date.getTime())) return 'غير محدد';
@@ -23,6 +25,14 @@ function categoryFromEvent(eventType?: string | null) {
   if (value.includes('goal') || value.includes('match') || value.includes('fixture')) return 'مباريات';
   if (value.includes('price') || value.includes('market') || value.includes('trade')) return 'السوق';
   return 'المنصة';
+}
+
+function normalizeTab(value?: string): NewsTab {
+  return value === 'press' || value === 'market' || value === 'matches' ? value : 'all';
+}
+
+function isMatchNews(item: any) {
+  return String(item?.category || '').includes('مباريات') || String(item?.eventType || '').toLowerCase().includes('match') || String(item?.eventType || '').toLowerCase().includes('goal');
 }
 
 const fallbackPressDigest = [
@@ -187,10 +197,21 @@ function MarketNewsCard({ item }: { item: any }) {
   );
 }
 
-export default async function NewsPage() {
+export default async function NewsPage({ searchParams }: { searchParams?: Promise<{ tab?: string }> | { tab?: string } }) {
+  const params = await Promise.resolve(searchParams || {});
+  const activeTab = normalizeTab(params.tab);
   const [marketNews, pressNews] = await Promise.all([getMarketNews(), getPressNews()]);
-  const featured = pressNews[0];
-  const restPress = pressNews.slice(1);
+
+  const visiblePress = activeTab === 'all' || activeTab === 'press' ? pressNews : activeTab === 'matches' ? pressNews.filter(isMatchNews) : [];
+  const visibleMarket = activeTab === 'all' || activeTab === 'market' ? marketNews : activeTab === 'matches' ? marketNews.filter(isMatchNews) : [];
+  const featured = visiblePress[0];
+  const restPress = visiblePress.slice(1);
+  const tabs = [
+    { href: '/news', key: 'all', label: 'الكل' },
+    { href: '/news?tab=press', key: 'press', label: 'رصد صحفي' },
+    { href: '/news?tab=market', key: 'market', label: 'أخبار السوق' },
+    { href: '/news?tab=matches', key: 'matches', label: 'أخبار المباريات' },
+  ];
 
   return (
     <main className="min-h-screen bg-background px-4 py-5 text-white sm:px-6 lg:px-8" dir="rtl">
@@ -217,47 +238,60 @@ export default async function NewsPage() {
             <div className="rounded-xl border border-white/10 bg-black/25 px-3 py-2"><div className="text-lg text-[#0FF0FC]">{marketNews.length}</div><div className="text-gray-500">أخبار سوق</div></div>
             <div className="rounded-xl border border-white/10 bg-black/25 px-3 py-2"><div className="text-lg text-emerald-300">Live</div><div className="text-gray-500">تحديث</div></div>
           </div>
+          <div className="mt-3 flex flex-wrap gap-2 border-t border-white/10 pt-3">
+            {tabs.map((tab) => (
+              <Link key={tab.key} href={tab.href} className={`rounded-xl border px-3 py-2 text-xs font-black transition ${activeTab === tab.key ? 'border-[#0FF0FC]/40 bg-[#0FF0FC]/15 text-[#0FF0FC]' : 'border-white/10 bg-black/20 text-gray-400 hover:border-white/20 hover:text-white'}`}>
+                {tab.label}
+              </Link>
+            ))}
+          </div>
         </div>
 
-        <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
-          {featured ? <PressCard item={featured} featured /> : null}
-          <aside className="rounded-[1.5rem] border border-emerald-400/20 bg-emerald-400/10 p-5">
-            <div className="mb-3 flex items-center gap-2 text-sm font-black text-emerald-200"><ShieldCheck size={17} /> قواعد النشر داخل المنصة</div>
-            <ul className="space-y-3 text-sm font-bold leading-7 text-emerald-50/85">
-              <li>• الأخبار الصحفية لا تتحول تلقائيًا إلى توصية شراء أو بيع.</li>
-              <li>• أي معلومة من مصدر خارجي تظهر كمصدر صحفي لا كمعلومة رسمية نهائية.</li>
-              <li>• التحليل الكروي منفصل عن حركة الأسعار الافتراضية.</li>
-            </ul>
-          </aside>
-        </div>
+        {(featured || activeTab === 'all' || activeTab === 'press' || activeTab === 'matches') && (
+          <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
+            {featured ? <PressCard item={featured} featured /> : <div className="rounded-[1.5rem] border border-dashed border-white/10 bg-white/[0.03] p-8 text-center text-sm font-bold text-gray-500">لا توجد أخبار في هذا التصنيف الآن.</div>}
+            <aside className="rounded-[1.5rem] border border-emerald-400/20 bg-emerald-400/10 p-5">
+              <div className="mb-3 flex items-center gap-2 text-sm font-black text-emerald-200"><ShieldCheck size={17} /> قواعد النشر داخل المنصة</div>
+              <ul className="space-y-3 text-sm font-bold leading-7 text-emerald-50/85">
+                <li>• الأخبار الصحفية لا تتحول تلقائيًا إلى توصية شراء أو بيع.</li>
+                <li>• أي معلومة من مصدر خارجي تظهر كمصدر صحفي لا كمعلومة رسمية نهائية.</li>
+                <li>• التحليل الكروي منفصل عن حركة الأسعار الافتراضية.</li>
+              </ul>
+            </aside>
+          </div>
+        )}
 
-        <section>
-          <div className="mb-4 flex items-center justify-between gap-3">
-            <h2 className="flex items-center gap-2 text-2xl font-black"><Radio className="text-[#FFD700]" /> رصد صحفي</h2>
-            <span className="text-xs font-bold text-gray-500">يمكن إضافة أخبار جديدة من لوحة الإدارة</span>
-          </div>
-          <div className="grid gap-4 md:grid-cols-3">
-            {restPress.map((item) => <PressCard key={item.id} item={item} />)}
-          </div>
-        </section>
+        {restPress.length > 0 && (
+          <section>
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <h2 className="flex items-center gap-2 text-2xl font-black"><Radio className="text-[#FFD700]" /> رصد صحفي</h2>
+              <span className="text-xs font-bold text-gray-500">يمكن إضافة أخبار جديدة من لوحة الإدارة</span>
+            </div>
+            <div className="grid gap-4 md:grid-cols-3">
+              {restPress.map((item) => <PressCard key={item.id} item={item} />)}
+            </div>
+          </section>
+        )}
 
-        <section>
-          <div className="mb-4 flex items-center justify-between gap-3">
-            <h2 className="flex items-center gap-2 text-2xl font-black"><TrendingUp className="text-[#0FF0FC]" /> أخبار السوق الافتراضي</h2>
-            <Link href="/market" className="inline-flex items-center gap-1 text-sm font-black text-[#0FF0FC]">فتح السوق <ExternalLink size={14} /></Link>
-          </div>
-          {marketNews.length ? (
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {marketNews.map((item) => <MarketNewsCard key={item.id} item={item} />)}
+        {(visibleMarket.length > 0 || activeTab === 'all' || activeTab === 'market' || activeTab === 'matches') && (
+          <section>
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <h2 className="flex items-center gap-2 text-2xl font-black"><TrendingUp className="text-[#0FF0FC]" /> أخبار السوق الافتراضي</h2>
+              <Link href="/market" className="inline-flex items-center gap-1 text-sm font-black text-[#0FF0FC]">فتح السوق <ExternalLink size={14} /></Link>
             </div>
-          ) : (
-            <div className="rounded-[1.5rem] border border-dashed border-white/10 bg-white/[0.03] p-8 text-center">
-              <Activity className="mx-auto mb-3 text-gray-500" size={42} />
-              <h3 className="text-xl font-black text-white">لا توجد أخبار سوق بعد</h3>
-              <p className="mt-2 text-sm font-bold text-gray-500">ستظهر هنا أخبار الأهداف، التحركات السعرية، وأحداث السوق فور توليدها.</p>
-            </div>
-          )}
-        </section>
+            {visibleMarket.length ? (
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                {visibleMarket.map((item) => <MarketNewsCard key={item.id} item={item} />)}
+              </div>
+            ) : (
+              <div className="rounded-[1.5rem] border border-dashed border-white/10 bg-white/[0.03] p-8 text-center">
+                <Activity className="mx-auto mb-3 text-gray-500" size={42} />
+                <h3 className="text-xl font-black text-white">لا توجد أخبار سوق بعد</h3>
+                <p className="mt-2 text-sm font-bold text-gray-500">ستظهر هنا أخبار الأهداف، التحركات السعرية، وأحداث السوق فور توليدها.</p>
+              </div>
+            )}
+          </section>
+        )}
 
         <div className="rounded-2xl border border-white/10 bg-white/[0.035] px-4 py-3 text-xs font-bold leading-6 text-gray-500">
           <CalendarDays size={14} className="mb-1 inline text-[#0FF0FC]" /> آخر تحديث: {formatDate(new Date())}. الأخبار الصحفية المعروضة هنا مختصرة ومحررة للمنصة وليست نقلًا كاملًا للنشرات الأصلية.
