@@ -1,4 +1,5 @@
 import prisma from '@/lib/prisma';
+import LiveMatchStatsPanel from '@/app/animation-live/player/LiveMatchStatsPanel';
 
 function isLiveStatus(status?: string) {
   const value = String(status || '').toUpperCase();
@@ -47,6 +48,13 @@ export default async function MatchCenterLayout({ children, params }: { children
     <>
       {sportsEventJsonLd ? <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(sportsEventJsonLd) }} /> : null}
       {children}
+      {match?.animationMatchId ? (
+        <div className="bg-background px-4 pb-8 text-white sm:px-6 lg:px-8" dir="rtl">
+          <section className="mx-auto max-w-7xl">
+            <LiveMatchStatsPanel matchId={String(match.animationMatchId)} />
+          </section>
+        </div>
+      ) : null}
     </>
   );
 }
