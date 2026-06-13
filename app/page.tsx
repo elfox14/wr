@@ -71,6 +71,20 @@ export default async function Home() {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
 
+      <style
+        dangerouslySetInnerHTML={{
+          __html: `
+            main > section:nth-of-type(3) > div.relative.grid {
+              grid-template-columns: minmax(0, 1fr) !important;
+            }
+
+            main > section:nth-of-type(3) > div.relative.grid > div:nth-child(2) {
+              display: none !important;
+            }
+          `,
+        }}
+      />
+
       <HomeClientSportsNext {...homeClientProps} />
     </>
   );
