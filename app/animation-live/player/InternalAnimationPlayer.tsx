@@ -12,6 +12,7 @@ type LiveStatsResponse = {
   updatedAt?: string;
   pollingSeconds?: number;
   hasStats?: boolean;
+  sourceStatus?: { mode?: string; isportsBlocked?: boolean; blockedUntil?: string; reason?: string; primary?: string; statsProvider?: string };
   match?: {
     id: string;
     animationMatchId?: number;
@@ -23,7 +24,7 @@ type LiveStatsResponse = {
     awayTeam: Team;
   };
   latest?: Snapshot;
-  sync?: { status?: string; error?: string; note?: string; providerStatus?: number };
+  sync?: { status?: string; error?: string; note?: string; providerStatus?: number; blockedUntil?: string; reason?: string };
   error?: string;
 };
 
@@ -38,9 +39,21 @@ type LiveEventsResponse = {
 const STATS_POLL_MS = 5 * 60 * 1000;
 const EVENTS_POLL_MS = 30 * 1000;
 
+const STAT_KEYS = [
+  'homePossession', 'awayPossession', 'homeAttacks', 'awayAttacks',
+  'homeDangerousAttacks', 'awayDangerousAttacks', 'homeShots', 'awayShots',
+  'homeShotsOnTarget', 'awayShotsOnTarget', 'homeShotsOffTarget', 'awayShotsOffTarget',
+  'homeCorners', 'awayCorners', 'homeYellowCards', 'awayYellowCards', 'homeRedCards', 'awayRedCards',
+];
+
 function statValue(snapshot: Snapshot, key: string) {
   const value = Number(snapshot?.[key]);
   return Number.isFinite(value) ? value : null;
+}
+
+function hasAnyDetailedStat(snapshot: Snapshot) {
+  if (!snapshot) return false;
+  return STAT_KEYS.some((key) => snapshot[key] !== null && snapshot[key] !== undefined);
 }
 
 function displayNumber(value: number | null, fallback = '—') {
@@ -68,6 +81,7 @@ function eventLabel(type: string) {
   if (value.includes('danger')) return 'هجمة خطيرة';
   if (value.includes('shot')) return 'تسديدة مؤثرة';
   if (value.includes('penalty')) return 'ركلة جزاء';
+  if (value.includes('status')) return 'تحديث الحالة';
   return 'حدث مهم';
 }
 
@@ -81,7 +95,7 @@ function inferBallPosition(event?: MatchEvent | null) {
   if (type.includes('corner')) return { left: isAway ? 7 : 93, top: 12, label: 'منطقة الركنية' };
   if (type.includes('danger')) return { left: attackingLeft, top: 38, label: 'هجمة خطيرة' };
   if (type.includes('shot')) return { left: attackingLeft, top: 58, label: 'تسديدة' };
-  if (type.includes('card')) return { left: 50, top: 50, label: 'توقف اللعب' };
+  if (type.includes('card') || type.includes('status')) return { left: 50, top: 50, label: 'توقف اللعب' };
   return { left: 50, top: 50, label: 'منتصف الملعب' };
 }
 
@@ -97,6 +111,22 @@ function inferLiveMinute(match?: LiveStatsResponse['match'], latest?: Snapshot) 
   const minute = Math.floor((Date.now() - start) / 60_000) + 1;
   if (minute < 1) return null;
   return Math.max(1, Math.min(135, minute));
+}
+
+function statsNotice(stats: LiveStatsResponse | null, latest: Snapshot) {
+  if (hasAnyDetailedStat(latest) || stats?.hasStats) return null;
+  const syncStatus = stats?.sync?.status || '';
+  const isQuotaBlocked = Boolean(stats?.sourceStatus?.isportsBlocked || syncStatus === 'isports_guard_active');
+  if (isQuotaBlocked) {
+    return 'الإحصائيات التفصيلية غير متاحة الآن لأن iSports وصل للحد اليومي. تم حفظ النتيجة والحالة من Football-Data، وستُحاول المنصة جلب الإحصائيات تلقائيًا بعد انتهاء الحظر.';
+  }
+  if (syncStatus === 'failed' || stats?.sync?.error) {
+    return `تعذر جلب الإحصائيات التفصيلية من المزود الآن: ${stats?.sync?.error || 'مزود الإحصائيات لم يرجع بيانات'}.`;
+  }
+  if (syncStatus === 'no_mapped_stats') {
+    return 'مزود الإحصائيات رجّع بيانات، لكن لم توجد أرقام قابلة للعرض مثل الاستحواذ أو التسديدات لهذه المباراة.';
+  }
+  return 'لا توجد لقطة إحصائيات محفوظة لهذه المباراة بعد. ستظهر الأرقام تلقائيًا عند وصولها من مزود الإحصائيات.';
 }
 
 function MiniStat({ label, home, away, accent = false }: { label: string; home: number | null; away: number | null; accent?: boolean }) {
@@ -143,9 +173,7 @@ export default function InternalAnimationPlayer({ matchId = '', dbMatchId = '' }
     try {
       const response = await fetch(`/api/matches/live-events?${query}`, { cache: 'no-store' });
       const json: LiveEventsResponse = await response.json();
-      if (json?.ok) {
-        setEvents(json.events || []);
-      }
+      if (json?.ok) setEvents(json.events || []);
     } catch {
       // Keep the last known events on screen.
     }
@@ -176,6 +204,7 @@ export default function InternalAnimationPlayer({ matchId = '', dbMatchId = '' }
   const homeScore = statValue(latest, 'homeScore') ?? match?.homeScore ?? 0;
   const awayScore = statValue(latest, 'awayScore') ?? match?.awayScore ?? 0;
   const minute = inferLiveMinute(match, latest);
+  const unavailableStatsNotice = statsNotice(stats, latest);
 
   if (loading) {
     return <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.03] p-10 text-center text-sm text-gray-400">جاري تحميل المشغل...</div>;
@@ -236,14 +265,20 @@ export default function InternalAnimationPlayer({ matchId = '', dbMatchId = '' }
             </div>
           </div>
 
-          <div className="grid gap-3 md:grid-cols-3">
-            <MiniStat label="استحواذ" home={statValue(latest, 'homePossession')} away={statValue(latest, 'awayPossession')} />
-            <MiniStat label="هجمات خطيرة" home={statValue(latest, 'homeDangerousAttacks')} away={statValue(latest, 'awayDangerousAttacks')} accent />
-            <MiniStat label="على المرمى" home={statValue(latest, 'homeShotsOnTarget')} away={statValue(latest, 'awayShotsOnTarget')} accent />
-            <MiniStat label="تسديدات" home={statValue(latest, 'homeShots')} away={statValue(latest, 'awayShots')} />
-            <MiniStat label="ركنيات" home={statValue(latest, 'homeCorners')} away={statValue(latest, 'awayCorners')} />
-            <MiniStat label="كروت" home={(statValue(latest, 'homeYellowCards') ?? 0) + (statValue(latest, 'homeRedCards') ?? 0)} away={(statValue(latest, 'awayYellowCards') ?? 0) + (statValue(latest, 'awayRedCards') ?? 0)} />
-          </div>
+          {unavailableStatsNotice ? (
+            <div className="rounded-2xl border border-[#FFD700]/20 bg-[#FFD700]/10 p-4 text-xs font-bold leading-6 text-[#FFD700]">
+              <AlertTriangle size={15} className="inline" /> {unavailableStatsNotice}
+            </div>
+          ) : (
+            <div className="grid gap-3 md:grid-cols-3">
+              <MiniStat label="استحواذ" home={statValue(latest, 'homePossession')} away={statValue(latest, 'awayPossession')} />
+              <MiniStat label="هجمات خطيرة" home={statValue(latest, 'homeDangerousAttacks')} away={statValue(latest, 'awayDangerousAttacks')} accent />
+              <MiniStat label="على المرمى" home={statValue(latest, 'homeShotsOnTarget')} away={statValue(latest, 'awayShotsOnTarget')} accent />
+              <MiniStat label="تسديدات" home={statValue(latest, 'homeShots')} away={statValue(latest, 'awayShots')} />
+              <MiniStat label="ركنيات" home={statValue(latest, 'homeCorners')} away={statValue(latest, 'awayCorners')} />
+              <MiniStat label="كروت" home={(statValue(latest, 'homeYellowCards') ?? 0) + (statValue(latest, 'homeRedCards') ?? 0)} away={(statValue(latest, 'awayYellowCards') ?? 0) + (statValue(latest, 'awayRedCards') ?? 0)} />
+            </div>
+          )}
         </div>
 
         <aside className="rounded-2xl border border-white/10 bg-black/25 p-4">
