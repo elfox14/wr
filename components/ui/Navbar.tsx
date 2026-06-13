@@ -12,6 +12,7 @@ import { InsufficientFundsModal } from './InsufficientFundsModal';
 const adminEmails = new Set(['worldcup@mcprim.com', 'elfox14usa@gmail.com']);
 const slogan = 'مباريات، تحليل، وإحصائيات في تجربة واحدة';
 const platformLogo = '/brand/worldcup-2026-logo.svg';
+const headerLogo = '/brand/worldcup-exchange-header-logo.svg';
 
 function DropdownLink({ href, icon, label, cyan, gold, danger, onClick }: { href: string; icon: ReactNode; label: string; cyan?: boolean; gold?: boolean; danger?: boolean; onClick?: () => void }) {
   const color = danger ? 'text-red-400 hover:text-red-300 hover:bg-red-500/10' : cyan ? 'text-[#0FF0FC] hover:bg-[#0FF0FC]/10' : gold ? 'text-[#FFD700] hover:bg-[#FFD700]/10' : 'text-gray-300 hover:text-white hover:bg-white/5';
@@ -88,6 +89,10 @@ export function Navbar() {
               <span className="hidden whitespace-nowrap rounded-full border border-[#0FF0FC]/20 bg-[#0FF0FC]/10 px-3 py-1 text-[10px] font-black leading-none text-[#0FF0FC] 2xl:inline-flex">
                 {slogan}
               </span>
+            </Link>
+
+            <Link href="/" aria-label="بورصة المونديال 2026" className="hidden h-14 w-[190px] flex-none items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-white/95 px-2 py-1 shadow-[0_0_22px_rgba(15,240,252,0.12)] transition hover:bg-white xl:flex 2xl:w-[230px]">
+              <img src={headerLogo} alt="بورصة المونديال 2026" className="h-full w-full object-contain" />
             </Link>
 
             <div className="hidden min-w-0 flex-1 items-center justify-center gap-1 px-3 lg:flex xl:gap-2 xl:px-5">
