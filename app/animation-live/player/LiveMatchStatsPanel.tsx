@@ -13,6 +13,7 @@ type LiveStatsResponse = {
   pollingSeconds?: number;
   providerSyncEnabled?: boolean;
   hasStats?: boolean;
+  sourceStatus?: { mode?: string; isportsBlocked?: boolean; blockedUntil?: string; reason?: string; primary?: string; statsProvider?: string };
   match?: {
     id: string;
     animationMatchId?: number;
@@ -82,6 +83,7 @@ function eventIcon(type: string) {
   if (value.includes('red')) return '🟥';
   if (value.includes('danger')) return '🔥';
   if (value.includes('shot')) return '🎯';
+  if (value.includes('status')) return 'ℹ️';
   return '•';
 }
 
@@ -93,6 +95,18 @@ function hasAnyStat(snapshot: Snapshot) {
     'homeShotsOnTarget', 'awayShotsOnTarget', 'homeShotsOffTarget', 'awayShotsOffTarget',
     'homeCorners', 'awayCorners', 'homeYellowCards', 'awayYellowCards', 'homeRedCards', 'awayRedCards',
   ].some((key) => snapshot[key] !== null && snapshot[key] !== undefined);
+}
+
+function unavailableStatsMessage(data: LiveStatsResponse | null, hasStats: boolean) {
+  if (hasStats) return null;
+  const syncStatus = data?.sync?.status || '';
+  if (data?.sourceStatus?.isportsBlocked || syncStatus === 'isports_guard_active') {
+    return 'الإحصائيات التفصيلية غير متاحة الآن لأن iSports وصل للحد اليومي. Football-Data يحدّث النتيجة والحالة فقط، لذلك لا نعرض أرقامًا غير موثقة للاستحواذ أو التسديدات.';
+  }
+  if (syncStatus === 'failed') {
+    return `مزود الإحصائيات لم يرجع بيانات الآن${data?.sync?.providerStatus ? ` (status ${data.sync.providerStatus})` : ''}.`;
+  }
+  return 'لا توجد أرقام إحصائية محفوظة لهذه المباراة بعد. ستظهر تلقائيًا عند وصول لقطة موثقة من مزود الإحصائيات.';
 }
 
 export default function LiveMatchStatsPanel({ matchId }: { matchId: string }) {
@@ -145,11 +159,7 @@ export default function LiveMatchStatsPanel({ matchId }: { matchId: string }) {
   const match = data?.match;
   const hasStats = Boolean(data?.hasStats || hasAnyStat(latest));
   const statusLabel = data?.sync?.status === 'database_only' ? 'قراءة من قاعدة البيانات' : data?.sync?.status === 'cached_recent_snapshot' ? 'آخر لقطة محفوظة' : data?.sync?.status === 'saved' ? 'تم تسجيل لقطة جديدة' : data?.sync?.status || 'متابعة مباشرة';
-  const providerWarning = data?.sync?.status === 'failed'
-    ? `مزود الإحصائيات لم يرجع بيانات الآن${data.sync?.providerStatus ? ` (status ${data.sync.providerStatus})` : ''}.`
-    : !hasStats
-      ? 'لا توجد أرقام إحصائية محفوظة لهذه المباراة بعد. قد يكون المزود متوقفًا، الحد اليومي انتهى، أو المباراة في استراحة ولا يرسل التحليل الآن.'
-      : null;
+  const providerWarning = unavailableStatsMessage(data, hasStats);
 
   const derived = useMemo(() => {
     const homeScore = statValue(latest, 'homeScore') ?? match?.homeScore ?? 0;
@@ -164,8 +174,8 @@ export default function LiveMatchStatsPanel({ matchId }: { matchId: string }) {
       <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <p className="inline-flex items-center gap-2 rounded-full border border-[#0FF0FC]/25 bg-[#0FF0FC]/10 px-3 py-1 text-[10px] font-black text-[#0FF0FC]"><Activity size={13} /> Live Stats Recorder</p>
-          <h2 className="mt-2 text-xl font-black text-white">إحصائيات المباراة الحية</h2>
-          <p className="mt-1 text-xs leading-5 text-gray-400">الإحصائيات والنتيجة تُقرأ كل 5 دقائق فقط. الأحداث المهمة لها تحديث منفصل أخف من قاعدة البيانات.</p>
+          <h2 className="mt-2 text-xl font-black text-white">إحصائيات المباراة</h2>
+          <p className="mt-1 text-xs leading-5 text-gray-400">لا يتم اختراع أرقام. عند غياب مزود الإحصائيات نعرض النتيجة والأحداث المتاحة فقط.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2 text-xs font-black">
           <span className="rounded-full border border-white/10 bg-black/30 px-3 py-1 text-gray-300"><Clock size={13} className="inline" /> إحصائيات: {data?.updatedAt ? new Date(data.updatedAt).toLocaleTimeString('ar-EG') : '—'}</span>
@@ -173,12 +183,6 @@ export default function LiveMatchStatsPanel({ matchId }: { matchId: string }) {
           <span className="rounded-full border border-[#FFD700]/20 bg-[#FFD700]/10 px-3 py-1 text-[#FFD700]"><Database size={13} className="inline" /> {statusLabel}</span>
         </div>
       </div>
-
-      {providerWarning && (
-        <div className="mb-4 rounded-2xl border border-[#FFD700]/20 bg-[#FFD700]/10 p-3 text-xs font-bold leading-6 text-[#FFD700]">
-          <AlertTriangle size={15} className="inline" /> {providerWarning}
-        </div>
-      )}
 
       {loading ? (
         <div className="rounded-2xl border border-dashed border-white/10 p-8 text-center text-sm text-gray-400">جاري تحميل الإحصائيات...</div>
@@ -200,18 +204,26 @@ export default function LiveMatchStatsPanel({ matchId }: { matchId: string }) {
               <div className="mt-3 text-xs font-bold text-gray-500">الدقيقة: {displayNumber(statValue(latest, 'minute'))}</div>
             </div>
 
-            <StatRow label="الاستحواذ" home={statValue(latest, 'homePossession')} away={statValue(latest, 'awayPossession')} />
-            <StatRow label="الهجمات" home={statValue(latest, 'homeAttacks')} away={statValue(latest, 'awayAttacks')} />
-            <StatRow label="الهجمات الخطيرة" home={statValue(latest, 'homeDangerousAttacks')} away={statValue(latest, 'awayDangerousAttacks')} accent />
-            <StatRow label="التسديدات" home={statValue(latest, 'homeShots')} away={statValue(latest, 'awayShots')} />
-            <StatRow label="على المرمى" home={statValue(latest, 'homeShotsOnTarget')} away={statValue(latest, 'awayShotsOnTarget')} accent />
-            <StatRow label="خارج المرمى" home={statValue(latest, 'homeShotsOffTarget')} away={statValue(latest, 'awayShotsOffTarget')} />
+            {providerWarning ? (
+              <div className="rounded-2xl border border-[#FFD700]/20 bg-[#FFD700]/10 p-4 text-xs font-bold leading-6 text-[#FFD700]">
+                <AlertTriangle size={15} className="inline" /> {providerWarning}
+              </div>
+            ) : (
+              <>
+                <StatRow label="الاستحواذ" home={statValue(latest, 'homePossession')} away={statValue(latest, 'awayPossession')} />
+                <StatRow label="الهجمات" home={statValue(latest, 'homeAttacks')} away={statValue(latest, 'awayAttacks')} />
+                <StatRow label="الهجمات الخطيرة" home={statValue(latest, 'homeDangerousAttacks')} away={statValue(latest, 'awayDangerousAttacks')} accent />
+                <StatRow label="التسديدات" home={statValue(latest, 'homeShots')} away={statValue(latest, 'awayShots')} />
+                <StatRow label="على المرمى" home={statValue(latest, 'homeShotsOnTarget')} away={statValue(latest, 'awayShotsOnTarget')} accent />
+                <StatRow label="خارج المرمى" home={statValue(latest, 'homeShotsOffTarget')} away={statValue(latest, 'awayShotsOffTarget')} />
 
-            <div className="grid grid-cols-3 gap-3">
-              <StatMini icon={<CornerDownRight size={16} />} label="ركنيات" home={statValue(latest, 'homeCorners')} away={statValue(latest, 'awayCorners')} />
-              <StatMini icon={<ShieldAlert size={16} />} label="صفراء" home={statValue(latest, 'homeYellowCards')} away={statValue(latest, 'awayYellowCards')} />
-              <StatMini icon={<Zap size={16} />} label="حمراء" home={statValue(latest, 'homeRedCards')} away={statValue(latest, 'awayRedCards')} />
-            </div>
+                <div className="grid grid-cols-3 gap-3">
+                  <StatMini icon={<CornerDownRight size={16} />} label="ركنيات" home={statValue(latest, 'homeCorners')} away={statValue(latest, 'awayCorners')} />
+                  <StatMini icon={<ShieldAlert size={16} />} label="صفراء" home={statValue(latest, 'homeYellowCards')} away={statValue(latest, 'awayYellowCards')} />
+                  <StatMini icon={<Zap size={16} />} label="حمراء" home={statValue(latest, 'homeRedCards')} away={statValue(latest, 'awayRedCards')} />
+                </div>
+              </>
+            )}
           </div>
 
           <div className="rounded-2xl border border-white/10 bg-black/25 p-4">
