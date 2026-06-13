@@ -1,11 +1,12 @@
 'use client';
 
 import { ReactNode, useMemo, useState } from 'react';
-import { BarChart3, Brain, FileText, LineChart, ShoppingCart, Users } from 'lucide-react';
+import { BarChart3, Brain, ChartNoAxesCombined, FileText, LineChart, ShoppingCart, Users } from 'lucide-react';
 
 type AssetPageTabsProps = {
   isTeam: boolean;
   lineup?: ReactNode;
+  stats?: ReactNode;
   playerOverview?: ReactNode;
   trade?: ReactNode;
   technical?: ReactNode;
@@ -20,12 +21,13 @@ type TabItem = {
   content?: ReactNode;
 };
 
-export function AssetPageTabs({ isTeam, lineup, playerOverview, trade, technical, overview, market }: AssetPageTabsProps) {
+export function AssetPageTabs({ isTeam, lineup, playerOverview, trade, technical, overview, market, stats }: AssetPageTabsProps) {
   const tabs = useMemo<TabItem[]>(() => {
     const base: TabItem[] = isTeam
       ? [
           { id: 'overview', label: 'التحليل الكروي', icon: <FileText size={16} />, content: overview },
           { id: 'lineup', label: 'قائمة الفريق', icon: <Users size={16} />, content: lineup },
+          { id: 'stats', label: 'الإحصاءات', icon: <ChartNoAxesCombined size={16} />, content: stats },
           { id: 'technical', label: 'مؤشرات الجاهزية', icon: <Brain size={16} />, content: technical },
           { id: 'trade', label: 'التداول', icon: <ShoppingCart size={16} />, content: trade },
         ]
@@ -36,7 +38,7 @@ export function AssetPageTabs({ isTeam, lineup, playerOverview, trade, technical
         ];
 
     return base.filter((tab) => Boolean(tab.content));
-  }, [isTeam, lineup, playerOverview, trade, technical, overview, market]);
+  }, [isTeam, lineup, playerOverview, trade, technical, overview, market, stats]);
 
   const [activeTab, setActiveTab] = useState(tabs[0]?.id || 'overview');
   const active = tabs.find((tab) => tab.id === activeTab) || tabs[0];
