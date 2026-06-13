@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Swords, X, Search, ChevronLeft, Shield } from 'lucide-react';
 import { AssetImage } from '@/components/ui/AssetImage';
+import { getRealWorldCupData } from '@/lib/realWorldCupData';
 
 type TeamInfo = { id: string; name: string; image?: string | null; code?: string | null };
 
@@ -163,22 +164,56 @@ export default function TeamHeadToHeadModal({ currentTeam }: H2HProps) {
                   <div className="py-10 text-primary animate-pulse">جاري جلب أرقام الخصم...</div>
                 ) : (
                   <div className="space-y-6">
-                    <p className="text-sm text-slate-400">هنا سيتم عرض جدول المقارنة المباشرة (استحواذ، تسديدات، شباك نظيفة، بطاقات) بمجرد توفر البيانات التفصيلية لكلا المنتخبين بشكل كامل.</p>
-                    
-                    {/* Dummy UI for Stats comparison */}
-                    <div className="grid gap-2">
-                      {[
-                        { label: 'الأهداف المسجلة', myScore: '12', opScore: '8', myBetter: true },
-                        { label: 'الشباك النظيفة', myScore: '3', opScore: '4', myBetter: false },
-                        { label: 'نسبة الاستحواذ', myScore: '58%', opScore: '54%', myBetter: true },
-                      ].map((stat, i) => (
-                        <div key={i} className="flex items-center justify-between rounded-xl bg-white/5 px-4 py-3">
-                          <div className={`w-12 text-center text-lg font-black ${stat.myBetter ? 'text-primary' : 'text-slate-500'}`}>{stat.myScore}</div>
-                          <div className="flex-1 text-center text-xs font-bold text-slate-400">{stat.label}</div>
-                          <div className={`w-12 text-center text-lg font-black ${!stat.myBetter ? 'text-rose-400' : 'text-slate-500'}`}>{stat.opScore}</div>
-                        </div>
-                      ))}
-                    </div>
+                    {(() => {
+                      const myData = getRealWorldCupData(currentTeam.name);
+                      const opData = getRealWorldCupData(selectedOpponent.name);
+
+                      if (myData && opData) {
+                        return (
+                          <>
+                            <p className="text-sm text-slate-400">مقارنة السجل التاريخي الشامل في بطولة كأس العالم بين المنتخبين.</p>
+                            <div className="grid gap-2">
+                              {[
+                                { label: 'إجمالي الانتصارات', myScore: myData.wins, opScore: opData.wins, myBetter: myData.wins > opData.wins },
+                                { label: 'الأهداف المسجلة', myScore: myData.goalsFor || 0, opScore: opData.goalsFor || 0, myBetter: (myData.goalsFor || 0) > (opData.goalsFor || 0) },
+                                { label: 'المشاركات السابقة', myScore: myData.appearances, opScore: opData.appearances, myBetter: myData.appearances > opData.appearances },
+                              ].map((stat, i) => (
+                                <div key={i} className="flex items-center justify-between rounded-xl bg-white/5 px-4 py-3">
+                                  <div className={`w-12 text-center text-lg font-black ${stat.myBetter ? 'text-primary' : 'text-slate-500'}`}>{stat.myScore}</div>
+                                  <div className="flex-1 text-center text-xs font-bold text-slate-400">{stat.label}</div>
+                                  <div className={`w-12 text-center text-lg font-black ${!stat.myBetter && stat.myScore !== stat.opScore ? 'text-rose-400' : 'text-slate-500'}`}>{stat.opScore}</div>
+                                </div>
+                              ))}
+                              <div className="flex items-center justify-between rounded-xl bg-white/5 px-4 py-3">
+                                <div className="flex-1 text-right text-xs font-black text-primary">{myData.bestFinish}</div>
+                                <div className="w-24 text-center text-[10px] font-bold text-slate-500">أفضل إنجاز</div>
+                                <div className="flex-1 text-left text-xs font-black text-rose-400">{opData.bestFinish}</div>
+                              </div>
+                            </div>
+                          </>
+                        );
+                      }
+
+                      return (
+                        <>
+                          <p className="text-sm text-slate-400">هنا سيتم عرض جدول المقارنة المباشرة بمجرد توفر البيانات التفصيلية لكلا المنتخبين.</p>
+                          {/* Dummy UI for Stats comparison */}
+                          <div className="grid gap-2">
+                            {[
+                              { label: 'الأهداف المسجلة', myScore: '12', opScore: '8', myBetter: true },
+                              { label: 'الشباك النظيفة', myScore: '3', opScore: '4', myBetter: false },
+                              { label: 'نسبة الاستحواذ', myScore: '58%', opScore: '54%', myBetter: true },
+                            ].map((stat, i) => (
+                              <div key={i} className="flex items-center justify-between rounded-xl bg-white/5 px-4 py-3">
+                                <div className={`w-12 text-center text-lg font-black ${stat.myBetter ? 'text-primary' : 'text-slate-500'}`}>{stat.myScore}</div>
+                                <div className="flex-1 text-center text-xs font-bold text-slate-400">{stat.label}</div>
+                                <div className={`w-12 text-center text-lg font-black ${!stat.myBetter ? 'text-rose-400' : 'text-slate-500'}`}>{stat.opScore}</div>
+                              </div>
+                            ))}
+                          </div>
+                        </>
+                      );
+                    })()}
                   </div>
                 )}
               </div>
