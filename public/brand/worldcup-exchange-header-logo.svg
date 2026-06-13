@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 180" role="img" aria-label="بورصة المونديال 2026">
+  <defs>
+    <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FFE58A"/>
+      <stop offset="0.48" stop-color="#D5A536"/>
+      <stop offset="1" stop-color="#8A5A0A"/>
+    </linearGradient>
+    <linearGradient id="cyan" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0FF0FC"/>
+      <stop offset="1" stop-color="#0B6BFF"/>
+    </linearGradient>
+    <linearGradient id="green" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#25E07B"/>
+      <stop offset="1" stop-color="#007A4D"/>
+    </linearGradient>
+    <linearGradient id="red" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FF4646"/>
+      <stop offset="1" stop-color="#8B0F1C"/>
+    </linearGradient>
+    <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="8" stdDeviation="6" flood-color="#000" flood-opacity="0.25"/>
+    </filter>
+  </defs>
+
+  <rect x="8" y="8" width="704" height="164" rx="36" fill="#F6F7F8"/>
+  <rect x="8" y="8" width="704" height="164" rx="36" fill="none" stroke="#0FF0FC" stroke-opacity="0.22" stroke-width="3"/>
+
+  <g transform="translate(35 20)" filter="url(#softShadow)">
+    <circle cx="70" cy="70" r="62" fill="#111"/>
+    <path d="M18 70a52 52 0 0 1 104 0" fill="none" stroke="#2B2B2B" stroke-width="16" stroke-linecap="round"/>
+    <path d="M24 76h34v42H24z" fill="url(#red)"/>
+    <path d="M63 42h36v76H63z" fill="#1F1F1F"/>
+    <path d="M104 76h34v42h-34z" fill="url(#cyan)"/>
+    <path d="M37 34h35v34H37z" fill="url(#green)" transform="skewX(-18)"/>
+    <path d="M88 34h35v34H88z" fill="#0A62B7" transform="skewX(18)"/>
+    <path d="M70 18c14 0 25 11 25 25 0 19-14 26-18 43H63C59 69 45 62 45 43c0-14 11-25 25-25Z" fill="url(#gold)"/>
+    <circle cx="70" cy="40" r="9" fill="#fff" fill-opacity="0.5"/>
+    <path d="M42 106c15-12 40-12 56 0" fill="none" stroke="url(#gold)" stroke-width="7" stroke-linecap="round"/>
+    <circle cx="42" cy="100" r="13" fill="#fff" stroke="#111" stroke-width="3"/>
+    <path d="M35 100h14M42 93v14M33 94l18 12M51 94l-18 12" stroke="#111" stroke-width="2"/>
+  </g>
+
+  <g transform="translate(183 35)">
+    <text x="250" y="44" text-anchor="middle" direction="rtl" unicode-bidi="plaintext" font-family="Tajawal, Cairo, Arial, sans-serif" font-size="40" font-weight="900" fill="#111827">بورصة المونديال</text>
+    <text x="250" y="82" text-anchor="middle" font-family="Montserrat, Arial, sans-serif" font-size="25" font-weight="900" letter-spacing="7" fill="#111827">WORLD CUP EXCHANGE</text>
+    <g transform="translate(128 100)">
+      <line x1="0" y1="17" x2="70" y2="17" stroke="url(#gold)" stroke-width="6" stroke-linecap="round"/>
+      <text x="122" y="28" text-anchor="middle" font-family="Montserrat, Arial, sans-serif" font-size="45" font-weight="900" fill="url(#gold)">2026</text>
+      <line x1="176" y1="17" x2="246" y2="17" stroke="url(#gold)" stroke-width="6" stroke-linecap="round"/>
+    </g>
+  </g>
+</svg>
