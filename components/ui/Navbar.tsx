@@ -12,7 +12,7 @@ import { InsufficientFundsModal } from './InsufficientFundsModal';
 const adminEmails = new Set(['worldcup@mcprim.com', 'elfox14usa@gmail.com']);
 const slogan = 'مباريات، تحليل، وإحصائيات في تجربة واحدة';
 const platformLogo = '/brand/worldcup-2026-logo.svg';
-const headerLogo = '/brand/worldcup-exchange-header-logo.svg';
+const headerLogo = '/brand/worldcup-exchange-header-logo.svg?v=wc2026-logo-v3';
 
 function DropdownLink({ href, icon, label, cyan, gold, danger, onClick }: { href: string; icon: ReactNode; label: string; cyan?: boolean; gold?: boolean; danger?: boolean; onClick?: () => void }) {
   const color = danger ? 'text-red-400 hover:text-red-300 hover:bg-red-500/10' : cyan ? 'text-[#0FF0FC] hover:bg-[#0FF0FC]/10' : gold ? 'text-[#FFD700] hover:bg-[#FFD700]/10' : 'text-gray-300 hover:text-white hover:bg-white/5';
