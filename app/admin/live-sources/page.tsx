@@ -1,6 +1,9 @@
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 import { AlertTriangle, CheckCircle2, Clock, Database, Radio, ShieldAlert } from 'lucide-react';
+import prisma from '@/lib/prisma';
+import { ensureStatsTable } from '@/lib/live-match-stats';
+import { getProviderQuotaBlock } from '@/lib/provider-quota-guard';
 import ManualSyncForm from './ManualSyncForm';
 
 export const dynamic = 'force-dynamic';
@@ -11,21 +14,105 @@ export const metadata: Metadata = {
   description: 'مراقبة حالة iSports و football-data.org ومصدر بيانات الأنيميشن الداخلي.',
 };
 
-function getBaseUrl() {
-  const publicUrl = String(process.env.NEXT_PUBLIC_SITE_URL || '').trim().replace(/\/$/, '');
-  if (publicUrl) return publicUrl;
-  const vercelUrl = String(process.env.VERCEL_URL || '').trim().replace(/\/$/, '');
-  if (vercelUrl) return `https://${vercelUrl}`;
-  return 'http://localhost:3000';
+function toIso(value: any) {
+  return value instanceof Date ? value.toISOString() : value || null;
 }
 
 async function loadStatus() {
-  const baseUrl = getBaseUrl();
-  const key = process.env.ADMIN_API_SECRET || process.env.CRON_SECRET || '';
-  const url = `${baseUrl}/api/admin/live-sources/status${key ? `?key=${encodeURIComponent(key)}` : ''}`;
-  const response = await fetch(url, { cache: 'no-store' });
-  if (!response.ok) return { ok: false, error: `Status API returned ${response.status}` };
-  return response.json();
+  try {
+    await ensureStatsTable();
+    const isportsGuard = await getProviderQuotaBlock('ISPORTS');
+    const latestSnapshots = await prisma.$queryRawUnsafe<any[]>(`
+      SELECT DISTINCT ON ("matchId") *
+      FROM "MatchStatsSnapshot"
+      ORDER BY "matchId", "capturedAt" DESC
+      LIMIT 20
+    `);
+    const latestEvents = await prisma.matchEvent.findMany({
+      orderBy: { createdAt: 'desc' },
+      take: 20,
+      include: {
+        match: {
+          select: {
+            id: true,
+            animationMatchId: true,
+            status: true,
+            homeScore: true,
+            awayScore: true,
+            homeTeam: { select: { name: true, code: true } },
+            awayTeam: { select: { name: true, code: true } },
+          },
+        },
+      },
+    });
+    const liveMatches = await prisma.match.findMany({
+      where: { OR: [{ status: { in: ['IN_PLAY', 'LIVE', 'HT'] } }, { status: 'FINISHED', matchDate: { gte: new Date(Date.now() - 36 * 60 * 60 * 1000) } }] },
+      orderBy: { matchDate: 'asc' },
+      take: 12,
+      select: {
+        id: true,
+        animationMatchId: true,
+        status: true,
+        matchDate: true,
+        homeScore: true,
+        awayScore: true,
+        homeTeam: { select: { name: true, code: true } },
+        awayTeam: { select: { name: true, code: true } },
+      },
+    });
+
+    return {
+      ok: true,
+      updatedAt: new Date().toISOString(),
+      primaryProvider: isportsGuard ? 'FOOTBALL_DATA' : 'ISPORTS',
+      fallbackProvider: 'FOOTBALL_DATA',
+      isports: {
+        status: isportsGuard ? 'blocked' : 'active',
+        blockedUntil: toIso(isportsGuard?.blockedUntil),
+        reason: isportsGuard?.reason || null,
+      },
+      footballData: {
+        status: process.env.FOOTBALL_DATA_API_TOKEN ? 'configured' : 'missing_token',
+        competition: process.env.FOOTBALL_DATA_COMPETITION || 'WC',
+      },
+      liveMatches: liveMatches.map((match) => ({
+        id: match.id,
+        animationMatchId: match.animationMatchId,
+        status: match.status,
+        matchDate: toIso(match.matchDate),
+        score: `${match.homeScore ?? 0}-${match.awayScore ?? 0}`,
+        homeTeam: match.homeTeam,
+        awayTeam: match.awayTeam,
+      })),
+      latestSnapshots: latestSnapshots.map((row) => ({
+        id: row.id,
+        matchId: row.matchId,
+        provider: row.provider,
+        providerMatchId: row.providerMatchId,
+        minute: row.minute,
+        score: `${row.homeScore ?? 0}-${row.awayScore ?? 0}`,
+        hasStats: ['homePossession','awayPossession','homeDangerousAttacks','awayDangerousAttacks','homeShots','awayShots','homeCorners','awayCorners'].some((key) => row[key] !== null && row[key] !== undefined),
+        capturedAt: toIso(row.capturedAt),
+      })),
+      latestEvents: latestEvents.map((event) => ({
+        id: event.id,
+        type: event.type,
+        minute: event.minute,
+        detail: event.detail,
+        sourceName: event.sourceName,
+        createdAt: toIso(event.createdAt),
+        match: event.match ? {
+          animationMatchId: event.match.animationMatchId,
+          status: event.match.status,
+          score: `${event.match.homeScore ?? 0}-${event.match.awayScore ?? 0}`,
+          homeTeam: event.match.homeTeam,
+          awayTeam: event.match.awayTeam,
+        } : null,
+      })),
+    };
+  } catch (error: any) {
+    return { ok: false, error: error?.message || 'تعذر تحميل حالة المصادر' };
+  }
 }
 
 function formatDate(value?: string | null) {
