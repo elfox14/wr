@@ -7,10 +7,29 @@ on:
       - master
   pull_request:
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   verify:
     name: Lint, type-check, and build
     runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: wr_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d wr_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
 
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -28,17 +47,8 @@ jobs:
           node-version: 24
           cache: npm
 
-      - name: Start local PostgreSQL
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y postgresql postgresql-contrib
-          sudo systemctl start postgresql
-          sudo -u postgres psql -c "ALTER USER postgres PASSWORD 'postgres';"
-          sudo -u postgres psql -tc "SELECT 1 FROM pg_database WHERE datname = 'wr_ci'" | grep -q 1 || sudo -u postgres createdb wr_ci
-          pg_isready -h localhost -p 5432 -U postgres
-
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --no-audit --no-fund
 
       - name: Generate Prisma client
         run: npx prisma generate
@@ -77,7 +87,7 @@ jobs:
         run: npm run lint:team-intelligence-admin
 
       - name: Type-check
-        run: npm run type-check
+        run: npx tsc --noEmit
 
       - name: Build
-        run: npm run build
+        run: npx next build
