@@ -77,9 +77,18 @@ export function Navbar() {
     <>
       <nav className="fixed top-0 z-50 w-full border-b border-white/10 bg-black/80 shadow-[0_8px_30px_rgba(0,0,0,0.35)] backdrop-blur-xl">
         <div className="mx-auto max-w-[1400px] px-4 sm:px-6 lg:px-8">
-          <div className="flex h-16 items-center justify-between gap-3 lg:h-20">
+          <div className="relative flex h-20 items-center justify-center lg:hidden">
+            <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} aria-label="فتح القائمة" className="absolute left-2 top-1/2 -translate-y-1/2 rounded-lg p-2 text-gray-400 transition-colors hover:bg-white/5 hover:text-white">
+              {isMobileMenuOpen ? <X size={30} /> : <Menu size={30} />}
+            </button>
+            <Link href="/" aria-label="بورصة المونديال 2026" className="flex h-[70px] w-[70px] items-center justify-center overflow-hidden rounded-3xl bg-white p-1 shadow-[0_0_36px_rgba(15,240,252,0.35)]">
+              <img src={headerLogo} alt="بورصة المونديال 2026" className="h-full w-full object-contain" />
+            </Link>
+          </div>
+
+          <div className="hidden h-20 items-center justify-between gap-3 lg:flex">
             <Link href="/" className="group flex flex-none items-center gap-3 overflow-hidden rounded-2xl px-1 py-1 transition hover:bg-white/[0.03]">
-              <span className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-[#0FF0FC]/25 bg-white shadow-[0_0_18px_rgba(15,240,252,0.18)] lg:h-14 lg:w-14">
+              <span className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-[#0FF0FC]/25 bg-white shadow-[0_0_18px_rgba(15,240,252,0.18)]">
                 <img src={platformLogo} alt="World Cup 2026" className="h-full w-full object-contain" />
               </span>
               <span className="hidden min-w-[132px] flex-col leading-none sm:flex">
@@ -88,7 +97,7 @@ export function Navbar() {
               </span>
             </Link>
 
-            <Link href="/" aria-label="بورصة المونديال 2026" className="hidden h-[62px] w-[62px] flex-none items-center justify-center overflow-visible rounded-2xl border border-white/10 bg-white p-1 shadow-[0_0_22px_rgba(15,240,252,0.12)] transition hover:bg-white xl:flex 2xl:h-[68px] 2xl:w-[68px]">
+            <Link href="/" aria-label="بورصة المونديال 2026" className="hidden h-[68px] w-[68px] flex-none items-center justify-center overflow-hidden rounded-3xl bg-white p-1 shadow-[0_0_34px_rgba(15,240,252,0.25)] transition hover:bg-white xl:flex 2xl:h-[74px] 2xl:w-[74px]">
               <img src={headerLogo} alt="بورصة المونديال 2026" className="h-full w-full object-contain" />
             </Link>
 
@@ -135,7 +144,6 @@ export function Navbar() {
                   </div>
                 </div>
               ) : <div className="hidden items-center gap-3 lg:flex"><Link href="/login" className="px-4 py-2 text-sm font-bold text-gray-300 transition-colors hover:text-white">تسجيل الدخول</Link><Link href="/register" className="rounded-full bg-[#0FF0FC] px-6 py-2 text-sm font-black text-black shadow-[0_0_15px_rgba(15,240,252,0.3)] transition-all hover:bg-[#0FF0FC]/80">إنشاء حساب</Link></div>}
-              <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="rounded-lg p-2 text-gray-400 transition-colors hover:bg-white/5 hover:text-white lg:hidden">{isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}</button>
             </div>
           </div>
         </div>
@@ -143,8 +151,8 @@ export function Navbar() {
         {isMobileMenuOpen && (
           <div className="border-t border-white/10 bg-black/95 backdrop-blur-xl lg:hidden">
             <div className="flex items-center gap-3 border-b border-white/10 px-4 py-3">
-              <img src={platformLogo} alt="World Cup 2026" className="h-10 w-10 rounded-xl bg-white object-contain" />
-              <div><div className="text-sm font-black text-white">WORLD CUP 2026</div><div className="text-xs font-bold leading-5 text-gray-300">{slogan}</div></div>
+              <img src={headerLogo} alt="بورصة المونديال 2026" className="h-12 w-12 rounded-2xl bg-white object-contain p-1" />
+              <div><div className="text-sm font-black text-white">بورصة المونديال 2026</div><div className="text-xs font-bold leading-5 text-gray-300">{slogan}</div></div>
             </div>
             <div className="space-y-2 px-4 py-4">
               {navLinks.map((link) => <Link key={link.href} href={link.href} onClick={closeMobileMenu} className={`flex items-center gap-3 rounded-xl px-4 py-3 font-bold transition-colors ${isLinkActive(link) ? 'border border-[#0FF0FC]/20 bg-[#0FF0FC]/10 text-[#0FF0FC]' : 'text-gray-300 hover:bg-white/5 hover:text-white'}`}>{link.icon}{link.name}</Link>)}
@@ -154,7 +162,7 @@ export function Navbar() {
           </div>
         )}
       </nav>
-      <div className="h-16 lg:h-20" />
+      <div className="h-20" />
       <InsufficientFundsModal isOpen={showInsufficientFundsModal} onClose={() => setShowInsufficientFundsModal(false)} />
     </>
   );
