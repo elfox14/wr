@@ -12,18 +12,11 @@ type LiveStatsResponse = {
   updatedAt?: string;
   pollingSeconds?: number;
   hasStats?: boolean;
-  sourceStatus?: {
-    primary?: string;
-    statsProvider?: string;
-    mode?: string;
-    isportsBlocked?: boolean;
-    blockedUntil?: string | null;
-    reason?: string | null;
-  };
   match?: {
     id: string;
     animationMatchId?: number;
     status: string;
+    matchDate?: string | null;
     homeScore: number;
     awayScore: number;
     homeTeam: Team;
@@ -102,6 +95,20 @@ function inferBallPosition(event?: MatchEvent | null) {
   return { left: 50, top: 50, label: 'منتصف الملعب' };
 }
 
+function inferLiveMinute(match?: LiveStatsResponse['match'], latest?: Snapshot) {
+  const snapshotMinute = statValue(latest || null, 'minute');
+  if (snapshotMinute !== null) return snapshotMinute;
+  if (!match?.matchDate) return null;
+  const status = String(match.status || '').toUpperCase();
+  if (status === 'FINISHED') return 90;
+  if (status === 'HT') return 45;
+  const start = new Date(match.matchDate).getTime();
+  if (!Number.isFinite(start)) return null;
+  const minute = Math.floor((Date.now() - start) / 60_000) + 1;
+  if (minute < 1) return null;
+  return Math.max(1, Math.min(135, minute));
+}
+
 function MiniStat({ label, home, away, accent = false }: { label: string; home: number | null; away: number | null; accent?: boolean }) {
   return (
     <div className="rounded-2xl border border-white/10 bg-black/25 p-3">
@@ -114,17 +121,24 @@ function MiniStat({ label, home, away, accent = false }: { label: string; home: 
   );
 }
 
-export default function InternalAnimationPlayer({ matchId }: { matchId: string }) {
+export default function InternalAnimationPlayer({ matchId = '', dbMatchId = '' }: { matchId?: string; dbMatchId?: string }) {
   const [stats, setStats] = useState<LiveStatsResponse | null>(null);
   const [events, setEvents] = useState<MatchEvent[]>([]);
   const [eventsUpdatedAt, setEventsUpdatedAt] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const query = useMemo(() => {
+    const params = new URLSearchParams();
+    if (matchId) params.set('matchId', matchId);
+    if (dbMatchId) params.set('dbMatchId', dbMatchId);
+    return params.toString();
+  }, [matchId, dbMatchId]);
+
   async function fetchStats() {
-    if (!matchId) return;
+    if (!query) return;
     try {
-      const response = await fetch(`/api/matches/live-stats?matchId=${encodeURIComponent(matchId)}`, { cache: 'no-store' });
+      const response = await fetch(`/api/matches/live-stats?${query}`, { cache: 'no-store' });
       const json: LiveStatsResponse = await response.json();
       setStats(json);
       setError(json?.ok ? null : json?.error || 'تعذر تحميل بيانات المباراة');
@@ -136,9 +150,9 @@ export default function InternalAnimationPlayer({ matchId }: { matchId: string }
   }
 
   async function fetchEvents() {
-    if (!matchId) return;
+    if (!query) return;
     try {
-      const response = await fetch(`/api/matches/live-events?matchId=${encodeURIComponent(matchId)}`, { cache: 'no-store' });
+      const response = await fetch(`/api/matches/live-events?${query}`, { cache: 'no-store' });
       const json: LiveEventsResponse = await response.json();
       if (json?.ok) {
         setEvents(json.events || []);
@@ -150,6 +164,11 @@ export default function InternalAnimationPlayer({ matchId }: { matchId: string }
   }
 
   useEffect(() => {
+    if (!query) {
+      setLoading(false);
+      setError('لا يوجد معرف مباراة متاح للعرض.');
+      return;
+    }
     fetchStats();
     fetchEvents();
     const statsTimer = window.setInterval(fetchStats, STATS_POLL_MS);
@@ -158,7 +177,7 @@ export default function InternalAnimationPlayer({ matchId }: { matchId: string }
       window.clearInterval(statsTimer);
       window.clearInterval(eventsTimer);
     };
-  }, [matchId]);
+  }, [query]);
 
   const latest = stats?.latest || null;
   const match = stats?.match;
@@ -169,7 +188,7 @@ export default function InternalAnimationPlayer({ matchId }: { matchId: string }
   const awayName = match?.awayTeam?.name || 'الفريق الثاني';
   const homeScore = statValue(latest, 'homeScore') ?? match?.homeScore ?? 0;
   const awayScore = statValue(latest, 'awayScore') ?? match?.awayScore ?? 0;
-  const minute = statValue(latest, 'minute');
+  const minute = inferLiveMinute(match, latest);
 
   if (loading) {
     return <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.03] p-10 text-center text-sm text-gray-400">جاري تحميل المشغل الداخلي...</div>;
@@ -186,7 +205,7 @@ export default function InternalAnimationPlayer({ matchId }: { matchId: string }
           <div>
             <p className="inline-flex items-center gap-2 rounded-full border border-emerald-400/25 bg-emerald-400/10 px-3 py-1 text-[10px] font-black text-emerald-200"><Database size={13} /> Internal DB Animation</p>
             <h2 className="mt-2 text-2xl font-black text-white">بث أنيميشن داخلي من قاعدة البيانات</h2>
-            <p className="mt-1 text-xs leading-5 text-gray-400">الإحصائيات تُقرأ من قاعدة البيانات كل 5 دقائق، والأحداث المهمة من قاعدة البيانات كل 30 ثانية.</p>
+            <p className="mt-1 text-xs leading-5 text-gray-400">تظهر المباراة فورًا من قاعدة البيانات، حتى قبل وصول أول Snapshot للإحصائيات.</p>
           </div>
           <div className="flex flex-wrap gap-2 text-xs font-black">
             <span className="rounded-full border border-white/10 bg-black/30 px-3 py-1 text-gray-300"><Clock size={13} className="inline" /> إحصائيات: {stats?.updatedAt ? new Date(stats.updatedAt).toLocaleTimeString('ar-EG') : '—'}</span>
@@ -196,7 +215,7 @@ export default function InternalAnimationPlayer({ matchId }: { matchId: string }
       </div>
 
       {!hasStats && (
-        <div className="mx-4 mt-4 rounded-2xl border border-[#FFD700]/20 bg-[#FFD700]/10 p-3 text-xs font-bold leading-6 text-[#FFD700]"><AlertTriangle size={15} className="inline" /> لا توجد أرقام إحصائية محفوظة بعد. سيتم عرض النتيجة والأحداث المتاحة فقط حتى وصول أول Snapshot.</div>
+        <div className="mx-4 mt-4 rounded-2xl border border-[#FFD700]/20 bg-[#FFD700]/10 p-3 text-xs font-bold leading-6 text-[#FFD700]"><AlertTriangle size={15} className="inline" /> لا توجد أرقام إحصائية محفوظة بعد. سيتم عرض الفرق والنتيجة والزمن من جدول المباراة حتى وصول أول Snapshot.</div>
       )}
 
       <div className="grid gap-4 p-4 xl:grid-cols-[1.35fr_0.65fr]">
@@ -238,6 +257,9 @@ export default function InternalAnimationPlayer({ matchId }: { matchId: string }
 
             <div className="absolute left-4 top-4 rounded-2xl border border-white/10 bg-black/50 px-3 py-2 text-xs font-black text-white">
               الدقيقة: <span className="text-[#FFD700]">{displayNumber(minute)}</span>
+            </div>
+            <div className="absolute right-4 top-4 rounded-2xl border border-white/10 bg-black/50 px-3 py-2 text-xs font-black text-white">
+              الحالة: <span className="text-[#FFD700]">{match?.status || '—'}</span>
             </div>
             <div className="absolute bottom-4 left-4 right-4 rounded-2xl border border-white/10 bg-black/60 p-3">
               <div className="flex items-center gap-2 text-xs font-black text-[#FFD700]"><Radio size={14} /> آخر حدث</div>
