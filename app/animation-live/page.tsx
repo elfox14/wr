@@ -13,7 +13,7 @@ export const metadata: Metadata = {
 
 function getMatchWindow() {
   const now = new Date();
-  const start = new Date(now.getTime() - 4 * 60 * 60 * 1000);
+  const start = new Date(now.getTime() - 12 * 60 * 60 * 1000);
   const end = new Date(now.getTime() + 24 * 60 * 60 * 1000);
   return { now, start, end };
 }
@@ -92,13 +92,16 @@ function statusLabel(match: any, now = new Date()) {
 
 function getBroadcastHref(match: any) {
   if (match?.animationMatchId) {
-    return `/animation-live/player?matchId=${encodeURIComponent(String(match.animationMatchId))}&lang=en&statsPanel=simple&teamPanel=1`;
+    return `/animation-live/player?matchId=${encodeURIComponent(String(match.animationMatchId))}&dbMatchId=${encodeURIComponent(String(match.id))}`;
+  }
+  if (match?.id) {
+    return `/animation-live/player?dbMatchId=${encodeURIComponent(String(match.id))}`;
   }
   return '/animation-live/player';
 }
 
 function MatchCard({ match, now }: { match: any; now: Date }) {
-  const hasLinkedBroadcast = Boolean(match.animationMatchId);
+  const hasAnimationId = Boolean(match.animationMatchId);
   const score = `${Number(match.homeScore || 0)} - ${Number(match.awayScore || 0)}`;
   const isLive = isLiveByTime(match, now);
   const isFinished = String(match.status || '').toUpperCase() === 'FINISHED';
@@ -129,8 +132,8 @@ function MatchCard({ match, now }: { match: any; now: Date }) {
         <CalendarDays size={14} /> {new Date(match.matchDate).toLocaleString('ar-EG')}
       </div>
 
-      <Link href={getBroadcastHref(match)} className={`mt-4 inline-flex w-full items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-black transition ${hasLinkedBroadcast ? 'border border-[#FFD700]/25 bg-[#FFD700]/10 text-[#FFD700] hover:bg-[#FFD700] hover:text-black' : 'border border-[#0FF0FC]/25 bg-[#0FF0FC]/10 text-[#0FF0FC] hover:bg-[#0FF0FC] hover:text-black'}`}>
-        <Radio size={16} /> {hasLinkedBroadcast ? 'دخول البث' : 'لم يتم ربط البث بعد'}
+      <Link href={getBroadcastHref(match)} className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-[#FFD700]/25 bg-[#FFD700]/10 px-4 py-3 text-sm font-black text-[#FFD700] transition hover:bg-[#FFD700] hover:text-black">
+        <Radio size={16} /> {hasAnimationId ? 'دخول البث' : 'دخول البث الداخلي'}
       </Link>
     </article>
   );
