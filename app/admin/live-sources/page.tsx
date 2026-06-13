@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
-import { AlertTriangle, CheckCircle2, Clock, Database, Radio, ShieldAlert, Wrench } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Clock, Database, Radio, ShieldAlert } from 'lucide-react';
+import ManualSyncForm from './ManualSyncForm';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -40,9 +41,6 @@ function StatusBadge({ active, children }: { active: boolean; children: ReactNod
 
 export default async function LiveSourcesAdminPage() {
   const data = await loadStatus();
-  const baseUrl = getBaseUrl();
-  const sampleSyncUrl = `${baseUrl}/api/cron/isports-safe-sync?key=YOUR_SECRET&matchId=365760925&debug=true`;
-  const samplePlayerUrl = `${baseUrl}/animation-live/player?matchId=365760925`;
 
   return (
     <main className="min-h-screen bg-background px-4 py-6 text-white lg:px-8">
@@ -54,13 +52,7 @@ export default async function LiveSourcesAdminPage() {
         </div>
 
         <Panel title="مزامنة مباراة يدويًا">
-          <div className="rounded-xl border border-[#0FF0FC]/15 bg-[#0FF0FC]/5 p-4">
-            <div className="flex items-center gap-2 text-sm font-black text-[#0FF0FC]"><Wrench size={16} /> اختبار سريع لمباراة محددة</div>
-            <p className="mt-2 text-xs leading-6 text-gray-400">استخدم هذا الرابط بعد استبدال <span className="text-[#FFD700]">YOUR_SECRET</span> بمفتاح الإدارة. هذا يجبر مزامنة iSports لمباراة واحدة حتى لو انتهت.</p>
-            <pre className="mt-3 overflow-x-auto rounded-xl border border-white/10 bg-black/45 p-3 text-xs leading-6 text-gray-200">{sampleSyncUrl}</pre>
-            <p className="mt-2 text-xs leading-6 text-gray-500">بعد ظهور نتيجة JSON وفيها <span className="text-emerald-300">saved</span> أو Snapshot، افتح صفحة اللاعب:</p>
-            <pre className="mt-2 overflow-x-auto rounded-xl border border-white/10 bg-black/45 p-3 text-xs leading-6 text-gray-200">{samplePlayerUrl}</pre>
-          </div>
+          <ManualSyncForm />
         </Panel>
 
         {!data?.ok ? (
