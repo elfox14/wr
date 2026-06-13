@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { BarChart3, CalendarDays, CheckCircle2, ClipboardList, Database, FileText, Goal, ListChecks, Scale, Shield, ShieldAlert, Sparkles, Target, Users, XCircle, Zap } from 'lucide-react';
+import { BarChart3, BookOpen, CalendarDays, CheckCircle2, ClipboardList, Database, FileText, Goal, History, ListChecks, Scale, Shield, ShieldAlert, Sparkles, Target, Trophy, Users, XCircle, Zap } from 'lucide-react';
 import { AssetImage } from '@/components/ui/AssetImage';
 
 type TeamOverviewPlayer = {
@@ -37,6 +37,7 @@ type TeamOverviewReport = {
   body?: string | null;
   sourceName: string;
   sourceUrl?: string | null;
+  sourceCategory?: string | null;
   provider?: string | null;
   confidence?: string | null;
   publishedAt?: Date | string | null;
@@ -94,30 +95,17 @@ type RatingRow = {
   source: string;
 };
 
-type CardTone = 'summary' | 'identity' | 'performance' | 'attack' | 'defense' | 'midfield' | 'setPieces' | 'players' | 'tactics' | 'strengths' | 'weaknesses' | 'rating' | 'missing' | 'sources';
-
+const UNAVAILABLE = 'غير متوفر في المصادر';
 const AUTO_BASELINE_PROVIDERS = new Set(['MC_PRIME_AUTO']);
 const AUTO_BASELINE_SOURCE_NAMES = new Set(['MC PRIME Auto Intelligence Baseline']);
-const UNAVAILABLE = 'غير متوفر في المصادر';
-
-const cardToneClass: Record<CardTone, string> = {
-  summary: 'border-cyan-300/20 bg-[radial-gradient(circle_at_top_right,rgba(15,240,252,0.18),transparent_34%),linear-gradient(135deg,rgba(15,240,252,0.08),rgba(255,255,255,0.025))]',
-  identity: 'border-violet-300/20 bg-[radial-gradient(circle_at_top_right,rgba(168,85,247,0.20),transparent_36%),linear-gradient(135deg,rgba(168,85,247,0.08),rgba(255,255,255,0.025))]',
-  performance: 'border-sky-300/20 bg-[radial-gradient(circle_at_top_right,rgba(56,189,248,0.20),transparent_36%),linear-gradient(135deg,rgba(56,189,248,0.08),rgba(255,255,255,0.025))]',
-  attack: 'border-red-300/20 bg-[radial-gradient(circle_at_top_right,rgba(248,113,113,0.20),transparent_36%),linear-gradient(135deg,rgba(248,113,113,0.08),rgba(255,255,255,0.025))]',
-  defense: 'border-emerald-300/20 bg-[radial-gradient(circle_at_top_right,rgba(52,211,153,0.20),transparent_36%),linear-gradient(135deg,rgba(52,211,153,0.08),rgba(255,255,255,0.025))]',
-  midfield: 'border-amber-300/20 bg-[radial-gradient(circle_at_top_right,rgba(251,191,36,0.20),transparent_36%),linear-gradient(135deg,rgba(251,191,36,0.08),rgba(255,255,255,0.025))]',
-  setPieces: 'border-blue-300/20 bg-[radial-gradient(circle_at_top_right,rgba(96,165,250,0.20),transparent_36%),linear-gradient(135deg,rgba(96,165,250,0.08),rgba(255,255,255,0.025))]',
-  players: 'border-fuchsia-300/20 bg-[radial-gradient(circle_at_top_right,rgba(232,121,249,0.20),transparent_36%),linear-gradient(135deg,rgba(232,121,249,0.08),rgba(255,255,255,0.025))]',
-  tactics: 'border-indigo-300/20 bg-[radial-gradient(circle_at_top_right,rgba(129,140,248,0.22),transparent_36%),linear-gradient(135deg,rgba(129,140,248,0.08),rgba(255,255,255,0.025))]',
-  strengths: 'border-emerald-300/20 bg-[radial-gradient(circle_at_top_right,rgba(52,211,153,0.20),transparent_36%),linear-gradient(135deg,rgba(52,211,153,0.08),rgba(255,255,255,0.025))]',
-  weaknesses: 'border-orange-300/20 bg-[radial-gradient(circle_at_top_right,rgba(251,146,60,0.20),transparent_36%),linear-gradient(135deg,rgba(251,146,60,0.08),rgba(255,255,255,0.025))]',
-  rating: 'border-lime-300/20 bg-[radial-gradient(circle_at_top_right,rgba(190,242,100,0.18),transparent_36%),linear-gradient(135deg,rgba(190,242,100,0.07),rgba(255,255,255,0.025))]',
-  missing: 'border-yellow-300/20 bg-[radial-gradient(circle_at_top_right,rgba(250,204,21,0.20),transparent_36%),linear-gradient(135deg,rgba(250,204,21,0.08),rgba(255,255,255,0.025))]',
-  sources: 'border-slate-300/15 bg-[radial-gradient(circle_at_top_right,rgba(148,163,184,0.18),transparent_36%),linear-gradient(135deg,rgba(148,163,184,0.08),rgba(255,255,255,0.025))]',
-};
+const FBREF_PROVIDERS = new Set(['FBREF_STATHEAD_IMPORT', 'FBREF_STATHEAD_SNAPSHOT']);
 
 function formatDate(value?: Date | string | null) {
+  if (!value) return '—';
+  return new Date(value).toLocaleDateString('ar-EG', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+function formatMatchDate(value?: Date | string | null) {
   if (!value) return '—';
   return new Date(value).toLocaleDateString('ar-EG', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 }
@@ -132,11 +120,25 @@ function formatDecimal(value?: number | null, digits = 2) {
   return value.toLocaleString('ar-EG', { maximumFractionDigits: digits, minimumFractionDigits: digits });
 }
 
+function normalizeText(value?: string | null) {
+  return String(value || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 function getConfidenceLabel(value?: string | null) {
   if (value === 'A') return 'ثقة عالية';
   if (value === 'B') return 'ثقة جيدة';
   if (value === 'C') return 'ثقة متوسطة';
   return 'ثقة محدودة';
+}
+
+function isFbrefSnapshot(report: TeamOverviewReport) {
+  const haystack = normalizeText(`${report.provider || ''} ${report.sourceName || ''} ${report.title || ''}`);
+  return Boolean(report.provider && FBREF_PROVIDERS.has(report.provider)) || haystack.includes('fbref') || haystack.includes('stathead');
 }
 
 function parseReportBody(body?: string | null): ReportSection[] {
@@ -152,7 +154,7 @@ function parseReportBody(body?: string | null): ReportSection[] {
 
       const colonIndex = block.indexOf(':');
       const possibleTitle = colonIndex > 0 ? block.slice(0, colonIndex).replace(/^[-*#\s]+/, '').trim() : '';
-      const hasReadableTitle = possibleTitle.length >= 3 && possibleTitle.length <= 80 && !/[.!؟]$/.test(possibleTitle);
+      const hasReadableTitle = possibleTitle.length >= 3 && possibleTitle.length <= 90 && !/[.!؟]$/.test(possibleTitle);
       return {
         title: hasReadableTitle ? possibleTitle : `ملاحظة تحليلية ${index + 1}`,
         content: hasReadableTitle ? block.slice(colonIndex + 1).trim() : block,
@@ -160,29 +162,22 @@ function parseReportBody(body?: string | null): ReportSection[] {
     });
 }
 
-function getAllSections(reports: TeamOverviewReport[]) {
+function getSections(reports: TeamOverviewReport[]) {
   return reports.flatMap((report) => parseReportBody(report.body).map((section) => ({ ...section, report })));
 }
 
 function findSectionText(sections: Array<ReportSection & { report: TeamOverviewReport }>, keywords: string[], fallback = UNAVAILABLE) {
-  const normalizedKeywords = keywords.map((keyword) => keyword.toLowerCase());
+  const normalizedKeywords = keywords.map(normalizeText);
   const match = sections.find((section) => {
-    const haystack = `${section.title} ${section.content}`.toLowerCase();
+    const haystack = normalizeText(`${section.title} ${section.content}`);
     return normalizedKeywords.some((keyword) => haystack.includes(keyword));
   });
 
   return match?.content || fallback;
 }
 
-function joinReportList(items?: string[] | null) {
-  const values = (items || []).map((item) => item.trim()).filter(Boolean);
-  return values.length ? values.join(' — ') : UNAVAILABLE;
-}
-
 function HighlightedReportText({ text }: { text: string }) {
-  const marker = UNAVAILABLE;
-  const parts = text.split(marker);
-
+  const parts = text.split(UNAVAILABLE);
   if (parts.length === 1) return <>{text}</>;
 
   return (
@@ -190,61 +185,16 @@ function HighlightedReportText({ text }: { text: string }) {
       {parts.map((part, index) => (
         <span key={`${part}-${index}`}>
           {part}
-          {index < parts.length - 1 && (
-            <span className="mx-1 inline-flex rounded-lg border border-yellow-300/20 bg-yellow-300/10 px-2 py-0.5 text-[11px] font-black text-yellow-200">
-              {marker}
-            </span>
-          )}
+          {index < parts.length - 1 && <span className="mx-1 inline-flex rounded-lg border border-yellow-300/20 bg-yellow-300/10 px-2 py-0.5 text-[11px] font-black text-yellow-200">{UNAVAILABLE}</span>}
         </span>
       ))}
     </>
   );
 }
 
-function ThemedAnalysisCard({ tone, icon, eyebrow, title, children, className = '' }: { tone: CardTone; icon: React.ReactNode; eyebrow: string; title: string; children: React.ReactNode; className?: string }) {
-  return (
-    <article className={`relative overflow-hidden rounded-3xl border p-5 shadow-[0_18px_45px_rgba(0,0,0,0.18)] ${cardToneClass[tone]} ${className}`}>
-      <div className="pointer-events-none absolute -left-10 -top-10 h-28 w-28 rounded-full bg-white/5 blur-2xl" />
-      <div className="relative z-10">
-        <div className="mb-4 flex items-center justify-between gap-3">
-          <div className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-black/25 px-3 py-2 text-[11px] font-black text-white/80">
-            {icon}
-            {eyebrow}
-          </div>
-        </div>
-        <h4 className="mb-3 text-lg font-black text-white">{title}</h4>
-        <div className="text-sm leading-7 text-gray-200">{children}</div>
-      </div>
-    </article>
-  );
-}
-
-function MatchCard({ match, teamId }: { match: TeamOverviewMatch; teamId: string }) {
-  const isHome = match.homeTeamId === teamId || match.homeTeam?.id === teamId;
-  const opponent = isHome ? match.awayTeam : match.homeTeam;
-  const isFinished = match.status === 'FINISHED';
-  const isLive = ['IN_PLAY', 'LIVE'].includes(match.status);
-  const gf = isHome ? match.homeScore : match.awayScore;
-  const ga = isHome ? match.awayScore : match.homeScore;
-
-  return (
-    <Link href="/matches" className="block rounded-2xl border border-white/5 bg-white/5 p-4 transition hover:border-primary/30 hover:bg-white/[0.07]">
-      <div className="mb-3 flex items-center justify-between gap-3 text-xs">
-        <span className="text-gray-500">{formatDate(match.matchDate)}</span>
-        <span className={`rounded-lg px-2 py-1 font-black ${isLive ? 'bg-primary/10 text-primary' : isFinished ? 'bg-success/10 text-success' : 'bg-white/5 text-gray-400'}`}>{isLive ? 'مباشرة' : isFinished ? 'انتهت' : 'قادمة'}</span>
-      </div>
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <AssetImage image={opponent?.image || ''} type="TEAM" name={opponent?.name || 'Opponent'} width={38} height={38} className="h-10 w-10 rounded-xl object-cover" />
-          <div>
-            <div className="font-black text-white">ضد {opponent?.name || '-'}</div>
-            <div className="text-xs text-gray-500">{match.stage === 'group' ? 'دور المجموعات' : 'مرحلة إقصائية / مؤثرة'}</div>
-          </div>
-        </div>
-        {(isFinished || isLive) ? <div className="text-xl font-black text-primary tabular-nums">{gf} - {ga}</div> : <div className="text-xs font-black text-gray-500">VS</div>}
-      </div>
-    </Link>
-  );
+function joinReportList(items?: string[] | null) {
+  const values = (items || []).map((item) => item.trim()).filter(Boolean);
+  return values.length ? values.join(' — ') : UNAVAILABLE;
 }
 
 function getAllMatches(team: TeamOverviewTeam) {
@@ -293,13 +243,6 @@ function buildPerformanceStats(team: TeamOverviewTeam): PerformanceStats | null 
   };
 }
 
-function getPlayersSummary(team: TeamOverviewTeam) {
-  const players = (team.players || []).filter((player) => player.name).slice(0, 9);
-  if (!players.length) return UNAVAILABLE;
-
-  return `القائمة المتاحة في المنصة تضم ${formatNumber(team.players?.length || players.length)} لاعبًا. أسماء من القائمة: ${players.map((player) => `${player.name}${player.position ? ` (${player.position})` : ''}`).join('، ')}.`;
-}
-
 function clampRating(value: number) {
   return Math.max(1, Math.min(10, Math.round(value * 10) / 10));
 }
@@ -314,56 +257,71 @@ function buildRatingRows(stats: PerformanceStats | null, team: TeamOverviewTeam)
   const squadCount = team.players?.length || 0;
 
   return [
-    {
-      label: 'الهجوم',
-      rating: stats ? formatRating(clampRating(4 + stats.avgGoalsFor * 1.8)) : UNAVAILABLE,
-      reason: stats ? `معدل التسجيل: ${formatDecimal(stats.avgGoalsFor)} هدف/مباراة.` : UNAVAILABLE,
-      source,
-    },
-    {
-      label: 'الدفاع',
-      rating: stats ? formatRating(clampRating(8.2 - stats.avgGoalsAgainst * 1.35 + (stats.cleanSheets / stats.sampleSize))) : UNAVAILABLE,
-      reason: stats ? `استقبل ${formatNumber(stats.goalsAgainst)} هدفًا مع ${formatNumber(stats.cleanSheets)} شباك نظيفة.` : UNAVAILABLE,
-      source,
-    },
-    {
-      label: 'الزخم الأخير',
-      rating: stats ? formatRating(clampRating(4 + stats.wins * 1.05 + stats.draws * 0.35 - stats.losses * 0.25)) : UNAVAILABLE,
-      reason: stats ? `${formatNumber(stats.wins)} فوز، ${formatNumber(stats.draws)} تعادل، ${formatNumber(stats.losses)} خسارة.` : UNAVAILABLE,
-      source,
-    },
-    {
-      label: 'عمق القائمة',
-      rating: squadCount ? formatRating(clampRating(4.5 + Math.min(squadCount, 26) / 26 * 4.5)) : UNAVAILABLE,
-      reason: squadCount ? `عدد اللاعبين المرتبطين بالمنتخب داخل المنصة: ${formatNumber(squadCount)}.` : UNAVAILABLE,
-      source: squadCount ? 'قاعدة بيانات المنصة — قائمة اللاعبين المرتبطة بالمنتخب' : UNAVAILABLE,
-    },
+    { label: 'الهجوم', rating: stats ? formatRating(clampRating(4 + stats.avgGoalsFor * 1.8)) : UNAVAILABLE, reason: stats ? `معدل التسجيل: ${formatDecimal(stats.avgGoalsFor)} هدف/مباراة.` : UNAVAILABLE, source },
+    { label: 'الدفاع', rating: stats ? formatRating(clampRating(8.2 - stats.avgGoalsAgainst * 1.35 + (stats.cleanSheets / stats.sampleSize))) : UNAVAILABLE, reason: stats ? `استقبل ${formatNumber(stats.goalsAgainst)} هدفًا مع ${formatNumber(stats.cleanSheets)} شباك نظيفة.` : UNAVAILABLE, source },
+    { label: 'الزخم الأخير', rating: stats ? formatRating(clampRating(4 + stats.wins * 1.05 + stats.draws * 0.35 - stats.losses * 0.25)) : UNAVAILABLE, reason: stats ? `${formatNumber(stats.wins)} فوز، ${formatNumber(stats.draws)} تعادل، ${formatNumber(stats.losses)} خسارة.` : UNAVAILABLE, source },
+    { label: 'عمق القائمة', rating: squadCount ? formatRating(clampRating(4.5 + Math.min(squadCount, 26) / 26 * 4.5)) : UNAVAILABLE, reason: squadCount ? `عدد اللاعبين المرتبطين بالمنتخب داخل المنصة: ${formatNumber(squadCount)}.` : UNAVAILABLE, source: squadCount ? 'قاعدة بيانات المنصة — قائمة اللاعبين المرتبطة بالمنتخب' : UNAVAILABLE },
   ];
+}
+
+function getPlayersSummary(team: TeamOverviewTeam) {
+  const players = (team.players || []).filter((player) => player.name).slice(0, 10);
+  if (!players.length) return UNAVAILABLE;
+  return `القائمة المتاحة في المنصة تضم ${formatNumber(team.players?.length || players.length)} لاعبًا. أسماء من القائمة: ${players.map((player) => `${player.name}${player.position ? ` (${player.position})` : ''}`).join('، ')}.`;
+}
+
+function SourceBadge({ label, ready }: { label: string; ready: boolean }) {
+  return <span className={`rounded-xl border px-3 py-1 text-[11px] font-black ${ready ? 'border-emerald-300/25 bg-emerald-300/10 text-emerald-100' : 'border-slate-300/10 bg-white/5 text-slate-400'}`}>{label}</span>;
 }
 
 function StatTile({ label, value, note }: { label: string; value: string; note?: string }) {
   return (
     <div className="rounded-2xl border border-white/10 bg-black/25 p-4">
-      <div className="text-[11px] font-black text-gray-500">{label}</div>
+      <div className="text-[11px] font-black text-slate-500">{label}</div>
       <div className="mt-1 text-2xl font-black text-white tabular-nums">{value}</div>
-      {note && <div className="mt-1 text-[11px] leading-5 text-gray-500">{note}</div>}
+      {note && <div className="mt-1 text-[11px] leading-5 text-slate-500">{note}</div>}
     </div>
   );
 }
 
-function PerformanceStatsBlock({ stats }: { stats: PerformanceStats | null }) {
-  if (!stats) return <HighlightedReportText text={UNAVAILABLE} />;
+function ProfileCard({ icon, eyebrow, title, children, className = '' }: { icon: React.ReactNode; eyebrow: string; title: string; children: React.ReactNode; className?: string }) {
+  return (
+    <article className={`rounded-3xl border border-white/10 bg-white/[0.035] p-5 shadow-[0_18px_45px_rgba(0,0,0,0.22)] ${className}`}>
+      <div className="mb-4 inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-black/30 px-3 py-2 text-[11px] font-black text-white/75">
+        {icon}
+        {eyebrow}
+      </div>
+      <h4 className="mb-3 text-lg font-black text-white">{title}</h4>
+      <div className="text-sm leading-8 text-slate-200"><HighlightedReportText text={typeof children === 'string' ? children : ''} />{typeof children !== 'string' ? children : null}</div>
+    </article>
+  );
+}
+
+function MatchCard({ match, teamId }: { match: TeamOverviewMatch; teamId: string }) {
+  const isHome = match.homeTeamId === teamId || match.homeTeam?.id === teamId;
+  const opponent = isHome ? match.awayTeam : match.homeTeam;
+  const isFinished = match.status === 'FINISHED';
+  const isLive = ['IN_PLAY', 'LIVE'].includes(match.status);
+  const gf = isHome ? match.homeScore : match.awayScore;
+  const ga = isHome ? match.awayScore : match.homeScore;
 
   return (
-    <div className="space-y-4">
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <StatTile label="العينة" value={`${formatNumber(stats.sampleSize)} مباريات`} note="آخر مباريات منتهية في المنصة" />
-        <StatTile label="النتائج" value={`${formatNumber(stats.wins)}ف / ${formatNumber(stats.draws)}ت / ${formatNumber(stats.losses)}خ`} />
-        <StatTile label="الأهداف" value={`${formatNumber(stats.goalsFor)} له / ${formatNumber(stats.goalsAgainst)} عليه`} />
-        <StatTile label="شباك نظيفة" value={formatNumber(stats.cleanSheets)} />
+    <Link href="/matches" className="block rounded-2xl border border-white/5 bg-white/5 p-4 transition hover:border-primary/30 hover:bg-white/[0.07]">
+      <div className="mb-3 flex items-center justify-between gap-3 text-xs">
+        <span className="text-slate-500">{formatMatchDate(match.matchDate)}</span>
+        <span className={`rounded-lg px-2 py-1 font-black ${isLive ? 'bg-primary/10 text-primary' : isFinished ? 'bg-emerald-300/10 text-emerald-200' : 'bg-white/5 text-slate-400'}`}>{isLive ? 'مباشرة' : isFinished ? 'انتهت' : 'قادمة'}</span>
       </div>
-      <p className="text-xs leading-6 text-gray-400">مصدر الأرقام: قاعدة بيانات المنصة بعد مزامنة المباريات. إذا لم تكن المباراة أو النتيجة موثقة لا تدخل في الحساب.</p>
-    </div>
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <AssetImage image={opponent?.image || ''} type="TEAM" name={opponent?.name || 'Opponent'} width={38} height={38} className="h-10 w-10 rounded-xl object-cover" />
+          <div>
+            <div className="font-black text-white">ضد {opponent?.name || '-'}</div>
+            <div className="text-xs text-slate-500">{match.stage === 'group' ? 'دور المجموعات' : 'مرحلة إقصائية / مؤثرة'}</div>
+          </div>
+        </div>
+        {(isFinished || isLive) ? <div className="text-2xl font-black text-white tabular-nums">{gf ?? 0}-{ga ?? 0}</div> : null}
+      </div>
+    </Link>
   );
 }
 
@@ -371,7 +329,7 @@ function RatingTable({ rows }: { rows: RatingRow[] }) {
   return (
     <div className="overflow-hidden rounded-2xl border border-white/10">
       <table className="w-full min-w-[680px] text-right text-xs">
-        <thead className="bg-black/35 text-gray-400">
+        <thead className="bg-black/35 text-slate-400">
           <tr>
             <th className="px-4 py-3 font-black">البند</th>
             <th className="px-4 py-3 font-black">التقييم المبدئي</th>
@@ -383,9 +341,9 @@ function RatingTable({ rows }: { rows: RatingRow[] }) {
           {rows.map((row) => (
             <tr key={row.label} className="bg-white/[0.02] align-top">
               <td className="px-4 py-3 font-black text-white">{row.label}</td>
-              <td className="px-4 py-3 font-black text-primary tabular-nums">{row.rating}</td>
-              <td className="px-4 py-3 text-gray-300"><HighlightedReportText text={row.reason} /></td>
-              <td className="px-4 py-3 text-gray-400"><HighlightedReportText text={row.source} /></td>
+              <td className="px-4 py-3 font-black text-primary tabular-nums"><HighlightedReportText text={row.rating} /></td>
+              <td className="px-4 py-3 text-slate-300"><HighlightedReportText text={row.reason} /></td>
+              <td className="px-4 py-3 text-slate-400"><HighlightedReportText text={row.source} /></td>
             </tr>
           ))}
         </tbody>
@@ -396,128 +354,142 @@ function RatingTable({ rows }: { rows: RatingRow[] }) {
 
 function SourcesList({ reports }: { reports: TeamOverviewReport[] }) {
   if (!reports.length) return <HighlightedReportText text={UNAVAILABLE} />;
-
   return (
     <ul className="space-y-3 text-xs leading-6">
-      {reports.slice(0, 8).map((report) => (
+      {reports.slice(0, 14).map((report) => (
         <li key={report.id} className="rounded-2xl border border-white/10 bg-black/20 p-3">
           <div className="flex flex-wrap items-center gap-2">
             <span className="rounded-lg border border-primary/20 bg-primary/10 px-2 py-1 font-black text-primary">{getConfidenceLabel(report.confidence)}</span>
             <span className="font-black text-white">{report.sourceName || UNAVAILABLE}</span>
-            {report.provider && <span className="text-gray-500">{report.provider}</span>}
+            {report.provider && <span className="text-slate-500">{report.provider}</span>}
           </div>
-          <div className="mt-1 text-gray-400">{report.title}</div>
-          {report.sourceUrl && (
-            <a href={report.sourceUrl} target="_blank" rel="noreferrer" className="mt-2 inline-flex text-primary hover:underline">
-              فتح المصدر
-            </a>
-          )}
+          <div className="mt-1 text-slate-400">{report.title}</div>
+          {report.sourceUrl && <a href={report.sourceUrl} target="_blank" rel="noreferrer" className="mt-2 inline-flex text-primary hover:underline">فتح المصدر</a>}
         </li>
       ))}
     </ul>
   );
 }
 
-function ThemedAnalysisGrid({ team, reports }: { team: TeamOverviewTeam; reports: TeamOverviewReport[] }) {
-  const sections = getAllSections(reports);
-  const latestReport = reports[0];
+function TeamProfileLayout({ team, reports }: { team: TeamOverviewTeam; reports: TeamOverviewReport[] }) {
+  const profileReports = reports.filter((report) => !isFbrefSnapshot(report));
+  const snapshotReports = reports.filter(isFbrefSnapshot);
+  const profileSections = getSections(profileReports);
+  const snapshotSections = getSections(snapshotReports);
+  const allSections = getSections(reports);
   const stats = buildPerformanceStats(team);
   const ratings = buildRatingRows(stats, team);
 
-  const summary = latestReport?.summary || UNAVAILABLE;
-  const identity = findSectionText(
-    sections,
-    ['بطاقة المنتخب', 'طريقة التأهل', 'المدرب', 'القارة', 'المجموعة'],
-    `المنتخب: ${team.name}. المجموعة: ${team.group || UNAVAILABLE}. القارة: ${team.continent || UNAVAILABLE}. التصنيف: ${formatNumber(team.fifaRank, UNAVAILABLE)}.`,
-  );
-  const context = findSectionText(sections, ['وضع المنتخب', 'قبل البطولة', 'السياق', 'الجاهزية'], UNAVAILABLE);
-  const performanceText = findSectionText(sections, ['تحليل الأداء بالأرقام', 'الأداء بالأرقام', 'آخر 5', 'آخر خمس', 'النتائج'], '');
-  const attack = findSectionText(sections, ['قراءة هجومية', 'القوة الهجومية', 'الأهداف', 'xg'], UNAVAILABLE);
-  const defense = findSectionText(sections, ['قراءة دفاعية', 'القوة الدفاعية', 'الأهداف المستقبلة', 'xga'], UNAVAILABLE);
-  const midfield = findSectionText(sections, ['وسط الملعب', 'التحكم', 'الاستحواذ', 'دقة التمرير'], UNAVAILABLE);
-  const setPieces = findSectionText(sections, ['الكرات الثابتة', 'ركلات ركنية', 'set pieces'], UNAVAILABLE);
-  const players = findSectionText(sections, ['أسماء بارزة', 'القائمة', 'قائمة المنتخب', 'اللاعبون'], getPlayersSummary(team));
-  const tactics = findSectionText(sections, ['التحليل التكتيكي', 'بناء اللعب', 'الضغط', 'التحولات', 'الرسم الخططي', 'تكتيكي'], UNAVAILABLE);
-  const strengths = joinReportList(reports.flatMap((report) => report.strengths || [])) !== UNAVAILABLE
-    ? joinReportList(reports.flatMap((report) => report.strengths || []))
-    : findSectionText(sections, ['نقاط القوة', 'مميزات', 'القوة'], UNAVAILABLE);
-  const weaknesses = joinReportList(reports.flatMap((report) => report.weaknesses || [])) !== UNAVAILABLE
-    ? joinReportList(reports.flatMap((report) => report.weaknesses || []))
-    : findSectionText(sections, ['نقاط الضعف', 'نقاط تحتاج متابعة', 'مخاطر فنية', 'الضعف'], UNAVAILABLE);
-  const missing = findSectionText(
-    sections,
-    ['معلومات غير متوفرة', 'غير متوفرة في المصادر', 'غير متوفر في المصادر'],
-    reports.length ? 'أي خانة لا يظهر لها مصدر واضح داخل هذا التقرير تُعامل كغير متوفر في المصادر.' : UNAVAILABLE,
-  );
+  const sourceHaystack = normalizeText(reports.map((report) => `${report.sourceName} ${report.provider} ${report.title}`).join(' '));
+  const hasOfficial = sourceHaystack.includes('fifa') || sourceHaystack.includes('federation') || sourceHaystack.includes('official') || sourceHaystack.includes('اتحاد');
+  const hasHistorical = sourceHaystack.includes('rsssf') || sourceHaystack.includes('worldfootball') || sourceHaystack.includes('history') || sourceHaystack.includes('historical') || sourceHaystack.includes('تاريخ');
+  const hasStats = sourceHaystack.includes('fbref') || sourceHaystack.includes('stathead') || sourceHaystack.includes('opta') || sourceHaystack.includes('statsbomb');
+  const hasEditorial = sourceHaystack.includes('reuters') || sourceHaystack.includes('athletic') || sourceHaystack.includes('analyst') || sourceHaystack.includes('تحليل');
+
+  const historicalRecord = findSectionText(profileSections, ['السجل التاريخي', 'تاريخ كأس العالم', 'world cup historical', 'historical record', 'المشاركات', 'أفضل إنجاز']);
+  const qualificationPath = findSectionText(profileSections, ['طريق التأهل', 'التصفيات', 'qualification', 'qualifying path', 'الجاهزية']);
+  const squadProfile = findSectionText(allSections, ['القائمة الحالية', 'قائمة المنتخب', 'current squad', 'أسماء بارزة', 'اللاعبون'], getPlayersSummary(team));
+  const tacticalIdentity = findSectionText(profileSections, ['الهوية التكتيكية', 'التحليل التكتيكي', 'style of play', 'pressing', 'بناء اللعب', 'الضغط', 'التحولات']);
+  const recentPerformance = findSectionText(profileSections, ['آخر النتائج', 'النتائج الأخيرة', 'recent form', 'آخر 5', 'form']);
+  const currentSnapshot = findSectionText(snapshotSections, ['وضع المنتخب في المجموعة', 'تحليل الأداء بالأرقام', 'بطاقة المنتخب', 'القوة الهجومية'], snapshotReports[0]?.summary || UNAVAILABLE);
+  const attack = findSectionText(allSections, ['القوة الهجومية', 'الهجوم', 'xg', 'التسديدات']);
+  const defense = findSectionText(allSections, ['القوة الدفاعية', 'الدفاع', 'xga', 'الأهداف المستقبلة']);
+  const midfield = findSectionText(allSections, ['وسط الملعب', 'الاستحواذ', 'التمرير', 'possession', 'passing']);
+  const strengths = joinReportList(profileReports.flatMap((report) => report.strengths || [])) !== UNAVAILABLE
+    ? joinReportList(profileReports.flatMap((report) => report.strengths || []))
+    : findSectionText(profileSections, ['نقاط القوة', 'مميزات', 'strengths']);
+  const weaknesses = joinReportList(profileReports.flatMap((report) => report.weaknesses || [])) !== UNAVAILABLE
+    ? joinReportList(profileReports.flatMap((report) => report.weaknesses || []))
+    : findSectionText(profileSections, ['نقاط الضعف', 'ما يحتاج متابعة', 'weaknesses']);
+  const missing = findSectionText(allSections, ['معلومات غير متوفرة', 'غير متوفرة في المصادر', 'missing'], 'السجل التاريخي الكامل، طريق التأهل، المدرب، القائد، والأدوار التكتيكية التفصيلية يجب إدخالها من مصادر رسمية وتاريخية متعددة إذا لم تكن ظاهرة هنا.');
 
   return (
     <div className="space-y-5">
-      <div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
-        <ThemedAnalysisCard tone="summary" icon={<Sparkles size={15} />} eyebrow="ملخص" title="ملخص تنفيذي موثق">
-          <HighlightedReportText text={summary} />
-        </ThemedAnalysisCard>
-        <ThemedAnalysisCard tone="identity" icon={<FileText size={15} />} eyebrow="بطاقة" title="1) بطاقة المنتخب">
-          <HighlightedReportText text={identity} />
-        </ThemedAnalysisCard>
-      </div>
-
-      <div className="grid gap-4 xl:grid-cols-[0.85fr_1.15fr]">
-        <ThemedAnalysisCard tone="performance" icon={<ClipboardList size={15} />} eyebrow="سياق" title="2) وضع المنتخب قبل البطولة">
-          <HighlightedReportText text={context} />
-        </ThemedAnalysisCard>
-        <ThemedAnalysisCard tone="performance" icon={<BarChart3 size={15} />} eyebrow="أرقام" title="3) تحليل الأداء بالأرقام">
-          <div className="space-y-4">
-            {performanceText && <p><HighlightedReportText text={performanceText} /></p>}
-            <PerformanceStatsBlock stats={stats} />
+      <section className="grid gap-5 xl:grid-cols-[1.2fr_0.8fr]">
+        <div className="rounded-3xl border border-primary/15 bg-[radial-gradient(circle_at_top_left,rgba(15,240,252,0.16),transparent_34%),linear-gradient(135deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))] p-6">
+          <div className="mb-4 flex flex-wrap items-center gap-2">
+            <span className="rounded-xl border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-black text-primary">PROFESSIONAL TEAM PROFILE</span>
+            {team.code && <span className="rounded-xl border border-white/10 bg-black/25 px-3 py-1 text-xs font-black text-slate-300">{team.code}</span>}
+            {team.group && <span className="rounded-xl border border-white/10 bg-black/25 px-3 py-1 text-xs font-black text-slate-300">المجموعة {team.group}</span>}
           </div>
-        </ThemedAnalysisCard>
-      </div>
+          <h3 className="text-2xl font-black text-white md:text-3xl">ملف كروي تاريخي لمنتخب {team.name}</h3>
+          <p className="mt-3 max-w-4xl text-sm leading-8 text-slate-300">
+            هذه الصفحة مصممة كتقرير تاريخي وتحليلي متعدد المصادر. FBref/Stathead يظهر كـ “لقطة إحصائية حالية” فقط، ولا يُعامل كتقرير نهائي منفرد. أي معلومة غير موثقة تظهر بوضوح كـ {UNAVAILABLE}.
+          </p>
+        </div>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        <ThemedAnalysisCard tone="attack" icon={<Goal size={15} />} eyebrow="هجوم" title="القوة الهجومية">
-          <HighlightedReportText text={attack} />
-        </ThemedAnalysisCard>
-        <ThemedAnalysisCard tone="defense" icon={<Shield size={15} />} eyebrow="دفاع" title="القوة الدفاعية">
-          <HighlightedReportText text={defense} />
-        </ThemedAnalysisCard>
-        <ThemedAnalysisCard tone="midfield" icon={<Zap size={15} />} eyebrow="وسط" title="وسط الملعب والتحكم">
-          <HighlightedReportText text={midfield} />
-        </ThemedAnalysisCard>
-        <ThemedAnalysisCard tone="setPieces" icon={<Target size={15} />} eyebrow="كرات ثابتة" title="الكرات الثابتة">
-          <HighlightedReportText text={setPieces} />
-        </ThemedAnalysisCard>
-        <ThemedAnalysisCard tone="players" icon={<Users size={15} />} eyebrow="قائمة" title="4) أسماء بارزة في القائمة">
-          <HighlightedReportText text={players} />
-        </ThemedAnalysisCard>
-        <ThemedAnalysisCard tone="tactics" icon={<Scale size={15} />} eyebrow="تكتيك" title="5) التحليل التكتيكي">
-          <HighlightedReportText text={tactics} />
-        </ThemedAnalysisCard>
-      </div>
+        <div className="rounded-3xl border border-white/10 bg-black/25 p-5">
+          <h4 className="mb-4 flex items-center gap-2 text-lg font-black text-white"><Database size={18} className="text-primary" /> طبقات المصادر</h4>
+          <div className="flex flex-wrap gap-2">
+            <SourceBadge label="رسمي / FIFA" ready={hasOfficial} />
+            <SourceBadge label="تاريخي" ready={hasHistorical} />
+            <SourceBadge label="إحصائي" ready={hasStats} />
+            <SourceBadge label="تحريري / تكتيكي" ready={hasEditorial} />
+          </div>
+          <div className="mt-4 grid grid-cols-2 gap-3 text-xs">
+            <StatTile label="تقارير متعددة المصادر" value={formatNumber(profileReports.length, '0')} />
+            <StatTile label="لقطات FBref" value={formatNumber(snapshotReports.length, '0')} />
+          </div>
+        </div>
+      </section>
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <ThemedAnalysisCard tone="strengths" icon={<CheckCircle2 size={15} />} eyebrow="قوة" title="6) نقاط القوة">
-          <HighlightedReportText text={strengths} />
-        </ThemedAnalysisCard>
-        <ThemedAnalysisCard tone="weaknesses" icon={<XCircle size={15} />} eyebrow="متابعة" title="7) نقاط الضعف / ما يحتاج متابعة">
-          <HighlightedReportText text={weaknesses} />
-        </ThemedAnalysisCard>
-      </div>
+      {!profileReports.length && (
+        <div className="rounded-3xl border border-yellow-300/20 bg-yellow-300/10 p-5 text-sm leading-7 text-yellow-50">
+          <ShieldAlert size={16} className="ml-1 inline" /> لا يوجد حتى الآن تقرير تاريخي متعدد المصادر لهذا المنتخب. الموجود حاليًا قد يكون لقطة FBref فقط. المطلوب إدخال Source Pack تاريخي من FIFA/RSSSF/WorldFootball/Reuters/Opta أو مصادر معتمدة مماثلة.
+        </div>
+      )}
 
-      <ThemedAnalysisCard tone="rating" icon={<ListChecks size={15} />} eyebrow="تقييم" title="8) تقييم مبدئي مبني على البيانات المتاحة">
+      <section className="grid gap-4 lg:grid-cols-2">
+        <ProfileCard icon={<Trophy size={15} />} eyebrow="تاريخ" title="1) السجل التاريخي في كأس العالم">{historicalRecord}</ProfileCard>
+        <ProfileCard icon={<ClipboardList size={15} />} eyebrow="تأهل" title="2) طريق التأهل والجاهزية">{qualificationPath}</ProfileCard>
+      </section>
+
+      <section className="grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
+        <ProfileCard icon={<Users size={15} />} eyebrow="قائمة" title="3) القائمة الحالية وبنية الفريق">{squadProfile}</ProfileCard>
+        <ProfileCard icon={<Scale size={15} />} eyebrow="تكتيك" title="4) الهوية التكتيكية وأسلوب اللعب">{tacticalIdentity}</ProfileCard>
+      </section>
+
+      <section className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
+        <ProfileCard icon={<BarChart3 size={15} />} eyebrow="فورمة" title="5) النتائج الأخيرة ومؤشرات الجاهزية">
+          <div className="space-y-4">
+            <HighlightedReportText text={recentPerformance} />
+            {stats ? (
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <StatTile label="العينة" value={`${formatNumber(stats.sampleSize)} مباريات`} />
+                <StatTile label="النتائج" value={`${formatNumber(stats.wins)}ف / ${formatNumber(stats.draws)}ت / ${formatNumber(stats.losses)}خ`} />
+                <StatTile label="الأهداف" value={`${formatNumber(stats.goalsFor)} له / ${formatNumber(stats.goalsAgainst)} عليه`} />
+                <StatTile label="شباك نظيفة" value={formatNumber(stats.cleanSheets)} />
+              </div>
+            ) : null}
+          </div>
+        </ProfileCard>
+        <ProfileCard icon={<Sparkles size={15} />} eyebrow="2026" title="6) لقطة إحصائية حالية من البطولة">{currentSnapshot}</ProfileCard>
+      </section>
+
+      <section className="grid gap-4 md:grid-cols-3">
+        <ProfileCard icon={<Goal size={15} />} eyebrow="هجوم" title="القوة الهجومية">{attack}</ProfileCard>
+        <ProfileCard icon={<Shield size={15} />} eyebrow="دفاع" title="القوة الدفاعية">{defense}</ProfileCard>
+        <ProfileCard icon={<Zap size={15} />} eyebrow="وسط" title="وسط الملعب والتحكم">{midfield}</ProfileCard>
+      </section>
+
+      <section className="grid gap-4 lg:grid-cols-2">
+        <ProfileCard icon={<CheckCircle2 size={15} />} eyebrow="قوة" title="7) نقاط القوة المدعومة بالمصادر">{strengths}</ProfileCard>
+        <ProfileCard icon={<XCircle size={15} />} eyebrow="متابعة" title="8) نقاط الضعف وما يحتاج متابعة">{weaknesses}</ProfileCard>
+      </section>
+
+      <ProfileCard icon={<ListChecks size={15} />} eyebrow="تقييم" title="9) تقييم مبدئي مبني على البيانات المتاحة">
         <div className="space-y-3 overflow-x-auto">
           <RatingTable rows={ratings} />
-          <p className="text-xs leading-6 text-gray-400">هذا الجدول تقييم تحريري مبدئي محسوب من بيانات المنصة المتاحة فقط، وليس توقعًا نهائيًا أو توصية تداول. أي بند بلا بيانات كافية يظهر كـ “غير متوفر في المصادر”.</p>
+          <p className="text-xs leading-6 text-slate-400">هذا الجدول تقييم تحريري مبدئي محسوب من بيانات المنصة المتاحة فقط، وليس توقعًا نهائيًا أو توصية تداول.</p>
         </div>
-      </ThemedAnalysisCard>
+      </ProfileCard>
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <ThemedAnalysisCard tone="missing" icon={<ShieldAlert size={15} />} eyebrow="شفافية" title="معلومات غير متوفرة في المصادر">
-          <HighlightedReportText text={missing} />
-        </ThemedAnalysisCard>
-        <ThemedAnalysisCard tone="sources" icon={<Database size={15} />} eyebrow="مصادر" title="9) سجل المصادر">
+      <section className="grid gap-4 lg:grid-cols-2">
+        <ProfileCard icon={<ShieldAlert size={15} />} eyebrow="شفافية" title="معلومات غير متوفرة في المصادر">{missing}</ProfileCard>
+        <ProfileCard icon={<Database size={15} />} eyebrow="مصادر" title="سجل المصادر المستخدم">
           <SourcesList reports={reports} />
-        </ThemedAnalysisCard>
-      </div>
+        </ProfileCard>
+      </section>
     </div>
   );
 }
@@ -544,24 +516,23 @@ export default function TeamOverviewPanel({ team }: { team: TeamOverviewTeam }) 
             <AssetImage image={team.image || ''} type="TEAM" name={team.name} width={78} height={78} className="h-20 w-20 rounded-3xl border border-white/10 bg-black/30 object-cover" />
             <div>
               <div className="mb-2 flex flex-wrap items-center gap-2">
-                <span className="rounded-xl border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-black text-primary">FOOTBALL SOURCE REPORT</span>
-                {team.code && <span className="rounded-xl border border-white/10 bg-white/5 px-3 py-1 text-xs font-black text-gray-300">{team.code}</span>}
-                {team.group && <span className="rounded-xl border border-white/10 bg-white/5 px-3 py-1 text-xs font-black text-gray-300">المجموعة {team.group}</span>}
-                {team.continent && <span className="rounded-xl border border-white/10 bg-white/5 px-3 py-1 text-xs font-black text-gray-300">{team.continent}</span>}
+                <span className="rounded-xl border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-black text-primary">FOOTBALL HISTORICAL PROFILE</span>
+                {team.code && <span className="rounded-xl border border-white/10 bg-white/5 px-3 py-1 text-xs font-black text-slate-300">{team.code}</span>}
+                {team.group && <span className="rounded-xl border border-white/10 bg-white/5 px-3 py-1 text-xs font-black text-slate-300">المجموعة {team.group}</span>}
+                {team.continent && <span className="rounded-xl border border-white/10 bg-white/5 px-3 py-1 text-xs font-black text-slate-300">{team.continent}</span>}
               </div>
-              <h2 className="text-2xl font-black text-white md:text-3xl">التحليل الكروي لمنتخب {team.name}</h2>
-              <p className="mt-1 max-w-4xl text-sm leading-relaxed text-gray-400">
-                هذا التب مخصص للتحليل الكروي فقط: بطاقة المنتخب، الأداء بالأرقام، القراءة التكتيكية، نقاط القوة والضعف، والتقييم المبدئي المبني على البيانات المتاحة. لا يتم عرض السعر أو القيمة العادلة أو توصيات التداول هنا.
-              </p>
+              <h2 className="text-2xl font-black text-white md:text-3xl">الملف التاريخي والتحليل الكروي لمنتخب {team.name}</h2>
+              <p className="mt-1 max-w-4xl text-sm leading-relaxed text-slate-400">تقرير كروي متعدد المصادر: تاريخ كأس العالم، طريق التأهل، القائمة، الهوية التكتيكية، لقطة البطولة الحالية، ونقاط القوة والضعف. لا يتم عرض السعر أو توصيات التداول هنا.</p>
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
+            <Link href={`/admin/team-intelligence?teamId=${team.id}`} className="rounded-2xl border border-primary/30 bg-primary/10 px-4 py-3 text-sm font-black text-primary hover:bg-primary hover:text-black">إضافة تقرير تاريخي</Link>
             <Link href="/groups" className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-black text-white hover:border-primary/40 hover:text-primary">المجموعات</Link>
-            <Link href="/matches" className="rounded-2xl border border-primary/30 bg-primary/10 px-4 py-3 text-sm font-black text-primary hover:bg-primary hover:text-black">المباريات</Link>
+            <Link href="/matches" className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-black text-white hover:border-primary/40 hover:text-primary">المباريات</Link>
           </div>
         </div>
 
-        <ThemedAnalysisGrid team={team} reports={reports} />
+        <TeamProfileLayout team={team} reports={reports} />
 
         <div className="mt-5 grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
           <div className="rounded-3xl border border-white/5 bg-black/25 p-5">
@@ -569,15 +540,15 @@ export default function TeamOverviewPanel({ team }: { team: TeamOverviewTeam }) 
             {(upcomingMatches.length || finishedMatches.length) ? (
               <div className="space-y-3">{[...finishedMatches, ...upcomingMatches].slice(0, 5).map((match) => <MatchCard key={match.id} match={match} teamId={team.id} />)}</div>
             ) : (
-              <div className="rounded-2xl border border-dashed border-white/10 bg-black/20 p-5 text-sm text-gray-500">لا توجد مباريات موثقة مرتبطة حاليًا بهذا المنتخب.</div>
+              <div className="rounded-2xl border border-dashed border-white/10 bg-black/20 p-5 text-sm text-slate-500">لا توجد مباريات موثقة مرتبطة حاليًا بهذا المنتخب.</div>
             )}
-            <p className="mt-3 text-[11px] leading-5 text-gray-500">مصدر المباريات: قاعدة بيانات المنصة بعد مزامنة جدول البطولة. إذا لم تتوفر المباراة يكتب: غير متوفر في المصادر.</p>
+            <p className="mt-3 text-[11px] leading-5 text-slate-500">مصدر المباريات: قاعدة بيانات المنصة بعد مزامنة جدول البطولة. إذا لم تتوفر المباراة يكتب: غير متوفر في المصادر.</p>
           </div>
 
           <div className="rounded-3xl border border-white/5 bg-black/25 p-5">
-            <h3 className="mb-4 flex items-center gap-2 text-xl font-black text-white"><Database size={20} className="text-primary" /> سياسة المصادر</h3>
-            <div className="space-y-3 text-sm leading-7 text-gray-300">
-              <p>المصادر المعتمدة للتحليل: FIFA والاتحادات الرسمية، Reuters، Opta/Opta Analyst، StatsBomb، Wyscout، FBref، FotMob، Sofascore، WhoScored، Understat، Transfermarkt، CIES، The Athletic، وSports Reference / Stathead / FBref عند توفر رابط عام أو export مسموح من الاشتراك.</p>
+            <h3 className="mb-4 flex items-center gap-2 text-xl font-black text-white"><BookOpen size={20} className="text-primary" /> سياسة التقرير الاحترافي</h3>
+            <div className="space-y-3 text-sm leading-7 text-slate-300">
+              <p>التقرير النهائي لا يعتمد على FBref وحده. FBref/Stathead يستخدم للطبقة الإحصائية الحالية، بينما التاريخ والهوية الرسمية يحتاجان FIFA، الاتحاد الرسمي، RSSSF، WorldFootball.net، ومصادر تحريرية موثوقة مثل Reuters وOpta Analyst وStatsBomb عند توفرها.</p>
               <p>لا يتم استخدام أي رقم في هذا التب إلا إذا كان موثقًا داخل التقرير نفسه، أو محسوبًا بوضوح من مباريات وقوائم موجودة داخل قاعدة بيانات المنصة.</p>
             </div>
             <div className="mt-4 rounded-2xl border border-yellow-300/10 bg-yellow-300/[0.04] p-4 text-xs leading-6 text-yellow-100">
@@ -592,9 +563,9 @@ export default function TeamOverviewPanel({ team }: { team: TeamOverviewTeam }) 
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
               {news.slice(0, 6).map((item) => (
                 <div key={item.id || item.title || item.titleAr} className="rounded-2xl border border-white/5 bg-white/5 p-4">
-                  <div className="mb-2 text-xs text-gray-500">{formatDate(item.publishedAt)}</div>
+                  <div className="mb-2 text-xs text-slate-500">{formatDate(item.publishedAt)}</div>
                   <h4 className="font-black text-white">{item.title || item.titleAr}</h4>
-                  {item.summary && <p className="mt-2 text-sm leading-relaxed text-gray-400">{item.summary}</p>}
+                  {item.summary && <p className="mt-2 text-sm leading-relaxed text-slate-400">{item.summary}</p>}
                 </div>
               ))}
             </div>
@@ -603,7 +574,7 @@ export default function TeamOverviewPanel({ team }: { team: TeamOverviewTeam }) 
 
         <div className="mt-5 rounded-3xl border border-emerald-400/10 bg-emerald-400/[0.04] p-5">
           <h3 className="mb-3 flex items-center gap-2 text-lg font-black text-emerald-300"><Sparkles size={18} /> الفصل التحريري</h3>
-          <p className="text-sm leading-7 text-gray-300">التحليل الكروي في هذا التب منفصل عن التداول. أي قراءة سعرية أو طلب أو مخاطرة سوقية تظهر فقط في تب التداول.</p>
+          <p className="text-sm leading-7 text-slate-300">التحليل الكروي في هذا التب منفصل عن التداول. أي قراءة سعرية أو طلب أو مخاطرة سوقية تظهر فقط في تب التداول.</p>
         </div>
       </div>
     </section>
