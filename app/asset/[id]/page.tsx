@@ -10,7 +10,7 @@ import { PlayerAnalysisPanel } from '@/components/PlayerAnalysisPanel';
 import TeamPitchLineup from '@/components/TeamPitchLineup';
 import TeamOverviewPanel from '@/components/TeamOverviewPanel';
 import TeamRadarChart from '@/components/TeamRadarChart';
-import TeamTradePanel from '@/components/TeamTradePanel';
+import TeamHeroProfile from '@/components/TeamHeroProfile';
 import { AssetPageTabs } from '@/components/ui/AssetPageTabs';
 import { StickyTradeCTA } from '@/components/ui/StickyTradeCTA';
 import { FootballTechnicalAnalysis } from '@/features/analysis/components/FootballTechnicalAnalysis';
@@ -140,19 +140,61 @@ export default async function AssetPage({ params }: Props) {
   const squadDepth = normalizedAsset && isTeam ? computeSquadDepth(normalizedAsset) : 0.5;
   const jsonLd = asset ? { '@context': 'https://schema.org', '@type': isTeam ? 'SportsTeam' : 'Person', name: asset.name, description: isTeam ? `تحليل كروي لمنتخب ${asset.name}: التقارير، قائمة الفريق، مؤشرات الجاهزية، والمباريات.` : `تداول أسهم ${asset.name} في منصة MC PRIME Exchange. السعر المباشر: ${asset.current_price}¢.`, url: `${baseUrl}/asset/${asset.id}` } : null;
 
-  const statsTab = normalizedAsset && isTeam ? (
-    <section className="mx-auto mb-4 w-full max-w-[1600px] space-y-5 px-4">
-      {/* Radar + Group Standings side by side on large screens */}
-      <div className="grid gap-5 xl:grid-cols-2">
+  // The new Pure Football layout for Teams (no tabs, no trading noise)
+  const teamProfileView = normalizedAsset && isTeam ? (
+    <div className="mx-auto w-full max-w-[1600px] space-y-8 px-4 pb-20">
+      <TeamHeroProfile asset={normalizedAsset} remainingMatches={3} />
+      
+      <div className="flex justify-end pt-2">
+        <Link href={`/admin/team-intelligence?teamId=${normalizedAsset.id}`} className="rounded-2xl border border-primary/30 bg-primary/10 px-4 py-3 text-xs font-black text-primary transition hover:bg-primary hover:text-black">
+          إضافة / تحديث تقرير هذا المنتخب
+        </Link>
+      </div>
+
+      <div className="grid gap-6 xl:grid-cols-2">
         <TeamRadarChart teamId={normalizedAsset.id} teamName={normalizedAsset.name} formScore={formScore} squadDepth={squadDepth} />
         <GroupStandingsWidget team={normalizedAsset} allGroupTeams={groupTeams} />
       </div>
-      {/* FBRef detailed stats */}
+
       <div className="rounded-3xl border border-white/8 bg-white/[0.03] p-5 shadow-[0_14px_34px_rgba(0,0,0,0.2)]">
         <FBRefStatsCards teamId={normalizedAsset.id} />
       </div>
-    </section>
+
+      <div className="rounded-3xl border border-white/8 bg-white/[0.03] p-5 shadow-[0_14px_34px_rgba(0,0,0,0.2)]">
+        <TeamPitchLineup team={normalizedAsset} />
+      </div>
+
+      <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
+        <div className="rounded-3xl border border-white/8 bg-white/[0.03] p-5">
+          <FootballTechnicalAnalysis asset={normalizedAsset} />
+        </div>
+        <div className="space-y-6">
+          <TeamOverviewPanel team={normalizedAsset} />
+          <AssetRelatedNewsPanel asset={normalizedAsset} pressNews={relatedPressNews} matchEvents={relatedMatchEvents} />
+        </div>
+      </div>
+    </div>
   ) : undefined;
 
-  return <>{jsonLd && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />}{normalizedAsset && !isTeam && <AssetCommandHeader asset={normalizedAsset} isTeam={isTeam} />}{normalizedAsset && isTeam && <div className="mx-auto mb-4 flex w-full max-w-[1600px] justify-end px-4 pt-4"><Link href={`/admin/team-intelligence?teamId=${normalizedAsset.id}`} className="rounded-2xl border border-primary/30 bg-primary/10 px-4 py-3 text-sm font-black text-primary transition hover:bg-primary hover:text-black">إضافة / تحديث تقرير هذا المنتخب</Link></div>}{normalizedAsset && <AssetRelatedNewsPanel asset={normalizedAsset} pressNews={relatedPressNews} matchEvents={relatedMatchEvents} />}{normalizedAsset && <AssetPageTabs isTeam={isTeam} lineup={isTeam ? <TeamPitchLineup team={normalizedAsset} /> : undefined} stats={statsTab} trade={isTeam ? <TeamTradePanel assetId={normalizedAsset.id} initialPrice={normalizedAsset.marketPrice ?? normalizedAsset.current_price} fairValue={normalizedAsset.fairValue} change={normalizedAsset.change} /> : undefined} technical={<div id="technical-analysis"><FootballTechnicalAnalysis asset={normalizedAsset} /></div>} overview={isTeam ? <TeamOverviewPanel team={normalizedAsset} /> : undefined} playerOverview={!isTeam ? <PlayerAnalysisPanel asset={normalizedAsset} /> : undefined} market={!isTeam ? <AssetClient /> : undefined} />}{normalizedAsset && !isTeam && <StickyTradeCTA assetId={normalizedAsset.id} assetName={normalizedAsset.name} price={normalizedAsset.marketPrice ?? normalizedAsset.current_price} isTeam={isTeam} />}</>;
+  // The old layout for Players (with tabs)
+  const playerProfileView = normalizedAsset && !isTeam ? (
+    <>
+      <AssetCommandHeader asset={normalizedAsset} isTeam={false} />
+      <AssetRelatedNewsPanel asset={normalizedAsset} pressNews={relatedPressNews} matchEvents={relatedMatchEvents} />
+      <AssetPageTabs 
+        isTeam={false} 
+        playerOverview={<PlayerAnalysisPanel asset={normalizedAsset} />} 
+        technical={<div id="technical-analysis"><FootballTechnicalAnalysis asset={normalizedAsset} /></div>} 
+        market={<AssetClient />} 
+      />
+      <StickyTradeCTA assetId={normalizedAsset.id} assetName={normalizedAsset.name} price={normalizedAsset.marketPrice ?? normalizedAsset.current_price} isTeam={false} />
+    </>
+  ) : undefined;
+
+  return (
+    <>
+      {jsonLd && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />}
+      {isTeam ? teamProfileView : playerProfileView}
+    </>
+  );
 }
