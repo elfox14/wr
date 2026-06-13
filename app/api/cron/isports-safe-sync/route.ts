@@ -30,6 +30,16 @@ function isFinished(status?: string | null) {
   return String(status || '').toUpperCase() === 'FINISHED';
 }
 
+function hasLikelyFinalSnapshot(match: any, latest: any) {
+  if (!latest) return false;
+  const minute = Number(latest.minute);
+  if (Number.isFinite(minute) && minute >= 90) return true;
+  const start = new Date(match.matchDate).getTime();
+  const capturedAt = new Date(latest.capturedAt).getTime();
+  if (!Number.isFinite(start) || !Number.isFinite(capturedAt)) return false;
+  return capturedAt >= start + 105 * 60_000;
+}
+
 async function fallback(match: any, reason: string, debug: boolean) {
   try {
     return await syncFootballDataFallbackForMatch(match, { reason, debug });
@@ -45,7 +55,10 @@ export async function GET(req: Request) {
   const debug = url.searchParams.get('debug') === 'true';
   const singleMatchId = Number(url.searchParams.get('matchId') || 0);
   const hasSingleMatchId = Boolean(singleMatchId && Number.isFinite(singleMatchId));
+  const now = new Date();
   const finishedSince = new Date(Date.now() - Number(url.searchParams.get('finishedHours') || 36) * 60 * 60 * 1000);
+  const inferredLiveStart = new Date(Date.now() - 3 * 60 * 60 * 1000);
+  const inferredLiveEnd = new Date(Date.now() + 15 * 60 * 1000);
 
   try {
     await ensureStatsTable();
@@ -54,6 +67,7 @@ export async function GET(req: Request) {
         animationMatchId: { not: null },
         OR: [
           { status: { in: ['IN_PLAY', 'LIVE', 'HT'] } },
+          { status: 'SCHEDULED', matchDate: { gte: inferredLiveStart, lte: inferredLiveEnd } },
           { status: 'FINISHED', matchDate: { gte: finishedSince } },
         ],
       },
@@ -78,8 +92,8 @@ export async function GET(req: Request) {
 
     for (const match of matches) {
       const latest = await getLatestSnapshot(match.id);
-      if (!hasSingleMatchId && isFinished(match.status) && latest) {
-        processed.push({ matchId: match.id, status: 'finished_snapshot_already_saved', snapshotId: latest.id, capturedAt: latest.capturedAt });
+      if (!hasSingleMatchId && isFinished(match.status) && hasLikelyFinalSnapshot(match, latest)) {
+        processed.push({ matchId: match.id, status: 'final_snapshot_already_saved', snapshotId: latest.id, minute: latest.minute, capturedAt: latest.capturedAt });
         continue;
       }
 
@@ -102,7 +116,15 @@ export async function GET(req: Request) {
       }
     }
 
-    return NextResponse.json({ ok: true, mode: 'isports_primary_with_football_data_fallback', guard: guard ? { active: true, blockedUntil: guard.blockedUntil, reason: guard.reason } : { active: false }, finishedWindowHours: Number(url.searchParams.get('finishedHours') || 36), count: processed.length, processed }, { headers: { 'Cache-Control': 'no-store' } });
+    return NextResponse.json({
+      ok: true,
+      mode: 'isports_primary_with_football_data_fallback',
+      guard: guard ? { active: true, blockedUntil: guard.blockedUntil, reason: guard.reason } : { active: false },
+      inferredLiveWindow: { from: inferredLiveStart.toISOString(), to: inferredLiveEnd.toISOString(), now: now.toISOString() },
+      finishedWindowHours: Number(url.searchParams.get('finishedHours') || 36),
+      count: processed.length,
+      processed,
+    }, { headers: { 'Cache-Control': 'no-store' } });
   } catch (error: any) {
     return NextResponse.json({ ok: false, error: error?.message || 'Internal Server Error' }, { status: 500 });
   }
