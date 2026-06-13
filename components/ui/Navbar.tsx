@@ -86,12 +86,9 @@ export function Navbar() {
                 <span className="text-sm font-black tracking-wide text-white">WORLD CUP</span>
                 <span className="mt-1 text-[10px] font-black text-[#FFD700]">2026</span>
               </span>
-              <span className="hidden whitespace-nowrap rounded-full border border-[#0FF0FC]/20 bg-[#0FF0FC]/10 px-3 py-1 text-[10px] font-black leading-none text-[#0FF0FC] 2xl:inline-flex">
-                {slogan}
-              </span>
             </Link>
 
-            <Link href="/" aria-label="بورصة المونديال 2026" className="hidden h-14 w-[190px] flex-none items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-white/95 px-2 py-1 shadow-[0_0_22px_rgba(15,240,252,0.12)] transition hover:bg-white xl:flex 2xl:w-[230px]">
+            <Link href="/" aria-label="بورصة المونديال 2026" className="hidden h-[62px] w-[62px] flex-none items-center justify-center overflow-visible rounded-2xl border border-white/10 bg-white p-1 shadow-[0_0_22px_rgba(15,240,252,0.12)] transition hover:bg-white xl:flex 2xl:h-[68px] 2xl:w-[68px]">
               <img src={headerLogo} alt="بورصة المونديال 2026" className="h-full w-full object-contain" />
             </Link>
 
