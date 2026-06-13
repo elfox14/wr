@@ -15,6 +15,7 @@ import TeamMatchTimeline from '@/components/TeamMatchTimeline';
 import TeamInjuryTracker from '@/components/TeamInjuryTracker';
 import TeamHeadToHeadModal from '@/components/TeamHeadToHeadModal';
 import TeamTradePanel from '@/components/TeamTradePanel';
+import TeamPerformanceChart from '@/components/TeamPerformanceChart';
 import { AssetPageTabs } from '@/components/ui/AssetPageTabs';
 import { StickyTradeCTA } from '@/components/ui/StickyTradeCTA';
 import { FootballTechnicalAnalysis } from '@/features/analysis/components/FootballTechnicalAnalysis';
@@ -168,6 +169,7 @@ export default async function AssetPage({ params }: Props) {
                 <AssetRelatedNewsPanel asset={normalizedAsset} pressNews={relatedPressNews} matchEvents={relatedMatchEvents} />
               </div>
               <div className="space-y-6">
+                <TeamPerformanceChart teamName={normalizedAsset.name} formScore={formScore} matches={allTeamMatches} />
                 <TeamRadarChart teamId={normalizedAsset.id} teamName={normalizedAsset.name} formScore={formScore} squadDepth={squadDepth} />
                 <GroupStandingsWidget team={normalizedAsset} allGroupTeams={groupTeams} />
               </div>
