@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Activity, AlertTriangle, Clock, Database, Goal, Radio } from 'lucide-react';
+import { AlertTriangle, Goal, Radio } from 'lucide-react';
 
 type Team = { id?: string; name?: string; code?: string; image?: string } | null;
 type Snapshot = Record<string, any> | null;
@@ -71,16 +71,6 @@ function eventLabel(type: string) {
   return 'حدث مهم';
 }
 
-function hasAnyStat(snapshot: Snapshot) {
-  if (!snapshot) return false;
-  return [
-    'homePossession', 'awayPossession', 'homeAttacks', 'awayAttacks',
-    'homeDangerousAttacks', 'awayDangerousAttacks', 'homeShots', 'awayShots',
-    'homeShotsOnTarget', 'awayShotsOnTarget', 'homeShotsOffTarget', 'awayShotsOffTarget',
-    'homeCorners', 'awayCorners', 'homeYellowCards', 'awayYellowCards', 'homeRedCards', 'awayRedCards',
-  ].some((key) => snapshot[key] !== null && snapshot[key] !== undefined);
-}
-
 function inferBallPosition(event?: MatchEvent | null) {
   if (!event) return { left: 50, top: 50, label: 'منتصف الملعب' };
   const type = event.type.toLowerCase();
@@ -124,7 +114,6 @@ function MiniStat({ label, home, away, accent = false }: { label: string; home: 
 export default function InternalAnimationPlayer({ matchId = '', dbMatchId = '' }: { matchId?: string; dbMatchId?: string }) {
   const [stats, setStats] = useState<LiveStatsResponse | null>(null);
   const [events, setEvents] = useState<MatchEvent[]>([]);
-  const [eventsUpdatedAt, setEventsUpdatedAt] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -156,7 +145,6 @@ export default function InternalAnimationPlayer({ matchId = '', dbMatchId = '' }
       const json: LiveEventsResponse = await response.json();
       if (json?.ok) {
         setEvents(json.events || []);
-        setEventsUpdatedAt(json.updatedAt || new Date().toISOString());
       }
     } catch {
       // Keep the last known events on screen.
@@ -183,7 +171,6 @@ export default function InternalAnimationPlayer({ matchId = '', dbMatchId = '' }
   const match = stats?.match;
   const lastEvent = events[0] || null;
   const ball = useMemo(() => inferBallPosition(lastEvent), [lastEvent]);
-  const hasStats = Boolean(stats?.hasStats || hasAnyStat(latest));
   const homeName = match?.homeTeam?.name || 'الفريق الأول';
   const awayName = match?.awayTeam?.name || 'الفريق الثاني';
   const homeScore = statValue(latest, 'homeScore') ?? match?.homeScore ?? 0;
@@ -191,7 +178,7 @@ export default function InternalAnimationPlayer({ matchId = '', dbMatchId = '' }
   const minute = inferLiveMinute(match, latest);
 
   if (loading) {
-    return <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.03] p-10 text-center text-sm text-gray-400">جاري تحميل المشغل الداخلي...</div>;
+    return <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.03] p-10 text-center text-sm text-gray-400">جاري تحميل المشغل...</div>;
   }
 
   if (error) {
@@ -200,24 +187,6 @@ export default function InternalAnimationPlayer({ matchId = '', dbMatchId = '' }
 
   return (
     <section className="overflow-hidden rounded-3xl border border-white/10 bg-[radial-gradient(circle_at_top,rgba(15,240,252,0.12),transparent_34%),linear-gradient(180deg,rgba(255,255,255,0.055),rgba(255,255,255,0.015))] shadow-[0_25px_90px_rgba(0,0,0,0.45)]">
-      <div className="border-b border-white/10 bg-black/25 p-4">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <p className="inline-flex items-center gap-2 rounded-full border border-emerald-400/25 bg-emerald-400/10 px-3 py-1 text-[10px] font-black text-emerald-200"><Database size={13} /> Internal DB Animation</p>
-            <h2 className="mt-2 text-2xl font-black text-white">بث أنيميشن داخلي من قاعدة البيانات</h2>
-            <p className="mt-1 text-xs leading-5 text-gray-400">تظهر المباراة فورًا من قاعدة البيانات، حتى قبل وصول أول Snapshot للإحصائيات.</p>
-          </div>
-          <div className="flex flex-wrap gap-2 text-xs font-black">
-            <span className="rounded-full border border-white/10 bg-black/30 px-3 py-1 text-gray-300"><Clock size={13} className="inline" /> إحصائيات: {stats?.updatedAt ? new Date(stats.updatedAt).toLocaleTimeString('ar-EG') : '—'}</span>
-            <span className="rounded-full border border-white/10 bg-black/30 px-3 py-1 text-gray-300"><Activity size={13} className="inline" /> أحداث: {eventsUpdatedAt ? new Date(eventsUpdatedAt).toLocaleTimeString('ar-EG') : '—'}</span>
-          </div>
-        </div>
-      </div>
-
-      {!hasStats && (
-        <div className="mx-4 mt-4 rounded-2xl border border-[#FFD700]/20 bg-[#FFD700]/10 p-3 text-xs font-bold leading-6 text-[#FFD700]"><AlertTriangle size={15} className="inline" /> لا توجد أرقام إحصائية محفوظة بعد. سيتم عرض الفرق والنتيجة والزمن من جدول المباراة حتى وصول أول Snapshot.</div>
-      )}
-
       <div className="grid gap-4 p-4 xl:grid-cols-[1.35fr_0.65fr]">
         <div className="space-y-4">
           <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 rounded-2xl border border-white/10 bg-black/30 p-4 text-center">
@@ -281,7 +250,6 @@ export default function InternalAnimationPlayer({ matchId = '', dbMatchId = '' }
           <div className="mb-3 flex items-center justify-between gap-2">
             <div>
               <h3 className="font-black text-white">Timeline الأحداث المهمة</h3>
-              <p className="text-xs text-gray-500">هذا القسم سريع لكنه يقرأ من قاعدة البيانات فقط.</p>
             </div>
             <Goal className="text-[#FFD700]" size={22} />
           </div>
@@ -296,10 +264,6 @@ export default function InternalAnimationPlayer({ matchId = '', dbMatchId = '' }
             )}
           </div>
         </aside>
-      </div>
-
-      <div className="border-t border-white/10 bg-black/25 p-3 text-[11px] font-bold leading-5 text-gray-400">
-        <span className="inline-flex items-center gap-2 text-emerald-200"><Database size={14} /> وضع داخلي موفر:</span> عدد المشاهدين لا يطلب أي API خارجي. الزوار يقرأون بيانات محفوظة من قاعدة البيانات فقط.
       </div>
     </section>
   );
