@@ -313,10 +313,21 @@ export default function HomeClientSportsNext({ initialAssets, upcomingMatches = 
 
   const mobileLinks = [
     { title: 'المباريات', subtitle: 'نتائج ومواعيد', href: '/matches', icon: Radio, tone: 'border-red-400/25 bg-red-500/10 text-red-300' },
+    { title: 'البوابة', subtitle: 'دليل سريع', href: '#worldcup-gateway', icon: Sparkles, tone: 'border-[#0FF0FC]/25 bg-[#0FF0FC]/10 text-[#0FF0FC]' },
     { title: 'الأخبار', subtitle: 'موثق وسريع', href: '#news', icon: Newspaper, tone: 'border-[#FFD700]/25 bg-[#FFD700]/10 text-[#FFD700]' },
     { title: 'التحليل', subtitle: 'قبل وبعد', href: '#analysis', icon: LineChart, tone: 'border-[#0FF0FC]/25 bg-[#0FF0FC]/10 text-[#0FF0FC]' },
     { title: 'المنتخبات', subtitle: 'بطاقات وقوائم', href: '#teams', icon: Trophy, tone: 'border-emerald-400/25 bg-emerald-400/10 text-emerald-300' },
     { title: 'البورصة', subtitle: 'ترفيه افتراضي', href: '#fan-exchange', icon: BarChart3, tone: 'border-violet-400/25 bg-violet-400/10 text-violet-300' },
+  ];
+
+  const gatewayCards = [
+    { title: 'مركز المباريات', text: 'مواعيد، نتائج، مباريات اليوم، وحالة كل مباراة عند توفر البيانات الحية.', href: '/matches', icon: Radio, tone: 'border-red-400/25 bg-red-500/[0.07] text-red-300' },
+    { title: 'المجموعات', text: 'عرض مجموعات كأس العالم 2026 وترتيب المنتخبات داخل كل مجموعة.', href: '/groups', icon: Trophy, tone: 'border-emerald-400/25 bg-emerald-400/[0.07] text-emerald-300' },
+    { title: 'دليل المنتخبات', text: 'صفحات خاصة لكل منتخب تشمل المعلومات الأساسية، الأداء، أبرز الأسماء، والتحليل المتاح.', href: '/market?type=TEAM', icon: ShieldCheck, tone: 'border-[#0FF0FC]/25 bg-[#0FF0FC]/[0.07] text-[#0FF0FC]' },
+    { title: 'المدن والملاعب', text: 'تعريف بالمدن المستضيفة والملاعب التي ستقام عليها مباريات البطولة.', href: '#host-cities', icon: Globe, tone: 'border-white/15 bg-white/[0.045] text-gray-200' },
+    { title: 'الإحصائيات', text: 'أرقام البطولة، المنتخبات، المباريات، والأداء عند توفر مصادر موثوقة.', href: '/methodology', icon: BarChart3, tone: 'border-violet-400/25 bg-violet-400/[0.07] text-violet-300' },
+    { title: 'الأخبار والتحليل', text: 'تقارير رياضية وتحليل فني منفصل عن أي جانب ترفيهي أو افتراضي.', href: '/articles', icon: Newspaper, tone: 'border-[#FFD700]/25 bg-[#FFD700]/[0.07] text-[#FFD700]' },
+    { title: 'البورصة الافتراضية', text: 'تجربة تفاعلية ترفيهية مستوحاة من البطولة، بدون أموال حقيقية أو مراهنات أو توصيات شراء وبيع.', href: '/market', icon: Wallet, tone: 'border-orange-400/25 bg-orange-400/[0.07] text-orange-300' },
   ];
 
   const analysisCards = [
@@ -379,11 +390,11 @@ export default function HomeClientSportsNext({ initialAssets, upcomingMatches = 
         <div className="relative grid gap-4 lg:grid-cols-[0.96fr_1.04fr] lg:items-start">
           <div className="flex flex-col justify-start pt-1">
             <div className="mb-2 flex flex-wrap items-center gap-2">
-              <p className="inline-flex w-fit items-center gap-2 rounded-full border border-[#0FF0FC]/25 bg-[#0FF0FC]/10 px-3 py-1 text-[10px] font-black text-[#0FF0FC]"><Sparkles size={13} /> كأس العالم مع MC PRIME</p>
+              <p className="inline-flex w-fit items-center gap-2 rounded-full border border-[#0FF0FC]/25 bg-[#0FF0FC]/10 px-3 py-1 text-[10px] font-black text-[#0FF0FC]"><Sparkles size={13} /> بورصة المونديال 2026</p>
               <span className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[10px] font-black ${heroStatus.cls}`}><span className={`h-2 w-2 rounded-full ${heroStatus.dot}`} />{heroStatus.label}</span>
             </div>
-            <h1 className="max-w-3xl text-xl font-black leading-tight text-white sm:text-2xl md:text-3xl">كل ما يحدث في كأس العالم… مباشر، موثق، وتحليلي</h1>
-            <p className="mt-2 max-w-2xl text-[11px] leading-5 text-gray-300 sm:text-xs md:text-sm">ابدأ من المباراة والنتيجة والخبر، ثم انتقل للتحليل الكروي وصفحات المنتخبات. البورصة طبقة ترفيهية افتراضية في النهاية.</p>
+            <h1 className="max-w-3xl text-xl font-black leading-tight text-white sm:text-2xl md:text-3xl">منصة كأس العالم 2026… مباريات، تحليل، وإحصائيات في تجربة واحدة</h1>
+            <p className="mt-2 max-w-2xl text-[11px] leading-5 text-gray-300 sm:text-xs md:text-sm">ابدأ من مباريات اليوم والنتائج، ثم انتقل إلى المجموعات والمنتخبات والتحليل الرياضي. البورصة الافتراضية داخل المنصة طبقة ترفيهية فقط، بدون أموال حقيقية أو مراهنات أو توصيات شراء وبيع.</p>
             <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
               {heroStats.map((stat) => {
                 const Icon = stat.icon;
@@ -392,7 +403,8 @@ export default function HomeClientSportsNext({ initialAssets, upcomingMatches = 
             </div>
             <div className="mt-3 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
               <Link href="/matches" className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#0FF0FC] px-3 py-2 text-xs font-black text-black transition hover:bg-[#70f7ff]"><Radio size={16} /> مركز المباريات</Link>
-              <Link href="/articles" className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-xs font-black text-white transition hover:bg-white/15"><Newspaper size={16} /> الأخبار والتحليل</Link>
+              <Link href="#worldcup-gateway" className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-xs font-black text-white transition hover:bg-white/15"><Sparkles size={16} /> بوابة البطولة</Link>
+              <Link href="/market?type=TEAM" className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-xs font-black text-white transition hover:bg-white/15"><Trophy size={16} /> دليل المنتخبات</Link>
             </div>
           </div>
           <div className="rounded-[1.25rem] border border-white/10 bg-black/40 p-3 backdrop-blur-xl sm:p-4">
@@ -416,6 +428,46 @@ export default function HomeClientSportsNext({ initialAssets, upcomingMatches = 
               <div className="rounded-2xl border border-dashed border-white/10 p-6 text-center text-sm text-gray-500">لم يتم تحميل مباريات بعد.<Link href="/matches" className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-[#0FF0FC]/25 bg-[#0FF0FC]/10 px-3 py-2 text-xs font-black text-[#0FF0FC]">فتح صفحة المباريات <ArrowLeft size={14} /></Link></div>
             )}
           </div>
+        </div>
+      </section>
+
+      <section id="worldcup-gateway" className="scroll-mt-24 rounded-[1.6rem] border border-[#0FF0FC]/16 bg-[linear-gradient(135deg,rgba(15,240,252,0.075),rgba(255,255,255,0.025))] p-4 sm:p-5">
+        <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <p className="inline-flex items-center gap-2 rounded-full border border-[#0FF0FC]/25 bg-[#0FF0FC]/10 px-3 py-1 text-[10px] font-black text-[#0FF0FC]"><Sparkles size={13} /> بوابة كأس العالم 2026</p>
+            <h2 className="mt-3 text-xl font-black text-white sm:text-2xl">كل ما تحتاجه لمتابعة كأس العالم 2026 في مكان واحد</h2>
+            <p className="mt-2 max-w-4xl text-sm leading-7 text-gray-400">هذا القسم مستوحى من تنظيم صفحة World Cup Hub، لكنه مصمم لهوية بورصة المونديال: منصة رياضية شاملة تبدأ بالمباريات والمجموعات والمنتخبات والإحصائيات، ثم تضيف تجربة بورصة افتراضية ترفيهية في النهاية.</p>
+          </div>
+          <Link href="/matches" className="inline-flex w-fit items-center gap-2 rounded-xl border border-[#FFD700]/25 bg-[#FFD700]/10 px-4 py-2 text-xs font-black text-[#FFD700] transition hover:bg-[#FFD700] hover:text-black">ابدأ من مباريات اليوم <ArrowLeft size={14} /></Link>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {gatewayCards.map((card) => {
+            const Icon = card.icon;
+            return (
+              <Link key={card.title} href={card.href} className={`group rounded-2xl border p-4 transition hover:-translate-y-1 hover:bg-white/[0.065] ${card.tone}`}>
+                <div className="mb-4 flex items-center justify-between gap-3">
+                  <span className="flex h-11 w-11 items-center justify-center rounded-2xl border border-current/20 bg-black/25"><Icon size={22} /></span>
+                  <ArrowLeft className="opacity-45 transition group-hover:-translate-x-1 group-hover:opacity-100" size={16} />
+                </div>
+                <h3 className="text-base font-black text-white">{card.title}</h3>
+                <p className="mt-2 min-h-[72px] text-xs leading-6 text-gray-400">{card.text}</p>
+              </Link>
+            );
+          })}
+        </div>
+        <div className="mt-4 rounded-2xl border border-orange-400/20 bg-orange-400/[0.055] p-4 text-xs font-bold leading-6 text-orange-100">
+          تنبيه مهم: البورصة الافتراضية داخل المنصة تجربة ترفيهية تعليمية مستوحاة من أداء البطولة، ولا تمثل تداولًا ماليًا حقيقيًا أو مراهنات أو توصيات شراء وبيع.
+        </div>
+      </section>
+
+      <section id="host-cities" className="scroll-mt-24 rounded-[1.45rem] border border-white/10 bg-white/[0.03] p-4 sm:p-5">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div>
+            <p className="text-xs font-black text-[#FFD700]">Host Cities & Stadiums</p>
+            <h2 className="mt-1 text-xl font-black text-white sm:text-2xl">المدن والملاعب</h2>
+            <p className="mt-2 max-w-3xl text-sm leading-7 text-gray-400">مساحة مخصصة لتعريف الزائر بالمدن المستضيفة والملاعب. عند إضافة بيانات المدن والملاعب أو مقالاتها ستتحول إلى كروت تفصيلية وروابط مباشرة.</p>
+          </div>
+          <Link href="/articles" className="inline-flex items-center justify-center gap-2 rounded-xl border border-[#FFD700]/25 bg-[#FFD700]/10 px-4 py-2 text-xs font-black text-[#FFD700] transition hover:bg-[#FFD700] hover:text-black">مقالات البطولة <ArrowLeft size={14} /></Link>
         </div>
       </section>
 
@@ -467,20 +519,23 @@ export default function HomeClientSportsNext({ initialAssets, upcomingMatches = 
           </div>
         </div>
         <div id="fan-exchange" className="scroll-mt-24 rounded-[1.6rem] border border-[#FFD700]/20 bg-[#FFD700]/[0.045] p-4 sm:p-5">
-          <div className="mb-4 flex items-center justify-between"><div><p className="text-xs font-black text-[#FFD700]">Virtual Fan Exchange</p><h2 className="mt-1 text-xl font-black text-white sm:text-2xl">بورصة المونديال الترفيهية</h2></div><BarChart3 className="text-[#FFD700]" size={28} /></div>
-          <p className="text-sm leading-7 text-gray-300">أسعار ومؤشرات افتراضية تعكس الأداء والزخم والتفاعل داخل المنصة. الهدف ترفيهي وتعليمي.</p>
+          <div className="mb-4 flex items-center justify-between gap-3"><div><p className="text-xs font-black text-[#FFD700]">Virtual Fan Exchange</p><h2 className="mt-1 text-xl font-black text-white sm:text-2xl">البورصة الافتراضية</h2></div><Wallet className="text-[#FFD700]" size={26} /></div>
+          <p className="rounded-2xl border border-[#FFD700]/20 bg-black/25 p-4 text-sm leading-7 text-gray-300">طبقة تفاعلية ترفيهية مستوحاة من أداء المنتخبات واللاعبين داخل البطولة. لا توجد أموال حقيقية، ولا مراهنات، ولا توصيات شراء أو بيع.</p>
           <div className="mt-4 space-y-3">
             {marketMovers.length ? marketMovers.map((asset) => {
-              const value = change(asset);
+              const assetChange = change(asset);
               return (
-                <div key={asset.id || asset.name} className="flex items-center justify-between gap-3 rounded-2xl border border-white/8 bg-black/25 p-3 transition hover:border-[#FFD700]/30 hover:bg-white/[0.055]">
-                  <Link href={asset?.id ? `/asset/${asset.id}` : '/market'} className="flex min-w-0 flex-1 items-center gap-3"><AssetImage image={asset?.image} name={asset?.name || 'أصل افتراضي'} type={asset?.type || 'TEAM'} width={42} height={42} className="h-11 w-11 rounded-full border border-white/10 bg-black/40 object-cover" /><div className="min-w-0"><div className="truncate text-sm font-black text-white">{asset?.name || 'أصل افتراضي'}</div><div className="mt-1 text-[11px] font-bold text-gray-500">السعر الافتراضي: {price(asset) ? price(asset).toLocaleString('ar-EG', { maximumFractionDigits: 2 }) : 'غير متوفر'}</div></div></Link>
-                  <div className="flex shrink-0 items-center gap-2"><span className={`rounded-full px-3 py-1 text-xs font-black ${value > 0 ? 'bg-emerald-400/10 text-emerald-300' : value < 0 ? 'bg-red-500/10 text-red-300' : 'bg-white/10 text-gray-300'}`}>{changeText(value)}</span><button type="button" onClick={() => shareAssetOpinion(asset)} className="inline-flex items-center gap-1 rounded-full border border-[#FFD700]/25 bg-[#FFD700]/10 px-3 py-1 text-[11px] font-black text-[#FFD700] transition hover:bg-[#FFD700] hover:text-black"><Share2 size={13} /> شارك رأيك</button></div>
+                <div key={asset.id || asset.name} className="flex items-center justify-between gap-3 rounded-2xl border border-white/8 bg-black/25 p-3">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <AssetImage image={asset?.image} name={asset?.name || 'أصل'} type={asset?.type || 'TEAM'} width={42} height={42} className="h-11 w-11 rounded-full border border-white/10 bg-black/40 object-cover" />
+                    <div className="min-w-0"><Link href={asset?.id ? `/asset/${asset.id}` : '/market'} className="truncate text-sm font-black text-white hover:text-[#FFD700]">{asset?.name || 'أصل افتراضي'}</Link><div className="mt-1 text-[11px] font-bold text-gray-500">{price(asset).toLocaleString('ar-EG')} ¢</div></div>
+                  </div>
+                  <button onClick={() => shareAssetOpinion(asset)} className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[10px] font-black text-gray-300 transition hover:border-[#FFD700]/25 hover:text-[#FFD700]"><Share2 size={12} /> {changeText(assetChange)}</button>
                 </div>
               );
-            }) : <div className="rounded-2xl border border-dashed border-white/10 p-5 text-center text-sm text-gray-500">لا توجد مؤشرات سوق كافية بعد.</div>}
+            }) : <div className="rounded-2xl border border-dashed border-white/10 p-4 text-sm text-gray-500">لا توجد حركة أسعار افتراضية محملة حاليًا.</div>}
           </div>
-          <Link href="/market" className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-[#FFD700] px-5 py-3 text-sm font-black text-black transition hover:bg-[#ffe766]">ادخل البورصة الافتراضية <ArrowLeft size={16} /></Link>
+          <Link href="/market" className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#FFD700] px-3 py-2 text-xs font-black text-black transition hover:bg-[#ffe570]">فتح السوق الافتراضي <ArrowLeft size={14} /></Link>
         </div>
       </section>
     </main>
