@@ -26,14 +26,29 @@ function isFinished(status?: string | null) {
   return String(status || '').toUpperCase() === 'FINISHED';
 }
 
+function isScheduledButProbablyLive(match: any) {
+  if (String(match?.status || '').toUpperCase() !== 'SCHEDULED') return false;
+  if (!match?.matchDate) return false;
+  const start = new Date(match.matchDate).getTime();
+  if (!Number.isFinite(start)) return false;
+  const diffMinutes = Math.floor((Date.now() - start) / 60_000);
+  return diffMinutes >= -10 && diffMinutes <= 150;
+}
+
+function isAutoSyncCandidate(match: any, force: boolean) {
+  if (force) return true;
+  if (!match?.animationMatchId) return false;
+  return isLiveLike(match.status) || isFinished(match.status) || isScheduledButProbablyLive(match);
+}
+
 function shouldSync(match: any, latest: any, force: boolean) {
   if (force) return true;
   if (!match?.animationMatchId) return false;
+  if (!isAutoSyncCandidate(match, force)) return false;
   if (!latest) return true;
   const capturedAt = new Date(latest.capturedAt).getTime();
   if (!Number.isFinite(capturedAt)) return true;
   const ageMs = Date.now() - capturedAt;
-  if (isLiveLike(match.status) || isFinished(match.status)) return ageMs >= 300_000;
   return ageMs >= 300_000;
 }
 
@@ -55,7 +70,9 @@ export async function GET(request: Request) {
     const providerMatchId = Number(searchParams.get('matchId') || searchParams.get('animationMatchId') || 0);
     const dbMatchId = searchParams.get('dbMatchId') || searchParams.get('id') || '';
     const force = searchParams.get('force') === '1' || searchParams.get('force') === 'true';
-    const allowProviderSync = searchParams.get('sync') === '1' || searchParams.get('sync') === 'true' || force;
+    const syncParam = String(searchParams.get('sync') || '').toLowerCase();
+    const manualSyncRequested = syncParam === '1' || syncParam === 'true' || force;
+    const autoSyncDisabled = syncParam === '0' || syncParam === 'false';
 
     if (!providerMatchId && !dbMatchId) {
       return NextResponse.json({ ok: false, error: 'matchId or dbMatchId is required' }, { status: 400, headers: { 'Cache-Control': 'no-store' } });
@@ -76,8 +93,17 @@ export async function GET(request: Request) {
     let latest = await getLatestSnapshot(match.id);
     let syncResult: any = null;
     const quotaBlock = await getProviderQuotaBlock('ISPORTS');
+    const autoSyncCandidate = isAutoSyncCandidate(match, force);
+    const allowProviderSync = manualSyncRequested || (!autoSyncDisabled && autoSyncCandidate);
 
-    if (allowProviderSync && shouldSync(match, latest, force)) {
+    if (allowProviderSync && quotaBlock) {
+      syncResult = {
+        status: 'isports_guard_active',
+        note: 'Automatic provider sync skipped because iSports is temporarily blocked by the quota guard.',
+        blockedUntil: quotaBlock.blockedUntil instanceof Date ? quotaBlock.blockedUntil.toISOString() : quotaBlock.blockedUntil,
+        reason: quotaBlock.reason,
+      };
+    } else if (allowProviderSync && shouldSync(match, latest, force)) {
       try {
         syncResult = await syncMatchStats(match, { debug: false, force });
         latest = await getLatestSnapshot(match.id);
@@ -85,7 +111,9 @@ export async function GET(request: Request) {
         syncResult = { status: 'failed', ...providerErrorDetails(error) };
       }
     } else {
-      syncResult = allowProviderSync ? { status: 'cached_recent_snapshot' } : { status: 'database_only', note: 'UI polling reads stored snapshots only to protect API quota. Provider sync is handled by cron.' };
+      syncResult = allowProviderSync
+        ? { status: 'cached_recent_snapshot', autoSync: autoSyncCandidate, note: 'Latest snapshot is still fresh.' }
+        : { status: 'database_only', autoSync: autoSyncCandidate, note: autoSyncDisabled ? 'Provider sync disabled by sync=0.' : 'Match is outside automatic sync window.' };
     }
 
     const historyRows = await getSnapshotHistory(match.id, 80);
@@ -115,6 +143,7 @@ export async function GET(request: Request) {
       updatedAt: now.toISOString(),
       pollingSeconds: 300,
       providerSyncEnabled: allowProviderSync,
+      autoSyncCandidate,
       hasStats,
       sourceStatus,
       sync: syncResult,
