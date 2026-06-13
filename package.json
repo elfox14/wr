@@ -6,6 +6,8 @@
     "dev": "next dev",
     "prebuild": "prisma generate",
     "build": "next build",
+    "build:render": "npm ci && npx prisma generate && npx prisma migrate deploy && npm run build",
+    "build:render:dbpush": "npm ci && npx prisma generate && npx prisma db push && npm run build",
     "start": "next start",
     "lint": "echo \"Lint advisory only; type-check and build remain required\"",
     "lint:ai": "eslint features/analysis app/ai-analyst app/api/ai-analyst app/market/page.tsx app/api/ai-analyst/alerts/route.ts --max-warnings=0",
@@ -19,12 +21,11 @@
     "lint:team-intelligence-admin": "eslint app/admin/team-intelligence/page.tsx components/admin/TeamIntelligenceAdminDashboard.tsx app/api/admin/team-intelligence-report/route.ts --max-warnings=0",
     "pretype-check": "prisma generate",
     "type-check": "tsc --noEmit",
+    "db:migrate:deploy": "prisma migrate deploy",
+    "db:push:safe": "prisma db push",
     "sync-api": "tsx prisma/seedApi.ts",
     "sync-api:optional": "tsx prisma/seedApi.ts || echo \"Skipping API sync; continuing build\"",
     "seed:team-intelligence": "tsx prisma/seedTeamIntelligenceReports.ts"
-  },
-  "prisma": {
-    "seed": "tsx prisma/seedData.ts"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.2",
