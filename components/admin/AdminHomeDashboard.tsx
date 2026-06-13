@@ -1,8 +1,9 @@
 import Link from 'next/link';
 import AdminShell from './AdminShell';
-import { Activity, ArrowLeft, BarChart3, CalendarDays, Database, FileText, Newspaper, RefreshCcw, ShieldAlert, Sparkles, Trophy } from 'lucide-react';
+import { Activity, ArrowLeft, BarChart3, CalendarDays, Database, FileText, HeartPulse, Newspaper, RefreshCcw, ShieldAlert, Sparkles, Trophy } from 'lucide-react';
 
 const modules = [
+  { href: '/admin/system-health', title: 'حالة النظام', description: 'فحص قاعدة البيانات، السيرفر، حالة الكرون، وعدد المباريات والأصول بعد كل ديبلوي.', icon: HeartPulse, tag: 'تشغيل ومراقبة' },
   { href: '/admin/apis', title: 'اختبارات ومراقبة APIs', description: 'فحص البيئة، عرض مباريات API، live scores، أداء اللاعبين، وتنظيف المباريات الخاطئة.', icon: Activity, tag: 'تشغيل يومي' },
   { href: '/admin/worldcup-bootstrap', title: 'إعادة بناء بيانات كأس العالم', description: 'جلب المنتخبات، صورهم، اللاعبين، صور اللاعبين، المباريات، والمجموعات من المزود.', icon: Database, tag: 'تهيئة البطولة' },
   { href: '/admin/team-intelligence', title: 'إدارة تقارير المنتخبات', description: 'تشغيل seed تقارير Team Intelligence يدويًا، ثم مراجعة النتائج في مركز التحليل وIntelligence Hub.', icon: FileText, tag: 'ذكاء المنتخبات' },
