@@ -190,6 +190,7 @@ model Match {
   groupPhase  String?
   stage       String   @default("group")
   events      MatchEvent[]
+  statsSnapshots MatchStatsSnapshot[]
   @@index([animationMatchId])
 }
 
@@ -209,6 +210,46 @@ model MatchEvent {
   updatedAt  DateTime @updatedAt
   @@index([matchId, minute])
   @@index([playerId])
+}
+
+model MatchStatsSnapshot {
+  id                     String   @id
+  matchId                String
+  match                  Match    @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  provider               String   @default("ISPORTS")
+  providerMatchId        Int
+  minute                 Int?
+  homePossession         Int?
+  awayPossession         Int?
+  homeAttacks            Int?
+  awayAttacks            Int?
+  homeDangerousAttacks   Int?
+  awayDangerousAttacks   Int?
+  homeShots              Int?
+  awayShots              Int?
+  homeShotsOnTarget      Int?
+  awayShotsOnTarget      Int?
+  homeShotsOffTarget     Int?
+  awayShotsOffTarget     Int?
+  homeCorners            Int?
+  awayCorners            Int?
+  homeYellowCards        Int?
+  awayYellowCards        Int?
+  homeRedCards           Int?
+  awayRedCards           Int?
+  homeScore              Int?
+  awayScore              Int?
+  rawData                Json?
+  capturedAt             DateTime @default(now())
+  @@index([matchId, capturedAt])
+  @@index([providerMatchId])
+}
+
+model ProviderQuotaGuard {
+  provider     String   @id
+  blockedUntil DateTime
+  reason       String?
+  updatedAt    DateTime @updatedAt
 }
 
 model PriceHistory {
