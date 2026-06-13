@@ -11,6 +11,10 @@ import TeamPitchLineup from '@/components/TeamPitchLineup';
 import TeamOverviewPanel from '@/components/TeamOverviewPanel';
 import TeamRadarChart from '@/components/TeamRadarChart';
 import TeamHeroProfile from '@/components/TeamHeroProfile';
+import TeamMatchTimeline from '@/components/TeamMatchTimeline';
+import TeamInjuryTracker from '@/components/TeamInjuryTracker';
+import TeamHeadToHeadModal from '@/components/TeamHeadToHeadModal';
+import TeamTradePanel from '@/components/TeamTradePanel';
 import { AssetPageTabs } from '@/components/ui/AssetPageTabs';
 import { StickyTradeCTA } from '@/components/ui/StickyTradeCTA';
 import { FootballTechnicalAnalysis } from '@/features/analysis/components/FootballTechnicalAnalysis';
@@ -141,38 +145,64 @@ export default async function AssetPage({ params }: Props) {
   const jsonLd = asset ? { '@context': 'https://schema.org', '@type': isTeam ? 'SportsTeam' : 'Person', name: asset.name, description: isTeam ? `تحليل كروي لمنتخب ${asset.name}: التقارير، قائمة الفريق، مؤشرات الجاهزية، والمباريات.` : `تداول أسهم ${asset.name} في منصة MC PRIME Exchange. السعر المباشر: ${asset.current_price}¢.`, url: `${baseUrl}/asset/${asset.id}` } : null;
 
   // The new Pure Football layout for Teams (no tabs, no trading noise)
+  const allTeamMatches = normalizedAsset ? [...(normalizedAsset.homeMatches || []), ...(normalizedAsset.awayMatches || [])] : [];
+
   const teamProfileView = normalizedAsset && isTeam ? (
     <div className="mx-auto w-full max-w-[1600px] space-y-8 px-4 pb-20">
       <TeamHeroProfile asset={normalizedAsset} remainingMatches={3} />
       
-      <div className="flex justify-end pt-2">
+      <div className="flex flex-wrap items-center justify-end gap-3 pt-2">
+        <TeamHeadToHeadModal currentTeam={{ id: normalizedAsset.id, name: normalizedAsset.name, image: normalizedAsset.image, code: normalizedAsset.code }} />
         <Link href={`/admin/team-intelligence?teamId=${normalizedAsset.id}`} className="rounded-2xl border border-primary/30 bg-primary/10 px-4 py-3 text-xs font-black text-primary transition hover:bg-primary hover:text-black">
           إضافة / تحديث تقرير هذا المنتخب
         </Link>
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-2">
-        <TeamRadarChart teamId={normalizedAsset.id} teamName={normalizedAsset.name} formScore={formScore} squadDepth={squadDepth} />
-        <GroupStandingsWidget team={normalizedAsset} allGroupTeams={groupTeams} />
-      </div>
-
-      <div className="rounded-3xl border border-white/8 bg-white/[0.03] p-5 shadow-[0_14px_34px_rgba(0,0,0,0.2)]">
-        <FBRefStatsCards teamId={normalizedAsset.id} />
-      </div>
-
-      <div className="rounded-3xl border border-white/8 bg-white/[0.03] p-5 shadow-[0_14px_34px_rgba(0,0,0,0.2)]">
-        <TeamPitchLineup team={normalizedAsset} />
-      </div>
-
-      <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
-        <div className="rounded-3xl border border-white/8 bg-white/[0.03] p-5">
-          <FootballTechnicalAnalysis asset={normalizedAsset} />
-        </div>
-        <div className="space-y-6">
-          <TeamOverviewPanel team={normalizedAsset} />
-          <AssetRelatedNewsPanel asset={normalizedAsset} pressNews={relatedPressNews} matchEvents={relatedMatchEvents} />
-        </div>
-      </div>
+      <AssetPageTabs 
+        isTeam={true}
+        overview={
+          <div className="space-y-6">
+            <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
+              <div className="space-y-6">
+                <TeamOverviewPanel team={normalizedAsset} />
+                <AssetRelatedNewsPanel asset={normalizedAsset} pressNews={relatedPressNews} matchEvents={relatedMatchEvents} />
+              </div>
+              <div className="space-y-6">
+                <TeamRadarChart teamId={normalizedAsset.id} teamName={normalizedAsset.name} formScore={formScore} squadDepth={squadDepth} />
+                <GroupStandingsWidget team={normalizedAsset} allGroupTeams={groupTeams} />
+              </div>
+            </div>
+          </div>
+        }
+        lineup={
+          <div className="space-y-6">
+            <div className="rounded-3xl border border-white/8 bg-white/[0.03] p-5 shadow-[0_14px_34px_rgba(0,0,0,0.2)]">
+              <TeamPitchLineup team={normalizedAsset} />
+              <div className="mt-6">
+                <TeamInjuryTracker players={normalizedAsset.players} />
+              </div>
+            </div>
+          </div>
+        }
+        stats={
+          <div className="space-y-6">
+            <div className="rounded-3xl border border-white/8 bg-white/[0.03] p-5 shadow-[0_14px_34px_rgba(0,0,0,0.2)]">
+              <FBRefStatsCards teamId={normalizedAsset.id} />
+            </div>
+            <TeamMatchTimeline teamId={normalizedAsset.id} matches={allTeamMatches} />
+          </div>
+        }
+        technical={
+          <div className="rounded-3xl border border-white/8 bg-white/[0.03] p-5">
+            <FootballTechnicalAnalysis asset={normalizedAsset} />
+          </div>
+        }
+        trade={
+          <div className="rounded-3xl border border-white/8 bg-white/[0.03] p-5">
+            <TeamTradePanel assetId={normalizedAsset.id} initialPrice={normalizedAsset.current_price} fairValue={normalizedAsset.globalMarketValue ?? null} change={normalizedAsset.change} />
+          </div>
+        }
+      />
     </div>
   ) : undefined;
 

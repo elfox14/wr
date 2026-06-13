@@ -1,5 +1,8 @@
+'use client';
+
+import { useState } from 'react';
 import Link from 'next/link';
-import { AlertCircle, BadgeCheck, CircleDot, ShieldCheck, Users } from 'lucide-react';
+import { AlertCircle, BadgeCheck, CircleDot, ShieldCheck, Users, Star, Filter, TrendingUp } from 'lucide-react';
 import { AssetImage } from '@/components/ui/AssetImage';
 
 type PlayerAsset = {
@@ -145,6 +148,8 @@ function SubstituteCard({ player }: { player: PlayerAsset }) {
 }
 
 export default function TeamPitchLineup({ team }: { team: any }) {
+  const [posFilter, setPosFilter] = useState<string>('ALL');
+
   const players: PlayerAsset[] = Array.isArray(team?.players) ? team.players : [];
   const officialLineup: OfficialLineup | null = team?.officialLineup || null;
 
@@ -159,32 +164,75 @@ export default function TeamPitchLineup({ team }: { team: any }) {
   const substitutes = hasOfficialLineup
     ? [...officialSubstitutes, ...sortBest(players.filter((player) => !starterIds.has(player.id) && !officialSubIds.has(player.id))).slice(0, 12)]
     : sortBest(players.filter((player) => !starterIds.has(player.id))).slice(0, 18);
+  
   const lines = splitLines(starters);
   const statusLabel = hasOfficialLineup ? 'تشكيل رسمي من API' : 'تشكيل متوقع حسب البيانات';
   const sourceHint = hasOfficialLineup
     ? `مصدر التشكيل: ${officialLineup?.source || 'API'}${officialLineup?.fixtureId ? ` • Fixture ${officialLineup.fixtureId}` : ''}`
-    : 'لم يتوفر Lineup رسمي بعد؛ تم ترتيب الأساسيين حسب المركز، التقييم، والسعر الافتراضي.';
+    : 'لم يتوفر Lineup رسمي بعد؛ تم ترتيب الأساسيين حسب المركز والتقييم.';
+
+  // Derived metrics for the enhanced features
+  const avgStarterScore = starters.length ? Math.round(starters.reduce((acc, p) => acc + scoreOf(p), 0) / starters.length) : 0;
+  const top3Players = sortBest(players).slice(0, 3);
+  
+  const filteredSubstitutes = substitutes.filter(p => posFilter === 'ALL' || normalizePosition(p.position) === posFilter);
 
   return (
-    <section className="mx-auto mb-4 w-full max-w-[1600px] px-3 lg:px-4">
-      <div className="rounded-[1.7rem] border border-emerald-400/15 bg-[#101217] p-3 shadow-card lg:rounded-3xl lg:p-6">
+    <section className="mx-auto mb-4 w-full px-3 lg:px-4">
+      {/* Top Section: Highlight & Metrics */}
+      <div className="mb-6 grid gap-4 lg:grid-cols-[1fr_300px]">
+        {/* Highlighted Top 3 Players */}
+        <div className="rounded-[1.7rem] border border-white/10 bg-white/[0.02] p-5">
+          <div className="mb-4 flex items-center gap-2">
+            <Star size={16} className="text-[#FFD700]" />
+            <h3 className="font-black text-white">أبرز نجوم المنتخب</h3>
+          </div>
+          <div className="grid grid-cols-3 gap-3">
+            {top3Players.map((player, idx) => (
+              <Link href={`/asset/${player.id}`} key={player.id} className="relative flex flex-col items-center justify-center rounded-2xl border border-white/5 bg-black/40 p-3 transition hover:bg-white/5 active:scale-95">
+                {idx === 0 && <span className="absolute -top-2 rounded-full bg-[#FFD700] px-2 py-0.5 text-[9px] font-black text-black">الأفضل</span>}
+                <AssetImage image={player.image || ''} type="PLAYER" name={player.name} width={48} height={48} className="mb-2 h-12 w-12 rounded-full object-cover border border-white/10" />
+                <span className="truncate w-full text-center text-xs font-black text-white">{player.name}</span>
+                <span className="text-[10px] text-gray-400">{scoreOf(player)}/100</span>
+              </Link>
+            ))}
+          </div>
+        </div>
+
+        {/* Quick Team Lineup Metrics */}
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-1 items-center gap-4 rounded-[1.7rem] border border-white/10 bg-white/[0.02] p-4">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#0FF0FC]/10">
+              <TrendingUp size={20} className="text-[#0FF0FC]" />
+            </div>
+            <div>
+              <p className="text-[10px] font-bold text-gray-500">متوسط تقييم الأساسيين</p>
+              <p className="text-2xl font-black text-[#0FF0FC]">{avgStarterScore}</p>
+            </div>
+          </div>
+          <div className="flex flex-1 items-center gap-4 rounded-[1.7rem] border border-white/10 bg-white/[0.02] p-4">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-emerald-400/10">
+              <Users size={20} className="text-emerald-400" />
+            </div>
+            <div>
+              <p className="text-[10px] font-bold text-gray-500">إجمالي القائمة</p>
+              <p className="text-2xl font-black text-emerald-400">{players.length} لاعب</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="rounded-[1.7rem] border border-emerald-400/15 bg-black/20 p-3 lg:rounded-3xl lg:p-6">
         <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <div className="mb-2 flex flex-wrap items-center gap-2">
-              <span className="inline-flex items-center gap-2 rounded-xl border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-xs font-black text-emerald-300"><ShieldCheck size={14} /> قائمة الفريق</span>
+              <span className="inline-flex items-center gap-2 rounded-xl border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-xs font-black text-emerald-300"><ShieldCheck size={14} /> الخطة والتشكيل</span>
               <span className={`inline-flex items-center gap-2 rounded-xl border px-3 py-1 text-xs font-black ${hasOfficialLineup ? 'border-[#0FF0FC]/30 bg-[#0FF0FC]/10 text-[#0FF0FC]' : 'border-[#FFD700]/30 bg-[#FFD700]/10 text-[#FFD700]'}`}>
                 {hasOfficialLineup ? <BadgeCheck size={14} /> : <AlertCircle size={14} />}{statusLabel}
               </span>
               {officialLineup?.formation && <span className="rounded-xl border border-white/10 bg-white/5 px-3 py-1 text-xs font-black text-gray-300">الخطة {officialLineup.formation}</span>}
             </div>
-            <h2 className="text-xl font-black text-white lg:text-3xl">قائمة الفريق</h2>
-            <p className="mt-1 hidden max-w-4xl text-sm leading-7 text-gray-400 lg:block">الأساسيون داخل الملعب والاحتياطيون حوله. {sourceHint}</p>
-            <p className="mt-1 text-xs leading-6 text-gray-400 lg:hidden">عرض مختصر للتشكيل الأساسي والاحتياطيين بدون مساحة ملعب فارغة.</p>
-          </div>
-          <div className="grid grid-cols-3 gap-2 text-center text-xs">
-            <div className="rounded-2xl border border-white/10 bg-black/30 px-3 py-2 lg:px-4 lg:py-3"><p className="text-gray-500">الأساسيون</p><p className="text-lg font-black text-white lg:text-xl">{starters.length}</p></div>
-            <div className="rounded-2xl border border-white/10 bg-black/30 px-3 py-2 lg:px-4 lg:py-3"><p className="text-gray-500">الاحتياطيون</p><p className="text-lg font-black text-white lg:text-xl">{substitutes.length}</p></div>
-            <div className="rounded-2xl border border-white/10 bg-black/30 px-3 py-2 lg:px-4 lg:py-3"><p className="text-gray-500">القائمة</p><p className="text-lg font-black text-white lg:text-xl">{players.length}</p></div>
+            <p className="mt-1 hidden max-w-4xl text-sm leading-7 text-gray-400 lg:block">{sourceHint}</p>
           </div>
         </div>
 
@@ -193,27 +241,16 @@ export default function TeamPitchLineup({ team }: { team: any }) {
             لا توجد قائمة لاعبين مرتبطة بهذا المنتخب بعد. بعد جلب لاعبي المنتخب سيظهر الملعب والبدلاء هنا.
           </div>
         ) : (
-          <div className="grid gap-4 xl:grid-cols-[1fr_340px]">
-            <div className="block rounded-[1.5rem] border border-emerald-400/20 bg-[radial-gradient(circle_at_top,rgba(16,185,129,0.20),rgba(4,18,14,0.96))] p-3 lg:hidden">
-              <div className="mb-3 flex items-center justify-between">
-                <h3 className="font-black text-white">التشكيل الأساسي</h3>
-                <span className="rounded-full bg-emerald-400/10 px-3 py-1 text-[10px] font-black text-emerald-300">Starting XI</span>
-              </div>
-              <div className="space-y-2">
-                <MobileLine title="الهجوم" players={lines.FWD.length ? lines.FWD : lines.OTHER.slice(0, 3)} />
-                <MobileLine title="الوسط" players={lines.MID} />
-                <MobileLine title="الدفاع" players={lines.DEF} />
-                <MobileLine title="حراسة المرمى" players={lines.GK.length ? lines.GK : lines.OTHER.slice(3, 4)} />
-              </div>
-            </div>
-
-            <div className="relative hidden overflow-hidden rounded-[2rem] border border-emerald-400/20 bg-[radial-gradient(circle_at_center,rgba(16,185,129,0.30),rgba(2,44,34,0.92))] p-6 shadow-inner lg:block">
-              <div className="absolute inset-4 rounded-[1.5rem] border-2 border-white/15" />
-              <div className="absolute left-1/2 top-1/2 h-24 w-24 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white/15" />
-              <div className="absolute left-1/2 top-1/2 h-px w-[calc(100%-2rem)] -translate-x-1/2 bg-white/15" />
-              <div className="absolute left-1/2 top-0 h-20 w-44 -translate-x-1/2 rounded-b-full border-x-2 border-b-2 border-white/15" />
-              <div className="absolute bottom-0 left-1/2 h-20 w-44 -translate-x-1/2 rounded-t-full border-x-2 border-t-2 border-white/15" />
-              <div className="relative z-10 flex min-h-[560px] flex-col justify-between py-6">
+          <div className="grid gap-4 xl:grid-cols-[1fr_360px]">
+            {/* The Pitch */}
+            <div className="relative overflow-hidden rounded-[2rem] border border-emerald-400/20 bg-[radial-gradient(circle_at_center,rgba(16,185,129,0.25),rgba(2,36,26,0.95))] p-6 shadow-inner min-h-[500px]">
+              <div className="absolute inset-4 rounded-[1.5rem] border-2 border-white/10" />
+              <div className="absolute left-1/2 top-1/2 h-24 w-24 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white/10" />
+              <div className="absolute left-1/2 top-1/2 h-px w-[calc(100%-2rem)] -translate-x-1/2 bg-white/10" />
+              <div className="absolute left-1/2 top-0 h-20 w-44 -translate-x-1/2 rounded-b-full border-x-2 border-b-2 border-white/10" />
+              <div className="absolute bottom-0 left-1/2 h-20 w-44 -translate-x-1/2 rounded-t-full border-x-2 border-t-2 border-white/10" />
+              
+              <div className="relative z-10 flex h-full flex-col justify-between py-4">
                 <Line players={lines.FWD.length ? lines.FWD : lines.OTHER.slice(0, 3)} />
                 <Line players={lines.MID} />
                 <Line players={lines.DEF} />
@@ -221,39 +258,35 @@ export default function TeamPitchLineup({ team }: { team: any }) {
               </div>
             </div>
 
-            <aside className="rounded-[1.5rem] border border-white/10 bg-white/[0.04] p-3 lg:rounded-[2rem] lg:p-4">
-              <div className="mb-3 hidden items-center justify-between gap-3 lg:flex lg:mb-4">
-                <h3 className="flex items-center gap-2 font-black text-white"><Users size={18} className="text-[#FFD700]" /> الاحتياطيون</h3>
-                <span className="rounded-full bg-[#FFD700]/10 px-2 py-1 text-[10px] font-black text-[#FFD700]">Bench</span>
+            {/* Substitutes & Roster */}
+            <aside className="flex flex-col rounded-[2rem] border border-white/10 bg-white/[0.02] p-4">
+              <div className="mb-4 flex items-center justify-between">
+                <h3 className="flex items-center gap-2 font-black text-white"><Users size={16} className="text-[#0FF0FC]" /> الاحتياطيون والقائمة</h3>
+                <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-bold text-gray-300">{filteredSubstitutes.length} لاعب</span>
               </div>
-              {substitutes.length === 0 ? (
-                <p className="rounded-2xl border border-white/10 bg-black/30 p-4 text-sm text-gray-400">لا يوجد لاعبون احتياطيون ظاهرون حاليًا.</p>
-              ) : (
-                <>
-                  <details className="group lg:hidden">
-                    <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-2xl border border-[#FFD700]/20 bg-[#FFD700]/10 px-4 py-3 text-sm font-black text-[#FFD700] active:scale-[0.99]">
-                      <span className="flex items-center gap-2"><Users size={18} /> عرض الاحتياطيين</span>
-                      <span className="rounded-full bg-black/35 px-2 py-1 text-[11px] text-white">{substitutes.length}</span>
-                    </summary>
-                    <div className="mt-3 max-h-[58vh] space-y-2 overflow-y-auto rounded-2xl border border-white/10 bg-black/25 p-2">
-                      {substitutes.map((player) => <SubstituteCard key={player.id} player={player} />)}
-                    </div>
-                  </details>
+              
+              {/* Position Filter */}
+              <div className="mb-4 flex flex-wrap gap-2">
+                <button onClick={() => setPosFilter('ALL')} className={`rounded-xl px-3 py-1.5 text-xs font-bold transition ${posFilter === 'ALL' ? 'bg-[#0FF0FC] text-black' : 'bg-white/5 text-gray-400 hover:bg-white/10'}`}>الكل</button>
+                <button onClick={() => setPosFilter('FWD')} className={`rounded-xl px-3 py-1.5 text-xs font-bold transition ${posFilter === 'FWD' ? 'bg-primary text-black' : 'bg-white/5 text-gray-400 hover:bg-white/10'}`}>هجوم</button>
+                <button onClick={() => setPosFilter('MID')} className={`rounded-xl px-3 py-1.5 text-xs font-bold transition ${posFilter === 'MID' ? 'bg-primary text-black' : 'bg-white/5 text-gray-400 hover:bg-white/10'}`}>وسط</button>
+                <button onClick={() => setPosFilter('DEF')} className={`rounded-xl px-3 py-1.5 text-xs font-bold transition ${posFilter === 'DEF' ? 'bg-primary text-black' : 'bg-white/5 text-gray-400 hover:bg-white/10'}`}>دفاع</button>
+                <button onClick={() => setPosFilter('GK')} className={`rounded-xl px-3 py-1.5 text-xs font-bold transition ${posFilter === 'GK' ? 'bg-primary text-black' : 'bg-white/5 text-gray-400 hover:bg-white/10'}`}>حراس</button>
+              </div>
 
-                  <div className="hidden max-h-[590px] space-y-2 overflow-auto pr-1 lg:block">
-                    {substitutes.map((player) => <SubstituteCard key={player.id} player={player} />)}
+              <div className="flex-1 overflow-y-auto pr-1 space-y-2 max-h-[460px]">
+                {filteredSubstitutes.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-10 text-center opacity-50">
+                    <Filter size={24} className="mb-2" />
+                    <p className="text-sm">لا يوجد لاعبين في هذا المركز</p>
                   </div>
-                </>
-              )}
+                ) : (
+                  filteredSubstitutes.map((player) => <SubstituteCard key={player.id} player={player} />)
+                )}
+              </div>
             </aside>
           </div>
         )}
-
-        <div className="mt-4 grid gap-2 text-xs text-gray-400 lg:grid-cols-3 lg:gap-3">
-          <div className="rounded-2xl border border-white/10 bg-black/25 p-3"><CircleDot size={14} className="mb-2 text-[#0FF0FC]" /> اضغط على أي لاعب لفتح صفحة تحليله وسهمه الافتراضي.</div>
-          <div className="rounded-2xl border border-white/10 bg-black/25 p-3"><Users size={14} className="mb-2 text-[#FFD700]" /> الاحتياطيون يظهرون حسب Lineup الرسمي أو بقية القائمة عند عدم توفره.</div>
-          <div className="rounded-2xl border border-white/10 bg-black/25 p-3"><ShieldCheck size={14} className="mb-2 text-emerald-300" /> عند عدم توفر التشكيل الرسمي، يتم تمييزه بوضوح كتشكيل متوقع.</div>
-        </div>
       </div>
     </section>
   );
