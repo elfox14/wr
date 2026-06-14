@@ -9,15 +9,12 @@ import {
   BarChart3,
   CalendarDays,
   ChevronRight,
-  Flame,
   LayoutGrid,
-  LineChart,
   ListOrdered,
   ShieldCheck,
   Target,
   Trophy,
   Users,
-  Zap,
 } from 'lucide-react';
 
 type StandingRow = {
@@ -43,9 +40,6 @@ type GroupData = {
   scheduledMatches: number;
   liveMatches: number;
   avgScore: number;
-  avgMomentum: number;
-  highestDemandTeam?: Asset;
-  mostValuableTeam?: Asset;
 };
 
 type ThirdCandidate = StandingRow & { groupKey: string; groupName: string; rank: number };
@@ -68,24 +62,12 @@ function groupDomId(groupKey: string) {
   return `group-${encodeURIComponent(groupKey)}`;
 }
 
-function formatPrice(asset?: Asset | null) {
-  if (!asset) return '0¢';
-  const price = Math.round(asset.marketPrice ?? asset.current_price ?? 0);
-  return `${price.toLocaleString()}¢`;
-}
-
-function getPremiumDiscount(asset: Asset) {
-  const marketPrice = Number(asset.marketPrice ?? asset.current_price ?? 0);
-  const fairValue = Number(asset.fairValue ?? asset.current_price ?? marketPrice);
-  return fairValue > 0 ? ((marketPrice - fairValue) / fairValue) * 100 : 0;
-}
-
 function getTeamPower(team: Asset) {
   return Math.round(
-    ((team.score ?? 50) * 0.35) +
-    ((team.momentum ?? 50) * 0.25) +
-    ((team.marketDemand ?? 50) * 0.2) +
-    ((team.worldCupLegacy ?? 50) * 0.2)
+    ((team.score ?? 50) * 0.45) +
+    ((team.fundamental ?? 50) * 0.25) +
+    ((team.worldCupLegacy ?? 50) * 0.2) +
+    ((team.harmony ?? 50) * 0.1)
   );
 }
 
@@ -246,7 +228,7 @@ export default function GroupsClient() {
 
       const players = groupTeams
         .flatMap((team) => (team.players || []).map((player) => ({ ...player, team })))
-        .sort((a, b) => Number(b.marketPrice ?? b.current_price ?? 0) - Number(a.marketPrice ?? a.current_price ?? 0));
+        .sort((a, b) => getTeamPower(b.team || b) - getTeamPower(a.team || a));
 
       return {
         key,
@@ -259,9 +241,6 @@ export default function GroupsClient() {
         scheduledMatches: groupMatches.filter((match) => match.status === 'SCHEDULED').length,
         liveMatches: groupMatches.filter((match) => ['IN_PLAY', 'LIVE'].includes(match.status)).length,
         avgScore: groupTeams.length ? Math.round(groupTeams.reduce((sum, team) => sum + (team.score || 0), 0) / groupTeams.length) : 0,
-        avgMomentum: groupTeams.length ? Math.round(groupTeams.reduce((sum, team) => sum + (team.momentum || 50), 0) / groupTeams.length) : 0,
-        highestDemandTeam: [...groupTeams].sort((a, b) => (b.marketDemand || 0) - (a.marketDemand || 0))[0],
-        mostValuableTeam: [...groupTeams].sort((a, b) => Number(b.marketPrice ?? b.current_price ?? 0) - Number(a.marketPrice ?? a.current_price ?? 0))[0],
       };
     });
   }, [assets, matches]);
@@ -397,10 +376,9 @@ function GroupSection({ group }: { group: GroupData }) {
         )}
       </div>
 
-      <div className="mb-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className="mb-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         <StatCard icon={<Trophy size={18} />} label="المنتخبات" value={group.teams.length} hint="داخل المجموعة" />
-        <StatCard icon={<Target size={18} />} label="متوسط القوة" value={group.avgScore} hint="تقييم المنتخبات" accent="text-accent" />
-        <StatCard icon={<Flame size={18} />} label="متوسط الزخم" value={group.avgMomentum} hint="من بيانات السوق" accent="text-success" />
+        <StatCard icon={<Target size={18} />} label="متوسط القوة" value={group.avgScore} hint="تقييم رياضي مبدئي" accent="text-accent" />
         <StatCard icon={<Users size={18} />} label="اللاعبون" value={group.players.length} hint="مرتبطون بالمنتخبات" accent="text-yellow-300" />
       </div>
 
@@ -429,7 +407,7 @@ function GroupSection({ group }: { group: GroupData }) {
 
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
         <div className="rounded-3xl border border-white/5 bg-background/40 p-4">
-          <h3 className="mb-4 flex items-center gap-2 text-xl font-black text-white"><ShieldCheck size={20} className="text-primary" /> إحصائيات المنتخبات</h3>
+          <h3 className="mb-4 flex items-center gap-2 text-xl font-black text-white"><ShieldCheck size={20} className="text-primary" /> بطاقات المنتخبات</h3>
           <div className="grid gap-3 sm:grid-cols-2">
             {group.teams.map((team) => <TeamStatsCard key={team.id} team={team} />)}
           </div>
@@ -439,11 +417,6 @@ function GroupSection({ group }: { group: GroupData }) {
           <h3 className="mb-4 flex items-center gap-2 text-xl font-black text-white"><Users size={20} className="text-primary" /> أبرز اللاعبين</h3>
           {group.players.length === 0 ? <EmptyState title="لا توجد بيانات لاعبين" text="تأكد من ربط اللاعبين بمنتخباتهم داخل قاعدة البيانات." /> : <PlayersTable players={group.players.slice(0, 8)} />}
         </div>
-      </div>
-
-      <div className="mt-6 grid gap-4 lg:grid-cols-2">
-        <HighlightCard title="أعلى طلب سوقي" asset={group.highestDemandTeam} metric={group.highestDemandTeam ? `${Math.round(group.highestDemandTeam.marketDemand || 0)}/100` : '—'} icon={<Zap size={18} />} />
-        <HighlightCard title="أعلى سعر سوقي" asset={group.mostValuableTeam} metric={group.mostValuableTeam ? formatPrice(group.mostValuableTeam) : '—'} icon={<LineChart size={18} />} />
       </div>
     </section>
   );
@@ -467,7 +440,7 @@ function GroupStatsPanel({ group }: { group: GroupData }) {
         <MiniMetric label="الأقوى دفاعًا" value={bestDefense ? `${bestDefense.team.name} (${bestDefense.goalsAgainst})` : '—'} />
         <MiniMetric label="مباريات قادمة" value={group.scheduledMatches.toLocaleString('ar-EG')} />
         <MiniMetric label="مباشرة الآن" value={group.liveMatches.toLocaleString('ar-EG')} />
-        <MiniMetric label="فارق أقوى فريق" value={topAttack ? (topAttack.goalDifference > 0 ? `+${topAttack.goalDifference}` : String(topAttack.goalDifference)) : '—'} />
+        <MiniMetric label="أفضل فارق أهداف" value={topAttack ? (topAttack.goalDifference > 0 ? `+${topAttack.goalDifference}` : String(topAttack.goalDifference)) : '—'} />
       </div>
     </div>
   );
@@ -570,33 +543,23 @@ function TeamMini({ team, score, align = 'right' }: { team: Asset; score?: numbe
       <AssetImage image={team.image} type="TEAM" name={team.name} width={34} height={34} className="h-10 w-10 rounded-xl border border-white/10 object-cover" />
       <div className="min-w-0">
         <div className="truncate font-black text-white">{team.name}</div>
-        <div className="text-xs text-gray-500">{formatPrice(team)}</div>
+        <div className="text-xs text-gray-500">FIFA #{team.fifaRank || '-'}</div>
       </div>
       {score !== undefined && <div className="text-2xl font-black text-primary">{score}</div>}
     </div>
   );
 }
 
-function HighlightCard({ title, asset, metric, icon }: { title: string; asset?: Asset; metric: string; icon: React.ReactNode }) {
-  return (
-    <div className="rounded-3xl border border-white/5 bg-background/40 p-5">
-      <div className="mb-4 flex items-center gap-2 text-sm font-bold text-primary">{icon}{title}</div>
-      {asset ? <Link href={`/asset/${asset.id}`} className="flex items-center justify-between rounded-2xl bg-black/20 p-4 hover:bg-white/5"><div className="flex items-center gap-3"><AssetImage image={asset.image} type="TEAM" name={asset.name} width={46} height={46} className="h-12 w-12 rounded-xl object-cover" /><div><div className="font-black text-white">{asset.name}</div><div className="text-xs text-gray-500">{formatPrice(asset)}</div></div></div><div className="text-2xl font-black text-primary">{metric}</div></Link> : <p className="text-gray-500">لا توجد بيانات.</p>}
-    </div>
-  );
-}
-
 function TeamStatsCard({ team }: { team: Asset }) {
-  const premiumDiscount = getPremiumDiscount(team);
   return (
     <Link href={`/asset/${team.id}`} className="rounded-2xl border border-white/5 bg-black/20 p-4 transition-colors hover:border-primary/30">
       <div className="mb-4 flex items-start justify-between gap-3"><AssetImage image={team.image} type="TEAM" name={team.name} width={48} height={48} className="h-12 w-12 rounded-2xl object-cover" /><span className="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-xs font-bold text-gray-300">FIFA #{team.fifaRank || '-'}</span></div>
       <h4 className="mb-4 text-lg font-black text-white">{team.name}</h4>
       <div className="grid grid-cols-2 gap-2 text-xs">
-        <div className="rounded-xl bg-white/5 p-3"><div className="text-gray-500">السعر</div><div className="font-black text-white">{formatPrice(team)}</div></div>
+        <div className="rounded-xl bg-white/5 p-3"><div className="text-gray-500">القارة</div><div className="font-black text-white">{team.continent || '-'}</div></div>
         <div className="rounded-xl bg-white/5 p-3"><div className="text-gray-500">القوة</div><div className="font-black text-primary">{getTeamPower(team)}</div></div>
-        <div className="rounded-xl bg-white/5 p-3"><div className="text-gray-500">الزخم</div><div className="font-black text-success">{Math.round(team.momentum || 50)}</div></div>
-        <div className="rounded-xl bg-white/5 p-3"><div className="text-gray-500">خصم/علاوة</div><div className={premiumDiscount <= 0 ? 'font-black text-success' : 'font-black text-danger'}>{premiumDiscount > 0 ? '+' : ''}{premiumDiscount.toFixed(1)}%</div></div>
+        <div className="rounded-xl bg-white/5 p-3"><div className="text-gray-500">المدرب</div><div className="truncate font-black text-white">{team.coach || '-'}</div></div>
+        <div className="rounded-xl bg-white/5 p-3"><div className="text-gray-500">المجموعة</div><div className="font-black text-white">{normalizeGroupKey(team.group)}</div></div>
       </div>
     </Link>
   );
@@ -606,8 +569,8 @@ function PlayersTable({ players }: { players: (Asset & { team?: Asset })[] }) {
   return (
     <div className="overflow-x-auto rounded-2xl border border-white/5">
       <table className="w-full whitespace-nowrap text-right text-sm">
-        <thead className="bg-white/5 text-gray-400"><tr><th className="p-3">اللاعب</th><th className="p-3 text-center">المنتخب</th><th className="p-3 text-center">المركز</th><th className="p-3 text-center">السعر</th><th className="p-3 text-center">الزخم</th><th className="p-3 text-left">إجراء</th></tr></thead>
-        <tbody>{players.map((player) => <tr key={player.id} className="border-t border-white/5 hover:bg-white/5"><td className="p-3"><div className="flex items-center gap-3"><AssetImage image={player.image} type="PLAYER" name={player.name} width={38} height={38} className="h-10 w-10 rounded-xl border border-white/10 object-cover" /><div><div className="font-black text-white">{player.name}</div><div className="text-xs text-gray-500">{player.code}</div></div></div></td><td className="p-3 text-center text-gray-300">{player.team?.name || '-'}</td><td className="p-3 text-center"><span className="rounded-lg bg-white/5 px-2 py-1 text-xs font-bold text-gray-300">{player.position || '-'}</span></td><td className="p-3 text-center font-black text-white">{formatPrice(player)}</td><td className="p-3 text-center font-bold text-success">{Math.round(player.momentum || 50)}</td><td className="p-3 text-left"><Link href={`/asset/${player.id}`} className="inline-flex items-center gap-2 rounded-xl border border-primary/40 bg-primary/10 px-3 py-2 text-xs font-black text-primary hover:bg-primary/20">تحليل <ChevronRight size={14} /></Link></td></tr>)}</tbody>
+        <thead className="bg-white/5"><tr><th className="p-3">اللاعب</th><th className="p-3 text-center">المنتخب</th><th className="p-3 text-center">المركز</th><th className="p-3 text-center">العمر</th><th className="p-3 text-left">إجراء</th></tr></thead>
+        <tbody>{players.map((player) => <tr key={player.id} className="border-t border-white/5 hover:bg-white/5"><td className="p-3"><div className="flex items-center gap-3"><AssetImage image={player.image} type="PLAYER" name={player.name} width={38} height={38} className="h-10 w-10 rounded-xl border border-white/10 object-cover" /><div><div className="font-black text-white">{player.name}</div><div className="text-xs text-gray-500">{player.code}</div></div></div></td><td className="p-3 text-center text-gray-300">{player.team?.name || '-'}</td><td className="p-3 text-center"><span className="rounded-lg bg-white/5 px-2 py-1 text-xs font-bold text-gray-300">{player.position || '-'}</span></td><td className="p-3 text-center text-gray-300">{player.age || '-'}</td><td className="p-3 text-left"><Link href={`/asset/${player.id}`} className="inline-flex items-center gap-2 rounded-xl border border-primary/40 bg-primary/10 px-3 py-2 text-xs font-black text-primary hover:bg-primary/20">تحليل <ChevronRight size={14} /></Link></td></tr>)}</tbody>
       </table>
     </div>
   );
