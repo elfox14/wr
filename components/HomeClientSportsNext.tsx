@@ -97,8 +97,16 @@ const teamRegions = [
 
 const hostCountries = [{ name: 'أمريكا', flag: '🇺🇸' }, { name: 'كندا', flag: '🇨🇦' }, { name: 'المكسيك', flag: '🇲🇽' }] as const;
 
+const flagByCode: Record<string, string> = {
+  MEX: '🇲🇽', ZAF: '🇿🇦', RSA: '🇿🇦', KOR: '🇰🇷', CZE: '🇨🇿', CAN: '🇨🇦', BIH: '🇧🇦', BOS: '🇧🇦', QAT: '🇶🇦', SUI: '🇨🇭', CHE: '🇨🇭', BRA: '🇧🇷', MAR: '🇲🇦', HAI: '🇭🇹', SCO: '🏴', USA: '🇺🇸', USMNT: '🇺🇸', PAR: '🇵🇾', AUS: '🇦🇺', TUR: '🇹🇷', GER: '🇩🇪', DE: '🇩🇪', CUW: '🇨🇼', CW: '🇨🇼', ECU: '🇪🇨', CIV: '🇨🇮', NED: '🇳🇱', NLD: '🇳🇱', JPN: '🇯🇵', SWE: '🇸🇪', TUN: '🇹🇳', BEL: '🇧🇪', EGY: '🇪🇬', IRN: '🇮🇷', NZL: '🇳🇿', ESP: '🇪🇸', CPV: '🇨🇻', CV: '🇨🇻', KSA: '🇸🇦', SA: '🇸🇦', URU: '🇺🇾', UY: '🇺🇾', UR: '🇺🇾', URY: '🇺🇾', URUGUAY: '🇺🇾', FRA: '🇫🇷', SEN: '🇸🇳', IRQ: '🇮🇶', NOR: '🇳🇴', ARG: '🇦🇷', ALG: '🇩🇿', DZA: '🇩🇿', AUT: '🇦🇹', JOR: '🇯🇴', POR: '🇵🇹', COD: '🇨🇩', DRC: '🇨🇩', CD: '🇨🇩', UZB: '🇺🇿', COL: '🇨🇴', ENG: '🏴', CRO: '🇭🇷', GHA: '🇬🇭', PAN: '🇵🇦'
+};
+
 function formatCount(value?: number, fallback = 0) {
   return new Intl.NumberFormat('ar-EG').format(value && value > 0 ? value : fallback);
+}
+
+function flagForCode(code?: string | null) {
+  return flagByCode[String(code || '').trim().toUpperCase()] || '🏳️';
 }
 
 function formatMatchDate(value?: string | Date | null) {
@@ -458,19 +466,19 @@ function SmartFeatureGrid() {
   return (
     <section className="mt-5" aria-label="أقسام كأس العالم 2026 التفاعلية">
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-        <article className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.045] p-4 transition duration-200 hover:-translate-y-1 hover:border-[#0FF0FC]/35 hover:bg-white/[0.07] md:col-span-2 xl:col-span-3">
-          <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#0FF0FC]/50 to-transparent opacity-0 transition group-hover:opacity-100" />
+        <article className="group relative overflow-hidden rounded-2xl border border-[#0FF0FC]/15 bg-[radial-gradient(circle_at_top_right,rgba(15,240,252,0.09),transparent_28%),rgba(255,255,255,0.045)] p-4 transition duration-200 hover:-translate-y-1 hover:border-[#0FF0FC]/40 hover:bg-white/[0.07] md:col-span-2 xl:col-span-3">
+          <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#0FF0FC]/60 to-transparent" />
           <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
             <div>
               <h3 className="text-base font-black text-white md:text-lg">المجموعات</h3>
               <p className="mt-1 text-[11px] font-black text-[#FFD700]">المجموعة {selectedGroup} — {selectedStanding.arName}</p>
             </div>
-            <Link href={`/groups?group=${selectedGroup}`} className="rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-[11px] font-black text-[#FFD700] transition hover:border-[#FFD700]/35 hover:bg-[#FFD700]/10">عرض تفاصيل المجموعة</Link>
+            <Link href={`/groups?group=${selectedGroup}`} className="rounded-xl border border-[#FFD700]/20 bg-[#FFD700]/10 px-3 py-2 text-[11px] font-black text-[#FFD700] transition hover:bg-[#FFD700] hover:text-black">عرض تفاصيل المجموعة</Link>
           </div>
 
           <div className="mb-3 grid grid-cols-6 gap-1.5 md:grid-cols-12">
             {groupLetters.map((group) => (
-              <button key={group} type="button" onClick={() => setSelectedGroup(group)} className={`rounded-lg border py-1.5 text-center text-[10px] font-black transition ${selectedGroup === group ? 'border-[#0FF0FC]/45 bg-[#0FF0FC]/15 text-[#0FF0FC]' : 'border-white/10 bg-black/25 text-gray-300 hover:border-[#0FF0FC]/35 hover:text-[#0FF0FC]'}`}>
+              <button key={group} type="button" onClick={() => setSelectedGroup(group)} className={`rounded-lg border py-1.5 text-center text-[10px] font-black transition ${selectedGroup === group ? 'border-[#0FF0FC]/55 bg-[#0FF0FC]/20 text-[#0FF0FC] shadow-[0_0_18px_rgba(15,240,252,0.08)]' : 'border-white/10 bg-black/25 text-gray-300 hover:border-[#0FF0FC]/35 hover:text-[#0FF0FC]'}`}>
                 {group}
               </button>
             ))}
@@ -482,9 +490,9 @@ function SmartFeatureGrid() {
             <StatBox value={formatCount(selectedStanding.scheduledMatches)} label="قادمة" note="متبقية" />
           </div>
 
-          <div className="overflow-x-auto rounded-xl border border-white/10 bg-black/25">
-            <table className="min-w-[760px] w-full text-right text-[11px] font-bold text-gray-300">
-              <thead className="bg-white/[0.04] text-[10px] font-black text-gray-500">
+          <div className="overflow-x-auto rounded-xl border border-[#0FF0FC]/15 bg-black/30 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+            <table className="min-w-[800px] w-full text-right text-[11px] font-bold text-gray-300">
+              <thead className="bg-gradient-to-l from-[#0FF0FC]/10 via-white/[0.045] to-[#FFD700]/10 text-[10px] font-black text-gray-400">
                 <tr>
                   <th className="px-3 py-2">#</th>
                   <th className="px-3 py-2">المنتخب</th>
@@ -495,23 +503,26 @@ function SmartFeatureGrid() {
                   <th className="px-3 py-2 text-center">له</th>
                   <th className="px-3 py-2 text-center">عليه</th>
                   <th className="px-3 py-2 text-center">فرق</th>
-                  <th className="px-3 py-2 text-center">نقاط</th>
+                  <th className="px-3 py-2 text-center text-[#FFD700]">نقاط</th>
                 </tr>
               </thead>
               <tbody>
                 {selectedStanding.standings.map((row, index) => (
-                  <tr key={`${selectedGroup}-${row.code}`} className="border-t border-white/10">
+                  <tr key={`${selectedGroup}-${row.code}`} className={`border-t border-white/10 transition hover:bg-white/[0.035] ${index < 2 ? 'bg-[#0FF0FC]/[0.035]' : index === 2 ? 'bg-[#FFD700]/[0.025]' : ''}`}>
                     <td className="px-3 py-2 text-[#0FF0FC]">{index + 1}</td>
                     <td className="px-3 py-2">
                       <div className="flex items-center gap-2">
-                        <span className="flex h-6 w-8 items-center justify-center rounded-lg bg-[#0FF0FC]/10 text-[10px] font-black text-[#0FF0FC]">{row.code}</span>
-                        <span className="font-black text-white">{row.team}</span>
+                        <span className="flex h-7 w-7 items-center justify-center rounded-lg border border-white/10 bg-white/[0.06] text-base">{flagForCode(row.code)}</span>
+                        <div className="min-w-0">
+                          <div className="truncate font-black text-white">{row.team}</div>
+                          <div className="text-[10px] font-black text-[#0FF0FC]">{row.code}</div>
+                        </div>
                       </div>
                     </td>
                     <td className="px-3 py-2 text-center">{formatCount(row.played)}</td>
-                    <td className="px-3 py-2 text-center">{formatCount(row.won)}</td>
+                    <td className="px-3 py-2 text-center text-emerald-200">{formatCount(row.won)}</td>
                     <td className="px-3 py-2 text-center">{formatCount(row.drawn)}</td>
-                    <td className="px-3 py-2 text-center">{formatCount(row.lost)}</td>
+                    <td className="px-3 py-2 text-center text-red-200">{formatCount(row.lost)}</td>
                     <td className="px-3 py-2 text-center">{formatCount(row.goalsFor)}</td>
                     <td className="px-3 py-2 text-center">{formatCount(row.goalsAgainst)}</td>
                     <td className="px-3 py-2 text-center">{row.goalDifference > 0 ? '+' : ''}{formatCount(row.goalDifference)}</td>
@@ -524,6 +535,26 @@ function SmartFeatureGrid() {
 
           <p className="mt-2 text-[10px] font-bold text-gray-500">الترتيب محسوب من نتائج المباريات المنتهية فقط. قبل بداية مباريات المجموعة تظهر الأرقام صفرية.</p>
         </article>
+
+        <Link href="/players" className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.045] p-4 transition duration-200 hover:-translate-y-1 hover:border-[#0FF0FC]/35 hover:bg-white/[0.07] md:col-span-2 xl:col-span-3">
+          <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#0FF0FC]/50 to-transparent opacity-0 transition group-hover:opacity-100" />
+          <div className="mb-3 flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <h3 className="text-base font-black text-white md:text-lg">الإحصائيات</h3>
+              <p className="mt-2 text-xs font-bold leading-6 text-gray-400">أرقام فعلية من API المباريات وقاعدة البيانات، وليست أرقامًا ثابتة.</p>
+            </div>
+            <span className="rounded-full border border-[#0FF0FC]/20 bg-[#0FF0FC]/10 px-2.5 py-1 text-[10px] font-black text-[#0FF0FC]">مصدر الأرقام: API</span>
+          </div>
+          <div className="grid grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-6">
+            <StatBox value={formatCount(stats.totalMatches)} label="مباراة" note="إجمالي الجدول" />
+            <StatBox value={formatCount(stats.finishedMatches)} label="انتهت" note="حسب الحالة" />
+            <StatBox value={formatCount(stats.totalGoals)} label="هدف" note="من النتائج" />
+            <StatBox value={formatCount(stats.liveMatches)} label="مباشر" note="الآن" />
+            <StatBox value={formatCount(stats.yellowCards)} label="صفراء" note="آخر Snapshot" />
+            <StatBox value={formatCount(stats.redCards)} label="حمراء" note="آخر Snapshot" />
+          </div>
+          <div className="mt-3 text-[11px] font-black text-[#FFD700]">عرض الإحصائيات ←</div>
+        </Link>
 
         <Link href="/teams" className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.045] p-4 transition duration-200 hover:-translate-y-1 hover:border-[#0FF0FC]/35 hover:bg-white/[0.07] md:col-span-2 xl:col-span-3">
           <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#0FF0FC]/50 to-transparent opacity-0 transition group-hover:opacity-100" />
@@ -559,26 +590,6 @@ function SmartFeatureGrid() {
               <p className="mt-1 text-[11px] font-black text-[#FFD700]">تقارير، قراءة تكتيكية، ومتابعة يومية عند توفر المصادر ←</p>
             </div>
           </div>
-        </Link>
-
-        <Link href="/players" className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.045] p-4 transition duration-200 hover:-translate-y-1 hover:border-[#0FF0FC]/35 hover:bg-white/[0.07] md:col-span-2 xl:col-span-3">
-          <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#0FF0FC]/50 to-transparent opacity-0 transition group-hover:opacity-100" />
-          <div className="mb-3 flex flex-wrap items-start justify-between gap-4">
-            <div>
-              <h3 className="text-base font-black text-white md:text-lg">الإحصائيات</h3>
-              <p className="mt-2 text-xs font-bold leading-6 text-gray-400">أرقام فعلية من قاعدة بيانات المباريات وآخر لقطات الإحصائيات المتاحة.</p>
-            </div>
-            <span className="rounded-full border border-white/10 bg-black/25 px-2.5 py-1 text-[10px] font-black text-[#FFD700]">Data</span>
-          </div>
-          <div className="grid grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-6">
-            <StatBox value={formatCount(stats.totalMatches)} label="مباراة" note="إجمالي الجدول" />
-            <StatBox value={formatCount(stats.finishedMatches)} label="انتهت" note="حسب الحالة" />
-            <StatBox value={formatCount(stats.totalGoals)} label="هدف" note="من النتائج" />
-            <StatBox value={formatCount(stats.liveMatches)} label="مباشر" note="الآن" />
-            <StatBox value={formatCount(stats.yellowCards)} label="صفراء" note="آخر Snapshot" />
-            <StatBox value={formatCount(stats.redCards)} label="حمراء" note="آخر Snapshot" />
-          </div>
-          <div className="mt-3 text-[11px] font-black text-[#FFD700]">عرض الإحصائيات ←</div>
         </Link>
 
         <Link href="/animation-live" className="group relative overflow-hidden rounded-2xl border border-red-400/20 bg-red-500/[0.055] p-4 transition duration-200 hover:-translate-y-1 hover:border-red-300/45 hover:bg-red-500/[0.08] md:col-span-2 xl:col-span-3">
