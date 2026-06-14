@@ -5,6 +5,7 @@ import "./globals.css";
 import "./brand-logo.css";
 import { Providers } from "@/components/Providers";
 import { NotificationProvider } from "@/components/ui/NotificationProvider";
+import { Navbar } from "@/components/ui/Navbar";
 import { Footer } from "@/components/ui/Footer";
 
 const cairo = Cairo({
@@ -45,7 +46,8 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       <body className="min-h-full flex flex-col">
         <Providers>
           <NotificationProvider>
-            <div className="min-h-[calc(100vh-100px)]">{children}</div>
+            <Navbar />
+            <div className="min-h-[calc(100vh-180px)]">{children}</div>
             <Footer />
           </NotificationProvider>
         </Providers>
