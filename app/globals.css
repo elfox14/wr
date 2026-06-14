@@ -206,3 +206,164 @@ article p.text-xs.leading-6.text-gray-400::selection {
     scrollbar-color: rgba(255,255,255,0.18) transparent;
   }
 }
+
+/* ─── Mobile UX polish for the World Cup home experience ─── */
+main[dir="rtl"] a,
+main[dir="rtl"] button {
+  -webkit-tap-highlight-color: transparent;
+}
+
+main[dir="rtl"] a:active,
+main[dir="rtl"] button:active {
+  transform: scale(0.985);
+}
+
+main[dir="rtl"] .overflow-x-auto {
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(15,240,252,0.22) transparent;
+}
+
+main[dir="rtl"] .overflow-x-auto::-webkit-scrollbar {
+  height: 5px;
+}
+
+main[dir="rtl"] .overflow-x-auto::-webkit-scrollbar-thumb {
+  background: rgba(15,240,252,0.22);
+  border-radius: 999px;
+}
+
+@media (max-width: 640px) {
+  main[dir="rtl"] {
+    padding: 0.75rem 0.75rem 1.5rem !important;
+  }
+
+  main[dir="rtl"] > div.relative.mx-auto.max-w-7xl {
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+  }
+
+  main[dir="rtl"] section,
+  main[dir="rtl"] article {
+    border-radius: 1.1rem !important;
+  }
+
+  main[dir="rtl"] h1 {
+    font-size: clamp(1.55rem, 8vw, 2.15rem) !important;
+    line-height: 1.18 !important;
+    letter-spacing: -0.03em;
+  }
+
+  main[dir="rtl"] h2,
+  main[dir="rtl"] h3 {
+    line-height: 1.35 !important;
+  }
+
+  main[dir="rtl"] p {
+    line-height: 1.9 !important;
+  }
+
+  main[dir="rtl"] a,
+  main[dir="rtl"] button {
+    min-height: 44px;
+  }
+
+  main[dir="rtl"] table {
+    min-width: 640px !important;
+  }
+
+  main[dir="rtl"] section:first-of-type {
+    margin-bottom: 0 !important;
+    padding: 0.85rem !important;
+  }
+
+  main[dir="rtl"] section:first-of-type > div:first-child {
+    align-items: flex-start !important;
+  }
+
+  main[dir="rtl"] section:first-of-type > div:nth-of-type(2) {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  main[dir="rtl"] section:first-of-type article {
+    padding: 0.85rem !important;
+  }
+
+  main[dir="rtl"] section:first-of-type article > div:nth-of-type(2) {
+    display: flex !important;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.45rem;
+  }
+
+  main[dir="rtl"] section:first-of-type article > div:nth-of-type(2) > * {
+    flex: 1 1 auto;
+    min-width: max-content;
+  }
+
+  main[dir="rtl"] section:first-of-type article > div:nth-of-type(4) {
+    grid-template-columns: 1fr !important;
+  }
+
+  main[dir="rtl"] section:nth-of-type(2) > div.relative.z-10 {
+    padding: 1rem !important;
+  }
+
+  main[dir="rtl"] section:nth-of-type(2) > div.relative.z-10 > div:nth-of-type(2) {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+  }
+
+  main[dir="rtl"] section:nth-of-type(2) > div.relative.z-10 > div:nth-of-type(2) a {
+    justify-content: center;
+    text-align: center;
+    padding: 0.75rem 0.65rem !important;
+  }
+
+  main[dir="rtl"] section:nth-of-type(2) > div.relative.z-10 > div:nth-of-type(3) {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  main[dir="rtl"] section[aria-label="أقسام كأس العالم 2026 التفاعلية"] {
+    margin-top: 0 !important;
+  }
+
+  main[dir="rtl"] section[aria-label="أقسام كأس العالم 2026 التفاعلية"] > div {
+    gap: 0.85rem !important;
+  }
+
+  main[dir="rtl"] section[aria-label="أقسام كأس العالم 2026 التفاعلية"] article,
+  main[dir="rtl"] section[aria-label="أقسام كأس العالم 2026 التفاعلية"] a.group {
+    padding: 1rem !important;
+  }
+
+  main[dir="rtl"] section[aria-label="أقسام كأس العالم 2026 التفاعلية"] article > div:nth-of-type(3) {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+
+  main[dir="rtl"] section[aria-label="أقسام كأس العالم 2026 التفاعلية"] article > div:nth-of-type(2) button {
+    min-height: 38px;
+  }
+
+  main[dir="rtl"] section[aria-label="أقسام كأس العالم 2026 التفاعلية"] a[href="/teams"] > div:nth-of-type(3) {
+    display: flex !important;
+    gap: 0.65rem;
+    overflow-x: auto;
+    padding-bottom: 0.2rem;
+    scroll-snap-type: x proximity;
+  }
+
+  main[dir="rtl"] section[aria-label="أقسام كأس العالم 2026 التفاعلية"] a[href="/teams"] > div:nth-of-type(3) > div {
+    min-width: 82%;
+    scroll-snap-align: start;
+  }
+}
+
+@media (max-width: 380px) {
+  main[dir="rtl"] section:nth-of-type(2) > div.relative.z-10 > div:nth-of-type(2),
+  main[dir="rtl"] section:nth-of-type(2) > div.relative.z-10 > div:nth-of-type(3) {
+    grid-template-columns: 1fr !important;
+  }
+}
