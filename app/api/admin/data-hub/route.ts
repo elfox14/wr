@@ -18,7 +18,21 @@ function isAdminSession(session: AdminSession) {
   return session?.user?.role === 'ADMIN' || email === 'worldcup@mcprim.com' || email === 'elfox14usa@gmail.com';
 }
 
-async function requireAdmin() {
+function getBearerToken(request: Request) {
+  const authorization = request.headers.get('authorization') || '';
+  if (!authorization.toLowerCase().startsWith('bearer ')) return '';
+  return authorization.slice(7).trim();
+}
+
+function hasAdminSecret(request: Request) {
+  const url = new URL(request.url);
+  const supplied = getBearerToken(request) || request.headers.get('x-admin-secret') || url.searchParams.get('token') || '';
+  const expected = process.env.ADMIN_API_SECRET || process.env.ADMIN_CRON_SECRET || process.env.CRON_SECRET || '';
+  return Boolean(expected && supplied && supplied === expected);
+}
+
+async function requireAdmin(request: Request) {
+  if (hasAdminSecret(request)) return { session: null };
   const session = await getServerSession(authOptions as any) as AdminSession;
   if (!session?.user) return { error: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) };
   if (!isAdminSession(session)) return { error: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) };
@@ -32,7 +46,7 @@ function parseLimit(value: string | null, fallback = 12) {
 }
 
 export async function GET(request: Request) {
-  const admin = await requireAdmin();
+  const admin = await requireAdmin(request);
   if (admin.error) return admin.error;
 
   const url = new URL(request.url);
@@ -69,7 +83,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const admin = await requireAdmin();
+  const admin = await requireAdmin(request);
   if (admin.error) return admin.error;
 
   const body = await request.json().catch(() => ({}));
