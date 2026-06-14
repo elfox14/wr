@@ -101,15 +101,21 @@ function getInteractiveHref(match: HomeMatch) {
 }
 
 function formatCountdown(diffMs: number) {
-  const totalMinutes = Math.max(0, Math.floor(diffMs / 60_000));
-  const days = Math.floor(totalMinutes / 1440);
-  const hours = Math.floor((totalMinutes % 1440) / 60);
-  const minutes = totalMinutes % 60;
-  const parts = [];
-  if (days > 0) parts.push(`${formatCount(days)} يوم`);
-  if (hours > 0) parts.push(`${formatCount(hours)} ساعة`);
-  parts.push(`${formatCount(minutes)} دقيقة`);
-  return parts.join(' و ');
+  const totalSeconds = Math.max(0, Math.floor(diffMs / 1000));
+  const days = Math.floor(totalSeconds / 86_400);
+  const hours = Math.floor((totalSeconds % 86_400) / 3_600);
+  const minutes = Math.floor((totalSeconds % 3_600) / 60);
+  const seconds = totalSeconds % 60;
+
+  if (days > 0) {
+    return `بعد ${formatCount(days)}ي ${formatCount(hours)}س ${formatCount(minutes)}د`;
+  }
+
+  if (hours > 0) {
+    return `بعد ${formatCount(hours)}س ${formatCount(minutes)}د ${formatCount(seconds)}ث`;
+  }
+
+  return `بعد ${formatCount(minutes)}د ${formatCount(seconds)}ث`;
 }
 
 function matchTiming(match: HomeMatch, now: Date) {
@@ -118,13 +124,12 @@ function matchTiming(match: HomeMatch, now: Date) {
   const isConfirmedLive = Boolean(match.isLiveNow && !match.isLikelyLiveByTime);
 
   if (isFinished) {
-    return { label: 'انتهت', detail: 'تم تحديث النتيجة', live: false, waiting: false };
+    return { label: 'انتهت', live: false, waiting: false };
   }
 
   if (isConfirmedLive) {
     return {
-      label: 'مباشر الآن',
-      detail: match.liveLabel || (match.minute ? `الدقيقة ${formatCount(match.minute)}` : 'جارية الآن'),
+      label: match.liveLabel || (match.minute ? `مباشر • ${formatCount(match.minute)}′` : 'مباشر الآن'),
       live: true,
       waiting: false,
     };
@@ -134,32 +139,31 @@ function matchTiming(match: HomeMatch, now: Date) {
   const validDate = date && !Number.isNaN(date.getTime()) ? date : null;
 
   if (!validDate) {
-    return { label: 'موعد غير متوفر', detail: 'بانتظار تحديث المصدر', live: false, waiting: true };
+    return { label: 'بانتظار المصدر', live: false, waiting: true };
   }
 
   const diffMs = validDate.getTime() - now.getTime();
   if (diffMs > 0) {
-    return { label: 'العد التنازلي', detail: `يبدأ بعد ${formatCountdown(diffMs)}`, live: false, waiting: false };
+    return { label: formatCountdown(diffMs), live: false, waiting: false };
   }
 
-  return { label: 'بانتظار تأكيد البداية', detail: 'لا نعرض زمن المباراة إلا بعد تأكيد المصدر الحي', live: false, waiting: true };
+  return { label: 'بانتظار تأكيد البداية', live: false, waiting: true };
 }
 
-function MatchTimer({ match }: { match: HomeMatch }) {
+function InlineMatchTimer({ match }: { match: HomeMatch }) {
   const [now, setNow] = useState(() => new Date());
 
   useEffect(() => {
-    const timer = window.setInterval(() => setNow(new Date()), 30_000);
+    const timer = window.setInterval(() => setNow(new Date()), 1000);
     return () => window.clearInterval(timer);
   }, []);
 
   const timing = matchTiming(match, now);
 
   return (
-    <div className={`mt-3 rounded-2xl border px-3 py-2 text-center ${timing.live ? 'border-[#00FF88]/25 bg-[#00FF88]/10' : timing.waiting ? 'border-[#FFD700]/20 bg-[#FFD700]/10' : 'border-[#0FF0FC]/20 bg-[#0FF0FC]/10'}`}>
-      <div className={`text-[11px] font-black ${timing.live ? 'text-[#00FF88]' : timing.waiting ? 'text-[#FFD700]' : 'text-[#0FF0FC]'}`}>{timing.label}</div>
-      <div className="mt-1 text-xs font-black text-white">{timing.detail}</div>
-    </div>
+    <span className={`min-w-0 truncate rounded-full border px-2.5 py-1 text-center text-[11px] font-black ${timing.live ? 'border-[#00FF88]/25 bg-[#00FF88]/10 text-[#00FF88]' : timing.waiting ? 'border-[#FFD700]/20 bg-[#FFD700]/10 text-[#FFD700]' : 'border-[#0FF0FC]/20 bg-[#0FF0FC]/10 text-[#0FF0FC]'}`}>
+      {timing.label}
+    </span>
   );
 }
 
@@ -169,8 +173,9 @@ function UpcomingMatchCard({ match }: { match: HomeMatch }) {
   return (
     <article className="relative overflow-hidden rounded-2xl border border-white/10 bg-black/30 p-3 shadow-[0_14px_34px_rgba(0,0,0,0.18)] transition hover:border-[#0FF0FC]/35 hover:bg-white/[0.055]">
       <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#0FF0FC]/55 to-transparent opacity-70" />
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+      <div className="mb-3 grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2">
         <span className="rounded-full border border-[#FFD700]/20 bg-[#FFD700]/10 px-2.5 py-1 text-[11px] font-black text-[#FFD700]">{matchGroup(match)}</span>
+        <InlineMatchTimer match={match} />
         <span className="rounded-full border border-white/10 bg-white/[0.05] px-2.5 py-1 text-[11px] font-black text-gray-300">{formatMatchDate(match.matchDate)}</span>
       </div>
 
@@ -195,8 +200,6 @@ function UpcomingMatchCard({ match }: { match: HomeMatch }) {
           <p className="mt-0.5 text-[11px] font-bold text-gray-500">{teamCode(match.awayTeam)}</p>
         </div>
       </div>
-
-      <MatchTimer match={match} />
 
       <div className="mt-3 grid grid-cols-2 gap-2">
         <Link href={href} className="rounded-xl border border-white/10 bg-white/[0.05] px-3 py-2 text-center text-[11px] font-black text-gray-200 transition hover:bg-white/[0.1]">
@@ -239,16 +242,6 @@ function UpcomingMatchesStrip({ matches }: { matches: HomeMatch[] }) {
 
   return (
     <section className="mb-4 overflow-hidden rounded-2xl border border-white/10 bg-white/[0.04] p-3 shadow-[0_14px_38px_rgba(0,0,0,0.2)] backdrop-blur sm:p-4">
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <div>
-          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#0FF0FC]">NEXT MATCHES</p>
-          <h2 className="mt-0.5 text-base font-black text-white">المباراتان القادمتان</h2>
-        </div>
-        <Link href="/matches" className="rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-[11px] font-black text-white transition hover:border-[#FFD700]/40 hover:bg-white/[0.14]">
-          عرض الكل
-        </Link>
-      </div>
-
       {nextMatches.length > 0 ? (
         <div className="grid gap-3 lg:grid-cols-2">
           {nextMatches.map((match, index) => (
