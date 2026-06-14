@@ -48,10 +48,13 @@ type GroupData = {
   mostValuableTeam?: Asset;
 };
 
+type ThirdCandidate = StandingRow & { groupKey: string; groupName: string; rank: number };
+
 function normalizeGroupKey(value?: string | null): string {
   if (!value) return 'غير محددة';
   return value
     .replace('Group', '')
+    .replace('GROUP_', '')
     .replace('المجموعة', '')
     .trim()
     .toUpperCase();
@@ -97,8 +100,8 @@ function EmptyState({ title, text }: { title: string; text: string }) {
 }
 
 function matchPairKey(match: Match) {
-  const home = match.homeTeam?.id || match.homeTeamId || match.homeTeam?.code || 'home';
-  const away = match.awayTeam?.id || match.awayTeamId || match.awayTeam?.code || 'away';
+  const home = match.homeTeam?.id || match.homeTeam?.code || 'home';
+  const away = match.awayTeam?.id || match.awayTeam?.code || 'away';
   return [home, away].sort().join('|');
 }
 
@@ -119,14 +122,6 @@ function chooseBetterMatch(current: Match | undefined, candidate: Match) {
   const currentRank = statusRank(current.status);
   const candidateRank = statusRank(candidate.status);
   if (candidateRank !== currentRank) return candidateRank > currentRank ? candidate : current;
-
-  const currentHasAnimation = Boolean(current.animationMatchId);
-  const candidateHasAnimation = Boolean(candidate.animationMatchId);
-  if (candidateHasAnimation !== currentHasAnimation) return candidateHasAnimation ? candidate : current;
-
-  const currentHasExternal = Boolean(current.externalId);
-  const candidateHasExternal = Boolean(candidate.externalId);
-  if (candidateHasExternal !== currentHasExternal) return candidateHasExternal ? candidate : current;
 
   const currentGoals = matchScoreTotal(current);
   const candidateGoals = matchScoreTotal(candidate);
@@ -205,6 +200,18 @@ function buildStandings(teams: Asset[], matches: Match[]): StandingRow[] {
   });
 }
 
+function rankThirdCandidates(groups: GroupData[]) {
+  return groups
+    .map((group) => group.standings[2] ? ({ ...group.standings[2], groupKey: group.key, groupName: group.name, rank: 3 }) : null)
+    .filter(Boolean)
+    .sort((a, b) => {
+      if (b!.points !== a!.points) return b!.points - a!.points;
+      if (b!.goalDifference !== a!.goalDifference) return b!.goalDifference - a!.goalDifference;
+      if (b!.goalsFor !== a!.goalsFor) return b!.goalsFor - a!.goalsFor;
+      return a!.team.name.localeCompare(b!.team.name, 'ar');
+    }) as ThirdCandidate[];
+}
+
 export default function GroupsClient() {
   const { assets, matches, fetchAssets, fetchMatches } = useStore();
   const [loading, setLoading] = React.useState(true);
@@ -259,6 +266,9 @@ export default function GroupsClient() {
     });
   }, [assets, matches]);
 
+  const thirdCandidates = useMemo(() => rankThirdCandidates(groupData), [groupData]);
+  const projectedBestThirds = thirdCandidates.slice(0, 8);
+
   const scrollToGroup = (groupKey: string) => {
     const element = document.getElementById(groupDomId(groupKey));
     element?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -290,6 +300,8 @@ export default function GroupsClient() {
             </div>
           </div>
         </section>
+
+        <BestThirdsPreview candidates={projectedBestThirds} totalCandidates={thirdCandidates.length} />
 
         <section className="sticky top-16 z-40 mb-6 rounded-3xl border border-white/5 bg-background/90 p-3 backdrop-blur-xl">
           <div className="mb-3 flex items-center justify-between gap-4">
@@ -329,6 +341,42 @@ export default function GroupsClient() {
   );
 }
 
+function BestThirdsPreview({ candidates, totalCandidates }: { candidates: ThirdCandidate[]; totalCandidates: number }) {
+  return (
+    <section className="mb-6 rounded-3xl border border-primary/10 bg-primary/5 p-4 shadow-card md:p-5">
+      <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+        <div>
+          <h2 className="flex items-center gap-2 text-xl font-black text-white"><Trophy size={20} className="text-primary" /> تخمين أفضل الثوالث</h2>
+          <p className="mt-1 text-xs leading-6 text-gray-500">ترتيب مؤقت مبني على النقاط ثم فارق الأهداف ثم الأهداف المسجلة. ليس تأكيدًا نهائيًا قبل اكتمال مباريات المجموعات.</p>
+        </div>
+        <span className="w-fit rounded-xl border border-primary/20 bg-primary/10 px-3 py-2 text-xs font-black text-primary">أفضل ٨ من {totalCandidates}</span>
+      </div>
+
+      {candidates.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-white/10 p-5 text-center text-sm text-gray-500">لا توجد بيانات كافية لعرض أفضل الثوالث بعد.</div>
+      ) : (
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {candidates.map((candidate, index) => (
+            <Link key={`${candidate.groupKey}-${candidate.team.id}`} href={`/asset/${candidate.team.id}`} className="rounded-2xl border border-white/5 bg-black/25 p-3 transition hover:border-primary/30 hover:bg-white/5">
+              <div className="mb-3 flex items-center justify-between gap-2">
+                <span className="rounded-lg bg-primary/10 px-2 py-1 text-xs font-black text-primary">#{index + 1}</span>
+                <span className="rounded-lg bg-white/5 px-2 py-1 text-xs font-bold text-gray-400">{candidate.groupName}</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <AssetImage image={candidate.team.image} type="TEAM" name={candidate.team.name} width={40} height={40} className="h-10 w-10 rounded-xl border border-white/10 object-cover" />
+                <div className="min-w-0">
+                  <div className="truncate font-black text-white">{candidate.team.name}</div>
+                  <div className="text-xs text-gray-500">نقاط {candidate.points} · فارق {candidate.goalDifference > 0 ? `+${candidate.goalDifference}` : candidate.goalDifference} · له {candidate.goalsFor}</div>
+                </div>
+              </div>
+            </Link>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
 function GroupSection({ group }: { group: GroupData }) {
   return (
     <section id={groupDomId(group.key)} className="scroll-mt-40 rounded-3xl border border-white/5 bg-surface/70 p-5 shadow-card md:p-6">
@@ -363,6 +411,7 @@ function GroupSection({ group }: { group: GroupData }) {
             <span className="rounded-lg bg-white/5 px-2 py-1 text-xs text-gray-400">نتائج حقيقية فقط</span>
           </div>
           <StandingsTable standings={group.standings} finishedMatchesCount={group.finishedMatches} />
+          <GroupStatsPanel group={group} />
         </div>
 
         <div className="rounded-3xl border border-white/5 bg-background/40 p-4">
@@ -400,6 +449,39 @@ function GroupSection({ group }: { group: GroupData }) {
   );
 }
 
+function GroupStatsPanel({ group }: { group: GroupData }) {
+  const finished = group.matches.filter((match) => match.status === 'FINISHED');
+  const totalGoals = finished.reduce((sum, match) => sum + Number(match.homeScore || 0) + Number(match.awayScore || 0), 0);
+  const avgGoals = finished.length ? (totalGoals / finished.length).toFixed(1) : '0.0';
+  const topAttack = [...group.standings].sort((a, b) => b.goalsFor - a.goalsFor)[0];
+  const bestDefense = [...group.standings].sort((a, b) => a.goalsAgainst - b.goalsAgainst)[0];
+
+  return (
+    <div className="mt-4 rounded-2xl border border-white/5 bg-black/20 p-4">
+      <h4 className="mb-3 flex items-center gap-2 font-black text-white"><BarChart3 size={18} className="text-primary" /> إحصائيات المجموعة</h4>
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <MiniMetric label="المباريات المنتهية" value={`${group.finishedMatches}/${group.matches.length}`} />
+        <MiniMetric label="إجمالي الأهداف" value={totalGoals.toLocaleString('ar-EG')} />
+        <MiniMetric label="متوسط الأهداف" value={avgGoals} />
+        <MiniMetric label="الأكثر تسجيلًا" value={topAttack ? `${topAttack.team.name} (${topAttack.goalsFor})` : '—'} />
+        <MiniMetric label="الأقوى دفاعًا" value={bestDefense ? `${bestDefense.team.name} (${bestDefense.goalsAgainst})` : '—'} />
+        <MiniMetric label="مباريات قادمة" value={group.scheduledMatches.toLocaleString('ar-EG')} />
+        <MiniMetric label="مباشرة الآن" value={group.liveMatches.toLocaleString('ar-EG')} />
+        <MiniMetric label="فارق أقوى فريق" value={topAttack ? (topAttack.goalDifference > 0 ? `+${topAttack.goalDifference}` : String(topAttack.goalDifference)) : '—'} />
+      </div>
+    </div>
+  );
+}
+
+function MiniMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl border border-white/5 bg-white/[0.03] p-3">
+      <div className="text-[11px] font-bold text-gray-500">{label}</div>
+      <div className="mt-1 truncate text-sm font-black text-white">{value}</div>
+    </div>
+  );
+}
+
 function StatCard({ icon, label, value, hint, accent = 'text-primary' }: { icon: React.ReactNode; label: string; value: number; hint: string; accent?: string }) {
   return (
     <div className="rounded-2xl border border-white/5 bg-background/40 p-4">
@@ -408,6 +490,13 @@ function StatCard({ icon, label, value, hint, accent = 'text-primary' }: { icon:
       <p className="mt-1 text-xs text-gray-500">{hint}</p>
     </div>
   );
+}
+
+function StandingStatus({ index, finishedMatchesCount }: { index: number; finishedMatchesCount: number }) {
+  if (finishedMatchesCount === 0) return <span className="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-xs font-bold text-gray-400">لم يبدأ</span>;
+  if (index < 2) return <span className="rounded-lg border border-success/20 bg-success/10 px-2 py-1 text-xs font-bold text-success">تأهل مباشر</span>;
+  if (index === 2) return <span className="rounded-lg border border-primary/20 bg-primary/10 px-2 py-1 text-xs font-bold text-primary">أفضل الثوالث</span>;
+  return <span className="rounded-lg border border-red-400/20 bg-red-400/10 px-2 py-1 text-xs font-bold text-red-300">يخرج</span>;
 }
 
 function StandingsTable({ standings, finishedMatchesCount }: { standings: StandingRow[]; finishedMatchesCount: number }) {
@@ -447,9 +536,7 @@ function StandingsTable({ standings, finishedMatchesCount }: { standings: Standi
               <td className="p-3 text-center">{row.goalsAgainst}</td>
               <td className="p-3 text-center font-bold">{row.goalDifference > 0 ? `+${row.goalDifference}` : row.goalDifference}</td>
               <td className="p-3 text-center text-lg font-black text-primary">{row.points}</td>
-              <td className="p-3 text-center">
-                {finishedMatchesCount === 0 ? <span className="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-xs font-bold text-gray-400">لم يبدأ</span> : index < 2 ? <span className="rounded-lg border border-success/20 bg-success/10 px-2 py-1 text-xs font-bold text-success">منطقة تأهل</span> : <span className="rounded-lg border border-orange-400/20 bg-orange-400/10 px-2 py-1 text-xs font-bold text-orange-300">ينافس</span>}
-              </td>
+              <td className="p-3 text-center"><StandingStatus index={index} finishedMatchesCount={finishedMatchesCount} /></td>
             </tr>
           ))}
         </tbody>
@@ -463,7 +550,7 @@ function MatchCard({ match }: { match: Match }) {
   const isLive = ['IN_PLAY', 'LIVE'].includes(match.status);
   const isFinished = match.status === 'FINISHED';
   return (
-    <Link href={`/matches/${match.id}`} className="block rounded-2xl border border-white/5 bg-black/20 p-4 transition-colors hover:border-primary/30">
+    <Link href={`/match-center/${match.id}`} className="block rounded-2xl border border-white/5 bg-black/20 p-4 transition-colors hover:border-primary/30">
       <div className="mb-3 flex items-center justify-between text-xs text-gray-500">
         <span>{date.toLocaleDateString('ar-EG')} · {date.toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}</span>
         <span className={`rounded-lg px-2 py-1 font-bold ${isLive ? 'bg-primary/10 text-primary' : isFinished ? 'bg-success/10 text-success' : 'bg-white/5 text-gray-400'}`}>{isLive ? 'مباشرة' : isFinished ? 'انتهت' : 'قادمة'}</span>
