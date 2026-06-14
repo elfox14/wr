@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { normalizeName } from '@/lib/apiFootball';
 import { applyVolatilityCap } from '@/lib/liveEngine';
+import { saveFootballDataScoreSnapshot } from '@/lib/football-data-snapshot';
 import { blockProviderForHours, blockProviderUntil, getProviderQuotaBlock, isProviderQuotaError } from '@/lib/provider-quota-guard';
 
 export const dynamic = 'force-dynamic';
@@ -263,7 +264,24 @@ async function processFootballDataMatch(providerMatch: any, options: { applyMark
     ? await prisma.match.update({ where: { id: existing.id }, data })
     : await prisma.match.create({ data });
 
-  return { status: existing ? 'updated_existing_match' : 'created_missing_match', providerMatchId, localMatchId: saved.id, providerStatus: status, homeTeam: homeTeam.name, awayTeam: awayTeam.name, previousScore: existing ? `${existing.homeScore}-${existing.awayScore}` : null, score: `${saved.homeScore}-${saved.awayScore}`, priceUpdates };
+  const snapshot = await saveFootballDataScoreSnapshot({
+    matchId: saved.id,
+    providerMatchId,
+    status,
+    homeScore: saved.homeScore,
+    awayScore: saved.awayScore,
+    provider: 'FOOTBALL_DATA',
+    minIntervalMinutes: status === 'FINISHED' ? 720 : 10,
+    rawData: {
+      providerStatus: providerMatch?.status,
+      utcDate: providerMatch?.utcDate,
+      score: providerMatch?.score,
+      competition: providerMatch?.competition?.code || providerMatch?.competition?.name || null,
+      stage: providerMatch?.stage || null,
+    },
+  });
+
+  return { status: existing ? 'updated_existing_match' : 'created_missing_match', providerMatchId, localMatchId: saved.id, providerStatus: status, homeTeam: homeTeam.name, awayTeam: awayTeam.name, previousScore: existing ? `${existing.homeScore}-${existing.awayScore}` : null, score: `${saved.homeScore}-${saved.awayScore}`, snapshot, priceUpdates };
 }
 
 export async function GET(req: Request) {
