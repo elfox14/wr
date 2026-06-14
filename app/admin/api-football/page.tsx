@@ -13,11 +13,11 @@ export default function ApiFootballAdminPage() {
           </div>
         </div>
         <p className="text-sm leading-7 text-yellow-50">
-          تم إيقاف هذه الصفحة وإلغاء الاعتماد على API-Football. مصادر البيانات النشطة يجب أن تكون عبر iSports أو الاستيراد اليدوي/المصرح به مثل FBref وملفات التقارير.
+          تم إيقاف هذه الصفحة وإلغاء الاعتماد على API-Football. مصادر البيانات النشطة يجب أن تكون عبر iSports أو الاستيراد اليدوي/المصرح به من ملفات التقارير.
         </p>
         <div className="mt-5 flex flex-wrap gap-3">
           <Link href="/admin/live-health" className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-black text-white hover:border-primary/40 hover:text-primary">حالة اللايف</Link>
-          <Link href="/admin/fbref-import" className="rounded-2xl border border-primary/30 bg-primary/10 px-4 py-3 text-sm font-black text-primary hover:bg-primary hover:text-black">استيراد FBref</Link>
+          <Link href="/admin/team-intelligence" className="rounded-2xl border border-primary/30 bg-primary/10 px-4 py-3 text-sm font-black text-primary hover:bg-primary hover:text-black">تقارير المنتخبات</Link>
         </div>
       </section>
     </main>
