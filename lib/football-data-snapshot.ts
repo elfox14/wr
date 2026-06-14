@@ -1,31 +1,13 @@
 import { randomUUID } from 'crypto';
 import prisma from '@/lib/prisma';
-import { ensureStatsTable } from '@/lib/live-match-stats';
+import { ensureStatsTable, normalizeStats } from '@/lib/live-match-stats';
 
 const DETAILED_STAT_KEYS = [
-  'homePossession',
-  'awayPossession',
-  'homeAttacks',
-  'awayAttacks',
-  'homeDangerousAttacks',
-  'awayDangerousAttacks',
-  'homeShots',
-  'awayShots',
-  'homeShotsOnTarget',
-  'awayShotsOnTarget',
-  'homeShotsOffTarget',
-  'awayShotsOffTarget',
-  'homeCorners',
-  'awayCorners',
-  'homeYellowCards',
-  'awayYellowCards',
-  'homeRedCards',
-  'awayRedCards',
-];
-
-function quoteSql(value: string) {
-  return `'${String(value).replace(/'/g, "''")}'`;
-}
+  'homePossession', 'awayPossession', 'homeAttacks', 'awayAttacks',
+  'homeDangerousAttacks', 'awayDangerousAttacks', 'homeShots', 'awayShots',
+  'homeShotsOnTarget', 'awayShotsOnTarget', 'homeShotsOffTarget', 'awayShotsOffTarget',
+  'homeCorners', 'awayCorners', 'homeYellowCards', 'awayYellowCards', 'homeRedCards', 'awayRedCards',
+] as const;
 
 function hasDetailedStats(row: any) {
   if (!row) return false;
@@ -53,12 +35,11 @@ function inferMinute(status?: string | null) {
 
 async function getLatestSnapshot(matchId: string) {
   await ensureStatsTable();
-  const rows = await prisma.$queryRawUnsafe<any[]>(`
-    SELECT * FROM "MatchStatsSnapshot"
-    WHERE "matchId" = ${quoteSql(matchId)}
-    ORDER BY "capturedAt" DESC
-    LIMIT 1
-  `);
+  const rows = await prisma.matchStatsSnapshot.findMany({
+    where: { matchId },
+    orderBy: { capturedAt: 'desc' },
+    take: 1,
+  });
   return rows[0] || null;
 }
 
@@ -78,60 +59,70 @@ export async function saveFootballDataScoreSnapshot(params: {
 
   await ensureStatsTable();
   const latest = await getLatestSnapshot(params.matchId);
-  const latestHasDetailedStats = hasDetailedStats(latest);
-
-  if (latestHasDetailedStats && !String(latest.provider || '').startsWith('FOOTBALL_DATA')) {
+  if (hasDetailedStats(latest) && !String(latest.provider || '').startsWith('FOOTBALL_DATA')) {
     return { status: 'skipped_existing_detailed_snapshot', snapshotId: latest.id, provider: latest.provider };
   }
 
-  const homeScore = safeScore(params.homeScore);
-  const awayScore = safeScore(params.awayScore);
+  const normalized = normalizeStats(params.rawData || {});
+  const homeScore = safeScore(params.homeScore) ?? safeScore(normalized.homeScore);
+  const awayScore = safeScore(params.awayScore) ?? safeScore(normalized.awayScore);
   const status = String(params.status || '').toUpperCase() || null;
+  const minute = normalized.minute ?? inferMinute(status);
   const minIntervalMinutes = Math.max(0, Number(params.minIntervalMinutes ?? 60));
   const ageMinutes = snapshotAgeMinutes(latest);
-  const latestRawStatus = String(latest?.rawData?.status || latest?.rawData?.providerStatus || '').toUpperCase();
+  const latestRawStatus = String((latest?.rawData as any)?.status || (latest?.rawData as any)?.providerStatus || '').toUpperCase();
+  const mappedDetailedStats = hasDetailedStats(normalized);
   const sameFallbackState = latest
     && String(latest.provider || '').startsWith('FOOTBALL_DATA')
     && safeScore(latest.homeScore) === homeScore
     && safeScore(latest.awayScore) === awayScore
-    && (!status || latestRawStatus === status);
+    && (!status || latestRawStatus === status)
+    && hasDetailedStats(latest) === mappedDetailedStats;
 
   if (sameFallbackState && ageMinutes < minIntervalMinutes) {
-    return {
-      status: 'skipped_recent_same_football_data_snapshot',
-      snapshotId: latest.id,
-      ageMinutes: Math.round(ageMinutes * 10) / 10,
-      minIntervalMinutes,
-    };
+    return { status: 'skipped_recent_same_football_data_snapshot', snapshotId: latest.id, ageMinutes: Math.round(ageMinutes * 10) / 10, minIntervalMinutes, mappedDetailedStats };
   }
 
-  const id = randomUUID();
   const provider = params.provider || 'FOOTBALL_DATA';
   const rawData = {
     provider,
     status,
-    note: 'Football-Data score/status snapshot only. Detailed statistics remain null unless a provider supplies them.',
+    note: mappedDetailedStats
+      ? 'Football-Data snapshot includes only detailed statistics explicitly present in the provider payload.'
+      : 'Football-Data score/status snapshot only. Detailed statistics remain null unless the provider payload supplies them.',
     ...(params.rawData || {}),
   };
 
-  await prisma.$executeRawUnsafe(
-    `INSERT INTO "MatchStatsSnapshot" (
-      "id", "matchId", "provider", "providerMatchId", "minute",
-      "homePossession", "awayPossession", "homeAttacks", "awayAttacks",
-      "homeDangerousAttacks", "awayDangerousAttacks", "homeShots", "awayShots",
-      "homeShotsOnTarget", "awayShotsOnTarget", "homeShotsOffTarget", "awayShotsOffTarget",
-      "homeCorners", "awayCorners", "homeYellowCards", "awayYellowCards", "homeRedCards", "awayRedCards",
-      "homeScore", "awayScore", "rawData"
-    ) VALUES ($1,$2,$3,$4,$5,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,$6,$7,$8::jsonb)`,
-    id,
-    params.matchId,
-    provider,
-    providerMatchId,
-    inferMinute(status),
-    homeScore,
-    awayScore,
-    JSON.stringify(rawData),
-  );
+  const row = await prisma.matchStatsSnapshot.create({
+    data: {
+      id: randomUUID(),
+      matchId: params.matchId,
+      provider,
+      providerMatchId,
+      minute,
+      homePossession: normalized.homePossession,
+      awayPossession: normalized.awayPossession,
+      homeAttacks: normalized.homeAttacks,
+      awayAttacks: normalized.awayAttacks,
+      homeDangerousAttacks: normalized.homeDangerousAttacks,
+      awayDangerousAttacks: normalized.awayDangerousAttacks,
+      homeShots: normalized.homeShots,
+      awayShots: normalized.awayShots,
+      homeShotsOnTarget: normalized.homeShotsOnTarget,
+      awayShotsOnTarget: normalized.awayShotsOnTarget,
+      homeShotsOffTarget: normalized.homeShotsOffTarget,
+      awayShotsOffTarget: normalized.awayShotsOffTarget,
+      homeCorners: normalized.homeCorners,
+      awayCorners: normalized.awayCorners,
+      homeYellowCards: normalized.homeYellowCards,
+      awayYellowCards: normalized.awayYellowCards,
+      homeRedCards: normalized.homeRedCards,
+      awayRedCards: normalized.awayRedCards,
+      homeScore,
+      awayScore,
+      rawData,
+    },
+  });
 
-  return { status: 'saved_football_data_score_snapshot', snapshotId: id, provider, hasDetailedStats: false };
+  return { status: 'saved_football_data_score_snapshot', snapshotId: row.id, provider, hasDetailedStats: mappedDetailedStats };
 }
