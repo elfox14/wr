@@ -11,9 +11,7 @@ export default function NewsPage() {
       <section className="rounded-3xl border border-white/10 bg-white/[0.04] p-6">
         <p className="text-sm font-black text-[#0FF0FC]">MC PRIME World Cup</p>
         <h1 className="mt-3 text-3xl font-black md:text-5xl">الأخبار</h1>
-        <p className="mt-4 max-w-3xl leading-8 text-gray-300">
-          صفحة أخبار رياضية فقط. تم إيقاف أي محتوى مرتبط بالسوق أو التداول أو البورصة من الواجهة العامة.
-        </p>
+        <p className="mt-4 max-w-3xl leading-8 text-gray-300">صفحة أخبار رياضية لمتابعة مستجدات كأس العالم.</p>
       </section>
     </main>
   );
