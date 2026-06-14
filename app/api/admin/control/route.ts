@@ -4,6 +4,10 @@ import prisma from '@/lib/prisma';
 import { authOptions } from '@/lib/auth';
 import { apiFootballFetch } from '@/lib/apiFootball';
 
+// NOTE: This admin control route intentionally stays lightweight and keeps
+// provider-level diagnostic helpers in one place. The dedicated Data Hub sync
+// route lives at /api/admin/data-hub.
+
 type AdminSession = {
   user?: {
     id?: string;
@@ -118,7 +122,7 @@ async function countInvalidMatches() {
 }
 
 async function healthCheck() {
-  const [assets, teams, players, matches, performances, news, invalidMatches] = await Promise.all([
+  const [assets, teams, players, matches, performances, news, invalidMatches, dataHubReports, dataHubPerformances] = await Promise.all([
     prisma.asset.count(),
     prisma.asset.count({ where: { type: 'TEAM' } }),
     prisma.asset.count({ where: { type: 'PLAYER' } }),
@@ -126,6 +130,8 @@ async function healthCheck() {
     prisma.playerPerformance.count(),
     prisma.marketNews.count(),
     countInvalidMatches(),
+    prisma.teamIntelligenceReport.count({ where: { provider: 'MC_PRIME_DATA_HUB' } }),
+    prisma.playerPerformance.count({ where: { provider: 'MC_PRIME_DATA_HUB' } }),
   ]);
 
   return {
@@ -137,11 +143,14 @@ async function healthCheck() {
       nextAuthSecret: Boolean(process.env.NEXTAUTH_SECRET),
       adminApiSecret: Boolean(process.env.ADMIN_API_SECRET),
       cronSecret: Boolean(process.env.CRON_SECRET),
+      dataHubCronSecret: Boolean(process.env.DATA_HUB_CRON_SECRET || process.env.ADMIN_CRON_SECRET || process.env.CRON_SECRET),
+      dataHubUrl: process.env.MC_PRIME_DATA_HUB_URL || process.env.WORLDCUP_DATA_HUB_URL || null,
+      dataHubToken: Boolean(process.env.MC_PRIME_DATA_HUB_TOKEN || process.env.WORLDCUP_DATA_HUB_TOKEN),
       apiFootballKey: Boolean(process.env.API_FOOTBALL_KEY || process.env.API_FOOTBALL_KEYS),
       isportsKey: Boolean(process.env.ISPORTS_API_KEY || process.env.ISPORTS_API_KEYS),
       marketState: process.env.NEXT_PUBLIC_MARKET_STATE || null,
     },
-    database: { assets, teams, players, matches, performances, news, invalidMatches },
+    database: { assets, teams, players, matches, performances, news, invalidMatches, dataHubReports, dataHubPerformances },
   };
 }
 
@@ -283,6 +292,18 @@ export async function GET(req: Request) {
     if (action === 'provider-player-stats') {
       if (!fixtureId) return NextResponse.json({ error: 'fixtureId is required' }, { status: 400 });
       return NextResponse.json(await providerPlayerStats(fixtureId));
+    }
+
+    if (action === 'data-hub-status') {
+      const result = await callInternal(req, '/api/admin/data-hub?action=status');
+      return NextResponse.json(result, { status: result.ok ? 200 : result.status });
+    }
+
+    if (action === 'data-hub-sync') {
+      const params = new URLSearchParams({ action: 'sync-teams', limit: String(Math.min(Math.max(limit, 1), 100)) });
+      if (force) params.set('full', 'true');
+      const result = await callInternal(req, `/api/admin/data-hub?${params.toString()}`);
+      return NextResponse.json(result, { status: result.ok ? 200 : result.status });
     }
 
     if (action === 'fixtures') {
