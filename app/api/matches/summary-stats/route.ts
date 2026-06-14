@@ -26,32 +26,37 @@ function safeNumber(value: unknown) {
 
 export async function GET() {
   try {
-    const matches = await prisma.match.findMany({
-      select: {
-        id: true,
-        status: true,
-        homeScore: true,
-        awayScore: true,
-        statsSnapshots: {
-          orderBy: { capturedAt: 'desc' },
-          take: 1,
-          select: {
-            homeYellowCards: true,
-            awayYellowCards: true,
-            homeRedCards: true,
-            awayRedCards: true,
-            capturedAt: true,
+    const [matches, yellowEventCount, redEventCount, snapshotsCount] = await Promise.all([
+      prisma.match.findMany({
+        select: {
+          id: true,
+          status: true,
+          homeScore: true,
+          awayScore: true,
+          statsSnapshots: {
+            orderBy: { capturedAt: 'desc' },
+            take: 1,
+            select: {
+              homeYellowCards: true,
+              awayYellowCards: true,
+              homeRedCards: true,
+              awayRedCards: true,
+              capturedAt: true,
+            },
           },
         },
-      },
-    });
+      }),
+      prisma.matchEvent.count({ where: { type: { in: ['yellow_card', 'yellow', 'card_yellow'] } } }),
+      prisma.matchEvent.count({ where: { type: { in: ['red_card', 'red', 'card_red'] } } }),
+      prisma.matchStatsSnapshot.count().catch(() => 0),
+    ]);
 
     let finishedMatches = 0;
     let liveMatches = 0;
     let scheduledMatches = 0;
     let totalGoals = 0;
-    let yellowCards = 0;
-    let redCards = 0;
+    let snapshotYellowCards = 0;
+    let snapshotRedCards = 0;
     let matchesWithCardSnapshots = 0;
     let latestCardsUpdatedAt: string | null = null;
 
@@ -67,16 +72,20 @@ export async function GET() {
       if (latest) {
         const matchYellowCards = safeNumber(latest.homeYellowCards) + safeNumber(latest.awayYellowCards);
         const matchRedCards = safeNumber(latest.homeRedCards) + safeNumber(latest.awayRedCards);
-        yellowCards += matchYellowCards;
-        redCards += matchRedCards;
+        snapshotYellowCards += matchYellowCards;
+        snapshotRedCards += matchRedCards;
         if (matchYellowCards > 0 || matchRedCards > 0) matchesWithCardSnapshots += 1;
         const capturedAt = latest.capturedAt instanceof Date ? latest.capturedAt.toISOString() : String(latest.capturedAt || '');
         if (capturedAt && (!latestCardsUpdatedAt || capturedAt > latestCardsUpdatedAt)) latestCardsUpdatedAt = capturedAt;
       }
     }
 
+    const yellowCards = Math.max(snapshotYellowCards, yellowEventCount);
+    const redCards = Math.max(snapshotRedCards, redEventCount);
+
     return NextResponse.json({
       ok: true,
+      source: 'database_summary_from_matches_snapshots_and_events',
       totalMatches: matches.length,
       finishedMatches,
       liveMatches,
@@ -84,6 +93,15 @@ export async function GET() {
       totalGoals,
       yellowCards,
       redCards,
+      snapshotsCount,
+      cardsSource: {
+        yellow: snapshotYellowCards >= yellowEventCount ? 'MatchStatsSnapshot' : 'MatchEvent fallback',
+        red: snapshotRedCards >= redEventCount ? 'MatchStatsSnapshot' : 'MatchEvent fallback',
+        snapshotYellowCards,
+        snapshotRedCards,
+        yellowEventCount,
+        redEventCount,
+      },
       matchesWithCardSnapshots,
       latestCardsUpdatedAt,
     }, { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } });
