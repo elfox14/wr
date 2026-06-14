@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { WORLD_CUP_2026_GROUPS, type WorldCup2026GroupKey } from '@/lib/worldCup2026GroupConfig';
 
 type Team = {
   id?: string | number | null;
@@ -47,7 +48,7 @@ const heroActions = [
   ['التحليلات', '/news'],
 ] as const;
 
-const groupLetters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L'];
+const groupLetters = Object.keys(WORLD_CUP_2026_GROUPS) as WorldCup2026GroupKey[];
 const featuredTeamChips = ['المستضيفون', 'العرب', 'أوروبا', 'أمريكا الجنوبية'];
 
 function formatCount(value?: number, fallback = 0) {
@@ -315,21 +316,49 @@ function HomeMatchCenterCard({ fallbackMatches, upcomingMatchesCount }: { fallba
 }
 
 function SmartFeatureGrid() {
+  const [selectedGroup, setSelectedGroup] = useState<WorldCup2026GroupKey>('A');
+  const selectedGroupData = WORLD_CUP_2026_GROUPS[selectedGroup];
+
   return (
     <section className="mt-5" aria-label="أقسام كأس العالم 2026 التفاعلية">
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-        <Link href="/groups" className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.045] p-4 transition duration-200 hover:-translate-y-1 hover:border-[#0FF0FC]/35 hover:bg-white/[0.07]">
+        <article className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.045] p-4 transition duration-200 hover:-translate-y-1 hover:border-[#0FF0FC]/35 hover:bg-white/[0.07]">
           <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#0FF0FC]/50 to-transparent opacity-0 transition group-hover:opacity-100" />
           <div className="flex items-start justify-between gap-4">
-            <h3 className="text-base font-black text-white">المجموعات</h3>
+            <div>
+              <h3 className="text-base font-black text-white">المجموعات</h3>
+              <p className="mt-1 text-[11px] font-black text-[#FFD700]">المجموعة {selectedGroup} — {selectedGroupData.arName}</p>
+            </div>
             <span className="rounded-full border border-white/10 bg-black/25 px-2.5 py-1 text-[10px] font-black text-[#FFD700]">2026</span>
           </div>
-          <p className="mt-2 text-xs font-bold leading-6 text-gray-400">ترتيب مجموعات كأس العالم 2026، النقاط، الأهداف، وحالة المنافسة داخل كل مجموعة.</p>
-          <div className="mt-3 grid grid-cols-6 gap-1.5">
-            {groupLetters.map((group) => <span key={group} className="rounded-lg border border-white/10 bg-black/25 py-1 text-center text-[10px] font-black text-[#0FF0FC]">{group}</span>)}
+          <p className="mt-2 text-xs font-bold leading-6 text-gray-400">اختر أي مجموعة لعرض منتخباتها داخل الكارت مباشرة.</p>
+
+          <div className="mt-3 rounded-xl border border-white/10 bg-black/25 p-3">
+            <div className="mb-2 flex items-center justify-between text-[10px] font-black text-gray-500">
+              <span>المنتخب</span>
+              <span>الكود</span>
+            </div>
+            <div className="space-y-1.5">
+              {selectedGroupData.teams.map((team, index) => (
+                <div key={team.name} className="grid grid-cols-[auto_1fr_auto] items-center gap-2 rounded-lg border border-white/10 bg-white/[0.035] px-2.5 py-1.5">
+                  <span className="flex h-5 w-5 items-center justify-center rounded-md bg-[#0FF0FC]/10 text-[10px] font-black text-[#0FF0FC]">{index + 1}</span>
+                  <span className="truncate text-xs font-black text-white">{team.name}</span>
+                  <span className="text-[10px] font-black text-[#FFD700]">{team.codes[0]}</span>
+                </div>
+              ))}
+            </div>
           </div>
-          <div className="mt-3 text-[11px] font-black text-[#FFD700]">عرض المجموعات ←</div>
-        </Link>
+
+          <div className="mt-3 grid grid-cols-6 gap-1.5">
+            {groupLetters.map((group) => (
+              <button key={group} type="button" onClick={() => setSelectedGroup(group)} className={`rounded-lg border py-1 text-center text-[10px] font-black transition ${selectedGroup === group ? 'border-[#0FF0FC]/45 bg-[#0FF0FC]/15 text-[#0FF0FC]' : 'border-white/10 bg-black/25 text-gray-300 hover:border-[#0FF0FC]/35 hover:text-[#0FF0FC]'}`}>
+                {group}
+              </button>
+            ))}
+          </div>
+
+          <Link href={`/groups?group=${selectedGroup}`} className="mt-3 inline-flex text-[11px] font-black text-[#FFD700]">عرض تفاصيل المجموعة ←</Link>
+        </article>
 
         <Link href="/teams" className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.045] p-4 transition duration-200 hover:-translate-y-1 hover:border-[#0FF0FC]/35 hover:bg-white/[0.07]">
           <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#0FF0FC]/50 to-transparent opacity-0 transition group-hover:opacity-100" />
