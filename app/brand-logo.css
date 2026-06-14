@@ -1,54 +1,7 @@
-/* Updated MC PRIME Exchange logo override */
+/* Brand logo override: replace any old MC PRIME icon references with the official World Cup 2026 platform logo. */
 img[src*="/brand/logo-horizontal.png"],
-img[src*="/brand/logo-icon.png"] {
-  content: url('/brand/logo-icon-new.svg?v=20260611b') !important;
-  width: 56px !important;
-  height: 56px !important;
+img[src*="/brand/logo-icon.png"],
+img[src*="/brand/logo-icon-new.svg"] {
+  content: url('/brand/worldcup-2026-logo.svg?v=20260614c') !important;
   object-fit: contain !important;
-  filter: drop-shadow(0 0 14px rgba(15, 240, 252, 0.36));
-}
-
-/* Navbar: force the square uploaded logo instead of the old horizontal file. */
-nav a[href="/"] {
-  position: relative;
-  width: 58px;
-  height: 58px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
-nav a[href="/"] img {
-  opacity: 0 !important;
-  width: 0 !important;
-  height: 0 !important;
-  min-width: 0 !important;
-  max-width: 0 !important;
-  pointer-events: none;
-}
-
-nav a[href="/"]::before {
-  content: "";
-  display: block;
-  width: 56px;
-  height: 56px;
-  background-image: url('/brand/logo-icon-new.svg?v=20260611b');
-  background-repeat: no-repeat;
-  background-position: center;
-  background-size: contain;
-  filter: drop-shadow(0 0 14px rgba(15, 240, 252, 0.38));
-}
-
-@media (min-width: 1024px) {
-  nav a[href="/"] {
-    width: 66px;
-    height: 66px;
-  }
-
-  nav a[href="/"]::before,
-  nav img[src*="/brand/logo-horizontal.png"],
-  nav img[src*="/brand/logo-icon.png"] {
-    width: 64px !important;
-    height: 64px !important;
-  }
 }
