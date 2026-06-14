@@ -5,7 +5,6 @@ import "./globals.css";
 import "./brand-logo.css";
 import { Providers } from "@/components/Providers";
 import { NotificationProvider } from "@/components/ui/NotificationProvider";
-import { GlobalTicker } from "@/components/ui/GlobalTicker";
 import { Footer } from "@/components/ui/Footer";
 
 const cairo = Cairo({
@@ -19,10 +18,7 @@ const description = 'MC PRIME World Cup: live World Cup matches, verified news, 
 
 export const metadata: Metadata = {
   metadataBase: new URL(baseUrl),
-  title: {
-    default: "MC PRIME World Cup",
-    template: "%s | MC PRIME World Cup",
-  },
+  title: { default: "MC PRIME World Cup", template: "%s | MC PRIME World Cup" },
   description,
   keywords: ["World Cup", "football news", "live matches", "teams", "players"],
   authors: [{ name: "MC PRIME World Cup Team" }],
@@ -36,17 +32,8 @@ export const metadata: Metadata = {
     type: "website",
   },
   alternates: { canonical: '/', languages: { ar: '/', en: '/' } },
-  twitter: {
-    card: "summary_large_image",
-    title: "MC PRIME World Cup",
-    description,
-    images: ["/og-image.jpg"],
-  },
-  robots: {
-    index: true,
-    follow: true,
-    googleBot: { index: true, follow: true, 'max-video-preview': -1, 'max-image-preview': 'large', 'max-snippet': -1 },
-  },
+  twitter: { card: "summary_large_image", title: "MC PRIME World Cup", description, images: ["/og-image.jpg"] },
+  robots: { index: true, follow: true, googleBot: { index: true, follow: true, 'max-video-preview': -1, 'max-image-preview': 'large', 'max-snippet': -1 } },
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
@@ -58,11 +45,8 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       <body className="min-h-full flex flex-col">
         <Providers>
           <NotificationProvider>
-            <div className="min-h-[calc(100vh-100px)]">
-              {children}
-            </div>
+            <div className="min-h-[calc(100vh-100px)]">{children}</div>
             <Footer />
-            <GlobalTicker />
           </NotificationProvider>
         </Providers>
       </body>
