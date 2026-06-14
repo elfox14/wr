@@ -27,7 +27,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { route: '/teams', freq: 'daily', prio: 0.75 },
     { route: '/players', freq: 'daily', prio: 0.7 },
     { route: '/groups', freq: 'always', prio: 0.85 },
-    { route: '/team-intelligence', freq: 'weekly', prio: 0.75 },
   ].map((page) => ({
     url: `${baseUrl}${page.route}`,
     lastModified: new Date(),
