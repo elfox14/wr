@@ -54,13 +54,14 @@ export async function GET(request: Request) {
 
   try {
     if (action === 'status') {
+      const status = await getDataHubStatus();
       return NextResponse.json({
-        ok: true,
+        ...status,
+        ok: status.ok !== false,
         config: {
           ...getDataHubConfig(),
           token: undefined,
         },
-        ...(await getDataHubStatus()),
       });
     }
 
@@ -91,7 +92,8 @@ export async function POST(request: Request) {
 
   try {
     if (action === 'status') {
-      return NextResponse.json({ ok: true, ...(await getDataHubStatus()) });
+      const status = await getDataHubStatus();
+      return NextResponse.json({ ...status, ok: status.ok !== false });
     }
 
     if (action === 'sync-team') {
