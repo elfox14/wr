@@ -17,29 +17,21 @@ const links = [
 export function Navbar() {
   return (
     <>
-      <nav className="fixed top-0 z-50 w-full border-b border-white/10 bg-black/85 backdrop-blur-xl">
-        <div className="mx-auto flex h-20 max-w-[1400px] items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
-          <Link href="/" className="group flex items-center gap-3 rounded-2xl px-1 py-1 transition hover:bg-white/[0.04]">
-            <span className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-[#FFD700]/30 bg-white shadow-[0_0_24px_rgba(255,215,0,0.16)]">
-              <img src={logoSrc} alt="World Cup 2026" className="h-full w-full object-contain" />
-            </span>
-            <span className="hidden leading-none sm:block">
-              <span className="block text-sm font-black tracking-wide text-white">WORLD CUP 2026</span>
-              <span className="mt-1 block text-[11px] font-black text-[#0FF0FC]">مباريات • تحليل • إحصائيات</span>
-            </span>
+      <nav className="fixed top-0 z-50 w-full border-b border-white/10 bg-black/90 backdrop-blur-xl">
+        <div className="mx-auto grid h-20 max-w-[1400px] grid-cols-[auto_1fr_auto] items-center gap-4 px-4 sm:px-6 lg:px-8">
+          <Link href="/" aria-label="World Cup 2026 homepage" className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-2xl border border-[#FFD700]/25 bg-white p-1.5 shadow-[0_0_24px_rgba(255,215,0,0.18)] transition hover:scale-[1.03] lg:h-[72px] lg:w-[72px]">
+            <img src={logoSrc} alt="World Cup 2026" className="h-full w-full object-contain" />
           </Link>
 
-          <div className="hidden items-center gap-2 lg:flex">
+          <div className="hidden items-center justify-center gap-2 lg:flex">
             {links.map(([href, label]) => (
-              <Link key={href} href={href} className="rounded-xl px-3 py-2 text-sm font-bold text-gray-300 transition hover:bg-white/10 hover:text-white">
+              <Link key={href} href={href} className="rounded-xl px-3 py-2 text-sm font-bold text-gray-300 transition hover:bg-white/10 hover:text-white xl:px-4">
                 {label}
               </Link>
             ))}
           </div>
 
-          <Link href="/matches" className="rounded-2xl bg-[#0FF0FC] px-4 py-2 text-sm font-black text-black shadow-[0_0_18px_rgba(15,240,252,0.22)] transition hover:bg-[#4AFAFF]">
-            مباريات اليوم
-          </Link>
+          <div className="h-16 w-16 lg:h-[72px] lg:w-[72px]" aria-hidden="true" />
         </div>
       </nav>
       <div className="h-20" />
