@@ -3,6 +3,8 @@ import TeamIntelligenceHub from '@/components/teams/TeamIntelligenceHub';
 
 export const dynamic = 'force-dynamic';
 
+type Props = { params: Promise<{ id: string }> };
+
 function toIsoDate(value: unknown) {
   if (!value) return null;
   const date = value instanceof Date ? value : new Date(String(value));
@@ -76,7 +78,8 @@ function createSafeDemoTeam(id: string, dataError?: string) {
   };
 }
 
-export default async function TeamPage({ params }: { params: { id: string } }) {
+export default async function TeamPage({ params }: Props) {
+  const { id } = await params;
   let team: any = null;
   let players: any[] = [];
   let matches: any[] = [];
@@ -85,7 +88,7 @@ export default async function TeamPage({ params }: { params: { id: string } }) {
 
   try {
     team = await prisma.asset.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         intelligenceReports: {
           orderBy: { publishedAt: 'desc' },
@@ -122,7 +125,7 @@ export default async function TeamPage({ params }: { params: { id: string } }) {
 
   const safeTeam = team
     ? { ...team, intelligenceReports: undefined, isDemo: false }
-    : createSafeDemoTeam(params.id, dataError);
+    : createSafeDemoTeam(id, dataError);
 
   return (
     <main className="min-h-screen bg-[#050505] text-white">
