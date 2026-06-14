@@ -28,8 +28,7 @@
     "audit:prod": "npm audit --omit=dev",
     "sync-api": "tsx prisma/seedApi.ts",
     "sync-api:optional": "tsx prisma/seedApi.ts || echo \"Skipping API sync; continuing build\"",
-    "seed:team-intelligence": "tsx prisma/seedTeamIntelligenceReports.ts",
-    "fbref:worldcup-export": "tsx scripts/export-fbref-worldcup-2026.ts"
+    "seed:team-intelligence": "tsx prisma/seedTeamIntelligenceReports.ts"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.2",
