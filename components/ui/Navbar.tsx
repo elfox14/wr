@@ -6,6 +6,8 @@ const links = [
   ['/', 'Home'],
   ['/news', 'News'],
   ['/groups', 'Groups'],
+  ['/teams', 'Teams'],
+  ['/players', 'Players'],
   ['/matches', 'Matches'],
   ['/team-intelligence', 'Analysis'],
   ['/animation-live', 'Live'],
