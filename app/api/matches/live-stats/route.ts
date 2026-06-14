@@ -17,6 +17,22 @@ function toIso(value: any) {
   return value instanceof Date ? value.toISOString() : value || null;
 }
 
+function isAuthorized(req: Request, searchParams: URLSearchParams) {
+  const valid = [process.env.ADMIN_API_SECRET, process.env.CRON_SECRET].map((value) => String(value || '').trim()).filter(Boolean);
+  if (valid.length === 0) return false;
+  const auth = req.headers.get('authorization') || '';
+  const bearer = auth.startsWith('Bearer ') ? auth.slice(7).trim() : '';
+  const candidates = [
+    bearer,
+    req.headers.get('x-admin-secret')?.trim() || '',
+    req.headers.get('x-cron-secret')?.trim() || '',
+    searchParams.get('key')?.trim() || '',
+    searchParams.get('adminSecret')?.trim() || '',
+    searchParams.get('cronSecret')?.trim() || '',
+  ];
+  return candidates.some((value) => value && valid.includes(value));
+}
+
 function isLiveLike(status?: string | null) {
   const value = String(status || '').toUpperCase();
   return ['IN_PLAY', 'LIVE', 'HT'].includes(value);
@@ -34,8 +50,6 @@ function isScheduledButProbablyLive(match: any) {
 function isAutoSyncCandidate(match: any, force: boolean) {
   if (force) return true;
   if (!match?.animationMatchId) return false;
-  // Finished-match iSports backfill is now owned by the guarded cron only.
-  // Public page views should not repeatedly spend iSports quota on old matches.
   return isLiveLike(match.status) || isScheduledButProbablyLive(match);
 }
 
@@ -46,8 +60,7 @@ function shouldSync(match: any, latest: any, force: boolean) {
   if (!latest) return true;
   const capturedAt = new Date(latest.capturedAt).getTime();
   if (!Number.isFinite(capturedAt)) return true;
-  const ageMs = Date.now() - capturedAt;
-  return ageMs >= 300_000;
+  return Date.now() - capturedAt >= 300_000;
 }
 
 function hasAnyStat(snapshot: any) {
@@ -70,7 +83,7 @@ export async function GET(request: Request) {
     const force = searchParams.get('force') === '1' || searchParams.get('force') === 'true';
     const syncParam = String(searchParams.get('sync') || '').toLowerCase();
     const manualSyncRequested = syncParam === '1' || syncParam === 'true' || force;
-    const autoSyncDisabled = syncParam === '0' || syncParam === 'false';
+    const authorizedSync = manualSyncRequested && isAuthorized(request, searchParams);
 
     if (!providerMatchId && !dbMatchId) {
       return NextResponse.json({ ok: false, error: 'matchId or dbMatchId is required' }, { status: 400, headers: { 'Cache-Control': 'no-store' } });
@@ -92,16 +105,20 @@ export async function GET(request: Request) {
     let syncResult: any = null;
     const quotaBlock = await getProviderQuotaBlock('ISPORTS');
     const autoSyncCandidate = isAutoSyncCandidate(match, force);
-    const allowProviderSync = manualSyncRequested || (!autoSyncDisabled && autoSyncCandidate);
+    const allowProviderSync = authorizedSync;
 
-    if (allowProviderSync && quotaBlock) {
+    if (manualSyncRequested && !authorizedSync) {
+      syncResult = { status: 'database_only_unauthorized_sync_ignored', autoSync: autoSyncCandidate, note: 'Public requests never call external providers. Scheduled/admin sync must pass a valid secret.' };
+    } else if (!allowProviderSync) {
+      syncResult = { status: 'database_only', autoSync: autoSyncCandidate, note: 'Public live-stats reads from the database only. External providers are updated by cron/admin sync jobs.' };
+    } else if (quotaBlock) {
       syncResult = {
         status: 'isports_guard_active',
-        note: 'Automatic provider sync skipped because iSports is temporarily blocked by the quota guard.',
+        note: 'Manual provider sync skipped because iSports is temporarily blocked by the quota guard.',
         blockedUntil: quotaBlock.blockedUntil instanceof Date ? quotaBlock.blockedUntil.toISOString() : quotaBlock.blockedUntil,
         reason: quotaBlock.reason,
       };
-    } else if (allowProviderSync && shouldSync(match, latest, force)) {
+    } else if (shouldSync(match, latest, force)) {
       try {
         syncResult = await syncMatchStats(match, { debug: false, force });
         latest = await getLatestSnapshot(match.id);
@@ -109,13 +126,10 @@ export async function GET(request: Request) {
         syncResult = { status: 'failed', ...providerErrorDetails(error) };
       }
     } else {
-      syncResult = allowProviderSync
-        ? { status: 'cached_recent_snapshot', autoSync: autoSyncCandidate, note: 'Latest snapshot is still fresh.' }
-        : { status: 'database_only', autoSync: autoSyncCandidate, note: autoSyncDisabled ? 'Provider sync disabled by sync=0.' : 'Match is outside automatic sync window.' };
+      syncResult = { status: 'cached_recent_snapshot', autoSync: autoSyncCandidate, note: 'Latest snapshot is still fresh.' };
     }
 
     const historyRows = await getSnapshotHistory(match.id, 80);
-
     const latestPublic = publicSnapshot(latest);
     const latestHomeScore = latestPublic?.homeScore ?? match.homeScore;
     const latestAwayScore = latestPublic?.awayScore ?? match.awayScore;
@@ -130,9 +144,9 @@ export async function GET(request: Request) {
           reason: quotaBlock.reason,
         }
       : {
-          primary: 'ISPORTS',
-          statsProvider: latestPublic?.provider || 'ISPORTS',
-          mode: 'isports_primary',
+          primary: latestPublic?.provider || 'DATABASE',
+          statsProvider: latestPublic?.provider || 'DATABASE',
+          mode: 'database_first_public_endpoint',
           isportsBlocked: false,
         };
 
