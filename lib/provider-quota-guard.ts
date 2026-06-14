@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import prisma from '@/lib/prisma';
 
 function quoteSql(value: string) {
@@ -13,7 +14,8 @@ export function isProviderQuotaMessage(value: unknown) {
     lower.includes('quota') ||
     lower.includes('rate limit') ||
     lower.includes('too many requests') ||
-    lower.includes('requests limit')
+    lower.includes('requests limit') ||
+    lower.includes('local soft daily limit')
   );
 }
 
@@ -32,6 +34,23 @@ export async function ensureProviderQuotaGuardTable() {
       "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
     )
   `);
+}
+
+export async function ensureProviderRequestLogTable() {
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "ProviderRequestLog" (
+      "id" TEXT PRIMARY KEY,
+      "provider" TEXT NOT NULL,
+      "route" TEXT,
+      "providerMatchId" INTEGER,
+      "status" INTEGER,
+      "ok" BOOLEAN NOT NULL DEFAULT false,
+      "reason" TEXT,
+      "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+  await prisma.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS "ProviderRequestLog_provider_createdAt_idx" ON "ProviderRequestLog" ("provider", "createdAt")');
+  await prisma.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS "ProviderRequestLog_match_createdAt_idx" ON "ProviderRequestLog" ("providerMatchId", "createdAt")');
 }
 
 export async function getProviderQuotaBlock(provider: string) {
@@ -63,4 +82,58 @@ export async function blockProviderUntil(provider: string, blockedUntil: Date, r
 
 export async function blockProviderForHours(provider: string, hours: number, reason: string) {
   return blockProviderUntil(provider, new Date(Date.now() + Math.max(1, hours) * 60 * 60 * 1000), reason);
+}
+
+export async function recordProviderRequest(params: {
+  provider: string;
+  route?: string;
+  providerMatchId?: number | null;
+  status?: number | null;
+  ok?: boolean;
+  reason?: string | null;
+}) {
+  await ensureProviderRequestLogTable();
+  const id = randomUUID();
+  await prisma.$executeRawUnsafe(
+    `INSERT INTO "ProviderRequestLog" ("id", "provider", "route", "providerMatchId", "status", "ok", "reason") VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+    id,
+    params.provider,
+    params.route || null,
+    Number.isFinite(Number(params.providerMatchId)) ? Number(params.providerMatchId) : null,
+    Number.isFinite(Number(params.status)) ? Number(params.status) : null,
+    Boolean(params.ok),
+    params.reason ? String(params.reason).slice(0, 500) : null,
+  );
+  return id;
+}
+
+export async function countProviderRequestsSince(provider: string, since: Date) {
+  await ensureProviderRequestLogTable();
+  const rows = await prisma.$queryRawUnsafe<any[]>(`
+    SELECT COUNT(*)::int AS count
+    FROM "ProviderRequestLog"
+    WHERE "provider" = ${quoteSql(provider)}
+      AND "createdAt" >= ${quoteSql(since.toISOString())}::timestamp
+  `);
+  return Number(rows?.[0]?.count || 0);
+}
+
+export async function getProviderUsageSummary(provider: string, since: Date) {
+  await ensureProviderRequestLogTable();
+  const rows = await prisma.$queryRawUnsafe<any[]>(`
+    SELECT COUNT(*)::int AS total,
+           COUNT(*) FILTER (WHERE "ok" = true)::int AS ok,
+           COUNT(*) FILTER (WHERE "ok" = false)::int AS failed,
+           MAX("createdAt") AS "latestAt"
+    FROM "ProviderRequestLog"
+    WHERE "provider" = ${quoteSql(provider)}
+      AND "createdAt" >= ${quoteSql(since.toISOString())}::timestamp
+  `);
+  const row = rows?.[0] || {};
+  return {
+    total: Number(row.total || 0),
+    ok: Number(row.ok || 0),
+    failed: Number(row.failed || 0),
+    latestAt: row.latestAt instanceof Date ? row.latestAt.toISOString() : row.latestAt || null,
+  };
 }
