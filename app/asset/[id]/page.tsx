@@ -25,6 +25,9 @@ type Props = { params: Promise<{ id: string }> };
 type OfficialLineup = { source: 'ISPORTS' | 'PREDICTED' | 'UNAVAILABLE'; fixtureId?: number | string | null; formation?: string | null; matchLabel?: string | null; starters?: number[]; substitutes?: number[] };
 type AssetPageAsset = Prisma.AssetGetPayload<{ include: { team: true; performances: true; intelligenceReports: true; players: { include: { performances: true } }; marketNews: true; homeMatches: { include: { homeTeam: true; awayTeam: true } }; awayMatches: { include: { homeTeam: true; awayTeam: true } } } }>;
 type AssetPagePlayer = AssetPageAsset['players'][number];
+type TeamMatch = AssetPageAsset['homeMatches'][number] | AssetPageAsset['awayMatches'][number];
+type RelatedPressNewsRow = Record<string, unknown>;
+type RelatedMatchEventRow = Record<string, unknown> & { homeName?: string | null; awayName?: string | null };
 
 function quoteSql(value: string) { return `'${String(value).replace(/'/g, "''")}'`; }
 
@@ -42,7 +45,7 @@ async function getRelatedPressNews(assetId: string, assetName: string, isTeam: b
     await ensurePressNewsTable();
     const name = `%${assetName}%`;
     const relationColumn = isTeam ? 'relatedTeamId' : 'relatedPlayerId';
-    return prisma.$queryRawUnsafe<any[]>(`
+    return prisma.$queryRawUnsafe<RelatedPressNewsRow[]>(`
       SELECT * FROM "PressNews"
       WHERE "status" = 'published'
         AND ("${relationColumn}" = ${quoteSql(assetId)} OR "title" ILIKE ${quoteSql(name)} OR "body" ILIKE ${quoteSql(name)})
@@ -59,7 +62,7 @@ async function getRelatedMatchEvents(assetId: string, isTeam: boolean) {
   try {
     await ensureMatchEventTable();
     const column = isTeam ? 'teamId' : 'playerId';
-    return prisma.$queryRawUnsafe<any[]>(`
+    return prisma.$queryRawUnsafe<RelatedMatchEventRow[]>(`
       SELECT e.*, m."matchDate", h."name" AS "homeName", a."name" AS "awayName"
       FROM "MatchEvent" e
       LEFT JOIN "Match" m ON m."id" = e."matchId"
@@ -101,9 +104,9 @@ async function getGroupTeams(group: string | null | undefined) {
   }
 }
 
-function computeFormScore(asset: any): number {
-  const allMatches = [...(asset.homeMatches || []), ...(asset.awayMatches || [])];
-  const finished = allMatches.filter((m: any) => m.status === 'FINISHED');
+function computeFormScore(asset: Pick<AssetPageAsset, 'id' | 'homeMatches' | 'awayMatches'>): number {
+  const allMatches: TeamMatch[] = [...(asset.homeMatches || []), ...(asset.awayMatches || [])];
+  const finished = allMatches.filter((m) => m.status === 'FINISHED');
   if (finished.length === 0) return 0.5;
   let points = 0;
   for (const m of finished) {
@@ -116,7 +119,7 @@ function computeFormScore(asset: any): number {
   return Math.min(1, points / (finished.length * 3));
 }
 
-function computeSquadDepth(asset: any): number {
+function computeSquadDepth(asset: Pick<AssetPageAsset, 'players'>): number {
   const count = asset.players?.length || 0;
   return Math.min(1, count / 26);
 }
