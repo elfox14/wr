@@ -14,12 +14,12 @@ import TeamDataSources from './TeamDataSources';
 
 type TabType = 'overview' | 'matches' | 'squad' | 'stats' | 'tactics' | 'history' | 'sources';
 
-export default function TeamIntelligenceHub({ team, players, matches, intelligenceReport }: any) {
+export default function TeamIntelligenceHub({ team, players = [], matches = [], intelligenceReport }: any) {
   const [activeTab, setActiveTab] = useState<TabType>('overview');
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 font-sans" dir="rtl">
-      <TeamHero team={team} />
+      <TeamHero team={team} matches={matches} players={players} report={intelligenceReport} />
       
       <TeamTabs activeTab={activeTab} setActiveTab={setActiveTab} />
       
@@ -32,13 +32,13 @@ export default function TeamIntelligenceHub({ team, players, matches, intelligen
             exit={{ opacity: 0, y: -20 }}
             transition={{ duration: 0.3 }}
           >
-            {activeTab === 'overview' && <TeamOverviewPanel team={team} matches={matches} />}
-            {activeTab === 'matches' && <TeamMatchesList matches={matches} />}
+            {activeTab === 'overview' && <TeamOverviewPanel team={team} matches={matches} players={players} report={intelligenceReport} />}
+            {activeTab === 'matches' && <TeamMatchesList team={team} matches={matches} />}
             {activeTab === 'squad' && <TeamSquadHighlight players={players} />}
-            {activeTab === 'stats' && <TeamStatsOverview matches={matches} />}
+            {activeTab === 'stats' && <TeamStatsOverview team={team} matches={matches} />}
             {activeTab === 'tactics' && <TeamTacticalBoard report={intelligenceReport} />}
-            {activeTab === 'history' && <TeamHistoryPanel team={team} />}
-            {activeTab === 'sources' && <TeamDataSources />}
+            {activeTab === 'history' && <TeamHistoryPanel team={team} matches={matches} report={intelligenceReport} />}
+            {activeTab === 'sources' && <TeamDataSources report={intelligenceReport} />}
           </motion.div>
         </AnimatePresence>
       </div>
