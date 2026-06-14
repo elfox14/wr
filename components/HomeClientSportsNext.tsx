@@ -47,14 +47,8 @@ const heroActions = [
   ['التحليلات', '/news'],
 ] as const;
 
-const featureCards = [
-  ['مركز المباريات', 'مواعيد، نتائج، مباريات اليوم، وحالة كل مباراة عند توفر البيانات الحية.', '/matches'],
-  ['المجموعات', 'عرض مجموعات كأس العالم 2026 وترتيب المنتخبات داخل كل مجموعة.', '/groups'],
-  ['دليل المنتخبات', 'صفحات خاصة لكل منتخب تشمل المعلومات الأساسية، الأداء، أبرز الأسماء، والتحليل المتاح.', '/teams'],
-  ['الأخبار والتحليل', 'تقارير رياضية وتحليل فني منفصل عن أي جانب ترفيهي أو افتراضي.', '/news'],
-  ['الإحصائيات', 'أرقام البطولة، المنتخبات، المباريات، والأداء عند توفر مصادر موثوقة.', '/players'],
-  ['البث التفاعلي', 'متابعة تفاعلية للمباريات عند توفر البيانات الحية والرسوم الزمنية.', '/animation-live'],
-] as const;
+const groupLetters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L'];
+const featuredTeamChips = ['المستضيفون', 'العرب', 'أوروبا', 'أمريكا الجنوبية'];
 
 function formatCount(value?: number, fallback = 0) {
   return new Intl.NumberFormat('ar-EG').format(value && value > 0 ? value : fallback);
@@ -100,36 +94,69 @@ function getInteractiveHref(match: HomeMatch) {
     : '/animation-live';
 }
 
+function getMatchHref(match: HomeMatch) {
+  return match.id ? `/matches/${encodeURIComponent(String(match.id))}` : '/matches';
+}
+
+function normalizeStatus(match?: HomeMatch | null) {
+  return String(match?.displayStatus || match?.status || '').toUpperCase();
+}
+
+function isLiveMatch(match?: HomeMatch | null) {
+  const status = normalizeStatus(match);
+  return status === 'IN_PLAY' || status === 'LIVE' || status === 'HT' || Boolean(match?.isLiveNow && !match?.isLikelyLiveByTime);
+}
+
+function isFinishedMatch(match?: HomeMatch | null) {
+  const status = normalizeStatus(match);
+  return status === 'FINISHED' || status === 'FT';
+}
+
+function isScheduledMatch(match?: HomeMatch | null) {
+  const status = normalizeStatus(match);
+  return status === 'SCHEDULED' || status === 'TIMED' || status === 'NOT_STARTED';
+}
+
+function isSameCalendarDay(value?: string | Date | null, target = new Date()) {
+  if (!value) return false;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return false;
+  return date.getFullYear() === target.getFullYear() && date.getMonth() === target.getMonth() && date.getDate() === target.getDate();
+}
+
+function matchTime(match: HomeMatch) {
+  const date = match.matchDate ? new Date(match.matchDate) : null;
+  return date && !Number.isNaN(date.getTime()) ? date.getTime() : Number.MAX_SAFE_INTEGER;
+}
+
+function matchScore(match: HomeMatch) {
+  return `${Number(match.homeScore || 0)} - ${Number(match.awayScore || 0)}`;
+}
+
 function formatCountdown(diffMs: number) {
-  const totalSeconds = Math.max(0, Math.floor(diffMs / 1000));
-  const days = Math.floor(totalSeconds / 86_400);
-  const hours = Math.floor((totalSeconds % 86_400) / 3_600);
-  const minutes = Math.floor((totalSeconds % 3_600) / 60);
-  const seconds = totalSeconds % 60;
-
-  if (days > 0) {
-    return `بعد ${formatCount(days)}ي ${formatCount(hours)}س ${formatCount(minutes)}د`;
-  }
-
-  if (hours > 0) {
-    return `بعد ${formatCount(hours)}س ${formatCount(minutes)}د ${formatCount(seconds)}ث`;
-  }
-
-  return `بعد ${formatCount(minutes)}د ${formatCount(seconds)}ث`;
+  const totalMinutes = Math.max(0, Math.floor(diffMs / 60_000));
+  const days = Math.floor(totalMinutes / 1440);
+  const hours = Math.floor((totalMinutes % 1440) / 60);
+  const minutes = totalMinutes % 60;
+  const parts = [];
+  if (days > 0) parts.push(`${formatCount(days)} يوم`);
+  if (hours > 0) parts.push(`${formatCount(hours)} ساعة`);
+  parts.push(`${formatCount(minutes)} دقيقة`);
+  return parts.join(' و ');
 }
 
 function matchTiming(match: HomeMatch, now: Date) {
-  const status = String(match.displayStatus || match.status || '').toUpperCase();
-  const isFinished = status === 'FINISHED' || status === 'FT';
+  const status = normalizeStatus(match);
   const isConfirmedLive = Boolean(match.isLiveNow && !match.isLikelyLiveByTime);
 
-  if (isFinished) {
-    return { label: 'انتهت', live: false, waiting: false };
+  if (isFinishedMatch(match)) {
+    return { label: 'انتهت', detail: 'تم تحديث النتيجة', live: false, waiting: false };
   }
 
-  if (isConfirmedLive) {
+  if (isConfirmedLive || status === 'LIVE' || status === 'IN_PLAY' || status === 'HT') {
     return {
-      label: match.liveLabel || (match.minute ? `مباشر • ${formatCount(match.minute)}′` : 'مباشر الآن'),
+      label: status === 'HT' ? 'استراحة' : 'مباشر الآن',
+      detail: match.liveLabel || (match.minute ? `الدقيقة ${formatCount(match.minute)}` : 'جارية الآن'),
       live: true,
       waiting: false,
     };
@@ -139,43 +166,43 @@ function matchTiming(match: HomeMatch, now: Date) {
   const validDate = date && !Number.isNaN(date.getTime()) ? date : null;
 
   if (!validDate) {
-    return { label: 'بانتظار المصدر', live: false, waiting: true };
+    return { label: 'موعد غير متوفر', detail: 'بانتظار تحديث المصدر', live: false, waiting: true };
   }
 
   const diffMs = validDate.getTime() - now.getTime();
   if (diffMs > 0) {
-    return { label: formatCountdown(diffMs), live: false, waiting: false };
+    return { label: 'العد التنازلي', detail: `يبدأ بعد ${formatCountdown(diffMs)}`, live: false, waiting: false };
   }
 
-  return { label: 'بانتظار تأكيد البداية', live: false, waiting: true };
+  return { label: 'بانتظار تأكيد البداية', detail: 'لا نعرض زمن المباراة إلا بعد تأكيد المصدر الحي', live: false, waiting: true };
 }
 
-function InlineMatchTimer({ match }: { match: HomeMatch }) {
+function MatchTimer({ match }: { match: HomeMatch }) {
   const [now, setNow] = useState(() => new Date());
 
   useEffect(() => {
-    const timer = window.setInterval(() => setNow(new Date()), 1000);
+    const timer = window.setInterval(() => setNow(new Date()), 30_000);
     return () => window.clearInterval(timer);
   }, []);
 
   const timing = matchTiming(match, now);
 
   return (
-    <span className={`min-w-0 truncate rounded-full border px-2.5 py-1 text-center text-[11px] font-black ${timing.live ? 'border-[#00FF88]/25 bg-[#00FF88]/10 text-[#00FF88]' : timing.waiting ? 'border-[#FFD700]/20 bg-[#FFD700]/10 text-[#FFD700]' : 'border-[#0FF0FC]/20 bg-[#0FF0FC]/10 text-[#0FF0FC]'}`}>
-      {timing.label}
-    </span>
+    <div className={`mt-3 rounded-2xl border px-3 py-2 text-center ${timing.live ? 'border-[#00FF88]/25 bg-[#00FF88]/10' : timing.waiting ? 'border-[#FFD700]/20 bg-[#FFD700]/10' : 'border-[#0FF0FC]/20 bg-[#0FF0FC]/10'}`}>
+      <div className={`text-[11px] font-black ${timing.live ? 'text-[#00FF88]' : timing.waiting ? 'text-[#FFD700]' : 'text-[#0FF0FC]'}`}>{timing.label}</div>
+      <div className="mt-1 text-xs font-black text-white">{timing.detail}</div>
+    </div>
   );
 }
 
 function UpcomingMatchCard({ match }: { match: HomeMatch }) {
-  const href = match.id ? `/matches/${match.id}` : '/matches';
+  const href = getMatchHref(match);
 
   return (
     <article className="relative overflow-hidden rounded-2xl border border-white/10 bg-black/30 p-3 shadow-[0_14px_34px_rgba(0,0,0,0.18)] transition hover:border-[#0FF0FC]/35 hover:bg-white/[0.055]">
       <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#0FF0FC]/55 to-transparent opacity-70" />
-      <div className="mb-3 grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <span className="rounded-full border border-[#FFD700]/20 bg-[#FFD700]/10 px-2.5 py-1 text-[11px] font-black text-[#FFD700]">{matchGroup(match)}</span>
-        <InlineMatchTimer match={match} />
         <span className="rounded-full border border-white/10 bg-white/[0.05] px-2.5 py-1 text-[11px] font-black text-gray-300">{formatMatchDate(match.matchDate)}</span>
       </div>
 
@@ -200,6 +227,8 @@ function UpcomingMatchCard({ match }: { match: HomeMatch }) {
           <p className="mt-0.5 text-[11px] font-bold text-gray-500">{teamCode(match.awayTeam)}</p>
         </div>
       </div>
+
+      <MatchTimer match={match} />
 
       <div className="mt-3 grid grid-cols-2 gap-2">
         <Link href={href} className="rounded-xl border border-white/10 bg-white/[0.05] px-3 py-2 text-center text-[11px] font-black text-gray-200 transition hover:bg-white/[0.1]">
@@ -242,6 +271,16 @@ function UpcomingMatchesStrip({ matches }: { matches: HomeMatch[] }) {
 
   return (
     <section className="mb-4 overflow-hidden rounded-2xl border border-white/10 bg-white/[0.04] p-3 shadow-[0_14px_38px_rgba(0,0,0,0.2)] backdrop-blur sm:p-4">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <div>
+          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#0FF0FC]">NEXT MATCHES</p>
+          <h2 className="mt-0.5 text-base font-black text-white">المباراتان القادمتان</h2>
+        </div>
+        <Link href="/matches" className="rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-[11px] font-black text-white transition hover:border-[#FFD700]/40 hover:bg-white/[0.14]">
+          عرض الكل
+        </Link>
+      </div>
+
       {nextMatches.length > 0 ? (
         <div className="grid gap-3 lg:grid-cols-2">
           {nextMatches.map((match, index) => (
@@ -257,14 +296,234 @@ function UpcomingMatchesStrip({ matches }: { matches: HomeMatch[] }) {
   );
 }
 
+function StatLinkCard({ value, label, caption, href }: { value: string; label: string; caption: string; href: string }) {
+  return (
+    <Link href={href} className="group rounded-xl border border-white/10 bg-black/25 p-2.5 backdrop-blur transition hover:-translate-y-0.5 hover:border-[#0FF0FC]/35 hover:bg-white/[0.07]">
+      <div className="text-xl font-black text-[#FFD700] transition group-hover:text-[#0FF0FC]">{value}</div>
+      <div className="mt-0.5 text-[11px] font-black text-white">{label}</div>
+      <div className="mt-0.5 text-[10px] font-bold leading-4 text-gray-400">{caption}</div>
+    </Link>
+  );
+}
+
+function MatchCenterMiniTeam({ team, align = 'right' }: { team?: Team | null; align?: 'right' | 'left' }) {
+  return (
+    <div className={`min-w-0 ${align === 'left' ? 'text-left' : 'text-right'}`}>
+      <div className="mb-2 inline-flex h-11 w-11 items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-white/[0.07]">
+        {teamMark(team)}
+      </div>
+      <h3 className="truncate text-sm font-black text-white">{teamLabel(team)}</h3>
+      <p className="mt-0.5 text-[11px] font-bold text-gray-500">{teamCode(team)}</p>
+    </div>
+  );
+}
+
+function HomeMatchCenterCard({ fallbackMatches, upcomingMatchesCount }: { fallbackMatches: HomeMatch[]; upcomingMatchesCount: number }) {
+  const [matches, setMatches] = useState<HomeMatch[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadMatches() {
+      try {
+        const response = await fetch('/api/matches', { cache: 'no-store' });
+        if (!response.ok) return;
+        const data = await response.json();
+        const list = Array.isArray(data) ? data : Array.isArray(data?.matches) ? data.matches : [];
+        if (!cancelled && list.length) setMatches(list);
+      } catch {
+        // Fallback to the server-provided upcoming matches.
+      }
+    }
+
+    loadMatches();
+    const timer = window.setInterval(loadMatches, 30_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, []);
+
+  const sourceMatches = matches.length ? matches : fallbackMatches;
+  const now = new Date();
+  const todayCount = sourceMatches.filter((match) => isSameCalendarDay(match.matchDate, now)).length;
+  const liveCount = sourceMatches.filter(isLiveMatch).length;
+  const upcomingCount = matches.length ? sourceMatches.filter(isScheduledMatch).length : upcomingMatchesCount;
+  const finishedCount = sourceMatches.filter(isFinishedMatch).length;
+
+  const featuredMatch = useMemo(() => {
+    const sorted = [...sourceMatches].sort((a, b) => matchTime(a) - matchTime(b));
+    return sorted.find(isLiveMatch) || sorted.find((match) => isSameCalendarDay(match.matchDate) && !isFinishedMatch(match)) || sorted.find(isScheduledMatch) || sorted[0];
+  }, [sourceMatches]);
+
+  return (
+    <section className="mt-5 overflow-hidden rounded-[1.75rem] border border-[#0FF0FC]/20 bg-[radial-gradient(circle_at_top_right,rgba(15,240,252,0.13),transparent_34%),linear-gradient(135deg,rgba(255,255,255,0.065),rgba(255,255,255,0.018))] p-4 shadow-[0_18px_50px_rgba(0,0,0,0.28)] md:p-5" aria-label="مركز المباريات التفاعلي">
+      <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr] lg:items-stretch">
+        <div className="flex flex-col justify-between gap-4">
+          <div>
+            <div className="mb-3 flex flex-wrap items-center gap-2">
+              <span className="rounded-full border border-[#0FF0FC]/25 bg-[#0FF0FC]/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-[#0FF0FC]">MATCH CENTER</span>
+              <span className="rounded-full border border-[#FFD700]/20 bg-[#FFD700]/10 px-3 py-1 text-[10px] font-black text-[#FFD700]">2026 Live</span>
+            </div>
+            <h2 className="text-2xl font-black text-white md:text-3xl">مركز المباريات</h2>
+            <p className="mt-2 max-w-2xl text-sm font-bold leading-7 text-gray-300">
+              مباريات اليوم، النتائج، الحالة المباشرة، والبث التفاعلي عند توفر البيانات الحية.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <Link href="/matches" className="rounded-2xl border border-white/10 bg-black/25 p-3 text-center transition hover:border-[#0FF0FC]/35 hover:bg-white/[0.07]">
+              <div className="text-lg font-black text-[#FFD700]">{formatCount(todayCount)}</div>
+              <div className="mt-1 text-[11px] font-black text-white">اليوم</div>
+            </Link>
+            <Link href="/animation-live" className="rounded-2xl border border-red-400/20 bg-red-500/[0.08] p-3 text-center transition hover:border-red-300/45 hover:bg-red-500/[0.13]">
+              <div className="text-lg font-black text-red-200">{formatCount(liveCount)}</div>
+              <div className="mt-1 text-[11px] font-black text-white">مباشر</div>
+            </Link>
+            <Link href="/matches" className="rounded-2xl border border-white/10 bg-black/25 p-3 text-center transition hover:border-[#0FF0FC]/35 hover:bg-white/[0.07]">
+              <div className="text-lg font-black text-[#FFD700]">{formatCount(upcomingCount)}</div>
+              <div className="mt-1 text-[11px] font-black text-white">متبقية</div>
+            </Link>
+            <Link href="/matches" className="rounded-2xl border border-white/10 bg-black/25 p-3 text-center transition hover:border-[#0FF0FC]/35 hover:bg-white/[0.07]">
+              <div className="text-lg font-black text-[#FFD700]">{formatCount(finishedCount)}</div>
+              <div className="mt-1 text-[11px] font-black text-white">انتهت</div>
+            </Link>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <Link href="/matches" className="rounded-xl bg-[#0FF0FC] px-4 py-2 text-[11px] font-black text-black transition hover:bg-[#4AFAFF]">دخول مركز المباريات</Link>
+            <Link href="/animation-live" className="rounded-xl border border-[#FFD700]/25 bg-[#FFD700]/10 px-4 py-2 text-[11px] font-black text-[#FFD700] transition hover:bg-[#FFD700] hover:text-black">البث المباشر</Link>
+          </div>
+        </div>
+
+        <div className="rounded-[1.4rem] border border-white/10 bg-black/25 p-4">
+          {featuredMatch ? (
+            <>
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                <span className="rounded-full border border-[#FFD700]/20 bg-[#FFD700]/10 px-3 py-1 text-[11px] font-black text-[#FFD700]">{matchGroup(featuredMatch)}</span>
+                <span className="rounded-full border border-white/10 bg-white/[0.06] px-3 py-1 text-[11px] font-black text-gray-300">{formatMatchDate(featuredMatch.matchDate)}</span>
+              </div>
+              <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
+                <MatchCenterMiniTeam team={featuredMatch.homeTeam} />
+                <div className="rounded-2xl border border-[#0FF0FC]/20 bg-[#0FF0FC]/10 px-4 py-3 text-center text-lg font-black text-[#0FF0FC]">
+                  {isLiveMatch(featuredMatch) || isFinishedMatch(featuredMatch) ? matchScore(featuredMatch) : 'VS'}
+                </div>
+                <MatchCenterMiniTeam team={featuredMatch.awayTeam} align="left" />
+              </div>
+              <MatchTimer match={featuredMatch} />
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <Link href={getMatchHref(featuredMatch)} className="rounded-xl border border-white/10 bg-white/[0.055] px-3 py-2 text-center text-[11px] font-black text-white transition hover:bg-white/[0.1]">تفاصيل المباراة</Link>
+                <Link href={getInteractiveHref(featuredMatch)} className="rounded-xl bg-[#FFD700] px-3 py-2 text-center text-[11px] font-black text-black transition hover:bg-[#FFE36A]">البث التفاعلي</Link>
+              </div>
+            </>
+          ) : (
+            <div className="flex min-h-[210px] flex-col items-center justify-center rounded-2xl border border-dashed border-white/10 bg-white/[0.035] p-4 text-center">
+              <p className="text-base font-black text-white">لا توجد مباراة جاهزة للعرض الآن</p>
+              <p className="mt-2 text-xs font-bold leading-6 text-gray-400">سيظهر هنا أقرب لقاء عند تحديث مركز المباريات.</p>
+              <Link href="/matches" className="mt-3 rounded-xl border border-[#0FF0FC]/25 bg-[#0FF0FC]/10 px-4 py-2 text-[11px] font-black text-[#0FF0FC]">عرض الجدول الكامل</Link>
+            </div>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function SmartFeatureGrid() {
+  return (
+    <section className="mt-5" aria-label="أقسام كأس العالم 2026 التفاعلية">
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        <Link href="/groups" className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.045] p-4 transition duration-200 hover:-translate-y-1 hover:border-[#0FF0FC]/35 hover:bg-white/[0.07]">
+          <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#0FF0FC]/50 to-transparent opacity-0 transition group-hover:opacity-100" />
+          <div className="flex items-start justify-between gap-4">
+            <h3 className="text-base font-black text-white">المجموعات</h3>
+            <span className="rounded-full border border-white/10 bg-black/25 px-2.5 py-1 text-[10px] font-black text-[#FFD700]">2026</span>
+          </div>
+          <p className="mt-2 text-xs font-bold leading-6 text-gray-400">ترتيب مجموعات كأس العالم 2026، النقاط، الأهداف، وحالة المنافسة داخل كل مجموعة.</p>
+          <div className="mt-3 grid grid-cols-6 gap-1.5">
+            {groupLetters.map((group) => <span key={group} className="rounded-lg border border-white/10 bg-black/25 py-1 text-center text-[10px] font-black text-[#0FF0FC]">{group}</span>)}
+          </div>
+          <div className="mt-3 text-[11px] font-black text-[#FFD700]">عرض المجموعات ←</div>
+        </Link>
+
+        <Link href="/teams" className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.045] p-4 transition duration-200 hover:-translate-y-1 hover:border-[#0FF0FC]/35 hover:bg-white/[0.07]">
+          <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#0FF0FC]/50 to-transparent opacity-0 transition group-hover:opacity-100" />
+          <div className="flex items-start justify-between gap-4">
+            <h3 className="text-base font-black text-white">دليل المنتخبات</h3>
+            <span className="rounded-full border border-white/10 bg-black/25 px-2.5 py-1 text-[10px] font-black text-[#FFD700]">48 منتخب</span>
+          </div>
+          <p className="mt-2 text-xs font-bold leading-6 text-gray-400">كل منتخب في صفحة واحدة: بطاقة أساسية، قائمة، أداء، أسماء بارزة، وتحليل موثق.</p>
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            {featuredTeamChips.map((chip) => <span key={chip} className="rounded-full border border-white/10 bg-black/25 px-2.5 py-1 text-[10px] font-black text-gray-300">{chip}</span>)}
+          </div>
+          <div className="mt-3 text-[11px] font-black text-[#FFD700]">استكشف المنتخبات ←</div>
+        </Link>
+
+        <Link href="/news" className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.045] p-4 transition duration-200 hover:-translate-y-1 hover:border-[#0FF0FC]/35 hover:bg-white/[0.07]">
+          <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#0FF0FC]/50 to-transparent opacity-0 transition group-hover:opacity-100" />
+          <div className="flex items-start justify-between gap-4">
+            <h3 className="text-base font-black text-white">الأخبار والتحليل</h3>
+            <span className="rounded-full border border-emerald-400/20 bg-emerald-400/10 px-2.5 py-1 text-[10px] font-black text-emerald-200">تحليل رياضي</span>
+          </div>
+          <p className="mt-2 text-xs font-bold leading-6 text-gray-400">أخبار البطولة وتحليل فني رياضي فقط، بعيدًا عن أي توصيات أو جانب تجاري.</p>
+          <div className="mt-3 rounded-xl border border-white/10 bg-black/25 p-3">
+            <p className="text-[10px] font-black text-[#0FF0FC]">آخر التغطيات</p>
+            <p className="mt-1 text-xs font-bold leading-5 text-white">تقارير، قراءة تكتيكية، ومتابعة يومية عند توفر المصادر.</p>
+          </div>
+          <div className="mt-3 text-[11px] font-black text-[#FFD700]">قراءة التحليلات ←</div>
+        </Link>
+
+        <Link href="/players" className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.045] p-4 transition duration-200 hover:-translate-y-1 hover:border-[#0FF0FC]/35 hover:bg-white/[0.07]">
+          <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#0FF0FC]/50 to-transparent opacity-0 transition group-hover:opacity-100" />
+          <div className="flex items-start justify-between gap-4">
+            <h3 className="text-base font-black text-white">الإحصائيات</h3>
+            <span className="rounded-full border border-white/10 bg-black/25 px-2.5 py-1 text-[10px] font-black text-[#FFD700]">Data</span>
+          </div>
+          <p className="mt-2 text-xs font-bold leading-6 text-gray-400">أرقام المباريات والمنتخبات واللاعبين عند توفر مصادر موثوقة وبيانات محدثة.</p>
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            {['الأهداف', 'النتائج', 'اللاعبون', 'المنتخبات'].map((item) => <span key={item} className="rounded-xl border border-white/10 bg-black/25 px-2 py-2 text-center text-[10px] font-black text-gray-300">{item}</span>)}
+          </div>
+          <div className="mt-3 text-[11px] font-black text-[#FFD700]">عرض الإحصائيات ←</div>
+        </Link>
+
+        <Link href="/animation-live" className="group relative overflow-hidden rounded-2xl border border-red-400/20 bg-red-500/[0.055] p-4 transition duration-200 hover:-translate-y-1 hover:border-red-300/45 hover:bg-red-500/[0.08]">
+          <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-red-300/50 to-transparent opacity-70" />
+          <div className="flex items-start justify-between gap-4">
+            <h3 className="text-base font-black text-white">البث التفاعلي</h3>
+            <span className="rounded-full border border-red-300/20 bg-red-400/10 px-2.5 py-1 text-[10px] font-black text-red-100">LIVE</span>
+          </div>
+          <p className="mt-2 text-xs font-bold leading-6 text-gray-300">متابعة مرئية للمباريات الجارية والقريبة عند توفر بيانات حية ورسوم زمنية.</p>
+          <div className="mt-3 rounded-xl border border-red-300/15 bg-black/25 p-3 text-center">
+            <span className="inline-flex items-center gap-2 text-[11px] font-black text-red-100"><span className="h-2 w-2 animate-pulse rounded-full bg-red-300" /> صفحة البث المباشر</span>
+          </div>
+          <div className="mt-3 text-[11px] font-black text-[#FFD700]">دخول البث الآن ←</div>
+        </Link>
+
+        <Link href="/matches" className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.045] p-4 transition duration-200 hover:-translate-y-1 hover:border-[#0FF0FC]/35 hover:bg-white/[0.07]">
+          <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#0FF0FC]/50 to-transparent opacity-0 transition group-hover:opacity-100" />
+          <div className="flex items-start justify-between gap-4">
+            <h3 className="text-base font-black text-white">الدول المستضيفة</h3>
+            <span className="rounded-full border border-white/10 bg-black/25 px-2.5 py-1 text-[10px] font-black text-[#FFD700]">3 دول</span>
+          </div>
+          <p className="mt-2 text-xs font-bold leading-6 text-gray-400">أمريكا، كندا، والمكسيك ضمن نسخة تاريخية موزعة على ثلاث دول مستضيفة.</p>
+          <div className="mt-3 grid grid-cols-3 gap-2">
+            {['أمريكا', 'كندا', 'المكسيك'].map((country) => <span key={country} className="rounded-xl border border-white/10 bg-black/25 px-2 py-2 text-center text-[10px] font-black text-gray-300">{country}</span>)}
+          </div>
+          <div className="mt-3 text-[11px] font-black text-[#FFD700]">متابعة الجدول ←</div>
+        </Link>
+      </div>
+    </section>
+  );
+}
+
 export default function HomeClientSportsNext(props: Props) {
   const upcomingMatchesCount = props.upcomingMatchesCount ?? 0;
 
   const stats = [
-    ['48', 'منتخب', 'أكبر نسخة من البطولة'],
-    ['104', 'مباراة', 'من الافتتاح إلى النهائي'],
-    ['3', 'دول مستضيفة', 'أمريكا، كندا، المكسيك'],
-    [formatCount(upcomingMatchesCount), 'مباراة قريبة', 'داخل مركز المباريات'],
+    { value: '48', label: 'منتخب', caption: 'دليل المنتخبات المشاركة', href: '/teams' },
+    { value: '104', label: 'مباراة', caption: 'من الافتتاح إلى النهائي', href: '/matches' },
+    { value: '3', label: 'دول مستضيفة', caption: 'أمريكا، كندا، المكسيك', href: '/matches' },
+    { value: formatCount(upcomingMatchesCount), label: 'أقرب المباريات', caption: 'داخل مركز المباريات', href: '/matches' },
   ] as const;
 
   return (
@@ -311,35 +570,15 @@ export default function HomeClientSportsNext(props: Props) {
             </div>
 
             <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-              {stats.map(([value, label, caption]) => (
-                <div key={label} className="rounded-xl border border-white/10 bg-black/25 p-2.5 backdrop-blur">
-                  <div className="text-xl font-black text-[#FFD700]">{value}</div>
-                  <div className="mt-0.5 text-[11px] font-black text-white">{label}</div>
-                  <div className="mt-0.5 text-[10px] font-bold leading-4 text-gray-400">{caption}</div>
-                </div>
+              {stats.map((stat) => (
+                <StatLinkCard key={stat.label} {...stat} />
               ))}
             </div>
           </div>
         </section>
 
-        <section className="mt-5" aria-label="روابط أقسام كأس العالم 2026">
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-            {featureCards.map(([title, text, href]) => (
-              <Link
-                key={title}
-                href={href}
-                className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.045] p-4 transition duration-200 hover:-translate-y-1 hover:border-[#0FF0FC]/35 hover:bg-white/[0.07]"
-              >
-                <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#0FF0FC]/50 to-transparent opacity-0 transition group-hover:opacity-100" />
-                <div className="flex items-start justify-between gap-4">
-                  <h3 className="text-base font-black text-white">{title}</h3>
-                  <span className="rounded-full border border-white/10 bg-black/25 px-2.5 py-1 text-[10px] font-black text-[#FFD700]">2026</span>
-                </div>
-                <p className="mt-2 text-xs font-bold leading-6 text-gray-400">{text}</p>
-              </Link>
-            ))}
-          </div>
-        </section>
+        <HomeMatchCenterCard fallbackMatches={props.upcomingMatches ?? []} upcomingMatchesCount={upcomingMatchesCount} />
+        <SmartFeatureGrid />
       </div>
     </main>
   );
