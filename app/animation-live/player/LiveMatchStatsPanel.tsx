@@ -110,11 +110,39 @@ function isFootballDataProvider(snapshot: Snapshot) {
   return String(snapshot?.provider || '').startsWith('FOOTBALL_DATA');
 }
 
+function displaySourceName(source?: string | null) {
+  const value = String(source || '').trim();
+  if (!value) return '';
+  if (value === 'FOOTBALL_DATA' || value === 'FOOTBALL_DATA_FALLBACK') return '';
+  if (value === 'MC PRIME Live Monitor') return 'الرصد المباشر';
+  if (value === 'ISPORTS') return 'iSports';
+  return value.replace(/_/g, ' ');
+}
+
+function displaySnapshotProvider(source?: string | null) {
+  const value = String(source || '').trim();
+  if (!value) return '';
+  if (value === 'FOOTBALL_DATA' || value === 'FOOTBALL_DATA_FALLBACK') return 'Football-Data';
+  if (value === 'ISPORTS') return 'iSports';
+  return value.replace(/_/g, ' ');
+}
+
+function cleanEventDetail(detail?: string | null) {
+  return String(detail || '')
+    .replace(/هدف مؤكد من football-data\.org لـ\s*/gi, 'هدف لـ ')
+    .replace(/تحديث حالة المباراة من football-data\.org:\s*/gi, 'تحديث حالة المباراة: ')
+    .replace(/football-data\.org/gi, 'Football-Data')
+    .replace(/FOOTBALL_DATA_FALLBACK/g, '')
+    .replace(/FOOTBALL_DATA/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 function unavailableStatsMessage(data: LiveStatsResponse | null, hasStats: boolean) {
   if (hasStats) return null;
   const syncStatus = data?.sync?.status || '';
   if (isFootballDataProvider(data?.latest || null) || hasBasicSnapshot(data?.latest || null)) {
-    return 'المتاح الآن هو ملخص موثق من قاعدة البيانات/Football-Data: النتيجة وحالة المباراة فقط. الأرقام التفصيلية مثل الاستحواذ والتسديدات والركنيات تظهر فقط عند وصول مصدر موثق لها.';
+    return 'المتاح الآن هو ملخص موثق من قاعدة البيانات: النتيجة وحالة المباراة فقط. الأرقام التفصيلية مثل الاستحواذ والتسديدات والركنيات تظهر فقط عند وصول مصدر موثق لها.';
   }
   if (data?.sourceStatus?.isportsBlocked || syncStatus === 'isports_guard_active') {
     return 'iSports غير متاح مؤقتًا، ولا توجد لقطة تفصيلية محفوظة بعد. سنعرض الأرقام التفصيلية فقط عند توفر مصدر موثق.';
@@ -206,6 +234,7 @@ export default function LiveMatchStatsPanel({ matchId, dbMatchId }: Props) {
   const statusLabel = data?.sync?.status === 'database_only' ? 'قراءة من قاعدة البيانات' : data?.sync?.status === 'cached_recent_snapshot' ? 'آخر لقطة محفوظة' : data?.sync?.status === 'saved' ? 'تم تسجيل لقطة جديدة' : data?.sync?.status || 'متابعة مباشرة';
   const providerWarning = unavailableStatsMessage(data, hasStats);
   const visibleEvents = events.length ? events : fallbackEventFromSnapshot(data) ? [fallbackEventFromSnapshot(data)!] : [];
+  const snapshotProvider = displaySnapshotProvider(latest?.provider);
 
   const derived = useMemo(() => {
     const homeScore = statValue(latest, 'homeScore') ?? match?.homeScore ?? 0;
@@ -249,7 +278,7 @@ export default function LiveMatchStatsPanel({ matchId, dbMatchId }: Props) {
                 </div>
               </div>
               <div className="mt-3 text-xs font-bold text-gray-500">الدقيقة: {displayNumber(statValue(latest, 'minute'))}</div>
-              {latest?.provider ? <div className="mt-1 text-[11px] font-bold text-gray-600">المصدر: {String(latest.provider)}</div> : null}
+              {snapshotProvider ? <div className="mt-1 text-[11px] font-bold text-gray-600">مصدر النتيجة: {snapshotProvider}</div> : null}
             </div>
 
             {providerWarning ? (
@@ -283,12 +312,15 @@ export default function LiveMatchStatsPanel({ matchId, dbMatchId }: Props) {
               <Target className="text-[#FFD700]" size={22} />
             </div>
             <div className="max-h-[520px] space-y-2 overflow-y-auto pr-1">
-              {visibleEvents.length ? visibleEvents.map((event) => (
-                <div key={event.id} className="rounded-xl border border-white/10 bg-white/[0.035] p-3">
-                  <div className="flex items-center gap-2 text-xs font-black text-[#FFD700]"><span>{eventIcon(event.type)}</span>{event.minute ? `د${event.minute}` : 'حدث'}<span className="text-gray-600">•</span><span>{event.sourceName || 'Live'}</span></div>
-                  <p className="mt-1 text-sm leading-6 text-gray-200">{event.detail}</p>
-                </div>
-              )) : (
+              {visibleEvents.length ? visibleEvents.map((event) => {
+                const sourceLabel = displaySourceName(event.sourceName);
+                return (
+                  <div key={event.id} className="rounded-xl border border-white/10 bg-white/[0.035] p-3">
+                    <div className="flex items-center gap-2 text-xs font-black text-[#FFD700]"><span>{eventIcon(event.type)}</span>{event.minute ? `د${event.minute}` : 'حدث'}{sourceLabel ? <><span className="text-gray-600">•</span><span>{sourceLabel}</span></> : null}</div>
+                    <p className="mt-1 text-sm leading-6 text-gray-200">{cleanEventDetail(event.detail)}</p>
+                  </div>
+                );
+              }) : (
                 <div className="rounded-xl border border-dashed border-white/10 p-6 text-center text-sm text-gray-500">لا توجد أحداث تفصيلية محفوظة بعد.</div>
               )}
             </div>
