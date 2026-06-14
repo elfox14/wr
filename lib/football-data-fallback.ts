@@ -1,5 +1,6 @@
 import prisma from '@/lib/prisma';
 import { normalizeName } from '@/lib/apiFootball';
+import { saveFootballDataScoreSnapshot } from '@/lib/football-data-snapshot';
 
 type FallbackMatch = {
   id: string;
@@ -142,6 +143,22 @@ export async function syncFootballDataFallbackForMatch(localMatch: FallbackMatch
     },
   });
 
+  const snapshot = await saveFootballDataScoreSnapshot({
+    matchId: localMatch.id,
+    providerMatchId: Number(providerMatch.id),
+    status,
+    homeScore: nextHomeScore,
+    awayScore: nextAwayScore,
+    provider: 'FOOTBALL_DATA_FALLBACK',
+    minIntervalMinutes: status === 'FINISHED' ? 720 : 10,
+    rawData: {
+      providerStatus: providerMatch.status,
+      utcDate: providerMatch.utcDate,
+      score: providerMatch.score,
+      source: 'football-data fallback',
+    },
+  });
+
   const savedEvents = [];
   if (nextHomeScore > prevHomeScore) {
     const saved = await saveMatchEventIfNew(localMatch.id, 'goal_inferred', `هدف مؤكد من football-data.org لـ ${localMatch.homeTeam?.name || 'الفريق الأول'} — النتيجة ${nextHomeScore} - ${nextAwayScore}`);
@@ -165,6 +182,7 @@ export async function syncFootballDataFallbackForMatch(localMatch: FallbackMatch
     matchStatus: status,
     previousScore: `${prevHomeScore}-${prevAwayScore}`,
     score: `${nextHomeScore}-${nextAwayScore}`,
+    snapshot,
     savedEventsCount: savedEvents.length,
     fixturesFetched: matches.length,
     reason: options.reason,
