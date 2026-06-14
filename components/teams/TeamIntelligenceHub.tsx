@@ -38,7 +38,7 @@ export default function TeamIntelligenceHub({ team, players = [], matches = [], 
             {activeTab === 'stats' && <TeamStatsOverview team={team} matches={matches} />}
             {activeTab === 'tactics' && <TeamTacticalBoard report={intelligenceReport} />}
             {activeTab === 'history' && <TeamHistoryPanel team={team} matches={matches} report={intelligenceReport} />}
-            {activeTab === 'sources' && <TeamDataSources report={intelligenceReport} />}
+            {activeTab === 'sources' && <TeamDataSources />}
           </motion.div>
         </AnimatePresence>
       </div>
