@@ -20,6 +20,7 @@ export type FbrefBrowserTeamPayload = {
   };
   group?: { table?: AnyRecord[] };
   detectedImportantTables?: Record<string, boolean>;
+  rawTables?: { caption?: string; tableId?: string | null; rowsCount?: number }[];
 };
 
 function clean(value: unknown) {
@@ -74,6 +75,18 @@ function formationCounts(matches: AnyRecord[]) {
   }, {});
 }
 
+function normalizeFormations(formations: unknown): Record<string, number> {
+  if (Array.isArray(formations)) {
+    return formations.reduce<Record<string, number>>((acc, formation) => {
+      const key = clean(formation);
+      if (key) acc[key] = (acc[key] || 0) + 1;
+      return acc;
+    }, {});
+  }
+  if (formations && typeof formations === 'object') return formations as Record<string, number>;
+  return {};
+}
+
 function topFormationText(formations: Record<string, number> | undefined) {
   const values = Object.entries(formations || {}).sort((a, b) => b[1] - a[1]);
   return values.length ? values.map(([formation, count]) => `${formation} (${count})`).join('، ') : UNAVAILABLE;
@@ -91,6 +104,12 @@ function topClubs(players: AnyRecord[]) {
     return acc;
   }, {});
   return Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([club, count]) => `${club} (${count})`);
+}
+
+function extractGroupName(payload: FbrefBrowserTeamPayload) {
+  const rawCaption = (payload.rawTables || []).map((table) => table.caption || table.tableId || '').join(' ');
+  const match = rawCaption.match(/group\s+([a-l])/i);
+  return match?.[1]?.toUpperCase() || null;
 }
 
 function findGroupRow(payload: FbrefBrowserTeamPayload) {
@@ -113,7 +132,8 @@ export function buildFbrefBrowserTeamDraft(payload: FbrefBrowserTeamPayload) {
   const last10Matches = completed.slice(-10);
   const last5 = payload.fixturesAndForm?.last5 || { ...resultCounts(last5Matches), goalsFor: sum(last5Matches, 'goals_for'), goalsAgainst: sum(last5Matches, 'goals_against'), averagePossession: average(last5Matches, 'possession') };
   const last10 = payload.fixturesAndForm?.last10 || { ...resultCounts(last10Matches), goalsFor: sum(last10Matches, 'goals_for'), goalsAgainst: sum(last10Matches, 'goals_against'), averagePossession: average(last10Matches, 'possession') };
-  const formations = all.formations || formationCounts(completed);
+  const formations = normalizeFormations(all.formations || formationCounts(completed));
+  const groupName = extractGroupName(payload);
   const groupRow = findGroupRow(payload);
   const groupTeams = (payload.group?.table || []).map((row) => stripFbrefPrefix(row.team)).filter(Boolean);
   const missingTables = Object.entries(payload.detectedImportantTables || {})
@@ -126,7 +146,7 @@ export function buildFbrefBrowserTeamDraft(payload: FbrefBrowserTeamPayload) {
 
   const sections = [
     `بطاقة المنتخب: ${teamName}. المجموعة: ${groupTeams.length ? groupTeams.join('، ') : UNAVAILABLE}. عدد لاعبي القائمة في المصدر: ${players.length || payload.roster?.count || UNAVAILABLE}. متوسط العمر: ${avgAge ?? UNAVAILABLE}. أكثر الأندية حضورًا: ${list(clubs)}.`,
-    `وضع المنتخب في المجموعة: ${groupRow ? `المركز ${groupRow.rank || UNAVAILABLE}، لعب ${groupRow.games || UNAVAILABLE}، فاز ${groupRow.wins || UNAVAILABLE}، تعادل ${groupRow.ties || UNAVAILABLE}، خسر ${groupRow.losses || UNAVAILABLE}، له ${groupRow.goals_for || UNAVAILABLE}، عليه ${groupRow.goals_against || UNAVAILABLE}، نقاط ${groupRow.points || UNAVAILABLE}.` : UNAVAILABLE}`,
+    `وضع المنتخب في المجموعة: ${groupRow ? `المجموعة ${groupName || UNAVAILABLE}: المركز ${groupRow.rank || UNAVAILABLE}، لعب ${groupRow.games || UNAVAILABLE}، فاز ${groupRow.wins || UNAVAILABLE}، تعادل ${groupRow.ties || UNAVAILABLE}، خسر ${groupRow.losses || UNAVAILABLE}، له ${groupRow.goals_for || UNAVAILABLE}، عليه ${groupRow.goals_against || UNAVAILABLE}، نقاط ${groupRow.points || UNAVAILABLE}.` : UNAVAILABLE}`,
     `تحليل الأداء بالأرقام: في العينة المستخرجة من ${sourceName}: ${all.wins ?? 0} فوز، ${all.draws ?? 0} تعادل، ${all.losses ?? 0} خسارة، ${all.goalsFor ?? 0} هدفًا له، ${all.goalsAgainst ?? 0} عليه. آخر 5: ${last5.wins ?? 0} فوز / ${last5.draws ?? 0} تعادل / ${last5.losses ?? 0} خسارة. آخر 10: ${last10.wins ?? 0} فوز / ${last10.draws ?? 0} تعادل / ${last10.losses ?? 0} خسارة.`,
     `القوة الهجومية: تتوفر من هذا التصدير أهداف الفريق فقط: ${all.goalsFor ?? UNAVAILABLE} هدفًا في ${completed.length || UNAVAILABLE} مباراة منتهية. التسديدات، التسديدات على المرمى، xG، وصناعة الفرص غير متوفرة في هذا المصدر المستخرج.`,
     `القوة الدفاعية: استقبل المنتخب ${all.goalsAgainst ?? UNAVAILABLE} هدفًا في العينة، وخرج بشباك نظيفة ${cleanSheets} مرة. التصديات، xGA، التدخلات، والاعتراضات غير متوفرة في هذا المصدر المستخرج.`,
@@ -148,7 +168,7 @@ export function buildFbrefBrowserTeamDraft(payload: FbrefBrowserTeamPayload) {
     pageUrl: sourceUrl,
     tableAvailability: payload.detectedImportantTables || {},
     standing: groupRow ? {
-      group: 'C',
+      group: groupName,
       rank: groupRow.rank || null,
       mp: numberValue(groupRow.games),
       wins: numberValue(groupRow.wins),
@@ -178,7 +198,7 @@ export function buildFbrefBrowserTeamDraft(payload: FbrefBrowserTeamPayload) {
     matchContext: {
       completedCount: completed.length || numberValue(payload.fixturesAndForm?.completedCount),
       upcomingCount: payload.fixturesAndForm?.upcomingMatches?.length || numberValue(payload.fixturesAndForm?.upcomingCount),
-      formations: Object.keys(formations || {}),
+      formations: Object.keys(formations),
       averagePossession: numberValue(all.averagePossession),
     },
     roster: {
