@@ -43,6 +43,28 @@ type SummaryStats = {
   latestCardsUpdatedAt: string | null;
 };
 
+type GroupStandingRow = {
+  team: string;
+  code: string;
+  played: number;
+  won: number;
+  drawn: number;
+  lost: number;
+  goalsFor: number;
+  goalsAgainst: number;
+  goalDifference: number;
+  points: number;
+};
+
+type GroupStanding = {
+  key: WorldCup2026GroupKey;
+  arName: string;
+  finishedMatches: number;
+  liveMatches: number;
+  scheduledMatches: number;
+  standings: GroupStandingRow[];
+};
+
 type Props = {
   initialAssets?: unknown[];
   upcomingMatches?: HomeMatch[];
@@ -347,10 +369,35 @@ function StatBox({ value, label, note }: { value: string; label: string; note: s
   );
 }
 
+function buildFallbackStanding(group: WorldCup2026GroupKey): GroupStanding {
+  const data = WORLD_CUP_2026_GROUPS[group];
+  return {
+    key: group,
+    arName: data.arName,
+    finishedMatches: 0,
+    liveMatches: 0,
+    scheduledMatches: 0,
+    standings: data.teams.map((team) => ({
+      team: team.name,
+      code: team.codes[0],
+      played: 0,
+      won: 0,
+      drawn: 0,
+      lost: 0,
+      goalsFor: 0,
+      goalsAgainst: 0,
+      goalDifference: 0,
+      points: 0,
+    })),
+  };
+}
+
 function SmartFeatureGrid() {
   const [selectedGroup, setSelectedGroup] = useState<WorldCup2026GroupKey>('A');
   const [summaryStats, setSummaryStats] = useState<SummaryStats | null>(null);
+  const [groupStandings, setGroupStandings] = useState<GroupStanding[]>([]);
   const selectedGroupData = WORLD_CUP_2026_GROUPS[selectedGroup];
+  const selectedStanding = groupStandings.find((group) => group.key === selectedGroup) || buildFallbackStanding(selectedGroup);
 
   useEffect(() => {
     let cancelled = false;
@@ -366,8 +413,23 @@ function SmartFeatureGrid() {
       }
     }
 
+    async function loadGroupStandings() {
+      try {
+        const response = await fetch('/api/groups/standings', { cache: 'no-store' });
+        if (!response.ok) return;
+        const data = await response.json();
+        if (!cancelled && data?.ok && Array.isArray(data.groups)) setGroupStandings(data.groups);
+      } catch {
+        // Keep fallback group standings if the endpoint is unavailable.
+      }
+    }
+
     loadSummaryStats();
-    const timer = window.setInterval(loadSummaryStats, 60_000);
+    loadGroupStandings();
+    const timer = window.setInterval(() => {
+      loadSummaryStats();
+      loadGroupStandings();
+    }, 60_000);
     return () => {
       cancelled = true;
       window.clearInterval(timer);
@@ -386,42 +448,71 @@ function SmartFeatureGrid() {
   return (
     <section className="mt-5" aria-label="أقسام كأس العالم 2026 التفاعلية">
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-        <article className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.045] p-4 transition duration-200 hover:-translate-y-1 hover:border-[#0FF0FC]/35 hover:bg-white/[0.07]">
+        <article className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.045] p-4 transition duration-200 hover:-translate-y-1 hover:border-[#0FF0FC]/35 hover:bg-white/[0.07] md:col-span-2 xl:col-span-3">
           <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#0FF0FC]/50 to-transparent opacity-0 transition group-hover:opacity-100" />
-          <div className="flex items-start justify-between gap-4">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h3 className="text-base font-black text-white">المجموعات</h3>
-              <p className="mt-1 text-[11px] font-black text-[#FFD700]">المجموعة {selectedGroup} — {selectedGroupData.arName}</p>
+              <h3 className="text-base font-black text-white md:text-lg">المجموعات</h3>
+              <p className="mt-1 text-[11px] font-black text-[#FFD700]">المجموعة {selectedGroup} — {selectedStanding.arName}</p>
             </div>
-            <span className="rounded-full border border-white/10 bg-black/25 px-2.5 py-1 text-[10px] font-black text-[#FFD700]">2026</span>
-          </div>
-          <p className="mt-2 text-xs font-bold leading-6 text-gray-400">اختر أي مجموعة لعرض منتخباتها داخل الكارت مباشرة.</p>
-
-          <div className="mt-3 rounded-xl border border-white/10 bg-black/25 p-3">
-            <div className="mb-2 flex items-center justify-between text-[10px] font-black text-gray-500">
-              <span>المنتخب</span>
-              <span>الكود</span>
-            </div>
-            <div className="space-y-1.5">
-              {selectedGroupData.teams.map((team, index) => (
-                <div key={team.name} className="grid grid-cols-[auto_1fr_auto] items-center gap-2 rounded-lg border border-white/10 bg-white/[0.035] px-2.5 py-1.5">
-                  <span className="flex h-5 w-5 items-center justify-center rounded-md bg-[#0FF0FC]/10 text-[10px] font-black text-[#0FF0FC]">{index + 1}</span>
-                  <span className="truncate text-xs font-black text-white">{team.name}</span>
-                  <span className="text-[10px] font-black text-[#FFD700]">{team.codes[0]}</span>
-                </div>
-              ))}
-            </div>
+            <Link href={`/groups?group=${selectedGroup}`} className="rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-[11px] font-black text-[#FFD700] transition hover:border-[#FFD700]/35 hover:bg-[#FFD700]/10">عرض تفاصيل المجموعة</Link>
           </div>
 
-          <div className="mt-3 grid grid-cols-6 gap-1.5">
+          <div className="mb-3 grid grid-cols-6 gap-1.5 md:grid-cols-12">
             {groupLetters.map((group) => (
-              <button key={group} type="button" onClick={() => setSelectedGroup(group)} className={`rounded-lg border py-1 text-center text-[10px] font-black transition ${selectedGroup === group ? 'border-[#0FF0FC]/45 bg-[#0FF0FC]/15 text-[#0FF0FC]' : 'border-white/10 bg-black/25 text-gray-300 hover:border-[#0FF0FC]/35 hover:text-[#0FF0FC]'}`}>
+              <button key={group} type="button" onClick={() => setSelectedGroup(group)} className={`rounded-lg border py-1.5 text-center text-[10px] font-black transition ${selectedGroup === group ? 'border-[#0FF0FC]/45 bg-[#0FF0FC]/15 text-[#0FF0FC]' : 'border-white/10 bg-black/25 text-gray-300 hover:border-[#0FF0FC]/35 hover:text-[#0FF0FC]'}`}>
                 {group}
               </button>
             ))}
           </div>
 
-          <Link href={`/groups?group=${selectedGroup}`} className="mt-3 inline-flex text-[11px] font-black text-[#FFD700]">عرض تفاصيل المجموعة ←</Link>
+          <div className="mb-3 grid grid-cols-3 gap-2">
+            <StatBox value={formatCount(selectedStanding.finishedMatches)} label="منتهية" note="في المجموعة" />
+            <StatBox value={formatCount(selectedStanding.liveMatches)} label="مباشرة" note="الآن" />
+            <StatBox value={formatCount(selectedStanding.scheduledMatches)} label="قادمة" note="متبقية" />
+          </div>
+
+          <div className="overflow-x-auto rounded-xl border border-white/10 bg-black/25">
+            <table className="min-w-[760px] w-full text-right text-[11px] font-bold text-gray-300">
+              <thead className="bg-white/[0.04] text-[10px] font-black text-gray-500">
+                <tr>
+                  <th className="px-3 py-2">#</th>
+                  <th className="px-3 py-2">المنتخب</th>
+                  <th className="px-3 py-2 text-center">لعب</th>
+                  <th className="px-3 py-2 text-center">فاز</th>
+                  <th className="px-3 py-2 text-center">تعادل</th>
+                  <th className="px-3 py-2 text-center">خسر</th>
+                  <th className="px-3 py-2 text-center">له</th>
+                  <th className="px-3 py-2 text-center">عليه</th>
+                  <th className="px-3 py-2 text-center">فرق</th>
+                  <th className="px-3 py-2 text-center">نقاط</th>
+                </tr>
+              </thead>
+              <tbody>
+                {selectedStanding.standings.map((row, index) => (
+                  <tr key={`${selectedGroup}-${row.code}`} className="border-t border-white/10">
+                    <td className="px-3 py-2 text-[#0FF0FC]">{index + 1}</td>
+                    <td className="px-3 py-2">
+                      <div className="flex items-center gap-2">
+                        <span className="flex h-6 w-8 items-center justify-center rounded-lg bg-[#0FF0FC]/10 text-[10px] font-black text-[#0FF0FC]">{row.code}</span>
+                        <span className="font-black text-white">{row.team}</span>
+                      </div>
+                    </td>
+                    <td className="px-3 py-2 text-center">{formatCount(row.played)}</td>
+                    <td className="px-3 py-2 text-center">{formatCount(row.won)}</td>
+                    <td className="px-3 py-2 text-center">{formatCount(row.drawn)}</td>
+                    <td className="px-3 py-2 text-center">{formatCount(row.lost)}</td>
+                    <td className="px-3 py-2 text-center">{formatCount(row.goalsFor)}</td>
+                    <td className="px-3 py-2 text-center">{formatCount(row.goalsAgainst)}</td>
+                    <td className="px-3 py-2 text-center">{row.goalDifference > 0 ? '+' : ''}{formatCount(row.goalDifference)}</td>
+                    <td className="px-3 py-2 text-center text-[#FFD700]">{formatCount(row.points)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <p className="mt-2 text-[10px] font-bold text-gray-500">الترتيب محسوب من نتائج المباريات المنتهية فقط. قبل بداية مباريات المجموعة تظهر الأرقام صفرية.</p>
         </article>
 
         <Link href="/teams" className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.045] p-4 transition duration-200 hover:-translate-y-1 hover:border-[#0FF0FC]/35 hover:bg-white/[0.07]">
