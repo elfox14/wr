@@ -22,10 +22,6 @@ function isLiveLike(status?: string | null) {
   return ['IN_PLAY', 'LIVE', 'HT'].includes(value);
 }
 
-function isFinished(status?: string | null) {
-  return String(status || '').toUpperCase() === 'FINISHED';
-}
-
 function isScheduledButProbablyLive(match: any) {
   if (String(match?.status || '').toUpperCase() !== 'SCHEDULED') return false;
   if (!match?.matchDate) return false;
@@ -38,7 +34,9 @@ function isScheduledButProbablyLive(match: any) {
 function isAutoSyncCandidate(match: any, force: boolean) {
   if (force) return true;
   if (!match?.animationMatchId) return false;
-  return isLiveLike(match.status) || isFinished(match.status) || isScheduledButProbablyLive(match);
+  // Finished-match iSports backfill is now owned by the guarded cron only.
+  // Public page views should not repeatedly spend iSports quota on old matches.
+  return isLiveLike(match.status) || isScheduledButProbablyLive(match);
 }
 
 function shouldSync(match: any, latest: any, force: boolean) {
