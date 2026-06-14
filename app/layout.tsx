@@ -9,7 +9,6 @@ import { NotificationProvider } from "@/components/ui/NotificationProvider";
 import { GlobalTicker } from "@/components/ui/GlobalTicker";
 import { Navbar } from "@/components/ui/Navbar";
 import { Footer } from "@/components/ui/Footer";
-import { MobileBottomNav } from "@/components/ui/MobileBottomNav";
 
 const cairo = Cairo({
   variable: "--font-cairo",
@@ -18,32 +17,31 @@ const cairo = Cairo({
 });
 
 const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://worldcup.mcprim.com';
-const bilingualDescription = 'بورصة المونديال من MC PRIME: مباريات كأس العالم مباشرة، أخبار موثقة، تحليل كروي، صفحات منتخبات ولاعبين، وبورصة افتراضية ترفيهية للتفاعل الجماهيري. World Cup Exchange by MC PRIME: live matches, verified news, football analysis, team and player hubs, and a virtual fan exchange experience.';
+const description = 'MC PRIME World Cup: live World Cup matches, verified news, football analysis, team and player hubs, groups, and interactive match center.';
 
 export const metadata: Metadata = {
   metadataBase: new URL(baseUrl),
   title: {
-    default: "بورصة المونديال | World Cup Exchange — مباشر وتحليل كأس العالم",
-    template: "%s | بورصة المونديال — World Cup Exchange",
+    default: "MC PRIME World Cup",
+    template: "%s | MC PRIME World Cup",
   },
-  description: bilingualDescription,
-  keywords: ["بورصة المونديال", "كأس العالم", "مباشر كأس العالم", "أخبار كأس العالم", "تحليل كروي", "منتخبات كأس العالم", "لاعبو كأس العالم", "سوق رياضي افتراضي", "World Cup Exchange", "live World Cup matches", "football analysis", "football intelligence"],
-  authors: [{ name: "MC PRIME Exchange Team" }],
+  description,
+  keywords: ["World Cup", "football news", "football analysis", "live matches", "teams", "players"],
+  authors: [{ name: "MC PRIME World Cup Team" }],
   openGraph: {
-    title: "بورصة المونديال | World Cup Exchange — مباشر وتحليل كأس العالم",
-    description: bilingualDescription,
+    title: "MC PRIME World Cup",
+    description,
     url: baseUrl,
-    siteName: "بورصة المونديال | World Cup Exchange",
-    images: [{ url: "/og-image.jpg", width: 1200, height: 630, alt: "بورصة المونديال World Cup Exchange live matches and football analysis" }],
+    siteName: "MC PRIME World Cup",
+    images: [{ url: "/og-image.jpg", width: 1200, height: 630, alt: "MC PRIME World Cup" }],
     locale: "ar_EG",
-    alternateLocale: ["en_US", "ar_SA", "ar_AE", "ar_MA", "ar_QA"],
     type: "website",
   },
   alternates: { canonical: '/', languages: { ar: '/', en: '/' } },
   twitter: {
     card: "summary_large_image",
-    title: "بورصة المونديال | World Cup Exchange",
-    description: bilingualDescription,
+    title: "MC PRIME World Cup",
+    description,
     images: ["/og-image.jpg"],
   },
   robots: {
@@ -69,7 +67,6 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
               {children}
             </div>
             <Footer />
-            <MobileBottomNav />
             <GlobalTicker />
           </NotificationProvider>
         </Providers>
