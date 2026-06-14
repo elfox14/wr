@@ -1,10 +1,11 @@
-import { mkdir, writeFile } from 'fs/promises';
+import { mkdir, readFile, writeFile } from 'fs/promises';
 import path from 'path';
 import { extractFbrefSquadLinks, extractFbrefTablesFromHtml } from '../lib/fbref/htmlTables';
 import type { FbrefExportPayload, FbrefSquadPage } from '../lib/fbref/importer';
 
 const DEFAULT_COMPETITION_URL = 'https://fbref.com/en/comps/1/World-Cup-Stats';
 const competitionUrl = process.env.FBREF_WORLD_CUP_URL || DEFAULT_COMPETITION_URL;
+const competitionHtmlFile = process.env.FBREF_COMPETITION_HTML_FILE || '';
 const outputDir = process.env.FBREF_OUTPUT_DIR || path.join(process.cwd(), 'data', 'imports');
 const fetchSquads = process.env.FBREF_FETCH_SQUADS === 'true';
 const limit = Number(process.env.FBREF_SQUAD_LIMIT || '0') || 0;
@@ -21,6 +22,16 @@ async function fetchHtml(url: string) {
   return response.text();
 }
 
+async function readCompetitionHtml() {
+  if (competitionHtmlFile) {
+    const htmlPath = path.resolve(process.cwd(), competitionHtmlFile);
+    console.log(`Reading FBref competition HTML from local file: ${htmlPath}`);
+    return readFile(htmlPath, 'utf8');
+  }
+
+  return fetchHtml(competitionUrl);
+}
+
 async function readSquadPage(link: { name?: string; href?: string }): Promise<FbrefSquadPage> {
   if (!link.href) return { squad: link.name, url: link.href, ok: false, error: 'Missing squad href' };
   try {
@@ -33,7 +44,7 @@ async function readSquadPage(link: { name?: string; href?: string }): Promise<Fb
 }
 
 async function main() {
-  const html = await fetchHtml(competitionUrl);
+  const html = await readCompetitionHtml();
   const competitionTables = extractFbrefTablesFromHtml(html, competitionUrl);
   const squadLinks = extractFbrefSquadLinks(html, competitionUrl);
   const selectedLinks = limit > 0 ? squadLinks.slice(0, limit) : squadLinks;
@@ -48,7 +59,7 @@ async function main() {
 
   const payload: FbrefExportPayload = {
     source: 'FBref',
-    extractionMethod: fetchSquads ? 'node_fetch_competition_and_squads' : 'node_fetch_competition_only',
+    extractionMethod: competitionHtmlFile ? 'local_competition_html' : fetchSquads ? 'node_fetch_competition_and_squads' : 'node_fetch_competition_only',
     competitionUrl,
     exportedAt: new Date().toISOString(),
     competitionTables,
@@ -63,6 +74,7 @@ async function main() {
   console.log(JSON.stringify({
     outputPath,
     competitionUrl,
+    competitionHtmlFile: competitionHtmlFile || null,
     competitionTableCount: competitionTables.length,
     squadLinkCount: squadLinks.length,
     squadPageCount: squadPages.length,
