@@ -1,8 +1,4 @@
 import { NextResponse } from 'next/server';
-import prisma from '@/lib/prisma';
-
-const FBREF_PROVIDERS = new Set(['FBREF_STATHEAD_IMPORT', 'FBREF_STATHEAD_SNAPSHOT']);
-const FBREF_BROWSER_PROVIDERS = new Set(['FBREF_BROWSER_EXTRACT']);
 
 type StandingMetrics = {
   group?: string | null;
@@ -76,76 +72,19 @@ export type TeamFBRefStats = {
   standard: StandardMetrics | null;
 };
 
-function safeJson<T>(value: unknown): T | null {
-  if (!value || typeof value !== 'object') return null;
-  return value as T;
-}
-
-async function findStatsReport(id: string) {
-  const primary = await prisma.teamIntelligenceReport.findFirst({
-    where: {
-      teamId: id,
-      provider: { in: Array.from(FBREF_PROVIDERS) },
-    },
-    orderBy: { publishedAt: 'desc' },
-    select: { metrics: true, publishedAt: true, sourceUrl: true },
+export async function GET() {
+  return NextResponse.json({
+    available: false,
+    exportedAt: null,
+    sourceUrl: null,
+    standing: null,
+    shooting: null,
+    goalkeeping: null,
+    misc: null,
+    matchContext: null,
+    roster: null,
+    standard: null,
+  } satisfies TeamFBRefStats, {
+    headers: { 'Cache-Control': 'public, s-maxage=600, stale-while-revalidate=300' },
   });
-
-  if (primary?.metrics) return primary;
-
-  return prisma.teamIntelligenceReport.findFirst({
-    where: {
-      teamId: id,
-      provider: { in: Array.from(FBREF_BROWSER_PROVIDERS) },
-    },
-    orderBy: { publishedAt: 'desc' },
-    select: { metrics: true, publishedAt: true, sourceUrl: true },
-  });
-}
-
-export async function GET(_request: Request, context: { params: Promise<{ id: string }> }) {
-  try {
-    const { id } = await context.params;
-
-    const report = await findStatsReport(id);
-
-    if (!report || !report.metrics) {
-      return NextResponse.json({
-        available: false,
-        exportedAt: null,
-        sourceUrl: null,
-        standing: null,
-        shooting: null,
-        goalkeeping: null,
-        misc: null,
-        matchContext: null,
-        roster: null,
-        standard: null,
-      } satisfies TeamFBRefStats, {
-        headers: { 'Cache-Control': 'public, s-maxage=600, stale-while-revalidate=300' },
-      });
-    }
-
-    const m = report.metrics as Record<string, unknown>;
-
-    const result: TeamFBRefStats = {
-      available: true,
-      exportedAt: (m.exportedAt as string) || (m.importedAt as string) || report.publishedAt?.toISOString() || null,
-      sourceUrl: (m.pageUrl as string) || report.sourceUrl || null,
-      standing: safeJson<StandingMetrics>(m.standing),
-      shooting: safeJson<ShootingMetrics>(m.shooting),
-      goalkeeping: safeJson<GoalkeepingMetrics>(m.goalkeeping),
-      misc: safeJson<MiscMetrics>(m.misc),
-      matchContext: safeJson<MatchContextMetrics>(m.matchContext),
-      roster: safeJson<RosterMetrics>(m.roster),
-      standard: safeJson<StandardMetrics>(m.standard),
-    };
-
-    return NextResponse.json(result, {
-      headers: { 'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=1800' },
-    });
-  } catch (error) {
-    console.error('team-stats API error:', error);
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
-  }
 }
