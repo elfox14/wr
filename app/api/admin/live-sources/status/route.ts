@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { ensureStatsTable } from '@/lib/live-match-stats';
-import { getProviderQuotaBlock } from '@/lib/provider-quota-guard';
+import { getProviderQuotaBlock, getProviderUsageSummary } from '@/lib/provider-quota-guard';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -29,7 +29,11 @@ export async function GET(req: Request) {
 
   try {
     await ensureStatsTable();
-    const isportsGuard = await getProviderQuotaBlock('ISPORTS');
+    const usageSince = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const [isportsGuard, isportsUsage] = await Promise.all([
+      getProviderQuotaBlock('ISPORTS'),
+      getProviderUsageSummary('ISPORTS', usageSince),
+    ]);
     const latestSnapshots = await prisma.$queryRawUnsafe<any[]>(`
       SELECT DISTINCT ON ("matchId") *
       FROM "MatchStatsSnapshot"
@@ -75,6 +79,11 @@ export async function GET(req: Request) {
       updatedAt: new Date().toISOString(),
       primaryProvider: isportsGuard ? 'FOOTBALL_DATA' : 'ISPORTS',
       fallbackProvider: 'FOOTBALL_DATA',
+      providerUsage: {
+        windowHours: 24,
+        isports: isportsUsage,
+        softLimit: Number(process.env.ISPORTS_DAILY_SOFT_LIMIT || 120),
+      },
       isports: {
         status: isportsGuard ? 'blocked' : 'active',
         blockedUntil: toIso(isportsGuard?.blockedUntil),
