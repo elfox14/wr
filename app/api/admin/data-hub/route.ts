@@ -51,6 +51,8 @@ async function withPlaceholderIdCleanup<T extends Record<string, any>>(result: T
   return { ...result, placeholderIdCleanup };
 }
 
+const officialSquadNotice = 'Official World Cup squads are managed separately. Data Hub general squad imports are disabled.';
+
 export async function GET(request: Request) {
   const admin = await requireAdmin(request);
   if (admin.error) return admin.error;
@@ -64,6 +66,8 @@ export async function GET(request: Request) {
       return NextResponse.json({
         ...status,
         ok: status.ok !== false,
+        squadImportDisabled: true,
+        squadImportNotice: officialSquadNotice,
         config: {
           ...getDataHubConfig(),
           token: undefined,
@@ -77,14 +81,24 @@ export async function GET(request: Request) {
 
     if (action === 'sync-teams') {
       const limit = parseLimit(url.searchParams.get('limit'));
-      const full = url.searchParams.get('full') === '1' || url.searchParams.get('full') === 'true';
-      return NextResponse.json(await withPlaceholderIdCleanup(await importDataHubTeams({ limit, full })));
+      const requestedFull = url.searchParams.get('full') === '1' || url.searchParams.get('full') === 'true';
+      const result = await importDataHubTeams({ limit, full: false });
+      return NextResponse.json(await withPlaceholderIdCleanup({
+        ...result,
+        requestedFull,
+        full: false,
+        squadImportDisabled: true,
+        squadImportNotice: officialSquadNotice,
+      }));
     }
 
     if (action === 'sync-team') {
-      const teamId = url.searchParams.get('team_id') || url.searchParams.get('teamId');
-      if (!teamId) return NextResponse.json({ error: 'team_id is required' }, { status: 400 });
-      return NextResponse.json(await withPlaceholderIdCleanup({ ok: true, team: await importSingleDataHubTeam(teamId) }));
+      return NextResponse.json({
+        ok: false,
+        error: 'sync-team is disabled because it may import general provider squads.',
+        squadImportDisabled: true,
+        squadImportNotice: officialSquadNotice,
+      }, { status: 409 });
     }
 
     return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
@@ -103,7 +117,7 @@ export async function POST(request: Request) {
   try {
     if (action === 'status') {
       const status = await getDataHubStatus();
-      return NextResponse.json({ ...status, ok: status.ok !== false });
+      return NextResponse.json({ ...status, ok: status.ok !== false, squadImportDisabled: true, squadImportNotice: officialSquadNotice });
     }
 
     if (action === 'cleanup-placeholder-api-ids') {
@@ -111,15 +125,25 @@ export async function POST(request: Request) {
     }
 
     if (action === 'sync-team') {
-      const teamId = body.team_id || body.teamId;
-      if (!teamId) return NextResponse.json({ error: 'team_id is required' }, { status: 400 });
-      return NextResponse.json(await withPlaceholderIdCleanup({ ok: true, team: await importSingleDataHubTeam(teamId) }));
+      return NextResponse.json({
+        ok: false,
+        error: 'sync-team is disabled because it may import general provider squads.',
+        squadImportDisabled: true,
+        squadImportNotice: officialSquadNotice,
+      }, { status: 409 });
     }
 
     if (action === 'sync-teams') {
       const limit = parseLimit(String(body.limit || '12'));
-      const full = Boolean(body.full);
-      return NextResponse.json(await withPlaceholderIdCleanup(await importDataHubTeams({ limit, full })));
+      const requestedFull = Boolean(body.full);
+      const result = await importDataHubTeams({ limit, full: false });
+      return NextResponse.json(await withPlaceholderIdCleanup({
+        ...result,
+        requestedFull,
+        full: false,
+        squadImportDisabled: true,
+        squadImportNotice: officialSquadNotice,
+      }));
     }
 
     return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
