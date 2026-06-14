@@ -31,6 +31,18 @@ type HomeMatch = {
   liveLabel?: string | null;
 };
 
+type SummaryStats = {
+  totalMatches: number;
+  finishedMatches: number;
+  liveMatches: number;
+  scheduledMatches: number;
+  totalGoals: number;
+  yellowCards: number;
+  redCards: number;
+  matchesWithCardSnapshots: number;
+  latestCardsUpdatedAt: string | null;
+};
+
 type Props = {
   initialAssets?: unknown[];
   upcomingMatches?: HomeMatch[];
@@ -49,7 +61,17 @@ const heroActions = [
 ] as const;
 
 const groupLetters = Object.keys(WORLD_CUP_2026_GROUPS) as WorldCup2026GroupKey[];
-const featuredTeamChips = ['المستضيفون', 'العرب', 'أوروبا', 'أمريكا الجنوبية'];
+
+const teamRegions = [
+  { title: 'المستضيفون', names: ['المكسيك', 'كندا', 'الولايات المتحدة'] },
+  { title: 'العرب', names: ['قطر', 'المغرب', 'تونس', 'مصر', 'السعودية', 'العراق', 'الجزائر', 'الأردن'] },
+  { title: 'أوروبا', names: ['التشيك', 'البوسنة والهرسك', 'سويسرا', 'اسكتلندا', 'تركيا', 'ألمانيا', 'هولندا', 'السويد', 'بلجيكا', 'إسبانيا', 'فرنسا', 'النرويج', 'النمسا', 'البرتغال', 'إنجلترا', 'كرواتيا'] },
+  { title: 'أمريكا الجنوبية', names: ['البرازيل', 'باراغواي', 'الإكوادور', 'أوروغواي', 'الأرجنتين', 'كولومبيا'] },
+  { title: 'أفريقيا', names: ['جنوب أفريقيا', 'المغرب', 'كوت ديفوار', 'تونس', 'مصر', 'السنغال', 'الجزائر', 'الكونغو الديمقراطية', 'غانا', 'الرأس الأخضر'] },
+  { title: 'آسيا', names: ['كوريا الجنوبية', 'قطر', 'اليابان', 'إيران', 'السعودية', 'العراق', 'الأردن', 'أوزبكستان'] },
+  { title: 'أمريكا الشمالية والكاريبي', names: ['المكسيك', 'كندا', 'الولايات المتحدة', 'هايتي', 'كوراساو', 'بنما'] },
+  { title: 'أوقيانوسيا', names: ['أستراليا', 'نيوزيلندا'] },
+] as const;
 
 function formatCount(value?: number, fallback = 0) {
   return new Intl.NumberFormat('ar-EG').format(value && value > 0 ? value : fallback);
@@ -315,9 +337,51 @@ function HomeMatchCenterCard({ fallbackMatches, upcomingMatchesCount }: { fallba
   );
 }
 
+function StatBox({ value, label, note }: { value: string; label: string; note: string }) {
+  return (
+    <div className="rounded-xl border border-white/10 bg-black/25 px-2 py-2 text-center">
+      <div className="text-lg font-black text-[#FFD700]">{value}</div>
+      <div className="mt-0.5 text-[10px] font-black text-white">{label}</div>
+      <div className="mt-0.5 text-[9px] font-bold text-gray-500">{note}</div>
+    </div>
+  );
+}
+
 function SmartFeatureGrid() {
   const [selectedGroup, setSelectedGroup] = useState<WorldCup2026GroupKey>('A');
+  const [summaryStats, setSummaryStats] = useState<SummaryStats | null>(null);
   const selectedGroupData = WORLD_CUP_2026_GROUPS[selectedGroup];
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadSummaryStats() {
+      try {
+        const response = await fetch('/api/matches/summary-stats', { cache: 'no-store' });
+        if (!response.ok) return;
+        const data = await response.json();
+        if (!cancelled && data?.ok) setSummaryStats(data);
+      } catch {
+        // Keep fallback values if the summary endpoint is unavailable.
+      }
+    }
+
+    loadSummaryStats();
+    const timer = window.setInterval(loadSummaryStats, 60_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, []);
+
+  const stats = {
+    totalMatches: summaryStats?.totalMatches ?? 104,
+    finishedMatches: summaryStats?.finishedMatches ?? 0,
+    liveMatches: summaryStats?.liveMatches ?? 0,
+    totalGoals: summaryStats?.totalGoals ?? 0,
+    yellowCards: summaryStats?.yellowCards ?? 0,
+    redCards: summaryStats?.redCards ?? 0,
+  };
 
   return (
     <section className="mt-5" aria-label="أقسام كأس العالم 2026 التفاعلية">
@@ -366,9 +430,14 @@ function SmartFeatureGrid() {
             <h3 className="text-base font-black text-white">دليل المنتخبات</h3>
             <span className="rounded-full border border-white/10 bg-black/25 px-2.5 py-1 text-[10px] font-black text-[#FFD700]">48 منتخب</span>
           </div>
-          <p className="mt-2 text-xs font-bold leading-6 text-gray-400">كل منتخب في صفحة واحدة: بطاقة أساسية، قائمة، أداء، أسماء بارزة، وتحليل موثق.</p>
-          <div className="mt-3 flex flex-wrap gap-1.5">
-            {featuredTeamChips.map((chip) => <span key={chip} className="rounded-full border border-white/10 bg-black/25 px-2.5 py-1 text-[10px] font-black text-gray-300">{chip}</span>)}
+          <p className="mt-2 text-xs font-bold leading-6 text-gray-400">تصنيف سريع للمنتخبات حسب الاستضافة والمنطقة الجغرافية.</p>
+          <div className="mt-3 space-y-2">
+            {teamRegions.map((region) => (
+              <div key={region.title} className="rounded-xl border border-white/10 bg-black/25 p-2.5">
+                <div className="mb-1 text-[10px] font-black text-[#0FF0FC]">{region.title}</div>
+                <p className="text-[11px] font-bold leading-5 text-gray-300">{region.names.join('، ')}</p>
+              </div>
+            ))}
           </div>
           <div className="mt-3 text-[11px] font-black text-[#FFD700]">استكشف المنتخبات ←</div>
         </Link>
@@ -393,9 +462,14 @@ function SmartFeatureGrid() {
             <h3 className="text-base font-black text-white">الإحصائيات</h3>
             <span className="rounded-full border border-white/10 bg-black/25 px-2.5 py-1 text-[10px] font-black text-[#FFD700]">Data</span>
           </div>
-          <p className="mt-2 text-xs font-bold leading-6 text-gray-400">أرقام المباريات والمنتخبات واللاعبين عند توفر مصادر موثوقة وبيانات محدثة.</p>
+          <p className="mt-2 text-xs font-bold leading-6 text-gray-400">أرقام فعلية من قاعدة بيانات المباريات وآخر لقطات الإحصائيات المتاحة.</p>
           <div className="mt-3 grid grid-cols-2 gap-2">
-            {['الأهداف', 'النتائج', 'اللاعبون', 'المنتخبات'].map((item) => <span key={item} className="rounded-xl border border-white/10 bg-black/25 px-2 py-2 text-center text-[10px] font-black text-gray-300">{item}</span>)}
+            <StatBox value={formatCount(stats.totalMatches)} label="مباراة" note="إجمالي الجدول" />
+            <StatBox value={formatCount(stats.finishedMatches)} label="انتهت" note="حسب الحالة" />
+            <StatBox value={formatCount(stats.totalGoals)} label="هدف" note="من النتائج" />
+            <StatBox value={formatCount(stats.liveMatches)} label="مباشر" note="الآن" />
+            <StatBox value={formatCount(stats.yellowCards)} label="صفراء" note="آخر Snapshot" />
+            <StatBox value={formatCount(stats.redCards)} label="حمراء" note="آخر Snapshot" />
           </div>
           <div className="mt-3 text-[11px] font-black text-[#FFD700]">عرض الإحصائيات ←</div>
         </Link>
