@@ -18,6 +18,19 @@ type TableRow = {
   points: number;
 };
 
+type MatchForTable = {
+  id: string;
+  externalId: string | null;
+  animationMatchId: number | null;
+  matchDate: Date;
+  status: string;
+  groupPhase: string | null;
+  homeScore: number;
+  awayScore: number;
+  homeTeam: { name: string; code: string };
+  awayTeam: { name: string; code: string };
+};
+
 function normalizeGroupKey(value?: string | null): WorldCup2026GroupKey | null {
   const group = String(value || '').replace('Group', '').replace('GROUP_', '').replace('المجموعة', '').trim().toUpperCase();
   return group in WORLD_CUP_2026_GROUPS ? group as WorldCup2026GroupKey : null;
@@ -37,6 +50,38 @@ function safeNumber(value: unknown) {
   return Number.isFinite(number) ? number : 0;
 }
 
+function statusRank(status?: string | null) {
+  const value = String(status || '').toUpperCase();
+  if (value === 'FINISHED' || value === 'FT') return 4;
+  if (value === 'IN_PLAY' || value === 'LIVE' || value === 'HT') return 3;
+  if (value === 'SCHEDULED' || value === 'TIMED' || value === 'NOT_STARTED') return 2;
+  return 1;
+}
+
+function matchDedupeKey(match: MatchForTable) {
+  // In a World Cup group, each pair should meet once. Use the team pair as the stable key
+  // so duplicated rows from different providers do not double-count points.
+  const codes = [normalizeCode(match.homeTeam?.code), normalizeCode(match.awayTeam?.code)].sort();
+  return codes.join('|');
+}
+
+function chooseBetterMatch(current: MatchForTable | undefined, candidate: MatchForTable) {
+  if (!current) return candidate;
+  const currentRank = statusRank(current.status);
+  const candidateRank = statusRank(candidate.status);
+  if (candidateRank !== currentRank) return candidateRank > currentRank ? candidate : current;
+
+  const currentHasProviderId = Boolean(current.animationMatchId || current.externalId);
+  const candidateHasProviderId = Boolean(candidate.animationMatchId || candidate.externalId);
+  if (candidateHasProviderId !== currentHasProviderId) return candidateHasProviderId ? candidate : current;
+
+  const currentScoreTotal = safeNumber(current.homeScore) + safeNumber(current.awayScore);
+  const candidateScoreTotal = safeNumber(candidate.homeScore) + safeNumber(candidate.awayScore);
+  if (candidateScoreTotal !== currentScoreTotal) return candidateScoreTotal > currentScoreTotal ? candidate : current;
+
+  return new Date(candidate.matchDate).getTime() < new Date(current.matchDate).getTime() ? candidate : current;
+}
+
 function groupForTeamCode(code?: string | null) {
   const normalized = normalizeCode(code);
   if (!normalized) return null;
@@ -53,6 +98,9 @@ export async function GET() {
     const matches = await prisma.match.findMany({
       select: {
         id: true,
+        externalId: true,
+        animationMatchId: true,
+        matchDate: true,
         status: true,
         groupPhase: true,
         homeScore: true,
@@ -60,7 +108,7 @@ export async function GET() {
         homeTeam: { select: { name: true, code: true } },
         awayTeam: { select: { name: true, code: true } },
       },
-    });
+    }) as MatchForTable[];
 
     const groups = (Object.entries(WORLD_CUP_2026_GROUPS) as [WorldCup2026GroupKey, typeof WORLD_CUP_2026_GROUPS[WorldCup2026GroupKey]][]).map(([group, data]) => {
       const rows = data.teams.map<TableRow>((team) => ({
@@ -84,11 +132,25 @@ export async function GET() {
       let finishedMatches = 0;
       let liveMatches = 0;
       let scheduledMatches = 0;
+      let duplicateMatchesIgnored = 0;
+      const uniqueMatches = new Map<string, MatchForTable>();
 
       for (const match of matches) {
         const matchGroup = normalizeGroupKey(match.groupPhase) || groupForTeamCode(match.homeTeam?.code) || groupForTeamCode(match.awayTeam?.code);
         if (matchGroup !== group) continue;
 
+        const home = byCode.get(normalizeCode(match.homeTeam?.code));
+        const away = byCode.get(normalizeCode(match.awayTeam?.code));
+        if (!home || !away) continue;
+
+        const key = matchDedupeKey(match);
+        const previous = uniqueMatches.get(key);
+        const chosen = chooseBetterMatch(previous, match);
+        if (previous) duplicateMatchesIgnored += 1;
+        uniqueMatches.set(key, chosen);
+      }
+
+      for (const match of uniqueMatches.values()) {
         const status = String(match.status || '').toUpperCase();
         if (status === 'IN_PLAY' || status === 'LIVE' || status === 'HT') liveMatches += 1;
         if (status === 'SCHEDULED' || status === 'TIMED' || status === 'NOT_STARTED') scheduledMatches += 1;
@@ -142,6 +204,7 @@ export async function GET() {
         finishedMatches,
         liveMatches,
         scheduledMatches,
+        duplicateMatchesIgnored,
         standings: rows,
       };
     });
