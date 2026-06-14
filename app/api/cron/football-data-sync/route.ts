@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { normalizeName } from '@/lib/apiFootball';
 import { applyVolatilityCap } from '@/lib/liveEngine';
+import { blockProviderForHours, blockProviderUntil, getProviderQuotaBlock, isProviderQuotaError } from '@/lib/provider-quota-guard';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -279,14 +280,37 @@ export async function GET(req: Request) {
   const createMissing = url.searchParams.get('createMissing') === 'true';
   const dryRun = url.searchParams.get('dryRun') === 'true';
   const applyMarketEvents = url.searchParams.get('applyMarketEvents') === 'true';
+  const force = url.searchParams.get('force') === 'true';
+  const minIntervalMinutes = Math.max(0, Number(url.searchParams.get('minIntervalMinutes') || process.env.FOOTBALL_DATA_MIN_INTERVAL_MINUTES || 5));
   const processed: any[] = [];
   const errors: any[] = [];
 
   try {
+    const guard = force ? null : await getProviderQuotaBlock('FOOTBALL_DATA');
+    if (guard) {
+      return NextResponse.json({
+        ok: true,
+        skipped: true,
+        mode: 'football_data_backup_match_sync',
+        provider: 'FOOTBALL_DATA',
+        reason: 'provider_guard_or_cooldown_active',
+        guard: { blockedUntil: guard.blockedUntil, reason: guard.reason },
+        dateFrom,
+        dateTo,
+        externalRequestsUsed: 0,
+        startedAt: startedAt.toISOString(),
+        finishedAt: new Date().toISOString(),
+      }, { headers: { 'Cache-Control': 'no-store' } });
+    }
+
     const payload = await footballDataFetch(`/competitions/${encodeURIComponent(competition)}/matches`, { dateFrom, dateTo });
     const matches = Array.isArray(payload?.matches) ? payload.matches : [];
     for (const match of matches) {
       processed.push(await processFootballDataMatch(match, { applyMarketEvents, createMissing, dryRun }));
+    }
+
+    if (!dryRun && minIntervalMinutes > 0) {
+      await blockProviderUntil('FOOTBALL_DATA', new Date(Date.now() + minIntervalMinutes * 60 * 1000), `cooldown after successful sync (${dateFrom}..${dateTo})`);
     }
 
     return NextResponse.json({
@@ -300,6 +324,7 @@ export async function GET(req: Request) {
       dryRun,
       createMissing,
       applyMarketEvents,
+      minIntervalMinutes,
       externalRequestsUsed: 1,
       fixturesFetched: matches.length,
       processed,
@@ -308,8 +333,11 @@ export async function GET(req: Request) {
       finishedAt: new Date().toISOString(),
     }, { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate' } });
   } catch (error: any) {
+    if (isProviderQuotaError(error)) {
+      await blockProviderForHours('FOOTBALL_DATA', 24, error?.message || 'football-data quota or rate limit reached');
+    }
     errors.push({ message: error?.message || 'football-data sync failed', status: error?.status, provider: error?.provider || 'FOOTBALL_DATA', payload: error?.payload });
-    return NextResponse.json({ ok: false, mode: 'football_data_backup_match_sync', provider: 'FOOTBALL_DATA', competition, dateFrom, dateTo, processed, errors, startedAt: startedAt.toISOString(), finishedAt: new Date().toISOString() }, { status: error?.status || 500, headers: { 'Cache-Control': 'no-store' } });
+    return NextResponse.json({ ok: false, mode: 'football_data_backup_match_sync', provider: 'FOOTBALL_DATA', competition, dateFrom, dateTo, externalRequestsUsed: error?.status === 429 ? 1 : 0, processed, errors, startedAt: startedAt.toISOString(), finishedAt: new Date().toISOString() }, { status: error?.status || 500, headers: { 'Cache-Control': 'no-store' } });
   }
 }
 
