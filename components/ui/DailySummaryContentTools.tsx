@@ -15,13 +15,13 @@ export default function DailySummaryContentTools({ script, headline, summaryLine
   const [error, setError] = useState<string | null>(null);
 
   const pack = useMemo(() => {
-    const hashtags = '#بورصة_المونديال #كأس_العالم #ملخص_اليوم';
+    const hashtags = '#MCPrimeWorldCup #كأس_العالم #ملخص_اليوم';
     const shortSummary = trimText(summaryLine || headline, 260);
     return {
-      facebookPost: `${headline}\n\n${shortSummary}\n\nملخص كروي ورصد صحفي من بورصة المونديال.\nتنبيه: المحتوى ليس توصية تداول.\n\n${hashtags}`,
-      youtubeTitle: trimText(`${headline} | ملخص اليوم من بورصة المونديال`, 92),
-      youtubeDescription: `${shortSummary}\n\nفي هذا الملخص نراجع نتائج اليوم، الأخبار الصحفية، وأبرز إشارات السوق الافتراضي مع فصل واضح بين التحليل الكروي والتداول.\n\n${hashtags}`,
-      infographicPoints: [`عنوان اليوم: ${headline}`, summaryLine || 'راجع نتائج اليوم والأخبار المرتبطة بالمباريات.', 'نتائج ومباريات قادمة من قاعدة بيانات المنصة.', 'أخبار السوق الافتراضي منفصلة عن التحليل الكروي.', 'لا توجد توصية شراء أو بيع.'],
+      facebookPost: `${headline}\n\n${shortSummary}\n\nملخص كروي ورصد صحفي من MC PRIME World Cup.\n\n${hashtags}`,
+      youtubeTitle: trimText(`${headline} | ملخص اليوم من MC PRIME World Cup`, 92),
+      youtubeDescription: `${shortSummary}\n\nفي هذا الملخص نراجع نتائج اليوم، الأخبار الصحفية، وأبرز نقاط المتابعة الرياضية.\n\n${hashtags}`,
+      infographicPoints: [`عنوان اليوم: ${headline}`, summaryLine || 'راجع نتائج اليوم والأخبار المرتبطة بالمباريات.', 'نتائج ومباريات قادمة من قاعدة بيانات المنصة.', 'نقاط متابعة رياضية فقط.', 'لا توجد مراهنات أو توصيات مالية.'],
     };
   }, [headline, summaryLine]);
 
