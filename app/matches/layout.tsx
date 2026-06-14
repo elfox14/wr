@@ -1,7 +1,7 @@
 import { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'محفظتي | MC PRIME Exchange',
+  title: 'مركز المباريات | MC PRIME World Cup',
 };
 
 export default function Layout({ children }: { children: React.ReactNode }) {
