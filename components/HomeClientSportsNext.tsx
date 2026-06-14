@@ -139,6 +139,36 @@ function teamMark(team?: Team | null) {
   return <span className="text-sm font-black text-[#FFD700]">{team?.image || teamCode(team)}</span>;
 }
 
+function scoreLabel(value?: number | null) {
+  return typeof value === 'number' && Number.isFinite(value) ? formatCount(value) : '—';
+}
+
+function matchClock(match: HomeMatch, now: Date) {
+  if (!isLiveMatch(match) && !match.isHalfTime) return null;
+  if (typeof match.minute === 'number' && Number.isFinite(match.minute) && match.minute > 0) {
+    return `${formatCount(Math.floor(match.minute))}′`;
+  }
+
+  const start = match.matchDate ? new Date(match.matchDate) : null;
+  if (!start || Number.isNaN(start.getTime())) return null;
+
+  const elapsedMinutes = Math.max(1, Math.min(130, Math.floor((now.getTime() - start.getTime()) / 60_000)));
+  return `${formatCount(elapsedMinutes)}′`;
+}
+
+function TeamScoreBadge({ team, score, align }: { team?: Team | null; score?: number | null; align: 'right' | 'left' }) {
+  return (
+    <div className={`mb-1.5 inline-flex items-center gap-1.5 ${align === 'left' ? 'flex-row-reverse' : ''}`}>
+      <div className="inline-flex h-9 w-9 items-center justify-center overflow-hidden rounded-xl border border-white/10 bg-white/[0.07]">
+        {teamMark(team)}
+      </div>
+      <span className="flex h-8 min-w-8 items-center justify-center rounded-xl border border-[#FFD700]/25 bg-[#FFD700]/10 px-2 text-sm font-black text-[#FFD700] shadow-[0_0_16px_rgba(255,215,0,0.08)]">
+        {scoreLabel(score)}
+      </span>
+    </div>
+  );
+}
+
 function matchGroup(match: HomeMatch) {
   return match.groupPhase || match.group || match.stage || 'كأس العالم 2026';
 }
@@ -204,7 +234,7 @@ function matchTiming(match: HomeMatch, now: Date) {
 
   if (isConfirmedLive || status === 'LIVE' || status === 'IN_PLAY' || status === 'HT') {
     return {
-      label: status === 'HT' ? 'استراحة' : match.liveLabel || (match.minute ? `مباشر • ${formatCount(match.minute)}′` : 'مباشر الآن'),
+      label: status === 'HT' ? 'استراحة' : match.liveLabel || 'مباشر الآن',
       live: true,
       waiting: false,
     };
@@ -230,10 +260,12 @@ function InlineMatchTimer({ match }: { match: HomeMatch }) {
   }, []);
 
   const timing = matchTiming(match, now);
+  const clock = matchClock(match, now);
 
   return (
-    <span className={`min-w-0 truncate rounded-full border px-2.5 py-1 text-center text-[11px] font-black ${timing.live ? 'border-[#00FF88]/25 bg-[#00FF88]/10 text-[#00FF88]' : timing.waiting ? 'border-[#FFD700]/20 bg-[#FFD700]/10 text-[#FFD700]' : 'border-[#0FF0FC]/20 bg-[#0FF0FC]/10 text-[#0FF0FC]'}`}>
-      {timing.label}
+    <span className={`inline-flex min-w-0 items-center justify-center gap-1.5 rounded-full border px-2.5 py-1 text-center text-[11px] font-black ${timing.live ? 'border-[#00FF88]/25 bg-[#00FF88]/10 text-[#00FF88]' : timing.waiting ? 'border-[#FFD700]/20 bg-[#FFD700]/10 text-[#FFD700]' : 'border-[#0FF0FC]/20 bg-[#0FF0FC]/10 text-[#0FF0FC]'}`}>
+      <span className="min-w-0 truncate">{timing.label}</span>
+      {clock ? <span className="rounded-full bg-black/25 px-1.5 py-0.5 text-[10px] text-white">{clock}</span> : null}
     </span>
   );
 }
@@ -261,9 +293,7 @@ function UpcomingMatchCard({ match }: { match: HomeMatch }) {
 
       <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
         <div className="min-w-0 text-right">
-          <div className="mb-1.5 inline-flex h-9 w-9 items-center justify-center overflow-hidden rounded-xl border border-white/10 bg-white/[0.07]">
-            {teamMark(match.homeTeam)}
-          </div>
+          <TeamScoreBadge team={match.homeTeam} score={match.homeScore} align="right" />
           <h3 className="truncate text-sm font-black text-white">{teamLabel(match.homeTeam)}</h3>
           <p className="mt-0.5 text-[11px] font-bold text-gray-500">{teamCode(match.homeTeam)}</p>
         </div>
@@ -273,9 +303,7 @@ function UpcomingMatchCard({ match }: { match: HomeMatch }) {
         </div>
 
         <div className="min-w-0 text-left">
-          <div className="mb-1.5 inline-flex h-9 w-9 items-center justify-center overflow-hidden rounded-xl border border-white/10 bg-white/[0.07]">
-            {teamMark(match.awayTeam)}
-          </div>
+          <TeamScoreBadge team={match.awayTeam} score={match.awayScore} align="left" />
           <h3 className="truncate text-sm font-black text-white">{teamLabel(match.awayTeam)}</h3>
           <p className="mt-0.5 text-[11px] font-bold text-gray-500">{teamCode(match.awayTeam)}</p>
         </div>
