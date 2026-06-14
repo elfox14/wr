@@ -1,3 +1,3 @@
-export function StickyTradeCTA() {
+export function StickyTradeCTA(_props: any) {
   return null;
 }
