@@ -1,4 +1,3 @@
-import { Suspense } from "react";
 import Script from "next/script";
 import type { Metadata } from "next";
 import { Cairo } from "next/font/google";
@@ -7,7 +6,6 @@ import "./brand-logo.css";
 import { Providers } from "@/components/Providers";
 import { NotificationProvider } from "@/components/ui/NotificationProvider";
 import { GlobalTicker } from "@/components/ui/GlobalTicker";
-import { Navbar } from "@/components/ui/Navbar";
 import { Footer } from "@/components/ui/Footer";
 
 const cairo = Cairo({
@@ -17,7 +15,7 @@ const cairo = Cairo({
 });
 
 const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://worldcup.mcprim.com';
-const description = 'MC PRIME World Cup: live World Cup matches, verified news, football analysis, team and player hubs, groups, and interactive match center.';
+const description = 'MC PRIME World Cup: live World Cup matches, verified news, teams, players, groups, and interactive match center.';
 
 export const metadata: Metadata = {
   metadataBase: new URL(baseUrl),
@@ -26,7 +24,7 @@ export const metadata: Metadata = {
     template: "%s | MC PRIME World Cup",
   },
   description,
-  keywords: ["World Cup", "football news", "football analysis", "live matches", "teams", "players"],
+  keywords: ["World Cup", "football news", "live matches", "teams", "players"],
   authors: [{ name: "MC PRIME World Cup Team" }],
   openGraph: {
     title: "MC PRIME World Cup",
@@ -60,10 +58,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       <body className="min-h-full flex flex-col">
         <Providers>
           <NotificationProvider>
-            <Suspense fallback={<div className="h-16 lg:h-20" />}>
-              <Navbar />
-            </Suspense>
-            <div className="pb-28 lg:pb-10 min-h-[calc(100vh-100px)]">
+            <div className="min-h-[calc(100vh-100px)]">
               {children}
             </div>
             <Footer />
