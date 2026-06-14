@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 
 type Team = {
@@ -11,8 +12,10 @@ type Team = {
 
 type HomeMatch = {
   id?: string | number | null;
+  animationMatchId?: string | number | null;
   matchDate?: string | Date | null;
   status?: string | null;
+  displayStatus?: string | null;
   stage?: string | null;
   group?: string | null;
   groupPhase?: string | null;
@@ -20,6 +23,11 @@ type HomeMatch = {
   awayScore?: number | null;
   homeTeam?: Team | null;
   awayTeam?: Team | null;
+  isLiveNow?: boolean;
+  isHalfTime?: boolean;
+  isLikelyLiveByTime?: boolean;
+  minute?: number | null;
+  liveLabel?: string | null;
 };
 
 type Props = {
@@ -79,77 +87,176 @@ function teamMark(team?: Team | null) {
     return <img src={team.image} alt={teamLabel(team)} className="h-full w-full object-cover" />;
   }
 
-  return <span className="text-lg font-black text-[#FFD700]">{team?.image || teamCode(team)}</span>;
+  return <span className="text-sm font-black text-[#FFD700]">{team?.image || teamCode(team)}</span>;
 }
 
 function matchGroup(match: HomeMatch) {
   return match.groupPhase || match.group || match.stage || 'كأس العالم 2026';
 }
 
+function getInteractiveHref(match: HomeMatch) {
+  return match.animationMatchId
+    ? `/animation-live?matchId=${encodeURIComponent(String(match.animationMatchId))}&lang=en&statsPanel=simple&teamPanel=1`
+    : '/animation-live';
+}
+
+function formatCountdown(diffMs: number) {
+  const totalMinutes = Math.max(0, Math.floor(diffMs / 60_000));
+  const days = Math.floor(totalMinutes / 1440);
+  const hours = Math.floor((totalMinutes % 1440) / 60);
+  const minutes = totalMinutes % 60;
+  const parts = [];
+  if (days > 0) parts.push(`${formatCount(days)} يوم`);
+  if (hours > 0) parts.push(`${formatCount(hours)} ساعة`);
+  parts.push(`${formatCount(minutes)} دقيقة`);
+  return parts.join(' و ');
+}
+
+function matchTiming(match: HomeMatch, now: Date) {
+  const status = String(match.displayStatus || match.status || '').toUpperCase();
+  const isFinished = status === 'FINISHED' || status === 'FT';
+  const isConfirmedLive = Boolean(match.isLiveNow && !match.isLikelyLiveByTime);
+
+  if (isFinished) {
+    return { label: 'انتهت', detail: 'تم تحديث النتيجة', live: false, waiting: false };
+  }
+
+  if (isConfirmedLive) {
+    return {
+      label: 'مباشر الآن',
+      detail: match.liveLabel || (match.minute ? `الدقيقة ${formatCount(match.minute)}` : 'جارية الآن'),
+      live: true,
+      waiting: false,
+    };
+  }
+
+  const date = match.matchDate ? new Date(match.matchDate) : null;
+  const validDate = date && !Number.isNaN(date.getTime()) ? date : null;
+
+  if (!validDate) {
+    return { label: 'موعد غير متوفر', detail: 'بانتظار تحديث المصدر', live: false, waiting: true };
+  }
+
+  const diffMs = validDate.getTime() - now.getTime();
+  if (diffMs > 0) {
+    return { label: 'العد التنازلي', detail: `يبدأ بعد ${formatCountdown(diffMs)}`, live: false, waiting: false };
+  }
+
+  return { label: 'بانتظار تأكيد البداية', detail: 'لا نعرض زمن المباراة إلا بعد تأكيد المصدر الحي', live: false, waiting: true };
+}
+
+function MatchTimer({ match }: { match: HomeMatch }) {
+  const [now, setNow] = useState(() => new Date());
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(new Date()), 30_000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  const timing = matchTiming(match, now);
+
+  return (
+    <div className={`mt-3 rounded-2xl border px-3 py-2 text-center ${timing.live ? 'border-[#00FF88]/25 bg-[#00FF88]/10' : timing.waiting ? 'border-[#FFD700]/20 bg-[#FFD700]/10' : 'border-[#0FF0FC]/20 bg-[#0FF0FC]/10'}`}>
+      <div className={`text-[11px] font-black ${timing.live ? 'text-[#00FF88]' : timing.waiting ? 'text-[#FFD700]' : 'text-[#0FF0FC]'}`}>{timing.label}</div>
+      <div className="mt-1 text-xs font-black text-white">{timing.detail}</div>
+    </div>
+  );
+}
+
 function UpcomingMatchCard({ match }: { match: HomeMatch }) {
   const href = match.id ? `/matches/${match.id}` : '/matches';
 
   return (
-    <Link href={href} className="group relative overflow-hidden rounded-3xl border border-white/10 bg-black/30 p-4 transition hover:-translate-y-0.5 hover:border-[#0FF0FC]/35 hover:bg-white/[0.06] sm:p-5">
-      <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#0FF0FC]/60 to-transparent opacity-70" />
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <span className="rounded-full border border-[#FFD700]/20 bg-[#FFD700]/10 px-3 py-1 text-xs font-black text-[#FFD700]">{matchGroup(match)}</span>
-        <span className="rounded-full border border-white/10 bg-white/[0.05] px-3 py-1 text-xs font-black text-gray-300">{formatMatchDate(match.matchDate)}</span>
+    <article className="relative overflow-hidden rounded-2xl border border-white/10 bg-black/30 p-3 shadow-[0_14px_34px_rgba(0,0,0,0.18)] transition hover:border-[#0FF0FC]/35 hover:bg-white/[0.055]">
+      <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#0FF0FC]/55 to-transparent opacity-70" />
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <span className="rounded-full border border-[#FFD700]/20 bg-[#FFD700]/10 px-2.5 py-1 text-[11px] font-black text-[#FFD700]">{matchGroup(match)}</span>
+        <span className="rounded-full border border-white/10 bg-white/[0.05] px-2.5 py-1 text-[11px] font-black text-gray-300">{formatMatchDate(match.matchDate)}</span>
       </div>
 
-      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
+      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
         <div className="min-w-0 text-right">
-          <div className="mb-2 inline-flex h-12 w-12 items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-white/[0.07]">
+          <div className="mb-1.5 inline-flex h-9 w-9 items-center justify-center overflow-hidden rounded-xl border border-white/10 bg-white/[0.07]">
             {teamMark(match.homeTeam)}
           </div>
-          <h3 className="truncate text-base font-black text-white">{teamLabel(match.homeTeam)}</h3>
-          <p className="mt-1 text-xs font-bold text-gray-500">{teamCode(match.homeTeam)}</p>
+          <h3 className="truncate text-sm font-black text-white">{teamLabel(match.homeTeam)}</h3>
+          <p className="mt-0.5 text-[11px] font-bold text-gray-500">{teamCode(match.homeTeam)}</p>
         </div>
 
-        <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-[#0FF0FC]/20 bg-[#0FF0FC]/10 text-sm font-black text-[#0FF0FC] shadow-[0_0_18px_rgba(15,240,252,0.08)]">
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#0FF0FC]/20 bg-[#0FF0FC]/10 text-xs font-black text-[#0FF0FC]">
           ضد
         </div>
 
         <div className="min-w-0 text-left">
-          <div className="mb-2 inline-flex h-12 w-12 items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-white/[0.07]">
+          <div className="mb-1.5 inline-flex h-9 w-9 items-center justify-center overflow-hidden rounded-xl border border-white/10 bg-white/[0.07]">
             {teamMark(match.awayTeam)}
           </div>
-          <h3 className="truncate text-base font-black text-white">{teamLabel(match.awayTeam)}</h3>
-          <p className="mt-1 text-xs font-bold text-gray-500">{teamCode(match.awayTeam)}</p>
+          <h3 className="truncate text-sm font-black text-white">{teamLabel(match.awayTeam)}</h3>
+          <p className="mt-0.5 text-[11px] font-bold text-gray-500">{teamCode(match.awayTeam)}</p>
         </div>
       </div>
 
-      <div className="mt-4 flex items-center justify-between rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3">
-        <span className="text-xs font-bold text-gray-400">تفاصيل وتوقيت المباراة</span>
-        <span className="text-xs font-black text-[#0FF0FC] transition group-hover:translate-x-[-3px]">عرض المباراة ←</span>
+      <MatchTimer match={match} />
+
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <Link href={href} className="rounded-xl border border-white/10 bg-white/[0.05] px-3 py-2 text-center text-[11px] font-black text-gray-200 transition hover:bg-white/[0.1]">
+          تفاصيل المباراة
+        </Link>
+        <Link href={getInteractiveHref(match)} className="rounded-xl bg-[#0FF0FC] px-3 py-2 text-center text-[11px] font-black text-black transition hover:bg-[#4AFAFF]">
+          البث التفاعلي
+        </Link>
       </div>
-    </Link>
+    </article>
   );
 }
 
 function UpcomingMatchesStrip({ matches }: { matches: HomeMatch[] }) {
-  const nextMatches = matches.slice(0, 2);
+  const [liveMatches, setLiveMatches] = useState<HomeMatch[] | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadLiveCard() {
+      try {
+        const response = await fetch('/api/matches/live-card', { cache: 'no-store' });
+        if (!response.ok) return;
+        const data = await response.json();
+        if (!cancelled && Array.isArray(data?.matches)) setLiveMatches(data.matches);
+      } catch {
+        // Keep the server-rendered fallback matches if the live-card endpoint is unavailable.
+      }
+    }
+
+    loadLiveCard();
+    const timer = window.setInterval(loadLiveCard, 15_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, []);
+
+  const nextMatches = useMemo(() => (liveMatches?.length ? liveMatches : matches).slice(0, 2), [liveMatches, matches]);
 
   return (
-    <section className="mb-5 overflow-hidden rounded-[2rem] border border-white/10 bg-white/[0.045] p-4 shadow-[0_18px_50px_rgba(0,0,0,0.25)] backdrop-blur sm:p-5">
-      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <section className="mb-4 overflow-hidden rounded-2xl border border-white/10 bg-white/[0.04] p-3 shadow-[0_14px_38px_rgba(0,0,0,0.2)] backdrop-blur sm:p-4">
+      <div className="mb-3 flex items-center justify-between gap-3">
         <div>
-          <p className="text-xs font-black uppercase tracking-[0.2em] text-[#0FF0FC]">NEXT MATCHES</p>
-          <h2 className="mt-1 text-xl font-black text-white">المباراتان القادمتان</h2>
+          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#0FF0FC]">NEXT MATCHES</p>
+          <h2 className="mt-0.5 text-base font-black text-white">المباراتان القادمتان</h2>
         </div>
-        <Link href="/matches" className="w-fit rounded-2xl border border-white/10 bg-white/10 px-4 py-2 text-xs font-black text-white transition hover:border-[#FFD700]/40 hover:bg-white/[0.14]">
-          عرض كل المباريات
+        <Link href="/matches" className="rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-[11px] font-black text-white transition hover:border-[#FFD700]/40 hover:bg-white/[0.14]">
+          عرض الكل
         </Link>
       </div>
 
       {nextMatches.length > 0 ? (
-        <div className="grid gap-4 lg:grid-cols-2">
+        <div className="grid gap-3 lg:grid-cols-2">
           {nextMatches.map((match, index) => (
             <UpcomingMatchCard key={match.id || index} match={match} />
           ))}
         </div>
       ) : (
-        <div className="rounded-3xl border border-white/10 bg-black/25 p-5 text-sm font-bold leading-7 text-gray-400">
+        <div className="rounded-2xl border border-white/10 bg-black/25 p-4 text-xs font-bold leading-6 text-gray-400">
           لا توجد مباريات قادمة متاحة الآن. سيتم عرض أقرب مباراتين هنا عند تحديث مركز المباريات.
         </div>
       )}
@@ -168,41 +275,41 @@ export default function HomeClientSportsNext(props: Props) {
   ] as const;
 
   return (
-    <main dir="rtl" className="relative overflow-hidden bg-[#050505] px-4 py-6 text-white sm:px-6 lg:px-8">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_8%,rgba(15,240,252,0.12),transparent_26%),radial-gradient(circle_at_80%_12%,rgba(255,215,0,0.09),transparent_24%),radial-gradient(circle_at_50%_100%,rgba(0,128,96,0.1),transparent_28%)]" />
+    <main dir="rtl" className="relative overflow-hidden bg-[#050505] px-4 py-5 text-white sm:px-6 lg:px-8">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_8%,rgba(15,240,252,0.1),transparent_26%),radial-gradient(circle_at_80%_12%,rgba(255,215,0,0.08),transparent_24%),radial-gradient(circle_at_50%_100%,rgba(0,128,96,0.08),transparent_28%)]" />
 
       <div className="relative mx-auto max-w-7xl">
         <UpcomingMatchesStrip matches={props.upcomingMatches ?? []} />
 
-        <section className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-[#07111f] shadow-[0_22px_60px_rgba(0,0,0,0.42)]">
+        <section className="relative overflow-hidden rounded-2xl border border-white/10 bg-[#07111f] shadow-[0_18px_46px_rgba(0,0,0,0.34)]">
           <div className="absolute inset-0 bg-gradient-to-br from-[#07111f] via-[#081826] to-black" />
-          <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#FFD700]/60 to-transparent" />
-          <div className="absolute -right-20 top-4 h-52 w-52 rounded-full bg-[#0FF0FC]/12 blur-3xl" />
-          <div className="absolute -left-20 bottom-4 h-52 w-52 rounded-full bg-[#FFD700]/8 blur-3xl" />
+          <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#FFD700]/55 to-transparent" />
+          <div className="absolute -right-16 top-2 h-40 w-40 rounded-full bg-[#0FF0FC]/10 blur-3xl" />
+          <div className="absolute -left-16 bottom-2 h-40 w-40 rounded-full bg-[#FFD700]/7 blur-3xl" />
 
-          <div className="relative z-10 p-5 sm:p-6 lg:p-7">
-            <div className="inline-flex items-center gap-2 rounded-full border border-[#0FF0FC]/25 bg-[#0FF0FC]/10 px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.18em] text-[#0FF0FC]">
-              <span className="h-2 w-2 animate-pulse rounded-full bg-[#00FF88]" />
+          <div className="relative z-10 p-4 sm:p-5 lg:p-6">
+            <div className="inline-flex items-center gap-2 rounded-full border border-[#0FF0FC]/25 bg-[#0FF0FC]/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-[#0FF0FC]">
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#00FF88]" />
               WORLD CUP 2026 LIVE CENTER
             </div>
 
-            <h1 className="mt-4 max-w-4xl text-2xl font-black leading-snug tracking-tight text-white md:text-3xl lg:text-4xl">
+            <h1 className="mt-3 max-w-4xl text-xl font-black leading-snug tracking-tight text-white md:text-2xl lg:text-3xl">
               كل شيء عن كأس العالم 2026 في مكان واحد
             </h1>
 
-            <p className="mt-3 max-w-4xl text-sm font-semibold leading-7 text-gray-300 md:text-base md:leading-8">
+            <p className="mt-2 max-w-4xl text-xs font-semibold leading-6 text-gray-300 md:text-sm md:leading-7">
               تابع البطولة لحظة بلحظة: مباريات اليوم، النتائج، الأخبار، التحليلات الفنية، الإحصائيات، المنتخبات، الملاعب، والمدن المستضيفة في تجربة رياضية واحدة.
             </p>
 
-            <div className="mt-5 flex flex-wrap gap-2.5">
+            <div className="mt-4 flex flex-wrap gap-2">
               {heroActions.map(([label, href, variant]) => (
                 <Link
                   key={href + label}
                   href={href}
                   className={
                     variant === 'primary'
-                      ? 'rounded-2xl bg-[#0FF0FC] px-5 py-2.5 text-xs font-black text-black shadow-[0_0_22px_rgba(15,240,252,0.22)] transition hover:-translate-y-0.5 hover:bg-[#4AFAFF]'
-                      : 'rounded-2xl border border-white/10 bg-white/10 px-5 py-2.5 text-xs font-black text-white transition hover:-translate-y-0.5 hover:border-[#FFD700]/40 hover:bg-white/[0.14]'
+                      ? 'rounded-xl bg-[#0FF0FC] px-4 py-2 text-[11px] font-black text-black shadow-[0_0_18px_rgba(15,240,252,0.18)] transition hover:-translate-y-0.5 hover:bg-[#4AFAFF]'
+                      : 'rounded-xl border border-white/10 bg-white/10 px-4 py-2 text-[11px] font-black text-white transition hover:-translate-y-0.5 hover:border-[#FFD700]/40 hover:bg-white/[0.14]'
                   }
                 >
                   {label}
@@ -210,32 +317,32 @@ export default function HomeClientSportsNext(props: Props) {
               ))}
             </div>
 
-            <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
               {stats.map(([value, label, caption]) => (
-                <div key={label} className="rounded-2xl border border-white/10 bg-black/25 p-3 backdrop-blur">
-                  <div className="text-2xl font-black text-[#FFD700]">{value}</div>
-                  <div className="mt-1 text-xs font-black text-white">{label}</div>
-                  <div className="mt-1 text-[11px] font-bold leading-5 text-gray-400">{caption}</div>
+                <div key={label} className="rounded-xl border border-white/10 bg-black/25 p-2.5 backdrop-blur">
+                  <div className="text-xl font-black text-[#FFD700]">{value}</div>
+                  <div className="mt-0.5 text-[11px] font-black text-white">{label}</div>
+                  <div className="mt-0.5 text-[10px] font-bold leading-4 text-gray-400">{caption}</div>
                 </div>
               ))}
             </div>
           </div>
         </section>
 
-        <section className="mt-6" aria-label="روابط أقسام كأس العالم 2026">
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <section className="mt-5" aria-label="روابط أقسام كأس العالم 2026">
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             {featureCards.map(([title, text, href]) => (
               <Link
                 key={title}
                 href={href}
-                className="group relative overflow-hidden rounded-3xl border border-white/10 bg-white/[0.045] p-5 transition duration-200 hover:-translate-y-1 hover:border-[#0FF0FC]/35 hover:bg-white/[0.07]"
+                className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.045] p-4 transition duration-200 hover:-translate-y-1 hover:border-[#0FF0FC]/35 hover:bg-white/[0.07]"
               >
                 <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#0FF0FC]/50 to-transparent opacity-0 transition group-hover:opacity-100" />
                 <div className="flex items-start justify-between gap-4">
-                  <h3 className="text-lg font-black text-white">{title}</h3>
-                  <span className="rounded-full border border-white/10 bg-black/25 px-3 py-1 text-xs font-black text-[#FFD700]">2026</span>
+                  <h3 className="text-base font-black text-white">{title}</h3>
+                  <span className="rounded-full border border-white/10 bg-black/25 px-2.5 py-1 text-[10px] font-black text-[#FFD700]">2026</span>
                 </div>
-                <p className="mt-3 text-sm font-bold leading-7 text-gray-400">{text}</p>
+                <p className="mt-2 text-xs font-bold leading-6 text-gray-400">{text}</p>
               </Link>
             ))}
           </div>
