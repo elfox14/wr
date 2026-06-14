@@ -1,23 +1,70 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { type ReactNode, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { CalendarDays, CheckCircle2, Clock, Filter, Play, Radio } from 'lucide-react';
 
 type Team = { id?: string; name?: string; code?: string; image?: string };
-type Match = { id: string; status: string; matchDate: string; homeScore?: number; awayScore?: number; homeTeam?: Team | null; awayTeam?: Team | null; groupPhase?: string; group?: string; stage?: string; animationMatchId?: string | number | null };
+type Match = {
+  id: string;
+  status: string;
+  matchDate: string;
+  homeScore?: number | null;
+  awayScore?: number | null;
+  homeTeam?: Team | null;
+  awayTeam?: Team | null;
+  groupPhase?: string;
+  group?: string;
+  stage?: string;
+  animationMatchId?: string | number | null;
+};
 
-const validFilters = ['all', 'yesterday', 'today', 'tomorrow', 'live', 'animation', 'upcoming', 'finished'];
+const validFilters = ['all', 'yesterday', 'today', 'tomorrow', 'animation'];
 
-function normalizeGroupKey(value?: string | null) { return value ? value.replace('Group', '').replace('المجموعة', '').trim().toUpperCase() : 'غير محددة'; }
-function getMatchGroup(match: Match) { return normalizeGroupKey(match.groupPhase || match.group || match.homeTeam?.code || match.awayTeam?.code); }
-function hasAnimation(match: Match) { return Boolean(match.animationMatchId); }
-function isLiveStatus(status?: string) { const value = String(status || '').toUpperCase(); return value === 'IN_PLAY' || value === 'LIVE' || value === 'HT'; }
-function isFinished(status?: string) { return String(status || '').toUpperCase() === 'FINISHED'; }
-function startOfDay(value: Date) { const date = new Date(value); date.setHours(0, 0, 0, 0); return date; }
-function addDays(value: Date, days: number) { const date = new Date(value); date.setDate(date.getDate() + days); return date; }
-function isSameDay(value: string | Date, target: Date) { return startOfDay(new Date(value)).getTime() === startOfDay(target).getTime(); }
-function teamImage(team?: Team | null) { return team?.image?.startsWith?.('http') ? <img src={team.image} alt="" className="h-full w-full object-cover" /> : <span className="text-4xl">{team?.image || '⚽'}</span>; }
+function normalizeGroupKey(value?: string | null) {
+  return value ? value.replace('Group', '').replace('المجموعة', '').trim().toUpperCase() : 'غير محددة';
+}
+
+function getMatchGroup(match: Match) {
+  return normalizeGroupKey(match.groupPhase || match.group || match.homeTeam?.code || match.awayTeam?.code);
+}
+
+function hasAnimation(match: Match) {
+  return Boolean(match.animationMatchId);
+}
+
+function isLiveStatus(status?: string) {
+  const value = String(status || '').toUpperCase();
+  return value === 'IN_PLAY' || value === 'LIVE' || value === 'HT';
+}
+
+function isFinished(status?: string) {
+  return String(status || '').toUpperCase() === 'FINISHED';
+}
+
+function startOfDay(value: Date) {
+  const date = new Date(value);
+  date.setHours(0, 0, 0, 0);
+  return date;
+}
+
+function addDays(value: Date, days: number) {
+  const date = new Date(value);
+  date.setDate(date.getDate() + days);
+  return date;
+}
+
+function isSameDay(value: string | Date, target: Date) {
+  return startOfDay(new Date(value)).getTime() === startOfDay(target).getTime();
+}
+
+function teamImage(team?: Team | null) {
+  if (team?.image?.startsWith?.('http')) {
+    return <img src={team.image} alt={team.name || ''} className="h-full w-full object-cover" />;
+  }
+
+  return <span className="text-3xl">{team?.image || '⚽'}</span>;
+}
 
 export default function MatchesPage() {
   const [matches, setMatches] = useState<Match[]>([]);
@@ -28,10 +75,21 @@ export default function MatchesPage() {
   useEffect(() => {
     const filter = new URLSearchParams(window.location.search).get('filter');
     if (filter && validFilters.includes(filter)) setActiveTab(filter);
-    fetch('/api/matches').then((res) => (res.ok ? res.json() : [])).then((data) => setMatches(Array.isArray(data) ? data : [])).catch(console.error).finally(() => setLoading(false));
+
+    fetch('/api/matches')
+      .then((res) => (res.ok ? res.json() : []))
+      .then((data) => setMatches(Array.isArray(data) ? data : []))
+      .catch(console.error)
+      .finally(() => setLoading(false));
   }, []);
 
-  if (loading) return <div className="flex min-h-screen items-center justify-center bg-background"><div className="h-10 w-10 animate-spin rounded-full border-4 border-primary border-t-transparent" /></div>;
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="h-10 w-10 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+      </div>
+    );
+  }
 
   const today = new Date();
   const yesterday = addDays(today, -1);
@@ -53,23 +111,185 @@ export default function MatchesPage() {
   if (activeTab === 'yesterday') filteredMatches = filteredMatches.filter((m) => isSameDay(m.matchDate, yesterday));
   if (activeTab === 'today') filteredMatches = filteredMatches.filter((m) => isSameDay(m.matchDate, today));
   if (activeTab === 'tomorrow') filteredMatches = filteredMatches.filter((m) => isSameDay(m.matchDate, tomorrow));
-  if (activeTab === 'live') filteredMatches = filteredMatches.filter((m) => isLiveStatus(m.status));
   if (activeTab === 'animation') filteredMatches = filteredMatches.filter((m) => hasAnimation(m));
-  if (activeTab === 'upcoming') filteredMatches = filteredMatches.filter((m) => String(m.status).toUpperCase() === 'SCHEDULED');
-  if (activeTab === 'finished') filteredMatches = filteredMatches.filter((m) => isFinished(m.status));
   if (selectedGroup !== 'all') filteredMatches = filteredMatches.filter((m) => getMatchGroup(m) === selectedGroup);
   filteredMatches.sort((a, b) => new Date(a.matchDate).getTime() - new Date(b.matchDate).getTime());
 
-  const tabs = [{ id: 'all', label: 'الكل' }, { id: 'yesterday', label: 'أمس' }, { id: 'today', label: 'اليوم' }, { id: 'tomorrow', label: 'غدًا' }, { id: 'live', label: 'مباشر' }, { id: 'animation', label: 'بث تفاعلي' }, { id: 'upcoming', label: 'قادمة' }, { id: 'finished', label: 'انتهت' }];
+  const tabs = [
+    { id: 'all', label: 'الكل' },
+    { id: 'yesterday', label: 'أمس' },
+    { id: 'today', label: 'اليوم' },
+    { id: 'tomorrow', label: 'غدًا' },
+    { id: 'animation', label: 'بث تفاعلي' },
+  ];
 
-  return <div className="min-h-screen bg-background pb-20 text-foreground"><main className="mx-auto max-w-7xl px-4 py-6"><section className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3"><p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#0FF0FC]">MC PRIME World Cup</p><h1 className="text-xl font-black text-white md:text-2xl">مركز المباريات</h1><p className="truncate whitespace-nowrap text-xs font-bold text-gray-400 md:text-sm">تابع المواعيد والنتائج وحالة كل مباراة.</p></section><div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-4"><SummaryCard icon={<CalendarDays size={20} />} label="مباريات اليوم" value={todayMatchesCount} active={activeTab === 'today'} onClick={() => applySummaryFilter('today')} hint="فلتر اليوم" /><SummaryCard icon={<Play size={20} />} label="مباشرة الآن" value={liveMatchesCount} active={activeTab === 'live'} onClick={() => applySummaryFilter('live')} hint="فلتر المباشر" /><SummaryCard icon={<Clock size={20} />} label="المباريات المتبقية" value={upcomingMatchesCount} active={activeTab === 'upcoming'} onClick={() => applySummaryFilter('upcoming')} hint="فلتر المتبقي" /><SummaryCard icon={<CheckCircle2 size={20} />} label="انتهت" value={finishedMatchesCount} active={activeTab === 'finished'} onClick={() => applySummaryFilter('finished')} hint="فلتر المنتهية" /></div><div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between"><div className="flex w-full gap-2 overflow-x-auto lg:w-auto">{tabs.map((tab) => <button key={tab.id} onClick={() => applySummaryFilter(tab.id)} className={`whitespace-nowrap rounded-lg px-4 py-2 text-sm font-bold ${activeTab === tab.id ? 'bg-primary text-black' : 'border border-white/5 bg-surface text-gray-400 hover:text-white'}`}>{tab.label}</button>)}</div><label className="flex items-center gap-2 rounded-lg border border-white/10 bg-surface px-3 py-2"><Filter size={16} className="text-primary" /><span className="text-xs font-bold text-gray-500">المجموعة</span><select value={selectedGroup} onChange={(event) => setSelectedGroup(event.target.value)} className="bg-transparent text-sm font-bold text-white focus:outline-none"><option value="all">كل المجموعات</option>{groupOptions.map((group) => <option key={group} value={group}>المجموعة {group}</option>)}</select></label></div>{filteredMatches.length === 0 ? <EmptyMatches /> : <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">{filteredMatches.map((match) => <MatchCard key={match.id} match={match} />)}</div>}</main></div>;
+  return (
+    <div className="min-h-screen bg-background pb-20 text-foreground">
+      <main className="mx-auto max-w-7xl px-4 py-6">
+        <section className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3">
+          <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#0FF0FC]">MC PRIME World Cup</p>
+          <h1 className="text-xl font-black text-white md:text-2xl">مركز المباريات</h1>
+          <p className="truncate whitespace-nowrap text-xs font-bold text-gray-400 md:text-sm">تابع المواعيد والنتائج وحالة كل مباراة.</p>
+        </section>
+
+        <div className="mb-5 grid grid-cols-2 gap-2 md:grid-cols-4 md:gap-3">
+          <SummaryCard
+            icon={<CalendarDays size={18} />}
+            label="مباريات اليوم"
+            value={todayMatchesCount}
+            active={activeTab === 'today'}
+            onClick={() => applySummaryFilter('today')}
+            hint="فلتر اليوم"
+          />
+          <SummaryCard icon={<Play size={18} />} label="مباشرة الآن" value={liveMatchesCount} />
+          <SummaryCard icon={<Clock size={18} />} label="المباريات المتبقية" value={upcomingMatchesCount} />
+          <SummaryCard icon={<CheckCircle2 size={18} />} label="انتهت" value={finishedMatchesCount} />
+        </div>
+
+        <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex w-full gap-2 overflow-x-auto lg:w-auto">
+            {tabs.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => applySummaryFilter(tab.id)}
+                className={`whitespace-nowrap rounded-lg px-4 py-2 text-sm font-bold ${
+                  activeTab === tab.id ? 'bg-primary text-black' : 'border border-white/5 bg-surface text-gray-400 hover:text-white'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          <label className="flex items-center gap-2 rounded-lg border border-white/10 bg-surface px-3 py-2">
+            <Filter size={16} className="text-primary" />
+            <span className="text-xs font-bold text-gray-500">المجموعة</span>
+            <select
+              value={selectedGroup}
+              onChange={(event) => setSelectedGroup(event.target.value)}
+              className="bg-transparent text-sm font-bold text-white focus:outline-none"
+            >
+              <option value="all">كل المجموعات</option>
+              {groupOptions.map((group) => (
+                <option key={group} value={group}>
+                  المجموعة {group}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+
+        {filteredMatches.length === 0 ? (
+          <EmptyMatches />
+        ) : (
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            {filteredMatches.map((match) => (
+              <MatchCard key={match.id} match={match} />
+            ))}
+          </div>
+        )}
+      </main>
+    </div>
+  );
 }
 
-function SummaryCard({ icon, label, value, active, onClick, href, hint }: { icon: React.ReactNode; label: string; value: number | string; active?: boolean; onClick?: () => void; href?: string; hint?: string }) {
-  const className = `group flex min-h-[118px] flex-col items-center justify-center rounded-2xl border p-4 text-center transition hover:-translate-y-0.5 hover:border-[#0FF0FC]/35 hover:bg-white/[0.06] focus:outline-none focus:ring-2 focus:ring-[#0FF0FC]/40 ${active ? 'border-[#0FF0FC]/45 bg-[#0FF0FC]/10' : 'border-white/5 bg-surface'}`;
-  const content = <><div className="mb-2 text-[#0FF0FC]">{icon}</div><p className="mb-1 text-[10px] font-black uppercase tracking-widest text-gray-500 group-hover:text-gray-300">{label}</p><p className="text-2xl font-black text-white">{value}</p>{hint && <span className="mt-2 rounded-full border border-white/10 bg-black/20 px-2 py-1 text-[10px] font-bold text-gray-400">{hint}</span>}</>;
+function SummaryCard({
+  icon,
+  label,
+  value,
+  active,
+  onClick,
+  href,
+  hint,
+}: {
+  icon: ReactNode;
+  label: string;
+  value: number | string;
+  active?: boolean;
+  onClick?: () => void;
+  href?: string;
+  hint?: string;
+}) {
+  const interactive = Boolean(onClick || href);
+  const className = `group flex min-h-[78px] flex-col items-center justify-center rounded-xl border p-2.5 text-center transition focus:outline-none focus:ring-2 focus:ring-[#0FF0FC]/40 md:min-h-[86px] md:p-3 ${
+    interactive ? 'cursor-pointer hover:-translate-y-0.5 hover:border-[#0FF0FC]/35 hover:bg-white/[0.06]' : 'cursor-default'
+  } ${active ? 'border-[#0FF0FC]/45 bg-[#0FF0FC]/10' : 'border-white/5 bg-surface'}`;
+  const content = (
+    <>
+      <div className="mb-1 text-[#0FF0FC]">{icon}</div>
+      <p className="mb-0.5 text-[9px] font-black uppercase tracking-wider text-gray-500 group-hover:text-gray-300 md:text-[10px]">{label}</p>
+      <p className="text-lg font-black leading-none text-white md:text-xl">{value}</p>
+      {hint ? <span className="mt-1 rounded-full border border-white/10 bg-black/20 px-2 py-0.5 text-[9px] font-bold text-gray-400">{hint}</span> : null}
+    </>
+  );
+
   if (href) return <Link href={href} className={className}>{content}</Link>;
-  return <button type="button" onClick={onClick} className={`${className} w-full`}>{content}</button>;
+  if (onClick) return <button type="button" onClick={onClick} className={`${className} w-full`}>{content}</button>;
+  return <div className={className}>{content}</div>;
 }
-function EmptyMatches() { return <div className="rounded-3xl border border-white/5 bg-surface p-12 text-center"><CalendarDays size={64} className="mx-auto mb-6 text-gray-500" /><h2 className="mb-2 text-2xl font-bold text-white">لا توجد مباريات</h2><p className="mx-auto max-w-md text-gray-400">لا توجد مباريات تطابق الفلتر الحالي.</p></div>; }
-function MatchCard({ match }: { match: Match }) { const live = isLiveStatus(match.status); const finished = isFinished(match.status); const scoreVisible = live || finished; return <article className="rounded-3xl border border-white/5 bg-surface p-6"><div className="mb-6 flex flex-wrap items-center justify-between gap-3"><span className={`rounded px-2 py-1 text-xs font-bold ${live ? 'bg-emerald-400/10 text-emerald-300' : finished ? 'bg-gray-500/10 text-gray-400' : 'bg-orange-400/10 text-orange-300'}`}>{live ? 'مباشرة' : finished ? 'انتهت' : 'قريبًا'}</span><span className="text-xs text-gray-400">{new Date(match.matchDate).toLocaleString('ar-EG')}</span></div><div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 text-center"><div><div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center overflow-hidden rounded-full border border-white/10 bg-black/40">{teamImage(match.homeTeam)}</div><h2 className="line-clamp-1 font-black text-white">{match.homeTeam?.name || 'الفريق الأول'}</h2></div><div className="rounded-2xl border border-white/10 bg-black px-4 py-3 text-xl font-black text-[#FFD700]">{scoreVisible ? `${match.homeScore ?? 0} - ${match.awayScore ?? 0}` : 'VS'}</div><div><div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center overflow-hidden rounded-full border border-white/10 bg-black/40">{teamImage(match.awayTeam)}</div><h2 className="line-clamp-1 font-black text-white">{match.awayTeam?.name || 'الفريق الثاني'}</h2></div></div>{hasAnimation(match) && <Link href={`/animation-live/player?matchId=${encodeURIComponent(String(match.animationMatchId))}&dbMatchId=${encodeURIComponent(String(match.id))}`} className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-[#FFD700]/25 bg-[#FFD700]/10 px-4 py-3 text-sm font-black text-[#FFD700]"><Radio size={16} /> دخول البث التفاعلي</Link>}</article>; }
+
+function EmptyMatches() {
+  return (
+    <div className="rounded-3xl border border-white/5 bg-surface p-12 text-center">
+      <CalendarDays size={64} className="mx-auto mb-6 text-gray-500" />
+      <h2 className="mb-2 text-2xl font-bold text-white">لا توجد مباريات</h2>
+      <p className="mx-auto max-w-md text-gray-400">لا توجد مباريات تطابق الفلتر الحالي.</p>
+    </div>
+  );
+}
+
+function MatchCard({ match }: { match: Match }) {
+  const live = isLiveStatus(match.status);
+  const finished = isFinished(match.status);
+  const scoreVisible = live || finished;
+  const matchCenterHref = `/match-center/${encodeURIComponent(String(match.id))}`;
+  const title = `${match.homeTeam?.name || 'الفريق الأول'} ضد ${match.awayTeam?.name || 'الفريق الثاني'}`;
+
+  return (
+    <article className="group relative overflow-hidden rounded-2xl border border-white/5 bg-surface p-4 transition hover:-translate-y-0.5 hover:border-[#0FF0FC]/35 hover:bg-white/[0.04]">
+      <Link href={matchCenterHref} aria-label={`فتح مركز مباراة ${title}`} className="absolute inset-0 z-10 rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#0FF0FC]/40" />
+
+      <div className="relative z-0">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <span
+            className={`rounded px-2 py-1 text-[11px] font-bold ${
+              live ? 'bg-emerald-400/10 text-emerald-300' : finished ? 'bg-gray-500/10 text-gray-400' : 'bg-orange-400/10 text-orange-300'
+            }`}
+          >
+            {live ? 'مباشرة' : finished ? 'انتهت' : 'قريبًا'}
+          </span>
+          <span className="text-[11px] text-gray-400">{new Date(match.matchDate).toLocaleString('ar-EG')}</span>
+        </div>
+
+        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 text-center">
+          <div>
+            <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center overflow-hidden rounded-full border border-white/10 bg-black/40 md:h-14 md:w-14">
+              {teamImage(match.homeTeam)}
+            </div>
+            <h2 className="line-clamp-1 text-sm font-black text-white md:text-base">{match.homeTeam?.name || 'الفريق الأول'}</h2>
+          </div>
+
+          <div className="rounded-xl border border-white/10 bg-black px-3 py-2 text-lg font-black text-[#FFD700] md:text-xl">
+            {scoreVisible ? `${match.homeScore ?? 0} - ${match.awayScore ?? 0}` : 'VS'}
+          </div>
+
+          <div>
+            <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center overflow-hidden rounded-full border border-white/10 bg-black/40 md:h-14 md:w-14">
+              {teamImage(match.awayTeam)}
+            </div>
+            <h2 className="line-clamp-1 text-sm font-black text-white md:text-base">{match.awayTeam?.name || 'الفريق الثاني'}</h2>
+          </div>
+        </div>
+      </div>
+
+      {hasAnimation(match) ? (
+        <Link
+          href={`/animation-live/player?matchId=${encodeURIComponent(String(match.animationMatchId))}&dbMatchId=${encodeURIComponent(String(match.id))}`}
+          className="relative z-20 mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-[#FFD700]/25 bg-[#FFD700]/10 px-4 py-2.5 text-xs font-black text-[#FFD700] transition hover:bg-[#FFD700] hover:text-black"
+        >
+          <Radio size={15} /> دخول البث التفاعلي
+        </Link>
+      ) : null}
+    </article>
+  );
+}
