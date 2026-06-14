@@ -4,14 +4,6 @@ import prisma from '@/lib/prisma';
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://worldcup.mcprim.com';
 
-  const assets = await prisma.asset.findMany({ select: { id: true, type: true } });
-  const assetUrls = assets.map((asset) => ({
-    url: `${baseUrl}/asset/${asset.id}`,
-    lastModified: new Date(),
-    changeFrequency: asset.type === 'TEAM' ? 'daily' as const : 'weekly' as const,
-    priority: asset.type === 'TEAM' ? 0.85 : 0.75,
-  }));
-
   const matches = await prisma.match.findMany({
     select: { id: true, matchDate: true, status: true },
     orderBy: { matchDate: 'asc' },
@@ -32,8 +24,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { route: '/news', freq: 'hourly', prio: 0.85 },
     { route: '/matches', freq: 'hourly', prio: 0.95 },
     { route: '/animation-live', freq: 'hourly', prio: 0.8 },
-    { route: '/teams', freq: 'daily', prio: 0.85 },
-    { route: '/players', freq: 'daily', prio: 0.75 },
     { route: '/groups', freq: 'always', prio: 0.85 },
     { route: '/team-intelligence', freq: 'weekly', prio: 0.75 },
   ].map((page) => ({
@@ -45,7 +35,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   return [
     ...staticPages,
-    ...assetUrls,
     ...matchCenterUrls,
   ];
 }
