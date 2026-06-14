@@ -1,3 +1,5 @@
+import { countProviderRequestsSince, getProviderQuotaBlock, recordProviderRequest } from '@/lib/provider-quota-guard';
+
 type FootballParams = Record<string, string | number | boolean | undefined | null>;
 
 type Provider = 'ISPORTS';
@@ -30,6 +32,63 @@ function getApiKeys() {
 
 function getBaseUrl() {
   return process.env.ISPORTS_BASE_URL || 'http://api.isportsapi.com';
+}
+
+function getIsportsSoftLimit() {
+  const value = Number(process.env.ISPORTS_DAILY_SOFT_LIMIT || 120);
+  if (!Number.isFinite(value)) return 120;
+  return Math.max(0, Math.floor(value));
+}
+
+function rollingUsageWindowStart() {
+  return new Date(Date.now() - 24 * 60 * 60 * 1000);
+}
+
+function providerMatchIdFromParams(params: FootballParams = {}) {
+  const value = Number(params.fixture || params.matchId || params.id || 0);
+  return Number.isFinite(value) && value > 0 ? value : null;
+}
+
+async function assertIsportsCanRequest(path: string, params: FootballParams = {}) {
+  const guard = await getProviderQuotaBlock('ISPORTS');
+  if (guard) {
+    throw new ApiFootballError(
+      'ISPORTS quota guard active',
+      429,
+      { reason: guard.reason, blockedUntil: guard.blockedUntil, localGuard: true },
+      undefined,
+      'ISPORTS',
+    );
+  }
+
+  const softLimit = getIsportsSoftLimit();
+  if (softLimit <= 0) return;
+
+  const used = await countProviderRequestsSince('ISPORTS', rollingUsageWindowStart());
+  if (used >= softLimit) {
+    throw new ApiFootballError(
+      `ISPORTS local soft daily limit reached (${used}/${softLimit}). External request skipped before provider quota is exhausted.`,
+      429,
+      { used, softLimit, path, providerMatchId: providerMatchIdFromParams(params), localSoftLimit: true },
+      undefined,
+      'ISPORTS',
+    );
+  }
+}
+
+async function safeRecordIsportsRequest(params: FootballParams, path: string, status: number | null, ok: boolean, reason?: string) {
+  try {
+    await recordProviderRequest({
+      provider: 'ISPORTS',
+      route: path,
+      providerMatchId: providerMatchIdFromParams(params),
+      status,
+      ok,
+      reason,
+    });
+  } catch (error) {
+    console.warn('provider request log failed:', error);
+  }
 }
 
 function mapIsportsPath(path: string) {
@@ -186,6 +245,9 @@ function normalizeIsportsPayload(path: string, payload: any, params?: FootballPa
 async function fetchIsports<T>(path: string, params: FootballParams = {}): Promise<T> {
   const keys = getApiKeys();
   if (keys.length === 0) throw new ApiFootballError('ISPORTS_API_KEY/ISPORTS_API_KEYS is missing', undefined, undefined, undefined, 'ISPORTS');
+
+  await assertIsportsCanRequest(path, params);
+
   const errors: ApiFootballError[] = [];
   for (let keyIndex = 0; keyIndex < keys.length; keyIndex += 1) {
     const apiKey = keys[keyIndex];
@@ -193,7 +255,10 @@ async function fetchIsports<T>(path: string, params: FootballParams = {}): Promi
     const response = await fetch(url, { method: 'GET', cache: 'no-store', headers: { accept: 'application/json' } });
     let payload: any = null;
     try { payload = await response.json(); } catch { payload = null; }
+
     if (!response.ok) {
+      const reason = JSON.stringify(payload || {}).slice(0, 500) || `HTTP ${response.status}`;
+      await safeRecordIsportsRequest(params, path, response.status, false, reason);
       const error = new ApiFootballError(`ISPORTS request failed with status ${response.status}`, response.status, payload, keyIndex, 'ISPORTS');
       errors.push(error);
       if (isQuotaOrRateLimitError(response.status, payload) && keyIndex < keys.length - 1) continue;
@@ -201,11 +266,14 @@ async function fetchIsports<T>(path: string, params: FootballParams = {}): Promi
     }
     if (isProviderError(payload)) {
       const providerErrors = getProviderErrorPayload(payload);
+      await safeRecordIsportsRequest(params, path, response.status, false, typeof providerErrors === 'string' ? providerErrors : JSON.stringify(providerErrors || {}));
       const error = new ApiFootballError('ISPORTS returned errors', response.status, providerErrors, keyIndex, 'ISPORTS');
       errors.push(error);
       if (isQuotaOrRateLimitError(response.status, providerErrors) && keyIndex < keys.length - 1) continue;
       throw error;
     }
+
+    await safeRecordIsportsRequest(params, path, response.status, true);
     return normalizeIsportsPayload(path, payload, params) as T;
   }
   const lastError = errors[errors.length - 1];
