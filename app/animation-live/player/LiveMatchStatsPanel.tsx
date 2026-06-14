@@ -37,6 +37,11 @@ type LiveEventsResponse = {
   error?: string;
 };
 
+type Props = {
+  matchId?: string | number | null;
+  dbMatchId?: string | number | null;
+};
+
 const STATS_POLL_MS = 5 * 60 * 1000;
 const EVENTS_POLL_MS = 30 * 1000;
 
@@ -61,7 +66,7 @@ function percentPair(home: number | null, away: number | null) {
 function StatRow({ label, home, away, accent = false }: { label: string; home: number | null; away: number | null; accent?: boolean }) {
   const { homePct, awayPct } = percentPair(home, away);
   return (
-    <div className="rounded-2xl border border-white/8 bg-black/25 p-3">
+    <div className="rounded-2xl border border-white/10 bg-black/25 p-3">
       <div className="mb-2 grid grid-cols-[42px_1fr_42px] items-center gap-3 text-xs font-black">
         <span className={accent ? 'text-[#FFD700]' : 'text-white'}>{displayNumber(home)}</span>
         <span className="text-center text-gray-400">{label}</span>
@@ -109,17 +114,25 @@ function unavailableStatsMessage(data: LiveStatsResponse | null, hasStats: boole
   return 'لا توجد أرقام إحصائية محفوظة لهذه المباراة بعد. ستظهر تلقائيًا عند وصول لقطة موثقة من مزود الإحصائيات.';
 }
 
-export default function LiveMatchStatsPanel({ matchId }: { matchId: string }) {
+function buildQueryString(matchId?: string | number | null, dbMatchId?: string | number | null) {
+  const params = new URLSearchParams();
+  if (matchId) params.set('matchId', String(matchId));
+  if (dbMatchId) params.set('dbMatchId', String(dbMatchId));
+  return params.toString();
+}
+
+export default function LiveMatchStatsPanel({ matchId, dbMatchId }: Props) {
   const [data, setData] = useState<LiveStatsResponse | null>(null);
   const [events, setEvents] = useState<MatchEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [eventsUpdatedAt, setEventsUpdatedAt] = useState<string | null>(null);
+  const queryString = useMemo(() => buildQueryString(matchId, dbMatchId), [matchId, dbMatchId]);
 
   async function fetchStats() {
-    if (!matchId) return;
+    if (!queryString) return;
     try {
-      const response = await fetch(`/api/matches/live-stats?matchId=${encodeURIComponent(matchId)}`, { cache: 'no-store' });
+      const response = await fetch(`/api/matches/live-stats?${queryString}`, { cache: 'no-store' });
       const json = await response.json();
       setData(json);
       setError(json?.ok ? null : json?.error || 'تعذر تحميل الإحصائيات');
@@ -131,20 +144,21 @@ export default function LiveMatchStatsPanel({ matchId }: { matchId: string }) {
   }
 
   async function fetchImportantEvents() {
-    if (!matchId) return;
+    if (!queryString) return;
     try {
-      const response = await fetch(`/api/matches/live-events?matchId=${encodeURIComponent(matchId)}`, { cache: 'no-store' });
+      const response = await fetch(`/api/matches/live-events?${queryString}`, { cache: 'no-store' });
       const json: LiveEventsResponse = await response.json();
       if (json?.ok) {
         setEvents(json.events || []);
         setEventsUpdatedAt(json.updatedAt || new Date().toISOString());
       }
     } catch {
-      // keep the latest saved events visible; this endpoint is intentionally lightweight and database-only
+      // Keep the latest saved events visible; this endpoint is intentionally lightweight and database-first.
     }
   }
 
   useEffect(() => {
+    if (!queryString) return;
     fetchStats();
     fetchImportantEvents();
     const statsTimer = window.setInterval(fetchStats, STATS_POLL_MS);
@@ -153,7 +167,7 @@ export default function LiveMatchStatsPanel({ matchId }: { matchId: string }) {
       window.clearInterval(statsTimer);
       window.clearInterval(eventsTimer);
     };
-  }, [matchId]);
+  }, [queryString]);
 
   const latest = data?.latest || null;
   const match = data?.match;
@@ -167,7 +181,7 @@ export default function LiveMatchStatsPanel({ matchId }: { matchId: string }) {
     return { homeScore, awayScore };
   }, [latest, match]);
 
-  if (!matchId) return null;
+  if (!queryString) return null;
 
   return (
     <section className="rounded-2xl border border-white/10 bg-white/[0.035] p-4 shadow-card">
@@ -176,6 +190,7 @@ export default function LiveMatchStatsPanel({ matchId }: { matchId: string }) {
           <p className="inline-flex items-center gap-2 rounded-full border border-[#0FF0FC]/25 bg-[#0FF0FC]/10 px-3 py-1 text-[10px] font-black text-[#0FF0FC]"><Activity size={13} /> Live Stats Recorder</p>
           <h2 className="mt-2 text-xl font-black text-white">إحصائيات المباراة</h2>
           <p className="mt-1 text-xs leading-5 text-gray-400">لا يتم اختراع أرقام. عند غياب مزود الإحصائيات نعرض النتيجة والأحداث المتاحة فقط.</p>
+          <p className="mt-2 text-[11px] font-bold leading-5 text-gray-500">الخطة: iSports للإحصائيات التفصيلية عند توفره، Football-Data/قاعدة البيانات للنتيجة والحالة، والأحداث المهمة تحفظ من المصدر أو من تغيّر اللقطات فقط.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2 text-xs font-black">
           <span className="rounded-full border border-white/10 bg-black/30 px-3 py-1 text-gray-300"><Clock size={13} className="inline" /> إحصائيات: {data?.updatedAt ? new Date(data.updatedAt).toLocaleTimeString('ar-EG') : '—'}</span>
@@ -196,7 +211,7 @@ export default function LiveMatchStatsPanel({ matchId }: { matchId: string }) {
                 <div className="min-w-0 text-right">
                   <div className="truncate text-lg font-black text-white">{match?.homeTeam?.name || 'الفريق الأول'}</div>
                 </div>
-                <div className="rounded-2xl border border-[#FFD700]/25 bg-[#FFD700]/10 px-5 py-3 text-3xl font-black text-[#FFD700] tabular-nums">{derived.homeScore} - {derived.awayScore}</div>
+                <div className="rounded-2xl border border-[#FFD700]/25 bg-[#FFD700]/10 px-5 py-3 text-3xl font-black text-[#FFD700] tabular-nums">{displayNumber(derived.homeScore)} - {displayNumber(derived.awayScore)}</div>
                 <div className="min-w-0 text-left">
                   <div className="truncate text-lg font-black text-white">{match?.awayTeam?.name || 'الفريق الثاني'}</div>
                 </div>
@@ -236,7 +251,7 @@ export default function LiveMatchStatsPanel({ matchId }: { matchId: string }) {
             </div>
             <div className="max-h-[520px] space-y-2 overflow-y-auto pr-1">
               {events.length ? events.map((event) => (
-                <div key={event.id} className="rounded-xl border border-white/8 bg-white/[0.035] p-3">
+                <div key={event.id} className="rounded-xl border border-white/10 bg-white/[0.035] p-3">
                   <div className="flex items-center gap-2 text-xs font-black text-[#FFD700]"><span>{eventIcon(event.type)}</span>{event.minute ? `د${event.minute}` : 'حدث'}<span className="text-gray-600">•</span><span>{event.sourceName || 'Live'}</span></div>
                   <p className="mt-1 text-sm leading-6 text-gray-200">{event.detail}</p>
                 </div>
@@ -253,7 +268,7 @@ export default function LiveMatchStatsPanel({ matchId }: { matchId: string }) {
 
 function StatMini({ icon, label, home, away }: { icon: ReactNode; label: string; home: number | null; away: number | null }) {
   return (
-    <div className="rounded-2xl border border-white/8 bg-black/25 p-3 text-center">
+    <div className="rounded-2xl border border-white/10 bg-black/25 p-3 text-center">
       <div className="mb-2 flex justify-center text-[#FFD700]">{icon}</div>
       <div className="text-[11px] font-bold text-gray-500">{label}</div>
       <div className="mt-1 text-sm font-black text-white tabular-nums">{displayNumber(home)} - {displayNumber(away)}</div>
