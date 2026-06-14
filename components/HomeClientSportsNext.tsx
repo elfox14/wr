@@ -47,13 +47,8 @@ const heroActions = [
   ['التحليلات', '/news'],
 ] as const;
 
-const featureCards = [
-  ['المجموعات', 'عرض مجموعات كأس العالم 2026 وترتيب المنتخبات داخل كل مجموعة.', '/groups'],
-  ['دليل المنتخبات', 'صفحات خاصة لكل منتخب تشمل المعلومات الأساسية، الأداء، أبرز الأسماء، والتحليل المتاح.', '/teams'],
-  ['الأخبار والتحليل', 'تقارير رياضية وتحليل فني منفصل عن أي جانب ترفيهي أو افتراضي.', '/news'],
-  ['الإحصائيات', 'أرقام البطولة، المنتخبات، المباريات، والأداء عند توفر مصادر موثوقة.', '/players'],
-  ['البث التفاعلي', 'متابعة تفاعلية للمباريات عند توفر البيانات الحية والرسوم الزمنية.', '/animation-live'],
-] as const;
+const groupLetters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L'];
+const featuredTeamChips = ['المستضيفون', 'العرب', 'أوروبا', 'أمريكا الجنوبية'];
 
 function formatCount(value?: number, fallback = 0) {
   return new Intl.NumberFormat('ar-EG').format(value && value > 0 ? value : fallback);
@@ -132,10 +127,6 @@ function isSameCalendarDay(value?: string | Date | null, target = new Date()) {
 function matchTime(match: HomeMatch) {
   const date = match.matchDate ? new Date(match.matchDate) : null;
   return date && !Number.isNaN(date.getTime()) ? date.getTime() : Number.MAX_SAFE_INTEGER;
-}
-
-function matchScore(match: HomeMatch) {
-  return `${Number(match.homeScore || 0)} - ${Number(match.awayScore || 0)}`;
 }
 
 function formatCountdown(diffMs: number) {
@@ -353,22 +344,86 @@ function HomeMatchCenterCard({ fallbackMatches, upcomingMatchesCount }: { fallba
 
 function SmartFeatureGrid() {
   return (
-    <section className="mt-5" aria-label="روابط أقسام كأس العالم 2026">
+    <section className="mt-5" aria-label="أقسام كأس العالم 2026 التفاعلية">
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-        {featureCards.map(([title, text, href]) => (
-          <Link
-            key={title}
-            href={href}
-            className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.045] p-4 transition duration-200 hover:-translate-y-1 hover:border-[#0FF0FC]/35 hover:bg-white/[0.07]"
-          >
-            <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#0FF0FC]/50 to-transparent opacity-0 transition group-hover:opacity-100" />
-            <div className="flex items-start justify-between gap-4">
-              <h3 className="text-base font-black text-white">{title}</h3>
-              <span className="rounded-full border border-white/10 bg-black/25 px-2.5 py-1 text-[10px] font-black text-[#FFD700]">2026</span>
-            </div>
-            <p className="mt-2 text-xs font-bold leading-6 text-gray-400">{text}</p>
-          </Link>
-        ))}
+        <Link href="/groups" className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.045] p-4 transition duration-200 hover:-translate-y-1 hover:border-[#0FF0FC]/35 hover:bg-white/[0.07]">
+          <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#0FF0FC]/50 to-transparent opacity-0 transition group-hover:opacity-100" />
+          <div className="flex items-start justify-between gap-4">
+            <h3 className="text-base font-black text-white">المجموعات</h3>
+            <span className="rounded-full border border-white/10 bg-black/25 px-2.5 py-1 text-[10px] font-black text-[#FFD700]">2026</span>
+          </div>
+          <p className="mt-2 text-xs font-bold leading-6 text-gray-400">ترتيب مجموعات كأس العالم 2026، النقاط، الأهداف، وحالة المنافسة داخل كل مجموعة.</p>
+          <div className="mt-3 grid grid-cols-6 gap-1.5">
+            {groupLetters.map((group) => <span key={group} className="rounded-lg border border-white/10 bg-black/25 py-1 text-center text-[10px] font-black text-[#0FF0FC]">{group}</span>)}
+          </div>
+          <div className="mt-3 text-[11px] font-black text-[#FFD700]">عرض المجموعات ←</div>
+        </Link>
+
+        <Link href="/teams" className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.045] p-4 transition duration-200 hover:-translate-y-1 hover:border-[#0FF0FC]/35 hover:bg-white/[0.07]">
+          <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#0FF0FC]/50 to-transparent opacity-0 transition group-hover:opacity-100" />
+          <div className="flex items-start justify-between gap-4">
+            <h3 className="text-base font-black text-white">دليل المنتخبات</h3>
+            <span className="rounded-full border border-white/10 bg-black/25 px-2.5 py-1 text-[10px] font-black text-[#FFD700]">48 منتخب</span>
+          </div>
+          <p className="mt-2 text-xs font-bold leading-6 text-gray-400">كل منتخب في صفحة واحدة: بطاقة أساسية، قائمة، أداء، أسماء بارزة، وتحليل موثق.</p>
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            {featuredTeamChips.map((chip) => <span key={chip} className="rounded-full border border-white/10 bg-black/25 px-2.5 py-1 text-[10px] font-black text-gray-300">{chip}</span>)}
+          </div>
+          <div className="mt-3 text-[11px] font-black text-[#FFD700]">استكشف المنتخبات ←</div>
+        </Link>
+
+        <Link href="/news" className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.045] p-4 transition duration-200 hover:-translate-y-1 hover:border-[#0FF0FC]/35 hover:bg-white/[0.07]">
+          <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#0FF0FC]/50 to-transparent opacity-0 transition group-hover:opacity-100" />
+          <div className="flex items-start justify-between gap-4">
+            <h3 className="text-base font-black text-white">الأخبار والتحليل</h3>
+            <span className="rounded-full border border-emerald-400/20 bg-emerald-400/10 px-2.5 py-1 text-[10px] font-black text-emerald-200">تحليل رياضي</span>
+          </div>
+          <p className="mt-2 text-xs font-bold leading-6 text-gray-400">أخبار البطولة وتحليل فني رياضي فقط، بعيدًا عن أي توصيات أو جانب تجاري.</p>
+          <div className="mt-3 rounded-xl border border-white/10 bg-black/25 p-3">
+            <p className="text-[10px] font-black text-[#0FF0FC]">آخر التغطيات</p>
+            <p className="mt-1 text-xs font-bold leading-5 text-white">تقارير، قراءة تكتيكية، ومتابعة يومية عند توفر المصادر.</p>
+          </div>
+          <div className="mt-3 text-[11px] font-black text-[#FFD700]">قراءة التحليلات ←</div>
+        </Link>
+
+        <Link href="/players" className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.045] p-4 transition duration-200 hover:-translate-y-1 hover:border-[#0FF0FC]/35 hover:bg-white/[0.07]">
+          <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#0FF0FC]/50 to-transparent opacity-0 transition group-hover:opacity-100" />
+          <div className="flex items-start justify-between gap-4">
+            <h3 className="text-base font-black text-white">الإحصائيات</h3>
+            <span className="rounded-full border border-white/10 bg-black/25 px-2.5 py-1 text-[10px] font-black text-[#FFD700]">Data</span>
+          </div>
+          <p className="mt-2 text-xs font-bold leading-6 text-gray-400">أرقام المباريات والمنتخبات واللاعبين عند توفر مصادر موثوقة وبيانات محدثة.</p>
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            {['الأهداف', 'النتائج', 'اللاعبون', 'المنتخبات'].map((item) => <span key={item} className="rounded-xl border border-white/10 bg-black/25 px-2 py-2 text-center text-[10px] font-black text-gray-300">{item}</span>)}
+          </div>
+          <div className="mt-3 text-[11px] font-black text-[#FFD700]">عرض الإحصائيات ←</div>
+        </Link>
+
+        <Link href="/animation-live" className="group relative overflow-hidden rounded-2xl border border-red-400/20 bg-red-500/[0.055] p-4 transition duration-200 hover:-translate-y-1 hover:border-red-300/45 hover:bg-red-500/[0.08]">
+          <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-red-300/50 to-transparent opacity-70" />
+          <div className="flex items-start justify-between gap-4">
+            <h3 className="text-base font-black text-white">البث التفاعلي</h3>
+            <span className="rounded-full border border-red-300/20 bg-red-400/10 px-2.5 py-1 text-[10px] font-black text-red-100">LIVE</span>
+          </div>
+          <p className="mt-2 text-xs font-bold leading-6 text-gray-300">متابعة مرئية للمباريات الجارية والقريبة عند توفر بيانات حية ورسوم زمنية.</p>
+          <div className="mt-3 rounded-xl border border-red-300/15 bg-black/25 p-3 text-center">
+            <span className="inline-flex items-center gap-2 text-[11px] font-black text-red-100"><span className="h-2 w-2 animate-pulse rounded-full bg-red-300" /> صفحة البث المباشر</span>
+          </div>
+          <div className="mt-3 text-[11px] font-black text-[#FFD700]">دخول البث الآن ←</div>
+        </Link>
+
+        <Link href="/matches" className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.045] p-4 transition duration-200 hover:-translate-y-1 hover:border-[#0FF0FC]/35 hover:bg-white/[0.07]">
+          <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#0FF0FC]/50 to-transparent opacity-0 transition group-hover:opacity-100" />
+          <div className="flex items-start justify-between gap-4">
+            <h3 className="text-base font-black text-white">الدول المستضيفة</h3>
+            <span className="rounded-full border border-white/10 bg-black/25 px-2.5 py-1 text-[10px] font-black text-[#FFD700]">3 دول</span>
+          </div>
+          <p className="mt-2 text-xs font-bold leading-6 text-gray-400">أمريكا، كندا، والمكسيك ضمن نسخة تاريخية موزعة على ثلاث دول مستضيفة.</p>
+          <div className="mt-3 grid grid-cols-3 gap-2">
+            {['أمريكا', 'كندا', 'المكسيك'].map((country) => <span key={country} className="rounded-xl border border-white/10 bg-black/25 px-2 py-2 text-center text-[10px] font-black text-gray-300">{country}</span>)}
+          </div>
+          <div className="mt-3 text-[11px] font-black text-[#FFD700]">متابعة الجدول ←</div>
+        </Link>
       </div>
     </section>
   );
