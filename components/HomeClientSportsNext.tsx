@@ -2,9 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useStore } from '@/lib/store';
 import { AssetImage } from '@/components/ui/AssetImage';
-import { ArrowLeft, BarChart3, Calendar, Clock, FileText, Globe, LineChart, Newspaper, Radio, Share2, ShieldCheck, Sparkles, Trophy, Users, Wallet } from 'lucide-react';
+import { ArrowLeft, BarChart3, Calendar, Clock, FileText, Globe, LineChart, Newspaper, Radio, ShieldCheck, Sparkles, Trophy, Users } from 'lucide-react';
 
 type AcademyArticle = { id: string; title: string; excerpt: string; category: string; readingTime?: string };
 type Props = { initialAssets: any[]; upcomingMatches?: any[]; assetsCount?: number; playersCount?: number; teamsCount?: number; upcomingMatchesCount?: number; academyArticles?: AcademyArticle[] };
@@ -103,22 +102,6 @@ function countdown(match: any, now: number) {
   return days > 0 ? `${days} يوم ${pad(hours)}:${pad(minutes)}:${pad(seconds)}` : `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
 }
 
-function price(asset: any) {
-  const value = Number(asset?.marketPrice ?? asset?.currentPrice ?? asset?.price ?? asset?.fairValue ?? 0);
-  return Number.isFinite(value) && value > 0 ? value : 0;
-}
-
-function change(asset: any) {
-  const value = Number(asset?.priceChange24h ?? asset?.change24h ?? asset?.priceChange ?? asset?.momentum ?? 0);
-  return Number.isFinite(value) ? value : 0;
-}
-
-function changeText(value: number) {
-  if (value > 0) return `▲ ${value.toLocaleString('ar-EG', { maximumFractionDigits: 1 })}%`;
-  if (value < 0) return `▼ ${Math.abs(value).toLocaleString('ar-EG', { maximumFractionDigits: 1 })}%`;
-  return 'مستقر';
-}
-
 function shuffleTeams(teams: any[]) {
   return [...teams].sort(() => Math.random() - 0.5).slice(0, 4);
 }
@@ -145,10 +128,6 @@ export default function HomeClientSportsNext({ initialAssets, upcomingMatches = 
   const [now, setNow] = useState(() => Date.now());
   const [matches, setMatches] = useState<any[]>(() => (Array.isArray(upcomingMatches) ? upcomingMatches : []));
   const [spotlightTeams, setSpotlightTeams] = useState<any[]>([]);
-
-  useEffect(() => {
-    useStore.setState({ assets: initialAssets, loading: false });
-  }, [initialAssets]);
 
   useEffect(() => {
     setMatches(Array.isArray(upcomingMatches) ? upcomingMatches : []);
@@ -188,7 +167,6 @@ export default function HomeClientSportsNext({ initialAssets, upcomingMatches = 
   const hasLive = topMatches.some((match) => isLive(match, now));
   const secondMatch = currentMatch ? (currentIsLive ? pickNext(safeMatches, currentMatch, now) : topMatches.find((match) => match !== currentMatch) || pickNext(safeMatches, currentMatch, now)) : null;
   const stripMatch = secondMatch || (!currentIsLive ? currentMatch : null);
-  const marketMovers = [...assets].sort((a, b) => Math.abs(change(b)) - Math.abs(change(a))).slice(0, 3);
 
   useEffect(() => {
     setSpotlightTeams(shuffleTeams(teams));
@@ -210,7 +188,7 @@ export default function HomeClientSportsNext({ initialAssets, upcomingMatches = 
 
   const teamHref = (team: any) => {
     const asset = findTeamAsset(team);
-    return asset?.id ? `/asset/${asset.id}` : '/market?type=TEAM';
+    return asset?.id ? `/asset/${asset.id}` : '/teams';
   };
 
   const teamLogo = (team: any, compact = false) => {
@@ -227,15 +205,6 @@ export default function HomeClientSportsNext({ initialAssets, upcomingMatches = 
         />
       </Link>
     );
-  };
-
-  const shareAssetOpinion = async (asset: any) => {
-    const text = `رأيي في ${asset?.name || 'هذا المنتخب'} على بورصة المونديال: هل تتوقع أداءً قويًا في كأس العالم؟`;
-    const url = `${window.location.origin}${asset?.id ? `/asset/${asset.id}` : '/market'}`;
-    try {
-      if (navigator.share) await navigator.share({ title: 'بورصة المونديال', text, url });
-      else await navigator.clipboard.writeText(`${text} ${url}`);
-    } catch {}
   };
 
   const matchCard = (match: any, options?: { title?: string; compact?: boolean; countdown?: boolean }) => {
@@ -298,7 +267,7 @@ export default function HomeClientSportsNext({ initialAssets, upcomingMatches = 
   };
 
   const assetCard = (asset: any, label: string) => (
-    <Link key={asset.id || asset.name} href={asset?.id ? `/asset/${asset.id}` : '/market'} className="flex items-center gap-3 rounded-2xl border border-white/8 bg-black/25 p-3 transition hover:border-[#0FF0FC]/25 hover:bg-white/[0.055]">
+    <Link key={asset.id || asset.name} href={asset?.id ? `/asset/${asset.id}` : label === 'منتخب' ? '/teams' : '/players'} className="flex items-center gap-3 rounded-2xl border border-white/8 bg-black/25 p-3 transition hover:border-[#0FF0FC]/25 hover:bg-white/[0.055]">
       <AssetImage image={asset?.image} name={asset?.name || label} type={asset?.type || 'TEAM'} width={42} height={42} className="h-11 w-11 rounded-full border border-white/10 bg-black/40 object-cover" />
       <div className="min-w-0"><div className="truncate text-sm font-black text-white">{asset?.name || label}</div><div className="mt-1 text-[11px] font-bold text-gray-500">{label}</div></div>
     </Link>
@@ -307,7 +276,7 @@ export default function HomeClientSportsNext({ initialAssets, upcomingMatches = 
   const heroStats = [
     { label: 'منتخب', value: teamsCount || 48, icon: Globe },
     { label: 'لاعب', value: playersCount || 1249, icon: Users },
-    { label: 'أصل افتراضي', value: assetsCount || 1297, icon: Wallet },
+    { label: 'ملف رياضي', value: assetsCount || 1297, icon: FileText },
     { label: 'مباراة', value: upcomingMatchesCount || 71, icon: Calendar },
   ];
 
@@ -316,18 +285,18 @@ export default function HomeClientSportsNext({ initialAssets, upcomingMatches = 
     { title: 'البوابة', subtitle: 'دليل سريع', href: '#worldcup-gateway', icon: Sparkles, tone: 'border-[#0FF0FC]/25 bg-[#0FF0FC]/10 text-[#0FF0FC]' },
     { title: 'الأخبار', subtitle: 'موثق وسريع', href: '#news', icon: Newspaper, tone: 'border-[#FFD700]/25 bg-[#FFD700]/10 text-[#FFD700]' },
     { title: 'التحليل', subtitle: 'قبل وبعد', href: '#analysis', icon: LineChart, tone: 'border-[#0FF0FC]/25 bg-[#0FF0FC]/10 text-[#0FF0FC]' },
-    { title: 'المنتخبات', subtitle: 'بطاقات وقوائم', href: '#teams', icon: Trophy, tone: 'border-emerald-400/25 bg-emerald-400/10 text-emerald-300' },
-    { title: 'البورصة', subtitle: 'ترفيه افتراضي', href: '#fan-exchange', icon: BarChart3, tone: 'border-violet-400/25 bg-violet-400/10 text-violet-300' },
+    { title: 'المنتخبات', subtitle: 'بطاقات وقوائم', href: '/teams', icon: Trophy, tone: 'border-emerald-400/25 bg-emerald-400/10 text-emerald-300' },
+    { title: 'المجموعات', subtitle: 'ترتيب ومواقف', href: '/groups', icon: BarChart3, tone: 'border-violet-400/25 bg-violet-400/10 text-violet-300' },
   ];
 
   const gatewayCards = [
     { title: 'مركز المباريات', text: 'مواعيد، نتائج، مباريات اليوم، وحالة كل مباراة عند توفر البيانات الحية.', href: '/matches', icon: Radio, tone: 'border-red-400/25 bg-red-500/[0.07] text-red-300' },
     { title: 'المجموعات', text: 'عرض مجموعات كأس العالم 2026 وترتيب المنتخبات داخل كل مجموعة.', href: '/groups', icon: Trophy, tone: 'border-emerald-400/25 bg-emerald-400/[0.07] text-emerald-300' },
-    { title: 'دليل المنتخبات', text: 'صفحات خاصة لكل منتخب تشمل المعلومات الأساسية، الأداء، أبرز الأسماء، والتحليل المتاح.', href: '/market?type=TEAM', icon: ShieldCheck, tone: 'border-[#0FF0FC]/25 bg-[#0FF0FC]/[0.07] text-[#0FF0FC]' },
+    { title: 'دليل المنتخبات', text: 'صفحات خاصة لكل منتخب تشمل المعلومات الأساسية، الأداء، أبرز الأسماء، والتحليل المتاح.', href: '/teams', icon: ShieldCheck, tone: 'border-[#0FF0FC]/25 bg-[#0FF0FC]/[0.07] text-[#0FF0FC]' },
+    { title: 'دليل اللاعبين', text: 'ملفات اللاعبين والقوائم المتاحة دون أسعار أو تداول أو توصيات.', href: '/players', icon: Users, tone: 'border-white/15 bg-white/[0.045] text-gray-200' },
     { title: 'المدن والملاعب', text: 'تعريف بالمدن المستضيفة والملاعب التي ستقام عليها مباريات البطولة.', href: '#host-cities', icon: Globe, tone: 'border-white/15 bg-white/[0.045] text-gray-200' },
     { title: 'الإحصائيات', text: 'أرقام البطولة، المنتخبات، المباريات، والأداء عند توفر مصادر موثوقة.', href: '/methodology', icon: BarChart3, tone: 'border-violet-400/25 bg-violet-400/[0.07] text-violet-300' },
-    { title: 'الأخبار والتحليل', text: 'تقارير رياضية وتحليل فني منفصل عن أي جانب ترفيهي أو افتراضي.', href: '/articles', icon: Newspaper, tone: 'border-[#FFD700]/25 bg-[#FFD700]/[0.07] text-[#FFD700]' },
-    { title: 'البورصة الافتراضية', text: 'تجربة تفاعلية ترفيهية مستوحاة من البطولة، بدون أموال حقيقية أو مراهنات أو توصيات شراء وبيع.', href: '/market', icon: Wallet, tone: 'border-orange-400/25 bg-orange-400/[0.07] text-orange-300' },
+    { title: 'الأخبار والتحليل', text: 'تقارير رياضية وتحليل فني بعيد تمامًا عن أي جانب تجاري أو تداولي.', href: '/articles', icon: Newspaper, tone: 'border-[#FFD700]/25 bg-[#FFD700]/[0.07] text-[#FFD700]' },
   ];
 
   const analysisCards = [
@@ -338,13 +307,13 @@ export default function HomeClientSportsNext({ initialAssets, upcomingMatches = 
 
   const groupCards = [
     { title: 'ترتيب المجموعات', text: 'مدخل سريع لفهم موقف كل منتخب داخل مجموعته.', href: '/groups' },
-    { title: 'صفحات المنتخبات', text: 'بطاقة المنتخب، القائمة، التحليل، والمصادر المتاحة.', href: '/market?type=TEAM' },
+    { title: 'صفحات المنتخبات', text: 'بطاقة المنتخب، القائمة، التحليل، والمصادر المتاحة.', href: '/teams' },
     { title: 'مسار البطولة', text: 'انتقل من المباراة إلى المجموعة ثم إلى صفحة المنتخب.', href: '/matches' },
   ];
 
   return (
-    <main className="mx-auto max-w-7xl space-y-4 px-4 py-4 sm:px-6 sm:py-5 lg:space-y-5 lg:px-8">
-      <section className="overflow-hidden rounded-[1.35rem] border border-white/10 bg-black/40 p-3 backdrop-blur-xl">
+    <main className="mx-auto max-w-7xl space-y-4 px-4 py-4 sm:px-6 sm:py-5 lg:space-y-5">
+      <section className="rounded-[1.35rem] border border-white/10 bg-black/35 p-3 shadow-anti-gravity lg:hidden">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
           <span className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-black ${hasLive ? 'border-emerald-400/30 bg-emerald-400/10 text-emerald-300' : 'border-[#0FF0FC]/25 bg-[#0FF0FC]/10 text-[#0FF0FC]'}`}>
             <span className={`h-2 w-2 rounded-full ${hasLive ? 'animate-pulse bg-emerald-400' : 'bg-[#0FF0FC]'}`} />
@@ -390,11 +359,11 @@ export default function HomeClientSportsNext({ initialAssets, upcomingMatches = 
         <div className="relative grid gap-4 lg:grid-cols-[0.96fr_1.04fr] lg:items-start">
           <div className="flex flex-col justify-start pt-1">
             <div className="mb-2 flex flex-wrap items-center gap-2">
-              <p className="inline-flex w-fit items-center gap-2 rounded-full border border-[#0FF0FC]/25 bg-[#0FF0FC]/10 px-3 py-1 text-[10px] font-black text-[#0FF0FC]"><Sparkles size={13} /> بورصة المونديال 2026</p>
+              <p className="inline-flex w-fit items-center gap-2 rounded-full border border-[#0FF0FC]/25 bg-[#0FF0FC]/10 px-3 py-1 text-[10px] font-black text-[#0FF0FC]"><Sparkles size={13} /> كأس العالم 2026</p>
               <span className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[10px] font-black ${heroStatus.cls}`}><span className={`h-2 w-2 rounded-full ${heroStatus.dot}`} />{heroStatus.label}</span>
             </div>
             <h1 className="max-w-3xl text-xl font-black leading-tight text-white sm:text-2xl md:text-3xl">منصة كأس العالم 2026… مباريات، تحليل، وإحصائيات في تجربة واحدة</h1>
-            <p className="mt-2 max-w-2xl text-[11px] leading-5 text-gray-300 sm:text-xs md:text-sm">ابدأ من مباريات اليوم والنتائج، ثم انتقل إلى المجموعات والمنتخبات والتحليل الرياضي. البورصة الافتراضية داخل المنصة طبقة ترفيهية فقط، بدون أموال حقيقية أو مراهنات أو توصيات شراء وبيع.</p>
+            <p className="mt-2 max-w-2xl text-[11px] leading-5 text-gray-300 sm:text-xs md:text-sm">موقع رياضي فقط لمتابعة مباريات اليوم والنتائج، ثم الانتقال إلى المجموعات والمنتخبات واللاعبين والتحليل الفني والأخبار الموثقة. لا توجد بورصة أو تداول أو توصيات شراء وبيع.</p>
             <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
               {heroStats.map((stat) => {
                 const Icon = stat.icon;
@@ -404,7 +373,7 @@ export default function HomeClientSportsNext({ initialAssets, upcomingMatches = 
             <div className="mt-3 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
               <Link href="/matches" className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#0FF0FC] px-3 py-2 text-xs font-black text-black transition hover:bg-[#70f7ff]"><Radio size={16} /> مركز المباريات</Link>
               <Link href="#worldcup-gateway" className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-xs font-black text-white transition hover:bg-white/15"><Sparkles size={16} /> بوابة البطولة</Link>
-              <Link href="/market?type=TEAM" className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-xs font-black text-white transition hover:bg-white/15"><Trophy size={16} /> دليل المنتخبات</Link>
+              <Link href="/teams" className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-xs font-black text-white transition hover:bg-white/15"><Trophy size={16} /> دليل المنتخبات</Link>
             </div>
           </div>
           <div className="rounded-[1.25rem] border border-white/10 bg-black/40 p-3 backdrop-blur-xl sm:p-4">
@@ -436,7 +405,7 @@ export default function HomeClientSportsNext({ initialAssets, upcomingMatches = 
           <div>
             <p className="inline-flex items-center gap-2 rounded-full border border-[#0FF0FC]/25 bg-[#0FF0FC]/10 px-3 py-1 text-[10px] font-black text-[#0FF0FC]"><Sparkles size={13} /> بوابة كأس العالم 2026</p>
             <h2 className="mt-3 text-xl font-black text-white sm:text-2xl">كل ما تحتاجه لمتابعة كأس العالم 2026 في مكان واحد</h2>
-            <p className="mt-2 max-w-4xl text-sm leading-7 text-gray-400">هذا القسم مستوحى من تنظيم صفحة World Cup Hub، لكنه مصمم لهوية بورصة المونديال: منصة رياضية شاملة تبدأ بالمباريات والمجموعات والمنتخبات والإحصائيات، ثم تضيف تجربة بورصة افتراضية ترفيهية في النهاية.</p>
+            <p className="mt-2 max-w-4xl text-sm leading-7 text-gray-400">منصة رياضية شاملة تبدأ بالمباريات والمجموعات والمنتخبات والإحصائيات، ثم الأخبار والتحليل الفني. كل المحتوى موجه للمتابعة الرياضية فقط.</p>
           </div>
           <Link href="/matches" className="inline-flex w-fit items-center gap-2 rounded-xl border border-[#FFD700]/25 bg-[#FFD700]/10 px-4 py-2 text-xs font-black text-[#FFD700] transition hover:bg-[#FFD700] hover:text-black">ابدأ من مباريات اليوم <ArrowLeft size={14} /></Link>
         </div>
@@ -454,9 +423,6 @@ export default function HomeClientSportsNext({ initialAssets, upcomingMatches = 
               </Link>
             );
           })}
-        </div>
-        <div className="mt-4 rounded-2xl border border-orange-400/20 bg-orange-400/[0.055] p-4 text-xs font-bold leading-6 text-orange-100">
-          تنبيه مهم: البورصة الافتراضية داخل المنصة تجربة ترفيهية تعليمية مستوحاة من أداء البطولة، ولا تمثل تداولًا ماليًا حقيقيًا أو مراهنات أو توصيات شراء وبيع.
         </div>
       </section>
 
@@ -491,7 +457,7 @@ export default function HomeClientSportsNext({ initialAssets, upcomingMatches = 
           <div className="mt-4 rounded-2xl border border-white/10 bg-black/25 p-4">
             <div className="mb-3 flex items-center justify-between gap-3"><div><p className="text-[11px] font-black text-[#0FF0FC]">Football Spotlight</p><h3 className="text-sm font-black text-white">تحليل كروي مختصر لمنتخبات مختارة عشوائيًا</h3></div><span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[10px] font-black text-gray-400">يتغير مع تحديث الصفحة</span></div>
             <div className="grid gap-3 sm:grid-cols-2">
-              {(spotlightTeams.length ? spotlightTeams : teams).slice(0, 4).map((team) => <Link key={team.id || team.name} href={team?.id ? `/asset/${team.id}` : '/market?type=TEAM'} className="flex gap-3 rounded-2xl border border-white/8 bg-black/25 p-3 transition hover:border-[#0FF0FC]/25 hover:bg-white/[0.055]"><AssetImage image={team?.image} name={team?.name || 'منتخب'} type="TEAM" width={42} height={42} className="h-11 w-11 shrink-0 rounded-full border border-white/10 bg-black/40 object-cover" /><div className="min-w-0"><div className="truncate text-sm font-black text-white">{team?.name || 'منتخب'}</div><p className="mt-1 text-[11px] leading-5 text-gray-400">{footballSummary(team)}</p></div></Link>)}
+              {(spotlightTeams.length ? spotlightTeams : teams).slice(0, 4).map((team) => <Link key={team.id || team.name} href={team?.id ? `/asset/${team.id}` : '/teams'} className="flex gap-3 rounded-2xl border border-white/8 bg-black/25 p-3 transition hover:border-[#0FF0FC]/25 hover:bg-white/[0.055]"><AssetImage image={team?.image} name={team?.name || 'منتخب'} type="TEAM" width={42} height={42} className="h-11 w-11 shrink-0 rounded-full border border-white/10 bg-black/40 object-cover" /><div className="min-w-0"><div className="truncate text-sm font-black text-white">{team?.name || 'منتخب'}</div><p className="mt-1 text-[11px] leading-5 text-gray-400">{footballSummary(team)}</p></div></Link>)}
             </div>
           </div>
         </div>
@@ -501,7 +467,7 @@ export default function HomeClientSportsNext({ initialAssets, upcomingMatches = 
         <section className="rounded-[1.5rem] border border-emerald-400/20 bg-emerald-400/[0.045] p-4 sm:p-5">
           <div className="mb-4 flex items-center justify-between"><div><p className="text-xs font-black text-emerald-300">Discovery</p><h2 className="mt-1 text-xl font-black text-white sm:text-2xl">منتخبات تشارك لأول مرة</h2></div><Trophy className="text-emerald-300" size={26} /></div>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            {debutTeams.map((team) => <Link key={team.id || team.name} href={team?.id ? `/asset/${team.id}` : '/market?type=TEAM'} className="rounded-2xl border border-white/8 bg-black/25 p-4 transition hover:border-emerald-300/35 hover:bg-emerald-300/[0.06]"><AssetImage image={team?.image} name={team?.name || 'منتخب'} type="TEAM" width={46} height={46} className="mb-3 h-12 w-12 rounded-full border border-white/10 bg-black/40 object-cover" /><h3 className="font-black text-white">{team?.name || 'منتخب'}</h3><p className="mt-2 text-xs leading-6 text-gray-400">ظهور أول موثق داخل بيانات المنصة. غير ذلك لا يتم عرض هذا القسم.</p></Link>)}
+            {debutTeams.map((team) => <Link key={team.id || team.name} href={team?.id ? `/asset/${team.id}` : '/teams'} className="rounded-2xl border border-white/8 bg-black/25 p-4 transition hover:border-emerald-300/35 hover:bg-emerald-300/[0.06]"><AssetImage image={team?.image} name={team?.name || 'منتخب'} type="TEAM" width={46} height={46} className="mb-3 h-12 w-12 rounded-full border border-white/10 bg-black/40 object-cover" /><h3 className="font-black text-white">{team?.name || 'منتخب'}</h3><p className="mt-2 text-xs leading-6 text-gray-400">ظهور أول موثق داخل بيانات المنصة. غير ذلك لا يتم عرض هذا القسم.</p></Link>)}
           </div>
         </section>
       ) : null}
@@ -510,32 +476,11 @@ export default function HomeClientSportsNext({ initialAssets, upcomingMatches = 
         {groupCards.map((card) => <Link key={card.title} href={card.href} className="rounded-[1.4rem] border border-white/10 bg-white/[0.035] p-5 transition hover:-translate-y-1 hover:border-[#0FF0FC]/25 hover:bg-white/[0.06]"><h3 className="text-lg font-black text-white">{card.title}</h3><p className="mt-3 min-h-12 text-sm leading-7 text-gray-400">{card.text}</p><div className="mt-4 inline-flex items-center gap-2 text-sm font-black text-[#0FF0FC]">افتح القسم <ArrowLeft size={15} /></div></Link>)}
       </section>
 
-      <section className="grid gap-4 lg:grid-cols-2">
-        <div id="teams" className="scroll-mt-24 rounded-[1.6rem] border border-white/10 bg-white/[0.035] p-4 sm:p-5">
-          <div className="mb-4 flex items-center justify-between"><div><p className="text-xs font-black text-emerald-300">Team Hub</p><h2 className="mt-1 text-xl font-black text-white sm:text-2xl">المنتخبات واللاعبون</h2></div><Trophy className="text-emerald-300" size={26} /></div>
-          <div className="grid gap-3 md:grid-cols-2">
-            <div className="space-y-3"><div className="text-xs font-black text-gray-500">منتخبات</div>{teams.length ? teams.slice(0, 4).map((asset) => assetCard(asset, 'منتخب')) : <div className="rounded-2xl border border-dashed border-white/10 p-4 text-sm text-gray-500">لا توجد منتخبات محملة.</div>}</div>
-            <div className="space-y-3"><div className="text-xs font-black text-gray-500">لاعبون</div>{players.length ? players.slice(0, 4).map((asset) => assetCard(asset, 'لاعب')) : <div className="rounded-2xl border border-dashed border-white/10 p-4 text-sm text-gray-500">لا توجد بيانات لاعبين محملة.</div>}</div>
-          </div>
-        </div>
-        <div id="fan-exchange" className="scroll-mt-24 rounded-[1.6rem] border border-[#FFD700]/20 bg-[#FFD700]/[0.045] p-4 sm:p-5">
-          <div className="mb-4 flex items-center justify-between gap-3"><div><p className="text-xs font-black text-[#FFD700]">Virtual Fan Exchange</p><h2 className="mt-1 text-xl font-black text-white sm:text-2xl">البورصة الافتراضية</h2></div><Wallet className="text-[#FFD700]" size={26} /></div>
-          <p className="rounded-2xl border border-[#FFD700]/20 bg-black/25 p-4 text-sm leading-7 text-gray-300">طبقة تفاعلية ترفيهية مستوحاة من أداء المنتخبات واللاعبين داخل البطولة. لا توجد أموال حقيقية، ولا مراهنات، ولا توصيات شراء أو بيع.</p>
-          <div className="mt-4 space-y-3">
-            {marketMovers.length ? marketMovers.map((asset) => {
-              const assetChange = change(asset);
-              return (
-                <div key={asset.id || asset.name} className="flex items-center justify-between gap-3 rounded-2xl border border-white/8 bg-black/25 p-3">
-                  <div className="flex min-w-0 items-center gap-3">
-                    <AssetImage image={asset?.image} name={asset?.name || 'أصل'} type={asset?.type || 'TEAM'} width={42} height={42} className="h-11 w-11 rounded-full border border-white/10 bg-black/40 object-cover" />
-                    <div className="min-w-0"><Link href={asset?.id ? `/asset/${asset.id}` : '/market'} className="truncate text-sm font-black text-white hover:text-[#FFD700]">{asset?.name || 'أصل افتراضي'}</Link><div className="mt-1 text-[11px] font-bold text-gray-500">{price(asset).toLocaleString('ar-EG')} ¢</div></div>
-                  </div>
-                  <button onClick={() => shareAssetOpinion(asset)} className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[10px] font-black text-gray-300 transition hover:border-[#FFD700]/25 hover:text-[#FFD700]"><Share2 size={12} /> {changeText(assetChange)}</button>
-                </div>
-              );
-            }) : <div className="rounded-2xl border border-dashed border-white/10 p-4 text-sm text-gray-500">لا توجد حركة أسعار افتراضية محملة حاليًا.</div>}
-          </div>
-          <Link href="/market" className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#FFD700] px-3 py-2 text-xs font-black text-black transition hover:bg-[#ffe570]">فتح السوق الافتراضي <ArrowLeft size={14} /></Link>
+      <section id="teams" className="scroll-mt-24 rounded-[1.6rem] border border-white/10 bg-white/[0.035] p-4 sm:p-5">
+        <div className="mb-4 flex items-center justify-between"><div><p className="text-xs font-black text-emerald-300">Team Hub</p><h2 className="mt-1 text-xl font-black text-white sm:text-2xl">المنتخبات واللاعبون</h2></div><Trophy className="text-emerald-300" size={26} /></div>
+        <div className="grid gap-3 md:grid-cols-2">
+          <div className="space-y-3"><div className="text-xs font-black text-gray-500">منتخبات</div>{teams.length ? teams.slice(0, 4).map((asset) => assetCard(asset, 'منتخب')) : <div className="rounded-2xl border border-dashed border-white/10 p-4 text-sm text-gray-500">لا توجد منتخبات محملة.</div>}<Link href="/teams" className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-emerald-400/25 bg-emerald-400/10 px-3 py-2 text-xs font-black text-emerald-300">عرض كل المنتخبات <ArrowLeft size={14} /></Link></div>
+          <div className="space-y-3"><div className="text-xs font-black text-gray-500">لاعبون</div>{players.length ? players.slice(0, 4).map((asset) => assetCard(asset, 'لاعب')) : <div className="rounded-2xl border border-dashed border-white/10 p-4 text-sm text-gray-500">لا توجد بيانات لاعبين محملة.</div>}<Link href="/players" className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-[#0FF0FC]/25 bg-[#0FF0FC]/10 px-3 py-2 text-xs font-black text-[#0FF0FC]">عرض كل اللاعبين <ArrowLeft size={14} /></Link></div>
         </div>
       </section>
     </main>
