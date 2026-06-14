@@ -13,7 +13,7 @@
     "cron:expire-stale-matches": "node scripts/render-expire-stale-matches.mjs",
     "lint": "echo \"Lint advisory only; type-check and build remain required\"",
     "lint:ai": "eslint features/analysis app/ai-analyst app/api/ai-analyst app/market/page.tsx app/api/ai-analyst/alerts/route.ts --max-warnings=0",
-    "lint:asset-page": "eslint \"app/asset/[id]/page.tsx\" --max-warnings=0",
+    "lint:asset-page": "eslint app/asset/[id]/page.tsx --max-warnings=0",
     "lint:market-lite": "eslint app/market/page.tsx components/market/MarketClientClean.tsx components/market/market-client-types.ts features/analysis/components/AIMarketHighlights.tsx features/analysis/components/MarketAnalysisBadge.tsx features/analysis/components/FootballTechnicalAnalysis.tsx features/analysis/components/SmartTradeAlerts.tsx --max-warnings=0",
     "lint:market-client": "eslint components/market/MarketClientClean.tsx components/market/market-client-types.ts --max-warnings=0",
     "lint:portfolio-ai": "eslint app/portfolio/page.tsx features/analysis/components/AIPortfolioInsights.tsx features/analysis/lib/portfolio-insights.ts --max-warnings=0",
@@ -28,7 +28,8 @@
     "audit:prod": "npm audit --omit=dev",
     "sync-api": "tsx prisma/seedApi.ts",
     "sync-api:optional": "tsx prisma/seedApi.ts || echo \"Skipping API sync; continuing build\"",
-    "seed:team-intelligence": "tsx prisma/seedTeamIntelligenceReports.ts"
+    "seed:team-intelligence": "tsx prisma/seedTeamIntelligenceReports.ts",
+    "fbref:worldcup-export": "tsx scripts/export-fbref-worldcup-2026.ts"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.2",
@@ -53,7 +54,6 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "@types/react-sparklines": "^1.7.5",
     "eslint": "^9",
     "eslint-config-next": "16.2.7",
     "prisma": "^6.19.3",
