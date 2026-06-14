@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { getRealWorldCupData } from '@/lib/realWorldCupData';
 
 const FBREF_PROVIDERS = new Set(['FBREF_STATHEAD_IMPORT', 'FBREF_STATHEAD_SNAPSHOT']);
+const FBREF_BROWSER_PROVIDERS = new Set(['FBREF_BROWSER_EXTRACT']);
 
 type StandingMetrics = {
   group?: string | null;
@@ -81,54 +81,56 @@ function safeJson<T>(value: unknown): T | null {
   return value as T;
 }
 
+async function findStatsReport(id: string) {
+  const primary = await prisma.teamIntelligenceReport.findFirst({
+    where: {
+      teamId: id,
+      provider: { in: Array.from(FBREF_PROVIDERS) },
+    },
+    orderBy: { publishedAt: 'desc' },
+    select: { metrics: true, publishedAt: true, sourceUrl: true },
+  });
+
+  if (primary?.metrics) return primary;
+
+  return prisma.teamIntelligenceReport.findFirst({
+    where: {
+      teamId: id,
+      provider: { in: Array.from(FBREF_BROWSER_PROVIDERS) },
+    },
+    orderBy: { publishedAt: 'desc' },
+    select: { metrics: true, publishedAt: true, sourceUrl: true },
+  });
+}
+
 export async function GET(_request: Request, context: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await context.params;
 
-    const report = await prisma.teamIntelligenceReport.findFirst({
-      where: {
-        teamId: id,
-        provider: { in: Array.from(FBREF_PROVIDERS) },
-      },
-      orderBy: { publishedAt: 'desc' },
-      select: { metrics: true, publishedAt: true, sourceUrl: true },
-    });
+    const report = await findStatsReport(id);
 
     if (!report || !report.metrics) {
-      // Try resolving team to give realistic fallback data
-      const team = await prisma.asset.findUnique({ where: { id }, select: { name: true } });
-      const realData = team ? getRealWorldCupData(team.name) : null;
-      
       return NextResponse.json({
-        available: true,
-        exportedAt: new Date().toISOString(),
+        available: false,
+        exportedAt: null,
         sourceUrl: null,
-        standing: realData ? {
-          mp: realData.totalMatches,
-          wins: realData.wins,
-          draws: realData.draws,
-          losses: realData.losses,
-          gf: realData.goalsFor,
-        } : null,
-        shooting: realData && realData.goalsFor ? {
-          goals: realData.goalsFor,
-          shots: Math.floor(realData.goalsFor * 4.5), // estimated
-          shotsOnTarget: Math.floor(realData.goalsFor * 1.8), // estimated
-          shotAccuracy: 40,
-        } : null,
+        standing: null,
+        shooting: null,
         goalkeeping: null,
         misc: null,
-        matchContext: realData ? { completedCount: realData.totalMatches, averagePossession: 55 } : null,
+        matchContext: null,
         roster: null,
         standard: null,
-      } satisfies TeamFBRefStats);
+      } satisfies TeamFBRefStats, {
+        headers: { 'Cache-Control': 'public, s-maxage=600, stale-while-revalidate=300' },
+      });
     }
 
     const m = report.metrics as Record<string, unknown>;
 
     const result: TeamFBRefStats = {
       available: true,
-      exportedAt: (m.exportedAt as string) || report.publishedAt?.toISOString() || null,
+      exportedAt: (m.exportedAt as string) || (m.importedAt as string) || report.publishedAt?.toISOString() || null,
       sourceUrl: (m.pageUrl as string) || report.sourceUrl || null,
       standing: safeJson<StandingMetrics>(m.standing),
       shooting: safeJson<ShootingMetrics>(m.shooting),
