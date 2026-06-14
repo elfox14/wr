@@ -8,6 +8,7 @@ import {
   syncMatchStats,
 } from '@/lib/live-match-stats';
 import { footballFetchFromProvider } from '@/lib/apiFootball';
+import { getProviderQuotaBlock } from '@/lib/provider-quota-guard';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -48,6 +49,29 @@ export async function GET(req: Request) {
     const debug = url.searchParams.get('debug') === 'true';
     const singleMatchId = Number(url.searchParams.get('matchId') || 0);
     const hasSingleMatchId = Boolean(singleMatchId && Number.isFinite(singleMatchId));
+    const allowLegacyBulkSync = url.searchParams.get('allowLegacy') === 'true';
+
+    if (!hasSingleMatchId && !allowLegacyBulkSync) {
+      return NextResponse.json({
+        ok: true,
+        skipped: true,
+        mode: 'legacy_bulk_isports_sync_disabled',
+        message: 'This legacy bulk iSports route is disabled by default to protect the daily quota. Use /api/cron/isports-safe-sync for scheduled jobs, or pass matchId for a single manual diagnostic.',
+        externalRequestsUsed: 0,
+      }, { headers: { 'Cache-Control': 'no-store' } });
+    }
+
+    const guard = await getProviderQuotaBlock('ISPORTS');
+    if (guard) {
+      return NextResponse.json({
+        ok: true,
+        skipped: true,
+        mode: 'legacy_bulk_isports_sync_guarded',
+        guard: { blockedUntil: guard.blockedUntil, reason: guard.reason },
+        externalRequestsUsed: 0,
+      }, { headers: { 'Cache-Control': 'no-store' } });
+    }
+
     const recentlyFinishedSince = new Date(Date.now() - 3 * 60 * 60 * 1000);
 
     const matches = await prisma.match.findMany({
@@ -61,7 +85,7 @@ export async function GET(req: Request) {
             ],
           },
       orderBy: { matchDate: 'asc' },
-      take: hasSingleMatchId ? 1 : 12,
+      take: hasSingleMatchId ? 1 : 2,
       select: {
         id: true,
         animationMatchId: true,
@@ -118,7 +142,7 @@ export async function GET(req: Request) {
       }
     }
 
-    return NextResponse.json({ ok: true, authMethod: auth.method, count: processed.length, linkedInDatabase: matches.length > 0, pollHintSeconds: 5, finalStatsWindowHours: 3, processed }, { headers: { 'Cache-Control': 'no-store' } });
+    return NextResponse.json({ ok: true, authMethod: auth.method, count: processed.length, linkedInDatabase: matches.length > 0, pollHintSeconds: 300, finalStatsWindowHours: 3, processed }, { headers: { 'Cache-Control': 'no-store' } });
   } catch (error: any) {
     console.error('live-match-stats-sync error:', error);
     return NextResponse.json({ ok: false, error: error?.message || 'Internal Server Error' }, { status: 500 });
