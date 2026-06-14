@@ -48,7 +48,6 @@ const heroActions = [
 ] as const;
 
 const featureCards = [
-  ['مركز المباريات', 'مواعيد، نتائج، مباريات اليوم، وحالة كل مباراة عند توفر البيانات الحية.', '/matches'],
   ['المجموعات', 'عرض مجموعات كأس العالم 2026 وترتيب المنتخبات داخل كل مجموعة.', '/groups'],
   ['دليل المنتخبات', 'صفحات خاصة لكل منتخب تشمل المعلومات الأساسية، الأداء، أبرز الأسماء، والتحليل المتاح.', '/teams'],
   ['الأخبار والتحليل', 'تقارير رياضية وتحليل فني منفصل عن أي جانب ترفيهي أو افتراضي.', '/news'],
@@ -108,9 +107,35 @@ function normalizeStatus(match?: HomeMatch | null) {
   return String(match?.displayStatus || match?.status || '').toUpperCase();
 }
 
+function isLiveMatch(match?: HomeMatch | null) {
+  const status = normalizeStatus(match);
+  return status === 'IN_PLAY' || status === 'LIVE' || status === 'HT' || Boolean(match?.isLiveNow && !match?.isLikelyLiveByTime);
+}
+
 function isFinishedMatch(match?: HomeMatch | null) {
   const status = normalizeStatus(match);
   return status === 'FINISHED' || status === 'FT';
+}
+
+function isScheduledMatch(match?: HomeMatch | null) {
+  const status = normalizeStatus(match);
+  return status === 'SCHEDULED' || status === 'TIMED' || status === 'NOT_STARTED';
+}
+
+function isSameCalendarDay(value?: string | Date | null, target = new Date()) {
+  if (!value) return false;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return false;
+  return date.getFullYear() === target.getFullYear() && date.getMonth() === target.getMonth() && date.getDate() === target.getDate();
+}
+
+function matchTime(match: HomeMatch) {
+  const date = match.matchDate ? new Date(match.matchDate) : null;
+  return date && !Number.isNaN(date.getTime()) ? date.getTime() : Number.MAX_SAFE_INTEGER;
+}
+
+function matchScore(match: HomeMatch) {
+  return `${Number(match.homeScore || 0)} - ${Number(match.awayScore || 0)}`;
 }
 
 function formatCountdown(diffMs: number) {
@@ -267,6 +292,65 @@ function StatLinkCard({ value, label, caption, href }: { value: string; label: s
   );
 }
 
+function HomeMatchCenterCard({ fallbackMatches, upcomingMatchesCount }: { fallbackMatches: HomeMatch[]; upcomingMatchesCount: number }) {
+  const [matches, setMatches] = useState<HomeMatch[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadMatches() {
+      try {
+        const response = await fetch('/api/matches', { cache: 'no-store' });
+        if (!response.ok) return;
+        const data = await response.json();
+        const list = Array.isArray(data) ? data : Array.isArray(data?.matches) ? data.matches : [];
+        if (!cancelled && list.length) setMatches(list);
+      } catch {
+        // Keep fallback matches if the full matches endpoint is unavailable.
+      }
+    }
+
+    loadMatches();
+    const timer = window.setInterval(loadMatches, 30_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, []);
+
+  const sourceMatches = matches.length ? matches : fallbackMatches;
+  const now = new Date();
+  const todayCount = sourceMatches.filter((match) => isSameCalendarDay(match.matchDate, now)).length;
+  const liveCount = sourceMatches.filter(isLiveMatch).length;
+  const upcomingCount = matches.length ? sourceMatches.filter(isScheduledMatch).length : upcomingMatchesCount;
+  const finishedCount = sourceMatches.filter(isFinishedMatch).length;
+
+  const featuredMatch = useMemo(() => {
+    const sorted = [...sourceMatches].sort((a, b) => matchTime(a) - matchTime(b));
+    return sorted.find(isLiveMatch) || sorted.find((match) => isSameCalendarDay(match.matchDate) && !isFinishedMatch(match)) || sorted.find(isScheduledMatch) || sorted[0];
+  }, [sourceMatches]);
+
+  return (
+    <section className="mb-4 overflow-hidden rounded-2xl border border-white/10 bg-white/[0.04] p-3 shadow-[0_14px_38px_rgba(0,0,0,0.2)] backdrop-blur sm:p-4" aria-label="مركز المباريات">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <h2 className="text-base font-black text-white md:text-lg">مركز المباريات</h2>
+        <Link href="/matches" className="rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-[11px] font-black text-white transition hover:border-[#0FF0FC]/40 hover:bg-white/[0.14]">عرض الكل</Link>
+      </div>
+
+      <div className="mb-3 grid grid-cols-4 gap-2">
+        <Link href="/matches?filter=today" className="rounded-xl border border-white/10 bg-black/25 p-2 text-center transition hover:border-[#0FF0FC]/35 hover:bg-white/[0.07]"><div className="text-lg font-black text-[#FFD700]">{formatCount(todayCount)}</div><div className="text-[10px] font-black text-white">اليوم</div></Link>
+        <Link href="/matches?filter=live" className="rounded-xl border border-white/10 bg-black/25 p-2 text-center transition hover:border-[#0FF0FC]/35 hover:bg-white/[0.07]"><div className="text-lg font-black text-[#FFD700]">{formatCount(liveCount)}</div><div className="text-[10px] font-black text-white">مباشر</div></Link>
+        <Link href="/matches?filter=upcoming" className="rounded-xl border border-white/10 bg-black/25 p-2 text-center transition hover:border-[#0FF0FC]/35 hover:bg-white/[0.07]"><div className="text-lg font-black text-[#FFD700]">{formatCount(upcomingCount)}</div><div className="text-[10px] font-black text-white">متبقية</div></Link>
+        <Link href="/matches?filter=finished" className="rounded-xl border border-white/10 bg-black/25 p-2 text-center transition hover:border-[#0FF0FC]/35 hover:bg-white/[0.07]"><div className="text-lg font-black text-[#FFD700]">{formatCount(finishedCount)}</div><div className="text-[10px] font-black text-white">انتهت</div></Link>
+      </div>
+
+      {featuredMatch ? <UpcomingMatchCard match={featuredMatch} /> : (
+        <div className="rounded-2xl border border-white/10 bg-black/25 p-4 text-xs font-bold leading-6 text-gray-400">لا توجد مباراة جاهزة للعرض الآن. سيظهر هنا أقرب لقاء عند تحديث مركز المباريات.</div>
+      )}
+    </section>
+  );
+}
+
 function SmartFeatureGrid() {
   return (
     <section className="mt-5" aria-label="روابط أقسام كأس العالم 2026">
@@ -351,6 +435,7 @@ export default function HomeClientSportsNext(props: Props) {
           </div>
         </section>
 
+        <HomeMatchCenterCard fallbackMatches={props.upcomingMatches ?? []} upcomingMatchesCount={upcomingMatchesCount} />
         <SmartFeatureGrid />
       </div>
     </main>
