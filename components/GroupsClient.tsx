@@ -96,6 +96,54 @@ function EmptyState({ title, text }: { title: string; text: string }) {
   );
 }
 
+function matchPairKey(match: Match) {
+  const home = match.homeTeam?.id || match.homeTeamId || match.homeTeam?.code || 'home';
+  const away = match.awayTeam?.id || match.awayTeamId || match.awayTeam?.code || 'away';
+  return [home, away].sort().join('|');
+}
+
+function statusRank(status?: string | null) {
+  const value = String(status || '').toUpperCase();
+  if (value === 'FINISHED' || value === 'FT') return 4;
+  if (value === 'IN_PLAY' || value === 'LIVE' || value === 'HT') return 3;
+  if (value === 'SCHEDULED' || value === 'TIMED' || value === 'NOT_STARTED') return 2;
+  return 1;
+}
+
+function matchScoreTotal(match: Match) {
+  return Number(match.homeScore || 0) + Number(match.awayScore || 0);
+}
+
+function chooseBetterMatch(current: Match | undefined, candidate: Match) {
+  if (!current) return candidate;
+  const currentRank = statusRank(current.status);
+  const candidateRank = statusRank(candidate.status);
+  if (candidateRank !== currentRank) return candidateRank > currentRank ? candidate : current;
+
+  const currentHasAnimation = Boolean(current.animationMatchId);
+  const candidateHasAnimation = Boolean(candidate.animationMatchId);
+  if (candidateHasAnimation !== currentHasAnimation) return candidateHasAnimation ? candidate : current;
+
+  const currentHasExternal = Boolean(current.externalId);
+  const candidateHasExternal = Boolean(candidate.externalId);
+  if (candidateHasExternal !== currentHasExternal) return candidateHasExternal ? candidate : current;
+
+  const currentGoals = matchScoreTotal(current);
+  const candidateGoals = matchScoreTotal(candidate);
+  if (candidateGoals !== currentGoals) return candidateGoals > currentGoals ? candidate : current;
+
+  return new Date(candidate.matchDate).getTime() < new Date(current.matchDate).getTime() ? candidate : current;
+}
+
+function dedupeMatchesByPair(matches: Match[]) {
+  const byPair = new Map<string, Match>();
+  for (const match of matches) {
+    const key = matchPairKey(match);
+    byPair.set(key, chooseBetterMatch(byPair.get(key), match));
+  }
+  return [...byPair.values()].sort((a, b) => new Date(a.matchDate).getTime() - new Date(b.matchDate).getTime());
+}
+
 function buildStandings(teams: Asset[], matches: Match[]): StandingRow[] {
   const table = teams.map((team) => ({
     team,
@@ -111,7 +159,7 @@ function buildStandings(teams: Asset[], matches: Match[]): StandingRow[] {
 
   const byId = new Map(table.map((row) => [row.team.id, row]));
 
-  matches.filter((match) => match.status === 'FINISHED').forEach((match) => {
+  dedupeMatchesByPair(matches).filter((match) => match.status === 'FINISHED').forEach((match) => {
     const home = byId.get(match.homeTeam.id);
     const away = byId.get(match.awayTeam.id);
     if (!home || !away) return;
@@ -180,13 +228,14 @@ export default function GroupsClient() {
     return Object.keys(groups).sort((a, b) => a.localeCompare(b)).map((key) => {
       const groupTeams = [...groups[key]].sort((a, b) => (a.fifaRank || 999) - (b.fifaRank || 999));
       const teamIds = new Set(groupTeams.map((team) => team.id));
-      const groupMatches = matches
+      const rawGroupMatches = matches
         .filter((match) => {
           const sameGroup = normalizeGroupKey(match.groupPhase) === key;
           const sameTeams = teamIds.has(match.homeTeam?.id) || teamIds.has(match.awayTeam?.id);
           return sameGroup || sameTeams;
         })
         .sort((a, b) => new Date(a.matchDate).getTime() - new Date(b.matchDate).getTime());
+      const groupMatches = dedupeMatchesByPair(rawGroupMatches);
 
       const players = groupTeams
         .flatMap((team) => (team.players || []).map((player) => ({ ...player, team })))
