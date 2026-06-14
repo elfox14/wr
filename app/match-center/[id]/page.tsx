@@ -25,21 +25,53 @@ function formatDate(value: Date | string) {
   });
 }
 
-function statusInfo(status: string) {
+function formatCountdown(value: Date | string) {
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return null;
+  const diffMs = date.getTime() - Date.now();
+  if (diffMs <= 0) return null;
+
+  const totalSeconds = Math.floor(diffMs / 1000);
+  const days = Math.floor(totalSeconds / 86_400);
+  const hours = Math.floor((totalSeconds % 86_400) / 3_600);
+  const minutes = Math.floor((totalSeconds % 3_600) / 60);
+  const seconds = totalSeconds % 60;
+  const n = (value: number) => value.toLocaleString('ar-EG');
+
+  if (days > 0) return `بعد ${n(days)}ي ${n(hours)}س ${n(minutes)}د`;
+  if (hours > 0) return `بعد ${n(hours)}س ${n(minutes)}د ${n(seconds)}ث`;
+  return `بعد ${n(minutes)}د ${n(seconds)}ث`;
+}
+
+function statusInfo(status: string, matchDate?: Date | string) {
   const value = String(status || '').toUpperCase();
-  if (value === 'FINISHED') {
+  if (value === 'FINISHED' || value === 'FT') {
     return { label: 'انتهت', className: 'border-[#FFD700]/25 bg-[#FFD700]/10 text-[#FFD700]', icon: CheckCircle2 };
   }
   if (['IN_PLAY', 'LIVE', 'HT'].includes(value)) {
-    return { label: value === 'HT' ? 'استراحة' : 'مباشرة', className: 'border-red-400/25 bg-red-400/10 text-red-300', icon: Activity };
+    return { label: value === 'HT' ? 'استراحة' : 'مباشرة الآن', className: 'border-[#00FF88]/25 bg-[#00FF88]/10 text-[#00FF88]', icon: Activity };
   }
-  return { label: 'قادمة', className: 'border-[#0FF0FC]/25 bg-[#0FF0FC]/10 text-[#0FF0FC]', icon: Clock };
+
+  const countdown = matchDate ? formatCountdown(matchDate) : null;
+  return { label: countdown || 'قادمة', className: 'border-[#0FF0FC]/25 bg-[#0FF0FC]/10 text-[#0FF0FC]', icon: Clock };
 }
 
 function safeImage(asset: any) {
   const image = String(asset?.image || '');
   if (image.startsWith('http')) return <img src={image} alt={asset?.name || ''} className="h-full w-full object-cover" />;
-  return <span className="text-5xl">{image || '🏳️'}</span>;
+  return <span className="text-sm font-black text-[#FFD700]">{image || asset?.code || '🏳️'}</span>;
+}
+
+function teamName(asset: any, fallback: string) {
+  return asset?.name || fallback;
+}
+
+function teamCode(asset: any) {
+  return asset?.code || asset?.name?.slice?.(0, 3) || '---';
+}
+
+function groupLabel(match: any) {
+  return match.groupPhase || match.group || match.stage || 'كأس العالم 2026';
 }
 
 function quoteSql(value: string) {
@@ -81,83 +113,88 @@ export default async function MatchCenterPage({ params }: { params: Promise<{ id
 
   const home = match.homeTeam;
   const away = match.awayTeam;
-  const status = statusInfo(match.status);
+  const status = statusInfo(match.status, match.matchDate);
   const StatusIcon = status.icon;
   const pressNews = await getRelatedPressNews(match.id, home.id, away.id, home.name, away.name);
-  const showScore = String(match.status).toUpperCase() !== 'SCHEDULED';
+  const showScore = !['SCHEDULED', 'TIMED', 'NOT_STARTED'].includes(String(match.status).toUpperCase());
+  const animationHref = match.animationMatchId
+    ? `/animation-live/player?matchId=${encodeURIComponent(String(match.animationMatchId))}&dbMatchId=${encodeURIComponent(String(match.id))}&lang=en&statsPanel=simple&teamPanel=1`
+    : '/animation-live';
 
   return (
     <main className="min-h-screen bg-background px-4 py-6 text-white sm:px-6 lg:px-8" dir="rtl">
-      <section className="mx-auto max-w-7xl space-y-6">
+      <section className="mx-auto max-w-7xl space-y-5">
         <Link href="/matches" className="inline-flex items-center gap-2 text-sm font-black text-gray-400 transition hover:text-white">
           <ArrowLeft size={16} /> العودة إلى المباريات
         </Link>
 
-        <section className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(15,240,252,0.18),transparent_30%),radial-gradient(circle_at_bottom_left,rgba(255,215,0,0.12),transparent_28%),linear-gradient(135deg,rgba(255,255,255,0.055),rgba(255,255,255,0.015))] p-5 shadow-anti-gravity md:p-7">
-          <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-            <span className="rounded-full border border-white/10 bg-black/25 px-4 py-2 text-xs font-black text-gray-300">
-              {match.groupPhase || match.stage || 'دور المجموعات'}
+        <section className="relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.04] p-3 shadow-[0_14px_38px_rgba(0,0,0,0.2)] backdrop-blur sm:p-4">
+          <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#0FF0FC]/55 to-transparent opacity-70" />
+          <div className="mb-3 grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2">
+            <span className="rounded-full border border-[#FFD700]/20 bg-[#FFD700]/10 px-2.5 py-1 text-[11px] font-black text-[#FFD700]">
+              {groupLabel(match)}
             </span>
-            <span className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-xs font-black ${status.className}`}>
-              <StatusIcon size={14} /> {status.label}
+            <span className={`min-w-0 truncate rounded-full border px-2.5 py-1 text-center text-[11px] font-black ${status.className}`}>
+              <StatusIcon size={13} className="inline" /> {status.label}
+            </span>
+            <span className="rounded-full border border-white/10 bg-white/[0.05] px-2.5 py-1 text-[11px] font-black text-gray-300">
+              {formatDate(match.matchDate)}
             </span>
           </div>
 
-          <div className="grid items-center gap-5 md:grid-cols-[1fr_auto_1fr]">
-            <TeamHeader asset={home} />
-            <div className="text-center">
-              <div className="rounded-[1.5rem] border border-white/10 bg-black/35 px-7 py-5 shadow-2xl">
-                {showScore ? (
-                  <div className="font-mono text-5xl font-black text-white">{match.homeScore} - {match.awayScore}</div>
-                ) : (
-                  <div className="text-5xl font-black tracking-widest text-gray-600">VS</div>
-                )}
-                <p className="mt-3 text-xs font-bold text-gray-500">{formatDate(match.matchDate)}</p>
-              </div>
+          <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+            <TeamBlock asset={home} align="right" fallback="الفريق الأول" />
 
-              {match.animationMatchId ? (
-                <Link
-                  href={`/animation-live/player?matchId=${match.animationMatchId}&lang=en&statsPanel=simple&teamPanel=1`}
-                  className="mt-4 inline-flex items-center gap-2 rounded-2xl border border-[#FFD700]/25 bg-[#FFD700]/10 px-4 py-3 text-xs font-black text-[#FFD700] transition hover:bg-[#FFD700] hover:text-black"
-                >
-                  <Radio size={14} /> فتح البث الأنيميشن
-                </Link>
-              ) : null}
+            <div className={`flex min-h-10 min-w-10 items-center justify-center rounded-xl border px-3 text-xs font-black ${showScore ? 'border-[#FFD700]/25 bg-[#FFD700]/10 text-[#FFD700]' : 'border-[#0FF0FC]/20 bg-[#0FF0FC]/10 text-[#0FF0FC]'}`}>
+              {showScore ? `${match.homeScore ?? 0} - ${match.awayScore ?? 0}` : 'ضد'}
             </div>
-            <TeamHeader asset={away} />
+
+            <TeamBlock asset={away} align="left" fallback="الفريق الثاني" />
+          </div>
+
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <Link href="#match-stats" className="rounded-xl border border-white/10 bg-white/[0.05] px-3 py-2 text-center text-[11px] font-black text-gray-200 transition hover:bg-white/[0.1]">
+              تفاصيل المباراة
+            </Link>
+            <Link href={animationHref} className="rounded-xl bg-[#0FF0FC] px-3 py-2 text-center text-[11px] font-black text-black transition hover:bg-[#4AFAFF]">
+              البث التفاعلي
+            </Link>
           </div>
         </section>
 
-        <Panel title="الرصد الصحفي المرتبط" icon={<Newspaper className="text-[#FFD700]" />} action={<Link href="/news" className="text-xs font-black text-[#0FF0FC]">غرفة الأخبار</Link>}>
+        <div id="match-stats">
+          <LiveMatchStatsPanel
+            matchId={match.animationMatchId ? String(match.animationMatchId) : undefined}
+            dbMatchId={match.id}
+          />
+        </div>
+
+        <Panel
+          title="مرصد المباراة الإخباري ومجريات اللعب"
+          icon={<Newspaper className="text-[#FFD700]" />}
+          action={<Link href="/news" className="text-xs font-black text-[#0FF0FC]">غرفة الأخبار</Link>}
+        >
           {pressNews.length ? (
             <div className="grid gap-3 md:grid-cols-2">
               {pressNews.map((item) => <PressNewsCard key={item.id} item={item} />)}
             </div>
           ) : (
-            <EmptyText text="لا توجد أخبار صحفية مرتبطة بهذه المباراة حاليًا." />
+            <EmptyText text="لا توجد أخبار صحفية مرتبطة بهذه المباراة حاليًا. مجريات اللعب اللحظية تظهر في كارت الإحصائيات والأحداث عند توفر مصدر موثق." />
           )}
         </Panel>
-
-        {match.animationMatchId ? (
-          <LiveMatchStatsPanel matchId={String(match.animationMatchId)} />
-        ) : (
-          <Panel title="إحصائيات المباراة" icon={<BarChart3 className="text-[#0FF0FC]" />}>
-            <EmptyText text="لا توجد إحصائيات موثقة لهذه المباراة بعد. ستظهر عند ربط المباراة بمصدر بيانات حي." />
-          </Panel>
-        )}
       </section>
     </main>
   );
 }
 
-function TeamHeader({ asset }: { asset: any }) {
+function TeamBlock({ asset, align, fallback }: { asset: any; align: 'right' | 'left'; fallback: string }) {
   return (
-    <div className="flex flex-col items-center text-center">
-      <div className="mb-3 flex h-24 w-24 items-center justify-center overflow-hidden rounded-full border border-white/10 bg-black/35 shadow-2xl">
+    <div className={`min-w-0 ${align === 'right' ? 'text-right' : 'text-left'}`}>
+      <div className="mb-1.5 inline-flex h-9 w-9 items-center justify-center overflow-hidden rounded-xl border border-white/10 bg-white/[0.07]">
         {safeImage(asset)}
       </div>
-      <h2 className="text-2xl font-black text-white md:text-3xl">{asset.name}</h2>
-      <p className="mt-1 font-mono text-sm text-gray-500">{asset.code}</p>
+      <h2 className="truncate text-sm font-black text-white">{teamName(asset, fallback)}</h2>
+      <p className="mt-0.5 text-[11px] font-bold text-gray-500">{teamCode(asset)}</p>
     </div>
   );
 }
