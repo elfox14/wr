@@ -24,6 +24,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { route: '/news', freq: 'hourly', prio: 0.85 },
     { route: '/matches', freq: 'hourly', prio: 0.95 },
     { route: '/animation-live', freq: 'hourly', prio: 0.8 },
+    { route: '/teams', freq: 'daily', prio: 0.75 },
+    { route: '/players', freq: 'daily', prio: 0.7 },
     { route: '/groups', freq: 'always', prio: 0.85 },
     { route: '/team-intelligence', freq: 'weekly', prio: 0.75 },
   ].map((page) => ({
