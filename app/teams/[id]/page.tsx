@@ -62,6 +62,16 @@ function mapReport(report: any) {
   };
 }
 
+function chooseBestReport(reports: any[] = []) {
+  return (
+    reports.find((item) => item.provider === 'MC_PRIME_CURATED') ||
+    reports.find((item) => item.reportType === 'TEAM_PROFILE') ||
+    reports.find((item) => item.provider !== 'MC_PRIME_DATA_HUB') ||
+    reports[0] ||
+    null
+  );
+}
+
 function createSafeDemoTeam(id: string, dataError?: string) {
   return {
     id,
@@ -92,7 +102,7 @@ export default async function TeamPage({ params }: Props) {
       include: {
         intelligenceReports: {
           orderBy: { publishedAt: 'desc' },
-          take: 1,
+          take: 8,
         },
       },
     });
@@ -116,7 +126,7 @@ export default async function TeamPage({ params }: Props) {
         },
       });
 
-      report = team.intelligenceReports?.[0] || null;
+      report = chooseBestReport(team.intelligenceReports || []);
     }
   } catch (error) {
     console.error('Team page database error:', error);
