@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { importDataHubTeams, importSingleDataHubTeam } from '@/lib/dataHubImport';
+import { clearPlaceholderApiFootballIds } from '@/lib/dataHubMaintenance';
 
 export const dynamic = 'force-dynamic';
 
@@ -34,12 +35,15 @@ async function run(request: Request) {
   try {
     if (mode === 'team') {
       if (!teamId) return NextResponse.json({ error: 'team_id is required for mode=team' }, { status: 400 });
-      return NextResponse.json({ ok: true, mode, team: await importSingleDataHubTeam(teamId) });
+      const team = await importSingleDataHubTeam(teamId);
+      const maintenance = await clearPlaceholderApiFootballIds();
+      return NextResponse.json({ ok: true, mode, team, maintenance });
     }
 
     if (mode === 'teams') {
       const result = await importDataHubTeams({ limit, full });
-      return NextResponse.json({ ...result, ok: result.ok !== false, mode });
+      const maintenance = await clearPlaceholderApiFootballIds();
+      return NextResponse.json({ ...result, ok: result.ok !== false, mode, maintenance });
     }
 
     return NextResponse.json({ error: 'Unknown mode' }, { status: 400 });
