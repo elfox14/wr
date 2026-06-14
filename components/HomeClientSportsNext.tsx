@@ -229,50 +229,6 @@ function UpcomingMatchCard({ match }: { match: HomeMatch }) {
   );
 }
 
-function UpcomingMatchesStrip({ matches }: { matches: HomeMatch[] }) {
-  const [liveMatches, setLiveMatches] = useState<HomeMatch[] | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function loadLiveCard() {
-      try {
-        const response = await fetch('/api/matches/live-card', { cache: 'no-store' });
-        if (!response.ok) return;
-        const data = await response.json();
-        if (!cancelled && Array.isArray(data?.matches)) setLiveMatches(data.matches);
-      } catch {
-        // Keep the server-rendered fallback matches if the live-card endpoint is unavailable.
-      }
-    }
-
-    loadLiveCard();
-    const timer = window.setInterval(loadLiveCard, 15_000);
-    return () => {
-      cancelled = true;
-      window.clearInterval(timer);
-    };
-  }, []);
-
-  const nextMatches = useMemo(() => (liveMatches?.length ? liveMatches : matches).slice(0, 2), [liveMatches, matches]);
-
-  return (
-    <section className="mb-4 overflow-hidden rounded-2xl border border-white/10 bg-white/[0.04] p-3 shadow-[0_14px_38px_rgba(0,0,0,0.2)] backdrop-blur sm:p-4">
-      {nextMatches.length > 0 ? (
-        <div className="grid gap-3 lg:grid-cols-2">
-          {nextMatches.map((match, index) => (
-            <UpcomingMatchCard key={match.id || index} match={match} />
-          ))}
-        </div>
-      ) : (
-        <div className="rounded-2xl border border-white/10 bg-black/25 p-4 text-xs font-bold leading-6 text-gray-400">
-          لا توجد مباريات قادمة متاحة الآن. سيتم عرض أقرب مباراتين هنا عند تحديث مركز المباريات.
-        </div>
-      )}
-    </section>
-  );
-}
-
 function StatLinkCard({ value, label, caption, href }: { value: string; label: string; caption: string; href: string }) {
   return (
     <Link href={href} className="group rounded-xl border border-white/10 bg-black/25 p-2.5 backdrop-blur transition hover:-translate-y-0.5 hover:border-[#0FF0FC]/35 hover:bg-white/[0.07]">
@@ -316,9 +272,21 @@ function HomeMatchCenterCard({ fallbackMatches, upcomingMatchesCount }: { fallba
   const upcomingCount = matches.length ? sourceMatches.filter(isScheduledMatch).length : upcomingMatchesCount;
   const finishedCount = sourceMatches.filter(isFinishedMatch).length;
 
-  const featuredMatch = useMemo(() => {
+  const featuredMatches = useMemo(() => {
     const sorted = [...sourceMatches].sort((a, b) => matchTime(a) - matchTime(b));
-    return sorted.find(isLiveMatch) || sorted.find((match) => isSameCalendarDay(match.matchDate) && !isFinishedMatch(match)) || sorted.find(isScheduledMatch) || sorted[0];
+    const priority = [
+      ...sorted.filter(isLiveMatch),
+      ...sorted.filter((match) => !isLiveMatch(match) && isSameCalendarDay(match.matchDate) && !isFinishedMatch(match)),
+      ...sorted.filter((match) => !isLiveMatch(match) && !isSameCalendarDay(match.matchDate) && isScheduledMatch(match)),
+      ...sorted.filter((match) => !isLiveMatch(match) && !isScheduledMatch(match)),
+    ];
+    const seen = new Set<string>();
+    return priority.filter((match) => {
+      const key = String(match.id || `${teamLabel(match.homeTeam)}-${teamLabel(match.awayTeam)}-${match.matchDate || ''}`);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    }).slice(0, 2);
   }, [sourceMatches]);
 
   return (
@@ -335,7 +303,11 @@ function HomeMatchCenterCard({ fallbackMatches, upcomingMatchesCount }: { fallba
         <Link href="/matches?filter=finished" className="rounded-xl border border-white/10 bg-black/25 p-2 text-center transition hover:border-[#0FF0FC]/35 hover:bg-white/[0.07]"><div className="text-lg font-black text-[#FFD700]">{formatCount(finishedCount)}</div><div className="text-[10px] font-black text-white">انتهت</div></Link>
       </div>
 
-      {featuredMatch ? <UpcomingMatchCard match={featuredMatch} /> : (
+      {featuredMatches.length > 0 ? (
+        <div className="grid gap-3 lg:grid-cols-2">
+          {featuredMatches.map((match, index) => <UpcomingMatchCard key={match.id || index} match={match} />)}
+        </div>
+      ) : (
         <div className="rounded-2xl border border-white/10 bg-black/25 p-4 text-xs font-bold leading-6 text-gray-400">لا توجد مباراة جاهزة للعرض الآن. سيظهر هنا أقرب لقاء عند تحديث مركز المباريات.</div>
       )}
     </section>
@@ -444,7 +416,7 @@ export default function HomeClientSportsNext(props: Props) {
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_8%,rgba(15,240,252,0.1),transparent_26%),radial-gradient(circle_at_80%_12%,rgba(255,215,0,0.08),transparent_24%),radial-gradient(circle_at_50%_100%,rgba(0,128,96,0.08),transparent_28%)]" />
 
       <div className="relative mx-auto max-w-7xl">
-        <UpcomingMatchesStrip matches={props.upcomingMatches ?? []} />
+        <HomeMatchCenterCard fallbackMatches={props.upcomingMatches ?? []} upcomingMatchesCount={upcomingMatchesCount} />
 
         <section className="relative overflow-hidden rounded-2xl border border-white/10 bg-[#07111f] shadow-[0_18px_46px_rgba(0,0,0,0.34)]">
           <div className="absolute inset-0 bg-gradient-to-br from-[#07111f] via-[#081826] to-black" />
@@ -490,7 +462,6 @@ export default function HomeClientSportsNext(props: Props) {
           </div>
         </section>
 
-        <HomeMatchCenterCard fallbackMatches={props.upcomingMatches ?? []} upcomingMatchesCount={upcomingMatchesCount} />
         <SmartFeatureGrid />
       </div>
     </main>
