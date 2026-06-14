@@ -38,7 +38,8 @@ async function run(request: Request) {
     }
 
     if (mode === 'teams') {
-      return NextResponse.json({ ok: true, mode, ...(await importDataHubTeams({ limit, full })) });
+      const result = await importDataHubTeams({ limit, full });
+      return NextResponse.json({ ...result, ok: result.ok !== false, mode });
     }
 
     return NextResponse.json({ error: 'Unknown mode' }, { status: 400 });
