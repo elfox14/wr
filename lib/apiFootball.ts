@@ -1,4 +1,5 @@
 import { countProviderRequestsSince, getProviderQuotaBlock, recordProviderRequest } from '@/lib/provider-quota-guard';
+import { getCachedProviderResponse, saveProviderResponse } from '@/lib/provider-response-cache';
 
 type FootballParams = Record<string, string | number | boolean | undefined | null>;
 
@@ -38,6 +39,15 @@ function getIsportsSoftLimit() {
   const value = Number(process.env.ISPORTS_DAILY_SOFT_LIMIT || 120);
   if (!Number.isFinite(value)) return 120;
   return Math.max(0, Math.floor(value));
+}
+
+function getIsportsCacheSeconds(path: string) {
+  const cleanPath = path.startsWith('/') ? path : `/${path}`;
+  const fromEnv = Number(process.env.ISPORTS_PROVIDER_CACHE_SECONDS || 0);
+  if (fromEnv > 0) return Math.floor(fromEnv);
+  if (cleanPath === '/analysis' || cleanPath === '/livescores') return 90;
+  if (cleanPath === '/fixtures') return 10 * 60;
+  return 6 * 60 * 60;
 }
 
 function rollingUsageWindowStart() {
@@ -246,6 +256,10 @@ async function fetchIsports<T>(path: string, params: FootballParams = {}): Promi
   const keys = getApiKeys();
   if (keys.length === 0) throw new ApiFootballError('ISPORTS_API_KEY/ISPORTS_API_KEYS is missing', undefined, undefined, undefined, 'ISPORTS');
 
+  const cacheSeconds = getIsportsCacheSeconds(path);
+  const cached = await getCachedProviderResponse({ provider: 'ISPORTS', route: path, requestParams: params, maxAgeSeconds: cacheSeconds });
+  if (cached?.payload) return normalizeIsportsPayload(path, cached.payload, params) as T;
+
   await assertIsportsCanRequest(path, params);
 
   const errors: ApiFootballError[] = [];
@@ -273,6 +287,7 @@ async function fetchIsports<T>(path: string, params: FootballParams = {}): Promi
       throw error;
     }
 
+    await saveProviderResponse({ provider: 'ISPORTS', route: path, requestParams: params, payload, status: response.status, ok: true });
     await safeRecordIsportsRequest(params, path, response.status, true);
     return normalizeIsportsPayload(path, payload, params) as T;
   }
