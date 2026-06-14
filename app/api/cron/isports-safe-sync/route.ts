@@ -70,12 +70,13 @@ export async function GET(req: Request) {
   const singleMatchId = Number(url.searchParams.get('matchId') || 0);
   const hasSingleMatchId = Boolean(singleMatchId && Number.isFinite(singleMatchId));
   const now = new Date();
-  const finishedHours = clampNumber(url.searchParams.get('finishedHours'), 36, 1, 240);
-  const backfillDays = clampNumber(url.searchParams.get('backfillDays'), 30, 1, 120);
-  const backfillMissing = url.searchParams.get('backfillMissing') !== 'false';
-  const take = clampNumber(url.searchParams.get('take'), 10, 1, 24);
-  const minStatsIntervalMinutes = hasSingleMatchId ? 0 : clampNumber(url.searchParams.get('minStatsIntervalMinutes'), 8, 0, 60);
-  const footballDataFallbackLimit = clampNumber(url.searchParams.get('footballDataFallbackLimit'), 2, 0, 8);
+  const allowHistoricalBackfill = url.searchParams.get('allowHistoricalBackfill') === 'true' || url.searchParams.get('backfillMode') === 'true';
+  const finishedHours = clampNumber(url.searchParams.get('finishedHours'), 6, 1, allowHistoricalBackfill ? 240 : 12);
+  const backfillDays = clampNumber(url.searchParams.get('backfillDays'), 7, 1, allowHistoricalBackfill ? 120 : 7);
+  const backfillMissing = allowHistoricalBackfill && url.searchParams.get('backfillMissing') === 'true';
+  const take = hasSingleMatchId ? 1 : clampNumber(url.searchParams.get('take'), 2, 1, allowHistoricalBackfill ? 24 : 4);
+  const minStatsIntervalMinutes = hasSingleMatchId ? 0 : clampNumber(url.searchParams.get('minStatsIntervalMinutes'), 30, 10, 180);
+  const footballDataFallbackLimit = clampNumber(url.searchParams.get('footballDataFallbackLimit'), 1, 0, 4);
   const finishedSince = new Date(Date.now() - finishedHours * 60 * 60 * 1000);
   const backfillSince = new Date(Date.now() - backfillDays * 24 * 60 * 60 * 1000);
   const inferredLiveStart = new Date(Date.now() - 3 * 60 * 60 * 1000);
@@ -94,7 +95,7 @@ export async function GET(req: Request) {
         ],
       },
       orderBy: { matchDate: 'asc' },
-      take: hasSingleMatchId ? 1 : take,
+      take,
       select: {
         id: true,
         animationMatchId: true,
@@ -161,8 +162,12 @@ export async function GET(req: Request) {
       guard: guard ? { active: true, blockedUntil: guard.blockedUntil, reason: guard.reason } : { active: false },
       inferredLiveWindow: { from: inferredLiveStart.toISOString(), to: inferredLiveEnd.toISOString(), now: now.toISOString() },
       finishedWindowHours: finishedHours,
-      backfill: { enabled: backfillMissing, days: backfillDays, since: backfillSince.toISOString() },
+      backfill: { enabled: backfillMissing, historicalBackfillAllowed: allowHistoricalBackfill, days: backfillDays, since: backfillSince.toISOString() },
       limits: { take, minStatsIntervalMinutes, footballDataFallbackLimit, footballDataFallbackUsed },
+      quotaProtection: {
+        note: 'iSports requests are also protected by a local rolling 24h soft limit before calling the external provider.',
+        env: 'ISPORTS_DAILY_SOFT_LIMIT',
+      },
       count: processed.length,
       processed,
     }, { headers: { 'Cache-Control': 'no-store' } });
