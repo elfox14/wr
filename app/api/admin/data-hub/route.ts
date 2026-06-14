@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { getDataHubStatus, importDataHubTeams, importSingleDataHubTeam } from '@/lib/dataHubImport';
+import { clearPlaceholderApiFootballIds } from '@/lib/dataHubMaintenance';
 import { getDataHubConfig } from '@/lib/mcPrimeDataHub';
 
 export const dynamic = 'force-dynamic';
@@ -45,6 +46,11 @@ function parseLimit(value: string | null, fallback = 12) {
   return Math.min(Math.max(Math.trunc(parsed), 1), 100);
 }
 
+async function withPlaceholderIdCleanup<T extends Record<string, any>>(result: T) {
+  const placeholderIdCleanup = await clearPlaceholderApiFootballIds();
+  return { ...result, placeholderIdCleanup };
+}
+
 export async function GET(request: Request) {
   const admin = await requireAdmin(request);
   if (admin.error) return admin.error;
@@ -65,16 +71,20 @@ export async function GET(request: Request) {
       });
     }
 
+    if (action === 'cleanup-placeholder-api-ids') {
+      return NextResponse.json(await clearPlaceholderApiFootballIds());
+    }
+
     if (action === 'sync-teams') {
       const limit = parseLimit(url.searchParams.get('limit'));
       const full = url.searchParams.get('full') === '1' || url.searchParams.get('full') === 'true';
-      return NextResponse.json(await importDataHubTeams({ limit, full }));
+      return NextResponse.json(await withPlaceholderIdCleanup(await importDataHubTeams({ limit, full })));
     }
 
     if (action === 'sync-team') {
       const teamId = url.searchParams.get('team_id') || url.searchParams.get('teamId');
       if (!teamId) return NextResponse.json({ error: 'team_id is required' }, { status: 400 });
-      return NextResponse.json({ ok: true, team: await importSingleDataHubTeam(teamId) });
+      return NextResponse.json(await withPlaceholderIdCleanup({ ok: true, team: await importSingleDataHubTeam(teamId) }));
     }
 
     return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
@@ -96,16 +106,20 @@ export async function POST(request: Request) {
       return NextResponse.json({ ...status, ok: status.ok !== false });
     }
 
+    if (action === 'cleanup-placeholder-api-ids') {
+      return NextResponse.json(await clearPlaceholderApiFootballIds());
+    }
+
     if (action === 'sync-team') {
       const teamId = body.team_id || body.teamId;
       if (!teamId) return NextResponse.json({ error: 'team_id is required' }, { status: 400 });
-      return NextResponse.json({ ok: true, team: await importSingleDataHubTeam(teamId) });
+      return NextResponse.json(await withPlaceholderIdCleanup({ ok: true, team: await importSingleDataHubTeam(teamId) }));
     }
 
     if (action === 'sync-teams') {
       const limit = parseLimit(String(body.limit || '12'));
       const full = Boolean(body.full);
-      return NextResponse.json(await importDataHubTeams({ limit, full }));
+      return NextResponse.json(await withPlaceholderIdCleanup(await importDataHubTeams({ limit, full })));
     }
 
     return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
