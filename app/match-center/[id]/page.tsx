@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { Activity, ArrowLeft, BarChart3, CheckCircle2, Clock, Newspaper, Radio } from 'lucide-react';
+import { Activity, ArrowLeft, CheckCircle2, Clock, Newspaper } from 'lucide-react';
 import prisma from '@/lib/prisma';
 import LiveMatchStatsPanel from '@/app/animation-live/player/LiveMatchStatsPanel';
 
