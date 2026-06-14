@@ -9,7 +9,6 @@ const links = [
   ['/teams', 'Teams'],
   ['/players', 'Players'],
   ['/matches', 'Matches'],
-  ['/team-intelligence', 'Analysis'],
   ['/animation-live', 'Live'],
 ];
 
