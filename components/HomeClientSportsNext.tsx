@@ -85,15 +85,17 @@ const heroActions = [
 const groupLetters = Object.keys(WORLD_CUP_2026_GROUPS) as WorldCup2026GroupKey[];
 
 const teamRegions = [
-  { title: 'المستضيفون', names: ['المكسيك', 'كندا', 'الولايات المتحدة'] },
-  { title: 'العرب', names: ['قطر', 'المغرب', 'تونس', 'مصر', 'السعودية', 'العراق', 'الجزائر', 'الأردن'] },
-  { title: 'أوروبا', names: ['التشيك', 'البوسنة والهرسك', 'سويسرا', 'اسكتلندا', 'تركيا', 'ألمانيا', 'هولندا', 'السويد', 'بلجيكا', 'إسبانيا', 'فرنسا', 'النرويج', 'النمسا', 'البرتغال', 'إنجلترا', 'كرواتيا'] },
-  { title: 'أمريكا الجنوبية', names: ['البرازيل', 'باراغواي', 'الإكوادور', 'أوروغواي', 'الأرجنتين', 'كولومبيا'] },
-  { title: 'أفريقيا', names: ['جنوب أفريقيا', 'المغرب', 'كوت ديفوار', 'تونس', 'مصر', 'السنغال', 'الجزائر', 'الكونغو الديمقراطية', 'غانا', 'الرأس الأخضر'] },
-  { title: 'آسيا', names: ['كوريا الجنوبية', 'قطر', 'اليابان', 'إيران', 'السعودية', 'العراق', 'الأردن', 'أوزبكستان'] },
-  { title: 'أمريكا الشمالية والكاريبي', names: ['المكسيك', 'كندا', 'الولايات المتحدة', 'هايتي', 'كوراساو', 'بنما'] },
-  { title: 'أوقيانوسيا', names: ['أستراليا', 'نيوزيلندا'] },
+  { title: 'المستضيفون', teams: [{ name: 'المكسيك', flag: '🇲🇽' }, { name: 'كندا', flag: '🇨🇦' }, { name: 'الولايات المتحدة', flag: '🇺🇸' }] },
+  { title: 'العرب', teams: [{ name: 'قطر', flag: '🇶🇦' }, { name: 'المغرب', flag: '🇲🇦' }, { name: 'تونس', flag: '🇹🇳' }, { name: 'مصر', flag: '🇪🇬' }, { name: 'السعودية', flag: '🇸🇦' }, { name: 'العراق', flag: '🇮🇶' }, { name: 'الجزائر', flag: '🇩🇿' }, { name: 'الأردن', flag: '🇯🇴' }] },
+  { title: 'أوروبا', teams: [{ name: 'التشيك', flag: '🇨🇿' }, { name: 'البوسنة والهرسك', flag: '🇧🇦' }, { name: 'سويسرا', flag: '🇨🇭' }, { name: 'اسكتلندا', flag: '🏴' }, { name: 'تركيا', flag: '🇹🇷' }, { name: 'ألمانيا', flag: '🇩🇪' }, { name: 'هولندا', flag: '🇳🇱' }, { name: 'السويد', flag: '🇸🇪' }, { name: 'بلجيكا', flag: '🇧🇪' }, { name: 'إسبانيا', flag: '🇪🇸' }, { name: 'فرنسا', flag: '🇫🇷' }, { name: 'النرويج', flag: '🇳🇴' }, { name: 'النمسا', flag: '🇦🇹' }, { name: 'البرتغال', flag: '🇵🇹' }, { name: 'إنجلترا', flag: '🏴' }, { name: 'كرواتيا', flag: '🇭🇷' }] },
+  { title: 'أمريكا الجنوبية', teams: [{ name: 'البرازيل', flag: '🇧🇷' }, { name: 'باراغواي', flag: '🇵🇾' }, { name: 'الإكوادور', flag: '🇪🇨' }, { name: 'أوروغواي', flag: '🇺🇾' }, { name: 'الأرجنتين', flag: '🇦🇷' }, { name: 'كولومبيا', flag: '🇨🇴' }] },
+  { title: 'أفريقيا', teams: [{ name: 'جنوب أفريقيا', flag: '🇿🇦' }, { name: 'المغرب', flag: '🇲🇦' }, { name: 'كوت ديفوار', flag: '🇨🇮' }, { name: 'تونس', flag: '🇹🇳' }, { name: 'مصر', flag: '🇪🇬' }, { name: 'السنغال', flag: '🇸🇳' }, { name: 'الجزائر', flag: '🇩🇿' }, { name: 'الكونغو الديمقراطية', flag: '🇨🇩' }, { name: 'غانا', flag: '🇬🇭' }, { name: 'الرأس الأخضر', flag: '🇨🇻' }] },
+  { title: 'آسيا', teams: [{ name: 'كوريا الجنوبية', flag: '🇰🇷' }, { name: 'قطر', flag: '🇶🇦' }, { name: 'اليابان', flag: '🇯🇵' }, { name: 'إيران', flag: '🇮🇷' }, { name: 'السعودية', flag: '🇸🇦' }, { name: 'العراق', flag: '🇮🇶' }, { name: 'الأردن', flag: '🇯🇴' }, { name: 'أوزبكستان', flag: '🇺🇿' }] },
+  { title: 'أمريكا الشمالية والكاريبي', teams: [{ name: 'المكسيك', flag: '🇲🇽' }, { name: 'كندا', flag: '🇨🇦' }, { name: 'الولايات المتحدة', flag: '🇺🇸' }, { name: 'هايتي', flag: '🇭🇹' }, { name: 'كوراساو', flag: '🇨🇼' }, { name: 'بنما', flag: '🇵🇦' }] },
+  { title: 'أوقيانوسيا', teams: [{ name: 'أستراليا', flag: '🇦🇺' }, { name: 'نيوزيلندا', flag: '🇳🇿' }] },
 ] as const;
+
+const hostCountries = [{ name: 'أمريكا', flag: '🇺🇸' }, { name: 'كندا', flag: '🇨🇦' }, { name: 'المكسيك', flag: '🇲🇽' }] as const;
 
 function formatCount(value?: number, fallback = 0) {
   return new Intl.NumberFormat('ar-EG').format(value && value > 0 ? value : fallback);
@@ -224,6 +226,15 @@ function InlineMatchTimer({ match }: { match: HomeMatch }) {
   return (
     <span className={`min-w-0 truncate rounded-full border px-2.5 py-1 text-center text-[11px] font-black ${timing.live ? 'border-[#00FF88]/25 bg-[#00FF88]/10 text-[#00FF88]' : timing.waiting ? 'border-[#FFD700]/20 bg-[#FFD700]/10 text-[#FFD700]' : 'border-[#0FF0FC]/20 bg-[#0FF0FC]/10 text-[#0FF0FC]'}`}>
       {timing.label}
+    </span>
+  );
+}
+
+function CountryChip({ team }: { team: { name: string; flag: string } }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.045] px-2.5 py-1 text-[11px] font-black text-gray-200">
+      <span className="text-sm leading-none">{team.flag}</span>
+      <span>{team.name}</span>
     </span>
   );
 }
@@ -396,7 +407,6 @@ function SmartFeatureGrid() {
   const [selectedGroup, setSelectedGroup] = useState<WorldCup2026GroupKey>('A');
   const [summaryStats, setSummaryStats] = useState<SummaryStats | null>(null);
   const [groupStandings, setGroupStandings] = useState<GroupStanding[]>([]);
-  const selectedGroupData = WORLD_CUP_2026_GROUPS[selectedGroup];
   const selectedStanding = groupStandings.find((group) => group.key === selectedGroup) || buildFallbackStanding(selectedGroup);
 
   useEffect(() => {
@@ -515,46 +525,52 @@ function SmartFeatureGrid() {
           <p className="mt-2 text-[10px] font-bold text-gray-500">الترتيب محسوب من نتائج المباريات المنتهية فقط. قبل بداية مباريات المجموعة تظهر الأرقام صفرية.</p>
         </article>
 
-        <Link href="/teams" className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.045] p-4 transition duration-200 hover:-translate-y-1 hover:border-[#0FF0FC]/35 hover:bg-white/[0.07]">
+        <Link href="/teams" className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.045] p-4 transition duration-200 hover:-translate-y-1 hover:border-[#0FF0FC]/35 hover:bg-white/[0.07] md:col-span-2 xl:col-span-3">
           <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#0FF0FC]/50 to-transparent opacity-0 transition group-hover:opacity-100" />
-          <div className="flex items-start justify-between gap-4">
-            <h3 className="text-base font-black text-white">دليل المنتخبات</h3>
-            <span className="rounded-full border border-white/10 bg-black/25 px-2.5 py-1 text-[10px] font-black text-[#FFD700]">48 منتخب</span>
+          <div className="mb-3 flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <h3 className="text-base font-black text-white md:text-lg">دليل المنتخبات</h3>
+              <p className="mt-2 text-xs font-bold leading-6 text-gray-400">تصنيف سريع للمنتخبات حسب الاستضافة والمنطقة الجغرافية، مع علم كل دولة.</p>
+            </div>
+            <span className="rounded-full border border-white/10 bg-black/25 px-3 py-1.5 text-[10px] font-black text-[#FFD700]">48 منتخب</span>
           </div>
-          <p className="mt-2 text-xs font-bold leading-6 text-gray-400">تصنيف سريع للمنتخبات حسب الاستضافة والمنطقة الجغرافية.</p>
-          <div className="mt-3 space-y-2">
+          <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
             {teamRegions.map((region) => (
-              <div key={region.title} className="rounded-xl border border-white/10 bg-black/25 p-2.5">
-                <div className="mb-1 text-[10px] font-black text-[#0FF0FC]">{region.title}</div>
-                <p className="text-[11px] font-bold leading-5 text-gray-300">{region.names.join('، ')}</p>
+              <div key={region.title} className="rounded-xl border border-white/10 bg-black/25 p-3">
+                <div className="mb-2 text-[10px] font-black text-[#0FF0FC]">{region.title}</div>
+                <div className="flex flex-wrap gap-1.5">
+                  {region.teams.map((team) => <CountryChip key={`${region.title}-${team.name}`} team={team} />)}
+                </div>
               </div>
             ))}
           </div>
           <div className="mt-3 text-[11px] font-black text-[#FFD700]">استكشف المنتخبات ←</div>
         </Link>
 
-        <Link href="/news" className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.045] p-4 transition duration-200 hover:-translate-y-1 hover:border-[#0FF0FC]/35 hover:bg-white/[0.07]">
+        <Link href="/news" className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.045] p-4 transition duration-200 hover:-translate-y-1 hover:border-[#0FF0FC]/35 hover:bg-white/[0.07] md:col-span-2 xl:col-span-3">
           <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#0FF0FC]/50 to-transparent opacity-0 transition group-hover:opacity-100" />
-          <div className="flex items-start justify-between gap-4">
-            <h3 className="text-base font-black text-white">الأخبار والتحليل</h3>
-            <span className="rounded-full border border-emerald-400/20 bg-emerald-400/10 px-2.5 py-1 text-[10px] font-black text-emerald-200">تحليل رياضي</span>
+          <div className="grid gap-3 md:grid-cols-[0.7fr_1.3fr] md:items-center">
+            <div className="flex items-start justify-between gap-4">
+              <h3 className="text-base font-black text-white md:text-lg">الأخبار والتحليل</h3>
+              <span className="rounded-full border border-emerald-400/20 bg-emerald-400/10 px-2.5 py-1 text-[10px] font-black text-emerald-200">تحليل رياضي</span>
+            </div>
+            <div className="rounded-xl border border-white/10 bg-black/25 p-3">
+              <p className="text-xs font-bold leading-6 text-gray-400">أخبار البطولة وتحليل فني رياضي فقط، بعيدًا عن أي توصيات أو جانب تجاري.</p>
+              <p className="mt-1 text-[11px] font-black text-[#FFD700]">تقارير، قراءة تكتيكية، ومتابعة يومية عند توفر المصادر ←</p>
+            </div>
           </div>
-          <p className="mt-2 text-xs font-bold leading-6 text-gray-400">أخبار البطولة وتحليل فني رياضي فقط، بعيدًا عن أي توصيات أو جانب تجاري.</p>
-          <div className="mt-3 rounded-xl border border-white/10 bg-black/25 p-3">
-            <p className="text-[10px] font-black text-[#0FF0FC]">آخر التغطيات</p>
-            <p className="mt-1 text-xs font-bold leading-5 text-white">تقارير، قراءة تكتيكية، ومتابعة يومية عند توفر المصادر.</p>
-          </div>
-          <div className="mt-3 text-[11px] font-black text-[#FFD700]">قراءة التحليلات ←</div>
         </Link>
 
-        <Link href="/players" className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.045] p-4 transition duration-200 hover:-translate-y-1 hover:border-[#0FF0FC]/35 hover:bg-white/[0.07]">
+        <Link href="/players" className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.045] p-4 transition duration-200 hover:-translate-y-1 hover:border-[#0FF0FC]/35 hover:bg-white/[0.07] md:col-span-2 xl:col-span-3">
           <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#0FF0FC]/50 to-transparent opacity-0 transition group-hover:opacity-100" />
-          <div className="flex items-start justify-between gap-4">
-            <h3 className="text-base font-black text-white">الإحصائيات</h3>
+          <div className="mb-3 flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <h3 className="text-base font-black text-white md:text-lg">الإحصائيات</h3>
+              <p className="mt-2 text-xs font-bold leading-6 text-gray-400">أرقام فعلية من قاعدة بيانات المباريات وآخر لقطات الإحصائيات المتاحة.</p>
+            </div>
             <span className="rounded-full border border-white/10 bg-black/25 px-2.5 py-1 text-[10px] font-black text-[#FFD700]">Data</span>
           </div>
-          <p className="mt-2 text-xs font-bold leading-6 text-gray-400">أرقام فعلية من قاعدة بيانات المباريات وآخر لقطات الإحصائيات المتاحة.</p>
-          <div className="mt-3 grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-6">
             <StatBox value={formatCount(stats.totalMatches)} label="مباراة" note="إجمالي الجدول" />
             <StatBox value={formatCount(stats.finishedMatches)} label="انتهت" note="حسب الحالة" />
             <StatBox value={formatCount(stats.totalGoals)} label="هدف" note="من النتائج" />
@@ -565,28 +581,33 @@ function SmartFeatureGrid() {
           <div className="mt-3 text-[11px] font-black text-[#FFD700]">عرض الإحصائيات ←</div>
         </Link>
 
-        <Link href="/animation-live" className="group relative overflow-hidden rounded-2xl border border-red-400/20 bg-red-500/[0.055] p-4 transition duration-200 hover:-translate-y-1 hover:border-red-300/45 hover:bg-red-500/[0.08]">
+        <Link href="/animation-live" className="group relative overflow-hidden rounded-2xl border border-red-400/20 bg-red-500/[0.055] p-4 transition duration-200 hover:-translate-y-1 hover:border-red-300/45 hover:bg-red-500/[0.08] md:col-span-2 xl:col-span-3">
           <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-red-300/50 to-transparent opacity-70" />
-          <div className="flex items-start justify-between gap-4">
-            <h3 className="text-base font-black text-white">البث التفاعلي</h3>
-            <span className="rounded-full border border-red-300/20 bg-red-400/10 px-2.5 py-1 text-[10px] font-black text-red-100">LIVE</span>
+          <div className="grid gap-3 md:grid-cols-[0.7fr_1.3fr] md:items-center">
+            <div className="flex items-start justify-between gap-4">
+              <h3 className="text-base font-black text-white md:text-lg">البث التفاعلي</h3>
+              <span className="rounded-full border border-red-300/20 bg-red-400/10 px-2.5 py-1 text-[10px] font-black text-red-100">LIVE</span>
+            </div>
+            <div className="rounded-xl border border-red-300/15 bg-black/25 p-3">
+              <p className="text-xs font-bold leading-6 text-gray-300">متابعة مرئية للمباريات الجارية والقريبة عند توفر بيانات حية ورسوم زمنية.</p>
+              <span className="mt-2 inline-flex items-center gap-2 text-[11px] font-black text-red-100"><span className="h-2 w-2 animate-pulse rounded-full bg-red-300" /> دخول البث الآن ←</span>
+            </div>
           </div>
-          <p className="mt-2 text-xs font-bold leading-6 text-gray-300">متابعة مرئية للمباريات الجارية والقريبة عند توفر بيانات حية ورسوم زمنية.</p>
-          <div className="mt-3 rounded-xl border border-red-300/15 bg-black/25 p-3 text-center">
-            <span className="inline-flex items-center gap-2 text-[11px] font-black text-red-100"><span className="h-2 w-2 animate-pulse rounded-full bg-red-300" /> صفحة البث المباشر</span>
-          </div>
-          <div className="mt-3 text-[11px] font-black text-[#FFD700]">دخول البث الآن ←</div>
         </Link>
 
-        <Link href="/matches" className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.045] p-4 transition duration-200 hover:-translate-y-1 hover:border-[#0FF0FC]/35 hover:bg-white/[0.07]">
+        <Link href="/matches" className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.045] p-4 transition duration-200 hover:-translate-y-1 hover:border-[#0FF0FC]/35 hover:bg-white/[0.07] md:col-span-2 xl:col-span-3">
           <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#0FF0FC]/50 to-transparent opacity-0 transition group-hover:opacity-100" />
-          <div className="flex items-start justify-between gap-4">
-            <h3 className="text-base font-black text-white">الدول المستضيفة</h3>
-            <span className="rounded-full border border-white/10 bg-black/25 px-2.5 py-1 text-[10px] font-black text-[#FFD700]">3 دول</span>
-          </div>
-          <p className="mt-2 text-xs font-bold leading-6 text-gray-400">أمريكا، كندا، والمكسيك ضمن نسخة تاريخية موزعة على ثلاث دول مستضيفة.</p>
-          <div className="mt-3 grid grid-cols-3 gap-2">
-            {['أمريكا', 'كندا', 'المكسيك'].map((country) => <span key={country} className="rounded-xl border border-white/10 bg-black/25 px-2 py-2 text-center text-[10px] font-black text-gray-300">{country}</span>)}
+          <div className="grid gap-3 md:grid-cols-[0.7fr_1.3fr] md:items-center">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h3 className="text-base font-black text-white md:text-lg">الدول المستضيفة</h3>
+                <p className="mt-2 text-xs font-bold leading-6 text-gray-400">نسخة تاريخية موزعة على ثلاث دول مستضيفة.</p>
+              </div>
+              <span className="rounded-full border border-white/10 bg-black/25 px-2.5 py-1 text-[10px] font-black text-[#FFD700]">3 دول</span>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {hostCountries.map((country) => <CountryChip key={country.name} team={country} />)}
+            </div>
           </div>
           <div className="mt-3 text-[11px] font-black text-[#FFD700]">متابعة الجدول ←</div>
         </Link>
