@@ -6,6 +6,13 @@ import { getProviderQuotaBlock, getProviderUsageSummary } from '@/lib/provider-q
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
+const DEFAULT_ISPORTS_DAILY_SOFT_LIMIT = 200;
+
+function getIsportsSoftLimit() {
+  const value = Number(process.env.ISPORTS_DAILY_SOFT_LIMIT || DEFAULT_ISPORTS_DAILY_SOFT_LIMIT);
+  return Number.isFinite(value) ? Math.max(0, Math.floor(value)) : DEFAULT_ISPORTS_DAILY_SOFT_LIMIT;
+}
+
 function isAuthorized(req: Request, url: URL) {
   const valid = [process.env.ADMIN_API_SECRET, process.env.CRON_SECRET].map((v) => String(v || '').trim()).filter(Boolean);
   if (valid.length === 0) return true;
@@ -82,7 +89,7 @@ export async function GET(req: Request) {
       providerUsage: {
         windowHours: 24,
         isports: isportsUsage,
-        softLimit: Number(process.env.ISPORTS_DAILY_SOFT_LIMIT || 120),
+        softLimit: getIsportsSoftLimit(),
       },
       isports: {
         status: isportsGuard ? 'blocked' : 'active',
