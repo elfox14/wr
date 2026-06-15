@@ -81,6 +81,37 @@ function dedupeMatches(matches: any[]) {
   return Array.from(byFamily.values()).sort((a, b) => new Date(a.matchDate).getTime() - new Date(b.matchDate).getTime());
 }
 
+function validMinute(value: unknown) {
+  const minute = Number(value);
+  if (!Number.isFinite(minute) || minute <= 0) return null;
+  return Math.max(1, Math.min(130, Math.floor(minute)));
+}
+
+async function latestDocumentedMinutes(matchIds: string[]) {
+  if (matchIds.length === 0) return new Map<string, number>();
+
+  const snapshots = await prisma.matchStatsSnapshot.findMany({
+    where: {
+      matchId: { in: matchIds },
+      minute: { not: null },
+    },
+    select: {
+      matchId: true,
+      minute: true,
+      capturedAt: true,
+    },
+    orderBy: { capturedAt: 'desc' },
+  });
+
+  const latestByMatch = new Map<string, number>();
+  for (const snapshot of snapshots) {
+    if (latestByMatch.has(snapshot.matchId)) continue;
+    const minute = validMinute(snapshot.minute);
+    if (minute !== null) latestByMatch.set(snapshot.matchId, minute);
+  }
+  return latestByMatch;
+}
+
 export async function GET() {
   try {
     const matches = await prisma.match.findMany({
@@ -91,7 +122,13 @@ export async function GET() {
       orderBy: { matchDate: 'asc' },
     });
 
-    return NextResponse.json(dedupeMatches(matches), { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } });
+    const documentedMinutes = await latestDocumentedMinutes(matches.map((match) => match.id));
+    const enrichedMatches = matches.map((match) => {
+      const minute = documentedMinutes.get(match.id);
+      return minute ? { ...match, minute, liveLabel: 'مباشر الآن' } : match;
+    });
+
+    return NextResponse.json(dedupeMatches(enrichedMatches), { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } });
   } catch (error) {
     console.error('Error fetching matches:', error);
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500, headers: { 'Cache-Control': 'no-store' } });
