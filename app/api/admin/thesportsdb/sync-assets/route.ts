@@ -77,40 +77,26 @@ function playerSearchQueries(assetName: string) {
   const name = String(assetName || '').trim();
   const queries = [name];
   const abbreviated = parseAbbreviatedName(name);
-  if (abbreviated?.surnameRaw) {
-    queries.push(`${abbreviated.initial} ${abbreviated.surnameRaw}`);
-    queries.push(abbreviated.surnameRaw);
-  }
+  if (abbreviated?.surnameRaw) queries.push(abbreviated.surnameRaw);
   return Array.from(new Set(queries.filter(Boolean)));
-}
-
-async function searchPlayerCandidates(assetName: string) {
-  const queries = playerSearchQueries(assetName);
-  const players: any[] = [];
-  const errors: string[] = [];
-
-  for (const query of queries) {
-    try {
-      const found = await searchPlayers(query);
-      players.push(...found);
-    } catch (error: any) {
-      errors.push(`${query}: ${error?.message || 'lookup failed'}`);
-    }
-  }
-
-  return { players: uniqueByPlayerId(players), queries, error: errors.join('; ') || null };
 }
 
 function isFootballPlayer(player: any) {
   const sport = String(player?.strSport || '').toLowerCase();
-  return !sport || sport.includes('soccer') || sport.includes('football');
+  if (sport && !(sport.includes('soccer') || sport.includes('football'))) return false;
+
+  const normalizedPosition = normalizeSportsDbName(player?.strPosition || '');
+  const knownNonFootballPositions = new Set(['defenceman', 'defenseman', 'center', 'centre', 'left wing', 'right wing']);
+  if (knownNonFootballPositions.has(normalizedPosition)) return false;
+
+  return true;
 }
 
 function bestPlayerMatch(assetName: string, players: any[]) {
   const normalizedAssetName = normalizeSportsDbName(assetName);
   const abbreviated = parseAbbreviatedName(assetName);
-  const candidates = players.filter(isFootballPlayer);
-  const pool = candidates.length ? candidates : players;
+  const pool = players.filter(isFootballPlayer);
+  if (!pool.length) return null;
 
   const exact = pool.find((player) => normalizeSportsDbName(player.strPlayer) === normalizedAssetName);
   if (exact) return exact;
@@ -123,15 +109,32 @@ function bestPlayerMatch(assetName: string, players: any[]) {
       const last = parts[parts.length - 1] || '';
       return first.startsWith(abbreviated.initial) && (last === abbreviated.surname || normalized.endsWith(` ${abbreviated.surname}`) || normalized.includes(` ${abbreviated.surname} `));
     });
-    if (byInitialAndSurname) return byInitialAndSurname;
 
-    const bySurnameWithImage = pool.find((player) => normalizeSportsDbName(player.strPlayer).includes(abbreviated.surname) && pickPlayerImage(player));
-    if (bySurnameWithImage) return bySurnameWithImage;
+    // For names like "D. Zima", never accept surname-only matches. They can map to a different player.
+    return byInitialAndSurname || null;
   }
 
   return pool.find((player) => normalizeSportsDbName(player.strPlayer).includes(normalizedAssetName) || normalizedAssetName.includes(normalizeSportsDbName(player.strPlayer))) ||
     pool.find((player) => pickPlayerImage(player)) ||
     pool[0] || null;
+}
+
+async function searchPlayerCandidates(assetName: string) {
+  const queries = playerSearchQueries(assetName);
+  const players: any[] = [];
+  const errors: string[] = [];
+
+  for (const query of queries) {
+    try {
+      const found = await searchPlayers(query);
+      players.push(...found);
+      if (bestPlayerMatch(assetName, uniqueByPlayerId(players))) break;
+    } catch (error: any) {
+      errors.push(`${query}: ${error?.message || 'lookup failed'}`);
+    }
+  }
+
+  return { players: uniqueByPlayerId(players), queries, error: errors.join('; ') || null };
 }
 
 function shouldReplaceImage(currentImage?: string | null) {
@@ -326,7 +329,7 @@ export async function POST(req: Request) {
           profile,
         });
 
-        await new Promise((resolve) => setTimeout(resolve, 200));
+        await new Promise((resolve) => setTimeout(resolve, 700));
       }
     } catch (error: any) {
       if (asset.type === 'PLAYER' && fallbackToTeamImage) {
