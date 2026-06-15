@@ -4,8 +4,14 @@ import prisma from '@/lib/prisma';
 export async function GET() {
   try {
     const assets = await prisma.asset.findMany({
+      where: {
+        OR: [
+          { type: 'TEAM' },
+          { type: 'PLAYER', isAvailable: true },
+        ],
+      },
       orderBy: [
-        { type: 'desc' }, // TEAM before PLAYER so national teams are visible first in market screens.
+        { type: 'desc' },
         { score: 'desc' },
         { marketPrice: 'desc' },
       ],
@@ -13,7 +19,9 @@ export async function GET() {
         priceHistory: {
           orderBy: { timestamp: 'asc' },
         },
-        players: true,
+        players: {
+          where: { isAvailable: true },
+        },
       },
     });
 
