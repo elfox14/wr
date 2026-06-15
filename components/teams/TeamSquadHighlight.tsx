@@ -41,8 +41,8 @@ function positionOrder(position?: string | null) {
   return 5;
 }
 
-export default function TeamSquadHighlight({ players = [] }: { players: any[] }) {
-  const rawPlayersCount = players.length;
+export default function TeamSquadHighlight({ players = [], rawPlayersCount }: { players: any[]; rawPlayersCount?: number }) {
+  const sourceCount = rawPlayersCount ?? players.length;
   const displayPlayers = dedupePlayers(players)
     .map(aggregatePlayer)
     .sort((a, b) => {
@@ -52,7 +52,7 @@ export default function TeamSquadHighlight({ players = [] }: { players: any[] })
       if (positionDiff) return positionDiff;
       return String(a.name || '').localeCompare(String(b.name || ''), 'ar');
     });
-  const duplicateCount = Math.max(0, rawPlayersCount - displayPlayers.length);
+  const duplicateCount = Math.max(0, sourceCount - displayPlayers.length);
 
   if (!displayPlayers.length) {
     return (
