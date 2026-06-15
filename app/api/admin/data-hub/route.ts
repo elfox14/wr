@@ -51,7 +51,7 @@ async function withPlaceholderIdCleanup<T extends Record<string, any>>(result: T
   return { ...result, placeholderIdCleanup };
 }
 
-const officialSquadNotice = 'Official World Cup squads are managed separately. Data Hub general squad imports are disabled.';
+const squadImportNotice = 'Data Hub general squad imports are disabled. football-data.org remains available only through a separate approved fallback or verification workflow when needed.';
 
 export async function GET(request: Request) {
   const admin = await requireAdmin(request);
@@ -67,7 +67,7 @@ export async function GET(request: Request) {
         ...status,
         ok: status.ok !== false,
         squadImportDisabled: true,
-        squadImportNotice: officialSquadNotice,
+        squadImportNotice,
         config: {
           ...getDataHubConfig(),
           token: undefined,
@@ -88,16 +88,16 @@ export async function GET(request: Request) {
         requestedFull,
         full: false,
         squadImportDisabled: true,
-        squadImportNotice: officialSquadNotice,
+        squadImportNotice,
       }));
     }
 
     if (action === 'sync-team') {
       return NextResponse.json({
         ok: false,
-        error: 'sync-team is disabled because it may import general provider squads.',
+        error: 'sync-team is disabled because it may import general Data Hub provider squads.',
         squadImportDisabled: true,
-        squadImportNotice: officialSquadNotice,
+        squadImportNotice,
       }, { status: 409 });
     }
 
@@ -117,7 +117,7 @@ export async function POST(request: Request) {
   try {
     if (action === 'status') {
       const status = await getDataHubStatus();
-      return NextResponse.json({ ...status, ok: status.ok !== false, squadImportDisabled: true, squadImportNotice: officialSquadNotice });
+      return NextResponse.json({ ...status, ok: status.ok !== false, squadImportDisabled: true, squadImportNotice });
     }
 
     if (action === 'cleanup-placeholder-api-ids') {
@@ -127,9 +127,9 @@ export async function POST(request: Request) {
     if (action === 'sync-team') {
       return NextResponse.json({
         ok: false,
-        error: 'sync-team is disabled because it may import general provider squads.',
+        error: 'sync-team is disabled because it may import general Data Hub provider squads.',
         squadImportDisabled: true,
-        squadImportNotice: officialSquadNotice,
+        squadImportNotice,
       }, { status: 409 });
     }
 
@@ -142,7 +142,7 @@ export async function POST(request: Request) {
         requestedFull,
         full: false,
         squadImportDisabled: true,
-        squadImportNotice: officialSquadNotice,
+        squadImportNotice,
       }));
     }
 
