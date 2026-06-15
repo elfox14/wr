@@ -1,4 +1,6 @@
 import { NextResponse } from 'next/server';
+import prisma from '@/lib/prisma';
+import { findGroupAFbrefStats, toTeamFBRefStats } from '@/lib/groupAFbrefStats';
 
 type StandingMetrics = {
   group?: string | null;
@@ -72,19 +74,38 @@ export type TeamFBRefStats = {
   standard: StandardMetrics | null;
 };
 
-export async function GET() {
-  return NextResponse.json({
-    available: false,
-    exportedAt: null,
-    sourceUrl: null,
-    standing: null,
-    shooting: null,
-    goalkeeping: null,
-    misc: null,
-    matchContext: null,
-    roster: null,
-    standard: null,
-  } satisfies TeamFBRefStats, {
+const unavailableStats: TeamFBRefStats = {
+  available: false,
+  exportedAt: null,
+  sourceUrl: null,
+  standing: null,
+  shooting: null,
+  goalkeeping: null,
+  misc: null,
+  matchContext: null,
+  roster: null,
+  standard: null,
+};
+
+export async function GET(_request: Request, { params }: { params: { id: string } }) {
+  const identifier = String(params.id || '').trim();
+
+  const team = await prisma.asset.findFirst({
+    where: {
+      type: 'TEAM',
+      OR: [
+        { id: identifier },
+        { code: identifier.toUpperCase() },
+      ],
+    },
+    select: { id: true, code: true, name: true },
+  });
+
+  const stats = findGroupAFbrefStats(team?.code || identifier)
+    || findGroupAFbrefStats(team?.name || identifier);
+  const response: TeamFBRefStats = stats ? toTeamFBRefStats(stats) : unavailableStats;
+
+  return NextResponse.json(response, {
     headers: { 'Cache-Control': 'public, s-maxage=600, stale-while-revalidate=300' },
   });
 }
