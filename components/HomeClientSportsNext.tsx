@@ -143,17 +143,12 @@ function scoreLabel(value?: number | null) {
   return typeof value === 'number' && Number.isFinite(value) ? formatCount(value) : '—';
 }
 
-function matchClock(match: HomeMatch, now: Date) {
+function matchClock(match: HomeMatch) {
   if (!isLiveMatch(match) && !match.isHalfTime) return null;
   if (typeof match.minute === 'number' && Number.isFinite(match.minute) && match.minute > 0) {
     return `${formatCount(Math.floor(match.minute))}′`;
   }
-
-  const start = match.matchDate ? new Date(match.matchDate) : null;
-  if (!start || Number.isNaN(start.getTime())) return null;
-
-  const elapsedMinutes = Math.max(1, Math.min(130, Math.floor((now.getTime() - start.getTime()) / 60_000)));
-  return `${formatCount(elapsedMinutes)}′`;
+  return null;
 }
 
 function TeamScoreBadge({ team, score, align }: { team?: Team | null; score?: number | null; align: 'right' | 'left' }) {
@@ -260,7 +255,7 @@ function InlineMatchTimer({ match }: { match: HomeMatch }) {
   }, []);
 
   const timing = matchTiming(match, now);
-  const clock = matchClock(match, now);
+  const clock = matchClock(match);
 
   return (
     <span className={`inline-flex min-w-0 items-center justify-center gap-1.5 rounded-full border px-2.5 py-1 text-center text-[11px] font-black ${timing.live ? 'border-[#00FF88]/25 bg-[#00FF88]/10 text-[#00FF88]' : timing.waiting ? 'border-[#FFD700]/20 bg-[#FFD700]/10 text-[#FFD700]' : 'border-[#0FF0FC]/20 bg-[#0FF0FC]/10 text-[#0FF0FC]'}`}>
@@ -359,365 +354,203 @@ function HomeMatchCenterCard({ fallbackMatches, upcomingMatchesCount }: { fallba
 
   const sourceMatches = matches.length ? matches : fallbackMatches;
   const now = new Date();
-  const todayCount = sourceMatches.filter((match) => isSameCalendarDay(match.matchDate, now)).length;
-  const liveCount = sourceMatches.filter(isLiveMatch).length;
-  const upcomingCount = matches.length ? sourceMatches.filter(isScheduledMatch).length : upcomingMatchesCount;
-  const finishedCount = sourceMatches.filter(isFinishedMatch).length;
-
-  const featuredMatches = useMemo(() => {
-    const sorted = [...sourceMatches].sort((a, b) => matchTime(a) - matchTime(b));
-    const priority = [
-      ...sorted.filter(isLiveMatch),
-      ...sorted.filter((match) => !isLiveMatch(match) && isSameCalendarDay(match.matchDate) && !isFinishedMatch(match)),
-      ...sorted.filter((match) => !isLiveMatch(match) && !isSameCalendarDay(match.matchDate) && isScheduledMatch(match)),
-      ...sorted.filter((match) => !isLiveMatch(match) && !isScheduledMatch(match)),
-    ];
-    const seen = new Set<string>();
-    return priority.filter((match) => {
-      const key = String(match.id || `${teamLabel(match.homeTeam)}-${teamLabel(match.awayTeam)}-${match.matchDate || ''}`);
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    }).slice(0, 2);
-  }, [sourceMatches]);
+  const todaysMatches = sourceMatches.filter((match) => isSameCalendarDay(match.matchDate, now));
+  const liveMatches = sourceMatches.filter((match) => isLiveMatch(match));
+  const upcomingMatches = sourceMatches
+    .filter((match) => !isFinishedMatch(match) && !isLiveMatch(match) && !match.isLikelyLiveByTime)
+    .sort((a, b) => matchTime(a) - matchTime(b));
+  const visibleMatches = liveMatches.length ? liveMatches : todaysMatches.length ? todaysMatches : upcomingMatches.slice(0, 4);
 
   return (
-    <section className="mb-4 overflow-hidden rounded-2xl border border-white/10 bg-white/[0.04] p-3 shadow-[0_14px_38px_rgba(0,0,0,0.2)] backdrop-blur sm:p-4" aria-label="مركز المباريات">
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <h2 className="text-base font-black text-white md:text-lg">مركز المباريات</h2>
-        <Link href="/matches" className="rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-[11px] font-black text-white transition hover:border-[#0FF0FC]/40 hover:bg-white/[0.14]">عرض الكل</Link>
+    <section className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.04] p-4 shadow-card backdrop-blur">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="text-xs font-black uppercase tracking-[0.16em] text-[#FFD700]">Match Center</p>
+          <h2 className="mt-1 text-2xl font-black text-white">مركز المباريات</h2>
+          <p className="mt-1 text-sm font-semibold text-gray-400">مباريات اليوم، البث التفاعلي، والنتائج المؤكدة.</p>
+        </div>
+        <Link href="/matches" className="rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-xs font-black text-gray-200 transition hover:bg-white/[0.08]">
+          عرض كل المباريات
+        </Link>
       </div>
 
-      <div className="mb-3 grid grid-cols-4 gap-2">
-        <Link href="/matches?filter=today" className="rounded-xl border border-white/10 bg-black/25 p-2 text-center transition hover:border-[#0FF0FC]/35 hover:bg-white/[0.07]"><div className="text-lg font-black text-[#FFD700]">{formatCount(todayCount)}</div><div className="text-[10px] font-black text-white">اليوم</div></Link>
-        <Link href="/matches?filter=live" className="rounded-xl border border-white/10 bg-black/25 p-2 text-center transition hover:border-[#0FF0FC]/35 hover:bg-white/[0.07]"><div className="text-lg font-black text-[#FFD700]">{formatCount(liveCount)}</div><div className="text-[10px] font-black text-white">مباشر</div></Link>
-        <Link href="/matches?filter=upcoming" className="rounded-xl border border-white/10 bg-black/25 p-2 text-center transition hover:border-[#0FF0FC]/35 hover:bg-white/[0.07]"><div className="text-lg font-black text-[#FFD700]">{formatCount(upcomingCount)}</div><div className="text-[10px] font-black text-white">متبقية</div></Link>
-        <Link href="/matches?filter=finished" className="rounded-xl border border-white/10 bg-black/25 p-2 text-center transition hover:border-[#0FF0FC]/35 hover:bg-white/[0.07]"><div className="text-lg font-black text-[#FFD700]">{formatCount(finishedCount)}</div><div className="text-[10px] font-black text-white">انتهت</div></Link>
-      </div>
-
-      {featuredMatches.length > 0 ? (
+      {visibleMatches.length ? (
         <div className="grid gap-3 lg:grid-cols-2">
-          {featuredMatches.map((match, index) => <UpcomingMatchCard key={match.id || index} match={match} />)}
+          {visibleMatches.map((match) => <UpcomingMatchCard key={String(match.id || match.animationMatchId || `${teamLabel(match.homeTeam)}-${teamLabel(match.awayTeam)}-${match.matchDate}`)} match={match} />)}
         </div>
       ) : (
-        <div className="rounded-2xl border border-white/10 bg-black/25 p-4 text-xs font-bold leading-6 text-gray-400">لا توجد مباراة جاهزة للعرض الآن. سيظهر هنا أقرب لقاء عند تحديث مركز المباريات.</div>
+        <div className="rounded-2xl border border-dashed border-white/10 bg-black/20 p-6 text-center text-sm font-bold text-gray-400">
+          لا توجد مباريات اليوم. القادم: {formatCount(upcomingMatchesCount)} مباراة مجدولة.
+        </div>
       )}
     </section>
   );
 }
 
-function StatBox({ value, label, note }: { value: string; label: string; note: string }) {
+function TournamentExplorerCard() {
+  const groups = groupLetters.slice(0, 8);
   return (
-    <div className="rounded-xl border border-white/10 bg-black/25 px-2 py-2 text-center">
-      <div className="text-lg font-black text-[#FFD700]">{value}</div>
-      <div className="mt-0.5 text-[10px] font-black text-white">{label}</div>
-      <div className="mt-0.5 text-[9px] font-bold text-gray-500">{note}</div>
-    </div>
+    <section className="rounded-2xl border border-white/10 bg-white/[0.04] p-4 shadow-card backdrop-blur">
+      <div className="mb-4 flex items-start justify-between gap-4">
+        <div>
+          <p className="text-xs font-black uppercase tracking-[0.16em] text-[#FFD700]">Tournament Guide</p>
+          <h2 className="mt-1 text-2xl font-black text-white">دليل البطولة</h2>
+          <p className="mt-1 text-sm font-semibold text-gray-400">انتقل سريعًا بين المجموعات، المنتخبات، والمدن المستضيفة.</p>
+        </div>
+        <Link href="/groups" className="rounded-xl border border-[#FFD700]/20 bg-[#FFD700]/10 px-3 py-2 text-xs font-black text-[#FFD700] transition hover:bg-[#FFD700]/15">المجموعات</Link>
+      </div>
+      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+        {groups.map((key) => {
+          const group = WORLD_CUP_2026_GROUPS[key];
+          return (
+            <Link key={key} href={`/groups/${encodeURIComponent(key)}`} className="rounded-xl border border-white/10 bg-black/25 p-3 transition hover:-translate-y-0.5 hover:border-[#FFD700]/30 hover:bg-white/[0.07]">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-sm font-black text-white">{group.arName}</span>
+                <span className="rounded-full bg-[#FFD700]/10 px-2 py-0.5 text-[10px] font-black text-[#FFD700]">{key}</span>
+              </div>
+              <p className="mt-2 text-xs font-bold leading-5 text-gray-400">{group.teams.map((team) => team.arName).join('، ')}</p>
+            </Link>
+          );
+        })}
+      </div>
+    </section>
   );
 }
 
-function buildFallbackStanding(group: WorldCup2026GroupKey): GroupStanding {
-  const data = WORLD_CUP_2026_GROUPS[group];
-  return {
-    key: group,
-    arName: data.arName,
-    finishedMatches: 0,
-    liveMatches: 0,
-    scheduledMatches: 0,
-    standings: data.teams.map((team) => ({
-      team: team.name,
-      code: team.codes[0],
-      played: 0,
-      won: 0,
-      drawn: 0,
-      lost: 0,
-      goalsFor: 0,
-      goalsAgainst: 0,
-      goalDifference: 0,
-      points: 0,
-    })),
-  };
+function ContentHubCard() {
+  const items = [
+    ['الأخبار والتحليل', 'تقارير وتحليلات رياضية منفصلة عن الجانب الترفيهي.', '/news'],
+    ['الإحصائيات', 'ملخصات مباشرة للأهداف والبطاقات وحالة المباريات.', '/stats'],
+    ['المنتخبات', 'بطاقات المنتخبات، اللاعبين، والمعلومات الأساسية.', '/teams'],
+  ] as const;
+
+  return (
+    <section className="rounded-2xl border border-white/10 bg-white/[0.04] p-4 shadow-card backdrop-blur">
+      <div className="mb-4">
+        <p className="text-xs font-black uppercase tracking-[0.16em] text-[#FFD700]">Content Hub</p>
+        <h2 className="mt-1 text-2xl font-black text-white">مركز المحتوى</h2>
+        <p className="mt-1 text-sm font-semibold text-gray-400">كل ما يخص البطولة من مباريات، منتخبات، وتحليل.</p>
+      </div>
+      <div className="grid gap-3 md:grid-cols-3">
+        {items.map(([title, body, href]) => (
+          <Link key={title} href={href} className="rounded-2xl border border-white/10 bg-black/25 p-4 transition hover:-translate-y-0.5 hover:border-[#0FF0FC]/30 hover:bg-white/[0.07]">
+            <h3 className="font-black text-white">{title}</h3>
+            <p className="mt-2 text-xs font-bold leading-6 text-gray-400">{body}</p>
+          </Link>
+        ))}
+      </div>
+    </section>
+  );
 }
 
-function SmartFeatureGrid() {
-  const [selectedGroup, setSelectedGroup] = useState<WorldCup2026GroupKey>('A');
+function WorldMapSection() {
+  return (
+    <section className="overflow-hidden rounded-2xl border border-white/10 bg-[radial-gradient(circle_at_top,rgba(15,240,252,0.12),transparent_30%),rgba(255,255,255,0.04)] p-4 shadow-card backdrop-blur">
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-xs font-black uppercase tracking-[0.16em] text-[#0FF0FC]">Global Stage</p>
+          <h2 className="mt-1 text-2xl font-black text-white">خريطة المنتخبات</h2>
+          <p className="mt-1 text-sm font-semibold text-gray-400">استعراض سريع للمناطق الكروية المشاركة في كأس العالم 2026.</p>
+        </div>
+        <Link href="/teams" className="rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-xs font-black text-gray-200 transition hover:bg-white/[0.08]">كل المنتخبات</Link>
+      </div>
+
+      <div className="grid gap-3 lg:grid-cols-2">
+        {teamRegions.map((region) => (
+          <div key={region.title} className="rounded-2xl border border-white/10 bg-black/25 p-3">
+            <h3 className="mb-2 text-sm font-black text-[#FFD700]">{region.title}</h3>
+            <div className="flex flex-wrap gap-1.5">
+              {region.teams.map((team) => <CountryChip key={`${region.title}-${team.name}`} team={team} />)}
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function HeroSection() {
+  return (
+    <section className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(15,240,252,0.14),transparent_28%),radial-gradient(circle_at_bottom_left,rgba(255,215,0,0.14),transparent_26%),linear-gradient(135deg,rgba(3,28,21,0.98),rgba(1,12,10,0.98))] p-5 shadow-[0_24px_90px_rgba(0,0,0,0.35)] sm:p-7">
+      <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#FFD700]/70 to-transparent" />
+      <div className="flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
+        <div className="max-w-3xl">
+          <div className="inline-flex items-center gap-2 rounded-full border border-[#FFD700]/25 bg-[#FFD700]/10 px-3 py-1 text-[11px] font-black uppercase tracking-[0.18em] text-[#FFD700]">
+            World Cup 2026 Live Hub
+          </div>
+          <h1 className="mt-4 text-4xl font-black leading-tight tracking-tight text-white md:text-5xl lg:text-6xl">
+            منصة كأس العالم 2026
+          </h1>
+          <p className="mt-4 max-w-2xl text-base font-semibold leading-8 text-gray-300 md:text-lg">
+            مباريات، منتخبات، مجموعات، إحصائيات، أخبار وتحليل رياضي في تجربة واحدة، مع فصل واضح بين المحتوى الكروي والجانب الترفيهي الافتراضي.
+          </p>
+          <div className="mt-6 flex flex-wrap gap-2">
+            {heroActions.map(([label, href, style]) => (
+              <Link key={label} href={href} className={`rounded-xl px-4 py-2 text-sm font-black transition ${style === 'primary' ? 'bg-[#0FF0FC] text-black hover:bg-[#4AFAFF]' : 'border border-white/10 bg-white/[0.06] text-white hover:bg-white/[0.1]'}`}>
+                {label}
+              </Link>
+            ))}
+          </div>
+        </div>
+
+        <div className="grid min-w-[260px] gap-3 rounded-[1.5rem] border border-white/10 bg-black/20 p-4">
+          <div className="text-xs font-black uppercase tracking-[0.16em] text-[#FFD700]">Hosts</div>
+          <div className="grid gap-2">
+            {hostCountries.map((host) => (
+              <div key={host.name} className="flex items-center justify-between rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2">
+                <span className="text-xl">{host.flag}</span>
+                <span className="text-sm font-black text-white">{host.name}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+export default function HomeClientSportsNext({ upcomingMatches = [], playersCount = 0, teamsCount = 0, upcomingMatchesCount = 0 }: Props) {
   const [summaryStats, setSummaryStats] = useState<SummaryStats | null>(null);
-  const [groupStandings, setGroupStandings] = useState<GroupStanding[]>([]);
-  const selectedStanding = groupStandings.find((group) => group.key === selectedGroup) || buildFallbackStanding(selectedGroup);
 
   useEffect(() => {
     let cancelled = false;
 
-    async function loadSummaryStats() {
+    async function loadSummary() {
       try {
         const response = await fetch('/api/matches/summary-stats', { cache: 'no-store' });
         if (!response.ok) return;
         const data = await response.json();
         if (!cancelled && data?.ok) setSummaryStats(data);
       } catch {
-        // Keep fallback values if the summary endpoint is unavailable.
+        // The hero keeps rendering with server-provided counts if the summary endpoint is unavailable.
       }
     }
 
-    async function loadGroupStandings() {
-      try {
-        const response = await fetch('/api/groups/standings', { cache: 'no-store' });
-        if (!response.ok) return;
-        const data = await response.json();
-        if (!cancelled && data?.ok && Array.isArray(data.groups)) setGroupStandings(data.groups);
-      } catch {
-        // Keep fallback group standings if the endpoint is unavailable.
-      }
-    }
-
-    loadSummaryStats();
-    loadGroupStandings();
-    const timer = window.setInterval(() => {
-      loadSummaryStats();
-      loadGroupStandings();
-    }, 60_000);
+    loadSummary();
+    const timer = window.setInterval(loadSummary, 60_000);
     return () => {
       cancelled = true;
       window.clearInterval(timer);
     };
   }, []);
 
-  const stats = {
-    totalMatches: summaryStats?.totalMatches ?? 104,
-    finishedMatches: summaryStats?.finishedMatches ?? 0,
-    liveMatches: summaryStats?.liveMatches ?? 0,
-    totalGoals: summaryStats?.totalGoals ?? 0,
-    yellowCards: summaryStats?.yellowCards ?? 0,
-    redCards: summaryStats?.redCards ?? 0,
-  };
+  const statsLinks = [
+    { value: formatCount(playersCount), label: 'لاعب', caption: 'قاعدة بيانات اللاعبين', href: '/players' },
+    { value: formatCount(teamsCount), label: 'منتخب', caption: 'فرق البطولة', href: '/teams' },
+    { value: formatCount(summaryStats?.totalGoals), label: 'هدف', caption: 'حسب نتائج المباريات', href: '/stats' },
+    { value: formatCount(summaryStats?.finishedMatches), label: 'مباراة منتهية', caption: 'تُحدّث تلقائيًا', href: '/matches' },
+  ];
 
   return (
-    <section className="mt-5" aria-label="أقسام كأس العالم 2026 التفاعلية">
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-        <article className="group relative overflow-hidden rounded-2xl border border-[#0FF0FC]/15 bg-[radial-gradient(circle_at_top_right,rgba(15,240,252,0.09),transparent_28%),rgba(255,255,255,0.045)] p-4 transition duration-200 hover:-translate-y-1 hover:border-[#0FF0FC]/40 hover:bg-white/[0.07] md:col-span-2 xl:col-span-3">
-          <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#0FF0FC]/60 to-transparent" />
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h3 className="text-base font-black text-white md:text-lg">المجموعات</h3>
-              <p className="mt-1 text-[11px] font-black text-[#FFD700]">المجموعة {selectedGroup} — {selectedStanding.arName}</p>
-            </div>
-            <Link href={`/groups?group=${selectedGroup}`} className="rounded-xl border border-[#FFD700]/20 bg-[#FFD700]/10 px-3 py-2 text-[11px] font-black text-[#FFD700] transition hover:bg-[#FFD700] hover:text-black">عرض تفاصيل المجموعة</Link>
-          </div>
-
-          <div className="mb-3 grid grid-cols-6 gap-1.5 md:grid-cols-12">
-            {groupLetters.map((group) => (
-              <button key={group} type="button" onClick={() => setSelectedGroup(group)} className={`rounded-lg border py-1.5 text-center text-[10px] font-black transition ${selectedGroup === group ? 'border-[#0FF0FC]/55 bg-[#0FF0FC]/20 text-[#0FF0FC] shadow-[0_0_18px_rgba(15,240,252,0.08)]' : 'border-white/10 bg-black/25 text-gray-300 hover:border-[#0FF0FC]/35 hover:text-[#0FF0FC]'}`}>
-                {group}
-              </button>
-            ))}
-          </div>
-
-          <div className="mb-3 grid grid-cols-3 gap-2">
-            <StatBox value={formatCount(selectedStanding.finishedMatches)} label="منتهية" note="في المجموعة" />
-            <StatBox value={formatCount(selectedStanding.liveMatches)} label="مباشرة" note="الآن" />
-            <StatBox value={formatCount(selectedStanding.scheduledMatches)} label="قادمة" note="متبقية" />
-          </div>
-
-          <div className="overflow-x-auto rounded-xl border border-[#0FF0FC]/15 bg-black/30 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
-            <table className="min-w-[800px] w-full text-right text-[11px] font-bold text-gray-300">
-              <thead className="bg-gradient-to-l from-[#0FF0FC]/10 via-white/[0.045] to-[#FFD700]/10 text-[10px] font-black text-gray-400">
-                <tr>
-                  <th className="px-3 py-2">#</th>
-                  <th className="px-3 py-2">المنتخب</th>
-                  <th className="px-3 py-2 text-center">لعب</th>
-                  <th className="px-3 py-2 text-center">فاز</th>
-                  <th className="px-3 py-2 text-center">تعادل</th>
-                  <th className="px-3 py-2 text-center">خسر</th>
-                  <th className="px-3 py-2 text-center">له</th>
-                  <th className="px-3 py-2 text-center">عليه</th>
-                  <th className="px-3 py-2 text-center">فرق</th>
-                  <th className="px-3 py-2 text-center text-[#FFD700]">نقاط</th>
-                </tr>
-              </thead>
-              <tbody>
-                {selectedStanding.standings.map((row, index) => (
-                  <tr key={`${selectedGroup}-${row.code}`} className={`border-t border-white/10 transition hover:bg-white/[0.035] ${index < 2 ? 'bg-[#0FF0FC]/[0.035]' : index === 2 ? 'bg-[#FFD700]/[0.025]' : ''}`}>
-                    <td className="px-3 py-2 text-[#0FF0FC]">{index + 1}</td>
-                    <td className="px-3 py-2">
-                      <div className="flex items-center gap-2">
-                        <span className="flex h-7 w-7 items-center justify-center rounded-lg border border-white/10 bg-white/[0.06] text-base">{flagForCode(row.code)}</span>
-                        <div className="min-w-0">
-                          <div className="truncate font-black text-white">{row.team}</div>
-                          <div className="text-[10px] font-black text-[#0FF0FC]">{row.code}</div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-3 py-2 text-center">{formatCount(row.played)}</td>
-                    <td className="px-3 py-2 text-center text-emerald-200">{formatCount(row.won)}</td>
-                    <td className="px-3 py-2 text-center">{formatCount(row.drawn)}</td>
-                    <td className="px-3 py-2 text-center text-red-200">{formatCount(row.lost)}</td>
-                    <td className="px-3 py-2 text-center">{formatCount(row.goalsFor)}</td>
-                    <td className="px-3 py-2 text-center">{formatCount(row.goalsAgainst)}</td>
-                    <td className="px-3 py-2 text-center">{row.goalDifference > 0 ? '+' : ''}{formatCount(row.goalDifference)}</td>
-                    <td className="px-3 py-2 text-center text-[#FFD700]">{formatCount(row.points)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          <p className="mt-2 text-[10px] font-bold text-gray-500">الترتيب محسوب من نتائج المباريات المنتهية فقط. قبل بداية مباريات المجموعة تظهر الأرقام صفرية.</p>
-        </article>
-
-        <Link href="/players" className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.045] p-4 transition duration-200 hover:-translate-y-1 hover:border-[#0FF0FC]/35 hover:bg-white/[0.07] md:col-span-2 xl:col-span-3">
-          <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#0FF0FC]/50 to-transparent opacity-0 transition group-hover:opacity-100" />
-          <div className="mb-3 flex flex-wrap items-start justify-between gap-4">
-            <div>
-              <h3 className="text-base font-black text-white md:text-lg">الإحصائيات</h3>
-              <p className="mt-2 text-xs font-bold leading-6 text-gray-400">أرقام فعلية من API المباريات وقاعدة البيانات، وليست أرقامًا ثابتة.</p>
-            </div>
-            <span className="rounded-full border border-[#0FF0FC]/20 bg-[#0FF0FC]/10 px-2.5 py-1 text-[10px] font-black text-[#0FF0FC]">مصدر الأرقام: API</span>
-          </div>
-          <div className="grid grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-6">
-            <StatBox value={formatCount(stats.totalMatches)} label="مباراة" note="إجمالي الجدول" />
-            <StatBox value={formatCount(stats.finishedMatches)} label="انتهت" note="حسب الحالة" />
-            <StatBox value={formatCount(stats.totalGoals)} label="هدف" note="من النتائج" />
-            <StatBox value={formatCount(stats.liveMatches)} label="مباشر" note="الآن" />
-            <StatBox value={formatCount(stats.yellowCards)} label="صفراء" note="آخر Snapshot" />
-            <StatBox value={formatCount(stats.redCards)} label="حمراء" note="آخر Snapshot" />
-          </div>
-          <div className="mt-3 text-[11px] font-black text-[#FFD700]">عرض الإحصائيات ←</div>
-        </Link>
-
-        <Link href="/teams" className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.045] p-4 transition duration-200 hover:-translate-y-1 hover:border-[#0FF0FC]/35 hover:bg-white/[0.07] md:col-span-2 xl:col-span-3">
-          <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#0FF0FC]/50 to-transparent opacity-0 transition group-hover:opacity-100" />
-          <div className="mb-3 flex flex-wrap items-start justify-between gap-4">
-            <div>
-              <h3 className="text-base font-black text-white md:text-lg">دليل المنتخبات</h3>
-              <p className="mt-2 text-xs font-bold leading-6 text-gray-400">تصنيف سريع للمنتخبات حسب الاستضافة والمنطقة الجغرافية، مع علم كل دولة.</p>
-            </div>
-            <span className="rounded-full border border-white/10 bg-black/25 px-3 py-1.5 text-[10px] font-black text-[#FFD700]">48 منتخب</span>
-          </div>
-          <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
-            {teamRegions.map((region) => (
-              <div key={region.title} className="rounded-xl border border-white/10 bg-black/25 p-3">
-                <div className="mb-2 text-[10px] font-black text-[#0FF0FC]">{region.title}</div>
-                <div className="flex flex-wrap gap-1.5">
-                  {region.teams.map((team) => <CountryChip key={`${region.title}-${team.name}`} team={team} />)}
-                </div>
-              </div>
-            ))}
-          </div>
-          <div className="mt-3 text-[11px] font-black text-[#FFD700]">استكشف المنتخبات ←</div>
-        </Link>
-
-        <Link href="/news" className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.045] p-4 transition duration-200 hover:-translate-y-1 hover:border-[#0FF0FC]/35 hover:bg-white/[0.07] md:col-span-2 xl:col-span-3">
-          <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#0FF0FC]/50 to-transparent opacity-0 transition group-hover:opacity-100" />
-          <div className="grid gap-3 md:grid-cols-[0.7fr_1.3fr] md:items-center">
-            <div className="flex items-start justify-between gap-4">
-              <h3 className="text-base font-black text-white md:text-lg">الأخبار والتحليل</h3>
-              <span className="rounded-full border border-emerald-400/20 bg-emerald-400/10 px-2.5 py-1 text-[10px] font-black text-emerald-200">تحليل رياضي</span>
-            </div>
-            <div className="rounded-xl border border-white/10 bg-black/25 p-3">
-              <p className="text-xs font-bold leading-6 text-gray-400">أخبار البطولة وتحليل فني رياضي فقط، بعيدًا عن أي توصيات أو جانب تجاري.</p>
-              <p className="mt-1 text-[11px] font-black text-[#FFD700]">تقارير، قراءة تكتيكية، ومتابعة يومية عند توفر المصادر ←</p>
-            </div>
-          </div>
-        </Link>
-
-        <Link href="/animation-live" className="group relative overflow-hidden rounded-2xl border border-red-400/20 bg-red-500/[0.055] p-4 transition duration-200 hover:-translate-y-1 hover:border-red-300/45 hover:bg-red-500/[0.08] md:col-span-2 xl:col-span-3">
-          <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-red-300/50 to-transparent opacity-70" />
-          <div className="grid gap-3 md:grid-cols-[0.7fr_1.3fr] md:items-center">
-            <div className="flex items-start justify-between gap-4">
-              <h3 className="text-base font-black text-white md:text-lg">البث التفاعلي</h3>
-              <span className="rounded-full border border-red-300/20 bg-red-400/10 px-2.5 py-1 text-[10px] font-black text-red-100">LIVE</span>
-            </div>
-            <div className="rounded-xl border border-red-300/15 bg-black/25 p-3">
-              <p className="text-xs font-bold leading-6 text-gray-300">متابعة مرئية للمباريات الجارية والقريبة عند توفر بيانات حية ورسوم زمنية.</p>
-              <span className="mt-2 inline-flex items-center gap-2 text-[11px] font-black text-red-100"><span className="h-2 w-2 animate-pulse rounded-full bg-red-300" /> دخول البث الآن ←</span>
-            </div>
-          </div>
-        </Link>
-
-        <Link href="/matches" className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.045] p-4 transition duration-200 hover:-translate-y-1 hover:border-[#0FF0FC]/35 hover:bg-white/[0.07] md:col-span-2 xl:col-span-3">
-          <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#0FF0FC]/50 to-transparent opacity-0 transition group-hover:opacity-100" />
-          <div className="grid gap-3 md:grid-cols-[0.7fr_1.3fr] md:items-center">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <h3 className="text-base font-black text-white md:text-lg">الدول المستضيفة</h3>
-                <p className="mt-2 text-xs font-bold leading-6 text-gray-400">نسخة تاريخية موزعة على ثلاث دول مستضيفة.</p>
-              </div>
-              <span className="rounded-full border border-white/10 bg-black/25 px-2.5 py-1 text-[10px] font-black text-[#FFD700]">3 دول</span>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {hostCountries.map((country) => <CountryChip key={country.name} team={country} />)}
-            </div>
-          </div>
-          <div className="mt-3 text-[11px] font-black text-[#FFD700]">متابعة الجدول ←</div>
-        </Link>
+    <main className="space-y-4">
+      <HeroSection />
+      <HomeMatchCenterCard fallbackMatches={upcomingMatches} upcomingMatchesCount={upcomingMatchesCount} />
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {statsLinks.map((item) => <StatLinkCard key={item.label} {...item} />)}
       </div>
-    </section>
-  );
-}
-
-export default function HomeClientSportsNext(props: Props) {
-  const upcomingMatchesCount = props.upcomingMatchesCount ?? 0;
-
-  const stats = [
-    { value: '48', label: 'منتخب', caption: 'دليل المنتخبات المشاركة', href: '/teams' },
-    { value: '104', label: 'مباراة', caption: 'من الافتتاح إلى النهائي', href: '/matches' },
-    { value: '3', label: 'دول مستضيفة', caption: 'أمريكا، كندا، المكسيك', href: '/matches' },
-    { value: formatCount(upcomingMatchesCount), label: 'أقرب المباريات', caption: 'داخل مركز المباريات', href: '/matches' },
-  ] as const;
-
-  return (
-    <main dir="rtl" className="relative overflow-hidden bg-[#050505] px-4 py-5 text-white sm:px-6 lg:px-8">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_8%,rgba(15,240,252,0.1),transparent_26%),radial-gradient(circle_at_80%_12%,rgba(255,215,0,0.08),transparent_24%),radial-gradient(circle_at_50%_100%,rgba(0,128,96,0.08),transparent_28%)]" />
-
-      <div className="relative mx-auto max-w-7xl">
-        <HomeMatchCenterCard fallbackMatches={props.upcomingMatches ?? []} upcomingMatchesCount={upcomingMatchesCount} />
-
-        <section className="relative overflow-hidden rounded-2xl border border-white/10 bg-[#07111f] shadow-[0_18px_46px_rgba(0,0,0,0.34)]">
-          <div className="absolute inset-0 bg-gradient-to-br from-[#07111f] via-[#081826] to-black" />
-          <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#FFD700]/55 to-transparent" />
-          <div className="absolute -right-16 top-2 h-40 w-40 rounded-full bg-[#0FF0FC]/10 blur-3xl" />
-          <div className="absolute -left-16 bottom-2 h-40 w-40 rounded-full bg-[#FFD700]/7 blur-3xl" />
-
-          <div className="relative z-10 p-4 sm:p-5 lg:p-6">
-            <div className="inline-flex items-center gap-2 rounded-full border border-[#0FF0FC]/25 bg-[#0FF0FC]/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-[#0FF0FC]">
-              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#00FF88]" />
-              WORLD CUP 2026 LIVE CENTER
-            </div>
-
-            <h1 className="mt-3 max-w-4xl text-xl font-black leading-snug tracking-tight text-white md:text-2xl lg:text-3xl">
-              كل شيء عن كأس العالم 2026 في مكان واحد
-            </h1>
-
-            <p className="mt-2 max-w-4xl text-xs font-semibold leading-6 text-gray-300 md:text-sm md:leading-7">
-              تابع البطولة لحظة بلحظة: مباريات اليوم، النتائج، الأخبار، التحليلات الفنية، الإحصائيات، المنتخبات، الملاعب، والمدن المستضيفة في تجربة رياضية واحدة.
-            </p>
-
-            <div className="mt-4 flex flex-wrap gap-2">
-              {heroActions.map(([label, href, variant]) => (
-                <Link
-                  key={href + label}
-                  href={href}
-                  className={
-                    variant === 'primary'
-                      ? 'rounded-xl bg-[#0FF0FC] px-4 py-2 text-[11px] font-black text-black shadow-[0_0_18px_rgba(15,240,252,0.18)] transition hover:-translate-y-0.5 hover:bg-[#4AFAFF]'
-                      : 'rounded-xl border border-white/10 bg-white/10 px-4 py-2 text-[11px] font-black text-white transition hover:-translate-y-0.5 hover:border-[#FFD700]/40 hover:bg-white/[0.14]'
-                  }
-                >
-                  {label}
-                </Link>
-              ))}
-            </div>
-
-            <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-              {stats.map((stat) => (
-                <StatLinkCard key={stat.label} {...stat} />
-              ))}
-            </div>
-          </div>
-        </section>
-
-        <SmartFeatureGrid />
-      </div>
+      <TournamentExplorerCard />
+      <ContentHubCard />
+      <WorldMapSection />
     </main>
   );
 }
