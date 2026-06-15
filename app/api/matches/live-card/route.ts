@@ -68,6 +68,10 @@ function nullableNumber(value: unknown) {
   return Number.isFinite(n) ? n : null;
 }
 
+function hasAnyNumber(...values: unknown[]) {
+  return values.some((value) => nullableNumber(value) !== null);
+}
+
 function providerMinute(value: any) {
   const raw = value?.fixture?.status?.elapsed ?? value?.fixture?.status?.minute ?? value?.minute ?? value?.elapsed;
   const n = Number(raw);
@@ -147,16 +151,20 @@ function decorateMatch(match: any, now: Date, providerState?: any, snapshotState
   const isProviderLive = !isFinished && isProviderLiveStatus(providerStatus);
   const isLikelyLiveByTime = !isFinished && !providerHasState && dbStatus === 'SCHEDULED' && localMinute >= 1 && localMinute < maxLiveMinutes(match);
   const isLiveNow = !isFinished && (isDbLive || isProviderLive || isLikelyLiveByTime);
-  const localFirstHalfMinute = isLikelyLiveByTime && localMinute <= 45 ? Math.max(1, localMinute) : null;
-  const displayMinute = isHalfTime ? null : (providerHasMinute && !staleByTime ? providerState.minute : (snapshotMinute ?? localFirstHalfMinute));
-  const fallbackLabel = isLikelyLiveByTime && localMinute > 65 ? 'الشوط الثاني جارٍ' : null;
+  const localSafeMinute = isLiveNow && localMinute >= 1 && localMinute < maxLiveMinutes(match) ? Math.max(1, Math.min(150, localMinute)) : null;
+  const displayMinute = isHalfTime ? null : (providerHasMinute && !staleByTime ? providerState.minute : (snapshotMinute ?? localSafeMinute));
+  const fallbackLabel = isLiveNow && localSafeMinute && localSafeMinute > 65 ? 'الشوط الثاني جارٍ' : null;
+  const providerHasScore = hasAnyNumber(providerState?.homeScore, providerState?.awayScore);
+  const snapshotHasScore = hasAnyNumber(snapshotState?.homeScore, snapshotState?.awayScore);
+  const useSnapshotScore = !providerHasScore && snapshotHasScore && (isLiveNow || isFinished);
+  const scoreSource = providerHasScore ? 'provider' : useSnapshotScore ? 'snapshot' : 'match';
 
   return {
     ...match,
     status: isFinished ? 'FINISHED' : isHalfTime ? 'HT' : (isProviderLive ? 'IN_PLAY' : match.status),
-    homeScore: pickLiveScore(providerState?.homeScore, snapshotState?.homeScore, match.homeScore),
-    awayScore: pickLiveScore(providerState?.awayScore, snapshotState?.awayScore, match.awayScore),
-    scoreSource: providerState?.homeScore != null || providerState?.awayScore != null ? 'provider' : snapshotState ? 'snapshot' : 'match',
+    homeScore: pickLiveScore(providerState?.homeScore, useSnapshotScore ? snapshotState?.homeScore : null, match.homeScore),
+    awayScore: pickLiveScore(providerState?.awayScore, useSnapshotScore ? snapshotState?.awayScore : null, match.awayScore),
+    scoreSource,
     isLiveNow,
     isHalfTime,
     isLikelyLiveByTime,
