@@ -1,5 +1,7 @@
 'use client';
 
+import { dedupePlayers, hasUsablePlayerImage } from '@/lib/playerDedupe';
+
 function sum(values: any[], key: string) {
   return values.reduce((total, item) => total + (Number(item?.[key]) || 0), 0);
 }
@@ -40,7 +42,8 @@ function positionOrder(position?: string | null) {
 }
 
 export default function TeamSquadHighlight({ players = [] }: { players: any[] }) {
-  const displayPlayers = players
+  const rawPlayersCount = players.length;
+  const displayPlayers = dedupePlayers(players)
     .map(aggregatePlayer)
     .sort((a, b) => {
       const scoreDiff = b.score - a.score;
@@ -49,6 +52,7 @@ export default function TeamSquadHighlight({ players = [] }: { players: any[] })
       if (positionDiff) return positionDiff;
       return String(a.name || '').localeCompare(String(b.name || ''), 'ar');
     });
+  const duplicateCount = Math.max(0, rawPlayersCount - displayPlayers.length);
 
   if (!displayPlayers.length) {
     return (
@@ -67,17 +71,23 @@ export default function TeamSquadHighlight({ players = [] }: { players: any[] })
         <div>
           <h2 className="text-2xl font-black mb-2">قائمة اللاعبين</h2>
           <p className="text-gray-400 text-sm">
-            يتم عرض كل اللاعبين المتاحين لهذا المنتخب في قاعدة البيانات الحالية، وليس أول 9 لاعبين فقط.
+            يتم دمج النسخ المتكررة لنفس اللاعب وتفضيل النسخة التي تحتوي على صورة لاعب حقيقية واسم أوضح.
           </p>
         </div>
         <div className="rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-sm font-bold text-gray-300">
-          <span className="text-2xl font-black text-white">{displayPlayers.length}</span> لاعب مسجل
+          <span className="text-2xl font-black text-white">{displayPlayers.length}</span> لاعب بعد الدمج
         </div>
       </div>
 
+      {duplicateCount > 0 ? (
+        <div className="rounded-2xl border border-[#0FF0FC]/20 bg-[#0FF0FC]/10 p-4 text-sm font-bold leading-7 text-cyan-100">
+          تم إخفاء {duplicateCount} نسخة مكررة من العرض الحالي؛ البيانات الأصلية موجودة كما هي في قاعدة البيانات.
+        </div>
+      ) : null}
+
       {displayPlayers.length < 26 ? (
         <div className="rounded-2xl border border-yellow-500/20 bg-yellow-500/10 p-4 text-sm font-bold leading-7 text-yellow-100">
-          القائمة الحالية أقل من 26 لاعبًا؛ هذا يعني أن قاعدة البيانات لم تستقبل القائمة الكاملة لهذا المنتخب بعد، ولن يتم اختراع أسماء غير موجودة.
+          القائمة الحالية أقل من 26 لاعبًا بعد الدمج؛ هذا يعني أن قاعدة البيانات لم تستقبل القائمة الكاملة لهذا المنتخب بعد، ولن يتم اختراع أسماء غير موجودة.
         </div>
       ) : null}
       
@@ -86,7 +96,7 @@ export default function TeamSquadHighlight({ players = [] }: { players: any[] })
           <div key={player.id} className="bg-[#111] border border-white/10 rounded-2xl p-5 hover:border-[#0FF0FC]/50 transition-colors">
             <div className="flex items-start gap-4 mb-4">
               <div className="w-16 h-16 rounded-full bg-white/10 border-2 border-white/20 flex-shrink-0 flex items-center justify-center font-black text-xl overflow-hidden">
-                {player.image ? <img src={player.image} alt={player.name} className="w-full h-full rounded-full object-cover" /> : player.name?.charAt(0) || '؟'}
+                {hasUsablePlayerImage(player.image) ? <img src={player.image} alt={player.name} className="w-full h-full rounded-full object-cover" /> : player.name?.charAt(0) || '؟'}
               </div>
               <div>
                 <h3 className="font-bold text-lg">{player.name}</h3>
@@ -119,7 +129,7 @@ export default function TeamSquadHighlight({ players = [] }: { players: any[] })
   );
 }
 
-function Stat({ label, value }: { label: string; value: string | number }) {
+function Stat({ label, value }: { label: string | number; value: string | number }) {
   return (
     <div>
       <p className="text-gray-500 text-xs">{label}</p>
