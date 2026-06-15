@@ -13,7 +13,7 @@ import { findGroupLFbrefStats, toTeamFBRefStats as toGroupLTeamFBRefStats } from
 
 type StandingMetrics = {
   group?: string | null;
-  rank?: string | null;
+  rank?: string | number | null;
   mp?: number | null;
   wins?: number | null;
   draws?: number | null;
@@ -37,7 +37,7 @@ type GoalkeepingMetrics = {
   saves?: number | null;
   shotsOnTargetAgainst?: number | null;
   goalsAgainst?: number | null;
-  savePercentage?: string | null;
+  savePercentage?: string | number | null;
 };
 
 type MiscMetrics = {
