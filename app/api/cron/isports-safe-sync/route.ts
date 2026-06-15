@@ -7,6 +7,8 @@ import { syncFootballDataFallbackForMatch } from '@/lib/football-data-fallback';
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
+process.env.ISPORTS_DAILY_SOFT_LIMIT ||= '200';
+
 function reasonFrom(error: any) {
   if (typeof error?.payload === 'string') return error.payload;
   if (error?.payload) return JSON.stringify(error.payload);
@@ -167,6 +169,7 @@ export async function GET(req: Request) {
       quotaProtection: {
         note: 'iSports requests are also protected by a local rolling 24h soft limit before calling the external provider.',
         env: 'ISPORTS_DAILY_SOFT_LIMIT',
+        defaultSoftLimit: 200,
       },
       count: processed.length,
       processed,
