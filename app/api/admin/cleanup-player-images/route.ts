@@ -1,57 +1,81 @@
-import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/lib/auth";
-import prisma from "@/lib/prisma";
+import { NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
+import prisma from '@/lib/prisma';
+import { authOptions } from '@/lib/auth';
+import { hasUsablePlayerImage, isLikelyFlagOrTeamImage } from '@/lib/playerDedupe';
 
-function isEmoji(value: string) {
-  if (!value) return false;
-  return (
-    value.length <= 8 &&
-    /[\u{1F300}-\u{1F9FF}]|[\u{1F600}-\u{1F64F}]|[\u{1F680}-\u{1F6FF}]|[\u{2600}-\u{27BF}]|[\u{1F1E6}-\u{1F1FF}]{2}/u.test(value)
-  );
+type AdminSession = { user?: { email?: string | null; role?: string | null } } | null;
+
+function isAdminSession(session: AdminSession) {
+  const email = session?.user?.email || '';
+  return session?.user?.role === 'ADMIN' || email === 'worldcup@mcprim.com' || email === 'elfox14usa@gmail.com';
 }
 
-function shouldCleanImage(image?: string | null) {
-  if (!image) return true;
-  if (image === "👤") return true;
-  if (isEmoji(image)) return true;
-  if (image.includes("flagcdn.com")) return true;
-  return false;
+async function requireAdmin() {
+  const session = await getServerSession(authOptions as any) as AdminSession;
+  if (!session?.user) return { error: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) };
+  if (!isAdminSession(session)) return { error: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) };
+  return { session };
+}
+
+function toBool(value: string | null, fallback = false) {
+  if (value === null) return fallback;
+  return ['1', 'true', 'yes', 'on'].includes(value.toLowerCase());
+}
+
+async function cleanup(req: Request) {
+  const admin = await requireAdmin();
+  if (admin.error) return admin.error;
+
+  const { searchParams } = new URL(req.url);
+  const dryRun = toBool(searchParams.get('dryRun'), true);
+  const teamId = searchParams.get('teamId');
+
+  const players = await prisma.asset.findMany({
+    where: {
+      type: 'PLAYER',
+      image: { not: null },
+      ...(teamId ? { teamId } : {}),
+    },
+    select: {
+      id: true,
+      name: true,
+      image: true,
+      teamId: true,
+      team: { select: { name: true, code: true } },
+    },
+    orderBy: [{ team: { name: 'asc' } }, { name: 'asc' }],
+    take: 5000,
+  });
+
+  const invalid = players.filter((player) => player.image && (!hasUsablePlayerImage(player.image) || isLikelyFlagOrTeamImage(player.image)));
+
+  if (!dryRun && invalid.length) {
+    await prisma.asset.updateMany({
+      where: { id: { in: invalid.map((player) => player.id) } },
+      data: { image: null },
+    });
+  }
+
+  return NextResponse.json({
+    ok: true,
+    dryRun,
+    checked: players.length,
+    invalidImages: invalid.length,
+    updated: dryRun ? 0 : invalid.length,
+    samples: invalid.slice(0, 30).map((player) => ({
+      id: player.id,
+      name: player.name,
+      team: player.team?.name || player.teamId,
+      image: player.image,
+    })),
+  });
+}
+
+export async function GET(req: Request) {
+  return cleanup(req);
 }
 
 export async function POST(req: Request) {
-  try {
-    const session = await getServerSession(authOptions);
-
-    if (!session || !session.user || session.user.email !== "worldcup@mcprim.com") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const players = await prisma.asset.findMany({
-      where: { type: "PLAYER" },
-      select: { id: true, name: true, image: true }
-    });
-
-    const cleanedPlayers = [];
-
-    for (const player of players) {
-      if (shouldCleanImage(player.image)) {
-        await prisma.asset.update({
-          where: { id: player.id },
-          data: { image: "" }
-        });
-        cleanedPlayers.push({ id: player.id, name: player.name, previousImage: player.image });
-      }
-    }
-
-    return NextResponse.json({
-      success: true,
-      totalProcessed: players.length,
-      totalCleaned: cleanedPlayers.length,
-      cleaned: cleanedPlayers
-    });
-  } catch (err: any) {
-    console.error("Cleanup player images error:", err);
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
-  }
+  return cleanup(req);
 }
