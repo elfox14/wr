@@ -49,8 +49,7 @@ export default function TeamMatchesList({ team, matches = [] }: { team?: any; ma
     <div className="space-y-4">
       <h2 className="text-2xl font-black mb-6">مباريات كأس العالم 2026</h2>
       <div className="bg-[#111] border border-white/10 rounded-2xl overflow-hidden">
-        {/* Desktop Table */}
-        <div className="hidden md:block overflow-x-auto">
+        <div className="overflow-x-auto">
           <table className="w-full text-sm text-right">
             <thead className="bg-white/5 text-gray-400 border-b border-white/10">
               <tr>
@@ -104,60 +103,6 @@ export default function TeamMatchesList({ team, matches = [] }: { team?: any; ma
               })}
             </tbody>
           </table>
-        </div>
-
-        {/* Mobile Cards */}
-        <div className="md:hidden divide-y divide-white/5">
-          {matches.map((match: any) => {
-            const snapshot = latestSnapshot(match);
-            const label = statusLabel(match.status);
-            return (
-              <div key={`mobile-${match.id}`} className="p-5 space-y-4 hover:bg-white/[0.02] transition-colors">
-                <div className="flex justify-between items-center">
-                  <span className={`px-2 py-1 rounded text-xs font-bold ${label === 'مباشرة' ? 'bg-red-500/20 text-red-500' : 'bg-white/10 text-gray-400'}`}>
-                    {label}
-                  </span>
-                  <span className="text-xs text-gray-400">{formatDate(match.matchDate)}</span>
-                </div>
-                
-                <div className="flex items-center justify-between">
-                  <div className="flex-1 font-bold text-base truncate">
-                    {match.homeTeam?.name || 'غير متوفر'}
-                  </div>
-                  <div className="px-4 text-center font-black text-xl" dir="ltr">
-                    {scoreLabel(match)}
-                  </div>
-                  <div className="flex-1 text-left font-bold text-base truncate">
-                    {match.awayTeam?.name || 'غير متوفر'}
-                  </div>
-                </div>
-
-                <div className="flex flex-col gap-2 text-xs text-gray-400 bg-black/20 p-3 rounded-xl border border-white/5">
-                  <div className="flex justify-between">
-                    <span>الجولة:</span>
-                    <span className="font-bold text-gray-300">{match.groupPhase || match.stage || 'غير متوفر'}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>الملعب:</span>
-                    <span className="font-bold text-gray-300">غير متوفر في المصادر</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>الاستحواذ:</span>
-                    <span className="font-bold text-gray-300" dir="ltr">
-                      {snapshot ? `${snapshot.homePossession ?? '-'}% / ${snapshot.awayPossession ?? '-'}%` : 'غير متوفر'}
-                    </span>
-                  </div>
-                </div>
-
-                <a
-                  href={`/match-center/${match.id}`}
-                  className="block w-full text-center py-3 bg-white/5 hover:bg-[#0FF0FC] hover:text-black transition-colors rounded-xl font-bold text-sm"
-                >
-                  تحليل المباراة
-                </a>
-              </div>
-            );
-          })}
         </div>
       </div>
       {team?.isDemo && <p className="text-xs text-yellow-200/80">هذه صفحة اختبار؛ لا يتم عرض أي مباريات وهمية.</p>}

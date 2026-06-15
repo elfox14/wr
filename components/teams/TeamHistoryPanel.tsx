@@ -59,7 +59,7 @@ export default function TeamHistoryPanel({ team, matches = [], report }: { team:
       <div>
         <h2 className="text-2xl font-black mb-6">تاريخ كأس العالم</h2>
         <div className="mb-4 rounded-2xl border border-white/10 bg-[#111] p-5">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+          <div className="grid grid-cols-2 gap-4 text-sm">
             <Info label="عدد المشاركات" value={team.participations ?? 'غير متوفر في المصادر'} />
             <Info label="أفضل إنجاز" value={metrics?.bestWorldCupFinish || 'غير متوفر في المصادر'} />
             <Info label="أول مشاركة" value={metrics?.firstWorldCup || 'غير متوفر في المصادر'} />
@@ -89,7 +89,7 @@ function H2HCard({ opponent, played, won, drawn, lost, goalsFor, goalsAgainst, l
         <h3 className="font-bold text-lg">ضد {opponent}</h3>
         <span className="text-xs text-gray-400">آخر مواجهة: {lastMatch || 'غير متوفر'}</span>
       </div>
-      <div className="grid grid-cols-3 sm:grid-cols-6 gap-y-4 gap-x-2 text-center text-sm">
+      <div className="grid grid-cols-6 gap-2 text-center text-sm">
         <Small label="لعب" value={played} />
         <Small label="فاز" value={won} />
         <Small label="تعادل" value={drawn} />
