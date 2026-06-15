@@ -61,6 +61,10 @@ type StandardMetrics = {
   minutesLeaders?: string[];
 };
 
+type RouteContext = {
+  params: Promise<{ id: string }>;
+};
+
 export type TeamFBRefStats = {
   available: boolean;
   exportedAt: string | null;
@@ -87,8 +91,9 @@ const unavailableStats: TeamFBRefStats = {
   standard: null,
 };
 
-export async function GET(_request: Request, { params }: { params: { id: string } }) {
-  const identifier = String(params.id || '').trim();
+export async function GET(_request: Request, context: RouteContext) {
+  const { id } = await context.params;
+  const identifier = String(id || '').trim();
 
   const team = await prisma.asset.findFirst({
     where: {
