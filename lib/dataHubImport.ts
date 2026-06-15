@@ -1,6 +1,9 @@
 import prisma from '@/lib/prisma';
 import { extractDataHubArray, getDataHubTeam, getDataHubTeams, getDataHubSummary, getDataHubReadiness, getDataHubSources, unwrapDataHubData } from '@/lib/mcPrimeDataHub';
 
+const OFFICIAL_PLAYER_SOURCE_POLICY = 'OFFICIAL_WORLD_CUP_SQUADS_ONLY';
+const EXTERNAL_PLAYER_IMPORT_NOTICE = 'External provider squads and player statistics are ignored. Official World Cup squads must be imported through a separate approved official-squad workflow.';
+
 function first<T = any>(...values: any[]): T | null {
   for (const value of values) {
     if (value !== undefined && value !== null && value !== '') return value as T;
@@ -20,11 +23,9 @@ function asInt(...values: any[]) {
   return Number.isFinite(parsed) ? Math.trunc(parsed) : null;
 }
 
-function asFloat(...values: any[]) {
-  const value = first(...values);
-  if (value === null) return null;
-  const parsed = Number(String(value).replace('%', ''));
-  return Number.isFinite(parsed) ? parsed : null;
+function positiveInt(...values: any[]) {
+  const parsed = asInt(...values);
+  return parsed && parsed > 0 ? parsed : null;
 }
 
 function cleanCode(value: string | null, fallback: string) {
@@ -62,7 +63,7 @@ function getHubTeamIdentifier(row: any) {
 
 function getApiTeamId(row: any) {
   const { team, apiProfile } = getEnvelope(row);
-  return asInt(team?.apiFootballId, team?.api_football_id, team?.api_team_id, team?.api_id, apiProfile?.api_team_id, apiProfile?.api_id, row?.api_team_id, row?.api_id);
+  return positiveInt(team?.apiFootballId, team?.api_football_id, team?.api_team_id, team?.api_id, apiProfile?.api_team_id, apiProfile?.api_id, row?.api_team_id, row?.api_id);
 }
 
 function getTeamName(row: any) {
@@ -97,50 +98,22 @@ function getTeamNotice(row: any) {
   return normalizeScopeText(notices);
 }
 
-function extractSquad(row: any) {
+function getIgnoredSquadCount(row: any) {
   const { data } = getEnvelope(row);
   const squad = data?.squad || row?.squad || data?.players || row?.players || [];
-  return Array.isArray(squad) ? squad : [];
+  return Array.isArray(squad) ? squad.length : 0;
 }
 
-function extractPlayerStatistics(row: any) {
+function getIgnoredPlayerStatsCount(row: any) {
   const { data } = getEnvelope(row);
   const stats = data?.player_statistics || data?.playerStatistics || row?.player_statistics || row?.playerStatistics || [];
-  return Array.isArray(stats) ? stats : [];
+  return Array.isArray(stats) ? stats.length : 0;
 }
 
 function extractRecentFixtures(row: any) {
   const { data } = getEnvelope(row);
   const fixtures = data?.recent_fixtures || data?.recentFixtures || row?.recent_fixtures || row?.recentFixtures || [];
   return Array.isArray(fixtures) ? fixtures : [];
-}
-
-function playerApiId(player: any) {
-  return asInt(player?.api_player_id, player?.player_id, player?.id, player?.api_id, player?.player?.id);
-}
-
-function playerName(player: any) {
-  return asString(player?.player_name, player?.name, player?.player?.name) || 'لاعب غير مسمى';
-}
-
-function playerPhoto(player: any) {
-  return asString(player?.player_photo, player?.photo, player?.image, player?.player?.photo) || '';
-}
-
-function playerPosition(player: any) {
-  return asString(player?.player_position, player?.position, player?.games?.position, player?.statistics?.[0]?.games?.position);
-}
-
-function playerAge(player: any) {
-  return asInt(player?.player_age, player?.age, player?.player?.age);
-}
-
-function getPlayerStat(statsRows: any[], apiPlayerId: number | null, name: string) {
-  return statsRows.find((item) => {
-    const candidateId = asInt(item?.api_player_id, item?.player_id, item?.id, item?.player?.id);
-    const candidateName = asString(item?.player_name, item?.name, item?.player?.name);
-    return (apiPlayerId && candidateId === apiPlayerId) || (!!candidateName && candidateName.toLowerCase() === name.toLowerCase());
-  });
 }
 
 function buildReportBody(row: any) {
@@ -226,11 +199,10 @@ export async function importDataHubTeam(row: any, options: { full?: boolean } = 
       },
     });
 
-  const squad = extractSquad(sourceRow);
-  const playerStats = extractPlayerStatistics(sourceRow);
-  const players = await importSquad(team.id, squad, playerStats);
-
   const recentFixtures = extractRecentFixtures(sourceRow);
+  const ignoredSquadCount = getIgnoredSquadCount(sourceRow);
+  const ignoredPlayerStatsCount = getIgnoredPlayerStatsCount(sourceRow);
+
   await prisma.teamIntelligenceReport.deleteMany({
     where: { teamId: team.id, provider: 'MC_PRIME_DATA_HUB', reportType: 'DATA_HUB_PROFILE' },
   });
@@ -253,6 +225,11 @@ export async function importDataHubTeam(row: any, options: { full?: boolean } = 
         sourceSummary,
         dataNotices: data?.data_notices || data?.dataNotices || [],
         recentFixtures,
+        ignoredSquadCount,
+        ignoredPlayerStatsCount,
+        externalPlayerImportDisabled: true,
+        officialPlayerSourcePolicy: OFFICIAL_PLAYER_SOURCE_POLICY,
+        playerImportNotice: EXTERNAL_PLAYER_IMPORT_NOTICE,
         importedAt: new Date().toISOString(),
         scope: 'API_FOOTBALL_GENERAL_NOT_WORLD_CUP_2026',
       },
@@ -268,108 +245,13 @@ export async function importDataHubTeam(row: any, options: { full?: boolean } = 
     name: team.name,
     code: team.code,
     apiFootballId: team.apiFootballId,
-    playersImported: players.imported,
-    playerStatsImported: players.statsImported,
+    playersImported: 0,
+    playerStatsImported: 0,
+    externalPlayerImportDisabled: true,
+    ignoredSquadCount,
+    ignoredPlayerStatsCount,
     recentFixtures: recentFixtures.length,
   };
-}
-
-async function importSquad(teamId: string, squad: any[], playerStats: any[]) {
-  let imported = 0;
-  let statsImported = 0;
-
-  for (const player of squad) {
-    const apiPlayerId = playerApiId(player);
-    const name = playerName(player);
-    const stat = getPlayerStat(playerStats, apiPlayerId, name) || {};
-    const id = apiPlayerId ? `api-football-player-${apiPlayerId}` : stableId('dh-player', teamId, name);
-    const code = cleanCode(asString(player?.code, player?.player_code), `${name.slice(0, 3)}${apiPlayerId || imported}`);
-
-    const asset = await prisma.asset.upsert({
-      where: { id },
-      update: {
-        type: 'PLAYER',
-        name,
-        code,
-        image: playerPhoto(player),
-        position: playerPosition(player),
-        age: playerAge(player),
-        teamId,
-        ...(apiPlayerId ? { apiFootballId: apiPlayerId } : {}),
-      },
-      create: {
-        id,
-        type: 'PLAYER',
-        name,
-        code,
-        image: playerPhoto(player),
-        current_price: 100,
-        high_price: 100,
-        low_price: 100,
-        market_cap: '0',
-        volume: '0',
-        change: 0,
-        position: playerPosition(player),
-        age: playerAge(player),
-        teamId,
-        apiFootballId: apiPlayerId,
-        playerTier: 0.5,
-        roleImportance: 0.5,
-        score: 50,
-        popularity: 50,
-        fundamental: 50,
-        marketDemand: 50,
-        momentum: 50,
-        volatilityScore: 10,
-        fairValue: 100,
-        marketPrice: 100,
-      },
-    });
-
-    imported += 1;
-
-    if (stat && Object.keys(stat).length > 0) {
-      const season = asInt(stat?.season, stat?.league?.season) || null;
-      if (apiPlayerId || season) {
-        await prisma.playerPerformance.deleteMany({
-          where: {
-            assetId: asset.id,
-            provider: 'MC_PRIME_DATA_HUB',
-            ...(apiPlayerId ? { providerPlayerId: apiPlayerId } : {}),
-            ...(season ? { season } : {}),
-          },
-        });
-      }
-      await prisma.playerPerformance.create({
-        data: {
-          assetId: asset.id,
-          provider: 'MC_PRIME_DATA_HUB',
-          providerPlayerId: apiPlayerId,
-          season,
-          competition: asString(stat?.league_name, stat?.league?.name) || 'API Football General',
-          teamName: asString(stat?.team_name, stat?.team?.name),
-          minutes: asInt(stat?.minutes, stat?.games?.minutes) || 0,
-          started: Boolean(asInt(stat?.lineups, stat?.games?.lineups)),
-          goals: asInt(stat?.goals, stat?.goals_total, stat?.goals?.total) || 0,
-          assists: asInt(stat?.assists, stat?.goals?.assists) || 0,
-          shotsTotal: asInt(stat?.shots_total, stat?.shots?.total) || 0,
-          shotsOnTarget: asInt(stat?.shots_on, stat?.shots_on_target, stat?.shots?.on) || 0,
-          passes: asInt(stat?.passes_total, stat?.passes?.total) || 0,
-          keyPasses: asInt(stat?.key_passes, stat?.passes?.key) || 0,
-          passAccuracy: asFloat(stat?.pass_accuracy, stat?.passes?.accuracy) || 0,
-          tackles: asInt(stat?.tackles_total, stat?.tackles?.total) || 0,
-          interceptions: asInt(stat?.interceptions, stat?.tackles?.interceptions) || 0,
-          yellowCards: asInt(stat?.yellow_cards, stat?.cards?.yellow) || 0,
-          redCards: asInt(stat?.red_cards, stat?.cards?.red) || 0,
-          apiRating: asFloat(stat?.rating, stat?.games?.rating),
-          rawData: stat,
-        },
-      });
-      statsImported += 1;
-    }
-  }
-
-  return { imported, statsImported };
 }
 
 export async function importDataHubTeams(options: { limit?: number; full?: boolean } = {}) {
@@ -389,11 +271,16 @@ export async function importDataHubTeams(options: { limit?: number; full?: boole
     requested: selected.length,
     available: rows.length,
     full: Boolean(options.full),
+    externalPlayerImportDisabled: true,
+    officialPlayerSourcePolicy: OFFICIAL_PLAYER_SOURCE_POLICY,
+    playerImportNotice: EXTERNAL_PLAYER_IMPORT_NOTICE,
     teams,
     totals: {
       teamsImported: teams.length,
-      playersImported: teams.reduce((sum, team) => sum + team.playersImported, 0),
-      playerStatsImported: teams.reduce((sum, team) => sum + team.playerStatsImported, 0),
+      playersImported: 0,
+      playerStatsImported: 0,
+      ignoredSquadCount: teams.reduce((sum, team) => sum + team.ignoredSquadCount, 0),
+      ignoredPlayerStatsCount: teams.reduce((sum, team) => sum + team.ignoredPlayerStatsCount, 0),
     },
   };
 }
@@ -419,6 +306,9 @@ export async function getDataHubStatus() {
 
   return {
     ok: summary?.ok !== false,
+    externalPlayerImportDisabled: true,
+    officialPlayerSourcePolicy: OFFICIAL_PLAYER_SOURCE_POLICY,
+    playerImportNotice: EXTERNAL_PLAYER_IMPORT_NOTICE,
     dataHub: summary,
     readiness,
     sources,
