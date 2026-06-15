@@ -1,9 +1,9 @@
 'use client';
 
 function formatDate(value?: string | null) {
-  if (!value) return 'موعد غير محدد';
+  if (!value) return 'غير متوفر في المصادر';
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return 'موعد غير محدد';
+  if (Number.isNaN(date.getTime())) return 'غير متوفر في المصادر';
   return new Intl.DateTimeFormat('ar-EG', {
     weekday: 'short',
     day: 'numeric',
@@ -39,7 +39,7 @@ export default function TeamMatchesList({ team, matches = [] }: { team?: any; ma
       <div className="space-y-4">
         <h2 className="text-2xl font-black mb-6">مباريات كأس العالم 2026</h2>
         <div className="rounded-2xl border border-white/10 bg-[#111] p-6 text-sm text-gray-400">
-          لا توجد مباريات مجدولة لهذا المنتخب في الوقت الحالي.
+          غير متوفر في المصادر: لا توجد مباريات مرتبطة بهذا المنتخب في قاعدة البيانات الحالية.
         </div>
       </div>
     );
@@ -78,7 +78,7 @@ export default function TeamMatchesList({ team, matches = [] }: { team?: any; ma
                       {match.homeTeam?.name || 'غير متوفر'} × {match.awayTeam?.name || 'غير متوفر'}
                     </td>
                     <td className="p-4 text-gray-400">{formatDate(match.matchDate)}</td>
-                    <td className="p-4 text-gray-400">يُحدد لاحقاً</td>
+                    <td className="p-4 text-gray-400">غير متوفر في المصادر</td>
                     <td className="p-4 text-gray-400">{match.groupPhase || match.stage || 'غير متوفر'}</td>
                     <td className="p-4 text-center font-black text-lg">{scoreLabel(match)}</td>
                     <td className="p-4 text-center text-xs text-gray-400">
@@ -87,7 +87,7 @@ export default function TeamMatchesList({ team, matches = [] }: { team?: any; ma
                           استحواذ {snapshot.homePossession ?? '-'}% / {snapshot.awayPossession ?? '-'}%
                         </span>
                       ) : (
-                        'لم تتوفر إحصائيات'
+                        'غير متوفر'
                       )}
                     </td>
                     <td className="p-4 text-center">
@@ -105,7 +105,7 @@ export default function TeamMatchesList({ team, matches = [] }: { team?: any; ma
           </table>
         </div>
       </div>
-      {team?.isDemo && <p className="text-xs text-yellow-200/80">نسخة تجريبية: بيانات المباريات الحقيقية غير متاحة.</p>}
+      {team?.isDemo && <p className="text-xs text-yellow-200/80">هذه صفحة اختبار؛ لا يتم عرض أي مباريات وهمية.</p>}
     </div>
   );
 }

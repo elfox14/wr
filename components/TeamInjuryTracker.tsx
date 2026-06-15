@@ -59,11 +59,9 @@ export default function TeamInjuryTracker({ players }: TeamInjuryTrackerProps) {
             <div>
               <div className="text-sm font-black text-white truncate max-w-[120px]">{player.name}</div>
               <div className="mt-1 flex items-center gap-2">
-                {player.position && (
-                  <span className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] font-bold text-slate-400">
-                    {player.position}
-                  </span>
-                )}
+                <span className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] font-bold text-slate-400">
+                  {player.position || 'غير محدد'}
+                </span>
                 <span className="text-[10px] font-bold text-rose-400">
                   غير متاح
                 </span>

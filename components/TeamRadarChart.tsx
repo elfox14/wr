@@ -29,7 +29,7 @@ function computeMetrics(
       { label: 'Defense', labelAr: 'الدفاع', value: 0.5 },
       { label: 'Possession', labelAr: 'الاستحواذ', value: 0.5 },
       { label: 'Discipline', labelAr: 'الانضباط', value: 0.7 },
-      { label: 'Form', labelAr: 'مستوى الأداء', value: formScore },
+      { label: 'Form', labelAr: 'الفورمة', value: formScore },
       { label: 'Squad Depth', labelAr: 'عمق القائمة', value: squadDepth },
     ];
   }
@@ -61,7 +61,7 @@ function computeMetrics(
     { label: 'Defense', labelAr: 'الدفاع', value: defense },
     { label: 'Possession', labelAr: 'الاستحواذ', value: possession },
     { label: 'Discipline', labelAr: 'الانضباط', value: discipline },
-    { label: 'Form', labelAr: 'مستوى الأداء', value: formScore },
+    { label: 'Form', labelAr: 'الفورمة', value: formScore },
     { label: 'Squad Depth', labelAr: 'عمق القائمة', value: squadDepth },
   ];
 }
@@ -194,7 +194,7 @@ export default function TeamRadarChart({ teamId, teamName, formScore, squadDepth
 
       {loading ? (
         <div className="flex h-[300px] items-center justify-center text-sm text-gray-500">
-          جاري تحليل بيانات أداء الفريق...
+          جاري التحميل...
         </div>
       ) : (
         <RadarSVG metrics={metrics} />

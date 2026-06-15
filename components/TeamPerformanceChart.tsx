@@ -65,8 +65,8 @@ export default function TeamPerformanceChart({ teamName, formScore, matches }: T
   const isUp = diff >= 0;
 
   return (
-    <div className="rounded-3xl border border-white/8 bg-white/[0.03] p-4 sm:p-5 lg:p-6 shadow-[0_14px_34px_rgba(0,0,0,0.2)]">
-      <div className="mb-4 sm:mb-6 flex flex-col sm:flex-row sm:items-start justify-between gap-4 sm:gap-0">
+    <div className="rounded-3xl border border-white/8 bg-white/[0.03] p-5 shadow-[0_14px_34px_rgba(0,0,0,0.2)]">
+      <div className="mb-6 flex items-start justify-between">
         <div>
           <div className="flex items-center gap-2 mb-1">
             <Activity size={16} className="text-primary" />
@@ -75,7 +75,7 @@ export default function TeamPerformanceChart({ teamName, formScore, matches }: T
           <p className="text-xs text-slate-400">مؤشر الزخم لمنتخب {teamName} بناءً على النتائج التراكمية</p>
         </div>
         
-        <div className="text-right sm:text-left flex flex-row sm:flex-col justify-between items-center sm:items-end w-full sm:w-auto border-t border-white/5 sm:border-0 pt-3 sm:pt-0 mt-1 sm:mt-0">
+        <div className="text-right">
           <div className="text-2xl font-black text-white">{currentRating}</div>
           <div className={`flex justify-end items-center gap-1 text-xs font-bold ${isUp ? 'text-emerald-400' : 'text-rose-400'}`}>
             <TrendingUp size={12} className={!isUp ? 'rotate-180' : ''} />
@@ -84,7 +84,7 @@ export default function TeamPerformanceChart({ teamName, formScore, matches }: T
         </div>
       </div>
 
-      <div className="h-[240px] sm:h-[280px] lg:h-[320px] w-full" dir="ltr">
+      <div className="h-[240px] w-full" dir="ltr">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
             <defs>
