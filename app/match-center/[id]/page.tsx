@@ -139,6 +139,32 @@ async function getMatch(id: string) {
   });
 }
 
+async function getRelatedPressNews(matchId: string, homeId: string, awayId: string, homeName: string, awayName: string) {
+  try {
+    const homePattern = `%${homeName}%`;
+    const awayPattern = `%${awayName}%`;
+    return await prisma.$queryRaw<any[]>`
+      SELECT *
+      FROM "PressNews"
+      WHERE "status" = 'published'
+        AND (
+          "relatedMatchId" = ${matchId}
+          OR "relatedTeamId" = ${homeId}
+          OR "relatedTeamId" = ${awayId}
+          OR "title" ILIKE ${homePattern}
+          OR "body" ILIKE ${homePattern}
+          OR "title" ILIKE ${awayPattern}
+          OR "body" ILIKE ${awayPattern}
+        )
+      ORDER BY "publishedAt" DESC, "importance" DESC
+      LIMIT 8
+    `;
+  } catch (error) {
+    console.error('match center press news error:', error);
+    return [];
+  }
+}
+
 export default async function MatchCenterPage({ params }: { params: Promise<{ id: string }> | { id: string } }) {
   const resolved = await params;
   const match = await getMatch(resolved.id);
@@ -149,6 +175,7 @@ export default async function MatchCenterPage({ params }: { params: Promise<{ id
   const finished = isFinishedMatch(match);
   const status = statusInfo(match);
   const StatusIcon = status.icon;
+  const pressNews = await getRelatedPressNews(match.id, home.id, away.id, home.name, away.name);
   const showScore = finished || !['SCHEDULED', 'TIMED', 'NOT_STARTED'].includes(String(match.status).toUpperCase());
   const animationHref = match.animationMatchId
     ? `/animation-live/player?matchId=${encodeURIComponent(String(match.animationMatchId))}&dbMatchId=${encodeURIComponent(String(match.id))}&lang=en&statsPanel=simple&teamPanel=1`
@@ -198,7 +225,11 @@ export default async function MatchCenterPage({ params }: { params: Promise<{ id
         </div>
 
         <Panel title="مرصد المباراة الإخباري ومجريات اللعب" icon={<Newspaper className="text-[#FFD700]" />} action={<Link href="/news" className="text-xs font-black text-[#0FF0FC]">غرفة الأخبار</Link>}>
-          <EmptyText text="مجريات اللعب اللحظية تظهر في كارت الإحصائيات عند توفر مصدر موثق." />
+          {pressNews.length ? (
+            <div className="grid gap-3 md:grid-cols-2">{pressNews.map((item) => <PressNewsCard key={item.id} item={item} />)}</div>
+          ) : (
+            <EmptyText text="لا توجد أخبار صحفية مرتبطة بهذه المباراة حاليًا. مجريات اللعب اللحظية تظهر في كارت الإحصائيات عند توفر مصدر موثق." />
+          )}
         </Panel>
       </section>
     </main>
@@ -229,4 +260,22 @@ function Panel({ title, icon, action, children }: { title: string; icon?: React.
 
 function EmptyText({ text }: { text: string }) {
   return <div className="rounded-2xl border border-dashed border-white/10 bg-black/20 p-6 text-center text-sm font-bold leading-7 text-gray-400">{text}</div>;
+}
+
+function PressNewsCard({ item }: { item: any }) {
+  const date = item.publishedAt ? new Date(item.publishedAt).toLocaleDateString('ar-EG') : '';
+  return (
+    <article className="rounded-2xl border border-white/10 bg-black/25 p-4">
+      <div className="mb-2 flex flex-wrap items-center gap-2 text-[10px] font-black text-gray-500">
+        <span className="rounded-full border border-[#FFD700]/20 bg-[#FFD700]/10 px-2 py-1 text-[#FFD700]">{item.category || 'رصد صحفي'}</span>
+        <span>{item.sourceName || 'مصدر غير محدد'}</span>
+        {date ? <span>{date}</span> : null}
+      </div>
+      <h4 className="text-base font-black leading-7 text-white">{item.title}</h4>
+      <p className="mt-2 line-clamp-3 text-xs font-bold leading-6 text-gray-400">{item.body}</p>
+      {item.sourceUrl ? (
+        <a href={item.sourceUrl} target="_blank" rel="noopener noreferrer" className="mt-3 inline-flex text-xs font-black text-[#0FF0FC]">فتح المصدر</a>
+      ) : null}
+    </article>
+  );
 }
