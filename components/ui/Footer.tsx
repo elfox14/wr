@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 
-const logoSrc = '/brand/worldcup-2026-logo.svg';
+const logoSrc = '/brand/worldcup-2026-logo-upload.svg?v=20260615a';
 
 const links = [
   ['/', 'الرئيسية'],
