@@ -125,16 +125,6 @@ function snapshotHasScore(snapshot: any) {
   return nullableNumber(snapshot?.homeScore) !== null || nullableNumber(snapshot?.awayScore) !== null;
 }
 
-function shouldUseSnapshotScore(match: any, snapshot: any) {
-  if (!snapshot || !snapshotHasScore(snapshot)) return false;
-  if (snapshotMinute(snapshot) !== null) return true;
-  if (hasAnyStat(snapshot)) return true;
-  if (isFinishedMatch(match)) return true;
-  // A minute=0 snapshot while the match is live-like is usually a kickoff/fallback row.
-  // Do not let it override the canonical Match score shown elsewhere on the platform.
-  return false;
-}
-
 function cleanPublicSnapshot(match: any, snapshot: any) {
   if (!snapshot) return null;
   if (snapshotMinute(snapshot) !== null) return snapshot;
@@ -200,9 +190,9 @@ export async function GET(request: Request) {
     const historyRows = await getSnapshotHistory(match.id, 80);
     const rawLatestPublic = publicSnapshot(latest);
     const latestPublic = cleanPublicSnapshot(match, rawLatestPublic);
-    const useSnapshotScore = shouldUseSnapshotScore(match, latestPublic);
-    const latestHomeScore = useSnapshotScore ? (latestPublic?.homeScore ?? match.homeScore) : match.homeScore;
-    const latestAwayScore = useSnapshotScore ? (latestPublic?.awayScore ?? match.awayScore) : match.awayScore;
+    const ignoredSnapshotScore = Boolean(latestPublic && snapshotHasScore(latestPublic));
+    const latestHomeScore = match.homeScore;
+    const latestAwayScore = match.awayScore;
     const effectiveStatus = isFinishedMatch(match) ? 'FINISHED' : match.status;
     const hasStats = hasAnyStat(latestPublic);
     const sourceStatus = quotaBlock
@@ -231,8 +221,9 @@ export async function GET(request: Request) {
       sourceStatus,
       sync: syncResult,
       scorePolicy: {
-        source: useSnapshotScore ? 'snapshot' : 'match',
-        ignoredMinuteZeroSnapshot: Boolean(latestPublic && !useSnapshotScore && snapshotHasScore(latestPublic)),
+        source: 'match',
+        ignoredSnapshotScore,
+        ignoredMinuteZeroSnapshot: Boolean(latestPublic && snapshotHasScore(latestPublic) && snapshotMinute(latestPublic) === null),
       },
       match: {
         id: match.id,
