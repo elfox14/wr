@@ -11,7 +11,7 @@ export default function FBRefStatsCards({ teamId }: FBRefStatsCardsProps) {
 
   return (
     <div className="rounded-3xl border border-yellow-300/15 bg-yellow-300/[0.06] p-6 text-yellow-50">
-      <div className="mb-3 flex items-center gap-3">
+      <div className="mb-3 flex flex-col sm:flex-row sm:items-center items-start gap-4 sm:gap-3">
         <div className="rounded-2xl bg-yellow-300/10 p-3 text-yellow-100">
           <Database size={22} />
         </div>
