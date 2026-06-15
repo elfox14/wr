@@ -34,7 +34,7 @@ export default function TeamIntelligenceHub({ team, players = [], matches = [], 
           >
             {activeTab === 'overview' && <TeamOverviewPanel team={team} matches={matches} players={players} report={intelligenceReport} />}
             {activeTab === 'matches' && <TeamMatchesList team={team} matches={matches} />}
-            {activeTab === 'squad' && <TeamSquadHighlight players={players} />}
+            {activeTab === 'squad' && <TeamSquadHighlight players={players} rawPlayersCount={team?.rawPlayersCount} />}
             {activeTab === 'stats' && <TeamStatsOverview team={team} matches={matches} />}
             {activeTab === 'tactics' && <TeamTacticalBoard report={intelligenceReport} />}
             {activeTab === 'history' && <TeamHistoryPanel team={team} matches={matches} report={intelligenceReport} />}
