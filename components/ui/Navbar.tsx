@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { Menu, X } from 'lucide-react';
 
-const logoSrc = '/brand/worldcup-2026-logo.svg?v=20260614c';
+const logoSrc = '/brand/worldcup-2026-logo-upload.svg?v=20260615a';
 
 const links = [
   ['/', 'الرئيسية'],
