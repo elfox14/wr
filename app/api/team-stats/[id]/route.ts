@@ -6,6 +6,7 @@ import { findGroupCFbrefStats, toTeamFBRefStats as toGroupCTeamFBRefStats } from
 import { findGroupDFbrefStats, toTeamFBRefStats as toGroupDTeamFBRefStats } from '@/lib/groupDFbrefStats';
 import { findGroupEFbrefStats, toTeamFBRefStats as toGroupETeamFBRefStats } from '@/lib/groupEFbrefStats';
 import { findGroupGHIFbrefStats, toTeamFBRefStats as toGroupGHITeamFBRefStats } from '@/lib/groupGHIFbrefStats';
+import { findGroupJFbrefStats, toTeamFBRefStats as toGroupJTeamFBRefStats } from '@/lib/groupJFbrefStats';
 
 type StandingMetrics = {
   group?: string | null;
@@ -119,6 +120,7 @@ export async function GET(_request: Request, context: RouteContext) {
   const groupDStats = groupAStats || groupBStats || groupCStats ? null : findGroupDFbrefStats(lookupKey) || findGroupDFbrefStats(fallbackKey);
   const groupEStats = groupAStats || groupBStats || groupCStats || groupDStats ? null : findGroupEFbrefStats(lookupKey) || findGroupEFbrefStats(fallbackKey);
   const groupGHIStats = groupAStats || groupBStats || groupCStats || groupDStats || groupEStats ? null : findGroupGHIFbrefStats(lookupKey) || findGroupGHIFbrefStats(fallbackKey);
+  const groupJStats = groupAStats || groupBStats || groupCStats || groupDStats || groupEStats || groupGHIStats ? null : findGroupJFbrefStats(lookupKey) || findGroupJFbrefStats(fallbackKey);
   const response: TeamFBRefStats = groupAStats
     ? toGroupATeamFBRefStats(groupAStats)
     : groupBStats
@@ -131,7 +133,9 @@ export async function GET(_request: Request, context: RouteContext) {
             ? toGroupETeamFBRefStats(groupEStats)
             : groupGHIStats
               ? toGroupGHITeamFBRefStats(groupGHIStats)
-              : unavailableStats;
+              : groupJStats
+                ? toGroupJTeamFBRefStats(groupJStats)
+                : unavailableStats;
 
   return NextResponse.json(response, {
     headers: { 'Cache-Control': 'public, s-maxage=600, stale-while-revalidate=300' },
