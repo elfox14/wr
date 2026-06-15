@@ -15,10 +15,16 @@ const MATCH_SELECT = {
   homeScore: true,
   awayScore: true,
   groupPhase: true,
+  group: true,
   stage: true,
   homeTeam: { select: TEAM_SELECT },
   awayTeam: { select: TEAM_SELECT },
 };
+
+const LIVE_STATUSES = ['1H', '2H', 'ET', 'BT', 'P', 'LIVE', 'IN_PLAY', 'HT'];
+const FINISHED_STATUSES = ['FT', 'AET', 'PEN', 'FINISHED'];
+const GROUP_STAGE_MAX_LIVE_MINUTES = 115;
+const KNOCKOUT_MAX_LIVE_MINUTES = 150;
 
 function dateKey(date = new Date()) {
   return date.toISOString().slice(0, 10);
@@ -37,7 +43,24 @@ function isHalftimeStatus(status: string) {
 }
 
 function isProviderLiveStatus(status: string) {
-  return ['1H', '2H', 'ET', 'BT', 'P', 'LIVE', 'IN_PLAY'].includes(status) || isHalftimeStatus(status);
+  return LIVE_STATUSES.includes(status) || isHalftimeStatus(status);
+}
+
+function isFinishedStatus(status: string) {
+  return FINISHED_STATUSES.includes(status);
+}
+
+function isGroupStage(match: any) {
+  const value = String(match.groupPhase || match.group || match.stage || '').toUpperCase();
+  return value.includes('GROUP');
+}
+
+function maxLiveMinutes(match: any) {
+  return isGroupStage(match) ? GROUP_STAGE_MAX_LIVE_MINUTES : KNOCKOUT_MAX_LIVE_MINUTES;
+}
+
+function isStaleByTime(match: any, localMinute: number) {
+  return localMinute >= maxLiveMinutes(match);
 }
 
 function nullableNumber(value: unknown) {
@@ -49,7 +72,7 @@ function nullableNumber(value: unknown) {
 function providerMinute(value: any) {
   const raw = value?.fixture?.status?.elapsed ?? value?.fixture?.status?.minute ?? value?.minute ?? value?.elapsed;
   const n = Number(raw);
-  return Number.isFinite(n) ? Math.max(1, Math.min(135, Math.round(n))) : null;
+  return Number.isFinite(n) ? Math.max(1, Math.min(150, Math.round(n))) : null;
 }
 
 function quoteSql(value: string) {
@@ -116,30 +139,32 @@ function decorateMatch(match: any, now: Date, providerState?: any, snapshotState
   const providerHasState = Boolean(providerStatus);
   const providerHasMinute = providerState?.minute != null;
   const snapshotMinute = nullableNumber(snapshotState?.minute);
-  const isHalfTimeFromProvider = isHalftimeStatus(effectiveStatus);
-  const isLocalHalftimeFallback = !providerHasState && dbStatus === 'SCHEDULED' && localMinute >= 46 && localMinute <= 65;
+  const staleByTime = isStaleByTime(match, localMinute);
+  const isFinished = staleByTime || isFinishedStatus(dbStatus) || isFinishedStatus(effectiveStatus);
+  const isHalfTimeFromProvider = !isFinished && isHalftimeStatus(effectiveStatus);
+  const isLocalHalftimeFallback = !isFinished && !providerHasState && dbStatus === 'SCHEDULED' && localMinute >= 46 && localMinute <= 65;
   const isHalfTime = isHalfTimeFromProvider || isLocalHalftimeFallback;
-  const isDbLive = dbStatus === 'IN_PLAY' || dbStatus === 'LIVE' || dbStatus === 'HT';
-  const isProviderLive = isProviderLiveStatus(providerStatus);
-  const isLikelyLiveByTime = !providerHasState && dbStatus === 'SCHEDULED' && localMinute >= 1 && localMinute <= 135;
-  const isLiveNow = isDbLive || isProviderLive || isLikelyLiveByTime;
-  const isFinished = dbStatus === 'FINISHED' || ['FT', 'AET', 'PEN', 'FINISHED'].includes(effectiveStatus);
+  const isDbLive = !isFinished && (dbStatus === 'IN_PLAY' || dbStatus === 'LIVE' || dbStatus === 'HT');
+  const isProviderLive = !isFinished && isProviderLiveStatus(providerStatus);
+  const isLikelyLiveByTime = !isFinished && !providerHasState && dbStatus === 'SCHEDULED' && localMinute >= 1 && localMinute < maxLiveMinutes(match);
+  const isLiveNow = !isFinished && (isDbLive || isProviderLive || isLikelyLiveByTime);
   const localFirstHalfMinute = isLikelyLiveByTime && localMinute <= 45 ? Math.max(1, localMinute) : null;
-  const displayMinute = isHalfTime ? null : (providerHasMinute ? providerState.minute : (snapshotMinute ?? localFirstHalfMinute));
+  const displayMinute = isHalfTime ? null : (providerHasMinute && !staleByTime ? providerState.minute : (snapshotMinute ?? localFirstHalfMinute));
   const fallbackLabel = isLikelyLiveByTime && localMinute > 65 ? 'الشوط الثاني جارٍ' : null;
 
   return {
     ...match,
-    status: isHalfTime ? 'HT' : (isProviderLive ? 'IN_PLAY' : match.status),
+    status: isFinished ? 'FINISHED' : isHalfTime ? 'HT' : (isProviderLive ? 'IN_PLAY' : match.status),
     homeScore: pickLiveScore(providerState?.homeScore, snapshotState?.homeScore, match.homeScore),
     awayScore: pickLiveScore(providerState?.awayScore, snapshotState?.awayScore, match.awayScore),
     scoreSource: providerState?.homeScore != null || providerState?.awayScore != null ? 'provider' : snapshotState ? 'snapshot' : 'match',
     isLiveNow,
     isHalfTime,
     isLikelyLiveByTime,
-    displayStatus: isHalfTime ? 'HT' : (isLiveNow ? 'IN_PLAY' : match.status),
-    minute: displayMinute,
-    liveLabel: isHalfTime ? 'استراحة بين الشوطين' : (isLiveNow ? (displayMinute ? `الدقيقة ${displayMinute}` : (fallbackLabel || 'جارية الآن')) : (isFinished ? 'انتهت المباراة' : null)),
+    isStaleAutoFinished: isFinished && staleByTime,
+    displayStatus: isFinished ? 'FINISHED' : isHalfTime ? 'HT' : (isLiveNow ? 'IN_PLAY' : match.status),
+    minute: isFinished ? null : displayMinute,
+    liveLabel: isFinished ? 'انتهت المباراة' : isHalfTime ? 'استراحة بين الشوطين' : (isLiveNow ? (displayMinute ? `الدقيقة ${displayMinute}` : (fallbackLabel || 'جارية الآن')) : null),
   };
 }
 
@@ -170,7 +195,7 @@ export async function GET() {
       select: MATCH_SELECT,
     }),
     prisma.match.findMany({
-      where: { status: 'FINISHED', matchDate: { gte: recentSince, lte: now } },
+      where: { status: { in: ['FINISHED', 'FT', 'AET', 'PEN'] }, matchDate: { gte: recentSince, lte: now } },
       orderBy: { matchDate: 'desc' },
       take: 4,
       select: MATCH_SELECT,
@@ -200,6 +225,8 @@ export async function GET() {
       recentlyFinishedCount: decoratedFinished.length,
       recentFinishedWindowHours: 6,
       liveDetection: 'provider_or_snapshot_score_then_safe_time_window',
+      groupStageMaxLiveMinutes: GROUP_STAGE_MAX_LIVE_MINUTES,
+      knockoutMaxLiveMinutes: KNOCKOUT_MAX_LIVE_MINUTES,
       selectionMode: 'one_live_plus_one_next',
       updatedEverySeconds: 15,
     },
