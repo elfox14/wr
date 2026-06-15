@@ -5,21 +5,21 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-cairo), ui-sans-serif, system-ui, sans-serif;
 
-  /* Design System Tokens */
-  --color-surface: #101214;
-  --color-surface-elevated: #15181B;
-  --color-primary: #0FF0FC; /* Electric Blue */
-  --color-primary-light: #4AFAFF; /* Lighter Electric Blue */
-  --color-success: #00FF88; /* Profit Green */
-  --color-danger: #FF3B5C; /* Loss Red */
-  --color-accent: #FFD700; /* Royal Gold */
-  --color-warning: #FFB020;
+  /* World Cup Sports Theme Tokens */
+  --color-surface: #071812;
+  --color-surface-elevated: #0B2118;
+  --color-primary: #18E58F; /* Stadium Green */
+  --color-primary-light: #4CF7B5;
+  --color-success: #22C55E;
+  --color-danger: #FF4D5E;
+  --color-accent: #F8C846; /* Trophy Gold */
+  --color-warning: #F59E0B;
 
-  --shadow-card: 0 4px 6px -1px rgba(0, 0, 0, 0.2), 0 2px 4px -2px rgba(0, 0, 0, 0.2);
-  --shadow-card-hover: 0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -4px rgba(0, 0, 0, 0.2);
+  --shadow-card: 0 4px 6px -1px rgba(0, 0, 0, 0.24), 0 2px 4px -2px rgba(0, 0, 0, 0.24);
+  --shadow-card-hover: 0 10px 15px -3px rgba(0, 0, 0, 0.34), 0 4px 6px -4px rgba(0, 0, 0, 0.24);
   
-  --shadow-anti-gravity: 0 15px 35px -5px rgba(15, 240, 252, 0.15), 0 5px 15px rgba(0,0,0,0.5);
-  --shadow-anti-gravity-hover: 0 25px 45px -5px rgba(15, 240, 252, 0.3), 0 10px 20px rgba(0,0,0,0.7);
+  --shadow-anti-gravity: 0 15px 35px -5px rgba(24, 229, 143, 0.16), 0 5px 15px rgba(0,0,0,0.5);
+  --shadow-anti-gravity-hover: 0 25px 45px -5px rgba(24, 229, 143, 0.28), 0 10px 20px rgba(0,0,0,0.7);
   --animate-marquee: marquee 150s linear infinite;
 
   @keyframes marquee {
@@ -29,15 +29,31 @@
 }
 
 :root {
-  --background: #050505; /* MC PRIME Base */
-  --foreground: #FFFFFF; /* White */
+  --background: #04110D;
+  --foreground: #F8FAFC;
+  --wc-bg: #04110D;
+  --wc-bg-soft: #071812;
+  --wc-panel: #0B2118;
+  --wc-panel-2: #102A1F;
+  --wc-border: rgba(248, 250, 252, 0.10);
+  --wc-border-strong: rgba(24, 229, 143, 0.36);
+  --wc-green: #18E58F;
+  --wc-green-rgb: 24, 229, 143;
+  --wc-green-soft: rgba(24, 229, 143, 0.12);
+  --wc-gold: #F8C846;
+  --wc-gold-rgb: 248, 200, 70;
+  --wc-gold-soft: rgba(248, 200, 70, 0.13);
+  --wc-data: #7DD3FC;
+  --wc-data-rgb: 125, 211, 252;
+  --wc-danger: #FF4D5E;
+  --wc-muted: #94A3B8;
 }
 
 @utility bg-glass {
-  background-color: rgba(26, 26, 26, 0.6); /* Surface transparent Matte Black */
+  background-color: rgba(7, 24, 18, 0.72);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--wc-border);
 }
 
 * {
@@ -53,7 +69,10 @@ html {
 }
 
 body {
-  background: var(--background);
+  background:
+    radial-gradient(circle at 18% 0%, rgba(var(--wc-green-rgb), 0.12), transparent 32%),
+    radial-gradient(circle at 84% 10%, rgba(var(--wc-gold-rgb), 0.10), transparent 30%),
+    linear-gradient(180deg, #04110D 0%, #061611 48%, #030907 100%);
   color: var(--foreground);
   font-family: var(--font-sans);
   width: 100%;
@@ -90,6 +109,116 @@ img[src*="/brand/logo-horizontal.png"] {
   object-fit: contain !important;
 }
 
+/* ─── Global World Cup palette refresh ───
+   The project has many existing Tailwind arbitrary color classes.
+   These overrides remap the old neon-cyan / pure-gold palette into a
+   stadium-green + trophy-gold identity without rewriting every component. */
+main[dir="rtl"],
+.market-page {
+  background:
+    radial-gradient(circle at 12% 0%, rgba(var(--wc-green-rgb), 0.12), transparent 30%),
+    radial-gradient(circle at 88% 8%, rgba(var(--wc-gold-rgb), 0.10), transparent 28%),
+    linear-gradient(180deg, var(--wc-bg) 0%, #061711 48%, #030907 100%) !important;
+}
+
+main[dir="rtl"] section,
+main[dir="rtl"] article,
+main[dir="rtl"] [class*="bg-white/"],
+main[dir="rtl"] [class*="bg-black/"] {
+  border-color: var(--wc-border);
+}
+
+main[dir="rtl"] [class~="bg-[#050505]"],
+main[dir="rtl"] [class~="bg-[#07111f]"] {
+  background-color: var(--wc-bg) !important;
+}
+
+main[dir="rtl"] [class~="bg-[#111]"],
+main[dir="rtl"] [class~="bg-black/25"],
+main[dir="rtl"] [class~="bg-black/30"],
+main[dir="rtl"] [class~="bg-black/40"] {
+  background-color: rgba(4, 17, 13, 0.62) !important;
+}
+
+main[dir="rtl"] [class~="text-[#0FF0FC]"],
+main[dir="rtl"] [class*="group-hover:text-[#0FF0FC]"],
+.market-page [class~="text-[#0FF0FC]"] {
+  color: var(--wc-green) !important;
+}
+
+main[dir="rtl"] [class~="text-[#FFD700]"],
+.market-page [class~="text-[#FFD700]"] {
+  color: var(--wc-gold) !important;
+}
+
+main[dir="rtl"] [class~="bg-[#0FF0FC]"],
+.market-page [class~="bg-[#0FF0FC]"] {
+  background-color: var(--wc-green) !important;
+}
+
+main[dir="rtl"] [class~="hover:bg-[#4AFAFF]"]:hover,
+.market-page [class~="hover:bg-[#4AFAFF]"]:hover {
+  background-color: var(--wc-primary-light, #4CF7B5) !important;
+}
+
+main[dir="rtl"] [class*="bg-[#0FF0FC]/10"],
+.market-page [class*="bg-[#0FF0FC]/10"] {
+  background-color: rgba(var(--wc-green-rgb), 0.12) !important;
+}
+
+main[dir="rtl"] [class*="bg-[#0FF0FC]/20"],
+.market-page [class*="bg-[#0FF0FC]/20"] {
+  background-color: rgba(var(--wc-green-rgb), 0.20) !important;
+}
+
+main[dir="rtl"] [class*="bg-[#FFD700]/10"],
+.market-page [class*="bg-[#FFD700]/10"] {
+  background-color: rgba(var(--wc-gold-rgb), 0.13) !important;
+}
+
+main[dir="rtl"] [class*="bg-[#FFD700]/20"],
+.market-page [class*="bg-[#FFD700]/20"] {
+  background-color: rgba(var(--wc-gold-rgb), 0.20) !important;
+}
+
+main[dir="rtl"] [class*="border-[#0FF0FC]"],
+.market-page [class*="border-[#0FF0FC]"] {
+  border-color: rgba(var(--wc-green-rgb), 0.38) !important;
+}
+
+main[dir="rtl"] [class*="border-[#FFD700]"],
+.market-page [class*="border-[#FFD700]"] {
+  border-color: rgba(var(--wc-gold-rgb), 0.38) !important;
+}
+
+main[dir="rtl"] [class*="via-[#0FF0FC]"],
+main[dir="rtl"] [class*="from-[#0FF0FC]"],
+main[dir="rtl"] [class*="to-[#0FF0FC]"] {
+  --tw-gradient-from: rgba(var(--wc-green-rgb), 0.55) var(--tw-gradient-from-position) !important;
+  --tw-gradient-to: rgba(var(--wc-green-rgb), 0) var(--tw-gradient-to-position) !important;
+  --tw-gradient-stops: var(--tw-gradient-from), rgba(var(--wc-green-rgb), 0.46) var(--tw-gradient-via-position), var(--tw-gradient-to) !important;
+}
+
+main[dir="rtl"] [class*="via-[#FFD700]"],
+main[dir="rtl"] [class*="from-[#FFD700]"],
+main[dir="rtl"] [class*="to-[#FFD700]"] {
+  --tw-gradient-from: rgba(var(--wc-gold-rgb), 0.55) var(--tw-gradient-from-position) !important;
+  --tw-gradient-to: rgba(var(--wc-gold-rgb), 0) var(--tw-gradient-to-position) !important;
+  --tw-gradient-stops: var(--tw-gradient-from), rgba(var(--wc-gold-rgb), 0.46) var(--tw-gradient-via-position), var(--tw-gradient-to) !important;
+}
+
+main[dir="rtl"] [class*="shadow-[0_0_"],
+main[dir="rtl"] [class*="shadow-[0_14px_"],
+main[dir="rtl"] [class*="shadow-[0_18px_"] {
+  box-shadow: 0 18px 46px rgba(0, 0, 0, 0.32), 0 0 22px rgba(var(--wc-green-rgb), 0.08) !important;
+}
+
+main[dir="rtl"] ::selection,
+.market-page ::selection {
+  background: rgba(var(--wc-green-rgb), 0.24);
+  color: #ffffff;
+}
+
 .market-page {
   width: 100%;
   max-width: 100vw;
@@ -116,7 +245,7 @@ img[src*="/brand/logo-horizontal.png"] {
 .custom-scrollbar,
 .mobile-scrollbar {
   scrollbar-width: thin;
-  scrollbar-color: rgba(255,255,255,0.18) transparent;
+  scrollbar-color: rgba(var(--wc-green-rgb), 0.25) transparent;
 }
 
 .custom-scrollbar::-webkit-scrollbar,
@@ -127,7 +256,7 @@ img[src*="/brand/logo-horizontal.png"] {
 
 .custom-scrollbar::-webkit-scrollbar-thumb,
 .mobile-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(255,255,255,0.18);
+  background: rgba(var(--wc-green-rgb), 0.25);
   border-radius: 999px;
 }
 
@@ -137,7 +266,7 @@ img[src*="/brand/logo-horizontal.png"] {
 
 .mobile-card {
   border-radius: 1.35rem;
-  border: 1px solid rgba(255,255,255,0.08);
+  border: 1px solid var(--wc-border);
   background: rgba(255,255,255,0.035);
 }
 
@@ -148,8 +277,8 @@ img[src*="/brand/logo-horizontal.png"] {
 .pro-card {
   position: relative;
   overflow: hidden;
-  border: 1px solid rgba(255,255,255,0.08);
-  background: linear-gradient(145deg, rgba(255,255,255,0.055), rgba(255,255,255,0.022));
+  border: 1px solid var(--wc-border);
+  background: linear-gradient(145deg, rgba(24,229,143,0.065), rgba(248,200,70,0.035));
   box-shadow: 0 14px 34px rgba(0,0,0,0.24);
 }
 
@@ -158,8 +287,8 @@ img[src*="/brand/logo-horizontal.png"] {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  background: radial-gradient(circle at 18% 0%, rgba(15,240,252,0.12), transparent 28%), radial-gradient(circle at 100% 100%, rgba(255,215,0,0.08), transparent 28%);
-  opacity: 0.75;
+  background: radial-gradient(circle at 18% 0%, rgba(var(--wc-green-rgb),0.13), transparent 28%), radial-gradient(circle at 100% 100%, rgba(var(--wc-gold-rgb),0.10), transparent 28%);
+  opacity: 0.78;
 }
 
 .pro-interactive {
@@ -168,8 +297,8 @@ img[src*="/brand/logo-horizontal.png"] {
 
 .pro-interactive:hover {
   transform: translateY(-2px);
-  border-color: rgba(15,240,252,0.35);
-  box-shadow: 0 18px 42px rgba(0,0,0,0.34), 0 0 22px rgba(15,240,252,0.08);
+  border-color: rgba(var(--wc-green-rgb),0.38);
+  box-shadow: 0 18px 42px rgba(0,0,0,0.34), 0 0 22px rgba(var(--wc-green-rgb),0.10);
 }
 
 .pro-interactive:active {
@@ -177,7 +306,7 @@ img[src*="/brand/logo-horizontal.png"] {
 }
 
 .skeleton-shimmer {
-  background: linear-gradient(90deg, rgba(255,255,255,0.04), rgba(255,255,255,0.11), rgba(255,255,255,0.04));
+  background: linear-gradient(90deg, rgba(255,255,255,0.04), rgba(var(--wc-green-rgb),0.12), rgba(255,255,255,0.04));
   background-size: 240% 100%;
   animation: skeleton-shimmer 1.25s ease-in-out infinite;
 }
@@ -194,7 +323,7 @@ article p.text-xs.leading-6.text-gray-400 {
 }
 
 article p.text-xs.leading-6.text-gray-400::selection {
-  background: rgba(15, 240, 252, 0.22);
+  background: rgba(var(--wc-green-rgb), 0.22);
 }
 
 @media (min-width: 1024px) {
@@ -221,7 +350,7 @@ main[dir="rtl"] button:active {
 main[dir="rtl"] .overflow-x-auto {
   -webkit-overflow-scrolling: touch;
   scrollbar-width: thin;
-  scrollbar-color: rgba(15,240,252,0.22) transparent;
+  scrollbar-color: rgba(var(--wc-green-rgb),0.26) transparent;
 }
 
 main[dir="rtl"] .overflow-x-auto::-webkit-scrollbar {
@@ -229,7 +358,7 @@ main[dir="rtl"] .overflow-x-auto::-webkit-scrollbar {
 }
 
 main[dir="rtl"] .overflow-x-auto::-webkit-scrollbar-thumb {
-  background: rgba(15,240,252,0.22);
+  background: rgba(var(--wc-green-rgb),0.26);
   border-radius: 999px;
 }
 
@@ -260,110 +389,12 @@ main[dir="rtl"] .overflow-x-auto::-webkit-scrollbar-thumb {
     line-height: 1.35 !important;
   }
 
-  main[dir="rtl"] p {
-    line-height: 1.9 !important;
+  main[dir="rtl"] .grid-cols-4 {
+    gap: 0.35rem !important;
   }
 
   main[dir="rtl"] a,
   main[dir="rtl"] button {
-    min-height: 44px;
-  }
-
-  main[dir="rtl"] table {
-    min-width: 640px !important;
-  }
-
-  main[dir="rtl"] section:first-of-type {
-    margin-bottom: 0 !important;
-    padding: 0.85rem !important;
-  }
-
-  main[dir="rtl"] section:first-of-type > div:first-child {
-    align-items: flex-start !important;
-  }
-
-  main[dir="rtl"] section:first-of-type > div:nth-of-type(2) {
-    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-  }
-
-  main[dir="rtl"] section:first-of-type article {
-    padding: 0.85rem !important;
-  }
-
-  main[dir="rtl"] section:first-of-type article > div:nth-of-type(2) {
-    display: flex !important;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.45rem;
-  }
-
-  main[dir="rtl"] section:first-of-type article > div:nth-of-type(2) > * {
-    flex: 1 1 auto;
-    min-width: max-content;
-  }
-
-  main[dir="rtl"] section:first-of-type article > div:nth-of-type(4) {
-    grid-template-columns: 1fr !important;
-  }
-
-  main[dir="rtl"] section:nth-of-type(2) > div.relative.z-10 {
-    padding: 1rem !important;
-  }
-
-  main[dir="rtl"] section:nth-of-type(2) > div.relative.z-10 > div:nth-of-type(2) {
-    display: grid !important;
-    grid-template-columns: 1fr 1fr;
-    gap: 0.5rem;
-  }
-
-  main[dir="rtl"] section:nth-of-type(2) > div.relative.z-10 > div:nth-of-type(2) a {
-    justify-content: center;
-    text-align: center;
-    padding: 0.75rem 0.65rem !important;
-  }
-
-  main[dir="rtl"] section:nth-of-type(2) > div.relative.z-10 > div:nth-of-type(3) {
-    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-  }
-
-  main[dir="rtl"] section[aria-label="أقسام كأس العالم 2026 التفاعلية"] {
-    margin-top: 0 !important;
-  }
-
-  main[dir="rtl"] section[aria-label="أقسام كأس العالم 2026 التفاعلية"] > div {
-    gap: 0.85rem !important;
-  }
-
-  main[dir="rtl"] section[aria-label="أقسام كأس العالم 2026 التفاعلية"] article,
-  main[dir="rtl"] section[aria-label="أقسام كأس العالم 2026 التفاعلية"] a.group {
-    padding: 1rem !important;
-  }
-
-  main[dir="rtl"] section[aria-label="أقسام كأس العالم 2026 التفاعلية"] article > div:nth-of-type(3) {
-    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
-  }
-
-  main[dir="rtl"] section[aria-label="أقسام كأس العالم 2026 التفاعلية"] article > div:nth-of-type(2) button {
-    min-height: 38px;
-  }
-
-  main[dir="rtl"] section[aria-label="أقسام كأس العالم 2026 التفاعلية"] a[href="/teams"] > div:nth-of-type(3) {
-    display: flex !important;
-    gap: 0.65rem;
-    overflow-x: auto;
-    padding-bottom: 0.2rem;
-    scroll-snap-type: x proximity;
-  }
-
-  main[dir="rtl"] section[aria-label="أقسام كأس العالم 2026 التفاعلية"] a[href="/teams"] > div:nth-of-type(3) > div {
-    min-width: 82%;
-    scroll-snap-align: start;
-  }
-}
-
-@media (max-width: 380px) {
-  main[dir="rtl"] section:nth-of-type(2) > div.relative.z-10 > div:nth-of-type(2),
-  main[dir="rtl"] section:nth-of-type(2) > div.relative.z-10 > div:nth-of-type(3) {
-    grid-template-columns: 1fr !important;
+    min-height: 40px;
   }
 }
