@@ -1,4 +1,4 @@
-import { Shield, Globe, Trophy, Star, Goal, Percent } from 'lucide-react';
+import { Shield, Globe, Trophy, Goal } from 'lucide-react';
 import { AssetImage } from '@/components/ui/AssetImage';
 
 type TeamHeroProfileProps = {
@@ -11,86 +11,63 @@ export default function TeamHeroProfile({ asset, remainingMatches }: TeamHeroPro
   const fifaRank = asset.fifaRank ? `#${asset.fifaRank}` : '—';
   
   return (
-    <div className="mx-auto mb-6 w-full max-w-[1600px] px-4">
-      {/* 
-        Background: Dynamic gradient based on team theme.
-        We use a rich dark gradient to give a premium football feel (like Champions League / World Cup branding).
-      */}
-      <div className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-[radial-gradient(ellipse_at_top,rgba(0,255,136,0.15),transparent_50%),linear-gradient(180deg,#15181b_0%,#050505_100%)] p-6 shadow-2xl lg:p-10">
-        
-        {/* Animated Background Overlay */}
-        <div className="absolute inset-0 bg-[url('/noise.png')] opacity-[0.03] mix-blend-overlay"></div>
-        
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center md:justify-between gap-8">
+    <div className="mx-auto mb-12 w-full max-w-[1600px] px-4 md:px-8">
+      <div className="flex flex-col border-y-[3px] border-white/10 py-10 md:py-16">
+        <div className="flex flex-col xl:flex-row xl:items-end justify-between gap-12">
           
-          {/* Left Side: Identity */}
-          <div className="flex flex-col sm:flex-row sm:items-center gap-6">
-            {/* Huge Team Logo */}
-            <div className="flex shrink-0 items-center justify-center rounded-[2rem] border border-white/10 bg-black/40 p-4 shadow-xl backdrop-blur-md">
+          {/* Huge Identity Section */}
+          <div className="flex flex-col md:flex-row items-start md:items-center gap-6 md:gap-10">
+            <div className="flex shrink-0 items-center justify-center bg-white p-3 shadow-2xl">
               <AssetImage
                 image={asset.image || ''}
                 type="TEAM"
                 name={asset.name}
-                width={120}
-                height={120}
-                className="h-[80px] w-[80px] object-contain sm:h-[120px] sm:w-[120px]"
+                width={160}
+                height={160}
+                className="h-[100px] w-[100px] object-contain md:h-[160px] md:w-[160px]"
               />
             </div>
             
-            <div>
-              <div className="flex flex-wrap items-center gap-2 mb-3">
-                <span className="rounded-full border border-white/15 bg-white/5 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-gray-300">
-                  {asset.code}
-                </span>
-                {asset.group && (
-                  <span className="flex items-center gap-1 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-primary">
-                    <Trophy size={12} /> مجموعة {asset.group}
-                  </span>
-                )}
-                {asset.continent && (
-                  <span className="flex items-center gap-1 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[10px] font-black text-gray-300">
-                    <Globe size={12} /> {asset.continent}
-                  </span>
-                )}
+            <div className="flex flex-col">
+              <div className="flex flex-wrap items-center gap-3 mb-4 text-xs font-black uppercase tracking-[0.2em] text-white/50">
+                <span>{asset.code}</span>
+                <span className="w-1.5 h-1.5 bg-white/20" />
+                {asset.group && <span className="flex items-center gap-1.5"><Trophy size={14} /> المجموعة {asset.group.replace('Group ', '')}</span>}
+                <span className="w-1.5 h-1.5 bg-white/20" />
+                {asset.continent && <span className="flex items-center gap-1.5"><Globe size={14} /> {asset.continent}</span>}
               </div>
               
-              <h1 className="text-4xl font-black text-white sm:text-5xl lg:text-6xl tracking-tight">
+              <h1 className="text-6xl md:text-[100px] lg:text-[140px] font-black text-white tracking-tighter leading-[0.9] uppercase">
                 {asset.name}
               </h1>
             </div>
           </div>
 
-          {/* Right Side: Key Football Stats (No trading buttons here) */}
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 md:grid-cols-2 lg:grid-cols-4 shrink-0">
-            {/* FIFA Rank */}
-            <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-4 text-center backdrop-blur-sm">
-              <Globe size={18} className="mx-auto mb-2 text-gray-400" />
-              <div className="text-[10px] font-bold text-gray-500 uppercase">تصنيف الفيفا</div>
-              <div className="mt-1 text-xl font-black text-white">{fifaRank}</div>
+          {/* Stark Data Grid */}
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-y-10 gap-x-8 xl:gap-x-16 border-t-[3px] border-white/10 xl:border-t-0 pt-8 xl:pt-0">
+            
+            <div className="flex flex-col">
+              <div className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40 mb-2 flex items-center gap-2">
+                <Globe size={12} /> تصنيف الفيفا
+              </div>
+              <div className="text-5xl md:text-7xl font-black text-white leading-none tracking-tighter">{fifaRank}</div>
             </div>
 
-            {/* Team Power */}
-            <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-4 text-center backdrop-blur-sm">
-              <Shield size={18} className="mx-auto mb-2 text-primary" />
-              <div className="text-[10px] font-bold text-gray-500 uppercase">قوة الفريق</div>
-              <div className="mt-1 text-xl font-black text-primary">{technicalScore}</div>
+            <div className="flex flex-col">
+              <div className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40 mb-2 flex items-center gap-2">
+                <Shield size={12} /> قوة الفريق
+              </div>
+              <div className="text-5xl md:text-7xl font-black text-primary leading-none tracking-tighter">{technicalScore}</div>
             </div>
 
-            {/* Remaining Matches */}
-            <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-4 text-center backdrop-blur-sm">
-              <Goal size={18} className="mx-auto mb-2 text-accent" />
-              <div className="text-[10px] font-bold text-gray-500 uppercase">مباريات باقية</div>
-              <div className="mt-1 text-xl font-black text-accent">{remainingMatches}</div>
+            <div className="flex flex-col col-span-2 md:col-span-1 border-t-[3px] border-white/10 md:border-t-0 pt-6 md:pt-0">
+              <div className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40 mb-2 flex items-center gap-2">
+                <Goal size={12} /> مباريات متبقية
+              </div>
+              <div className="text-5xl md:text-7xl font-black text-accent leading-none tracking-tighter">{remainingMatches}</div>
             </div>
 
-            {/* Form/Momentum (Football context) */}
-            <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-4 text-center backdrop-blur-sm">
-              <Star size={18} className="mx-auto mb-2 text-[#FFB020]" />
-              <div className="text-[10px] font-bold text-gray-500 uppercase">النجوم</div>
-              <div className="mt-1 text-xl font-black text-[#FFB020]">{asset.players?.length || 0}</div>
-            </div>
           </div>
-          
         </div>
       </div>
     </div>
