@@ -1,5 +1,6 @@
 import prisma from '@/lib/prisma';
 import TeamIntelligenceHub from '@/components/teams/TeamIntelligenceHub';
+import { dedupePlayers } from '@/lib/playerDedupe';
 
 export const dynamic = 'force-dynamic';
 
@@ -84,6 +85,7 @@ function createSafeDemoTeam(id: string, dataError?: string) {
     coach: null,
     participations: null,
     players: [],
+    rawPlayersCount: 0,
     isDemo: true,
     dataNotice: dataError || 'لا توجد بيانات موثقة لهذا المنتخب في قاعدة البيانات الحالية.',
   };
@@ -135,15 +137,16 @@ export default async function TeamPage({ params }: Props) {
   }
 
   const mappedPlayers = players.map(mapPlayer);
+  const dedupedPlayers = dedupePlayers(mappedPlayers);
   const safeTeam = team
-    ? { ...team, intelligenceReports: undefined, players: mappedPlayers, isDemo: false }
+    ? { ...team, intelligenceReports: undefined, players: dedupedPlayers, rawPlayersCount: mappedPlayers.length, isDemo: false }
     : createSafeDemoTeam(id, dataError);
 
   return (
     <main className="min-h-screen bg-[#050505] text-white">
       <TeamIntelligenceHub
         team={safeTeam}
-        players={mappedPlayers}
+        players={dedupedPlayers}
         matches={matches.map(mapMatch)}
         intelligenceReport={mapReport(report)}
       />
