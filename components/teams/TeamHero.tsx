@@ -1,5 +1,7 @@
 'use client';
 
+import { getTeamFlag } from '@/lib/teamFlags';
+
 function parseDate(value?: string | null) {
   if (!value) return null;
   const date = new Date(value);
@@ -52,6 +54,7 @@ export default function TeamHero({ team, matches = [], players = [], report }: {
   const nextMatch = getNextMatch(team.id, matches);
   const nextOpponent = nextMatch ? getOpponent(team.id, nextMatch) : null;
   const completeness = getDataCompleteness(team, matches, players, report);
+  const flag = getTeamFlag(team);
 
   return (
     <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-white/[0.04] p-8 mb-8">
@@ -59,13 +62,9 @@ export default function TeamHero({ team, matches = [], players = [], report }: {
       
       <div className="relative z-10 flex flex-col md:flex-row items-center gap-6">
         <div className="flex-shrink-0">
-          {team.image ? (
-            <img src={team.image} alt={team.name} className="h-24 w-24 rounded-full border-2 border-white/20 object-cover" />
-          ) : (
-            <div className="h-24 w-24 rounded-full border-2 border-white/20 bg-white/10 flex items-center justify-center text-3xl font-black">
-              {team.name?.charAt(0) || '؟'}
-            </div>
-          )}
+          <div className="flex h-24 w-24 items-center justify-center rounded-3xl border-2 border-white/20 bg-white/10 text-6xl shadow-inner shadow-black/30">
+            {flag || <span className="text-3xl font-black">{team.name?.charAt(0) || '؟'}</span>}
+          </div>
         </div>
         
         <div className="text-center md:text-right flex-1">
