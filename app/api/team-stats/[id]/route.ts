@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { findGroupAFbrefStats, toTeamFBRefStats } from '@/lib/groupAFbrefStats';
+import { findGroupAFbrefStats, toTeamFBRefStats as toGroupATeamFBRefStats } from '@/lib/groupAFbrefStats';
+import { findGroupBFbrefStats, toTeamFBRefStats as toGroupBTeamFBRefStats } from '@/lib/groupBFbrefStats';
 
 type StandingMetrics = {
   group?: string | null;
@@ -106,9 +107,15 @@ export async function GET(_request: Request, context: RouteContext) {
     select: { id: true, code: true, name: true },
   });
 
-  const stats = findGroupAFbrefStats(team?.code || identifier)
-    || findGroupAFbrefStats(team?.name || identifier);
-  const response: TeamFBRefStats = stats ? toTeamFBRefStats(stats) : unavailableStats;
+  const lookupKey = team?.code || identifier;
+  const fallbackKey = team?.name || identifier;
+  const groupAStats = findGroupAFbrefStats(lookupKey) || findGroupAFbrefStats(fallbackKey);
+  const groupBStats = groupAStats ? null : findGroupBFbrefStats(lookupKey) || findGroupBFbrefStats(fallbackKey);
+  const response: TeamFBRefStats = groupAStats
+    ? toGroupATeamFBRefStats(groupAStats)
+    : groupBStats
+      ? toGroupBTeamFBRefStats(groupBStats)
+      : unavailableStats;
 
   return NextResponse.json(response, {
     headers: { 'Cache-Control': 'public, s-maxage=600, stale-while-revalidate=300' },
