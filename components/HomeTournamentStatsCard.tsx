@@ -47,6 +47,8 @@ type Props = {
   upcomingMatchesCount?: number;
 };
 
+const STATS_REFRESH_MS = 60_000;
+
 function formatCount(value?: number | null) {
   if (typeof value !== 'number' || !Number.isFinite(value)) return 'غير متوفر';
   return new Intl.NumberFormat('ar-EG').format(value);
@@ -91,6 +93,8 @@ export default function HomeTournamentStatsCard({ playersCount, teamsCount, upco
     let cancelled = false;
 
     async function loadStats() {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+
       try {
         const response = await fetch('/api/matches/summary-stats', { cache: 'no-store' });
         if (!response.ok) return;
@@ -107,7 +111,7 @@ export default function HomeTournamentStatsCard({ playersCount, teamsCount, upco
     }
 
     loadStats();
-    const timer = window.setInterval(loadStats, 30_000);
+    const timer = window.setInterval(loadStats, STATS_REFRESH_MS);
     return () => {
       cancelled = true;
       window.clearInterval(timer);
@@ -190,7 +194,7 @@ export default function HomeTournamentStatsCard({ playersCount, teamsCount, upco
           </p>
         </div>
         <div className="rounded-2xl border border-white/10 bg-black/25 px-3 py-2 text-left text-[10px] font-bold leading-5 text-gray-400">
-          <div className="font-black text-[#FFD700]">تحديث تلقائي كل 30 ثانية</div>
+          <div className="font-black text-[#FFD700]">تحديث تلقائي كل 60 ثانية</div>
           <div>آخر مصدر: {formatUpdateTime(stats?.latestUpdatedAt || stats?.latestCardsUpdatedAt)}</div>
           <div>آخر جلب: {lastClientRefresh ? formatUpdateTime(lastClientRefresh.toISOString()) : isLoading ? 'جاري التحميل...' : 'غير متوفر'}</div>
         </div>
