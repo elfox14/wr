@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import HomeTournamentStatsCard from '@/components/HomeTournamentStatsCard';
 import { WORLD_CUP_2026_GROUPS, type WorldCup2026GroupKey } from '@/lib/worldCup2026GroupConfig';
 import { getTeamFlagUrl } from '@/lib/teamFlags';
 
@@ -45,13 +44,6 @@ type Props = {
 
 const MATCH_REFRESH_MS = 60_000;
 
-const heroActions = [
-  { label: 'مباريات اليوم', href: '/matches', primary: true },
-  { label: 'جدول البطولة', href: '/matches', primary: false },
-  { label: 'المجموعات', href: '/groups', primary: false },
-  { label: 'التحليلات', href: '/news', primary: false },
-] as const;
-
 const groupLetters = Object.keys(WORLD_CUP_2026_GROUPS) as WorldCup2026GroupKey[];
 
 const teamRegions = [
@@ -64,8 +56,6 @@ const teamRegions = [
   { title: 'أمريكا الشمالية والكاريبي', teams: [{ name: 'المكسيك', flag: '🇲🇽' }, { name: 'كندا', flag: '🇨🇦' }, { name: 'الولايات المتحدة', flag: '🇺🇸' }, { name: 'هايتي', flag: '🇭🇹' }, { name: 'كوراساو', flag: '🇨🇼' }, { name: 'بنما', flag: '🇵🇦' }] },
   { title: 'أوقيانوسيا', teams: [{ name: 'أستراليا', flag: '🇦🇺' }, { name: 'نيوزيلندا', flag: '🇳🇿' }] },
 ] as const;
-
-const hostCountries = [{ name: 'أمريكا', flag: '🇺🇸' }, { name: 'كندا', flag: '🇨🇦' }, { name: 'المكسيك', flag: '🇲🇽' }] as const;
 
 function formatCount(value?: number | null, fallback = 0) {
   return new Intl.NumberFormat('ar-EG').format(typeof value === 'number' && Number.isFinite(value) ? value : fallback);
@@ -486,54 +476,12 @@ function WorldMapSection() {
   );
 }
 
-function HeroSection() {
-  return (
-    <section className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(15,240,252,0.14),transparent_28%),radial-gradient(circle_at_bottom_left,rgba(255,215,0,0.14),transparent_26%),linear-gradient(135deg,rgba(3,28,21,0.98),rgba(1,12,10,0.98))] p-5 shadow-[0_24px_90px_rgba(0,0,0,0.35)] sm:p-7">
-      <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#FFD700]/70 to-transparent" />
-      <div className="flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
-        <div className="max-w-3xl">
-          <div className="inline-flex items-center gap-2 rounded-full border border-[#FFD700]/25 bg-[#FFD700]/10 px-3 py-1 text-[11px] font-black uppercase tracking-[0.18em] text-[#FFD700]">
-            World Cup 2026 Live Hub
-          </div>
-          <h1 className="mt-4 text-4xl font-black leading-tight tracking-tight text-white md:text-5xl lg:text-6xl">
-            منصة كأس العالم 2026
-          </h1>
-          <p className="mt-4 max-w-2xl text-base font-semibold leading-8 text-gray-300 md:text-lg">
-            مباريات، منتخبات، مجموعات، إحصائيات، أخبار وتحليل رياضي في تجربة واحدة، مع فصل واضح بين المحتوى الكروي والجانب الترفيهي الافتراضي.
-          </p>
-          <div className="mt-6 flex flex-wrap gap-2">
-            {heroActions.map((action) => (
-              <Link key={action.label} href={action.href} className={`rounded-xl px-4 py-2 text-sm font-black transition ${action.primary ? 'bg-[#0FF0FC] text-black hover:bg-[#4AFAFF]' : 'border border-white/10 bg-white/[0.06] text-white hover:bg-white/[0.1]'}`}>
-                {action.label}
-              </Link>
-            ))}
-          </div>
-        </div>
-
-        <div className="grid min-w-[260px] gap-3 rounded-[1.5rem] border border-white/10 bg-black/20 p-4">
-          <div className="text-xs font-black uppercase tracking-[0.16em] text-[#FFD700]">Hosts</div>
-          <div className="grid gap-2">
-            {hostCountries.map((host) => (
-              <div key={host.name} className="flex items-center justify-between rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2">
-                <span className="text-xl">{host.flag}</span>
-                <span className="text-sm font-black text-white">{host.name}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-export default function HomeClientSportsNext({ upcomingMatches = [], playersCount = 0, teamsCount = 0, upcomingMatchesCount = 0 }: Props) {
+export default function HomeClientSportsNext({ upcomingMatches = [], upcomingMatchesCount = 0 }: Props) {
   const safeUpcomingMatches = Array.isArray(upcomingMatches) ? (upcomingMatches as HomeMatch[]) : [];
 
   return (
     <main dir="rtl" className="mx-auto max-w-7xl space-y-4 px-3 py-4 sm:px-4 lg:px-6">
-      <HeroSection />
       <HomeMatchCenterCard fallbackMatches={safeUpcomingMatches} upcomingMatchesCount={upcomingMatchesCount} />
-      <HomeTournamentStatsCard playersCount={playersCount} teamsCount={teamsCount} upcomingMatchesCount={upcomingMatchesCount} />
       <TournamentExplorerCard />
       <ContentHubCard />
       <WorldMapSection />
