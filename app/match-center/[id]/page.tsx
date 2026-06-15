@@ -31,26 +31,28 @@ function formatDate(value: Date | string) {
   });
 }
 
+function formatScoreNumber(value?: number | null) {
+  return Number(value || 0).toLocaleString('ar-EG');
+}
+
 function formatCountdown(value: Date | string) {
   const date = new Date(value);
   if (!Number.isFinite(date.getTime())) return null;
   const diffMs = date.getTime() - Date.now();
   if (diffMs <= 0) return null;
-
   const totalSeconds = Math.floor(diffMs / 1000);
   const days = Math.floor(totalSeconds / 86_400);
   const hours = Math.floor((totalSeconds % 86_400) / 3_600);
   const minutes = Math.floor((totalSeconds % 3_600) / 60);
   const seconds = totalSeconds % 60;
   const n = (value: number) => value.toLocaleString('ar-EG');
-
   if (days > 0) return `بعد ${n(days)}ي ${n(hours)}س ${n(minutes)}د`;
   if (hours > 0) return `بعد ${n(hours)}س ${n(minutes)}د ${n(seconds)}ث`;
   return `بعد ${n(minutes)}د ${n(seconds)}ث`;
 }
 
 function isGroupStage(match: any) {
-  const value = String(match.groupPhase || match.group || match.stage || '').toUpperCase();
+  const value = String(match.groupPhase || match.stage || '').toUpperCase();
   return value.includes('GROUP');
 }
 
@@ -85,7 +87,6 @@ function statusInfo(match: any) {
   if (LIVE_STATUSES.includes(value)) {
     return { label: value === 'HT' ? 'استراحة' : 'مباشرة الآن', className: 'border-[#00FF88]/25 bg-[#00FF88]/10 text-[#00FF88]', icon: Activity };
   }
-
   const countdown = match.matchDate ? formatCountdown(match.matchDate) : null;
   return { label: countdown || 'قادمة', className: 'border-[#0FF0FC]/25 bg-[#0FF0FC]/10 text-[#0FF0FC]', icon: Clock };
 }
@@ -113,27 +114,22 @@ function TeamInlineName({ asset, fallback }: { asset: any; fallback: string }) {
   );
 }
 
-function teamName(asset: any, fallback: string) {
-  return asset?.name || fallback;
-}
-
 function teamCode(asset: any) {
   return asset?.code || asset?.name?.slice?.(0, 3) || '---';
 }
 
 function groupLabel(match: any) {
-  return match.groupPhase || match.group || match.stage || 'كأس العالم 2026';
+  return match.groupPhase || match.stage || 'كأس العالم 2026';
 }
 
-function quoteSql(value: string) {
-  return `'${String(value).replace(/'/g, "''")}'`;
-}
-
-async function ensurePressNewsTable() {
-  await prisma.$executeRawUnsafe(`CREATE TABLE IF NOT EXISTS "PressNews" ("id" TEXT PRIMARY KEY,"title" TEXT NOT NULL,"body" TEXT NOT NULL,"category" TEXT NOT NULL DEFAULT 'رصد صحفي',"sourceName" TEXT NOT NULL,"sourceUrl" TEXT,"sourceType" TEXT NOT NULL DEFAULT 'newsletter',"language" TEXT NOT NULL DEFAULT 'ar',"status" TEXT NOT NULL DEFAULT 'published',"importance" INTEGER NOT NULL DEFAULT 50,"tags" JSONB,"relatedTeamId" TEXT,"relatedPlayerId" TEXT,"relatedMatchId" TEXT,"publishedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,"createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,"updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP)`);
-  await prisma.$executeRawUnsafe('ALTER TABLE "PressNews" ADD COLUMN IF NOT EXISTS "relatedTeamId" TEXT');
-  await prisma.$executeRawUnsafe('ALTER TABLE "PressNews" ADD COLUMN IF NOT EXISTS "relatedPlayerId" TEXT');
-  await prisma.$executeRawUnsafe('ALTER TABLE "PressNews" ADD COLUMN IF NOT EXISTS "relatedMatchId" TEXT');
+function RtlScore({ homeScore, awayScore }: { homeScore?: number | null; awayScore?: number | null }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 tabular-nums" dir="rtl">
+      <span>{formatScoreNumber(homeScore)}</span>
+      <span className="text-[#FFD700]/70">-</span>
+      <span>{formatScoreNumber(awayScore)}</span>
+    </span>
+  );
 }
 
 async function getMatch(id: string) {
@@ -141,20 +137,6 @@ async function getMatch(id: string) {
     where: { id },
     include: { homeTeam: true, awayTeam: true },
   });
-}
-
-async function getRelatedPressNews(matchId: string, homeId: string, awayId: string, homeName: string, awayName: string) {
-  try {
-    await ensurePressNewsTable();
-    const home = `%${homeName}%`;
-    const away = `%${awayName}%`;
-    return prisma.$queryRawUnsafe<any[]>(
-      `SELECT * FROM "PressNews" WHERE "status" = 'published' AND ("relatedMatchId" = ${quoteSql(matchId)} OR "relatedTeamId" = ${quoteSql(homeId)} OR "relatedTeamId" = ${quoteSql(awayId)} OR "title" ILIKE ${quoteSql(home)} OR "body" ILIKE ${quoteSql(home)} OR "title" ILIKE ${quoteSql(away)} OR "body" ILIKE ${quoteSql(away)}) ORDER BY "publishedAt" DESC, "importance" DESC LIMIT 8`
-    );
-  } catch (error) {
-    console.error('match center press news error:', error);
-    return [];
-  }
 }
 
 export default async function MatchCenterPage({ params }: { params: Promise<{ id: string }> | { id: string } }) {
@@ -167,7 +149,6 @@ export default async function MatchCenterPage({ params }: { params: Promise<{ id
   const finished = isFinishedMatch(match);
   const status = statusInfo(match);
   const StatusIcon = status.icon;
-  const pressNews = await getRelatedPressNews(match.id, home.id, away.id, home.name, away.name);
   const showScore = finished || !['SCHEDULED', 'TIMED', 'NOT_STARTED'].includes(String(match.status).toUpperCase());
   const animationHref = match.animationMatchId
     ? `/animation-live/player?matchId=${encodeURIComponent(String(match.animationMatchId))}&dbMatchId=${encodeURIComponent(String(match.id))}&lang=en&statsPanel=simple&teamPanel=1`
@@ -192,8 +173,8 @@ export default async function MatchCenterPage({ params }: { params: Promise<{ id
 
           <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
             <TeamBlock asset={home} align="right" fallback="الفريق الأول" />
-            <div className={`flex min-h-10 min-w-10 items-center justify-center rounded-xl border px-3 text-xs font-black ${showScore ? 'border-[#FFD700]/25 bg-[#FFD700]/10 text-[#FFD700]' : 'border-[#0FF0FC]/20 bg-[#0FF0FC]/10 text-[#0FF0FC]'}`} dir="ltr">
-              {showScore ? `${match.homeScore ?? 0} - ${match.awayScore ?? 0}` : 'VS'}
+            <div className={`flex min-h-10 min-w-10 items-center justify-center rounded-xl border px-3 text-xs font-black ${showScore ? 'border-[#FFD700]/25 bg-[#FFD700]/10 text-[#FFD700]' : 'border-[#0FF0FC]/20 bg-[#0FF0FC]/10 text-[#0FF0FC]'}`}>
+              {showScore ? <RtlScore homeScore={match.homeScore} awayScore={match.awayScore} /> : 'VS'}
             </div>
             <TeamBlock asset={away} align="left" fallback="الفريق الثاني" />
           </div>
@@ -217,11 +198,7 @@ export default async function MatchCenterPage({ params }: { params: Promise<{ id
         </div>
 
         <Panel title="مرصد المباراة الإخباري ومجريات اللعب" icon={<Newspaper className="text-[#FFD700]" />} action={<Link href="/news" className="text-xs font-black text-[#0FF0FC]">غرفة الأخبار</Link>}>
-          {pressNews.length ? (
-            <div className="grid gap-3 md:grid-cols-2">{pressNews.map((item) => <PressNewsCard key={item.id} item={item} />)}</div>
-          ) : (
-            <EmptyText text="لا توجد أخبار صحفية مرتبطة بهذه المباراة حاليًا. مجريات اللعب اللحظية تظهر في كارت الإحصائيات والأحداث عند توفر مصدر موثق." />
-          )}
+          <EmptyText text="مجريات اللعب اللحظية تظهر في كارت الإحصائيات عند توفر مصدر موثق." />
         </Panel>
       </section>
     </main>
@@ -252,22 +229,4 @@ function Panel({ title, icon, action, children }: { title: string; icon?: React.
 
 function EmptyText({ text }: { text: string }) {
   return <div className="rounded-2xl border border-dashed border-white/10 bg-black/20 p-6 text-center text-sm font-bold leading-7 text-gray-400">{text}</div>;
-}
-
-function PressNewsCard({ item }: { item: any }) {
-  const date = item.publishedAt ? new Date(item.publishedAt).toLocaleDateString('ar-EG') : '';
-  return (
-    <article className="rounded-2xl border border-white/10 bg-black/25 p-4">
-      <div className="mb-2 flex flex-wrap items-center gap-2 text-[10px] font-black text-gray-500">
-        <span className="rounded-full border border-[#FFD700]/20 bg-[#FFD700]/10 px-2 py-1 text-[#FFD700]">{item.category || 'رصد صحفي'}</span>
-        <span>{item.sourceName || 'مصدر غير محدد'}</span>
-        {date ? <span>{date}</span> : null}
-      </div>
-      <h4 className="text-base font-black leading-7 text-white">{item.title}</h4>
-      <p className="mt-2 line-clamp-3 text-xs font-bold leading-6 text-gray-400">{item.body}</p>
-      {item.sourceUrl ? (
-        <a href={item.sourceUrl} target="_blank" rel="noopener noreferrer" className="mt-3 inline-flex text-xs font-black text-[#0FF0FC]">فتح المصدر</a>
-      ) : null}
-    </article>
-  );
 }
