@@ -122,16 +122,20 @@ function isSameCalendarDay(value?: string | Date | null, target = new Date()) {
   return date.getFullYear() === target.getFullYear() && date.getMonth() === target.getMonth() && date.getDate() === target.getDate();
 }
 
-function formatCountdown(diffMs: number) {
+function countdownParts(diffMs: number) {
   const totalSeconds = Math.max(0, Math.floor(diffMs / 1000));
   const days = Math.floor(totalSeconds / 86_400);
   const hours = Math.floor((totalSeconds % 86_400) / 3_600);
   const minutes = Math.floor((totalSeconds % 3_600) / 60);
   const seconds = totalSeconds % 60;
+  return { days, hours, minutes, seconds };
+}
 
-  if (days > 0) return `بعد ${formatCount(days)}ي ${formatCount(hours)}س ${formatCount(minutes)}د`;
-  if (hours > 0) return `بعد ${formatCount(hours)}س ${formatCount(minutes)}د ${formatCount(seconds)}ث`;
-  return `بعد ${formatCount(minutes)}د ${formatCount(seconds)}ث`;
+function compactCountdownLabel(diffMs: number) {
+  const parts = countdownParts(diffMs);
+  if (parts.days > 0) return `بعد ${formatCount(parts.days)}ي ${formatCount(parts.hours)}س`;
+  if (parts.hours > 0) return `بعد ${formatCount(parts.hours)}س ${formatCount(parts.minutes)}د`;
+  return `بعد ${formatCount(parts.minutes)}د ${formatCount(parts.seconds)}ث`;
 }
 
 function matchTiming(match: HomeMatch, now: Date) {
@@ -143,7 +147,7 @@ function matchTiming(match: HomeMatch, now: Date) {
   if (!validDate) return { label: 'بانتظار المصدر', live: false, waiting: true };
 
   const diffMs = validDate.getTime() - now.getTime();
-  if (diffMs > 0) return { label: formatCountdown(diffMs), live: false, waiting: false };
+  if (diffMs > 0) return { label: compactCountdownLabel(diffMs), live: false, waiting: false };
 
   return { label: 'بانتظار تأكيد البداية', live: false, waiting: true };
 }
@@ -193,7 +197,56 @@ function TeamScoreBadge({ team, score, align }: { team?: Team | null; score?: nu
   );
 }
 
+function CountdownUnit({ value, label }: { value: number; label: string }) {
+  return (
+    <span className="flex min-w-[2.25rem] flex-col items-center justify-center rounded-lg border border-[#FFD700]/20 bg-black/25 px-1.5 py-1 leading-none shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
+      <span className="text-[12px] font-black text-white">{formatCount(value)}</span>
+      <span className="mt-0.5 text-[8px] font-black text-[#FFD700]">{label}</span>
+    </span>
+  );
+}
+
+function UpcomingCountdown({ diffMs }: { diffMs: number }) {
+  const parts = countdownParts(diffMs);
+  const units = parts.days > 0
+    ? [
+        { value: parts.days, label: 'يوم' },
+        { value: parts.hours, label: 'س' },
+        { value: parts.minutes, label: 'د' },
+      ]
+    : parts.hours > 0
+      ? [
+          { value: parts.hours, label: 'س' },
+          { value: parts.minutes, label: 'د' },
+          { value: parts.seconds, label: 'ث' },
+        ]
+      : [
+          { value: parts.minutes, label: 'د' },
+          { value: parts.seconds, label: 'ث' },
+        ];
+
+  return (
+    <span className="inline-flex max-w-full items-center gap-1.5 rounded-2xl border border-[#FFD700]/30 bg-[linear-gradient(135deg,rgba(255,215,0,0.16),rgba(15,240,252,0.08))] px-2 py-1.5 shadow-[0_0_22px_rgba(255,215,0,0.08)]">
+      <span className="inline-flex items-center gap-1 text-[9px] font-black text-[#FFD700]">
+        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#FFD700]" />
+        تبدأ بعد
+      </span>
+      <span className="flex items-center gap-1">
+        {units.map((unit) => <CountdownUnit key={unit.label} value={unit.value} label={unit.label} />)}
+      </span>
+    </span>
+  );
+}
+
 function InlineMatchTimer({ match, now }: { match: HomeMatch; now: Date }) {
+  const date = match.matchDate ? new Date(match.matchDate) : null;
+  const validDate = date && !Number.isNaN(date.getTime()) ? date : null;
+  const diffMs = validDate ? validDate.getTime() - now.getTime() : 0;
+
+  if (diffMs > 0 && !isLive(match, now) && !isFinished(match, now)) {
+    return <UpcomingCountdown diffMs={diffMs} />;
+  }
+
   const timing = matchTiming(match, now);
   const clock = matchClock(match, now);
 
@@ -209,7 +262,7 @@ function MatchCard({ match, now }: { match: HomeMatch; now: Date }) {
   return (
     <article className="relative overflow-hidden rounded-2xl border border-white/10 bg-black/30 p-3 shadow-[0_14px_34px_rgba(0,0,0,0.18)] transition hover:border-[#0FF0FC]/35 hover:bg-white/[0.055]">
       <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#0FF0FC]/55 to-transparent opacity-70" />
-      <div className="mb-3 grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <span className="rounded-full border border-[#FFD700]/20 bg-[#FFD700]/10 px-2.5 py-1 text-[11px] font-black text-[#FFD700]">{matchGroup(match)}</span>
         <InlineMatchTimer match={match} now={now} />
         <span className="rounded-full border border-white/10 bg-white/[0.05] px-2.5 py-1 text-[11px] font-black text-gray-300">{formatMatchDate(match.matchDate)}</span>
