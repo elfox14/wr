@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { findGroupAFbrefStats, toTeamFBRefStats as toGroupATeamFBRefStats } from '@/lib/groupAFbrefStats';
 import { findGroupBFbrefStats, toTeamFBRefStats as toGroupBTeamFBRefStats } from '@/lib/groupBFbrefStats';
+import { findGroupCFbrefStats, toTeamFBRefStats as toGroupCTeamFBRefStats } from '@/lib/groupCFbrefStats';
+import { findGroupDFbrefStats, toTeamFBRefStats as toGroupDTeamFBRefStats } from '@/lib/groupDFbrefStats';
 
 type StandingMetrics = {
   group?: string | null;
@@ -111,11 +113,17 @@ export async function GET(_request: Request, context: RouteContext) {
   const fallbackKey = team?.name || identifier;
   const groupAStats = findGroupAFbrefStats(lookupKey) || findGroupAFbrefStats(fallbackKey);
   const groupBStats = groupAStats ? null : findGroupBFbrefStats(lookupKey) || findGroupBFbrefStats(fallbackKey);
+  const groupCStats = groupAStats || groupBStats ? null : findGroupCFbrefStats(lookupKey) || findGroupCFbrefStats(fallbackKey);
+  const groupDStats = groupAStats || groupBStats || groupCStats ? null : findGroupDFbrefStats(lookupKey) || findGroupDFbrefStats(fallbackKey);
   const response: TeamFBRefStats = groupAStats
     ? toGroupATeamFBRefStats(groupAStats)
     : groupBStats
       ? toGroupBTeamFBRefStats(groupBStats)
-      : unavailableStats;
+      : groupCStats
+        ? toGroupCTeamFBRefStats(groupCStats)
+        : groupDStats
+          ? toGroupDTeamFBRefStats(groupDStats)
+          : unavailableStats;
 
   return NextResponse.json(response, {
     headers: { 'Cache-Control': 'public, s-maxage=600, stale-while-revalidate=300' },
