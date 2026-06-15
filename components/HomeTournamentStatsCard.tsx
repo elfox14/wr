@@ -22,6 +22,10 @@ type SummaryStats = {
   scheduledMatches?: number;
   teamCount?: number;
   playerCount?: number;
+  rawPlayerRows?: number;
+  hiddenDuplicatePlayerRows?: number;
+  estimatedFinalSquadCapacity?: number;
+  overEstimatedCapacityBy?: number;
   totalGoals?: number;
   yellowCards?: number;
   redCards?: number;
@@ -120,12 +124,15 @@ export default function HomeTournamentStatsCard({ playersCount, teamsCount, upco
 
   const penaltiesAvailable = Boolean(stats?.penalties?.available);
   const biggestScore = stats?.biggestScore || null;
+  const playerNote = stats?.rawPlayerRows && stats.rawPlayerRows > (stats.playerCount || 0)
+    ? `بعد الدمج · الخام: ${formatCount(stats.rawPlayerRows)}`
+    : 'لاعب ظاهر بعد الدمج';
 
   const tiles = useMemo(() => ([
     {
       label: 'عدد اللاعبين',
       value: formatCount(stats?.playerCount ?? playersCount),
-      note: 'لاعب مسجل في قاعدة البيانات',
+      note: playerNote,
       href: '/players',
       tone: 'default' as const,
     },
@@ -178,7 +185,7 @@ export default function HomeTournamentStatsCard({ playersCount, teamsCount, upco
       href: '/matches',
       tone: 'default' as const,
     },
-  ]), [stats, playersCount, upcomingMatchesCount, penaltiesAvailable, biggestScore]);
+  ]), [stats, playersCount, upcomingMatchesCount, penaltiesAvailable, biggestScore, playerNote]);
 
   return (
     <section className="mx-auto mb-4 max-w-7xl overflow-hidden rounded-2xl border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(255,215,0,0.13),transparent_28%),linear-gradient(135deg,rgba(7,24,18,0.94),rgba(4,17,13,0.98))] p-3 text-white shadow-[0_18px_46px_rgba(0,0,0,0.32)] backdrop-blur sm:p-4" aria-label="إحصائيات البطولة الحية">
@@ -206,7 +213,7 @@ export default function HomeTournamentStatsCard({ playersCount, teamsCount, upco
 
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-[10px] font-bold text-gray-500">
         <span>الفرق المسجلة: {formatCount(stats?.teamCount ?? teamsCount)} منتخب</span>
-        <span>مصدر الإحصائيات: قاعدة البيانات + snapshots + أحداث المباراة عند توفرها</span>
+        <span>سعة القوائم التقديرية: {formatCount(stats?.estimatedFinalSquadCapacity)} لاعب · المصدر: قاعدة البيانات بعد الدمج</span>
       </div>
     </section>
   );
