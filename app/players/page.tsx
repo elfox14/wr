@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import prisma from '@/lib/prisma';
+import { dedupePlayers, hasUsablePlayerImage } from '@/lib/playerDedupe';
 
 export const dynamic = 'force-dynamic';
 
@@ -50,8 +51,8 @@ function PlayerCard({ player }: PlayerCardProps) {
   const content = (
     <>
       <div className="flex items-center gap-3">
-        {player.image ? (
-          <img src={player.image} alt={player.name} className="h-14 w-14 rounded-full border border-white/10 object-cover" />
+        {hasUsablePlayerImage(player.image) ? (
+          <img src={player.image as string} alt={player.name} className="h-14 w-14 rounded-full border border-white/10 object-cover" />
         ) : (
           <div className="flex h-14 w-14 items-center justify-center rounded-full border border-white/10 bg-white/10 text-sm font-black text-gray-300">
             {initials}
@@ -113,7 +114,7 @@ export default async function PlayersPage({ searchParams }: Props) {
   const selectedTeam = cleanParam(firstParam(resolvedSearchParams.team));
   const selectedPosition = cleanParam(firstParam(resolvedSearchParams.position));
 
-  const allPlayers = await prisma.asset.findMany({
+  const rawPlayers = await prisma.asset.findMany({
     where: { type: 'PLAYER' },
     orderBy: [{ team: { name: 'asc' } }, { position: 'asc' }, { name: 'asc' }],
     take: 500,
@@ -137,6 +138,9 @@ export default async function PlayersPage({ searchParams }: Props) {
       },
     },
   });
+
+  const allPlayers = dedupePlayers(rawPlayers);
+  const hiddenDuplicates = Math.max(0, rawPlayers.length - allPlayers.length);
 
   const teams = Array.from(
     new Map(
@@ -176,6 +180,11 @@ export default async function PlayersPage({ searchParams }: Props) {
             <p className="mt-4 max-w-3xl leading-8 text-gray-300">
               تصفح اللاعبين المسجلين على المنصة، وابحث حسب الاسم أو المنتخب أو المركز للوصول السريع لملف اللاعب داخل صفحة منتخب بلاده.
             </p>
+            {hiddenDuplicates > 0 ? (
+              <p className="mt-3 text-sm font-bold text-cyan-100">
+                تم دمج {hiddenDuplicates} نسخة مكررة في العرض حتى لا يظهر اللاعب أكثر من مرة.
+              </p>
+            ) : null}
           </div>
           <div className="rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm font-bold text-gray-300">
             <span className="text-2xl font-black text-white">{players.length}</span> لاعب ظاهر
