@@ -6,6 +6,7 @@ import { groupCFbrefStats } from './groupCFbrefStats';
 import { groupDFbrefStats } from './groupDFbrefStats';
 import { groupEFbrefStats } from './groupEFbrefStats';
 import { groupFFbrefStats } from './groupFFbrefStats';
+import { manualFbrefRosterSnapshots } from './fbrefManualRosterSnapshots';
 
 const PLAYER_PROVIDER = 'FBREF_COPIED_ROSTER_PLAYER_ASSET';
 
@@ -25,14 +26,22 @@ type SeedResult = {
 };
 
 function allFbrefTeams(): FbrefTeamWithOptionalRoster[] {
-  return [
+  const byCode = new Map<string, FbrefTeamWithOptionalRoster>();
+  for (const stats of [
     ...groupAFbrefStats,
     ...groupBFbrefStats,
     ...groupCFbrefStats,
     ...groupDFbrefStats,
     ...groupEFbrefStats,
     ...groupFFbrefStats,
-  ] as FbrefTeamWithOptionalRoster[];
+    ...manualFbrefRosterSnapshots,
+  ] as FbrefTeamWithOptionalRoster[]) {
+    const existing = byCode.get(stats.teamCode);
+    const currentRosterCount = Array.isArray(stats.roster) ? stats.roster.length : 0;
+    const existingRosterCount = Array.isArray(existing?.roster) ? existing!.roster!.length : 0;
+    if (!existing || currentRosterCount > existingRosterCount) byCode.set(stats.teamCode, stats);
+  }
+  return [...byCode.values()];
 }
 
 function toSlug(value: string) {
