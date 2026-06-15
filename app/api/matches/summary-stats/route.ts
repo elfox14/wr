@@ -11,12 +11,12 @@ function isLiveStatus(status?: string | null) {
 
 function isFinishedStatus(status?: string | null) {
   const value = String(status || '').toUpperCase();
-  return value === 'FINISHED' || value === 'FT';
+  return value === 'FINISHED' || value === 'FT' || value === 'AET' || value === 'PEN';
 }
 
 function isScheduledStatus(status?: string | null) {
   const value = String(status || '').toUpperCase();
-  return value === 'SCHEDULED' || value === 'TIMED' || value === 'NOT_STARTED';
+  return value === 'SCHEDULED' || value === 'TIMED' || value === 'NOT_STARTED' || value === 'NS';
 }
 
 function safeNumber(value: unknown) {
@@ -24,15 +24,42 @@ function safeNumber(value: unknown) {
   return Number.isFinite(number) ? number : 0;
 }
 
+function textIncludesAny(value: string, terms: string[]) {
+  return terms.some((term) => value.includes(term));
+}
+
+function isPenaltyEvent(type?: string | null, detail?: string | null) {
+  const text = `${type || ''} ${detail || ''}`.toLowerCase();
+  return textIncludesAny(text, ['penalty', 'spot kick', 'ركلة جزاء', 'ضربة جزاء', 'جزاء']);
+}
+
+function isPenaltyMissed(type?: string | null, detail?: string | null) {
+  const text = `${type || ''} ${detail || ''}`.toLowerCase();
+  return textIncludesAny(text, ['miss', 'missed', 'saved', 'failed', 'off target', 'ضائعة', 'اهدر', 'أهدر', 'تصدى', 'تصدي']);
+}
+
+function isPenaltyScored(type?: string | null, detail?: string | null) {
+  const text = `${type || ''} ${detail || ''}`.toLowerCase();
+  if (isPenaltyMissed(type, detail)) return false;
+  return textIncludesAny(text, ['penalty_scored', 'penalty goal', 'scored penalty', 'goal penalty', 'penalty converted', 'سجل', 'مسجلة', 'هدف من ركلة جزاء']);
+}
+
+function maxIsoDate(...values: Array<string | null | undefined>) {
+  return values.filter(Boolean).sort().pop() || null;
+}
+
 export async function GET() {
   try {
-    const [matches, yellowEventCount, redEventCount, snapshotsCount] = await Promise.all([
+    const [matches, yellowEventCount, redEventCount, snapshotsCount, playerCount, teamCount, matchEvents] = await Promise.all([
       prisma.match.findMany({
         select: {
           id: true,
           status: true,
           homeScore: true,
           awayScore: true,
+          matchDate: true,
+          homeTeam: { select: { name: true, code: true } },
+          awayTeam: { select: { name: true, code: true } },
           statsSnapshots: {
             orderBy: { capturedAt: 'desc' },
             take: 1,
@@ -49,6 +76,17 @@ export async function GET() {
       prisma.matchEvent.count({ where: { type: { in: ['yellow_card', 'yellow', 'card_yellow'] } } }),
       prisma.matchEvent.count({ where: { type: { in: ['red_card', 'red', 'card_red'] } } }),
       prisma.matchStatsSnapshot.count().catch(() => 0),
+      prisma.asset.count({ where: { type: 'PLAYER' } }),
+      prisma.asset.count({ where: { type: 'TEAM' } }),
+      prisma.matchEvent.findMany({
+        select: {
+          type: true,
+          detail: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+        take: 10000,
+      }).catch(() => []),
     ]);
 
     let finishedMatches = 0;
@@ -59,13 +97,44 @@ export async function GET() {
     let snapshotRedCards = 0;
     let matchesWithCardSnapshots = 0;
     let latestCardsUpdatedAt: string | null = null;
+    let biggestScore: null | {
+      matchId: string;
+      homeTeam: { name: string; code: string };
+      awayTeam: { name: string; code: string };
+      homeScore: number;
+      awayScore: number;
+      totalGoals: number;
+      goalDifference: number;
+      matchDate: string;
+    } = null;
 
     for (const match of matches) {
-      if (isFinishedStatus(match.status)) finishedMatches += 1;
-      if (isLiveStatus(match.status)) liveMatches += 1;
+      const finished = isFinishedStatus(match.status);
+      const live = isLiveStatus(match.status);
+
+      if (finished) finishedMatches += 1;
+      if (live) liveMatches += 1;
       if (isScheduledStatus(match.status)) scheduledMatches += 1;
-      if (isFinishedStatus(match.status) || isLiveStatus(match.status)) {
-        totalGoals += safeNumber(match.homeScore) + safeNumber(match.awayScore);
+
+      if (finished || live) {
+        const homeScore = safeNumber(match.homeScore);
+        const awayScore = safeNumber(match.awayScore);
+        const matchGoals = homeScore + awayScore;
+        const goalDifference = Math.abs(homeScore - awayScore);
+        totalGoals += matchGoals;
+
+        if (matchGoals > 0 && (!biggestScore || matchGoals > biggestScore.totalGoals || (matchGoals === biggestScore.totalGoals && goalDifference > biggestScore.goalDifference))) {
+          biggestScore = {
+            matchId: match.id,
+            homeTeam: { name: match.homeTeam?.name || 'غير متوفر', code: match.homeTeam?.code || '' },
+            awayTeam: { name: match.awayTeam?.name || 'غير متوفر', code: match.awayTeam?.code || '' },
+            homeScore,
+            awayScore,
+            totalGoals: matchGoals,
+            goalDifference,
+            matchDate: match.matchDate instanceof Date ? match.matchDate.toISOString() : String(match.matchDate || ''),
+          };
+        }
       }
 
       const latest = match.statsSnapshots[0];
@@ -83,16 +152,37 @@ export async function GET() {
     const yellowCards = Math.max(snapshotYellowCards, yellowEventCount);
     const redCards = Math.max(snapshotRedCards, redEventCount);
 
+    const penaltyEvents = matchEvents.filter((event) => isPenaltyEvent(event.type, event.detail));
+    const penaltiesScored = penaltyEvents.filter((event) => isPenaltyScored(event.type, event.detail)).length;
+    const penaltiesMissed = penaltyEvents.filter((event) => isPenaltyMissed(event.type, event.detail)).length;
+    const penaltiesUnknown = Math.max(0, penaltyEvents.length - penaltiesScored - penaltiesMissed);
+    const latestEventUpdatedAt = matchEvents
+      .map((event) => event.updatedAt instanceof Date ? event.updatedAt.toISOString() : event.createdAt instanceof Date ? event.createdAt.toISOString() : '')
+      .filter(Boolean)
+      .sort()
+      .pop() || null;
+
     return NextResponse.json({
       ok: true,
-      source: 'database_summary_from_matches_snapshots_and_events',
+      source: 'database_summary_from_matches_snapshots_events_and_assets',
       totalMatches: matches.length,
       finishedMatches,
       liveMatches,
       scheduledMatches,
+      teamCount,
+      playerCount,
       totalGoals,
       yellowCards,
       redCards,
+      penalties: {
+        available: matchEvents.length > 0,
+        total: penaltyEvents.length,
+        scored: penaltiesScored,
+        missed: penaltiesMissed,
+        unknown: penaltiesUnknown,
+        source: matchEvents.length > 0 ? 'MatchEvent' : 'غير متوفر في المصادر',
+      },
+      biggestScore,
       snapshotsCount,
       cardsSource: {
         yellow: snapshotYellowCards >= yellowEventCount ? 'MatchStatsSnapshot' : 'MatchEvent fallback',
@@ -104,6 +194,8 @@ export async function GET() {
       },
       matchesWithCardSnapshots,
       latestCardsUpdatedAt,
+      latestEventUpdatedAt,
+      latestUpdatedAt: maxIsoDate(latestCardsUpdatedAt, latestEventUpdatedAt),
     }, { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } });
   } catch (error: any) {
     console.error('summary-stats endpoint error:', error);
