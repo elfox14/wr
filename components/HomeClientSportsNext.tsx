@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import HomeTournamentStatsCard from '@/components/HomeTournamentStatsCard';
 import { WORLD_CUP_2026_GROUPS, type WorldCup2026GroupKey } from '@/lib/worldCup2026GroupConfig';
 import { getTeamFlagUrl } from '@/lib/teamFlags';
 
@@ -33,17 +34,13 @@ type HomeMatch = {
 };
 
 type Props = {
-  initialAssets?: unknown[];
   upcomingMatches?: HomeMatch[] | unknown[];
-  assetsCount?: number;
   playersCount?: number;
   teamsCount?: number;
   upcomingMatchesCount?: number;
-  academyArticles?: unknown[];
 };
 
 const MATCH_REFRESH_MS = 60_000;
-
 const groupLetters = Object.keys(WORLD_CUP_2026_GROUPS) as WorldCup2026GroupKey[];
 
 const teamRegions = [
@@ -476,12 +473,13 @@ function WorldMapSection() {
   );
 }
 
-export default function HomeClientSportsNext({ upcomingMatches = [], upcomingMatchesCount = 0 }: Props) {
+export default function HomeClientSportsNext({ upcomingMatches = [], playersCount = 0, teamsCount = 0, upcomingMatchesCount = 0 }: Props) {
   const safeUpcomingMatches = Array.isArray(upcomingMatches) ? (upcomingMatches as HomeMatch[]) : [];
 
   return (
     <main dir="rtl" className="mx-auto max-w-7xl space-y-4 px-3 py-4 sm:px-4 lg:px-6">
       <HomeMatchCenterCard fallbackMatches={safeUpcomingMatches} upcomingMatchesCount={upcomingMatchesCount} />
+      <HomeTournamentStatsCard playersCount={playersCount} teamsCount={teamsCount} upcomingMatchesCount={upcomingMatchesCount} />
       <TournamentExplorerCard />
       <ContentHubCard />
       <WorldMapSection />
