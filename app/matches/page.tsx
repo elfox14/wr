@@ -3,11 +3,13 @@
 import { type ReactNode, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { CalendarDays, CheckCircle2, Clock, Filter, Play, Radio } from 'lucide-react';
+import { getTeamFlagUrl } from '@/lib/teamFlags';
 
 type Team = { id?: string; name?: string; code?: string; image?: string };
 type Match = {
   id: string;
   status: string;
+  displayStatus?: string | null;
   matchDate: string;
   homeScore?: number | null;
   awayScore?: number | null;
@@ -17,12 +19,18 @@ type Match = {
   group?: string;
   stage?: string;
   animationMatchId?: string | number | null;
+  isStaleAutoFinished?: boolean;
 };
 
 const validFilters = ['all', 'yesterday', 'today', 'tomorrow', 'animation'];
+const LIVE_STATUSES = ['IN_PLAY', 'LIVE', 'HT'];
+const FINISHED_STATUSES = ['FINISHED', 'FT', 'AET', 'PEN'];
+const GROUP_STAGE_MAX_LIVE_MINUTES = 115;
+const KNOCKOUT_MAX_LIVE_MINUTES = 150;
 
 function normalizeGroupKey(value?: string | null) {
-  return value ? value.replace('Group', '').replace('المجموعة', '').trim().toUpperCase() : 'غير محددة';
+  if (!value) return 'غير محددة';
+  return value.replace(/^group[_\s-]*/i, '').replace('Group', '').replace('المجموعة', '').trim().toUpperCase();
 }
 
 function getMatchGroup(match: Match) {
@@ -33,13 +41,38 @@ function hasAnimation(match: Match) {
   return Boolean(match.animationMatchId);
 }
 
-function isLiveStatus(status?: string) {
-  const value = String(status || '').toUpperCase();
-  return value === 'IN_PLAY' || value === 'LIVE' || value === 'HT';
+function isGroupStage(match: Match) {
+  const value = String(match.groupPhase || match.group || match.stage || '').toUpperCase();
+  return value.includes('GROUP');
 }
 
-function isFinished(status?: string) {
-  return String(status || '').toUpperCase() === 'FINISHED';
+function maxLiveMinutes(match: Match) {
+  return isGroupStage(match) ? GROUP_STAGE_MAX_LIVE_MINUTES : KNOCKOUT_MAX_LIVE_MINUTES;
+}
+
+function elapsedMinutes(match: Match, now = new Date()) {
+  const matchTime = new Date(match.matchDate).getTime();
+  if (!Number.isFinite(matchTime)) return null;
+  return Math.floor((now.getTime() - matchTime) / 60_000);
+}
+
+function isStaleLive(match: Match, now = new Date()) {
+  const status = String(match.displayStatus || match.status || '').toUpperCase();
+  if (!LIVE_STATUSES.includes(status)) return false;
+  const elapsed = elapsedMinutes(match, now);
+  if (elapsed === null) return false;
+  return elapsed >= maxLiveMinutes(match);
+}
+
+function isLiveStatus(match: Match, now = new Date()) {
+  if (isFinished(match, now)) return false;
+  const value = String(match.displayStatus || match.status || '').toUpperCase();
+  return LIVE_STATUSES.includes(value);
+}
+
+function isFinished(match: Match, now = new Date()) {
+  const value = String(match.displayStatus || match.status || '').toUpperCase();
+  return FINISHED_STATUSES.includes(value) || Boolean(match.isStaleAutoFinished) || isStaleLive(match, now);
 }
 
 function startOfDay(value: Date) {
@@ -59,11 +92,20 @@ function isSameDay(value: string | Date, target: Date) {
 }
 
 function teamImage(team?: Team | null) {
-  if (team?.image?.startsWith?.('http')) {
-    return <img src={team.image} alt={team.name || ''} className="h-full w-full object-cover" />;
-  }
+  const src = getTeamFlagUrl({ code: team?.code, name: team?.name, image: team?.image }, 80);
+  if (src) return <img src={src} alt={`علم ${team?.name || team?.code || 'منتخب'}`} className="h-full w-full object-cover" loading="lazy" />;
+  return <span className="text-xs font-black text-[#FFD700]">{team?.code || team?.name?.slice(0, 3) || '---'}</span>;
+}
 
-  return <span className="text-3xl">{team?.image || '⚽'}</span>;
+function TeamNameWithFlag({ team, fallback }: { team?: Team | null; fallback: string }) {
+  return (
+    <span className="inline-flex max-w-full items-center justify-center gap-1.5">
+      <span className="inline-flex h-4 w-5 shrink-0 overflow-hidden rounded-[3px] border border-white/10 bg-black/30">
+        {teamImage(team)}
+      </span>
+      <span className="truncate">{team?.name || fallback}</span>
+    </span>
+  );
 }
 
 export default function MatchesPage() {
@@ -76,7 +118,7 @@ export default function MatchesPage() {
     const filter = new URLSearchParams(window.location.search).get('filter');
     if (filter && validFilters.includes(filter)) setActiveTab(filter);
 
-    fetch('/api/matches')
+    fetch('/api/matches', { cache: 'no-store' })
       .then((res) => (res.ok ? res.json() : []))
       .then((data) => setMatches(Array.isArray(data) ? data : []))
       .catch(console.error)
@@ -91,13 +133,14 @@ export default function MatchesPage() {
     );
   }
 
-  const today = new Date();
+  const now = new Date();
+  const today = now;
   const yesterday = addDays(today, -1);
   const tomorrow = addDays(today, 1);
   const todayMatchesCount = matches.filter((m) => isSameDay(m.matchDate, today)).length;
-  const liveMatchesCount = matches.filter((m) => isLiveStatus(m.status)).length;
-  const upcomingMatchesCount = matches.filter((m) => String(m.status).toUpperCase() === 'SCHEDULED').length;
-  const finishedMatchesCount = matches.filter((m) => isFinished(m.status)).length;
+  const liveMatchesCount = matches.filter((m) => isLiveStatus(m, now)).length;
+  const upcomingMatchesCount = matches.filter((m) => String(m.status).toUpperCase() === 'SCHEDULED' && !isFinished(m, now)).length;
+  const finishedMatchesCount = matches.filter((m) => isFinished(m, now)).length;
   const groupOptions = Array.from(new Set(matches.map(getMatchGroup).filter(Boolean))).sort((a, b) => a.localeCompare(b));
 
   const applySummaryFilter = (tab: string) => {
@@ -111,7 +154,7 @@ export default function MatchesPage() {
   if (activeTab === 'yesterday') filteredMatches = filteredMatches.filter((m) => isSameDay(m.matchDate, yesterday));
   if (activeTab === 'today') filteredMatches = filteredMatches.filter((m) => isSameDay(m.matchDate, today));
   if (activeTab === 'tomorrow') filteredMatches = filteredMatches.filter((m) => isSameDay(m.matchDate, tomorrow));
-  if (activeTab === 'animation') filteredMatches = filteredMatches.filter((m) => hasAnimation(m));
+  if (activeTab === 'animation') filteredMatches = filteredMatches.filter((m) => hasAnimation(m) && !isFinished(m, now));
   if (selectedGroup !== 'all') filteredMatches = filteredMatches.filter((m) => getMatchGroup(m) === selectedGroup);
   filteredMatches.sort((a, b) => new Date(a.matchDate).getTime() - new Date(b.matchDate).getTime());
 
@@ -133,14 +176,7 @@ export default function MatchesPage() {
         </section>
 
         <div className="mb-5 grid grid-cols-2 gap-2 md:grid-cols-4 md:gap-3">
-          <SummaryCard
-            icon={<CalendarDays size={18} />}
-            label="مباريات اليوم"
-            value={todayMatchesCount}
-            active={activeTab === 'today'}
-            onClick={() => applySummaryFilter('today')}
-            hint="فلتر اليوم"
-          />
+          <SummaryCard icon={<CalendarDays size={18} />} label="مباريات اليوم" value={todayMatchesCount} active={activeTab === 'today'} onClick={() => applySummaryFilter('today')} hint="فلتر اليوم" />
           <SummaryCard icon={<Play size={18} />} label="مباشرة الآن" value={liveMatchesCount} />
           <SummaryCard icon={<Clock size={18} />} label="المباريات المتبقية" value={upcomingMatchesCount} />
           <SummaryCard icon={<CheckCircle2 size={18} />} label="انتهت" value={finishedMatchesCount} />
@@ -164,11 +200,7 @@ export default function MatchesPage() {
           <label className="flex items-center gap-2 rounded-lg border border-white/10 bg-surface px-3 py-2">
             <Filter size={16} className="text-primary" />
             <span className="text-xs font-bold text-gray-500">المجموعة</span>
-            <select
-              value={selectedGroup}
-              onChange={(event) => setSelectedGroup(event.target.value)}
-              className="bg-transparent text-sm font-bold text-white focus:outline-none"
-            >
+            <select value={selectedGroup} onChange={(event) => setSelectedGroup(event.target.value)} className="bg-transparent text-sm font-bold text-white focus:outline-none">
               <option value="all">كل المجموعات</option>
               {groupOptions.map((group) => (
                 <option key={group} value={group}>
@@ -183,9 +215,7 @@ export default function MatchesPage() {
           <EmptyMatches />
         ) : (
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-            {filteredMatches.map((match) => (
-              <MatchCard key={match.id} match={match} />
-            ))}
+            {filteredMatches.map((match) => <MatchCard key={match.id} match={match} now={now} />)}
           </div>
         )}
       </main>
@@ -193,23 +223,7 @@ export default function MatchesPage() {
   );
 }
 
-function SummaryCard({
-  icon,
-  label,
-  value,
-  active,
-  onClick,
-  href,
-  hint,
-}: {
-  icon: ReactNode;
-  label: string;
-  value: number | string;
-  active?: boolean;
-  onClick?: () => void;
-  href?: string;
-  hint?: string;
-}) {
+function SummaryCard({ icon, label, value, active, onClick, href, hint }: { icon: ReactNode; label: string; value: number | string; active?: boolean; onClick?: () => void; href?: string; hint?: string }) {
   const interactive = Boolean(onClick || href);
   const className = `group flex min-h-[78px] flex-col items-center justify-center rounded-xl border p-2.5 text-center transition focus:outline-none focus:ring-2 focus:ring-[#0FF0FC]/40 md:min-h-[86px] md:p-3 ${
     interactive ? 'cursor-pointer hover:-translate-y-0.5 hover:border-[#0FF0FC]/35 hover:bg-white/[0.06]' : 'cursor-default'
@@ -238,9 +252,9 @@ function EmptyMatches() {
   );
 }
 
-function MatchCard({ match }: { match: Match }) {
-  const live = isLiveStatus(match.status);
-  const finished = isFinished(match.status);
+function MatchCard({ match, now }: { match: Match; now: Date }) {
+  const live = isLiveStatus(match, now);
+  const finished = isFinished(match, now);
   const scoreVisible = live || finished;
   const matchCenterHref = `/match-center/${encodeURIComponent(String(match.id))}`;
   const title = `${match.homeTeam?.name || 'الفريق الأول'} ضد ${match.awayTeam?.name || 'الفريق الثاني'}`;
@@ -251,11 +265,7 @@ function MatchCard({ match }: { match: Match }) {
 
       <div className="relative z-0">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <span
-            className={`rounded px-2 py-1 text-[11px] font-bold ${
-              live ? 'bg-emerald-400/10 text-emerald-300' : finished ? 'bg-gray-500/10 text-gray-400' : 'bg-orange-400/10 text-orange-300'
-            }`}
-          >
+          <span className={`rounded px-2 py-1 text-[11px] font-bold ${live ? 'bg-emerald-400/10 text-emerald-300' : finished ? 'bg-gray-500/10 text-gray-400' : 'bg-orange-400/10 text-orange-300'}`}>
             {live ? 'مباشرة' : finished ? 'انتهت' : 'قريبًا'}
           </span>
           <span className="text-[11px] text-gray-400">{new Date(match.matchDate).toLocaleString('ar-EG')}</span>
@@ -266,7 +276,9 @@ function MatchCard({ match }: { match: Match }) {
             <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center overflow-hidden rounded-full border border-white/10 bg-black/40 md:h-14 md:w-14">
               {teamImage(match.homeTeam)}
             </div>
-            <h2 className="line-clamp-1 text-sm font-black text-white md:text-base">{match.homeTeam?.name || 'الفريق الأول'}</h2>
+            <h2 className="line-clamp-1 text-sm font-black text-white md:text-base">
+              <TeamNameWithFlag team={match.homeTeam} fallback="الفريق الأول" />
+            </h2>
           </div>
 
           <div className="rounded-xl border border-white/10 bg-black px-3 py-2 text-lg font-black text-[#FFD700] md:text-xl">
@@ -277,12 +289,14 @@ function MatchCard({ match }: { match: Match }) {
             <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center overflow-hidden rounded-full border border-white/10 bg-black/40 md:h-14 md:w-14">
               {teamImage(match.awayTeam)}
             </div>
-            <h2 className="line-clamp-1 text-sm font-black text-white md:text-base">{match.awayTeam?.name || 'الفريق الثاني'}</h2>
+            <h2 className="line-clamp-1 text-sm font-black text-white md:text-base">
+              <TeamNameWithFlag team={match.awayTeam} fallback="الفريق الثاني" />
+            </h2>
           </div>
         </div>
       </div>
 
-      {hasAnimation(match) ? (
+      {hasAnimation(match) && !finished ? (
         <Link
           href={`/animation-live/player?matchId=${encodeURIComponent(String(match.animationMatchId))}&dbMatchId=${encodeURIComponent(String(match.id))}`}
           className="relative z-20 mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-[#FFD700]/25 bg-[#FFD700]/10 px-4 py-2.5 text-xs font-black text-[#FFD700] transition hover:bg-[#FFD700] hover:text-black"
