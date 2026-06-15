@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
+import { getTeamFlag } from '@/lib/teamFlags';
+import { hasUsablePlayerImage } from '@/lib/playerDedupe';
 
 interface AssetImageProps {
   image: string | null | undefined;
@@ -17,7 +19,7 @@ interface AssetImageProps {
 
 export function AssetImage({
   image,
-  type = 'PLAYER', // Default to PLAYER for safety
+  type = 'PLAYER',
   name,
   alt,
   width = 100,
@@ -36,12 +38,31 @@ export function AssetImage({
   const isLocal = !!image && image.startsWith('/');
   const isExternal = !!image && (image.startsWith('http://') || image.startsWith('https://'));
   const isTeam = type === 'TEAM';
+  const teamFlag = isTeam ? getTeamFlag({ name, image }) : null;
   
   // Heuristic to detect if the string is an emoji (e.g. flag emojis or single soccer ball emojis)
   const isEmojiStr = !!image && (
     image.length <= 8 && 
-    (/[\u{1F300}-\u{1F9FF}]|[\u{1F600}-\u{1F64F}]|[\u{1F680}-\u{1F6FF}]|[\u{2600}-\u{27BF}]|[\u{1F1E6}-\u{1F1FF}]{2}/u.test(image))
+    (/[🌀-🧿]|[😀-🙏]|[🚀-🛿]|[☀-➿]|[🇦-🇿]{2}/u.test(image))
   );
+
+  const renderTeamFlag = (flag: string) => (
+    <div
+      className={`flex items-center justify-center select-none rounded-xl bg-white/10 ${className}`}
+      style={{
+        width: fill ? '100%' : width,
+        height: fill ? '100%' : height,
+        fontSize: fill ? 'inherit' : `${Math.min(width, height) * 0.6}px`,
+        lineHeight: 1,
+      }}
+      aria-label={alt || name}
+    >
+      {flag}
+    </div>
+  );
+
+  // For teams, the platform should display the country flag consistently instead of the provider logo.
+  if (isTeam && teamFlag) return renderTeamFlag(teamFlag);
 
   // Fallback initials container with premium styling (cyan/gold border and dark background)
   const renderFallback = () => {
@@ -79,24 +100,12 @@ export function AssetImage({
 
   // If the image source is an emoji and it's a team, render it directly
   if (isTeam && isEmojiStr && image) {
-    return (
-      <div 
-        className={`flex items-center justify-center select-none ${className}`} 
-        style={{ 
-          width: fill ? '100%' : width, 
-          height: fill ? '100%' : height,
-          fontSize: fill ? 'inherit' : `${Math.min(width, height) * 0.6}px`,
-          lineHeight: 1
-        }}
-        aria-label={alt || name}
-      >
-        {image}
-      </div>
-    );
+    return renderTeamFlag(image);
   }
 
-  // Load the target image if it is local/external and not an emoji
-  const hasValidImage = (isLocal || isExternal) && !isEmojiStr;
+  // Load the target image if it is local/external and not an emoji.
+  // For players, ignore country flags/emojis and show initials unless there is a real image URL.
+  const hasValidImage = type === 'PLAYER' ? hasUsablePlayerImage(image) : (isLocal || isExternal) && !isEmojiStr;
 
   if (!hasValidImage || hasError) {
     return renderFallback();
