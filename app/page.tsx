@@ -1,6 +1,4 @@
 import HomeClientSportsNext from '@/components/HomeClientSportsNext';
-import { getAssets } from '@/lib/store-server';
-import { getAllArticles } from '@/lib/articles';
 import prisma from '@/lib/prisma';
 
 export const dynamic = 'force-dynamic';
@@ -11,39 +9,13 @@ export default async function Home() {
   const liveWindowStart = new Date(now.getTime() - 3 * 60 * 60 * 1000);
   const upcomingUntil = new Date(now.getTime() + 24 * 60 * 60 * 1000);
 
-  let assets: Awaited<ReturnType<typeof getAssets>> = [];
-  let assetsCount = 0;
   let playersCount = 0;
   let teamsCount = 0;
   let upcomingMatchesCount = 0;
   let upcomingMatches: unknown[] = [];
 
   try {
-    assets = await getAssets();
-  } catch {
-    assets = [];
-  }
-
-  const academyArticles = (() => {
-    try {
-      return getAllArticles().slice(0, 4).map((article) => ({
-        id: article.id,
-        title: article.title,
-        excerpt: article.excerpt,
-        category: article.category,
-        readingTime: article.readingTime,
-        level: article.level,
-        imageUrl: article.imageUrl,
-        date: article.date,
-      }));
-    } catch {
-      return [];
-    }
-  })();
-
-  try {
-    const [totalAssets, totalPlayers, totalTeams, totalUpcomingMatches, upcomingMatchesRaw] = await Promise.all([
-      prisma.asset.count(),
+    const [totalPlayers, totalTeams, totalUpcomingMatches, upcomingMatchesRaw] = await Promise.all([
       prisma.asset.count({ where: { type: 'PLAYER' } }),
       prisma.asset.count({ where: { type: 'TEAM' } }),
       prisma.match.count({
@@ -63,7 +35,6 @@ export default async function Home() {
       }),
     ]);
 
-    assetsCount = totalAssets;
     playersCount = totalPlayers;
     teamsCount = totalTeams;
     upcomingMatchesCount = totalUpcomingMatches;
@@ -90,13 +61,10 @@ export default async function Home() {
       />
 
       <HomeClientSportsNext
-        initialAssets={assets}
         upcomingMatches={upcomingMatches}
-        assetsCount={assetsCount}
         playersCount={playersCount}
         teamsCount={teamsCount}
         upcomingMatchesCount={upcomingMatchesCount}
-        academyArticles={academyArticles}
       />
     </>
   );
