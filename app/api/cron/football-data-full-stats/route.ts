@@ -153,6 +153,43 @@ function teamMatches(providerTeam: any, localTeam: any) {
   return provider.some((name) => local.includes(name)) || local.some((name) => provider.includes(name));
 }
 
+function providerErrorText(error: any) {
+  return [
+    error?.payload?.message,
+    error?.payload?.error,
+    error?.message,
+    typeof error?.payload === 'string' ? error.payload : '',
+    JSON.stringify(error?.payload || {}),
+  ].filter(Boolean).join(' ');
+}
+
+function retryDelayMsFromFootballDataError(error: any) {
+  const text = providerErrorText(error).toLowerCase();
+  const waitMatch = text.match(/wait\s+(\d+)\s*(second|seconds|sec|s|minute|minutes|min|m|hour|hours|h)\b/);
+  if (!waitMatch) return null;
+
+  const amount = Number(waitMatch[1]);
+  if (!Number.isFinite(amount) || amount <= 0) return null;
+  const unit = waitMatch[2];
+  if (['second', 'seconds', 'sec', 's'].includes(unit)) return amount * 1000;
+  if (['minute', 'minutes', 'min', 'm'].includes(unit)) return amount * 60 * 1000;
+  if (['hour', 'hours', 'h'].includes(unit)) return amount * 60 * 60 * 1000;
+  return null;
+}
+
+async function blockFootballDataAfterError(error: any) {
+  const text = providerErrorText(error) || 'football-data quota or rate limit reached';
+  const retryDelayMs = retryDelayMsFromFootballDataError(error);
+
+  if (retryDelayMs !== null) {
+    const safetyBufferMs = 10 * 1000;
+    const blockedUntil = new Date(Date.now() + retryDelayMs + safetyBufferMs);
+    return blockProviderUntil('FOOTBALL_DATA', blockedUntil, text.slice(0, 500));
+  }
+
+  return blockProviderForHours('FOOTBALL_DATA', 24, text.slice(0, 500));
+}
+
 async function footballDataFetch(path: string, params: Record<string, string> = {}) {
   const token = String(process.env.FOOTBALL_DATA_API_TOKEN || process.env.FOOTBALL_DATA_API_KEY || '').trim();
   if (!token) throw Object.assign(new Error('FOOTBALL_DATA_API_TOKEN is missing'), { status: 400, provider: 'FOOTBALL_DATA' });
@@ -282,14 +319,14 @@ async function saveFullStatsSnapshot(params: {
   matchDetail: any;
   homeTeam: TeamAsset;
   awayTeam: TeamAsset;
-  force: boolean;
+  forceSnapshot: boolean;
 }) {
   await ensureStatsTable();
   const latest = await getLatestFullSnapshot(params.localMatch.id);
   const latestRaw = (latest?.rawData || {}) as any;
   const providerLastUpdated = params.matchDetail?.lastUpdated || null;
 
-  if (!params.force && latest && providerLastUpdated && latestRaw?.providerLastUpdated === providerLastUpdated) {
+  if (!params.forceSnapshot && latest && providerLastUpdated && latestRaw?.providerLastUpdated === providerLastUpdated) {
     return { status: 'skipped_same_provider_last_updated', snapshotId: latest.id, providerLastUpdated };
   }
 
@@ -459,7 +496,7 @@ function shouldFetchDetail(providerMatch: any, includeScheduled: boolean) {
   return Number.isFinite(date) && date <= Date.now();
 }
 
-async function processProviderMatch(providerMatch: any, options: { createMissing: boolean; dryRun: boolean; force: boolean }) {
+async function processProviderMatch(providerMatch: any, options: { createMissing: boolean; dryRun: boolean; forceSnapshot: boolean }) {
   const providerMatchId = Number(providerMatch?.id);
   const matchDate = new Date(providerMatch?.utcDate || Date.now());
   const providerStatus = normalizeFootballDataStatus(providerMatch?.status);
@@ -528,7 +565,7 @@ async function processProviderMatch(providerMatch: any, options: { createMissing
     matchDetail,
     homeTeam,
     awayTeam,
-    force: options.force,
+    forceSnapshot: options.forceSnapshot,
   });
   const savedEvents = await saveFootballDataEvents(localMatch, matchDetail);
   const latestScore = extractScore(matchDetail);
@@ -563,7 +600,8 @@ export async function GET(req: Request) {
   const createMissing = url.searchParams.get('createMissing') !== 'false';
   const dryRun = url.searchParams.get('dryRun') === 'true';
   const includeScheduled = url.searchParams.get('includeScheduled') === 'true';
-  const force = url.searchParams.get('force') === 'true';
+  const forceSnapshot = url.searchParams.get('forceSnapshot') === 'true' || url.searchParams.get('force') === 'true';
+  const bypassCooldown = url.searchParams.get('bypassCooldown') === 'true' || url.searchParams.get('ignoreCooldown') === 'true' || url.searchParams.get('force') === 'true';
   const minIntervalMinutes = Math.max(0, Number(url.searchParams.get('minIntervalMinutes') || process.env.FOOTBALL_DATA_FULL_STATS_MIN_INTERVAL_MINUTES || 15));
   const maxMatches = Math.max(1, Math.min(150, Number(url.searchParams.get('maxMatches') || process.env.FOOTBALL_DATA_FULL_STATS_MAX_MATCHES || 104)));
   const processed: any[] = [];
@@ -572,7 +610,7 @@ export async function GET(req: Request) {
   let externalRequestsUsed = 0;
 
   try {
-    const guard = force ? null : await getProviderQuotaBlock('FOOTBALL_DATA');
+    const guard = bypassCooldown ? null : await getProviderQuotaBlock('FOOTBALL_DATA');
     if (guard) {
       return NextResponse.json({
         ok: true,
@@ -602,7 +640,7 @@ export async function GET(req: Request) {
 
     for (const match of matchesToProcess) {
       try {
-        const result = await processProviderMatch(match, { createMissing, dryRun, force });
+        const result = await processProviderMatch(match, { createMissing, dryRun, forceSnapshot });
         if (!dryRun && !String(result.status || '').startsWith('skipped_')) externalRequestsUsed += 1;
         processed.push(result);
       } catch (error: any) {
@@ -627,7 +665,8 @@ export async function GET(req: Request) {
       dryRun,
       createMissing,
       includeScheduled,
-      force,
+      bypassCooldown,
+      forceSnapshot,
       minIntervalMinutes,
       maxMatches,
       listMatchesFetched: providerMatches.length,
@@ -641,7 +680,7 @@ export async function GET(req: Request) {
     }, { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate' } });
   } catch (error: any) {
     if (isProviderQuotaError(error)) {
-      await blockProviderForHours('FOOTBALL_DATA', 24, error?.message || 'football-data quota or rate limit reached');
+      await blockFootballDataAfterError(error);
     }
     errors.push({ message: error?.message || 'football-data full stats sync failed', status: error?.status, provider: error?.provider || 'FOOTBALL_DATA', payload: error?.payload });
     return NextResponse.json({
