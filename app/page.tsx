@@ -59,6 +59,8 @@ function decorateInitialMatch(match: any, now: Date) {
 
 export default async function Home() {
   const now = new Date();
+  const tickerStart = new Date(now.getTime() - 24 * 60 * 60 * 1000); // Past 24h
+  const tickerEnd = new Date(now.getTime() + 48 * 60 * 60 * 1000);   // Next 48h
   const liveWindowStart = new Date(now.getTime() - 3 * 60 * 60 * 1000);
   const upcomingUntil = new Date(now.getTime() + 24 * 60 * 60 * 1000);
 
@@ -66,9 +68,18 @@ export default async function Home() {
   let teamsCount = 0;
   let upcomingMatchesCount = 0;
   let upcomingMatches: unknown[] = [];
+  let tickerMatches: unknown[] = [];
+  let nextMarqueeMatch: any = null;
 
   try {
-    const [totalPlayers, totalTeams, totalUpcomingMatches, upcomingMatchesRaw] = await Promise.all([
+    const [
+      totalPlayers,
+      totalTeams,
+      totalUpcomingMatches,
+      upcomingMatchesRaw,
+      tickerMatchesRaw,
+      nextMatchRaw
+    ] = await Promise.all([
       prisma.asset.count({ where: { type: 'PLAYER' } }),
       prisma.asset.count({ where: { type: 'TEAM' } }),
       prisma.match.count({
@@ -86,19 +97,41 @@ export default async function Home() {
         take: 5,
         include: { homeTeam: true, awayTeam: true },
       }),
+      prisma.match.findMany({
+        where: {
+          matchDate: { gte: tickerStart, lte: tickerEnd },
+        },
+        orderBy: { matchDate: 'asc' },
+        take: 15,
+        include: { homeTeam: true, awayTeam: true },
+      }),
+      prisma.match.findFirst({
+        where: {
+          status: { in: ['SCHEDULED', 'TIMED', 'NOT_STARTED', 'NS'] },
+          matchDate: { gte: now },
+        },
+        orderBy: { matchDate: 'asc' },
+        include: { homeTeam: true, awayTeam: true },
+      }),
     ]);
 
     playersCount = totalPlayers;
     teamsCount = totalTeams;
     upcomingMatchesCount = totalUpcomingMatches;
     upcomingMatches = JSON.parse(JSON.stringify(upcomingMatchesRaw.map((match) => decorateInitialMatch(match, now))));
-  } catch {
+    tickerMatches = JSON.parse(JSON.stringify(tickerMatchesRaw.map((match) => decorateInitialMatch(match, now))));
+    nextMarqueeMatch = nextMatchRaw ? JSON.parse(JSON.stringify(decorateInitialMatch(nextMatchRaw, now))) : null;
+  } catch (error) {
+    console.error('Error fetching dashboard data:', error);
     upcomingMatches = [];
+    tickerMatches = [];
   }
 
   return (
     <HomeClientSportsNext
       upcomingMatches={upcomingMatches}
+      tickerMatches={tickerMatches}
+      nextMarqueeMatch={nextMarqueeMatch}
       playersCount={playersCount}
       teamsCount={teamsCount}
       upcomingMatchesCount={upcomingMatchesCount}

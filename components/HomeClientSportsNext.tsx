@@ -5,6 +5,9 @@ import Link from 'next/link';
 import HomeTournamentStatsCard from '@/components/HomeTournamentStatsCard';
 import { WORLD_CUP_2026_GROUPS, type WorldCup2026GroupKey } from '@/lib/worldCup2026GroupConfig';
 import { getTeamFlagUrl } from '@/lib/teamFlags';
+import HomeLiveMatchTicker from '@/components/HomeLiveMatchTicker';
+import HomeHeroCountdown from '@/components/HomeHeroCountdown';
+import HomeGroupStandingsWidget from '@/components/HomeGroupStandingsWidget';
 
 type Team = {
   id?: string | number | null;
@@ -35,10 +38,15 @@ type HomeMatch = {
 
 type Props = {
   upcomingMatches?: HomeMatch[] | unknown[];
+  tickerMatches?: HomeMatch[] | unknown[];
+  nextMarqueeMatch?: HomeMatch | null | unknown;
   playersCount?: number;
   teamsCount?: number;
   upcomingMatchesCount?: number;
 };
+// ... (rest of the helper functions unchanged)
+// We will replace from the function definition of HomeClientSportsNext to the end of the file.
+
 
 const MATCH_REFRESH_MS = 60_000;
 const groupLetters = Object.keys(WORLD_CUP_2026_GROUPS) as WorldCup2026GroupKey[];
@@ -473,16 +481,44 @@ function WorldMapSection() {
   );
 }
 
-export default function HomeClientSportsNext({ upcomingMatches = [], playersCount = 0, teamsCount = 0, upcomingMatchesCount = 0 }: Props) {
+export default function HomeClientSportsNext({ 
+  upcomingMatches = [], 
+  tickerMatches = [], 
+  nextMarqueeMatch = null, 
+  playersCount = 0, 
+  teamsCount = 0, 
+  upcomingMatchesCount = 0 
+}: Props) {
   const safeUpcomingMatches = Array.isArray(upcomingMatches) ? (upcomingMatches as HomeMatch[]) : [];
+  const safeTickerMatches = Array.isArray(tickerMatches) ? (tickerMatches as HomeMatch[]) : [];
+  const safeNextMatch = nextMarqueeMatch as any;
 
   return (
-    <main dir="rtl" className="mx-auto max-w-7xl space-y-4 px-3 py-4 sm:px-4 lg:px-6">
-      <HomeMatchCenterCard fallbackMatches={safeUpcomingMatches} upcomingMatchesCount={upcomingMatchesCount} />
+    <main dir="rtl" className="mx-auto max-w-7xl space-y-6 px-3 py-4 sm:px-4 lg:px-6">
+      {/* 1. Live Match Ticker */}
+      <HomeLiveMatchTicker matches={safeTickerMatches} />
+
+      {/* 2. Hero Countdown Banner */}
+      <HomeHeroCountdown nextMatch={safeNextMatch} />
+
+      {/* 3. Main content grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+        <div className="lg:col-span-2">
+          <HomeMatchCenterCard fallbackMatches={safeUpcomingMatches} upcomingMatchesCount={upcomingMatchesCount} />
+        </div>
+        <div className="lg:col-span-1">
+          <HomeGroupStandingsWidget />
+        </div>
+      </div>
+
+      {/* 4. Stats and secondary sections */}
       <HomeTournamentStatsCard playersCount={playersCount} teamsCount={teamsCount} upcomingMatchesCount={upcomingMatchesCount} />
       <TournamentExplorerCard />
-      <ContentHubCard />
-      <WorldMapSection />
+      
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <ContentHubCard />
+        <WorldMapSection />
+      </div>
     </main>
   );
 }
