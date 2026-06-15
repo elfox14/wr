@@ -33,8 +33,9 @@ function hasAnyImage(p: any) {
 export async function POST(req: Request) {
   try {
     const session = await getServerSession(authOptions);
-
-    if (!session || !session.user || session.user.email !== "worldcup@mcprim.com") {
+    const email = session?.user?.email || '';
+    const isAdmin = session?.user?.role === 'ADMIN' || email === 'worldcup@mcprim.com' || email === 'elfox14usa@gmail.com';
+    if (!session || !session.user || !isAdmin) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
