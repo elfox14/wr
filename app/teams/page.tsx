@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import prisma from '@/lib/prisma';
+import { getTeamFlag } from '@/lib/teamFlags';
 
 export const dynamic = 'force-dynamic';
 
@@ -147,47 +148,47 @@ export default async function TeamsPage({ searchParams }: Props) {
 
       {teams.length ? (
         <section className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {teams.map((team) => (
-            <Link
-              key={team.id}
-              className="group block rounded-2xl border border-white/10 bg-black/25 p-4 transition hover:-translate-y-1 hover:border-[#0FF0FC]/60 hover:bg-white/[0.06]"
-              href={`/teams/${team.id}`}
-            >
-              <div className="flex items-center gap-3">
-                {team.image ? (
-                  <img src={team.image} alt={team.name} className="h-12 w-12 rounded-full border border-white/10 object-cover" />
-                ) : (
-                  <div className="flex h-12 w-12 items-center justify-center rounded-full border border-white/10 bg-white/10 text-sm font-black text-gray-300">
-                    {team.code || team.name.slice(0, 2)}
+          {teams.map((team) => {
+            const flag = getTeamFlag(team);
+
+            return (
+              <Link
+                key={team.id}
+                className="group block rounded-2xl border border-white/10 bg-black/25 p-4 transition hover:-translate-y-1 hover:border-[#0FF0FC]/60 hover:bg-white/[0.06]"
+                href={`/teams/${team.id}`}
+              >
+                <div className="flex items-center gap-3">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-white/10 text-3xl shadow-inner shadow-black/20">
+                    {flag || <span className="text-sm font-black text-gray-300">{team.code || team.name.slice(0, 2)}</span>}
                   </div>
-                )}
-                <div className="min-w-0 flex-1">
-                  <h2 className="truncate font-black text-white group-hover:text-[#0FF0FC]">{team.name}</h2>
-                  <p className="mt-1 text-xs font-bold text-gray-400">
-                    {team.code || 'N/A'} · {team.group || 'Group N/A'}
-                  </p>
+                  <div className="min-w-0 flex-1">
+                    <h2 className="truncate font-black text-white group-hover:text-[#0FF0FC]">{team.name}</h2>
+                    <p className="mt-1 text-xs font-bold text-gray-400">
+                      {team.code || 'N/A'} · {team.group || 'Group N/A'}
+                    </p>
+                  </div>
                 </div>
-              </div>
 
-              <div className="mt-4 grid grid-cols-2 gap-2 text-xs font-bold text-gray-400">
-                <div className="rounded-xl bg-white/[0.04] p-3">
-                  <p className="text-gray-500">القارة</p>
-                  <p className="mt-1 truncate text-white">{team.continent || 'غير متوفر'}</p>
+                <div className="mt-4 grid grid-cols-2 gap-2 text-xs font-bold text-gray-400">
+                  <div className="rounded-xl bg-white/[0.04] p-3">
+                    <p className="text-gray-500">القارة</p>
+                    <p className="mt-1 truncate text-white">{team.continent || 'غير متوفر'}</p>
+                  </div>
+                  <div className="rounded-xl bg-white/[0.04] p-3">
+                    <p className="text-gray-500">تصنيف FIFA</p>
+                    <p className="mt-1 text-white">{team.fifaRank ?? 'غير متوفر'}</p>
+                  </div>
                 </div>
-                <div className="rounded-xl bg-white/[0.04] p-3">
-                  <p className="text-gray-500">تصنيف FIFA</p>
-                  <p className="mt-1 text-white">{team.fifaRank ?? 'غير متوفر'}</p>
-                </div>
-              </div>
 
-              <div className="mt-4 flex items-center justify-between text-xs font-black text-[#0FF0FC]">
-                <span>افتح صفحة المنتخب</span>
-                <span aria-hidden="true" className="transition group-hover:translate-x-[-4px]">
-                  ←
-                </span>
-              </div>
-            </Link>
-          ))}
+                <div className="mt-4 flex items-center justify-between text-xs font-black text-[#0FF0FC]">
+                  <span>افتح صفحة المنتخب</span>
+                  <span aria-hidden="true" className="transition group-hover:translate-x-[-4px]">
+                    ←
+                  </span>
+                </div>
+              </Link>
+            );
+          })}
         </section>
       ) : (
         <section className="mt-6 rounded-3xl border border-dashed border-white/15 bg-black/25 p-8 text-center">
