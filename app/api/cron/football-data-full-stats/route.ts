@@ -313,6 +313,15 @@ async function getLatestFullSnapshot(matchId: string) {
   });
 }
 
+function providerMatchLastUpdated(providerMatch: any) {
+  return providerMatch?.lastUpdated || providerMatch?.updatedAt || providerMatch?.last_update || null;
+}
+
+function fullSnapshotProviderLastUpdated(snapshot: any) {
+  const raw = (snapshot?.rawData || {}) as any;
+  return raw?.providerLastUpdated || null;
+}
+
 async function saveFullStatsSnapshot(params: {
   localMatch: any;
   providerMatchId: number;
@@ -323,10 +332,9 @@ async function saveFullStatsSnapshot(params: {
 }) {
   await ensureStatsTable();
   const latest = await getLatestFullSnapshot(params.localMatch.id);
-  const latestRaw = (latest?.rawData || {}) as any;
   const providerLastUpdated = params.matchDetail?.lastUpdated || null;
 
-  if (!params.forceSnapshot && latest && providerLastUpdated && latestRaw?.providerLastUpdated === providerLastUpdated) {
+  if (!params.forceSnapshot && latest && providerLastUpdated && fullSnapshotProviderLastUpdated(latest) === providerLastUpdated) {
     return { status: 'skipped_same_provider_last_updated', snapshotId: latest.id, providerLastUpdated };
   }
 
@@ -510,6 +518,7 @@ async function processProviderMatch(providerMatch: any, options: { createMissing
       providerAway: providerMatch?.awayTeam?.name,
       homeMatched: Boolean(homeTeam),
       awayMatched: Boolean(awayTeam),
+      detailRequestUsed: false,
     };
   }
 
@@ -527,6 +536,7 @@ async function processProviderMatch(providerMatch: any, options: { createMissing
       awayTeam: awayTeam.name,
       score: `${nextHomeScore}-${nextAwayScore}`,
       hint: 'Pass createMissing=true to create the match before saving football-data full stats.',
+      detailRequestUsed: false,
     };
   }
 
@@ -551,12 +561,37 @@ async function processProviderMatch(providerMatch: any, options: { createMissing
       homeTeam: homeTeam.name,
       awayTeam: awayTeam.name,
       score: `${nextHomeScore}-${nextAwayScore}`,
+      detailRequestUsed: false,
     };
   }
 
   const localMatch = existing
     ? await prisma.match.update({ where: { id: existing.id }, data, select: MATCH_SELECT })
     : await prisma.match.create({ data, select: MATCH_SELECT });
+
+  const listLastUpdated = providerMatchLastUpdated(providerMatch);
+  if (!options.forceSnapshot && listLastUpdated) {
+    const latestFullSnapshot = await getLatestFullSnapshot(localMatch.id);
+    if (latestFullSnapshot && fullSnapshotProviderLastUpdated(latestFullSnapshot) === listLastUpdated) {
+      return {
+        status: 'skipped_up_to_date_from_match_list',
+        providerMatchId,
+        localMatchId: localMatch.id,
+        providerStatus,
+        homeTeam: homeTeam.name,
+        awayTeam: awayTeam.name,
+        score: `${localMatch.homeScore}-${localMatch.awayScore}`,
+        snapshot: {
+          status: 'skipped_same_provider_last_updated_without_detail_request',
+          snapshotId: latestFullSnapshot.id,
+          providerLastUpdated: listLastUpdated,
+        },
+        savedEventsCount: 0,
+        detailLastUpdated: listLastUpdated,
+        detailRequestUsed: false,
+      };
+    }
+  }
 
   const matchDetail = await footballDataFetch(`/matches/${providerMatchId}`);
   const snapshot = await saveFullStatsSnapshot({
@@ -581,6 +616,7 @@ async function processProviderMatch(providerMatch: any, options: { createMissing
     snapshot,
     savedEventsCount: savedEvents.length,
     detailLastUpdated: matchDetail?.lastUpdated || null,
+    detailRequestUsed: true,
   };
 }
 
@@ -608,6 +644,9 @@ export async function GET(req: Request) {
   const skipped: any[] = [];
   const errors: any[] = [];
   let externalRequestsUsed = 0;
+  let detailRequestsUsed = 0;
+  let rateLimited = false;
+  let stopReason: string | null = null;
 
   try {
     const guard = bypassCooldown ? null : await getProviderQuotaBlock('FOOTBALL_DATA');
@@ -622,6 +661,7 @@ export async function GET(req: Request) {
         dateFrom,
         dateTo,
         externalRequestsUsed,
+        detailRequestsUsed,
         startedAt: startedAt.toISOString(),
         finishedAt: new Date().toISOString(),
       }, { headers: { 'Cache-Control': 'no-store' } });
@@ -641,20 +681,33 @@ export async function GET(req: Request) {
     for (const match of matchesToProcess) {
       try {
         const result = await processProviderMatch(match, { createMissing, dryRun, forceSnapshot });
-        if (!dryRun && !String(result.status || '').startsWith('skipped_')) externalRequestsUsed += 1;
+        if (result?.detailRequestUsed) {
+          externalRequestsUsed += 1;
+          detailRequestsUsed += 1;
+        }
         processed.push(result);
       } catch (error: any) {
-        errors.push({ providerMatchId: match?.id, message: error?.message || 'football-data detail sync failed', status: error?.status, payload: error?.payload });
-        if (isProviderQuotaError(error)) throw error;
+        const errorPayload = { providerMatchId: match?.id, message: error?.message || 'football-data detail sync failed', status: error?.status, payload: error?.payload };
+        errors.push(errorPayload);
+        if (isProviderQuotaError(error)) {
+          rateLimited = true;
+          stopReason = error?.message || 'football-data rate limit reached';
+          await blockFootballDataAfterError(error);
+          skipped.push({ providerMatchId: match?.id, status: match?.status, utcDate: match?.utcDate, reason: 'rate_limited_before_detail_completed' });
+          break;
+        }
       }
     }
 
-    if (!dryRun && minIntervalMinutes > 0) {
+    if (!dryRun && !rateLimited && minIntervalMinutes > 0) {
       await blockProviderUntil('FOOTBALL_DATA', new Date(Date.now() + minIntervalMinutes * 60 * 1000), `cooldown after full stats sync (${dateFrom}..${dateTo})`);
     }
 
     return NextResponse.json({
-      ok: errors.length === 0,
+      ok: errors.length === 0 || rateLimited,
+      partial: rateLimited || errors.length > 0,
+      rateLimited,
+      stopReason,
       mode: 'football_data_full_stats_sync',
       authMethod: auth.method,
       provider: 'FOOTBALL_DATA',
@@ -672,6 +725,7 @@ export async function GET(req: Request) {
       listMatchesFetched: providerMatches.length,
       detailMatchesProcessed: matchesToProcess.length,
       externalRequestsUsed,
+      detailRequestsUsed,
       processed,
       skipped,
       errors,
@@ -691,6 +745,7 @@ export async function GET(req: Request) {
       dateFrom,
       dateTo,
       externalRequestsUsed,
+      detailRequestsUsed,
       processed,
       skipped,
       errors,
