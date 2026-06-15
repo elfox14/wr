@@ -83,6 +83,7 @@ function createSafeDemoTeam(id: string, dataError?: string) {
     fifaRank: null,
     coach: null,
     participations: null,
+    players: [],
     isDemo: true,
     dataNotice: dataError || 'لا توجد بيانات موثقة لهذا المنتخب في قاعدة البيانات الحالية.',
   };
@@ -133,15 +134,16 @@ export default async function TeamPage({ params }: Props) {
     dataError = 'تعذر الاتصال بقاعدة البيانات، لذلك يتم عرض الصفحة بدون أرقام موثقة.';
   }
 
+  const mappedPlayers = players.map(mapPlayer);
   const safeTeam = team
-    ? { ...team, intelligenceReports: undefined, isDemo: false }
+    ? { ...team, intelligenceReports: undefined, players: mappedPlayers, isDemo: false }
     : createSafeDemoTeam(id, dataError);
 
   return (
     <main className="min-h-screen bg-[#050505] text-white">
       <TeamIntelligenceHub
         team={safeTeam}
-        players={players.map(mapPlayer)}
+        players={mappedPlayers}
         matches={matches.map(mapMatch)}
         intelligenceReport={mapReport(report)}
       />
