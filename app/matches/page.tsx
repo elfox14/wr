@@ -34,7 +34,7 @@ function normalizeGroupKey(value?: string | null) {
 }
 
 function getMatchGroup(match: Match) {
-  return normalizeGroupKey(match.groupPhase || match.group || match.homeTeam?.code || match.awayTeam?.code);
+  return normalizeGroupKey(match.groupPhase || match.group || match.stage);
 }
 
 function hasAnimation(match: Match) {
@@ -42,7 +42,7 @@ function hasAnimation(match: Match) {
 }
 
 function isGroupStage(match: Match) {
-  const value = String(match.groupPhase || match.group || match.stage || '').toUpperCase();
+  const value = String(match.groupPhase || match.stage || '').toUpperCase();
   return value.includes('GROUP');
 }
 
@@ -64,15 +64,15 @@ function isStaleLive(match: Match, now = new Date()) {
   return elapsed >= maxLiveMinutes(match);
 }
 
+function isFinished(match: Match, now = new Date()) {
+  const value = String(match.displayStatus || match.status || '').toUpperCase();
+  return FINISHED_STATUSES.includes(value) || Boolean(match.isStaleAutoFinished) || isStaleLive(match, now);
+}
+
 function isLiveStatus(match: Match, now = new Date()) {
   if (isFinished(match, now)) return false;
   const value = String(match.displayStatus || match.status || '').toUpperCase();
   return LIVE_STATUSES.includes(value);
-}
-
-function isFinished(match: Match, now = new Date()) {
-  const value = String(match.displayStatus || match.status || '').toUpperCase();
-  return FINISHED_STATUSES.includes(value) || Boolean(match.isStaleAutoFinished) || isStaleLive(match, now);
 }
 
 function startOfDay(value: Date) {
@@ -89,6 +89,20 @@ function addDays(value: Date, days: number) {
 
 function isSameDay(value: string | Date, target: Date) {
   return startOfDay(new Date(value)).getTime() === startOfDay(target).getTime();
+}
+
+function formatScoreNumber(value?: number | null) {
+  return Number(value || 0).toLocaleString('ar-EG');
+}
+
+function RtlScore({ homeScore, awayScore }: { homeScore?: number | null; awayScore?: number | null }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 tabular-nums" dir="rtl">
+      <span>{formatScoreNumber(homeScore)}</span>
+      <span className="text-[#FFD700]/70">-</span>
+      <span>{formatScoreNumber(awayScore)}</span>
+    </span>
+  );
 }
 
 function teamImage(team?: Team | null) {
@@ -167,7 +181,7 @@ export default function MatchesPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-background pb-20 text-foreground">
+    <div className="min-h-screen bg-background pb-20 text-foreground" dir="rtl">
       <main className="mx-auto max-w-7xl px-4 py-6">
         <section className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3">
           <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#0FF0FC]">MC PRIME World Cup</p>
@@ -282,7 +296,7 @@ function MatchCard({ match, now }: { match: Match; now: Date }) {
           </div>
 
           <div className="rounded-xl border border-white/10 bg-black px-3 py-2 text-lg font-black text-[#FFD700] md:text-xl">
-            {scoreVisible ? `${match.homeScore ?? 0} - ${match.awayScore ?? 0}` : 'VS'}
+            {scoreVisible ? <RtlScore homeScore={match.homeScore} awayScore={match.awayScore} /> : 'VS'}
           </div>
 
           <div>
