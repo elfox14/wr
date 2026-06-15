@@ -20,6 +20,7 @@ type Match = {
   stage?: string;
   animationMatchId?: string | number | null;
   isStaleAutoFinished?: boolean;
+  events?: any[] | null;
 };
 
 const validFilters = ['all', 'yesterday', 'today', 'tomorrow', 'animation'];
@@ -266,6 +267,67 @@ function EmptyMatches() {
   );
 }
 
+function MatchGoalscorers({ match }: { match: Match }) {
+  const events = match.events || [];
+  const goalEvents = events.filter(
+    (e: any) => e.type === 'goal' || e.type === 'goal_inferred'
+  );
+
+  if (goalEvents.length === 0) return null;
+
+  const homeGoals = goalEvents.filter((e: any) => {
+    if (e.teamId) return String(e.teamId) === String(match.homeTeam?.id);
+    if (e.teamName) return e.teamName === match.homeTeam?.name;
+    return match.homeTeam?.name && e.detail?.includes(match.homeTeam.name);
+  });
+
+  const awayGoals = goalEvents.filter((e: any) => {
+    if (e.teamId) return String(e.teamId) === String(match.awayTeam?.id);
+    if (e.teamName) return e.teamName === match.awayTeam?.name;
+    return match.awayTeam?.name && e.detail?.includes(match.awayTeam.name);
+  });
+
+  const formatScorer = (e: any) => {
+    const minStr = e.minute ? ` ${e.minute}'` : '';
+    if (!e.playerName) {
+      if (e.detail && e.detail.includes('football-data.org')) {
+        return `⚽ هدف${minStr}`;
+      }
+      return `⚽ ${e.detail || 'هدف'}${minStr}`;
+    }
+    return `⚽ ${e.playerName}${minStr}`;
+  };
+
+  return (
+    <div className="mt-3.5 border-t border-white/5 pt-2.5 text-[10px] text-gray-400">
+      <div className="grid grid-cols-[1fr_auto_1fr] gap-3">
+        {/* Home scorers */}
+        <div className="text-right space-y-0.5 min-w-0">
+          {homeGoals.map((g: any, i: number) => (
+            <div key={g.id || i} className="truncate" title={g.playerName || g.detail}>
+              {formatScorer(g)}
+            </div>
+          ))}
+        </div>
+
+        {/* Divider icon */}
+        <div className="flex items-start justify-center pt-0.5 opacity-30 select-none">
+          <span>⚽</span>
+        </div>
+
+        {/* Away scorers */}
+        <div className="text-left space-y-0.5 min-w-0">
+          {awayGoals.map((g: any, i: number) => (
+            <div key={g.id || i} className="truncate" title={g.playerName || g.detail}>
+              {formatScorer(g)}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function MatchCard({ match, now }: { match: Match; now: Date }) {
   const live = isLiveStatus(match, now);
   const finished = isFinished(match, now);
@@ -308,6 +370,9 @@ function MatchCard({ match, now }: { match: Match; now: Date }) {
             </h2>
           </div>
         </div>
+
+        {/* Goal scorers section */}
+        <MatchGoalscorers match={match} />
       </div>
 
       {hasAnimation(match) && !finished ? (

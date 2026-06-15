@@ -177,6 +177,7 @@ export async function GET() {
       include: {
         homeTeam: true,
         awayTeam: true,
+        events: true,
       },
       orderBy: { matchDate: 'asc' },
     });

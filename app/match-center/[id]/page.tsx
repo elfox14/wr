@@ -132,10 +132,103 @@ function RtlScore({ homeScore, awayScore }: { homeScore?: number | null; awaySco
   );
 }
 
+function eventIcon(type: string) {
+  const value = type.toLowerCase();
+  if (value.includes('goal')) return '⚽';
+  if (value.includes('corner')) return '🚩';
+  if (value.includes('yellow')) return '🟨';
+  if (value.includes('red')) return '🟥';
+  if (value.includes('danger')) return '🔥';
+  if (value.includes('shot')) return '🎯';
+  if (value.includes('status')) return 'ℹ️';
+  return '•';
+}
+
+function displaySourceName(source?: string | null) {
+  const value = String(source || '').trim();
+  if (!value) return '';
+  if (value === 'FOOTBALL_DATA' || value === 'FOOTBALL_DATA_FALLBACK') return '';
+  if (value === 'MC PRIME Live Monitor') return 'الرصد المباشر';
+  if (value === 'ISPORTS') return 'iSports';
+  return value.replace(/_/g, ' ');
+}
+
+function cleanEventDetail(detail?: string | null) {
+  return String(detail || '')
+    .replace(/هدف مؤكد من football-data\.org لـ\s*/gi, 'هدف لـ ')
+    .replace(/تحديث حالة المباراة من football-data\.org:\s*/gi, 'تحديث حالة المباراة: ')
+    .replace(/football-data\.org/gi, 'Football-Data')
+    .replace(/FOOTBALL_DATA_FALLBACK/g, '')
+    .replace(/FOOTBALL_DATA/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function MatchGoalscorers({ match }: { match: any }) {
+  const events = match.events || [];
+  const goalEvents = events.filter(
+    (e: any) => e.type === 'goal' || e.type === 'goal_inferred'
+  );
+
+  if (goalEvents.length === 0) return null;
+
+  const homeGoals = goalEvents.filter((e: any) => {
+    if (e.teamId) return String(e.teamId) === String(match.homeTeam?.id);
+    if (e.teamName) return e.teamName === match.homeTeam?.name;
+    return match.homeTeam?.name && e.detail?.includes(match.homeTeam.name);
+  });
+
+  const awayGoals = goalEvents.filter((e: any) => {
+    if (e.teamId) return String(e.teamId) === String(match.awayTeam?.id);
+    if (e.teamName) return e.teamName === match.awayTeam?.name;
+    return match.awayTeam?.name && e.detail?.includes(match.awayTeam.name);
+  });
+
+  const formatScorer = (e: any) => {
+    const minStr = e.minute ? ` ${e.minute}'` : '';
+    if (!e.playerName) {
+      if (e.detail && e.detail.includes('football-data.org')) {
+        return `⚽ هدف${minStr}`;
+      }
+      return `⚽ ${e.detail || 'هدف'}${minStr}`;
+    }
+    return `⚽ ${e.playerName}${minStr}`;
+  };
+
+  return (
+    <div className="mt-4 border-t border-white/5 pt-3.5 text-xs text-gray-400">
+      <div className="grid grid-cols-[1fr_auto_1fr] gap-3">
+        {/* Home scorers */}
+        <div className="text-right space-y-1 min-w-0">
+          {homeGoals.map((g: any, i: number) => (
+            <div key={g.id || i} className="truncate" title={g.playerName || g.detail}>
+              {formatScorer(g)}
+            </div>
+          ))}
+        </div>
+
+        {/* Divider icon */}
+        <div className="flex items-start justify-center pt-0.5 opacity-30 select-none">
+          <span>⚽</span>
+        </div>
+
+        {/* Away scorers */}
+        <div className="text-left space-y-1 min-w-0">
+          {awayGoals.map((g: any, i: number) => (
+            <div key={g.id || i} className="truncate" title={g.playerName || g.detail}>
+              {formatScorer(g)}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 async function getMatch(id: string) {
   return prisma.match.findUnique({
     where: { id },
-    include: { homeTeam: true, awayTeam: true },
+    include: { homeTeam: true, awayTeam: true, events: true },
   });
 }
 
@@ -179,6 +272,9 @@ export default async function MatchCenterPage({ params }: { params: Promise<{ id
             <TeamBlock asset={away} align="left" fallback="الفريق الثاني" />
           </div>
 
+          {/* Goal scorers section */}
+          <MatchGoalscorers match={match} />
+
           <div className="mt-3 grid grid-cols-2 gap-2">
             <Link href="#match-stats" className="rounded-xl border border-white/10 bg-white/[0.05] px-3 py-2 text-center text-[11px] font-black text-gray-200 transition hover:bg-white/[0.1]">تفاصيل المباراة</Link>
             {!finished ? (
@@ -198,7 +294,30 @@ export default async function MatchCenterPage({ params }: { params: Promise<{ id
         </div>
 
         <Panel title="مرصد المباراة الإخباري ومجريات اللعب" icon={<Newspaper className="text-[#FFD700]" />} action={<Link href="/news" className="text-xs font-black text-[#0FF0FC]">غرفة الأخبار</Link>}>
-          <EmptyText text="مجريات اللعب اللحظية تظهر في كارت الإحصائيات عند توفر مصدر موثق." />
+          {match.events && match.events.length > 0 ? (
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {match.events.map((event: any) => {
+                const sourceLabel = displaySourceName(event.sourceName);
+                return (
+                  <div key={event.id} className="rounded-xl border border-white/10 bg-black/35 p-3">
+                    <div className="flex items-center gap-2 text-xs font-black text-[#FFD700]">
+                      <span>{eventIcon(event.type)}</span>
+                      <span>{event.minute ? `د${event.minute}` : 'حدث'}</span>
+                      {sourceLabel ? (
+                        <>
+                          <span className="text-gray-600">•</span>
+                          <span>{sourceLabel}</span>
+                        </>
+                      ) : null}
+                    </div>
+                    <p className="mt-1.5 text-sm leading-6 text-gray-200">{cleanEventDetail(event.detail)}</p>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <EmptyText text="مجريات اللعب اللحظية تظهر في كارت الإحصائيات عند توفر مصدر موثق." />
+          )}
         </Panel>
       </section>
     </main>

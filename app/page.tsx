@@ -95,7 +95,7 @@ export default async function Home() {
         },
         orderBy: { matchDate: 'asc' },
         take: 5,
-        include: { homeTeam: true, awayTeam: true },
+        include: { homeTeam: true, awayTeam: true, events: true },
       }),
       prisma.match.findMany({
         where: {
@@ -103,7 +103,7 @@ export default async function Home() {
         },
         orderBy: { matchDate: 'asc' },
         take: 15,
-        include: { homeTeam: true, awayTeam: true },
+        include: { homeTeam: true, awayTeam: true, events: true },
       }),
       prisma.match.findFirst({
         where: {
@@ -111,7 +111,7 @@ export default async function Home() {
           matchDate: { gte: now },
         },
         orderBy: { matchDate: 'asc' },
-        include: { homeTeam: true, awayTeam: true },
+        include: { homeTeam: true, awayTeam: true, events: true },
       }),
     ]);
 

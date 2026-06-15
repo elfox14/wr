@@ -24,6 +24,7 @@ type TickerMatch = {
   isLiveNow?: boolean;
   minute?: number | null;
   groupPhase?: string | null;
+  events?: any[] | null;
 };
 
 type Props = {
@@ -42,6 +43,52 @@ function isLive(match: TickerMatch) {
 function isFinished(match: TickerMatch) {
   const status = normalizeStatus(match.displayStatus || match.status);
   return ['FINISHED', 'FT', 'AET', 'PEN'].includes(status);
+}
+
+function TickerGoalscorers({ match }: { match: TickerMatch }) {
+  const events = match.events || [];
+  const goalEvents = events.filter(
+    (e: any) => e.type === 'goal' || e.type === 'goal_inferred'
+  );
+  if (goalEvents.length === 0) return null;
+
+  const homeGoals = goalEvents.filter((e: any) => {
+    if (e.teamId) return String(e.teamId) === String(match.homeTeam?.id);
+    if (e.teamName) return e.teamName === match.homeTeam?.name;
+    return match.homeTeam?.name && e.detail?.includes(match.homeTeam.name);
+  });
+
+  const awayGoals = goalEvents.filter((e: any) => {
+    if (e.teamId) return String(e.teamId) === String(match.awayTeam?.id);
+    if (e.teamName) return e.teamName === match.awayTeam?.name;
+    return match.awayTeam?.name && e.detail?.includes(match.awayTeam.name);
+  });
+
+  const formatShort = (e: any) => {
+    const name = e.playerName || 'هدف';
+    const minStr = e.minute ? ` ${e.minute}'` : '';
+    return `${name}${minStr}`;
+  };
+
+  const homeText = homeGoals.map(formatShort).join(', ');
+  const awayText = awayGoals.map(formatShort).join(', ');
+
+  if (!homeText && !awayText) return null;
+
+  return (
+    <div className="mt-2 border-t border-white/5 pt-1.5 text-[9px] text-gray-400 space-y-0.5 w-full">
+      {homeText && (
+        <div className="truncate text-right" title={homeText}>
+          ⚽ {homeText}
+        </div>
+      )}
+      {awayText && (
+        <div className="truncate text-left" title={awayText}>
+          ⚽ {awayText}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default function HomeLiveMatchTicker({ matches = [] }: Props) {
@@ -82,55 +129,60 @@ export default function HomeLiveMatchTicker({ matches = [] }: Props) {
             >
               <motion.div 
                 whileHover={{ y: -2 }}
-                className={`relative flex w-60 items-center justify-between gap-4 rounded-xl border p-3 bg-black/40 backdrop-blur-md transition-all duration-300 ${
+                className={`relative flex flex-col w-60 rounded-xl border p-3 bg-black/40 backdrop-blur-md transition-all duration-300 ${
                   live 
                     ? 'border-[#00FF88]/40 shadow-[0_0_12px_rgba(0,255,136,0.06)]' 
                     : 'border-white/10 hover:border-[#0FF0FC]/30'
                 }`}
               >
-                {/* Status bar */}
-                <div className="flex flex-col gap-1.5 min-w-[3.5rem]">
-                  {live ? (
-                    <span className="inline-flex items-center gap-1 text-[10px] font-black text-[#00FF88] uppercase tracking-wide">
-                      <span className="h-1.5 w-1.5 rounded-full bg-[#00FF88] animate-pulse" />
-                      مباشر {match.minute ? `${match.minute}'` : ''}
+                <div className="flex items-center justify-between gap-4 w-full">
+                  {/* Status bar */}
+                  <div className="flex flex-col gap-1.5 min-w-[3.5rem]">
+                    {live ? (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-black text-[#00FF88] uppercase tracking-wide">
+                        <span className="h-1.5 w-1.5 rounded-full bg-[#00FF88] animate-pulse" />
+                        مباشر {match.minute ? `${match.minute}'` : ''}
+                      </span>
+                    ) : finished ? (
+                      <span className="text-[10px] font-bold text-gray-500">انتهت</span>
+                    ) : (
+                      <span className="text-[10px] font-bold text-[#0FF0FC]">
+                        {match.matchDate ? new Intl.DateTimeFormat('ar-EG', {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        }).format(new Date(match.matchDate)) : 'قريباً'}
+                      </span>
+                    )}
+                    <span className="text-[9px] font-bold text-gray-400 truncate max-w-[4rem]">
+                      {match.groupPhase ? match.groupPhase.replace('Group ', 'المجموعة ') : 'كأس العالم'}
                     </span>
-                  ) : finished ? (
-                    <span className="text-[10px] font-bold text-gray-500">انتهت</span>
-                  ) : (
-                    <span className="text-[10px] font-bold text-[#0FF0FC]">
-                      {match.matchDate ? new Intl.DateTimeFormat('ar-EG', {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      }).format(new Date(match.matchDate)) : 'قريباً'}
-                    </span>
-                  )}
-                  <span className="text-[9px] font-bold text-gray-400 truncate max-w-[4rem]">
-                    {match.groupPhase ? match.groupPhase.replace('Group ', 'المجموعة ') : 'كأس العالم'}
-                  </span>
+                  </div>
+
+                  {/* Teams and Scores */}
+                  <div className="flex flex-col gap-1 flex-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <img src={homeFlag || undefined} alt="" className="h-4 w-4 rounded-sm object-cover" />
+                        <span className="text-xs font-bold text-white truncate">{match.homeTeam?.name}</span>
+                      </div>
+                      {(live || finished) && (
+                        <span className="text-xs font-black text-white">{match.homeScore}</span>
+                      )}
+                    </div>
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <img src={awayFlag || undefined} alt="" className="h-4 w-4 rounded-sm object-cover" />
+                        <span className="text-xs font-bold text-white truncate">{match.awayTeam?.name}</span>
+                      </div>
+                      {(live || finished) && (
+                        <span className="text-xs font-black text-white">{match.awayScore}</span>
+                      )}
+                    </div>
+                  </div>
                 </div>
 
-                {/* Teams and Scores */}
-                <div className="flex flex-col gap-1 flex-1">
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-1.5 min-w-0">
-                      <img src={homeFlag || undefined} alt="" className="h-4 w-4 rounded-sm object-cover" />
-                      <span className="text-xs font-bold text-white truncate">{match.homeTeam?.name}</span>
-                    </div>
-                    {(live || finished) && (
-                      <span className="text-xs font-black text-white">{match.homeScore}</span>
-                    )}
-                  </div>
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-1.5 min-w-0">
-                      <img src={awayFlag || undefined} alt="" className="h-4 w-4 rounded-sm object-cover" />
-                      <span className="text-xs font-bold text-white truncate">{match.awayTeam?.name}</span>
-                    </div>
-                    {(live || finished) && (
-                      <span className="text-xs font-black text-white">{match.awayScore}</span>
-                    )}
-                  </div>
-                </div>
+                {/* Compact Goalscorers */}
+                <TickerGoalscorers match={match} />
               </motion.div>
             </Link>
           );

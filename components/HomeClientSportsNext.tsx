@@ -34,6 +34,7 @@ type HomeMatch = {
   isLikelyLiveByTime?: boolean;
   minute?: number | null;
   liveLabel?: string | null;
+  events?: any[] | null;
 };
 
 type Props = {
@@ -270,6 +271,64 @@ function MatchScoreCenter({ homeScore, awayScore }: { homeScore?: number | null;
       <ScoreBox value={homeScore} />
       <span className="h-6 w-px rounded-full bg-white/15" />
       <ScoreBox value={awayScore} />
+    </div>
+  );
+}
+
+function MatchGoalscorers({ match }: { match: HomeMatch }) {
+  const events = match.events || [];
+  const goalEvents = events.filter(
+    (e: any) => e.type === 'goal' || e.type === 'goal_inferred'
+  );
+
+  if (goalEvents.length === 0) return null;
+
+  const homeGoals = goalEvents.filter((e: any) => {
+    if (e.teamId) return String(e.teamId) === String(match.homeTeam?.id);
+    if (e.teamName) return e.teamName === match.homeTeam?.name;
+    return match.homeTeam?.name && e.detail?.includes(match.homeTeam.name);
+  });
+
+  const awayGoals = goalEvents.filter((e: any) => {
+    if (e.teamId) return String(e.teamId) === String(match.awayTeam?.id);
+    if (e.teamName) return e.teamName === match.awayTeam?.name;
+    return match.awayTeam?.name && e.detail?.includes(match.awayTeam.name);
+  });
+
+  const formatScorer = (e: any) => {
+    const minStr = e.minute ? ` ${e.minute}'` : '';
+    if (!e.playerName) {
+      if (e.detail && e.detail.includes('football-data.org')) {
+        return `⚽ هدف${minStr}`;
+      }
+      return `⚽ ${e.detail || 'هدف'}${minStr}`;
+    }
+    return `⚽ ${e.playerName}${minStr}`;
+  };
+
+  return (
+    <div className="mt-3.5 border-t border-white/5 pt-2.5 text-[10px] text-gray-400">
+      <div className="grid grid-cols-[1fr_auto_1fr] gap-3">
+        <div className="text-right space-y-0.5 min-w-0">
+          {homeGoals.map((g: any, i: number) => (
+            <div key={g.id || i} className="truncate" title={g.playerName || g.detail}>
+              {formatScorer(g)}
+            </div>
+          ))}
+        </div>
+
+        <div className="flex items-start justify-center pt-0.5 opacity-30 select-none">
+          <span>⚽</span>
+        </div>
+
+        <div className="text-left space-y-0.5 min-w-0">
+          {awayGoals.map((g: any, i: number) => (
+            <div key={g.id || i} className="truncate" title={g.playerName || g.detail}>
+              {formatScorer(g)}
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
