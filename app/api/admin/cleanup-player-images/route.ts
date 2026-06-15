@@ -34,7 +34,7 @@ async function cleanup(req: Request) {
   const players = await prisma.asset.findMany({
     where: {
       type: 'PLAYER',
-      image: { not: null },
+      image: { not: '' },
       ...(teamId ? { teamId } : {}),
     },
     select: {
@@ -53,7 +53,7 @@ async function cleanup(req: Request) {
   if (!dryRun && invalid.length) {
     await prisma.asset.updateMany({
       where: { id: { in: invalid.map((player) => player.id) } },
-      data: { image: null },
+      data: { image: '' },
     });
   }
 
