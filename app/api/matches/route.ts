@@ -2,7 +2,8 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 
 const LIVE_STATUSES = ['IN_PLAY', 'LIVE', 'HT'];
-const MAX_LIVE_MINUTES = 180;
+const GROUP_STAGE_MAX_LIVE_MINUTES = 115;
+const KNOCKOUT_MAX_LIVE_MINUTES = 150;
 
 function dayHourKey(value: Date | string) {
   const date = new Date(value);
@@ -25,12 +26,21 @@ function duplicateFamilyKey(match: any) {
   return `teams:${teamsKey(match)}:${dayHourKey(match.matchDate)}`;
 }
 
+function isGroupStage(match: any) {
+  const value = String(match.groupPhase || match.group || match.stage || '').toUpperCase();
+  return value.includes('GROUP');
+}
+
+function maxLiveMinutes(match: any) {
+  return isGroupStage(match) ? GROUP_STAGE_MAX_LIVE_MINUTES : KNOCKOUT_MAX_LIVE_MINUTES;
+}
+
 function isStaleLive(match: any, now = Date.now()) {
   const status = String(match.status || '').toUpperCase();
   if (!LIVE_STATUSES.includes(status)) return false;
   const matchTime = new Date(match.matchDate).getTime();
   if (!Number.isFinite(matchTime)) return false;
-  return now - matchTime > MAX_LIVE_MINUTES * 60 * 1000;
+  return now - matchTime > maxLiveMinutes(match) * 60 * 1000;
 }
 
 function normalizeMatchForDisplay(match: any, now = Date.now()) {
@@ -81,9 +91,9 @@ export async function GET() {
       orderBy: { matchDate: 'asc' },
     });
 
-    return NextResponse.json(dedupeMatches(matches));
+    return NextResponse.json(dedupeMatches(matches), { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } });
   } catch (error) {
     console.error('Error fetching matches:', error);
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500, headers: { 'Cache-Control': 'no-store' } });
   }
 }
