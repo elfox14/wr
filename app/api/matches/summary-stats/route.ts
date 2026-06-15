@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { dedupePlayers } from '@/lib/playerDedupe';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -50,7 +51,7 @@ function maxIsoDate(...values: Array<string | null | undefined>) {
 
 export async function GET() {
   try {
-    const [matches, yellowEventCount, redEventCount, snapshotsCount, playerCount, teamCount, matchEvents] = await Promise.all([
+    const [matches, yellowEventCount, redEventCount, snapshotsCount, rawPlayers, teamCount, matchEvents] = await Promise.all([
       prisma.match.findMany({
         select: {
           id: true,
@@ -76,7 +77,21 @@ export async function GET() {
       prisma.matchEvent.count({ where: { type: { in: ['yellow_card', 'yellow', 'card_yellow'] } } }),
       prisma.matchEvent.count({ where: { type: { in: ['red_card', 'red', 'card_red'] } } }),
       prisma.matchStatsSnapshot.count().catch(() => 0),
-      prisma.asset.count({ where: { type: 'PLAYER' } }),
+      prisma.asset.findMany({
+        where: { type: 'PLAYER' },
+        select: {
+          id: true,
+          name: true,
+          code: true,
+          image: true,
+          position: true,
+          age: true,
+          club: true,
+          teamId: true,
+          team: { select: { id: true, name: true, code: true } },
+        },
+        take: 10000,
+      }),
       prisma.asset.count({ where: { type: 'TEAM' } }),
       prisma.matchEvent.findMany({
         select: {
@@ -88,6 +103,13 @@ export async function GET() {
         take: 10000,
       }).catch(() => []),
     ]);
+
+    const dedupedPlayers = dedupePlayers(rawPlayers);
+    const linkedDedupedPlayers = dedupedPlayers.filter((player) => player.teamId);
+    const playerCount = linkedDedupedPlayers.length;
+    const rawPlayerRows = rawPlayers.length;
+    const hiddenDuplicatePlayerRows = Math.max(0, rawPlayerRows - dedupedPlayers.length);
+    const estimatedFinalSquadCapacity = teamCount * 26;
 
     let finishedMatches = 0;
     let liveMatches = 0;
@@ -171,6 +193,11 @@ export async function GET() {
       scheduledMatches,
       teamCount,
       playerCount,
+      playerCountSource: 'deduped_linked_player_assets',
+      rawPlayerRows,
+      hiddenDuplicatePlayerRows,
+      estimatedFinalSquadCapacity,
+      overEstimatedCapacityBy: Math.max(0, playerCount - estimatedFinalSquadCapacity),
       totalGoals,
       yellowCards,
       redCards,
