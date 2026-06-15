@@ -1,4 +1,17 @@
-export const WORLD_CUP_2026_GROUPS = {
+export type WorldCup2026GroupKey = 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G' | 'H' | 'I' | 'J' | 'K' | 'L';
+
+export type WorldCup2026TeamConfig = {
+  name: string;
+  arName: string;
+  codes: readonly string[];
+};
+
+type WorldCup2026GroupConfig = {
+  arName: string;
+  teams: readonly WorldCup2026TeamConfig[];
+};
+
+export const WORLD_CUP_2026_GROUPS: Record<WorldCup2026GroupKey, WorldCup2026GroupConfig> = {
   A: { arName: 'الأولى', teams: [
     { name: 'المكسيك', arName: 'المكسيك', codes: ['MEX'] },
     { name: 'جنوب أفريقيا', arName: 'جنوب أفريقيا', codes: ['ZAF', 'RSA'] },
@@ -71,9 +84,7 @@ export const WORLD_CUP_2026_GROUPS = {
     { name: 'غانا', arName: 'غانا', codes: ['GHA'] },
     { name: 'بنما', arName: 'بنما', codes: ['PAN'] },
   ] },
-} as const;
-
-export type WorldCup2026GroupKey = keyof typeof WORLD_CUP_2026_GROUPS;
+};
 
 export function getWorldCup2026GroupKey(value?: string | null): WorldCup2026GroupKey {
   const group = String(value || 'A').trim().toUpperCase();
