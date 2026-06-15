@@ -1,0 +1,1 @@
+$(cat /mnt/data/groupCFbrefStats.ts)
