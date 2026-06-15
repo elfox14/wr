@@ -4,6 +4,7 @@ import { findGroupAFbrefStats, toTeamFBRefStats as toGroupATeamFBRefStats } from
 import { findGroupBFbrefStats, toTeamFBRefStats as toGroupBTeamFBRefStats } from '@/lib/groupBFbrefStats';
 import { findGroupCFbrefStats, toTeamFBRefStats as toGroupCTeamFBRefStats } from '@/lib/groupCFbrefStats';
 import { findGroupDFbrefStats, toTeamFBRefStats as toGroupDTeamFBRefStats } from '@/lib/groupDFbrefStats';
+import { findGroupEFbrefStats, toTeamFBRefStats as toGroupETeamFBRefStats } from '@/lib/groupEFbrefStats';
 import { findGroupGHIFbrefStats, toTeamFBRefStats as toGroupGHITeamFBRefStats } from '@/lib/groupGHIFbrefStats';
 
 type StandingMetrics = {
@@ -116,7 +117,8 @@ export async function GET(_request: Request, context: RouteContext) {
   const groupBStats = groupAStats ? null : findGroupBFbrefStats(lookupKey) || findGroupBFbrefStats(fallbackKey);
   const groupCStats = groupAStats || groupBStats ? null : findGroupCFbrefStats(lookupKey) || findGroupCFbrefStats(fallbackKey);
   const groupDStats = groupAStats || groupBStats || groupCStats ? null : findGroupDFbrefStats(lookupKey) || findGroupDFbrefStats(fallbackKey);
-  const groupGHIStats = groupAStats || groupBStats || groupCStats || groupDStats ? null : findGroupGHIFbrefStats(lookupKey) || findGroupGHIFbrefStats(fallbackKey);
+  const groupEStats = groupAStats || groupBStats || groupCStats || groupDStats ? null : findGroupEFbrefStats(lookupKey) || findGroupEFbrefStats(fallbackKey);
+  const groupGHIStats = groupAStats || groupBStats || groupCStats || groupDStats || groupEStats ? null : findGroupGHIFbrefStats(lookupKey) || findGroupGHIFbrefStats(fallbackKey);
   const response: TeamFBRefStats = groupAStats
     ? toGroupATeamFBRefStats(groupAStats)
     : groupBStats
@@ -125,9 +127,11 @@ export async function GET(_request: Request, context: RouteContext) {
         ? toGroupCTeamFBRefStats(groupCStats)
         : groupDStats
           ? toGroupDTeamFBRefStats(groupDStats)
-          : groupGHIStats
-            ? toGroupGHITeamFBRefStats(groupGHIStats)
-            : unavailableStats;
+          : groupEStats
+            ? toGroupETeamFBRefStats(groupEStats)
+            : groupGHIStats
+              ? toGroupGHITeamFBRefStats(groupGHIStats)
+              : unavailableStats;
 
   return NextResponse.json(response, {
     headers: { 'Cache-Control': 'public, s-maxage=600, stale-while-revalidate=300' },
