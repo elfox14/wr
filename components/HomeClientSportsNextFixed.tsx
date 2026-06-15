@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import HomeClientSportsNext from '@/components/HomeClientSportsNext';
+import HomeTournamentStatsCard from '@/components/HomeTournamentStatsCard';
 import { getTeamFlagUrl } from '@/lib/teamFlags';
 
 type Team = {
@@ -35,6 +36,8 @@ type HomeMatch = {
 type Props = {
   upcomingMatches?: HomeMatch[];
   upcomingMatchesCount?: number;
+  playersCount?: number;
+  teamsCount?: number;
   [key: string]: unknown;
 };
 
@@ -386,8 +389,10 @@ export default function HomeClientSportsNextFixed(props: Props) {
   return (
     <>
       <FixedMatchCenter fallbackMatches={props.upcomingMatches || []} upcomingMatchesCount={props.upcomingMatchesCount || 0} />
+      <HomeTournamentStatsCard playersCount={props.playersCount} teamsCount={props.teamsCount} upcomingMatchesCount={props.upcomingMatchesCount || 0} />
       <style jsx global>{`
-        section[aria-label="مركز المباريات"] {
+        section[aria-label="مركز المباريات"],
+        main > div.relative.mx-auto.max-w-7xl > section:nth-of-type(2) {
           display: none !important;
         }
       `}</style>
