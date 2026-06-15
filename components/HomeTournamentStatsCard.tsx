@@ -125,6 +125,7 @@ export default function HomeTournamentStatsCard({ playersCount, teamsCount, upco
 
   const isInitialLoading = isLoading && !stats;
   const loadingNote = 'جاري تحميل بيانات الإحصائيات...';
+  const cardsAvailable = Boolean((stats?.matchesWithCardSnapshots || 0) > 0 || (stats?.yellowCards || 0) > 0 || (stats?.redCards || 0) > 0);
   const penaltiesAvailable = Boolean(stats?.penalties?.available);
   const biggestScore = stats?.biggestScore || null;
   const playerNote = stats?.rawPlayerRows && stats.rawPlayerRows > (stats.playerCount || 0)
@@ -150,16 +151,16 @@ export default function HomeTournamentStatsCard({ playersCount, teamsCount, upco
     },
     {
       label: 'كروت صفراء',
-      value: isInitialLoading ? LOADING_VALUE : formatCount(stats?.yellowCards),
-      note: isInitialLoading ? loadingNote : 'من snapshots أو أحداث المباراة المتاحة',
+      value: isInitialLoading ? LOADING_VALUE : cardsAvailable ? formatCount(stats?.yellowCards) : 'غير متوفر',
+      note: isInitialLoading ? loadingNote : cardsAvailable ? 'من snapshots أو أحداث المباراة المتاحة' : 'غير متوفر في المصادر الحالية',
       href: '/matches',
       tone: 'gold' as const,
       loading: isInitialLoading,
     },
     {
       label: 'كروت حمراء',
-      value: isInitialLoading ? LOADING_VALUE : formatCount(stats?.redCards),
-      note: isInitialLoading ? loadingNote : 'من snapshots أو أحداث المباراة المتاحة',
+      value: isInitialLoading ? LOADING_VALUE : cardsAvailable ? formatCount(stats?.redCards) : 'غير متوفر',
+      note: isInitialLoading ? loadingNote : cardsAvailable ? 'من snapshots أو أحداث المباراة المتاحة' : 'غير متوفر في المصادر الحالية',
       href: '/matches',
       tone: 'danger' as const,
       loading: isInitialLoading,
@@ -196,7 +197,7 @@ export default function HomeTournamentStatsCard({ playersCount, teamsCount, upco
       tone: 'default' as const,
       loading: isInitialLoading,
     },
-  ]), [stats, playersCount, upcomingMatchesCount, penaltiesAvailable, biggestScore, playerNote, isInitialLoading]);
+  ]), [stats, playersCount, upcomingMatchesCount, cardsAvailable, penaltiesAvailable, biggestScore, playerNote, isInitialLoading]);
 
   return (
     <section className="mx-auto mb-4 max-w-7xl overflow-hidden rounded-2xl border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(255,215,0,0.13),transparent_28%),linear-gradient(135deg,rgba(7,24,18,0.94),rgba(4,17,13,0.98))] p-3 text-white shadow-[0_18px_46px_rgba(0,0,0,0.32)] backdrop-blur sm:p-4" aria-label="إحصائيات البطولة الحية">
