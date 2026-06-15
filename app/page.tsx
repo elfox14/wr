@@ -81,6 +81,40 @@ export default async function Home() {
             main > section:nth-of-type(3) > div.relative.grid > div:nth-child(2) {
               display: none !important;
             }
+
+            main section[aria-label="أقسام كأس العالم 2026 التفاعلية"] a[href="/players"] {
+              display: none !important;
+            }
+
+            main > div.relative.mx-auto.max-w-7xl > section:nth-of-type(2) .inline-flex.items-center.gap-2.rounded-full {
+              font-size: 0 !important;
+            }
+
+            main > div.relative.mx-auto.max-w-7xl > section:nth-of-type(2) .inline-flex.items-center.gap-2.rounded-full::after {
+              content: 'STATISTICS CENTER';
+              font-size: 10px !important;
+              letter-spacing: 0.16em;
+            }
+
+            main > div.relative.mx-auto.max-w-7xl > section:nth-of-type(2) h1 {
+              font-size: 0 !important;
+            }
+
+            main > div.relative.mx-auto.max-w-7xl > section:nth-of-type(2) h1::after {
+              content: 'الإحصائيات';
+              font-size: clamp(1.6rem, 4vw, 2.8rem) !important;
+              line-height: 1.15;
+            }
+
+            main > div.relative.mx-auto.max-w-7xl > section:nth-of-type(2) p:first-of-type {
+              font-size: 0 !important;
+            }
+
+            main > div.relative.mx-auto.max-w-7xl > section:nth-of-type(2) p:first-of-type::after {
+              content: 'ملخص رقمي مباشر للبطولة: إجمالي المباريات، المنتخبات، الدول المستضيفة، وأقرب مباريات مركز المباريات في بطاقة واحدة بدل الهيرو.';
+              font-size: 0.875rem !important;
+              line-height: 1.9;
+            }
           `,
         }}
       />
