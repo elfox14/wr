@@ -4,11 +4,11 @@ import { getDataHubTeam, getDataHubTeams, unwrapDataHubData } from '@/lib/mcPrim
 import { hasUsablePlayerImage } from '@/lib/playerDedupe';
 
 export type OfficialSquadPlayerInput = {
-  name?: string;
-  fullName?: string;
-  playerName?: string;
-  code?: string;
-  position?: string;
+  name?: string | null;
+  fullName?: string | null;
+  playerName?: string | null;
+  code?: string | null;
+  position?: string | null;
   age?: number | string | null;
   club?: string | null;
   image?: string | null;
@@ -20,17 +20,17 @@ export type OfficialSquadPlayerInput = {
   externalId?: number | string | null;
   apiFootballId?: number | string | null;
   api_football_id?: number | string | null;
-  player?: any;
+  player?: Record<string, any> | null;
   [key: string]: any;
 };
 
 export type OfficialSquadTeamInput = {
-  teamId?: string;
-  teamCode?: string;
-  teamName?: string;
+  teamId?: string | null;
+  teamCode?: string | null;
+  teamName?: string | null;
   teamApiId?: number | string | null;
-  sourceName?: string;
-  sourceUrl?: string;
+  sourceName?: string | null;
+  sourceUrl?: string | null;
   replaceExisting?: boolean;
   allowUnverified?: boolean;
   requireImages?: boolean;
@@ -60,14 +60,14 @@ function first<T = any>(...values: any[]): T | null {
 
 function asString(...values: any[]) {
   const value = first(...values);
-  if (value === undefined || value === null) return null;
+  if (value === null) return null;
   const text = String(value).trim();
   return text || null;
 }
 
 function asInt(...values: any[]) {
   const value = first(...values);
-  if (value === undefined || value === null || value === '') return null;
+  if (value === null) return null;
   const parsed = Number(value);
   return Number.isFinite(parsed) ? Math.trunc(parsed) : null;
 }
@@ -100,13 +100,11 @@ function slug(value: any, fallback = 'player') {
 }
 
 function cleanCode(value: any, fallback: string) {
-  const raw = String(value || fallback || 'PLAYER')
-    .toUpperCase()
-    .replace(/[^A-Z0-9]/g, '');
+  const raw = String(value || fallback || 'PLAYER').toUpperCase().replace(/[^A-Z0-9]/g, '');
   return raw.slice(0, 10) || 'PLAYER';
 }
 
-function getDataHubEnvelope(payload: any) {
+function envelope(payload: any) {
   const data = unwrapDataHubData(payload) || {};
   const team = data?.team || payload?.team || data || payload || {};
   const apiProfile = data?.api_profile || data?.apiProfile || payload?.api_profile || payload?.apiProfile || team?.api_profile || team?.apiProfile || {};
@@ -115,29 +113,35 @@ function getDataHubEnvelope(payload: any) {
   return { data, team, apiProfile, manualProfile, sourceSummary };
 }
 
-function getHubTeamIdentifier(row: any) {
-  const { team, apiProfile } = getDataHubEnvelope(row);
-  return first(team?.id, team?.team_id, row?.id, row?.team_id, apiProfile?.team_id, apiProfile?.api_team_id, team?.api_team_id, getDataHubTeamApiId(row));
-}
-
-function getDataHubTeamApiId(payload: any) {
-  const { team, apiProfile } = getDataHubEnvelope(payload);
+function dataHubTeamApiId(payload: any) {
+  const { team, apiProfile } = envelope(payload);
   return asInt(team?.apiFootballId, team?.api_football_id, team?.api_team_id, team?.api_id, apiProfile?.api_team_id, apiProfile?.api_id, payload?.api_team_id, payload?.api_id);
 }
 
-function getDataHubTeamName(payload: any) {
-  const { team, apiProfile, manualProfile } = getDataHubEnvelope(payload);
-  return asString(manualProfile?.name_ar, manualProfile?.official_name, team?.name_ar, team?.name, team?.team_name, apiProfile?.api_team_name, apiProfile?.name, payload?.name) || undefined;
+function dataHubTeamId(row: any) {
+  const { team, apiProfile } = envelope(row);
+  return first(team?.id, team?.team_id, row?.id, row?.team_id, apiProfile?.team_id, apiProfile?.api_team_id, dataHubTeamApiId(row));
 }
 
-function getDataHubTeamCode(payload: any) {
-  const { team, manualProfile } = getDataHubEnvelope(payload);
-  return asString(team?.code, team?.fifa_code, team?.fifaCode, manualProfile?.fifa_code, manualProfile?.country_iso3, payload?.code) || undefined;
+function dataHubTeamName(payload: any) {
+  const { team, apiProfile, manualProfile } = envelope(payload);
+  return asString(manualProfile?.name_ar, manualProfile?.official_name, team?.name_ar, team?.name, team?.team_name, apiProfile?.api_team_name, apiProfile?.name, payload?.name);
 }
 
-function getSourceUrl(input: OfficialSquadTeamInput, payload?: any) {
+function dataHubTeamCode(payload: any) {
+  const { team, manualProfile } = envelope(payload);
+  return asString(team?.code, team?.fifa_code, team?.fifaCode, manualProfile?.fifa_code, manualProfile?.country_iso3, payload?.code);
+}
+
+function sourceName(input: OfficialSquadTeamInput, payload?: any) {
+  if (input.sourceName) return input.sourceName;
+  const { data, sourceSummary } = envelope(payload || {});
+  return asString(sourceSummary?.sourceName, sourceSummary?.source_name, data?.sourceName, data?.source_name) || 'Official World Cup Squad';
+}
+
+function sourceUrl(input: OfficialSquadTeamInput, payload?: any) {
   if (input.sourceUrl) return input.sourceUrl;
-  const { data, manualProfile, sourceSummary } = getDataHubEnvelope(payload || {});
+  const { data, manualProfile, sourceSummary } = envelope(payload || {});
   return asString(
     manualProfile?.official_squad_url,
     manualProfile?.players_source_url,
@@ -147,12 +151,6 @@ function getSourceUrl(input: OfficialSquadTeamInput, payload?: any) {
     data?.sourceUrl,
     data?.source_url,
   );
-}
-
-function getSourceName(input: OfficialSquadTeamInput, payload?: any) {
-  if (input.sourceName) return input.sourceName;
-  const { data, sourceSummary } = getDataHubEnvelope(payload || {});
-  return asString(sourceSummary?.sourceName, sourceSummary?.source_name, data?.sourceName, data?.source_name) || 'Official World Cup Squad';
 }
 
 async function findTeam(input: OfficialSquadTeamInput) {
@@ -184,12 +182,12 @@ async function findTeam(input: OfficialSquadTeamInput) {
   return null;
 }
 
-function getPlayerRecord(player: OfficialSquadPlayerInput) {
+function playerRecord(player: OfficialSquadPlayerInput) {
   return player?.player || player;
 }
 
 function playerImage(player: OfficialSquadPlayerInput) {
-  const record = getPlayerRecord(player);
+  const record = playerRecord(player);
   const image = asString(
     player.image,
     player.photo,
@@ -218,7 +216,7 @@ function ageFromDate(value?: string | null) {
 }
 
 function normalizePlayer(player: OfficialSquadPlayerInput, index: number): NormalizedPlayer | null {
-  const record = getPlayerRecord(player);
+  const record = playerRecord(player);
   const name = asString(player.name, player.fullName, player.playerName, record?.name, record?.full_name, record?.fullName, record?.player_name, record?.playerName, record?.strPlayer);
   if (!name) return null;
 
@@ -231,17 +229,7 @@ function normalizePlayer(player: OfficialSquadPlayerInput, index: number): Norma
   const apiFootballId = asInt(player.apiFootballId, player.api_football_id, record?.apiFootballId, record?.api_football_id, record?.id, record?.player_id);
   const code = cleanCode(player.code, `${name.slice(0, 3)}${shirtNumber || index + 1}`);
 
-  return {
-    name,
-    code,
-    position,
-    age,
-    club,
-    image,
-    shirtNumber,
-    externalId,
-    apiFootballId,
-  };
+  return { name, code, position, age, club, image, shirtNumber, externalId, apiFootballId };
 }
 
 function playerBaseScore(position?: string | null, age?: number | null) {
@@ -271,23 +259,11 @@ function playerValuation(player: NormalizedPlayer) {
 export async function importOfficialSquad(input: OfficialSquadTeamInput) {
   const team = await findTeam(input);
   if (!team) {
-    return {
-      ok: false,
-      error: 'team_not_found',
-      teamId: input.teamId || null,
-      teamCode: input.teamCode || null,
-      teamName: input.teamName || null,
-      teamApiId: input.teamApiId || null,
-    };
+    return { ok: false, error: 'team_not_found', teamId: input.teamId || null, teamCode: input.teamCode || null, teamName: input.teamName || null, teamApiId: input.teamApiId || null };
   }
 
-  const sourceName = getSourceName(input);
-  const sourceUrl = getSourceUrl(input);
   const players = Array.isArray(input.players) ? input.players : [];
-  const normalizedPlayers = players
-    .map((player, index) => normalizePlayer(player, index))
-    .filter(Boolean) as NormalizedPlayer[];
-
+  const normalizedPlayers = players.map((player, index) => normalizePlayer(player, index)).filter((player): player is NormalizedPlayer => Boolean(player));
   const imported: any[] = [];
   const skippedRows = players.length - normalizedPlayers.length;
   let skippedForImages = 0;
@@ -298,9 +274,9 @@ export async function importOfficialSquad(input: OfficialSquadTeamInput) {
       continue;
     }
 
-    const { fundamental, score, fairValue } = playerValuation(player);
     const existing = await findExistingPlayer(team.id, player);
-    const baseData: any = {
+    const { fundamental, score, fairValue } = playerValuation(player);
+    const data = {
       type: 'PLAYER',
       name: player.name,
       code: player.code,
@@ -330,48 +306,21 @@ export async function importOfficialSquad(input: OfficialSquadTeamInput) {
     };
 
     const asset = existing
-      ? await prisma.asset.update({ where: { id: existing.id }, data: baseData })
-      : await prisma.asset.create({
-        data: {
-          id: `official-player-${team.id}-${slug(player.name)}`,
-          ...baseData,
-        },
-      });
+      ? await prisma.asset.update({ where: { id: existing.id }, data })
+      : await prisma.asset.create({ data: { id: `official-player-${team.id}-${slug(player.name)}`, ...data } });
 
-    imported.push({
-      id: asset.id,
-      name: asset.name,
-      code: asset.code,
-      position: asset.position,
-      age: asset.age,
-      club: asset.club,
-      image: asset.image,
-      shirtNumber: player.shirtNumber,
-      externalId: player.externalId,
-      apiFootballId: player.apiFootballId,
-    });
+    imported.push({ id: asset.id, name: asset.name, code: asset.code, position: asset.position, age: asset.age, club: asset.club, image: asset.image, shirtNumber: player.shirtNumber, externalId: player.externalId, apiFootballId: player.apiFootballId });
   }
 
   if (input.replaceExisting) {
     const importedIds = imported.map((player) => player.id);
-    await prisma.asset.updateMany({
-      where: {
-        type: 'PLAYER',
-        teamId: team.id,
-        id: { notIn: importedIds.length ? importedIds : ['__none__'] },
-      },
-      data: { isAvailable: false },
-    });
+    await prisma.asset.updateMany({ where: { type: 'PLAYER', teamId: team.id, id: { notIn: importedIds.length ? importedIds : ['__none__'] } }, data: { isAvailable: false } });
   }
 
-  await prisma.teamIntelligenceReport.deleteMany({
-    where: {
-      teamId: team.id,
-      provider: 'MC_PRIME_OFFICIAL_SQUAD',
-      reportType: 'OFFICIAL_SQUAD',
-    },
-  });
+  const finalSourceName = sourceName(input);
+  const finalSourceUrl = sourceUrl(input);
 
+  await prisma.teamIntelligenceReport.deleteMany({ where: { teamId: team.id, provider: 'MC_PRIME_OFFICIAL_SQUAD', reportType: 'OFFICIAL_SQUAD' } });
   await prisma.teamIntelligenceReport.create({
     data: {
       teamId: team.id,
@@ -380,8 +329,8 @@ export async function importOfficialSquad(input: OfficialSquadTeamInput) {
       body: imported.map((player) => `- ${player.name}${player.position ? ` — ${player.position}` : ''}${player.club ? ` — ${player.club}` : ''}`).join('\n'),
       reportType: 'OFFICIAL_SQUAD',
       language: 'ar',
-      sourceName,
-      sourceUrl,
+      sourceName: finalSourceName,
+      sourceUrl: finalSourceUrl,
       sourceCategory: input.allowUnverified ? 'trusted_data_hub_squad' : 'official_squad',
       confidence: input.allowUnverified ? 'B' : 'A',
       provider: 'MC_PRIME_OFFICIAL_SQUAD',
@@ -406,13 +355,9 @@ export async function importOfficialSquad(input: OfficialSquadTeamInput) {
 
   return {
     ok: true,
-    team: {
-      id: team.id,
-      name: team.name,
-      code: team.code,
-    },
-    sourceName,
-    sourceUrl,
+    team: { id: team.id, name: team.name, code: team.code },
+    sourceName: finalSourceName,
+    sourceUrl: finalSourceUrl,
     imported: imported.length,
     skipped: skippedRows + skippedForImages,
     skippedRows,
@@ -434,8 +379,8 @@ function extractCandidateArray(value: any): OfficialSquadPlayerInput[] {
 }
 
 function extractDataHubPlayers(payload: any) {
-  const { data, team } = getDataHubEnvelope(payload);
-  const candidates = [
+  const { data, team } = envelope(payload);
+  const rows = [
     data?.official_squad,
     data?.officialSquad,
     data?.final_squad,
@@ -453,54 +398,28 @@ function extractDataHubPlayers(payload: any) {
     payload?.squad,
     payload?.players,
     payload?.roster,
-  ];
-  const rows = candidates.flatMap(extractCandidateArray);
+  ].flatMap(extractCandidateArray);
+
   const seen = new Set<string>();
-  const result: OfficialSquadPlayerInput[] = [];
-
-  rows.forEach((row, index) => {
-    const normalized = normalizePlayer(row, index);
-    if (!normalized) return;
-    const key = String(normalized.apiFootballId || normalizeText(normalized.name));
-    if (seen.has(key)) return;
+  return rows.filter((row, index) => {
+    const player = normalizePlayer(row, index);
+    if (!player) return false;
+    const key = String(player.apiFootballId || normalizeText(player.name));
+    if (seen.has(key)) return false;
     seen.add(key);
-    result.push(row);
+    return true;
   });
-
-  return result;
 }
 
 function sourceText(payload: any) {
-  const { data, manualProfile, sourceSummary } = getDataHubEnvelope(payload);
-  return JSON.stringify({
-    sourceSummary,
-    dataNotices: data?.data_notices || data?.dataNotices,
-    sources: data?.sources || data?.source || data?.source_url || data?.sourceUrl,
-    manualSources: manualProfile?.sources || manualProfile?.source_url || manualProfile?.official_squad_url || manualProfile?.players_source_url,
-  }).toLowerCase();
+  const { data, manualProfile, sourceSummary } = envelope(payload);
+  return JSON.stringify({ sourceSummary, dataNotices: data?.data_notices || data?.dataNotices, sources: data?.sources || data?.source || data?.source_url || data?.sourceUrl, manualSources: manualProfile?.sources || manualProfile?.source_url || manualProfile?.official_squad_url || manualProfile?.players_source_url }).toLowerCase();
 }
 
-function isOfficialOrApprovedDataHubSquad(payload: any) {
-  const { data, team, manualProfile, sourceSummary } = getDataHubEnvelope(payload);
-  const explicit = first(
-    data?.official_squad_confirmed,
-    data?.officialSquadConfirmed,
-    data?.is_official_squad,
-    data?.isOfficialSquad,
-    data?.approved_squad,
-    data?.approvedSquad,
-    team?.official_squad_confirmed,
-    team?.is_official_squad,
-    sourceSummary?.official_squad_confirmed,
-    sourceSummary?.is_official_squad,
-    sourceSummary?.approved_for_players,
-    sourceSummary?.approvedForPlayers,
-    manualProfile?.official_squad_confirmed,
-    manualProfile?.is_official_squad,
-  );
-
+function isOfficialDataHubSquad(payload: any) {
+  const { data, team, manualProfile, sourceSummary } = envelope(payload);
+  const explicit = first(data?.official_squad_confirmed, data?.officialSquadConfirmed, data?.is_official_squad, data?.isOfficialSquad, data?.approved_squad, data?.approvedSquad, team?.official_squad_confirmed, team?.is_official_squad, sourceSummary?.official_squad_confirmed, sourceSummary?.is_official_squad, sourceSummary?.approved_for_players, sourceSummary?.approvedForPlayers, manualProfile?.official_squad_confirmed, manualProfile?.is_official_squad);
   if (explicit === true || explicit === 1 || String(explicit).toLowerCase() === 'true') return true;
-
   const text = sourceText(payload);
   const hasOfficialSignal = /(fifa|official|association|federation|fa\b|final squad|squad list|confirmed squad|قائمة رسمية|الاتحاد|فيفا)/i.test(text);
   const onlyGenericProviders = /(api-football|api_football|isports|fbref|thesportsdb)/i.test(text) && !/(fifa|official|association|federation|قائمة رسمية|الاتحاد|فيفا)/i.test(text);
@@ -509,7 +428,7 @@ function isOfficialOrApprovedDataHubSquad(payload: any) {
 
 async function getDataHubPayloads(payload: any) {
   const limit = Math.min(Math.max(asInt(payload?.limit) || 48, 1), 100);
-  const explicitTeamId = asString(payload?.teamId || payload?.team_id || payload?.dataHubTeamId || payload?.data_hub_team_id);
+  const explicitTeamId = asString(payload?.teamId, payload?.team_id, payload?.dataHubTeamId, payload?.data_hub_team_id);
   if (explicitTeamId) {
     const fullPayload = await getDataHubTeam(explicitTeamId, true);
     if (fullPayload?.ok === false) throw new Error(fullPayload.error || 'Failed to fetch Data Hub team');
@@ -524,7 +443,7 @@ async function getDataHubPayloads(payload: any) {
   const payloads = [];
 
   for (const row of selected) {
-    const identifier = getHubTeamIdentifier(row);
+    const identifier = dataHubTeamId(row);
     if (!identifier) {
       payloads.push(row);
       continue;
@@ -545,13 +464,13 @@ async function importFromDataHub(payload: any) {
 
   for (const teamPayload of payloads) {
     const players = extractDataHubPlayers(teamPayload);
-    const official = isOfficialOrApprovedDataHubSquad(teamPayload);
-    const teamInput: OfficialSquadTeamInput = {
-      teamCode: getDataHubTeamCode(teamPayload),
-      teamName: getDataHubTeamName(teamPayload),
-      teamApiId: getDataHubTeamApiId(teamPayload),
-      sourceName: getSourceName({}, teamPayload),
-      sourceUrl: getSourceUrl({}, teamPayload),
+    const official = isOfficialDataHubSquad(teamPayload);
+    const input: OfficialSquadTeamInput = {
+      teamCode: dataHubTeamCode(teamPayload),
+      teamName: dataHubTeamName(teamPayload),
+      teamApiId: dataHubTeamApiId(teamPayload),
+      sourceName: sourceName({}, teamPayload),
+      sourceUrl: sourceUrl({}, teamPayload),
       replaceExisting,
       allowUnverified,
       requireImages,
@@ -559,26 +478,12 @@ async function importFromDataHub(payload: any) {
     };
 
     if (!official && !allowUnverified) {
-      results.push({
-        ok: false,
-        error: 'unverified_datahub_squad',
-        teamCode: teamInput.teamCode || null,
-        teamName: teamInput.teamName || null,
-        availablePlayers: players.length,
-        imported: 0,
-        skipped: players.length,
-        notice: 'القائمة موجودة في Data Hub لكنها غير معلّمة كمصدر رسمي. استخدم allowUnverified=true فقط بعد مراجعة المصدر يدويًا.',
-      });
+      results.push({ ok: false, error: 'unverified_datahub_squad', teamCode: input.teamCode || null, teamName: input.teamName || null, availablePlayers: players.length, imported: 0, skipped: players.length, notice: 'القائمة موجودة في Data Hub لكنها غير معلّمة كمصدر رسمي. استخدم allowUnverified=true فقط بعد مراجعة المصدر يدويًا.' });
       continue;
     }
 
-    const result = await importOfficialSquad(teamInput);
-    results.push({
-      ...result,
-      dataHubOfficial: official,
-      sourceMode: official ? 'official_or_approved' : 'trusted_data_hub_override',
-      availablePlayers: players.length,
-    });
+    const result = await importOfficialSquad(input);
+    results.push({ ...result, dataHubOfficial: official, sourceMode: official ? 'official_or_approved' : 'trusted_data_hub_override', availablePlayers: players.length });
   }
 
   return {
