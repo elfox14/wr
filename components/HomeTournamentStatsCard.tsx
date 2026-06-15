@@ -52,9 +52,10 @@ type Props = {
 };
 
 const STATS_REFRESH_MS = 60_000;
+const LOADING_VALUE = '...';
 
-function formatCount(value?: number | null) {
-  if (typeof value !== 'number' || !Number.isFinite(value)) return 'غير متوفر';
+function formatCount(value?: number | null, unavailable = 'غير متوفر') {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return unavailable;
   return new Intl.NumberFormat('ar-EG').format(value);
 }
 
@@ -75,11 +76,11 @@ function teamName(team?: { name?: string; code?: string | null } | null) {
   return team?.name || team?.code || 'منتخب غير متوفر';
 }
 
-function StatTile({ value, label, note, href, tone = 'default' }: { value: string; label: string; note: string; href?: string; tone?: 'default' | 'gold' | 'danger' }) {
+function StatTile({ value, label, note, href, tone = 'default', loading = false }: { value: string; label: string; note: string; href?: string; tone?: 'default' | 'gold' | 'danger'; loading?: boolean }) {
   const content = (
     <div className="group relative h-full overflow-hidden rounded-2xl border border-white/10 bg-black/25 p-3 transition hover:-translate-y-0.5 hover:border-[#FFD700]/35 hover:bg-white/[0.06]">
       <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#FFD700]/45 to-transparent opacity-70" />
-      <div className={`text-xl font-black md:text-2xl ${tone === 'danger' ? 'text-red-200' : tone === 'gold' ? 'text-[#FFD700]' : 'text-white'}`}>{value}</div>
+      <div className={`text-xl font-black md:text-2xl ${loading ? 'animate-pulse text-gray-400' : tone === 'danger' ? 'text-red-200' : tone === 'gold' ? 'text-[#FFD700]' : 'text-white'}`}>{value}</div>
       <div className="mt-1 text-[11px] font-black text-[#FFD700]">{label}</div>
       <div className="mt-1 text-[10px] font-bold leading-4 text-gray-400">{note}</div>
     </div>
@@ -122,6 +123,8 @@ export default function HomeTournamentStatsCard({ playersCount, teamsCount, upco
     };
   }, []);
 
+  const isInitialLoading = isLoading && !stats;
+  const loadingNote = 'جاري تحميل بيانات الإحصائيات...';
   const penaltiesAvailable = Boolean(stats?.penalties?.available);
   const biggestScore = stats?.biggestScore || null;
   const playerNote = stats?.rawPlayerRows && stats.rawPlayerRows > (stats.playerCount || 0)
@@ -131,61 +134,69 @@ export default function HomeTournamentStatsCard({ playersCount, teamsCount, upco
   const tiles = useMemo(() => ([
     {
       label: 'عدد اللاعبين',
-      value: formatCount(stats?.playerCount ?? playersCount),
-      note: playerNote,
+      value: formatCount(stats?.playerCount ?? playersCount, isInitialLoading ? LOADING_VALUE : 'غير متوفر'),
+      note: isInitialLoading && !playersCount ? loadingNote : playerNote,
       href: '/players',
       tone: 'default' as const,
+      loading: isInitialLoading && !playersCount,
     },
     {
       label: 'أهداف البطولة',
-      value: formatCount(stats?.totalGoals),
-      note: 'من بداية البطولة حسب نتائج المباريات',
+      value: isInitialLoading ? LOADING_VALUE : formatCount(stats?.totalGoals),
+      note: isInitialLoading ? loadingNote : 'من بداية البطولة حسب نتائج المباريات',
       href: '/matches',
       tone: 'gold' as const,
+      loading: isInitialLoading,
     },
     {
       label: 'كروت صفراء',
-      value: formatCount(stats?.yellowCards),
-      note: 'من snapshots أو أحداث المباراة المتاحة',
+      value: isInitialLoading ? LOADING_VALUE : formatCount(stats?.yellowCards),
+      note: isInitialLoading ? loadingNote : 'من snapshots أو أحداث المباراة المتاحة',
       href: '/matches',
       tone: 'gold' as const,
+      loading: isInitialLoading,
     },
     {
       label: 'كروت حمراء',
-      value: formatCount(stats?.redCards),
-      note: 'من snapshots أو أحداث المباراة المتاحة',
+      value: isInitialLoading ? LOADING_VALUE : formatCount(stats?.redCards),
+      note: isInitialLoading ? loadingNote : 'من snapshots أو أحداث المباراة المتاحة',
       href: '/matches',
       tone: 'danger' as const,
+      loading: isInitialLoading,
     },
     {
       label: 'ركلات الجزاء',
-      value: penaltiesAvailable ? formatCount(stats?.penalties?.total) : 'غير متوفر',
-      note: penaltiesAvailable ? 'مرصودة من أحداث المباراة' : 'غير متوفر في المصادر الحالية',
+      value: isInitialLoading ? LOADING_VALUE : penaltiesAvailable ? formatCount(stats?.penalties?.total) : 'غير متوفر',
+      note: isInitialLoading ? loadingNote : penaltiesAvailable ? 'مرصودة من أحداث المباراة' : 'غير متوفر في المصادر الحالية',
       href: '/matches',
       tone: 'default' as const,
+      loading: isInitialLoading,
     },
     {
       label: 'جزاء مسجل',
-      value: penaltiesAvailable ? formatCount(stats?.penalties?.scored) : 'غير متوفر',
-      note: penaltiesAvailable ? `مهدرة: ${formatCount(stats?.penalties?.missed)} / غير مصنفة: ${formatCount(stats?.penalties?.unknown)}` : 'يظهر عند توفر أحداث الجزاءات',
+      value: isInitialLoading ? LOADING_VALUE : penaltiesAvailable ? formatCount(stats?.penalties?.scored) : 'غير متوفر',
+      note: isInitialLoading ? loadingNote : penaltiesAvailable ? `مهدرة: ${formatCount(stats?.penalties?.missed)} / غير مصنفة: ${formatCount(stats?.penalties?.unknown)}` : 'يظهر عند توفر أحداث الجزاءات',
       href: '/matches',
       tone: 'gold' as const,
+      loading: isInitialLoading,
     },
     {
       label: 'أكبر نتيجة',
-      value: biggestScore ? `${formatCount(biggestScore.homeScore)}-${formatCount(biggestScore.awayScore)}` : 'غير متوفر',
-      note: biggestScore ? `${teamName(biggestScore.homeTeam)} ضد ${teamName(biggestScore.awayTeam)}` : 'تظهر بعد تسجيل نتيجة بها أهداف',
+      value: isInitialLoading ? LOADING_VALUE : biggestScore ? `${formatCount(biggestScore.homeScore)}-${formatCount(biggestScore.awayScore)}` : 'غير متوفر',
+      note: isInitialLoading ? loadingNote : biggestScore ? `${teamName(biggestScore.homeTeam)} ضد ${teamName(biggestScore.awayTeam)}` : 'تظهر بعد تسجيل نتيجة بها أهداف',
       href: biggestScore?.matchId ? `/matches/${encodeURIComponent(biggestScore.matchId)}` : '/matches',
       tone: 'default' as const,
+      loading: isInitialLoading,
     },
     {
       label: 'مباريات منتهية',
-      value: formatCount(stats?.finishedMatches),
-      note: `مباشر الآن: ${formatCount(stats?.liveMatches)} / متبقية: ${formatCount(stats?.scheduledMatches ?? upcomingMatchesCount)}`,
+      value: isInitialLoading ? LOADING_VALUE : formatCount(stats?.finishedMatches),
+      note: isInitialLoading ? loadingNote : `مباشر الآن: ${formatCount(stats?.liveMatches)} / متبقية: ${formatCount(stats?.scheduledMatches ?? upcomingMatchesCount)}`,
       href: '/matches',
       tone: 'default' as const,
+      loading: isInitialLoading,
     },
-  ]), [stats, playersCount, upcomingMatchesCount, penaltiesAvailable, biggestScore, playerNote]);
+  ]), [stats, playersCount, upcomingMatchesCount, penaltiesAvailable, biggestScore, playerNote, isInitialLoading]);
 
   return (
     <section className="mx-auto mb-4 max-w-7xl overflow-hidden rounded-2xl border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(255,215,0,0.13),transparent_28%),linear-gradient(135deg,rgba(7,24,18,0.94),rgba(4,17,13,0.98))] p-3 text-white shadow-[0_18px_46px_rgba(0,0,0,0.32)] backdrop-blur sm:p-4" aria-label="إحصائيات البطولة الحية">
@@ -202,7 +213,7 @@ export default function HomeTournamentStatsCard({ playersCount, teamsCount, upco
         </div>
         <div className="rounded-2xl border border-white/10 bg-black/25 px-3 py-2 text-left text-[10px] font-bold leading-5 text-gray-400">
           <div className="font-black text-[#FFD700]">تحديث تلقائي كل 60 ثانية</div>
-          <div>آخر مصدر: {formatUpdateTime(stats?.latestUpdatedAt || stats?.latestCardsUpdatedAt)}</div>
+          <div>آخر مصدر: {isInitialLoading ? 'جاري التحميل...' : formatUpdateTime(stats?.latestUpdatedAt || stats?.latestCardsUpdatedAt)}</div>
           <div>آخر جلب: {lastClientRefresh ? formatUpdateTime(lastClientRefresh.toISOString()) : isLoading ? 'جاري التحميل...' : 'غير متوفر'}</div>
         </div>
       </div>
@@ -212,8 +223,8 @@ export default function HomeTournamentStatsCard({ playersCount, teamsCount, upco
       </div>
 
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-[10px] font-bold text-gray-500">
-        <span>الفرق المسجلة: {formatCount(stats?.teamCount ?? teamsCount)} منتخب</span>
-        <span>سعة القوائم التقديرية: {formatCount(stats?.estimatedFinalSquadCapacity)} لاعب · المصدر: قاعدة البيانات بعد الدمج</span>
+        <span>الفرق المسجلة: {formatCount(stats?.teamCount ?? teamsCount, isInitialLoading ? LOADING_VALUE : 'غير متوفر')} منتخب</span>
+        <span>سعة القوائم التقديرية: {formatCount(stats?.estimatedFinalSquadCapacity, isInitialLoading ? LOADING_VALUE : 'غير متوفر')} لاعب · المصدر: قاعدة البيانات بعد الدمج</span>
       </div>
     </section>
   );
