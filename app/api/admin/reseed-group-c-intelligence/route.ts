@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/prisma';
+import { seedGroupCFbrefReports } from '@/lib/groupCFbrefStats';
 import { seedTeamIntelligenceReports } from '@/lib/seedTeamIntelligenceReports';
 
 export const dynamic = 'force-dynamic';
@@ -55,18 +56,20 @@ export async function POST(request: Request) {
 
     const deleted = await prisma.teamIntelligenceReport.deleteMany({
       where: {
-        provider: 'MC_PRIME_CURATED',
+        provider: { in: ['MC_PRIME_CURATED', 'FBREF_STATHEAD_SNAPSHOT'] },
         teamId: { in: groupCTeams.map((team) => team.id) },
       },
     });
 
     const seedResult = await seedTeamIntelligenceReports(prisma);
+    const fbrefSeedResult = await seedGroupCFbrefReports(prisma);
 
     return NextResponse.json({
       success: true,
-      deletedCuratedReports: deleted.count,
+      deletedGroupCReports: deleted.count,
       groupCTeams,
-      ...seedResult,
+      curatedSeed: seedResult,
+      fbrefSeed: fbrefSeedResult,
     });
   } catch (error) {
     console.error('Failed to reseed Group C intelligence reports:', error);
@@ -81,7 +84,7 @@ export async function GET(request: Request) {
 
   return NextResponse.json({
     ok: true,
-    message: 'Use POST to delete and reseed curated Group C intelligence reports.',
+    message: 'Use POST to delete and reseed curated + FBref copied-source Group C intelligence reports.',
     groupCCodes: GROUP_C_CODES,
   });
 }
