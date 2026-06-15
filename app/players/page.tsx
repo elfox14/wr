@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import prisma from '@/lib/prisma';
 import { dedupePlayers, hasUsablePlayerImage } from '@/lib/playerDedupe';
+import { Search, User, Trophy, Shield, ChevronLeft, MapPin } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
 
@@ -50,57 +51,73 @@ function PlayerCard({ player }: PlayerCardProps) {
   const initials = player.code || player.name.slice(0, 2);
   const content = (
     <>
-      <div className="flex items-center gap-3">
-        {hasUsablePlayerImage(player.image) ? (
-          <img src={player.image as string} alt={player.name} className="h-14 w-14 rounded-full border border-white/10 object-cover" />
-        ) : (
-          <div className="flex h-14 w-14 items-center justify-center rounded-full border border-white/10 bg-white/10 text-sm font-black text-gray-300">
-            {initials}
+      <div className="relative flex items-center gap-4 z-10">
+        <div className="relative h-16 w-16 shrink-0 rounded-full bg-gradient-to-tr from-white/5 to-white/10 p-0.5 shadow-xl transition-transform duration-300 group-hover:scale-105 group-hover:shadow-[#0FF0FC]/20">
+          <div className="flex h-full w-full items-center justify-center overflow-hidden rounded-full bg-[#0a0a0a]">
+            {hasUsablePlayerImage(player.image) ? (
+              <img src={player.image as string} alt={player.name} className="h-full w-full object-cover" />
+            ) : (
+              <span className="text-lg font-black text-white/50">{initials}</span>
+            )}
           </div>
-        )}
+          {player.team?.image && (
+            <img 
+              src={player.team.image} 
+              alt={player.team.name} 
+              className="absolute -bottom-1 -right-1 h-6 w-6 rounded-full border-2 border-[#111] bg-black object-cover"
+            />
+          )}
+        </div>
 
         <div className="min-w-0 flex-1">
-          <h2 className="truncate font-black text-white group-hover:text-[#0FF0FC]">{player.name}</h2>
-          <p className="mt-1 text-xs font-bold text-gray-400">
-            {player.position || 'مركز غير متوفر'} · {player.code || 'N/A'}
-          </p>
+          <h2 className="truncate text-lg font-black text-white transition-colors duration-300 group-hover:text-[#0FF0FC] drop-shadow-sm">{player.name}</h2>
+          <div className="mt-1 flex items-center gap-2 text-xs font-bold text-gray-400">
+            <span className="flex items-center gap-1"><Shield size={12} className="text-[#0FF0FC]/70"/> {player.position || 'N/A'}</span>
+            <span className="text-white/20">•</span>
+            <span className="font-mono text-white/60">{player.code || 'N/A'}</span>
+          </div>
         </div>
       </div>
 
-      <div className="mt-4 grid grid-cols-2 gap-2 text-xs font-bold text-gray-400">
-        <div className="rounded-xl bg-white/[0.04] p-3">
-          <p className="text-gray-500">المنتخب</p>
-          <p className="mt-1 truncate text-white">{player.team?.name || 'غير متوفر'}</p>
+      <div className="mt-5 grid grid-cols-2 gap-3 z-10 relative">
+        <div className="rounded-xl border border-white/5 bg-gradient-to-br from-white/[0.03] to-transparent p-3 backdrop-blur-sm transition-colors duration-300 group-hover:border-white/10 group-hover:bg-white/[0.05]">
+          <p className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-gray-500"><Trophy size={12}/> المنتخب</p>
+          <p className="mt-1.5 truncate text-sm font-black text-white/90">{player.team?.name || 'غير متوفر'}</p>
         </div>
-        <div className="rounded-xl bg-white/[0.04] p-3">
-          <p className="text-gray-500">العمر</p>
-          <p className="mt-1 text-white">{player.age ?? 'غير متوفر'}</p>
+        <div className="rounded-xl border border-white/5 bg-gradient-to-br from-white/[0.03] to-transparent p-3 backdrop-blur-sm transition-colors duration-300 group-hover:border-white/10 group-hover:bg-white/[0.05]">
+          <p className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-gray-500"><User size={12}/> العمر</p>
+          <p className="mt-1.5 text-sm font-black text-white/90">{player.age ?? 'N/A'}</p>
         </div>
       </div>
 
-      <div className="mt-3 rounded-xl bg-white/[0.04] p-3 text-xs font-bold text-gray-400">
-        <p className="text-gray-500">النادي</p>
-        <p className="mt-1 truncate text-white">{player.club || 'غير متوفر'}</p>
+      <div className="mt-3 rounded-xl border border-white/5 bg-gradient-to-br from-white/[0.03] to-transparent p-3 backdrop-blur-sm transition-colors duration-300 group-hover:border-white/10 group-hover:bg-white/[0.05] z-10 relative">
+        <p className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-gray-500"><MapPin size={12}/> النادي الحالي</p>
+        <p className="mt-1.5 truncate text-sm font-bold text-white/80">{player.club || 'غير متوفر'}</p>
       </div>
 
-      <div className="mt-4 flex items-center justify-between text-xs font-black text-[#0FF0FC]">
-        <span>{player.teamId ? 'افتح داخل صفحة المنتخب' : 'غير مرتبط بمنتخب'}</span>
-        {player.teamId ? (
-          <span aria-hidden="true" className="transition group-hover:translate-x-[-4px]">
-            ←
-          </span>
-        ) : null}
+      <div className="mt-5 flex items-center justify-between border-t border-white/5 pt-4 text-[13px] font-black transition-colors duration-300 z-10 relative">
+        <span className={player.teamId ? "text-gray-400 group-hover:text-[#0FF0FC]" : "text-gray-600"}>
+          {player.teamId ? 'عرض إحصائيات اللاعب' : 'غير مرتبط بمنتخب'}
+        </span>
+        {player.teamId && (
+          <ChevronLeft size={16} className="text-gray-500 transition-all duration-300 group-hover:-translate-x-1 group-hover:text-[#0FF0FC]" />
+        )}
       </div>
+
+      {/* Decorative background glow */}
+      <div className="absolute inset-0 z-0 bg-gradient-to-br from-[#0FF0FC]/0 via-transparent to-[#0FF0FC]/0 opacity-0 transition-opacity duration-500 group-hover:from-[#0FF0FC]/[0.03] group-hover:to-transparent group-hover:opacity-100 rounded-2xl pointer-events-none" />
     </>
   );
 
+  const baseClasses = "relative group block overflow-hidden rounded-2xl border border-white/10 bg-[#111111]/80 p-5 backdrop-blur-md transition-all duration-300";
+
   if (!player.teamId) {
-    return <article className="rounded-2xl border border-white/10 bg-black/25 p-4 opacity-90">{content}</article>;
+    return <article className={`${baseClasses} opacity-80 grayscale-[30%]`}>{content}</article>;
   }
 
   return (
     <Link
-      className="group block rounded-2xl border border-white/10 bg-black/25 p-4 transition hover:-translate-y-1 hover:border-[#0FF0FC]/60 hover:bg-white/[0.06]"
+      className={`${baseClasses} hover:-translate-y-1.5 hover:border-[#0FF0FC]/30 hover:shadow-[0_8px_30px_rgb(0,0,0,0.5)] hover:shadow-[#0FF0FC]/10`}
       href={`/teams/${player.teamId}?player=${player.id}`}
     >
       {content}
@@ -171,96 +188,120 @@ export default async function PlayersPage({ searchParams }: Props) {
   const hasActiveFilters = Boolean(query || selectedTeam || selectedPosition);
 
   return (
-    <main className="mx-auto max-w-7xl px-4 py-8 text-white sm:px-6 lg:px-8">
-      <section className="overflow-hidden rounded-3xl border border-white/10 bg-white/[0.04] p-6 shadow-2xl shadow-black/30">
-        <p className="text-sm font-black uppercase tracking-[0.28em] text-[#0FF0FC]">World Cup Players</p>
-        <div className="mt-3 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <h1 className="text-3xl font-black md:text-5xl">دليل اللاعبين</h1>
-            <p className="mt-4 max-w-3xl leading-8 text-gray-300">
-              تصفح اللاعبين المسجلين على المنصة، وابحث حسب الاسم أو المنتخب أو المركز للوصول السريع لملف اللاعب داخل صفحة منتخب بلاده.
+    <main className="mx-auto max-w-[90rem] px-4 py-8 sm:px-6 lg:px-8 xl:py-12">
+      {/* Hero Section */}
+      <section className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-[#0a0a0a] px-6 py-12 sm:px-12 sm:py-16 shadow-2xl">
+        {/* Abstract Background Elements */}
+        <div className="absolute -top-40 -right-40 h-[500px] w-[500px] rounded-full bg-[#0FF0FC]/10 blur-[120px] pointer-events-none" />
+        <div className="absolute -bottom-40 -left-40 h-[500px] w-[500px] rounded-full bg-blue-600/10 blur-[120px] pointer-events-none" />
+        <div className="absolute inset-0 bg-[url('/noise.png')] opacity-[0.03] mix-blend-overlay pointer-events-none" />
+        
+        <div className="relative z-10 flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between">
+          <div className="max-w-3xl">
+            <div className="inline-flex items-center gap-2 rounded-full border border-[#0FF0FC]/30 bg-[#0FF0FC]/10 px-4 py-1.5 text-xs font-black uppercase tracking-widest text-[#0FF0FC] shadow-[0_0_15px_rgba(15,240,252,0.2)]">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#0FF0FC] opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-[#0FF0FC]"></span>
+              </span>
+              World Cup Athletes
+            </div>
+            <h1 className="mt-6 text-4xl font-black tracking-tight text-white sm:text-5xl lg:text-6xl">
+              دليل اللاعبين <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#0FF0FC] to-blue-400">الشامل</span>
+            </h1>
+            <p className="mt-6 text-lg leading-relaxed text-gray-400">
+              تصفح قاعدة بيانات النخبة. ابحث عن نجومك المفضلين حسب المنتخب أو المركز للوصول السريع إلى إحصائياتهم وأدائهم المالي في البورصة.
             </p>
-            {hiddenDuplicates > 0 ? (
-              <p className="mt-3 text-sm font-bold text-cyan-100">
-                تم دمج {hiddenDuplicates} نسخة مكررة في العرض حتى لا يظهر اللاعب أكثر من مرة.
-              </p>
-            ) : null}
+            {hiddenDuplicates > 0 && (
+              <div className="mt-6 inline-flex items-center gap-2 rounded-xl bg-white/5 px-4 py-2 text-xs font-bold text-gray-300 border border-white/5 backdrop-blur-sm">
+                <Shield size={14} className="text-[#0FF0FC]" />
+                <span>تم دمج {hiddenDuplicates} نسخة مكررة للحفاظ على دقة البيانات.</span>
+              </div>
+            )}
           </div>
-          <div className="rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm font-bold text-gray-300">
-            <span className="text-2xl font-black text-white">{players.length}</span> لاعب ظاهر
+          
+          <div className="flex shrink-0 flex-col items-center justify-center rounded-2xl border border-white/10 bg-black/40 px-8 py-6 backdrop-blur-md shadow-inner">
+            <span className="text-4xl font-black text-white drop-shadow-[0_0_10px_rgba(255,255,255,0.3)]">{players.length}</span>
+            <span className="mt-1 text-sm font-bold uppercase tracking-wider text-gray-500">لاعب متاح</span>
           </div>
         </div>
       </section>
 
-      <section className="mt-6 rounded-3xl border border-white/10 bg-black/25 p-4">
-        <form className="grid gap-3 md:grid-cols-[minmax(0,1.4fr)_minmax(180px,0.7fr)_minmax(160px,0.6fr)_auto]" method="GET">
-          <label className="flex flex-col gap-2 text-sm font-bold text-gray-300">
-            بحث
+      {/* Filters Section */}
+      <section className="mt-8 rounded-3xl border border-white/10 bg-[#111111]/60 p-5 backdrop-blur-xl sticky top-4 z-40 shadow-2xl shadow-black/50">
+        <form className="grid gap-4 md:grid-cols-[1fr_200px_200px_auto]" method="GET">
+          <div className="relative group">
+            <div className="absolute inset-y-0 right-4 flex items-center pointer-events-none text-gray-500 group-focus-within:text-[#0FF0FC] transition-colors">
+              <Search size={18} />
+            </div>
             <input
-              className="rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-3 text-white outline-none placeholder:text-gray-500 focus:border-[#0FF0FC]"
+              className="w-full rounded-2xl border border-white/10 bg-black/50 py-3.5 pr-12 pl-4 text-sm font-bold text-white outline-none placeholder:text-gray-600 focus:border-[#0FF0FC]/50 focus:bg-black focus:ring-2 focus:ring-[#0FF0FC]/20 transition-all"
               defaultValue={query}
               name="q"
-              placeholder="اسم اللاعب، المنتخب، النادي..."
+              placeholder="ابحث بالاسم، المنتخب، أو النادي..."
               type="search"
             />
-          </label>
+          </div>
 
-          <label className="flex flex-col gap-2 text-sm font-bold text-gray-300">
-            المنتخب
+          <div className="relative">
             <select
-              className="rounded-2xl border border-white/10 bg-[#111] px-4 py-3 text-white outline-none focus:border-[#0FF0FC]"
+              className="w-full appearance-none rounded-2xl border border-white/10 bg-black/50 py-3.5 px-4 text-sm font-bold text-white outline-none focus:border-[#0FF0FC]/50 focus:bg-black focus:ring-2 focus:ring-[#0FF0FC]/20 transition-all cursor-pointer"
               defaultValue={selectedTeam}
               name="team"
             >
-              <option value="">كل المنتخبات</option>
+              <option value="">🌍 كل المنتخبات</option>
               {teams.map((team) => (
                 <option key={team.id} value={team.id}>
-                  {team.name}{team.code ? ` · ${team.code}` : ''}
+                  {team.name}{team.code ? ` (${team.code})` : ''}
                 </option>
               ))}
             </select>
-          </label>
+          </div>
 
-          <label className="flex flex-col gap-2 text-sm font-bold text-gray-300">
-            المركز
+          <div className="relative">
             <select
-              className="rounded-2xl border border-white/10 bg-[#111] px-4 py-3 text-white outline-none focus:border-[#0FF0FC]"
+              className="w-full appearance-none rounded-2xl border border-white/10 bg-black/50 py-3.5 px-4 text-sm font-bold text-white outline-none focus:border-[#0FF0FC]/50 focus:bg-black focus:ring-2 focus:ring-[#0FF0FC]/20 transition-all cursor-pointer"
               defaultValue={selectedPosition}
               name="position"
             >
-              <option value="">كل المراكز</option>
+              <option value="">🎯 كل المراكز</option>
               {positions.map((position) => (
                 <option key={position} value={position}>
                   {position}
                 </option>
               ))}
             </select>
-          </label>
+          </div>
 
-          <div className="flex items-end gap-2">
-            <button className="h-12 rounded-2xl bg-[#0FF0FC] px-5 text-sm font-black text-black transition hover:scale-[1.02]" type="submit">
-              تطبيق
+          <div className="flex items-center gap-3">
+            <button className="h-[52px] rounded-2xl bg-gradient-to-r from-[#0FF0FC] to-[#00D4FF] px-8 text-sm font-black text-black shadow-[0_0_20px_rgba(15,240,252,0.3)] transition-all hover:scale-105 hover:shadow-[0_0_30px_rgba(15,240,252,0.5)] active:scale-95" type="submit">
+              تطبيق الفلاتر
             </button>
-            {hasActiveFilters ? (
-              <Link className="flex h-12 items-center rounded-2xl border border-white/10 px-5 text-sm font-black text-white hover:bg-white/10" href="/players">
-                مسح
+            {hasActiveFilters && (
+              <Link className="flex h-[52px] items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-6 text-sm font-black text-white hover:bg-white/10 hover:text-red-400 hover:border-red-500/30 transition-all" href="/players">
+                إلغاء
               </Link>
-            ) : null}
+            )}
           </div>
         </form>
       </section>
 
-      {players.length ? (
-        <section className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+      {/* Players Grid */}
+      {players.length > 0 ? (
+        <section className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
           {players.map((player) => (
             <PlayerCard key={player.id} player={player} />
           ))}
         </section>
       ) : (
-        <section className="mt-6 rounded-3xl border border-dashed border-white/15 bg-black/25 p-8 text-center">
-          <h2 className="text-2xl font-black">لا توجد نتائج مطابقة</h2>
-          <p className="mt-3 text-gray-400">جرّب تغيير اسم البحث أو مسح فلاتر المنتخب والمركز.</p>
-          <Link className="mt-5 inline-flex rounded-2xl bg-white px-5 py-3 text-sm font-black text-black" href="/players">
+        <section className="mt-12 flex flex-col items-center justify-center rounded-[2rem] border border-dashed border-white/10 bg-black/20 px-4 py-20 text-center backdrop-blur-sm">
+          <div className="rounded-full bg-white/5 p-6 mb-6 border border-white/10">
+            <Search size={48} className="text-gray-500" />
+          </div>
+          <h2 className="text-3xl font-black text-white">لم يتم العثور على نتائج</h2>
+          <p className="mt-4 max-w-md text-gray-400 leading-relaxed">
+            لم نتمكن من العثور على أي لاعب يطابق معايير البحث الحالية. جرب استخدام كلمات مفتاحية مختلفة أو إزالة بعض الفلاتر.
+          </p>
+          <Link className="mt-8 inline-flex items-center gap-2 rounded-2xl bg-white px-8 py-4 text-sm font-black text-black transition-transform hover:scale-105 active:scale-95" href="/players">
             عرض كل اللاعبين
           </Link>
         </section>
