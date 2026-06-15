@@ -32,6 +32,41 @@ const POSITION_PRIORITY: Record<string, number> = {
   FW: 3,
 };
 
+const FLAG_OR_TEAM_IMAGE_HOSTS = [
+  'flagcdn.com',
+  'flagsapi.com',
+  'countryflagsapi.com',
+  'hatscripts.github.io',
+];
+
+const FLAG_OR_TEAM_IMAGE_PATH_MARKERS = [
+  '/flags/',
+  '/flag/',
+  '/country/',
+  '/countries/',
+  '/football/teams/',
+  '/football/team/',
+  '/teams/',
+  '/team/',
+  '/logos/',
+  '/logo/',
+  '/badges/',
+  '/badge/',
+  '/crests/',
+  '/crest/',
+];
+
+const PLAYER_IMAGE_PATH_MARKERS = [
+  '/players/',
+  '/player/',
+  '/athletes/',
+  '/athlete/',
+  '/people/',
+  '/person/',
+  '/profile/',
+  '/avatar/',
+];
+
 function stripAccents(value: string) {
   return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 }
@@ -41,10 +76,40 @@ export function isLikelyEmoji(value?: string | null) {
   return Boolean(text && text.length <= 8 && /[\u{1F1E6}-\u{1F1FF}]{2}|[\u{1F300}-\u{1FAFF}]|[\u{2600}-\u{27BF}]/u.test(text));
 }
 
+function parsedImageUrl(value: string) {
+  try {
+    return new URL(value.startsWith('//') ? `https:${value}` : value, 'https://worldcup.mcprim.com');
+  } catch {
+    return null;
+  }
+}
+
+export function isLikelyFlagOrTeamImage(value?: string | null) {
+  const image = String(value || '').trim().toLowerCase();
+  if (!image || isLikelyEmoji(image)) return true;
+
+  const parsed = parsedImageUrl(image);
+  const host = parsed?.hostname || '';
+  const path = parsed?.pathname || image;
+
+  if (FLAG_OR_TEAM_IMAGE_HOSTS.some((marker) => host.includes(marker))) return true;
+  if (FLAG_OR_TEAM_IMAGE_PATH_MARKERS.some((marker) => path.includes(marker))) return true;
+  if (/\b(flag|country|national-team|team-logo|badge|crest)\b/.test(image)) return true;
+
+  return false;
+}
+
 export function hasUsablePlayerImage(value?: string | null) {
   const image = String(value || '').trim();
   if (!image || image === '👤' || image === '🏳️' || isLikelyEmoji(image)) return false;
-  return image.startsWith('http://') || image.startsWith('https://') || image.startsWith('/');
+  if (!(image.startsWith('http://') || image.startsWith('https://') || image.startsWith('/'))) return false;
+  if (isLikelyFlagOrTeamImage(image)) return false;
+
+  const lower = image.toLowerCase();
+  if (PLAYER_IMAGE_PATH_MARKERS.some((marker) => lower.includes(marker))) return true;
+
+  // Keep generic CDN photos only after excluding known flag/team-logo patterns.
+  return true;
 }
 
 function normalizePlayerName(value?: string | null) {
