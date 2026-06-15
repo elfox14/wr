@@ -1,7 +1,8 @@
-/* Brand logo override: replace any old MC PRIME icon references with the official World Cup 2026 platform logo. */
+/* Brand logo override: replace any old MC PRIME icon references with the current World Cup 2026 platform logo. */
 img[src*="/brand/logo-horizontal.png"],
 img[src*="/brand/logo-icon.png"],
-img[src*="/brand/logo-icon-new.svg"] {
-  content: url('/brand/worldcup-2026-logo.svg?v=20260614c') !important;
+img[src*="/brand/logo-icon-new.svg"],
+img[src*="/brand/worldcup-2026-logo.svg"] {
+  content: url('/brand/worldcup-2026-logo-upload.svg?v=20260615a') !important;
   object-fit: contain !important;
 }
