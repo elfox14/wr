@@ -1,8 +1,8 @@
 import prisma from '@/lib/prisma';
 import { extractDataHubArray, getDataHubTeam, getDataHubTeams, getDataHubSummary, getDataHubReadiness, getDataHubSources, unwrapDataHubData } from '@/lib/mcPrimeDataHub';
 
-const OFFICIAL_PLAYER_SOURCE_POLICY = 'OFFICIAL_WORLD_CUP_SQUADS_ONLY';
-const EXTERNAL_PLAYER_IMPORT_NOTICE = 'External provider squads and player statistics are ignored. Official World Cup squads must be imported through a separate approved official-squad workflow.';
+const OFFICIAL_PLAYER_SOURCE_POLICY = 'APPROVED_SQUAD_SOURCES_ONLY';
+const EXTERNAL_PLAYER_IMPORT_NOTICE = 'Data Hub and generic API-Football squads are ignored for players. football-data.org may be used later only through a separate approved fallback or verification workflow when official squad data is missing or needs review.';
 
 function first<T = any>(...values: any[]): T | null {
   for (const value of values) {
