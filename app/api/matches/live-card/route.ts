@@ -15,7 +15,6 @@ const MATCH_SELECT = {
   homeScore: true,
   awayScore: true,
   groupPhase: true,
-  group: true,
   stage: true,
   homeTeam: { select: TEAM_SELECT },
   awayTeam: { select: TEAM_SELECT },
@@ -51,7 +50,7 @@ function isFinishedStatus(status: string) {
 }
 
 function isGroupStage(match: any) {
-  const value = String(match.groupPhase || match.group || match.stage || '').toUpperCase();
+  const value = String(match.groupPhase || match.stage || '').toUpperCase();
   return value.includes('GROUP');
 }
 
