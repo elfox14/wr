@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import prisma from '@/lib/prisma';
-import { getTeamFlag } from '@/lib/teamFlags';
+import { getTeamFlagUrl } from '@/lib/teamFlags';
 
 export const dynamic = 'force-dynamic';
 
@@ -149,7 +149,7 @@ export default async function TeamsPage({ searchParams }: Props) {
       {teams.length ? (
         <section className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {teams.map((team) => {
-            const flag = getTeamFlag(team);
+            const flagUrl = getTeamFlagUrl(team, 80);
 
             return (
               <Link
@@ -158,8 +158,12 @@ export default async function TeamsPage({ searchParams }: Props) {
                 href={`/teams/${team.id}`}
               >
                 <div className="flex items-center gap-3">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-white/10 text-3xl shadow-inner shadow-black/20">
-                    {flag || <span className="text-sm font-black text-gray-300">{team.code || team.name.slice(0, 2)}</span>}
+                  <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-white/10 shadow-inner shadow-black/20">
+                    {flagUrl ? (
+                      <img src={flagUrl} alt={`علم ${team.name}`} className="h-full w-full object-cover" loading="lazy" />
+                    ) : (
+                      <span className="text-sm font-black text-gray-300">{team.code || team.name.slice(0, 2)}</span>
+                    )}
                   </div>
                   <div className="min-w-0 flex-1">
                     <h2 className="truncate font-black text-white group-hover:text-[#0FF0FC]">{team.name}</h2>
