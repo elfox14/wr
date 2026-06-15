@@ -47,13 +47,13 @@ export function Navbar() {
             </div>
 
             <div className="flex min-w-0 flex-1 items-center justify-end gap-1.5 lg:hidden">
-              <div className="flex min-w-0 items-center gap-1 overflow-x-auto rounded-2xl border border-white/10 bg-white/[0.035] p-1 mobile-scrollbar">
+              <div className="flex min-w-0 items-center gap-1.5 overflow-x-auto rounded-2xl border border-white/10 bg-white/[0.035] p-1.5 mobile-scrollbar">
                 {primaryMobileLinks.map(([href, label]) => (
                   <Link
                     key={href}
                     href={href}
                     onClick={closeMenu}
-                    className={`shrink-0 rounded-xl px-2.5 py-2 text-[11px] font-black transition ${href === '/animation-live' ? 'bg-red-500/15 text-red-100' : 'text-gray-200 hover:bg-white/10 hover:text-white'}`}
+                    className={`shrink-0 rounded-xl px-3 py-2.5 text-xs font-black transition ${href === '/animation-live' ? 'bg-red-500/15 text-red-100' : 'text-gray-200 hover:bg-white/10 hover:text-white'}`}
                   >
                     {label}
                   </Link>
@@ -75,13 +75,13 @@ export function Navbar() {
           {isOpen && (
             <div className="pb-3 lg:hidden">
               <div className="overflow-hidden rounded-2xl border border-white/10 bg-[#07111f]/95 shadow-[0_18px_42px_rgba(0,0,0,0.34)]">
-                <div className="grid grid-cols-2 gap-1.5 p-2">
+                <div className="grid grid-cols-2 gap-1.5 p-2 max-h-[60vh] overflow-y-auto">
                   {links.map(([href, label]) => (
                     <Link
                       key={href}
                       href={href}
                       onClick={closeMenu}
-                      className={`rounded-xl border px-3 py-3 text-center text-xs font-black transition active:scale-[0.98] ${href === '/animation-live' ? 'border-red-300/20 bg-red-500/10 text-red-100' : 'border-white/10 bg-white/[0.045] text-gray-100 hover:border-[#0FF0FC]/30 hover:bg-white/[0.075]'}`}
+                      className={`rounded-xl border px-3 py-3.5 text-center text-xs font-black transition active:scale-[0.98] ${href === '/animation-live' ? 'border-red-300/20 bg-red-500/10 text-red-100' : 'border-white/10 bg-white/[0.045] text-gray-100 hover:border-[#0FF0FC]/30 hover:bg-white/[0.075]'}`}
                     >
                       {label}
                     </Link>

@@ -74,7 +74,7 @@ export default function TeamStatsOverview({ team, matches = [] }: { team: any; m
       )}
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <div className="bg-[#111] border border-white/10 rounded-2xl p-6">
+        <div className="bg-[#111] border border-white/10 rounded-2xl p-4 sm:p-5 md:p-6">
           <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
             <span className="w-2 h-2 bg-green-500 rounded-full"></span>
             مؤشرات هجومية
@@ -87,7 +87,7 @@ export default function TeamStatsOverview({ team, matches = [] }: { team: any; m
           </div>
         </div>
 
-        <div className="bg-[#111] border border-white/10 rounded-2xl p-6">
+        <div className="bg-[#111] border border-white/10 rounded-2xl p-4 sm:p-5 md:p-6">
           <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
             <span className="w-2 h-2 bg-red-500 rounded-full"></span>
             مؤشرات دفاعية
@@ -100,7 +100,7 @@ export default function TeamStatsOverview({ team, matches = [] }: { team: any; m
           </div>
         </div>
 
-        <div className="bg-[#111] border border-white/10 rounded-2xl p-6">
+        <div className="bg-[#111] border border-white/10 rounded-2xl p-4 sm:p-5 md:p-6">
           <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
             <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
             مؤشرات التحكم
@@ -121,9 +121,9 @@ function StatRow({ label, value, max, current }: { label: string; value: string 
   const width = current === null ? 0 : Math.max(4, Math.min(100, Math.round((current / Math.max(max, 1)) * 100)));
   return (
     <div>
-      <div className="flex justify-between text-sm mb-1">
-        <span className="text-gray-300">{label}</span>
-        <span className="font-bold">{value}</span>
+      <div className="flex justify-between items-end gap-3 text-sm mb-1">
+        <span className="text-gray-300 truncate">{label}</span>
+        <span className="font-bold shrink-0">{value}</span>
       </div>
       <div className="h-1.5 w-full bg-white/10 rounded-full overflow-hidden">
         <div className="h-full bg-white rounded-full" style={{ width: `${width}%` }} />
