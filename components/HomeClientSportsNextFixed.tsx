@@ -47,6 +47,10 @@ function formatCount(value?: number, fallback = 0) {
   return new Intl.NumberFormat('ar-EG').format(typeof value === 'number' && Number.isFinite(value) ? value : fallback);
 }
 
+function formatScore(value?: number | null) {
+  return typeof value === 'number' && Number.isFinite(value) ? new Intl.NumberFormat('en-US').format(value) : '—';
+}
+
 function teamLabel(team?: Team | null) {
   return team?.name || team?.code || 'منتخب غير محدد';
 }
@@ -77,8 +81,16 @@ function normalizeStatus(match?: HomeMatch | null) {
   return String(match?.displayStatus || match?.status || '').toUpperCase();
 }
 
+function formatGroupLabel(value?: string | null) {
+  const raw = String(value || '').trim();
+  if (!raw) return 'كأس العالم 2026';
+  const groupLetter = raw.match(/^group[_\s-]*([a-z])$/i);
+  if (groupLetter?.[1]) return groupLetter[1].toUpperCase();
+  return raw;
+}
+
 function matchGroup(match: HomeMatch) {
-  return match.groupPhase || match.group || match.stage || 'كأس العالم 2026';
+  return formatGroupLabel(match.groupPhase || match.group || match.stage);
 }
 
 function matchTime(match: HomeMatch) {
@@ -195,17 +207,6 @@ function TeamFlag({ team }: { team?: Team | null }) {
   );
 }
 
-function TeamScoreBadge({ team, score, align }: { team?: Team | null; score?: number | null; align: 'right' | 'left' }) {
-  return (
-    <div className={`mb-1.5 inline-flex items-center gap-1.5 ${align === 'left' ? 'flex-row-reverse' : ''}`}>
-      <TeamFlag team={team} />
-      <span className="flex h-8 min-w-8 items-center justify-center rounded-xl border border-[#FFD700]/25 bg-[#FFD700]/10 px-2 text-sm font-black text-[#FFD700] shadow-[0_0_16px_rgba(255,215,0,0.08)]">
-        {typeof score === 'number' && Number.isFinite(score) ? formatCount(score) : '—'}
-      </span>
-    </div>
-  );
-}
-
 function CountdownUnit({ value, label }: { value: number; label: string }) {
   return (
     <span className="flex min-w-[2.25rem] flex-col items-center justify-center rounded-lg border border-[#FFD700]/20 bg-black/25 px-1.5 py-1 leading-none shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
@@ -267,17 +268,37 @@ function InlineMatchTimer({ match, now }: { match: HomeMatch; now: Date }) {
   );
 }
 
-function TeamSide({ team, score, align }: { team?: Team | null; score?: number | null; align: 'right' | 'left' }) {
+function TeamSide({ team, align }: { team?: Team | null; align: 'right' | 'left' }) {
   return (
     <Link
       href={getTeamHref(team)}
       className={`group/team block min-w-0 rounded-2xl border border-transparent p-1.5 transition hover:border-[#FFD700]/25 hover:bg-white/[0.055] ${align === 'right' ? 'text-right' : 'text-left'}`}
       title={`فتح صفحة ${teamLabel(team)}`}
     >
-      <TeamScoreBadge team={team} score={score} align={align} />
+      <div className={`mb-1.5 inline-flex items-center gap-1.5 ${align === 'left' ? 'flex-row-reverse' : ''}`}>
+        <TeamFlag team={team} />
+      </div>
       <h3 className="truncate text-sm font-black text-white transition group-hover/team:text-[#FFD700]">{teamLabel(team)}</h3>
       <p className="mt-0.5 text-[11px] font-bold text-gray-500 transition group-hover/team:text-gray-300">{teamCode(team)}</p>
     </Link>
+  );
+}
+
+function ScoreBox({ value }: { value?: number | null }) {
+  return (
+    <span className="flex h-10 min-w-10 items-center justify-center rounded-xl border border-[#FFD700]/30 bg-[#FFD700]/10 px-2 text-lg font-black leading-none text-[#FFD700] shadow-[0_0_16px_rgba(255,215,0,0.08)]" dir="ltr">
+      {formatScore(value)}
+    </span>
+  );
+}
+
+function MatchScoreCenter({ homeScore, awayScore }: { homeScore?: number | null; awayScore?: number | null }) {
+  return (
+    <div className="flex min-w-[5.75rem] items-center justify-center gap-1.5 rounded-2xl border border-white/10 bg-black/30 px-2 py-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]" aria-label="نتيجة المباراة" dir="ltr">
+      <ScoreBox value={homeScore} />
+      <span className="h-6 w-px rounded-full bg-white/15" />
+      <ScoreBox value={awayScore} />
+    </div>
   );
 }
 
@@ -286,19 +307,15 @@ function MatchCard({ match, now }: { match: HomeMatch; now: Date }) {
     <article className="relative overflow-hidden rounded-2xl border border-white/10 bg-black/30 p-3 shadow-[0_14px_34px_rgba(0,0,0,0.18)] transition hover:border-[#0FF0FC]/35 hover:bg-white/[0.055]">
       <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#0FF0FC]/55 to-transparent opacity-70" />
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <span className="rounded-full border border-[#FFD700]/20 bg-[#FFD700]/10 px-2.5 py-1 text-[11px] font-black text-[#FFD700]">{matchGroup(match)}</span>
+        <span className="flex h-7 min-w-7 items-center justify-center rounded-full border border-[#FFD700]/20 bg-[#FFD700]/10 px-2 text-[11px] font-black text-[#FFD700]">{matchGroup(match)}</span>
         <InlineMatchTimer match={match} now={now} />
         <span className="rounded-full border border-white/10 bg-white/[0.05] px-2.5 py-1 text-[11px] font-black text-gray-300">{formatMatchDate(match.matchDate)}</span>
       </div>
 
-      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
-        <TeamSide team={match.homeTeam} score={match.homeScore} align="right" />
-
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#0FF0FC]/20 bg-[#0FF0FC]/10 text-xs font-black text-[#0FF0FC]">
-          ضد
-        </div>
-
-        <TeamSide team={match.awayTeam} score={match.awayScore} align="left" />
+      <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2">
+        <TeamSide team={match.homeTeam} align="right" />
+        <MatchScoreCenter homeScore={match.homeScore} awayScore={match.awayScore} />
+        <TeamSide team={match.awayTeam} align="left" />
       </div>
 
       <div className="mt-3 grid grid-cols-2 gap-2">
