@@ -4,7 +4,7 @@ import { clearPlaceholderApiFootballIds } from '@/lib/dataHubMaintenance';
 
 export const dynamic = 'force-dynamic';
 
-const officialSquadNotice = 'Official World Cup squads are managed separately. Data Hub general squad imports are disabled.';
+const squadImportNotice = 'Data Hub general squad imports are disabled. football-data.org remains available only through a separate approved fallback or verification workflow when needed.';
 
 function getBearerToken(request: Request) {
   const authorization = request.headers.get('authorization') || '';
@@ -38,9 +38,9 @@ async function run(request: Request) {
       return NextResponse.json({
         ok: false,
         mode,
-        error: 'mode=team is disabled because it may import general provider squads.',
+        error: 'mode=team is disabled because it may import general Data Hub provider squads.',
         squadImportDisabled: true,
-        squadImportNotice: officialSquadNotice,
+        squadImportNotice,
       }, { status: 409 });
     }
 
@@ -54,7 +54,7 @@ async function run(request: Request) {
         requestedFull,
         full: false,
         squadImportDisabled: true,
-        squadImportNotice: officialSquadNotice,
+        squadImportNotice,
         maintenance,
       });
     }
