@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 
 const LIVE_STATUSES = ['IN_PLAY', 'LIVE', 'HT'];
+const SCHEDULED_STATUSES = ['SCHEDULED', 'TIMED', 'NOT_STARTED', 'NS'];
+const FINISHED_STATUSES = ['FINISHED', 'FT', 'AET', 'PEN'];
 const GROUP_STAGE_MAX_LIVE_MINUTES = 115;
 const KNOCKOUT_MAX_LIVE_MINUTES = 150;
 
@@ -26,6 +28,10 @@ function duplicateFamilyKey(match: any) {
   return `teams:${teamsKey(match)}:${dayHourKey(match.matchDate)}`;
 }
 
+function normalizeStatus(value?: string | null) {
+  return String(value || '').toUpperCase();
+}
+
 function isGroupStage(match: any) {
   const value = String(match.groupPhase || match.group || match.stage || '').toUpperCase();
   return value.includes('GROUP');
@@ -35,26 +41,79 @@ function maxLiveMinutes(match: any) {
   return isGroupStage(match) ? GROUP_STAGE_MAX_LIVE_MINUTES : KNOCKOUT_MAX_LIVE_MINUTES;
 }
 
-function isStaleLive(match: any, now = Date.now()) {
-  const status = String(match.status || '').toUpperCase();
-  if (!LIVE_STATUSES.includes(status)) return false;
+function minutesFromKickoff(match: any, now = Date.now()) {
   const matchTime = new Date(match.matchDate).getTime();
-  if (!Number.isFinite(matchTime)) return false;
-  return now - matchTime > maxLiveMinutes(match) * 60 * 1000;
+  if (!Number.isFinite(matchTime)) return null;
+  return Math.floor((now - matchTime) / 60_000) + 1;
+}
+
+function isOfficialFinished(match: any) {
+  return FINISHED_STATUSES.includes(normalizeStatus(match.status || match.displayStatus));
+}
+
+function isScheduledStatus(status?: string | null) {
+  return SCHEDULED_STATUSES.includes(normalizeStatus(status));
+}
+
+function isLiveStatus(status?: string | null) {
+  return LIVE_STATUSES.includes(normalizeStatus(status));
+}
+
+function isStaleByTime(match: any, now = Date.now()) {
+  const minute = minutesFromKickoff(match, now);
+  if (minute === null) return false;
+  return minute >= maxLiveMinutes(match);
+}
+
+function isLikelyLiveByTime(match: any, now = Date.now()) {
+  if (isOfficialFinished(match)) return false;
+  if (!isScheduledStatus(match.status)) return false;
+  const minute = minutesFromKickoff(match, now);
+  if (minute === null) return false;
+  return minute >= 1 && minute < maxLiveMinutes(match);
 }
 
 function normalizeMatchForDisplay(match: any, now = Date.now()) {
-  if (!isStaleLive(match, now)) return match;
-  return {
-    ...match,
-    status: 'FINISHED',
-    displayStatus: 'FINISHED',
-    isStaleAutoFinished: true,
-  };
+  const status = normalizeStatus(match.status);
+  const minute = minutesFromKickoff(match, now);
+
+  if (!isOfficialFinished(match) && (isLiveStatus(status) || isScheduledStatus(status)) && isStaleByTime(match, now)) {
+    return {
+      ...match,
+      status: 'FINISHED',
+      displayStatus: 'FINISHED',
+      isLiveNow: false,
+      isLikelyLiveByTime: false,
+      isStaleAutoFinished: true,
+    };
+  }
+
+  if (isLikelyLiveByTime(match, now)) {
+    const safeMinute = minute ? Math.max(1, Math.min(130, minute)) : null;
+    return {
+      ...match,
+      displayStatus: 'IN_PLAY',
+      isLiveNow: true,
+      isLikelyLiveByTime: true,
+      minute: safeMinute,
+      liveLabel: safeMinute ? `الدقيقة ${safeMinute}` : 'مباشر الآن',
+    };
+  }
+
+  if (isLiveStatus(status)) {
+    return {
+      ...match,
+      displayStatus: status,
+      isLiveNow: true,
+      isLikelyLiveByTime: false,
+    };
+  }
+
+  return match;
 }
 
 function rankMatch(match: any) {
-  const status = String(match.status || '').toUpperCase();
+  const status = normalizeStatus(match.displayStatus || match.status);
   const statusRank = status === 'IN_PLAY' || status === 'LIVE' || status === 'HT' ? 50 : status === 'FINISHED' ? 30 : 10;
   const animationRank = match.animationMatchId ? 20 : 0;
   const externalRank = match.externalId ? 5 : 0;
@@ -125,7 +184,7 @@ export async function GET() {
     const documentedMinutes = await latestDocumentedMinutes(matches.map((match) => match.id));
     const enrichedMatches = matches.map((match) => {
       const minute = documentedMinutes.get(match.id);
-      return minute ? { ...match, minute, liveLabel: 'مباشر الآن' } : match;
+      return minute ? { ...match, minute, displayStatus: 'IN_PLAY', isLiveNow: true, liveLabel: `الدقيقة ${minute}` } : match;
     });
 
     return NextResponse.json(dedupeMatches(enrichedMatches), { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } });
