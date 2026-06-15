@@ -41,6 +41,8 @@ type Props = {
   [key: string]: unknown;
 };
 
+const MATCH_REFRESH_MS = 60_000;
+
 function formatCount(value?: number, fallback = 0) {
   return new Intl.NumberFormat('ar-EG').format(typeof value === 'number' && Number.isFinite(value) ? value : fallback);
 }
@@ -51,6 +53,10 @@ function teamLabel(team?: Team | null) {
 
 function teamCode(team?: Team | null) {
   return team?.code || team?.name?.slice(0, 3) || '---';
+}
+
+function getTeamHref(team?: Team | null) {
+  return team?.id ? `/teams/${encodeURIComponent(String(team.id))}` : '/teams';
 }
 
 function formatMatchDate(value?: string | Date | null) {
@@ -261,6 +267,20 @@ function InlineMatchTimer({ match, now }: { match: HomeMatch; now: Date }) {
   );
 }
 
+function TeamSide({ team, score, align }: { team?: Team | null; score?: number | null; align: 'right' | 'left' }) {
+  return (
+    <Link
+      href={getTeamHref(team)}
+      className={`group/team block min-w-0 rounded-2xl border border-transparent p-1.5 transition hover:border-[#FFD700]/25 hover:bg-white/[0.055] ${align === 'right' ? 'text-right' : 'text-left'}`}
+      title={`فتح صفحة ${teamLabel(team)}`}
+    >
+      <TeamScoreBadge team={team} score={score} align={align} />
+      <h3 className="truncate text-sm font-black text-white transition group-hover/team:text-[#FFD700]">{teamLabel(team)}</h3>
+      <p className="mt-0.5 text-[11px] font-bold text-gray-500 transition group-hover/team:text-gray-300">{teamCode(team)}</p>
+    </Link>
+  );
+}
+
 function MatchCard({ match, now }: { match: HomeMatch; now: Date }) {
   return (
     <article className="relative overflow-hidden rounded-2xl border border-white/10 bg-black/30 p-3 shadow-[0_14px_34px_rgba(0,0,0,0.18)] transition hover:border-[#0FF0FC]/35 hover:bg-white/[0.055]">
@@ -272,21 +292,13 @@ function MatchCard({ match, now }: { match: HomeMatch; now: Date }) {
       </div>
 
       <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
-        <div className="min-w-0 text-right">
-          <TeamScoreBadge team={match.homeTeam} score={match.homeScore} align="right" />
-          <h3 className="truncate text-sm font-black text-white">{teamLabel(match.homeTeam)}</h3>
-          <p className="mt-0.5 text-[11px] font-bold text-gray-500">{teamCode(match.homeTeam)}</p>
-        </div>
+        <TeamSide team={match.homeTeam} score={match.homeScore} align="right" />
 
         <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#0FF0FC]/20 bg-[#0FF0FC]/10 text-xs font-black text-[#0FF0FC]">
           ضد
         </div>
 
-        <div className="min-w-0 text-left">
-          <TeamScoreBadge team={match.awayTeam} score={match.awayScore} align="left" />
-          <h3 className="truncate text-sm font-black text-white">{teamLabel(match.awayTeam)}</h3>
-          <p className="mt-0.5 text-[11px] font-bold text-gray-500">{teamCode(match.awayTeam)}</p>
-        </div>
+        <TeamSide team={match.awayTeam} score={match.awayScore} align="left" />
       </div>
 
       <div className="mt-3 grid grid-cols-2 gap-2">
@@ -314,6 +326,8 @@ function FixedMatchCenter({ fallbackMatches = [], upcomingMatchesCount = 0 }: { 
     let cancelled = false;
 
     async function loadMatches() {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+
       try {
         const response = await fetch('/api/matches', { cache: 'no-store' });
         if (!response.ok) return;
@@ -326,7 +340,7 @@ function FixedMatchCenter({ fallbackMatches = [], upcomingMatchesCount = 0 }: { 
     }
 
     loadMatches();
-    const timer = window.setInterval(loadMatches, 30_000);
+    const timer = window.setInterval(loadMatches, MATCH_REFRESH_MS);
     return () => {
       cancelled = true;
       window.clearInterval(timer);
