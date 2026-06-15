@@ -7,6 +7,7 @@ import { findGroupDFbrefStats, toTeamFBRefStats as toGroupDTeamFBRefStats } from
 import { findGroupEFbrefStats, toTeamFBRefStats as toGroupETeamFBRefStats } from '@/lib/groupEFbrefStats';
 import { findGroupGHIFbrefStats, toTeamFBRefStats as toGroupGHITeamFBRefStats } from '@/lib/groupGHIFbrefStats';
 import { findGroupJFbrefStats, toTeamFBRefStats as toGroupJTeamFBRefStats } from '@/lib/groupJFbrefStats';
+import { findGroupKFbrefStats, toTeamFBRefStats as toGroupKTeamFBRefStats } from '@/lib/groupKFbrefStats';
 
 type StandingMetrics = {
   group?: string | null;
@@ -121,6 +122,7 @@ export async function GET(_request: Request, context: RouteContext) {
   const groupEStats = groupAStats || groupBStats || groupCStats || groupDStats ? null : findGroupEFbrefStats(lookupKey) || findGroupEFbrefStats(fallbackKey);
   const groupGHIStats = groupAStats || groupBStats || groupCStats || groupDStats || groupEStats ? null : findGroupGHIFbrefStats(lookupKey) || findGroupGHIFbrefStats(fallbackKey);
   const groupJStats = groupAStats || groupBStats || groupCStats || groupDStats || groupEStats || groupGHIStats ? null : findGroupJFbrefStats(lookupKey) || findGroupJFbrefStats(fallbackKey);
+  const groupKStats = groupAStats || groupBStats || groupCStats || groupDStats || groupEStats || groupGHIStats || groupJStats ? null : findGroupKFbrefStats(lookupKey) || findGroupKFbrefStats(fallbackKey);
   const response: TeamFBRefStats = groupAStats
     ? toGroupATeamFBRefStats(groupAStats)
     : groupBStats
@@ -135,7 +137,9 @@ export async function GET(_request: Request, context: RouteContext) {
               ? toGroupGHITeamFBRefStats(groupGHIStats)
               : groupJStats
                 ? toGroupJTeamFBRefStats(groupJStats)
-                : unavailableStats;
+                : groupKStats
+                  ? toGroupKTeamFBRefStats(groupKStats)
+                  : unavailableStats;
 
   return NextResponse.json(response, {
     headers: { 'Cache-Control': 'public, s-maxage=600, stale-while-revalidate=300' },
