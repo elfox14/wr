@@ -12,12 +12,12 @@ const FIFA_TO_ISO2: Record<string, string> = {
   DEN: 'DK', DJI: 'DJ', DOM: 'DO', ECU: 'EC', EGY: 'EG', EQG: 'GQ', ERI: 'ER', ESP: 'ES', EST: 'EE', ETH: 'ET', FIN: 'FI', FRA: 'FR', GAB: 'GA', GAM: 'GM', GEO: 'GE', GER: 'DE', GHA: 'GH', GRE: 'GR', GRN: 'GD', GUA: 'GT', GUI: 'GN', GNB: 'GW', GUY: 'GY',
   HAI: 'HT', HON: 'HN', HUN: 'HU', IDN: 'ID', IND: 'IN', IRL: 'IE', IRN: 'IR', IRQ: 'IQ', ISL: 'IS', ISR: 'IL', ITA: 'IT', JAM: 'JM', JOR: 'JO', JPN: 'JP', KAZ: 'KZ', KEN: 'KE', KGZ: 'KG', KOR: 'KR', KSA: 'SA', KUW: 'KW',
   LAO: 'LA', LBN: 'LB', LBR: 'LR', LBY: 'LY', LIE: 'LI', LTU: 'LT', LUX: 'LU', LVA: 'LV', MAR: 'MA', MAS: 'MY', MDA: 'MD', MDV: 'MV', MEX: 'MX', MKD: 'MK', MLI: 'ML', MLT: 'MT', MNE: 'ME', MON: 'MN', MOZ: 'MZ', MTN: 'MR', MRI: 'MU',
-  NAM: 'NA', NED: 'NL', NEP: 'NP', NGA: 'NG', NIG: 'NE', NIR: 'GB', NOR: 'NO', NZL: 'NZ', OMA: 'OM', PAK: 'PK', PAN: 'PA', PAR: 'PY', PER: 'PE', PHI: 'PH', PNG: 'PG', POL: 'PL', POR: 'PT', PRK: 'KP', PUR: 'PR', QAT: 'QA', ROU: 'RO', RSA: 'ZA', RUS: 'RU', RWA: 'RW',
-  SCO: 'GB', SEN: 'SN', SEY: 'SC', SIN: 'SG', SLV: 'SV', SMR: 'SM', SRB: 'RS', SRI: 'LK', SUI: 'CH', SUR: 'SR', SVK: 'SK', SVN: 'SI', SWE: 'SE', SYR: 'SY', TAN: 'TZ', THA: 'TH', TJK: 'TJ', TOG: 'TG', TRI: 'TT', TUN: 'TN', TUR: 'TR', TPE: 'TW',
-  UAE: 'AE', UGA: 'UG', UKR: 'UA', URU: 'UY', USA: 'US', UZB: 'UZ', VEN: 'VE', VIE: 'VN', WAL: 'GB', ZAM: 'ZM', ZIM: 'ZW',
+  NAM: 'NA', NED: 'NL', NEP: 'NP', NGA: 'NG', NIG: 'NE', NIR: 'GB-NIR', NOR: 'NO', NZL: 'NZ', OMA: 'OM', PAK: 'PK', PAN: 'PA', PAR: 'PY', PER: 'PE', PHI: 'PH', PNG: 'PG', POL: 'PL', POR: 'PT', PRK: 'KP', PUR: 'PR', QAT: 'QA', ROU: 'RO', RSA: 'ZA', RUS: 'RU', RWA: 'RW',
+  SCO: 'GB-SCT', SEN: 'SN', SEY: 'SC', SIN: 'SG', SLV: 'SV', SMR: 'SM', SRB: 'RS', SRI: 'LK', SUI: 'CH', SUR: 'SR', SVK: 'SK', SVN: 'SI', SWE: 'SE', SYR: 'SY', TAN: 'TZ', THA: 'TH', TJK: 'TJ', TOG: 'TG', TRI: 'TT', TUN: 'TN', TUR: 'TR', TPE: 'TW',
+  UAE: 'AE', UGA: 'UG', UKR: 'UA', URU: 'UY', USA: 'US', UZB: 'UZ', VEN: 'VE', VIE: 'VN', WAL: 'GB-WLS', ZAM: 'ZM', ZIM: 'ZW', ENG: 'GB-ENG',
 };
 
-const SPECIAL_FLAG_BY_CODE: Record<string, string> = {
+const SPECIAL_FLAG_EMOJI_BY_CODE: Record<string, string> = {
   ENG: '🏴',
   NIR: '🇬🇧',
   SCO: '🏴',
@@ -53,7 +53,7 @@ const NAME_TO_ISO2: Record<string, string> = {
   'denmark': 'DK',
   'ecuador': 'EC',
   'egypt': 'EG',
-  'england': 'GB',
+  'england': 'GB-ENG',
   'france': 'FR',
   'germany': 'DE',
   'ghana': 'GH',
@@ -86,7 +86,7 @@ const NAME_TO_ISO2: Record<string, string> = {
   'republic of ireland': 'IE',
   'romania': 'RO',
   'saudi arabia': 'SA',
-  'scotland': 'GB',
+  'scotland': 'GB-SCT',
   'senegal': 'SN',
   'serbia': 'RS',
   'slovakia': 'SK',
@@ -106,7 +106,7 @@ const NAME_TO_ISO2: Record<string, string> = {
   'uruguay': 'UY',
   'uzbekistan': 'UZ',
   'venezuela': 'VE',
-  'wales': 'GB',
+  'wales': 'GB-WLS',
 };
 
 const ARABIC_NAME_TO_ISO2: Record<string, string> = {
@@ -127,8 +127,8 @@ const ARABIC_NAME_TO_ISO2: Record<string, string> = {
   'اسبانيا': 'ES',
   'ألمانيا': 'DE',
   'المانيا': 'DE',
-  'إنجلترا': 'GB',
-  'انجلترا': 'GB',
+  'إنجلترا': 'GB-ENG',
+  'انجلترا': 'GB-ENG',
   'البرتغال': 'PT',
   'هولندا': 'NL',
   'بلجيكا': 'BE',
@@ -145,6 +145,8 @@ const ARABIC_NAME_TO_ISO2: Record<string, string> = {
   'أستراليا': 'AU',
   'استراليا': 'AU',
   'نيوزيلندا': 'NZ',
+  'اسكتلندا': 'GB-SCT',
+  'ويلز': 'GB-WLS',
 };
 
 function normalizeName(value?: string | null) {
@@ -168,24 +170,37 @@ export function iso2ToFlag(iso2?: string | null) {
     .join('');
 }
 
-export function getTeamFlag(team: TeamIdentity) {
+export function getTeamFlagCode(team: TeamIdentity) {
   const code = String(team.code || '').trim().toUpperCase();
-  if (SPECIAL_FLAG_BY_CODE[code]) return SPECIAL_FLAG_BY_CODE[code];
-
   const isoFromCode = FIFA_TO_ISO2[code] || (/^[A-Z]{2}$/.test(code) ? code : null);
-  const codeFlag = iso2ToFlag(isoFromCode);
-  if (codeFlag) return codeFlag;
+  if (isoFromCode) return isoFromCode;
 
   const name = normalizeName(team.name);
-  if (name === 'england') return '🏴';
   const isoFromName = NAME_TO_ISO2[name] || ARABIC_NAME_TO_ISO2[String(team.name || '').trim()];
-  const nameFlag = iso2ToFlag(isoFromName);
-  if (nameFlag) return nameFlag;
+  if (isoFromName) return isoFromName;
 
   const country = normalizeName(team.continent);
   const isoFromCountry = NAME_TO_ISO2[country] || ARABIC_NAME_TO_ISO2[String(team.continent || '').trim()];
-  const countryFlag = iso2ToFlag(isoFromCountry);
-  if (countryFlag) return countryFlag;
+  if (isoFromCountry) return isoFromCountry;
+
+  return null;
+}
+
+export function getTeamFlagUrl(team: TeamIdentity, width = 80) {
+  const code = getTeamFlagCode(team);
+  if (!code) return null;
+  return `https://flagcdn.com/w${width}/${code.toLowerCase()}.png`;
+}
+
+export function getTeamFlag(team: TeamIdentity) {
+  const code = String(team.code || '').trim().toUpperCase();
+  if (SPECIAL_FLAG_EMOJI_BY_CODE[code]) return SPECIAL_FLAG_EMOJI_BY_CODE[code];
+
+  const resolvedCode = getTeamFlagCode(team);
+  if (resolvedCode && /^[A-Z]{2}$/.test(resolvedCode)) return iso2ToFlag(resolvedCode);
+
+  const name = normalizeName(team.name);
+  if (name === 'england' || name === 'scotland' || name === 'wales') return '🏴';
 
   return null;
 }
