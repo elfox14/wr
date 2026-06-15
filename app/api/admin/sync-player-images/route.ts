@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 import prisma from "@/lib/prisma";
+import { normalizeName } from "@/lib/apiFootball";
 
 function isLocalImage(image?: string | null) {
   return !!image && image.startsWith("/players/");
@@ -116,6 +117,9 @@ export async function POST(req: Request) {
           players.find(hasAnyImage);
 
         const image = selected ? getBestSportsDbImage(selected) : null;
+        const rawClub = selected?.strTeam || null;
+        // If club name matches national team name, ignore it
+        const club = (rawClub && asset.teamId && normalizeName(rawClub) !== normalizeName(asset.teamId.replace('team-', ''))) ? rawClub : null;
 
         if (!image) {
           results.push({
@@ -130,6 +134,7 @@ export async function POST(req: Request) {
           where: { id: asset.id },
           data: {
             image,
+            ...(club ? { club } : {}),
           },
         });
 
