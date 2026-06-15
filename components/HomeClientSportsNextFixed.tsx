@@ -315,8 +315,12 @@ function FixedMatchCenter({ fallbackMatches = [], upcomingMatchesCount = 0 }: { 
       </div>
 
       {featuredMatches.length > 0 ? (
-        <div className="grid gap-3 lg:grid-cols-3">
-          {featuredMatches.map((match, index) => <MatchCard key={match.id || index} match={match} now={now} />)}
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {featuredMatches.map((match, index) => (
+            <div key={match.id || index} className={index === 0 ? '' : 'hidden sm:block'}>
+              <MatchCard match={match} now={now} />
+            </div>
+          ))}
         </div>
       ) : (
         <div className="rounded-2xl border border-white/10 bg-black/25 p-4 text-xs font-bold leading-6 text-gray-400">لا توجد مباراة جاهزة للعرض الآن. سيظهر هنا أقرب لقاء عند تحديث مركز المباريات.</div>
