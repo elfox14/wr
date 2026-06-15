@@ -47,9 +47,9 @@ const MATCH_REFRESH_MS = 60_000;
 
 const heroActions = [
   { label: 'مباريات اليوم', href: '/matches', primary: true },
-  { label: 'جدول البطولة', href: '/matches' },
-  { label: 'المجموعات', href: '/groups' },
-  { label: 'التحليلات', href: '/news' },
+  { label: 'جدول البطولة', href: '/matches', primary: false },
+  { label: 'المجموعات', href: '/groups', primary: false },
+  { label: 'التحليلات', href: '/news', primary: false },
 ] as const;
 
 const groupLetters = Object.keys(WORLD_CUP_2026_GROUPS) as WorldCup2026GroupKey[];
