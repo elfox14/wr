@@ -7,20 +7,33 @@ export type OfficialSquadPlayerInput = {
   name?: string | null;
   fullName?: string | null;
   playerName?: string | null;
+  player_name?: string | null;
   code?: string | null;
   position?: string | null;
+  player_position?: string | null;
   age?: number | string | null;
+  player_age?: number | string | null;
   club?: string | null;
+  player_club?: string | null;
   image?: string | null;
   photo?: string | null;
   avatar?: string | null;
   thumb?: string | null;
+  player_photo?: string | null;
+  player_image?: string | null;
+  image_url?: string | null;
+  photo_url?: string | null;
   shirtNumber?: number | string | null;
   number?: number | string | null;
+  shirt_number?: number | string | null;
+  player_number?: number | string | null;
   externalId?: number | string | null;
   apiFootballId?: number | string | null;
   api_football_id?: number | string | null;
+  api_player_id?: number | string | null;
+  player_id?: number | string | null;
   player?: Record<string, any> | null;
+  raw_json?: string | null;
   [key: string]: any;
 };
 
@@ -104,6 +117,15 @@ function cleanCode(value: any, fallback: string) {
   return raw.slice(0, 10) || 'PLAYER';
 }
 
+function safeJson(value?: string | null) {
+  if (!value) return null;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return null;
+  }
+}
+
 function envelope(payload: any) {
   const data = unwrapDataHubData(payload) || {};
   const team = data?.team || payload?.team || data || payload || {};
@@ -136,7 +158,7 @@ function dataHubTeamCode(payload: any) {
 function sourceName(input: OfficialSquadTeamInput, payload?: any) {
   if (input.sourceName) return input.sourceName;
   const { data, sourceSummary } = envelope(payload || {});
-  return asString(sourceSummary?.sourceName, sourceSummary?.source_name, data?.sourceName, data?.source_name) || 'Official World Cup Squad';
+  return asString(sourceSummary?.sourceName, sourceSummary?.source_name, data?.sourceName, data?.source_name, sourceSummary?.team_source, data?.source) || 'Official World Cup Squad';
 }
 
 function sourceUrl(input: OfficialSquadTeamInput, payload?: any) {
@@ -183,7 +205,8 @@ async function findTeam(input: OfficialSquadTeamInput) {
 }
 
 function playerRecord(player: OfficialSquadPlayerInput) {
-  return player?.player || player;
+  const raw = typeof player?.raw_json === 'string' ? safeJson(player.raw_json) : null;
+  return player?.player || raw || player;
 }
 
 function playerImage(player: OfficialSquadPlayerInput) {
@@ -193,10 +216,18 @@ function playerImage(player: OfficialSquadPlayerInput) {
     player.photo,
     player.avatar,
     player.thumb,
+    player.player_photo,
+    player.player_image,
+    player.image_url,
+    player.photo_url,
     record?.image,
     record?.photo,
     record?.avatar,
     record?.thumb,
+    record?.player_photo,
+    record?.player_image,
+    record?.image_url,
+    record?.photo_url,
     record?.strThumb,
     record?.strCutout,
     record?.strRender,
@@ -217,16 +248,16 @@ function ageFromDate(value?: string | null) {
 
 function normalizePlayer(player: OfficialSquadPlayerInput, index: number): NormalizedPlayer | null {
   const record = playerRecord(player);
-  const name = asString(player.name, player.fullName, player.playerName, record?.name, record?.full_name, record?.fullName, record?.player_name, record?.playerName, record?.strPlayer);
+  const name = asString(player.name, player.fullName, player.playerName, player.player_name, record?.name, record?.full_name, record?.fullName, record?.player_name, record?.playerName, record?.strPlayer);
   if (!name) return null;
 
-  const shirtNumber = asInt(player.shirtNumber, player.number, record?.shirtNumber, record?.shirt_number, record?.number);
-  const age = asInt(player.age, record?.age) || ageFromDate(asString(record?.birthDate, record?.birth_date, record?.dateBorn, player?.birthDate, player?.birth_date));
-  const position = asString(player.position, record?.position, record?.pos, record?.strPosition);
-  const club = asString(player.club, record?.club, record?.team, record?.current_club, record?.currentClub, record?.strTeam);
+  const shirtNumber = asInt(player.shirtNumber, player.number, player.shirt_number, player.player_number, record?.shirtNumber, record?.shirt_number, record?.number, record?.player_number);
+  const age = asInt(player.age, player.player_age, record?.age, record?.player_age) || ageFromDate(asString(record?.birthDate, record?.birth_date, record?.dateBorn, player?.birthDate, player?.birth_date));
+  const position = asString(player.position, player.player_position, record?.position, record?.pos, record?.strPosition, record?.player_position);
+  const club = asString(player.club, player.player_club, record?.club, record?.team, record?.current_club, record?.currentClub, record?.strTeam, record?.player_club, record?.club_name);
   const image = playerImage(player);
-  const externalId = asString(player.externalId, record?.externalId, record?.id, record?.player_id);
-  const apiFootballId = asInt(player.apiFootballId, player.api_football_id, record?.apiFootballId, record?.api_football_id, record?.id, record?.player_id);
+  const externalId = asString(player.externalId, record?.externalId, player.id, record?.id, player.player_id, record?.player_id, player.api_player_id, record?.api_player_id);
+  const apiFootballId = asInt(player.apiFootballId, player.api_football_id, player.api_player_id, player.player_id, record?.apiFootballId, record?.api_football_id, record?.api_player_id, record?.id, record?.player_id);
   const code = cleanCode(player.code, `${name.slice(0, 3)}${shirtNumber || index + 1}`);
 
   return { name, code, position, age, club, image, shirtNumber, externalId, apiFootballId };
