@@ -13,6 +13,11 @@ import { getProviderQuotaBlock } from '@/lib/provider-quota-guard';
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
+const LIVE_STATUSES = ['IN_PLAY', 'LIVE', 'HT'];
+const FINISHED_STATUSES = ['FINISHED', 'FT', 'AET', 'PEN'];
+const GROUP_STAGE_MAX_LIVE_MINUTES = 115;
+const KNOCKOUT_MAX_LIVE_MINUTES = 150;
+
 function toIso(value: any) {
   return value instanceof Date ? value.toISOString() : value || null;
 }
@@ -33,23 +38,55 @@ function isAuthorized(req: Request, searchParams: URLSearchParams) {
   return candidates.some((value) => value && valid.includes(value));
 }
 
+function normalizeStatus(status?: string | null) {
+  return String(status || '').toUpperCase();
+}
+
 function isLiveLike(status?: string | null) {
-  const value = String(status || '').toUpperCase();
-  return ['IN_PLAY', 'LIVE', 'HT'].includes(value);
+  return LIVE_STATUSES.includes(normalizeStatus(status));
+}
+
+function isFinishedStatus(status?: string | null) {
+  return FINISHED_STATUSES.includes(normalizeStatus(status));
+}
+
+function isGroupStage(match: any) {
+  const value = String(match?.groupPhase || match?.group || match?.stage || '').toUpperCase();
+  return value.includes('GROUP');
+}
+
+function maxLiveMinutes(match: any) {
+  return isGroupStage(match) ? GROUP_STAGE_MAX_LIVE_MINUTES : KNOCKOUT_MAX_LIVE_MINUTES;
+}
+
+function elapsedMinutes(match: any) {
+  if (!match?.matchDate) return null;
+  const start = new Date(match.matchDate).getTime();
+  if (!Number.isFinite(start)) return null;
+  return Math.floor((Date.now() - start) / 60_000);
+}
+
+function isStaleLive(match: any) {
+  if (!isLiveLike(match?.status)) return false;
+  const elapsed = elapsedMinutes(match);
+  if (elapsed === null) return false;
+  return elapsed >= maxLiveMinutes(match);
 }
 
 function isScheduledButProbablyLive(match: any) {
-  if (String(match?.status || '').toUpperCase() !== 'SCHEDULED') return false;
-  if (!match?.matchDate) return false;
-  const start = new Date(match.matchDate).getTime();
-  if (!Number.isFinite(start)) return false;
-  const diffMinutes = Math.floor((Date.now() - start) / 60_000);
-  return diffMinutes >= -10 && diffMinutes <= 150;
+  if (normalizeStatus(match?.status) !== 'SCHEDULED') return false;
+  const diffMinutes = elapsedMinutes(match);
+  return diffMinutes !== null && diffMinutes >= -10 && diffMinutes < maxLiveMinutes(match);
+}
+
+function isFinishedMatch(match: any) {
+  return isFinishedStatus(match?.status) || isStaleLive(match);
 }
 
 function isAutoSyncCandidate(match: any, force: boolean) {
   if (force) return true;
   if (!match?.animationMatchId) return false;
+  if (isFinishedMatch(match)) return false;
   return isLiveLike(match.status) || isScheduledButProbablyLive(match);
 }
 
@@ -71,6 +108,37 @@ function hasAnyStat(snapshot: any) {
     'homeShotsOnTarget', 'awayShotsOnTarget', 'homeShotsOffTarget', 'awayShotsOffTarget',
     'homeCorners', 'awayCorners', 'homeYellowCards', 'awayYellowCards', 'homeRedCards', 'awayRedCards',
   ].some((key) => snapshot[key] !== null && snapshot[key] !== undefined);
+}
+
+function nullableNumber(value: unknown) {
+  if (value === null || value === undefined || value === '') return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+function snapshotMinute(snapshot: any) {
+  const minute = nullableNumber(snapshot?.minute);
+  return minute !== null && minute > 0 ? minute : null;
+}
+
+function snapshotHasScore(snapshot: any) {
+  return nullableNumber(snapshot?.homeScore) !== null || nullableNumber(snapshot?.awayScore) !== null;
+}
+
+function shouldUseSnapshotScore(match: any, snapshot: any) {
+  if (!snapshot || !snapshotHasScore(snapshot)) return false;
+  if (snapshotMinute(snapshot) !== null) return true;
+  if (hasAnyStat(snapshot)) return true;
+  if (isFinishedMatch(match)) return true;
+  // A minute=0 snapshot while the match is live-like is usually a kickoff/fallback row.
+  // Do not let it override the canonical Match score shown elsewhere on the platform.
+  return false;
+}
+
+function cleanPublicSnapshot(match: any, snapshot: any) {
+  if (!snapshot) return null;
+  if (snapshotMinute(snapshot) !== null) return snapshot;
+  return { ...snapshot, minute: null };
 }
 
 export async function GET(request: Request) {
@@ -130,9 +198,12 @@ export async function GET(request: Request) {
     }
 
     const historyRows = await getSnapshotHistory(match.id, 80);
-    const latestPublic = publicSnapshot(latest);
-    const latestHomeScore = latestPublic?.homeScore ?? match.homeScore;
-    const latestAwayScore = latestPublic?.awayScore ?? match.awayScore;
+    const rawLatestPublic = publicSnapshot(latest);
+    const latestPublic = cleanPublicSnapshot(match, rawLatestPublic);
+    const useSnapshotScore = shouldUseSnapshotScore(match, latestPublic);
+    const latestHomeScore = useSnapshotScore ? (latestPublic?.homeScore ?? match.homeScore) : match.homeScore;
+    const latestAwayScore = useSnapshotScore ? (latestPublic?.awayScore ?? match.awayScore) : match.awayScore;
+    const effectiveStatus = isFinishedMatch(match) ? 'FINISHED' : match.status;
     const hasStats = hasAnyStat(latestPublic);
     const sourceStatus = quotaBlock
       ? {
@@ -159,18 +230,22 @@ export async function GET(request: Request) {
       hasStats,
       sourceStatus,
       sync: syncResult,
+      scorePolicy: {
+        source: useSnapshotScore ? 'snapshot' : 'match',
+        ignoredMinuteZeroSnapshot: Boolean(latestPublic && !useSnapshotScore && snapshotHasScore(latestPublic)),
+      },
       match: {
         id: match.id,
         animationMatchId: match.animationMatchId,
-        status: match.status,
+        status: effectiveStatus,
         matchDate: toIso(match.matchDate),
-        homeScore: latestHomeScore,
-        awayScore: latestAwayScore,
+        homeScore: latestHomeScore ?? 0,
+        awayScore: latestAwayScore ?? 0,
         homeTeam: match.homeTeam,
         awayTeam: match.awayTeam,
       },
       latest: latestPublic,
-      history: historyRows.map(publicSnapshot).reverse(),
+      history: historyRows.map((row) => cleanPublicSnapshot(match, publicSnapshot(row))).reverse(),
     }, { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } });
   } catch (error: any) {
     console.error('live-stats endpoint error:', error);
