@@ -1,4 +1,4 @@
-import HomeClientSportsNext from '@/components/HomeClientSportsNext';
+import HomeClientSportsNextFixed from '@/components/HomeClientSportsNextFixed';
 import { getAssets } from '@/lib/store-server';
 import { getAllArticles } from '@/lib/articles';
 import prisma from '@/lib/prisma';
@@ -85,7 +85,7 @@ export default async function Home() {
         }}
       />
 
-      <HomeClientSportsNext {...homeClientProps} />
+      <HomeClientSportsNextFixed {...homeClientProps} />
     </>
   );
 }
