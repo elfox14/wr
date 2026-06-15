@@ -115,7 +115,7 @@ export default async function PlayersPage({ searchParams }: Props) {
   const selectedPosition = cleanParam(firstParam(resolvedSearchParams.position));
 
   const rawPlayers = await prisma.asset.findMany({
-    where: { type: 'PLAYER' },
+    where: { type: 'PLAYER', isAvailable: true },
     orderBy: [{ team: { name: 'asc' } }, { position: 'asc' }, { name: 'asc' }],
     take: 500,
     select: {
