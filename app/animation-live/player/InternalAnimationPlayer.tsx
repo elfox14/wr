@@ -46,6 +46,30 @@ const STAT_KEYS = [
   'homeCorners', 'awayCorners', 'homeYellowCards', 'awayYellowCards', 'homeRedCards', 'awayRedCards',
 ];
 
+const HALF_TIME_STATUSES = ['HT', 'HALFTIME', 'HALF_TIME', 'HALF-TIME'];
+const FINISHED_STATUSES = ['FINISHED', 'FT', 'AET', 'PEN'];
+
+function normalizeStatus(status?: string | null) {
+  return String(status || '').toUpperCase();
+}
+
+function isHalfTimeStatus(status?: string | null) {
+  return HALF_TIME_STATUSES.includes(normalizeStatus(status));
+}
+
+function isFinishedStatus(status?: string | null) {
+  return FINISHED_STATUSES.includes(normalizeStatus(status));
+}
+
+function displayMatchStatus(status?: string | null) {
+  const value = normalizeStatus(status);
+  if (isHalfTimeStatus(value)) return 'استراحة';
+  if (isFinishedStatus(value)) return 'انتهت';
+  if (value === 'IN_PLAY' || value === 'LIVE') return 'مباشرة الآن';
+  if (value === 'SCHEDULED' || value === 'TIMED' || value === 'NOT_STARTED' || value === 'NS') return 'قادمة';
+  return value || '—';
+}
+
 function statValue(snapshot: Snapshot, key: string) {
   const value = Number(snapshot?.[key]);
   return Number.isFinite(value) ? value : null;
@@ -85,6 +109,19 @@ function eventLabel(type: string) {
   return 'حدث مهم';
 }
 
+function cleanEventDetail(detail?: string | null) {
+  return String(detail || '')
+    .replace(/football-data\.org/gi, '')
+    .replace(/FOOTBALL_DATA_FALLBACK/g, '')
+    .replace(/FOOTBALL_DATA/g, '')
+    .replace(/ISPORTS_TIMELINE/g, '')
+    .replace(/ISPORTS_PAGE/g, '')
+    .replace(/ISPORTS/g, '')
+    .replace(/iSports Timeline/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 function inferBallPosition(event?: MatchEvent | null) {
   if (!event) return { left: 50, top: 50, label: 'منتصف الملعب' };
   const type = event.type.toLowerCase();
@@ -100,12 +137,15 @@ function inferBallPosition(event?: MatchEvent | null) {
 }
 
 function inferLiveMinute(match?: LiveStatsResponse['match'], latest?: Snapshot) {
+  if (!match) return null;
+  const status = normalizeStatus(match.status);
+  if (isFinishedStatus(status)) return 90;
+  if (isHalfTimeStatus(status)) return 45;
+
   const snapshotMinute = statValue(latest || null, 'minute');
-  if (snapshotMinute !== null) return snapshotMinute;
-  if (!match?.matchDate) return null;
-  const status = String(match.status || '').toUpperCase();
-  if (status === 'FINISHED') return 90;
-  if (status === 'HT') return 45;
+  if (snapshotMinute !== null && snapshotMinute > 0) return Math.max(1, Math.min(135, snapshotMinute));
+
+  if (!match.matchDate) return null;
   const start = new Date(match.matchDate).getTime();
   if (!Number.isFinite(start)) return null;
   const minute = Math.floor((Date.now() - start) / 60_000) + 1;
@@ -115,18 +155,7 @@ function inferLiveMinute(match?: LiveStatsResponse['match'], latest?: Snapshot) 
 
 function statsNotice(stats: LiveStatsResponse | null, latest: Snapshot) {
   if (hasAnyDetailedStat(latest) || stats?.hasStats) return null;
-  const syncStatus = stats?.sync?.status || '';
-  const isQuotaBlocked = Boolean(stats?.sourceStatus?.isportsBlocked || syncStatus === 'isports_guard_active');
-  if (isQuotaBlocked) {
-    return 'الإحصائيات التفصيلية غير متاحة الآن لأن iSports وصل للحد اليومي. تم حفظ النتيجة والحالة من Football-Data، وستُحاول المنصة جلب الإحصائيات تلقائيًا بعد انتهاء الحظر.';
-  }
-  if (syncStatus === 'failed' || stats?.sync?.error) {
-    return `تعذر جلب الإحصائيات التفصيلية من المزود الآن: ${stats?.sync?.error || 'مزود الإحصائيات لم يرجع بيانات'}.`;
-  }
-  if (syncStatus === 'no_mapped_stats') {
-    return 'مزود الإحصائيات رجّع بيانات، لكن لم توجد أرقام قابلة للعرض مثل الاستحواذ أو التسديدات لهذه المباراة.';
-  }
-  return 'لا توجد لقطة إحصائيات محفوظة لهذه المباراة بعد. ستظهر الأرقام تلقائيًا عند وصولها من مزود الإحصائيات.';
+  return 'الإحصائيات التفصيلية غير متاحة الآن.';
 }
 
 function MiniStat({ label, home, away, accent = false }: { label: string; home: number | null; away: number | null; accent?: boolean }) {
@@ -205,6 +234,8 @@ export default function InternalAnimationPlayer({ matchId = '', dbMatchId = '' }
   const awayScore = statValue(latest, 'awayScore') ?? match?.awayScore ?? 0;
   const minute = inferLiveMinute(match, latest);
   const unavailableStatsNotice = statsNotice(stats, latest);
+  const statusLabel = displayMatchStatus(match?.status);
+  const isHalfTime = isHalfTimeStatus(match?.status);
 
   if (loading) {
     return <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.03] p-10 text-center text-sm text-gray-400">جاري تحميل المشغل...</div>;
@@ -250,18 +281,18 @@ export default function InternalAnimationPlayer({ matchId = '', dbMatchId = '' }
 
             <div className="absolute z-20 -translate-x-1/2 -translate-y-1/2" style={{ left: `${ball.left}%`, top: `${ball.top}%` }}>
               <div className="relative flex h-12 w-12 items-center justify-center rounded-full border-2 border-white bg-black text-xl shadow-[0_0_35px_rgba(255,255,255,0.55)]">⚽</div>
-              <div className="absolute left-1/2 top-14 w-36 -translate-x-1/2 rounded-full border border-black/20 bg-black/70 px-3 py-1 text-center text-[10px] font-black text-white">{ball.label}</div>
+              <div className="absolute left-1/2 top-14 w-36 -translate-x-1/2 rounded-full border border-black/20 bg-black/70 px-3 py-1 text-center text-[10px] font-black text-white">{isHalfTime ? 'استراحة بين الشوطين' : ball.label}</div>
             </div>
 
             <div className="absolute left-4 top-4 rounded-2xl border border-white/10 bg-black/50 px-3 py-2 text-xs font-black text-white">
               الدقيقة: <span className="text-[#FFD700]">{displayNumber(minute)}</span>
             </div>
             <div className="absolute right-4 top-4 rounded-2xl border border-white/10 bg-black/50 px-3 py-2 text-xs font-black text-white">
-              الحالة: <span className="text-[#FFD700]">{match?.status || '—'}</span>
+              الحالة: <span className="text-[#FFD700]">{statusLabel}</span>
             </div>
             <div className="absolute bottom-4 left-4 right-4 rounded-2xl border border-white/10 bg-black/60 p-3">
               <div className="flex items-center gap-2 text-xs font-black text-[#FFD700]"><Radio size={14} /> آخر حدث</div>
-              <p className="mt-1 text-sm leading-6 text-white">{lastEvent ? `${eventIcon(lastEvent.type)} ${lastEvent.minute ? `د${lastEvent.minute} - ` : ''}${eventLabel(lastEvent.type)}: ${lastEvent.detail}` : 'لا توجد أحداث مهمة محفوظة بعد.'}</p>
+              <p className="mt-1 text-sm leading-6 text-white">{lastEvent ? `${eventIcon(lastEvent.type)} ${lastEvent.minute ? `د${lastEvent.minute} - ` : ''}${eventLabel(lastEvent.type)}: ${cleanEventDetail(lastEvent.detail)}` : 'لا توجد أحداث مهمة محفوظة بعد.'}</p>
             </div>
           </div>
 
@@ -283,16 +314,14 @@ export default function InternalAnimationPlayer({ matchId = '', dbMatchId = '' }
 
         <aside className="rounded-2xl border border-white/10 bg-black/25 p-4">
           <div className="mb-3 flex items-center justify-between gap-2">
-            <div>
-              <h3 className="font-black text-white">Timeline الأحداث المهمة</h3>
-            </div>
+            <h3 className="font-black text-white">Timeline الأحداث المهمة</h3>
             <Goal className="text-[#FFD700]" size={22} />
           </div>
           <div className="max-h-[670px] space-y-2 overflow-y-auto pr-1">
             {events.length ? events.map((event) => (
               <div key={event.id} className="rounded-xl border border-white/8 bg-white/[0.035] p-3">
-                <div className="flex items-center gap-2 text-xs font-black text-[#FFD700]"><span>{eventIcon(event.type)}</span>{event.minute ? `د${event.minute}` : 'حدث'}<span className="text-gray-600">•</span><span>{event.sourceName || 'Live'}</span></div>
-                <p className="mt-1 text-sm leading-6 text-gray-200">{event.detail}</p>
+                <div className="flex items-center gap-2 text-xs font-black text-[#FFD700]"><span>{eventIcon(event.type)}</span>{event.minute ? `د${event.minute}` : 'حدث'}</div>
+                <p className="mt-1 text-sm leading-6 text-gray-200">{cleanEventDetail(event.detail)}</p>
               </div>
             )) : (
               <div className="rounded-xl border border-dashed border-white/10 p-6 text-center text-sm text-gray-500">لا توجد أحداث مهمة محفوظة بعد.</div>
