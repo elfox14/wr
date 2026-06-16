@@ -7,6 +7,7 @@ import { getTeamFlagUrl } from '@/lib/teamFlags';
 type Team = { id?: string; name?: string; code?: string; image?: string } | null;
 type Snapshot = Record<string, any> | null;
 type EventSide = 'home' | 'away' | 'neutral';
+type PressureSide = 'home' | 'away' | 'balanced' | 'unknown';
 type EventFilterKey = 'all' | 'goals' | 'corners' | 'shots' | 'cards' | 'danger';
 type EventCategory = Exclude<EventFilterKey, 'all'> | 'other';
 type MatchEvent = { id: string; minute?: number | null; type: string; detail: string; playerName?: string | null; sourceName?: string | null; createdAt?: string | null };
@@ -21,6 +22,8 @@ type LiveStatsResponse = {
   error?: string;
 };
 type LiveEventsResponse = { ok: boolean; updatedAt?: string; events?: MatchEvent[]; error?: string };
+type PressureWindow = { available: boolean; home: number; away: number; homeEvents: number; awayEvents: number; leader: PressureSide };
+type PressureModel = { home: number; away: number; leader: PressureSide; rhythm: string; danger: string; window5: PressureWindow; window15: PressureWindow };
 
 const STATS_POLL_MS = 60_000;
 const EVENTS_POLL_MS = 30_000;
@@ -142,6 +145,61 @@ function sortEventsByMinute(a: MatchEvent, b: MatchEvent) {
   if (ma !== mb) return ma - mb;
   return String(a.createdAt || a.id).localeCompare(String(b.createdAt || b.id));
 }
+function pressureLeader(home: number, away: number): PressureSide {
+  if (home <= 0 && away <= 0) return 'unknown';
+  const diff = Math.abs(home - away);
+  if (diff <= Math.max(3, (home + away) * 0.08)) return 'balanced';
+  return home > away ? 'home' : 'away';
+}
+function pressureEventWeight(type: string) {
+  const category = eventCategory(type);
+  if (category === 'goals') return 10;
+  if (category === 'danger') return 6;
+  if (category === 'shots') return 4;
+  if (category === 'corners') return 3;
+  if (category === 'cards') return 1;
+  return 1;
+}
+function pressureWindow(events: MatchEvent[], currentMinute: number | null, span: number, home: Team, away: Team): PressureWindow {
+  const eventMinutes = events.map(eventMinute).filter((value): value is number => value !== null);
+  const anchor = currentMinute ?? (eventMinutes.length ? Math.max(...eventMinutes) : null);
+  if (anchor === null) return { available: false, home: 0, away: 0, homeEvents: 0, awayEvents: 0, leader: 'unknown' };
+  return events.reduce((acc, event) => {
+    const minute = eventMinute(event);
+    if (minute === null || minute < anchor - span || minute > anchor) return acc;
+    const side = eventSide(event, home, away);
+    const weight = pressureEventWeight(event.type);
+    if (side === 'home') { acc.home += weight; acc.homeEvents += 1; }
+    if (side === 'away') { acc.away += weight; acc.awayEvents += 1; }
+    acc.available = true;
+    acc.leader = pressureLeader(acc.home, acc.away);
+    return acc;
+  }, { available: false, home: 0, away: 0, homeEvents: 0, awayEvents: 0, leader: 'unknown' as PressureSide });
+}
+function calculatePressureModel(snapshot: Snapshot, events: MatchEvent[], currentMinute: number | null, home: Team, away: Team): PressureModel {
+  const homeBase = (n(snapshot, 'homeAttacks') ?? 0) + ((n(snapshot, 'homeDangerousAttacks') ?? 0) * 3) + ((n(snapshot, 'homeShots') ?? 0) * 4) + ((n(snapshot, 'homeShotsOnTarget') ?? 0) * 6) + ((n(snapshot, 'homeCorners') ?? 0) * 2);
+  const awayBase = (n(snapshot, 'awayAttacks') ?? 0) + ((n(snapshot, 'awayDangerousAttacks') ?? 0) * 3) + ((n(snapshot, 'awayShots') ?? 0) * 4) + ((n(snapshot, 'awayShotsOnTarget') ?? 0) * 6) + ((n(snapshot, 'awayCorners') ?? 0) * 2);
+  const window5 = pressureWindow(events, currentMinute, 5, home, away);
+  const window15 = pressureWindow(events, currentMinute, 15, home, away);
+  const home = homeBase + (window15.home * 2) + (window5.home * 2);
+  const away = awayBase + (window15.away * 2) + (window5.away * 2);
+  const leader = pressureLeader(home, away);
+  const rhythmScore = window15.available ? window15.home + window15.away : ((homeBase + awayBase) / Math.max(1, currentMinute ?? 90)) * 15;
+  const rhythm = rhythmScore >= 35 ? 'عالي' : rhythmScore >= 18 ? 'متوسط' : 'هادئ';
+  const maxPressure = Math.max(home, away);
+  const danger = maxPressure >= 220 ? 'مرتفعة' : maxPressure >= 110 ? 'متوسطة' : 'منخفضة';
+  return { home: Math.round(home), away: Math.round(away), leader, rhythm, danger, window5, window15 };
+}
+function sideName(side: PressureSide, home?: Team, away?: Team) {
+  if (side === 'home') return home?.name || 'الفريق الأول';
+  if (side === 'away') return away?.name || 'الفريق الثاني';
+  if (side === 'balanced') return 'متوازن';
+  return 'غير متوفر';
+}
+function windowLabel(window: PressureWindow) {
+  if (!window.available) return 'غير متوفر';
+  return `${ar(window.home)} - ${ar(window.away)}`;
+}
 function ballPosition(event?: MatchEvent | null, home?: Team, away?: Team) {
   if (!event) return { left: 50, top: 50, label: 'منتصف الملعب', side: 'neutral' as EventSide };
   const type = event.type.toLowerCase();
@@ -203,6 +261,9 @@ function StatRow({ label, home, away, accent = false }: { label: string; home: n
     </div>
   );
 }
+function IntelligenceTile({ label, value, hint, accent = false }: { label: string; value: string; hint?: string; accent?: boolean }) {
+  return <div className={`rounded-2xl border p-3 ${accent ? 'border-[#FFD700]/25 bg-[#FFD700]/10' : 'border-white/10 bg-black/25'}`}><div className="text-[10px] font-black text-gray-500">{label}</div><div className={`mt-1 text-lg font-black ${accent ? 'text-[#FFD700]' : 'text-white'}`}>{value}</div>{hint ? <div className="mt-1 text-[10px] font-bold text-gray-500">{hint}</div> : null}</div>;
+}
 
 export default function InternalAnimationPlayer({ matchId = '', dbMatchId = '' }: { matchId?: string; dbMatchId?: string }) {
   const [stats, setStats] = useState<LiveStatsResponse | null>(null);
@@ -254,6 +315,7 @@ export default function InternalAnimationPlayer({ matchId = '', dbMatchId = '' }
   const awayScore = n(latest, 'awayScore') ?? match?.awayScore ?? 0;
   const minute = n(latest, 'minute') ?? (isFinishedStatus(match?.status) ? 90 : null);
   const provider = sourceLabel(latest?.provider || stats?.sourceStatus?.statsProvider);
+  const pressure = useMemo(() => calculatePressureModel(latest, events, minute, match?.homeTeam || null, match?.awayTeam || null), [latest, events, minute, match?.homeTeam, match?.awayTeam]);
 
   useEffect(() => {
     if (!filteredEvents.length) {
@@ -298,6 +360,20 @@ export default function InternalAnimationPlayer({ matchId = '', dbMatchId = '' }
           <div className="rounded-2xl border border-white/10 bg-black/30 p-3 sm:p-4">
             <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 text-center"><TeamName team={match?.homeTeam || null} fallback="الفريق الأول" align="right" /><div className="rounded-3xl border border-[#FFD700]/25 bg-[#FFD700]/10 px-4 py-3 text-3xl font-black text-[#FFD700] tabular-nums sm:px-6 sm:text-4xl">{ar(homeScore)} - {ar(awayScore)}</div><TeamName team={match?.awayTeam || null} fallback="الفريق الثاني" align="left" /></div>
             <div className="mt-3 grid gap-2 sm:grid-cols-3"><div className="rounded-xl border border-white/10 bg-black/25 px-3 py-2"><div className="text-[10px] font-black text-gray-500">موعد المباراة</div><div className="mt-1 text-sm font-black text-white">{formatDate(match?.matchDate)}</div></div><div className="rounded-xl border border-[#00FF88]/20 bg-[#00FF88]/10 px-3 py-2"><div className="text-[10px] font-black text-[#00FF88]/80">الحالة</div><div className="mt-1 text-sm font-black text-[#00FF88]">{displayMatchStatus(match?.status)} {minute ? `- ${ar(minute)}′` : ''}</div></div><div className="rounded-xl border border-[#FFD700]/20 bg-[#FFD700]/10 px-3 py-2"><div className="text-[10px] font-black text-[#FFD700]/80">مصدر البيانات</div><div className="mt-1 text-sm font-black text-[#FFD700]">{provider}</div></div></div>
+          </div>
+
+          <div className="rounded-3xl border border-[#0FF0FC]/20 bg-[#0FF0FC]/[0.045] p-4">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2"><div><div className="text-sm font-black text-white">Match Intelligence</div><div className="mt-1 text-[11px] font-bold text-gray-500">مؤشر تقديري من الهجمات، الهجمات الخطيرة، التسديدات، الركنيات، وآخر الأحداث المتاحة.</div></div><span className="rounded-full border border-white/10 bg-black/30 px-3 py-1 text-[10px] font-black text-gray-400">ليس رقمًا رسميًا</span></div>
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <IntelligenceTile label="الفريق الأخطر حاليًا" value={sideName(pressure.leader, match?.homeTeam, match?.awayTeam)} hint={`${ar(pressure.home)} - ${ar(pressure.away)} مؤشر ضغط`} accent />
+              <IntelligenceTile label="رتم المباراة" value={pressure.rhythm} hint="هادئ / متوسط / عالي" />
+              <IntelligenceTile label="الخطورة اللحظية" value={pressure.danger} hint="منخفضة / متوسطة / مرتفعة" />
+              <IntelligenceTile label="آخر ٥ دقائق" value={windowLabel(pressure.window5)} hint={pressure.window5.available ? `${ar(pressure.window5.homeEvents)} - ${ar(pressure.window5.awayEvents)} أحداث مرصودة` : 'غير متوفر من الأحداث'} />
+              <IntelligenceTile label="آخر ١٥ دقيقة" value={windowLabel(pressure.window15)} hint={pressure.window15.available ? `${ar(pressure.window15.homeEvents)} - ${ar(pressure.window15.awayEvents)} أحداث مرصودة` : 'غير متوفر من الأحداث'} />
+              <IntelligenceTile label="ضغط فرنسا/الأول" value={ar(pressure.home)} hint={match?.homeTeam?.name || 'الفريق الأول'} />
+              <IntelligenceTile label="ضغط السنغال/الثاني" value={ar(pressure.away)} hint={match?.awayTeam?.name || 'الفريق الثاني'} />
+              <IntelligenceTile label="مصدر الذكاء" value="Live + Events" hint="بدون تخزين جديد في قاعدة البيانات" />
+            </div>
           </div>
 
           <div className="rounded-3xl border border-white/10 bg-black/20 p-3">
@@ -361,6 +437,7 @@ export default function InternalAnimationPlayer({ matchId = '', dbMatchId = '' }
 
         <aside className="rounded-2xl border border-white/10 bg-black/25 p-4">
           <div className="mb-3 flex items-center justify-between gap-2"><h3 className="font-black text-white">الأحداث والحالة</h3><Goal className="text-[#FFD700]" size={22} /></div>
+          <div className="mb-3 rounded-2xl border border-[#FFD700]/20 bg-[#FFD700]/10 p-3"><div className="text-[10px] font-black text-[#FFD700]/80">الأخطر الآن</div><div className="mt-1 text-base font-black text-[#FFD700]">{sideName(pressure.leader, match?.homeTeam, match?.awayTeam)}</div><div className="mt-1 text-[10px] font-bold text-gray-400">الرتم: {pressure.rhythm} · الخطورة: {pressure.danger}</div></div>
           <div className="mb-3 grid grid-cols-2 gap-2 text-[10px] font-black sm:grid-cols-3 xl:grid-cols-2">
             {EVENT_FILTERS.map((filter) => {
               const active = eventFilter === filter.key;
@@ -368,7 +445,7 @@ export default function InternalAnimationPlayer({ matchId = '', dbMatchId = '' }
             })}
           </div>
           <div className="max-h-[860px] space-y-2 overflow-y-auto pr-1">{filteredEvents.length ? filteredEvents.map((event) => { const active = event.id === selectedEvent?.id; return (<button key={event.id} type="button" onClick={() => selectEvent(event.id)} className={`block w-full rounded-xl border p-3 text-right transition ${active ? 'border-[#FFD700]/60 bg-[#FFD700]/12 shadow-[0_0_24px_rgba(255,215,0,0.10)]' : 'border-white/8 bg-white/[0.035] hover:border-[#0FF0FC]/35 hover:bg-white/[0.06]'}`}><div className="flex items-center gap-2 text-xs font-black text-[#FFD700]"><span>{eventIcon(event.type)}</span>{event.minute ? `د${event.minute}` : 'حدث'}<span className="mr-auto rounded-full border border-white/10 bg-black/25 px-2 py-0.5 text-[9px] text-gray-400">اضغط للعرض</span></div><p className="mt-1 text-sm leading-6 text-gray-200">{cleanEventDetail(event.detail)}</p></button>); }) : (<div className="rounded-xl border border-dashed border-white/10 p-6 text-center text-sm text-gray-500">لا توجد أحداث محفوظة لهذا الفلتر.</div>)}</div>
-          <div className="mt-3 flex items-center gap-2 rounded-xl border border-[#00FF88]/20 bg-[#00FF88]/10 px-3 py-2 text-[11px] font-bold text-[#00FF88]"><CheckCircle2 size={14} /> الفلتر والـ Replay يعملان من أحداث المباراة المحفوظة فقط.</div>
+          <div className="mt-3 flex items-center gap-2 rounded-xl border border-[#00FF88]/20 bg-[#00FF88]/10 px-3 py-2 text-[11px] font-bold text-[#00FF88]"><CheckCircle2 size={14} /> الفلتر والـ Replay والضغط اللحظي يعملون من البيانات المحفوظة فقط.</div>
         </aside>
       </div>
     </section>
