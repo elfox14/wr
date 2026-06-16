@@ -3,12 +3,18 @@ import { NextResponse, type NextRequest } from 'next/server';
 const OFFICIAL_PLAYER_REWRITE_HEADER = 'x-official-player-rewrite';
 const OFFICIAL_PLAYER_REWRITE_CONFIRMATION = 'CONFIRM_OFFICIAL_PLAYER_UPDATE';
 
+const OFFICIAL_SQUAD_MAINTENANCE_PATHS = [
+  '/api/admin/official-squads/audit',
+  '/api/admin/official-squads/prune',
+  '/api/admin/official-squads/repair-images',
+];
+
 function isOfficialSquadMutation(pathname: string, method: string) {
   if (method.toUpperCase() !== 'POST') return false;
   if (!pathname.startsWith('/api/admin/official-squads')) return false;
 
-  // Pruning hidden non-official players is a separate guarded cleanup endpoint.
-  if (pathname.startsWith('/api/admin/official-squads/prune')) return false;
+  // Maintenance endpoints have their own dry-run and confirmation guards.
+  if (OFFICIAL_SQUAD_MAINTENANCE_PATHS.some((path) => pathname.startsWith(path))) return false;
 
   return true;
 }
