@@ -129,6 +129,16 @@ function LoadingBox({ label }: { label: string }) {
   return <GoalStatCard title={label} value={LOADING_VALUE} subtitle="جاري التحميل" />;
 }
 
+function PlayerLeaderCard({ title, leader, metricLabel, tone }: { title: string; leader: any; metricLabel: string; tone: Tone }) {
+  const value = leader?.name ? shortText(String(leader.name), 18) : 'غير متوفر';
+  const subtitle = leader?.value
+    ? `${formatCount(Number(leader.value))} ${metricLabel}${leader?.team ? ` • ${shortText(teamName(leader.team), 14)}` : ''}`
+    : 'بانتظار بيانات موثقة';
+  const href = leader?.teamId ? `/teams/${encodeURIComponent(String(leader.teamId))}?player=${encodeURIComponent(String(leader.id))}` : '/players';
+
+  return <GoalStatCard title={title} value={value} subtitle={subtitle} source={leader ? 'DB' : '—'} tone={tone} href={href} />;
+}
+
 function PlayersGroupCard({ playerCount, teamCount, source }: { playerCount: number | null; teamCount: number | null; source: SourceName }) {
   return (
     <StatShell title="اللاعبون" source={source} tone="green" href="/players" itemClassName="col-span-1 sm:col-span-2 lg:col-span-2 xl:col-span-2">
@@ -202,6 +212,7 @@ function PenaltyMiniCard({ kickStats, usingFbref }: { kickStats: any; usingFbref
 export default function HomeTournamentStatsCard({ playersCount: serverPlayersCount, teamsCount }: Props) {
   const [stats, setStats] = useState<any>(null);
   const [fbrefStats, setFbrefStats] = useState<any>(null);
+  const [playerLeaders, setPlayerLeaders] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -209,9 +220,10 @@ export default function HomeTournamentStatsCard({ playersCount: serverPlayersCou
     async function loadStats() {
       if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
       try {
-        const [databaseResponse, fbrefResponse] = await Promise.all([
+        const [databaseResponse, fbrefResponse, playerLeadersResponse] = await Promise.all([
           fetch('/api/matches/summary-stats', { cache: 'no-store' }),
           fetch('/api/matches/fbref-summary-stats', { cache: 'no-store' }),
+          fetch('/api/players/leaders', { cache: 'no-store' }),
         ]);
         if (databaseResponse.ok) {
           const data = await databaseResponse.json();
@@ -220,6 +232,10 @@ export default function HomeTournamentStatsCard({ playersCount: serverPlayersCou
         if (fbrefResponse.ok) {
           const data = await fbrefResponse.json();
           if (!cancelled && data?.ok) setFbrefStats(data);
+        }
+        if (playerLeadersResponse.ok) {
+          const data = await playerLeadersResponse.json();
+          if (!cancelled && data?.ok) setPlayerLeaders(data);
         }
       } catch {
         // Keep the card readable if the endpoints are temporarily unavailable.
@@ -235,7 +251,7 @@ export default function HomeTournamentStatsCard({ playersCount: serverPlayersCou
     };
   }, []);
 
-  const isInitialLoading = isLoading && !stats && !fbrefStats;
+  const isInitialLoading = isLoading && !stats && !fbrefStats && !playerLeaders;
   const playerCount = pickNumber(stats?.playerCount, fbrefStats?.playerCount) ?? serverPlayersCount ?? DEFAULT_PLAYERS_COUNT;
   const totalGoals = pickNumber(stats?.totalGoals, fbrefStats?.totalGoals);
   const averageGoals = pickNumber(stats?.averageGoalsPerFinishedMatch, fbrefStats?.averageGoalsPerFinishedMatch);
@@ -254,6 +270,8 @@ export default function HomeTournamentStatsCard({ playersCount: serverPlayersCou
   const totalShotsOnTarget = pickNumber(finalStats?.totalShotsOnTarget, fbrefFinalStats?.totalShotsOnTarget);
   const cleanSheets = pickNumber(stats?.cleanSheets, fbrefStats?.cleanSheets);
   const teamCountValue = pickNumber(stats?.teamCount, fbrefStats?.teamCount ?? teamsCount);
+  const topScorer = playerLeaders?.leaders?.topScorer || null;
+  const topAssister = playerLeaders?.leaders?.topAssister || null;
   const usingFbrefShots = !usefulNumber(finalStats?.totalShots) && usefulNumber(fbrefFinalStats?.totalShots) !== null;
   const usingFbrefCards = (!usefulNumber(read(stats, 'yellow' + 'Cards')) && usefulNumber(read(fbrefStats, 'yellow' + 'Cards')) !== null) || (!usefulNumber(read(stats, 'red' + 'Cards')) && usefulNumber(read(fbrefStats, 'red' + 'Cards')) !== null);
   const usingFbrefGoals = !usefulNumber(stats?.totalGoals) && usefulNumber(fbrefStats?.totalGoals) !== null;
@@ -274,10 +292,12 @@ export default function HomeTournamentStatsCard({ playersCount: serverPlayersCou
 
       {isInitialLoading ? (
         <div className="grid auto-rows-[128px] grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-8 xl:grid-cols-12">
-          {['الأهداف', 'المتوسط', 'التسديدات', 'أكبر نتيجة', 'الشباك', 'اللاعبون', 'الكروت', 'الجزاءات'].map((label) => <LoadingBox key={label} label={label} />)}
+          {['الهداف', 'صانع الأهداف', 'الأهداف', 'المتوسط', 'التسديدات', 'أكبر نتيجة', 'الشباك', 'اللاعبون', 'الكروت', 'الجزاءات'].map((label) => <LoadingBox key={label} label={label} />)}
         </div>
       ) : (
         <div className="grid auto-rows-[128px] grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-8 xl:grid-cols-12">
+          <PlayerLeaderCard title="الهداف" leader={topScorer} metricLabel="هدف" tone="gold" />
+          <PlayerLeaderCard title="أكثر صانع أهداف" leader={topAssister} metricLabel="أسيست" tone="cyan" />
           <GoalStatCard title="أهداف البطولة" value={formatCount(totalGoals)} subtitle={`${formatCount(finishedMatches)} مباراة منتهية`} source={sourceFrom(usingFbrefGoals, true)} tone="gold" href="/matches" />
           <GoalStatCard title="متوسط الأهداف" value={formatDecimal(averageGoals)} subtitle="هدف لكل مباراة" source={sourceFrom(usingFbrefGoals, true)} tone="cyan" href="/matches" />
           <GoalStatCard title="التسديدات" value={`${formatCount(totalShots)} / ${formatCount(totalShotsOnTarget)}`} subtitle="إجمالي / على المرمى" source={sourceFrom(usingFbrefShots, true)} tone="cyan" href="/matches" />
