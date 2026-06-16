@@ -1,11 +1,47 @@
 'use client';
 
-import type { ComponentProps } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import HomeClientSportsNext from '@/components/HomeClientSportsNext';
+import HomeTournamentStatsCard from '@/components/HomeTournamentStatsCard';
+import HomeLiveMatchTicker from '@/components/HomeLiveMatchTicker';
+import HomeGroupStandingsWidget from '@/components/HomeGroupStandingsWidget';
 import { getTeamFlagUrl } from '@/lib/teamFlags';
 
-type HomeProps = ComponentProps<typeof HomeClientSportsNext>;
+type Team = {
+  id?: string | number | null;
+  name?: string | null;
+  code?: string | null;
+  image?: string | null;
+};
+
+type HomeMatch = {
+  id?: string | number | null;
+  animationMatchId?: string | number | null;
+  matchDate?: string | Date | null;
+  status?: string | null;
+  displayStatus?: string | null;
+  stage?: string | null;
+  group?: string | null;
+  groupPhase?: string | null;
+  homeScore?: number | null;
+  awayScore?: number | null;
+  homeTeam?: Team | null;
+  awayTeam?: Team | null;
+  isLiveNow?: boolean;
+  isHalfTime?: boolean;
+  isLikelyLiveByTime?: boolean;
+  minute?: number | null;
+  liveLabel?: string | null;
+};
+
+type Props = {
+  upcomingMatches?: HomeMatch[] | unknown[];
+  tickerMatches?: HomeMatch[] | unknown[];
+  nextMarqueeMatch?: HomeMatch | null | unknown;
+  playersCount?: number;
+  teamsCount?: number;
+  upcomingMatchesCount?: number;
+};
 
 type RegionalTeam = {
   name: string;
@@ -22,6 +58,9 @@ type TeamRegion = {
   paths: string[];
   teams: RegionalTeam[];
 };
+
+const MATCH_REFRESH_MS = 60_000;
+const GROUP_LETTERS = 'ABCDEFGHIJKL'.split('');
 
 const teamRegions: TeamRegion[] = [
   {
@@ -157,27 +196,322 @@ const teamRegions: TeamRegion[] = [
   },
 ];
 
-function formatCount(value: number) {
-  return new Intl.NumberFormat('ar-EG').format(value);
+function formatCount(value?: number | null, fallback = 0) {
+  return new Intl.NumberFormat('ar-EG').format(typeof value === 'number' && Number.isFinite(value) ? value : fallback);
+}
+
+function formatScore(value?: number | null) {
+  return typeof value === 'number' && Number.isFinite(value) ? new Intl.NumberFormat('en-US').format(value) : '0';
+}
+
+function teamLabel(team?: Team | null) {
+  return team?.name || team?.code || 'منتخب غير محدد';
+}
+
+function teamCode(team?: Team | null) {
+  return team?.code || team?.name?.slice(0, 3) || '---';
+}
+
+function getTeamHref(team?: Team | null) {
+  return team?.id ? `/teams/${encodeURIComponent(String(team.id))}` : '/teams';
+}
+
+function getMatchHref(match: HomeMatch) {
+  return match.id ? `/matches/${encodeURIComponent(String(match.id))}` : '/matches';
+}
+
+function getInteractiveHref(match: HomeMatch) {
+  return match.animationMatchId
+    ? `/animation-live?matchId=${encodeURIComponent(String(match.animationMatchId))}&lang=en&statsPanel=simple&teamPanel=1`
+    : '/animation-live';
+}
+
+function normalizeStatus(match?: HomeMatch | null) {
+  return String(match?.displayStatus || match?.status || '').toUpperCase();
+}
+
+function matchTime(match: HomeMatch) {
+  const date = match.matchDate ? new Date(match.matchDate) : null;
+  return date && !Number.isNaN(date.getTime()) ? date.getTime() : Number.MAX_SAFE_INTEGER;
+}
+
+function elapsedMinutes(match: HomeMatch, now: Date) {
+  const start = match.matchDate ? new Date(match.matchDate) : null;
+  if (!start || Number.isNaN(start.getTime())) return null;
+  return Math.floor((now.getTime() - start.getTime()) / 60_000);
+}
+
+function isGroupStage(match: HomeMatch) {
+  const group = String(match.groupPhase || match.group || match.stage || '').toUpperCase();
+  return group.includes('GROUP') || /^[A-L]$/.test(group);
+}
+
+function isOfficialFinished(match?: HomeMatch | null) {
+  return ['FINISHED', 'FT', 'AET', 'PEN'].includes(normalizeStatus(match));
+}
+
+function isScheduled(match?: HomeMatch | null) {
+  return ['SCHEDULED', 'TIMED', 'NOT_STARTED', 'NS'].includes(normalizeStatus(match));
+}
+
+function isStaleLive(match: HomeMatch, now: Date) {
+  const elapsed = elapsedMinutes(match, now);
+  if (elapsed === null) return false;
+  const maxMinutes = isGroupStage(match) ? 115 : 150;
+  return elapsed >= maxMinutes || (typeof match.minute === 'number' && match.minute >= maxMinutes);
+}
+
+function isLive(match: HomeMatch, now: Date) {
+  if (isOfficialFinished(match) || isStaleLive(match, now)) return false;
+  const status = normalizeStatus(match);
+  return status === 'IN_PLAY' || status === 'LIVE' || status === 'HT' || Boolean(match.isLiveNow && !match.isLikelyLiveByTime);
+}
+
+function isFinished(match: HomeMatch, now: Date) {
+  return isOfficialFinished(match) || isStaleLive(match, now);
+}
+
+function matchKey(match?: HomeMatch | null) {
+  return String(match?.id || `${teamLabel(match?.homeTeam)}-${teamLabel(match?.awayTeam)}-${match?.matchDate || ''}`);
+}
+
+function uniqueMatches(list: HomeMatch[]) {
+  const seen = new Set<string>();
+  return list.filter((match) => {
+    const key = matchKey(match);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function groupNumberLabel(match: HomeMatch) {
+  const raw = String(match.groupPhase || match.group || match.stage || '').trim().toUpperCase();
+  const letter = raw.match(/GROUP[_\s-]*([A-L])/)?.[1] || (/^[A-L]$/.test(raw) ? raw : '');
+  if (letter) return `المجموعة ${formatCount(GROUP_LETTERS.indexOf(letter) + 1)}`;
+  const number = raw.match(/(?:GROUP|المجموعة)?[_\s-]*(\d{1,2})/)?.[1];
+  if (number) return `المجموعة ${formatCount(Number(number))}`;
+  return 'كأس العالم 2026';
+}
+
+function formatMatchDate(value?: string | Date | null) {
+  if (!value) return 'موعد غير متوفر';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'موعد غير متوفر';
+  return new Intl.DateTimeFormat('ar-EG', { weekday: 'short', day: 'numeric', month: 'short' }).format(date);
+}
+
+function formatKickoffTime(value?: string | Date | null) {
+  if (!value) return '—';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '—';
+  return new Intl.DateTimeFormat('ar-EG', { hour: '2-digit', minute: '2-digit' }).format(date);
+}
+
+function countdownParts(match: HomeMatch, now: Date) {
+  const date = match.matchDate ? new Date(match.matchDate) : null;
+  const diffMs = date && !Number.isNaN(date.getTime()) ? date.getTime() - now.getTime() : 0;
+  const totalSeconds = Math.max(0, Math.floor(diffMs / 1000));
+  return {
+    active: diffMs > 0,
+    days: Math.floor(totalSeconds / 86_400),
+    hours: Math.floor((totalSeconds % 86_400) / 3_600),
+    minutes: Math.floor((totalSeconds % 3_600) / 60),
+    seconds: totalSeconds % 60,
+  };
+}
+
+function matchClock(match: HomeMatch, now: Date) {
+  if (!isLive(match, now)) return null;
+  if (typeof match.minute === 'number' && Number.isFinite(match.minute) && match.minute > 0) {
+    return `${formatCount(Math.min(Math.floor(match.minute), 115))}′`;
+  }
+
+  const elapsed = elapsedMinutes(match, now);
+  if (!elapsed || elapsed < 1) return null;
+  return `${formatCount(Math.min(elapsed, isGroupStage(match) ? 115 : 150))}′`;
+}
+
+function TeamBadge({ team, align }: { team?: Team | null; align: 'right' | 'left' }) {
+  const src = team?.image?.startsWith('http') ? team.image : getTeamFlagUrl({ code: team?.code, name: team?.name, image: team?.image }, 80);
+
+  return (
+    <Link href={getTeamHref(team)} className={`flex min-w-0 items-center gap-3 rounded-2xl border border-transparent p-2 transition hover:border-[#FFD700]/25 hover:bg-white/[0.055] ${align === 'left' ? 'flex-row-reverse text-left' : 'text-right'}`}>
+      <span className="h-10 w-10 shrink-0 rounded-xl border border-white/10 bg-cover bg-center bg-no-repeat" style={src ? { backgroundImage: `url(${src})` } : undefined}>
+        {!src ? <span className="flex h-full w-full items-center justify-center text-[10px] font-black text-[#FFD700]">{teamCode(team)}</span> : null}
+      </span>
+      <span className="min-w-0">
+        <span className="block truncate text-sm font-black text-white">{teamLabel(team)}</span>
+        <span className="mt-0.5 block text-[10px] font-bold text-gray-500">{teamCode(team)}</span>
+      </span>
+    </Link>
+  );
+}
+
+function ScoreBox({ value }: { value?: number | null }) {
+  return <span className="flex h-11 min-w-11 items-center justify-center rounded-xl border border-[#FFD700]/35 bg-[#FFD700]/10 px-2 text-xl font-black leading-none text-[#FFD700]" dir="ltr">{formatScore(value)}</span>;
+}
+
+function MatchScore({ match }: { match: HomeMatch }) {
+  return (
+    <div className="flex items-center justify-center gap-1.5 rounded-2xl border border-white/10 bg-black/35 px-2 py-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]" dir="rtl" aria-label="النتيجة: صاحب الأرض يمين والضيف يسار">
+      <ScoreBox value={match.homeScore} />
+      <span className="h-7 w-px rounded-full bg-white/15" />
+      <ScoreBox value={match.awayScore} />
+    </div>
+  );
+}
+
+function CountdownPill({ match, now }: { match: HomeMatch; now: Date }) {
+  const parts = countdownParts(match, now);
+  const clock = matchClock(match, now);
+
+  if (isLive(match, now)) {
+    return (
+      <span className="inline-flex items-center gap-2 rounded-2xl border border-[#00FF88]/25 bg-[#00FF88]/10 px-3 py-2 text-xs font-black text-[#00FF88]">
+        <span className="h-2 w-2 animate-pulse rounded-full bg-[#00FF88]" /> مباشر الآن {clock ? <span className="rounded-lg bg-black/30 px-2 py-0.5 text-white">{clock}</span> : null}
+      </span>
+    );
+  }
+
+  if (!parts.active) return <span className="rounded-2xl border border-[#FFD700]/20 bg-[#FFD700]/10 px-3 py-2 text-xs font-black text-[#FFD700]">بانتظار تأكيد البداية</span>;
+
+  const visibleParts = parts.days > 0
+    ? `${formatCount(parts.days)} يوم ${formatCount(parts.hours)} ساعة`
+    : parts.hours > 0
+      ? `${formatCount(parts.hours)} ساعة ${formatCount(parts.minutes)} دقيقة`
+      : `${formatCount(parts.minutes)} دقيقة ${formatCount(parts.seconds)} ثانية`;
+
+  return (
+    <span className="inline-flex items-center gap-2 rounded-2xl border border-[#0FF0FC]/25 bg-[#0FF0FC]/10 px-3 py-2 text-xs font-black text-[#0FF0FC]">
+      <span className="h-2 w-2 rounded-full bg-[#0FF0FC] shadow-[0_0_14px_rgba(15,240,252,0.8)]" /> بعد {visibleParts}
+    </span>
+  );
+}
+
+function MatchRow({ match, now, variant = 'normal' }: { match: HomeMatch; now: Date; variant?: 'live' | 'normal' }) {
+  return (
+    <article className={`relative overflow-hidden rounded-2xl border p-3 transition ${variant === 'live' ? 'border-[#00FF88]/25 bg-[radial-gradient(circle_at_top,rgba(0,255,136,0.12),transparent_32%),rgba(255,255,255,0.045)]' : 'border-white/10 bg-black/25 hover:border-[#0FF0FC]/30'}`}>
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <span className="rounded-full border border-[#FFD700]/20 bg-[#FFD700]/10 px-3 py-1 text-[11px] font-black text-[#FFD700]">{groupNumberLabel(match)}</span>
+        <span className="rounded-full border border-white/10 bg-white/[0.06] px-3 py-1 text-[11px] font-black text-gray-200">{formatMatchDate(match.matchDate)}</span>
+        <span className="rounded-full border border-[#0FF0FC]/20 bg-[#0FF0FC]/10 px-3 py-1 text-[12px] font-black text-[#0FF0FC]">{formatKickoffTime(match.matchDate)}</span>
+        <CountdownPill match={match} now={now} />
+      </div>
+
+      <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2">
+        <TeamBadge team={match.homeTeam} align="right" />
+        <MatchScore match={match} />
+        <TeamBadge team={match.awayTeam} align="left" />
+      </div>
+
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <Link href={getMatchHref(match)} className="rounded-xl border border-white/10 bg-white/[0.05] px-3 py-2 text-center text-[11px] font-black text-gray-200 transition hover:bg-white/[0.1]">دخول المباراة</Link>
+        <Link href={getInteractiveHref(match)} className="rounded-xl bg-[#0FF0FC] px-3 py-2 text-center text-[11px] font-black text-black transition hover:bg-[#4AFAFF]">البث التفاعلي</Link>
+      </div>
+    </article>
+  );
+}
+
+function MatchCenter({ fallbackMatches = [], nextMatch = null }: { fallbackMatches?: HomeMatch[]; nextMatch?: HomeMatch | null }) {
+  const [matches, setMatches] = useState<HomeMatch[]>([]);
+  const [now, setNow] = useState(() => new Date());
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(new Date()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadMatches() {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+      try {
+        const response = await fetch('/api/matches', { cache: 'no-store' });
+        if (!response.ok) return;
+        const data = await response.json();
+        const list = Array.isArray(data) ? data : Array.isArray(data?.matches) ? data.matches : [];
+        if (!cancelled) setMatches(list);
+      } catch {
+        // Keep server fallback matches if the full matches endpoint is unavailable.
+      }
+    }
+
+    loadMatches();
+    const timer = window.setInterval(loadMatches, MATCH_REFRESH_MS);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, []);
+
+  const mergedMatches = useMemo(() => uniqueMatches([...(nextMatch ? [nextMatch] : []), ...(matches.length ? matches : fallbackMatches)]), [nextMatch, matches, fallbackMatches]);
+  const sortedMatches = useMemo(() => [...mergedMatches].sort((a, b) => matchTime(a) - matchTime(b)), [mergedMatches]);
+  const liveMatch = sortedMatches.find((match) => isLive(match, now)) || null;
+  const upcomingMatches = sortedMatches.filter((match) => isScheduled(match) && !isFinished(match, now)).slice(0, 2);
+
+  return (
+    <section className="flex h-full min-h-[420px] flex-col overflow-hidden rounded-3xl border border-white/10 bg-white/[0.04] p-4 text-white shadow-[0_14px_38px_rgba(0,0,0,0.2)] backdrop-blur" aria-label="مركز المباريات">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="text-xs font-black uppercase tracking-[0.16em] text-[#FFD700]">Match Center</p>
+          <h1 className="mt-1 text-xl font-black text-white md:text-2xl">مركز المباريات</h1>
+        </div>
+        <Link href="/matches" className="rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-[11px] font-black text-white transition hover:border-[#0FF0FC]/40 hover:bg-white/[0.14]">جدول المباريات</Link>
+      </div>
+
+      <div className="flex flex-1 flex-col gap-3">
+        {liveMatch ? (
+          <div>
+            <div className="mb-2 text-[11px] font-black text-[#00FF88]">المباراة المباشرة</div>
+            <MatchRow match={liveMatch} now={now} variant="live" />
+          </div>
+        ) : (
+          <div className="rounded-2xl border border-dashed border-white/10 bg-black/20 p-4 text-sm font-bold text-gray-400">لا توجد مباراة مباشرة مؤكدة الآن.</div>
+        )}
+
+        <div className="grid flex-1 gap-3 md:grid-cols-2">
+          {upcomingMatches.map((match) => <MatchRow key={matchKey(match)} match={match} now={now} />)}
+          {!upcomingMatches.length ? <div className="rounded-2xl border border-dashed border-white/10 bg-black/20 p-4 text-sm font-bold text-gray-400 md:col-span-2">لا توجد مباراتان قادمتان جاهزتان للعرض الآن.</div> : null}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function ContentHubCard() {
+  const items = [
+    ['الأخبار والتحليل', 'تقارير وتحليلات رياضية منفصلة عن الجانب الترفيهي.', '/news'],
+    ['الإحصائيات', 'ملخصات مباشرة للأهداف والبطاقات وحالة المباريات.', '/matches'],
+    ['المنتخبات', 'بطاقات المنتخبات، اللاعبين، والمعلومات الأساسية.', '/teams'],
+  ] as const;
+
+  return (
+    <section className="rounded-3xl border border-white/10 bg-white/[0.04] p-4 shadow-card backdrop-blur">
+      <div className="mb-4">
+        <p className="text-xs font-black uppercase tracking-[0.16em] text-[#FFD700]">Content Hub</p>
+        <h2 className="mt-1 text-2xl font-black text-white">مركز المحتوى</h2>
+        <p className="mt-1 text-sm font-semibold text-gray-400">كل ما يخص البطولة من مباريات، منتخبات، وتحليل.</p>
+      </div>
+      <div className="grid gap-3 md:grid-cols-3">
+        {items.map(([title, body, href]) => (
+          <Link key={title} href={href} className="rounded-2xl border border-white/10 bg-black/25 p-4 transition hover:-translate-y-0.5 hover:border-[#0FF0FC]/30 hover:bg-white/[0.07]">
+            <h3 className="font-black text-white">{title}</h3>
+            <p className="mt-2 text-xs font-bold leading-6 text-gray-400">{body}</p>
+          </Link>
+        ))}
+      </div>
+    </section>
+  );
 }
 
 function TeamMapLabel({ team }: { team: RegionalTeam }) {
   const flagUrl = getTeamFlagUrl({ code: team.code, name: team.name }, 80);
 
   return (
-    <Link
-      href={`/teams?search=${encodeURIComponent(team.name)}`}
-      title={team.name}
-      className="absolute z-10 flex -translate-x-1/2 -translate-y-1/2 items-center gap-1.5 rounded-full border border-white/20 bg-black/80 px-2.5 py-1.5 text-[11px] font-black text-white shadow-[0_10px_26px_rgba(0,0,0,0.48)] backdrop-blur transition hover:z-20 hover:scale-110 hover:border-[#FFD700]/70 hover:bg-[#111827]"
-      style={{ left: `${team.x}%`, top: `${team.y}%` }}
-    >
-      <span
-        className="h-4 w-6 shrink-0 rounded-[3px] border border-white/20 bg-cover bg-center shadow-sm"
-        style={flagUrl ? { backgroundImage: `url(${flagUrl})` } : undefined}
-        aria-hidden="true"
-      >
-        {!flagUrl ? team.flag : null}
-      </span>
+    <Link href={`/teams?search=${encodeURIComponent(team.name)}`} title={team.name} className="absolute z-10 flex -translate-x-1/2 -translate-y-1/2 items-center gap-1.5 rounded-full border border-white/20 bg-black/80 px-2.5 py-1.5 text-[11px] font-black text-white shadow-[0_10px_26px_rgba(0,0,0,0.48)] backdrop-blur transition hover:z-20 hover:scale-110 hover:border-[#FFD700]/70 hover:bg-[#111827]" style={{ left: `${team.x}%`, top: `${team.y}%` }}>
+      <span className="h-4 w-6 shrink-0 rounded-[3px] border border-white/20 bg-cover bg-center shadow-sm" style={flagUrl ? { backgroundImage: `url(${flagUrl})` } : undefined} aria-hidden="true">{!flagUrl ? team.flag : null}</span>
       <span className="whitespace-nowrap leading-none">{team.name}</span>
     </Link>
   );
@@ -228,46 +562,36 @@ function FullWidthTournamentMap() {
   );
 }
 
-export default function HomeClientSportsNextWideMap(props: HomeProps) {
+export default function HomeClientSportsNextWideMap({
+  upcomingMatches = [],
+  tickerMatches = [],
+  nextMarqueeMatch = null,
+  playersCount = 0,
+  teamsCount = 0,
+  upcomingMatchesCount = 0,
+}: Props) {
+  const safeUpcomingMatches = Array.isArray(upcomingMatches) ? (upcomingMatches as HomeMatch[]) : [];
+  const safeTickerMatches = Array.isArray(tickerMatches) ? (tickerMatches as HomeMatch[]) : [];
+  const safeNextMatch = nextMarqueeMatch as HomeMatch | null;
+
   return (
-    <div className="home-wide-map-override bg-[#05070b]">
-      <style jsx global>{`
-        .home-wide-map-override > main > div:last-child > section:last-child {
-          display: none !important;
-        }
+    <div className="bg-[#05070b]">
+      <main dir="rtl" className="mx-auto max-w-7xl space-y-6 px-3 py-4 sm:px-4 lg:px-6">
+        <HomeLiveMatchTicker matches={safeTickerMatches} />
 
-        .home-wide-map-override > main > div:last-child > section:first-child {
-          grid-column: 1 / -1;
-        }
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3 lg:items-stretch">
+          <div className="lg:col-span-2">
+            <MatchCenter fallbackMatches={safeUpcomingMatches} nextMatch={safeNextMatch} />
+          </div>
+          <div className="lg:col-span-1">
+            <HomeGroupStandingsWidget />
+          </div>
+        </div>
 
-        .home-wide-map-override main section[aria-label='مركز المباريات'] {
-          padding: 0.75rem !important;
-        }
+        <HomeTournamentStatsCard playersCount={playersCount} teamsCount={teamsCount} upcomingMatchesCount={upcomingMatchesCount} />
+        <ContentHubCard />
+      </main>
 
-        .home-wide-map-override main section[aria-label='مركز المباريات'] h1 {
-          font-size: 1.15rem !important;
-          line-height: 1.45 !important;
-        }
-
-        .home-wide-map-override main section[aria-label='مركز المباريات'] h2 {
-          font-size: 1rem !important;
-        }
-
-        .home-wide-map-override main section[aria-label='مركز المباريات'] article {
-          border-radius: 1.25rem !important;
-          padding: 0.85rem !important;
-        }
-
-        .home-wide-map-override main section[aria-label='مركز المباريات'] [aria-label='العد التنازلي للمباراة المرتقبة'] {
-          display: none !important;
-        }
-
-        .home-wide-map-override main section[aria-label='مركز المباريات'] article + div {
-          margin-top: 0.75rem !important;
-          margin-bottom: 0.75rem !important;
-        }
-      `}</style>
-      <HomeClientSportsNext {...props} />
       <FullWidthTournamentMap />
     </div>
   );
