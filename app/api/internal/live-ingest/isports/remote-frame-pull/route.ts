@@ -1,7 +1,8 @@
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/adminAuth';
 import { extractISportsMatchId, htmlToText, parseISportsVisibleStats } from '@/lib/live-ingest/isports-page';
+import prisma from '@/lib/prisma';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -9,7 +10,19 @@ export const runtime = 'nodejs';
 
 type FrameMode = 'live' | 'timeline';
 
+type TimelineEvent = {
+  side: 'home' | 'away' | null;
+  teamId: string | null;
+  minute: number | null;
+  displayMinute: string | null;
+  type: string;
+  title: string;
+  detail: string;
+  cssClass: string | null;
+};
+
 const HOSTS = new Set(['isportslive8.com', 'www.isportslive8.com']);
+const TIMELINE_SOURCE = 'ISPORTS_TIMELINE';
 
 function json(value: unknown, status = 200) {
   return NextResponse.json(value, { status, headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } });
@@ -92,6 +105,109 @@ function maskUrl(value: string) {
     if (url.searchParams.has(key)) url.searchParams.set(key, '***');
   }
   return url.toString();
+}
+
+function unescapeHtml(value: string) {
+  return String(value || '')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;|&apos;/gi, "'")
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .trim();
+}
+
+function timelineType(title: string, cssClass?: string | null) {
+  const lower = `${title} ${cssClass || ''}`.toLowerCase().replace(/\s+/g, ' ');
+  if (lower.includes('goal') || /\bb\b/.test(lower)) return 'goal';
+  if (lower.includes('corner') || /\bf\b/.test(lower)) return 'corner';
+  if (lower.includes('yellow')) return 'yellow_card';
+  if (lower.includes('red')) return 'red_card';
+  if (lower.includes('substitution') || /\bc\b/.test(lower)) return 'substitution';
+  return 'timeline_event';
+}
+
+function parseMinute(title: string) {
+  const injury = title.match(/injury\s*time\s+(\d{1,3})\s*\+\s*(\d{1,2})['`′]?/i);
+  if (injury) {
+    const base = Number(injury[1]);
+    const extra = Number(injury[2]);
+    return {
+      minute: Number.isFinite(base) && Number.isFinite(extra) ? base + extra : null,
+      displayMinute: `${injury[1]}+${injury[2]}'`,
+    };
+  }
+  const normal = title.match(/(?:^|\s)(\d{1,3})\s*['`′]/);
+  if (normal) {
+    const minute = Number(normal[1]);
+    return { minute: Number.isFinite(minute) ? minute : null, displayMinute: `${normal[1]}'` };
+  }
+  return { minute: null, displayMinute: null };
+}
+
+function sideForIcon(html: string, index: number): 'home' | 'away' | null {
+  const before = html.slice(Math.max(0, index - 15000), index);
+  const home = Math.max(before.lastIndexOf('id="homeLine_'), before.lastIndexOf("id='homeLine_"));
+  const guest = Math.max(before.lastIndexOf('id="guestLine_'), before.lastIndexOf("id='guestLine_"));
+  if (home < 0 && guest < 0) return null;
+  return home > guest ? 'home' : 'away';
+}
+
+function extractTimelineEvents(html: string, match?: any): TimelineEvent[] {
+  const events = new Map<string, TimelineEvent>();
+  const iconRegex = /<i\b([^>]*\btitle\s*=\s*["']([^"']+)["'][^>]*)>/gi;
+  for (const item of html.matchAll(iconRegex)) {
+    const attrs = item[1] || '';
+    const title = unescapeHtml(item[2] || '');
+    if (!title) continue;
+    const cssClass = unescapeHtml(attrs.match(/\bclass\s*=\s*["']([^"']+)["']/i)?.[1] || '') || null;
+    const side = sideForIcon(html, item.index || 0);
+    const { minute, displayMinute } = parseMinute(title);
+    const type = timelineType(title, cssClass);
+    const teamId = side === 'home' ? match?.homeTeamId || match?.homeTeam?.id || null : side === 'away' ? match?.awayTeamId || match?.awayTeam?.id || null : null;
+    const detail = `${side ? (side === 'home' ? 'Home' : 'Away') + ' - ' : ''}${title}`;
+    const event: TimelineEvent = { side, teamId, minute, displayMinute, type, title, detail, cssClass };
+    const key = `${side || 'n'}:${minute ?? 'x'}:${type}:${title}`.toLowerCase();
+    events.set(key, event);
+  }
+  return [...events.values()].sort((a, b) => (a.minute ?? 999) - (b.minute ?? 999) || a.detail.localeCompare(b.detail));
+}
+
+async function getMatchForTimeline(input: { dbMatchId?: string | null; providerMatchId: number }) {
+  if (input.dbMatchId) {
+    return prisma.match.findUnique({
+      where: { id: input.dbMatchId },
+      include: { homeTeam: { select: { id: true, name: true, code: true } }, awayTeam: { select: { id: true, name: true, code: true } } },
+    });
+  }
+  return prisma.match.findFirst({
+    where: { animationMatchId: input.providerMatchId },
+    include: { homeTeam: { select: { id: true, name: true, code: true } }, awayTeam: { select: { id: true, name: true, code: true } } },
+  });
+}
+
+async function saveTimelineEvents(match: any, events: TimelineEvent[], sourceUrl: string, replace = true) {
+  if (!match?.id || !events.length) return { deleted: 0, inserted: 0 };
+  let deleted = 0;
+  if (replace) {
+    const result = await prisma.matchEvent.deleteMany({ where: { matchId: match.id, sourceName: TIMELINE_SOURCE } });
+    deleted = result.count;
+  }
+  await prisma.matchEvent.createMany({
+    data: events.map((event) => ({
+      id: randomUUID(),
+      matchId: match.id,
+      minute: event.minute,
+      type: event.type,
+      teamId: event.teamId,
+      playerId: null,
+      playerName: null,
+      detail: event.detail,
+      sourceName: TIMELINE_SOURCE,
+      sourceUrl,
+    })),
+  });
+  return { deleted, inserted: events.length };
 }
 
 async function fetchWrapper(url: string) {
@@ -186,9 +302,19 @@ async function handler(req: Request) {
     const frameUrl = buildFrameUrl(wrapperUrl, matchId, mode, credentials.ak, credentials.sk);
     const timeoutMs = clamp(url.searchParams.get('timeoutMs'), Number(process.env.LIVE_STATS_REMOTE_BROWSER_TIMEOUT_MS || 25000), 5000, 60000);
     const waitMs = clamp(url.searchParams.get('waitMs'), Number(process.env.LIVE_STATS_REMOTE_BROWSER_WAIT_MS || 8000), 1000, 25000);
+    const save = boolFromEnv(url.searchParams.get('save'));
+    const replace = url.searchParams.get('replace') === null ? true : boolFromEnv(url.searchParams.get('replace'));
+    const dbMatchId = url.searchParams.get('dbMatchId');
     const rendered = await renderWithBrowserless(frameUrl, timeoutMs, waitMs);
     const text = htmlToText(rendered.html);
     const stats = parseISportsVisibleStats(text);
+    const match = mode === 'timeline' && (save || url.searchParams.get('includeMatch') === 'true')
+      ? await getMatchForTimeline({ dbMatchId, providerMatchId: matchId })
+      : null;
+    const timelineEvents = mode === 'timeline' ? extractTimelineEvents(rendered.html, match) : [];
+    const saveResult = save && mode === 'timeline'
+      ? match ? await saveTimelineEvents(match, timelineEvents, wrapperUrl, replace) : { error: 'No local match found by dbMatchId or animationMatchId', deleted: 0, inserted: 0 }
+      : null;
 
     return json({
       ok: true,
@@ -213,9 +339,20 @@ async function handler(req: Request) {
         textLength: text.length,
         textSample: text.slice(0, 1600),
       },
+      match: match ? {
+        id: match.id,
+        status: match.status,
+        homeTeam: match.homeTeam,
+        awayTeam: match.awayTeam,
+      } : null,
       hasStats: Object.entries(stats).some(([key, value]) => !['homeScore', 'awayScore', 'minute'].includes(key) && value !== null),
       stats,
-      note: 'Diagnostic only. This renders the signed iframe through Browserless /content without requiring Chromium on Render.',
+      timeline: {
+        eventsCount: timelineEvents.length,
+        events: timelineEvents,
+        save: saveResult,
+      },
+      note: save ? 'Rendered with Browserless, parsed timeline icons, and saved MatchEvent rows when a local match was found.' : 'Diagnostic only unless save=true. This renders the signed iframe through Browserless /content without requiring Chromium on Render.',
     });
   } catch (error: any) {
     return json({ ok: false, error: error?.message || 'Internal Server Error' }, 500);
