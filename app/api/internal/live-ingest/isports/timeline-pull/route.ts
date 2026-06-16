@@ -16,6 +16,14 @@ const SPLIT_COLUMN = ',';
 
 type TimelineEventKind = 'dangerous_attack' | 'corner' | 'goal' | 'card_or_substitution' | 'unknown';
 
+type FetchedText = {
+  ok: boolean;
+  status: number;
+  text: string;
+  contentType: string | null;
+  cookies: string[];
+};
+
 function json(value: unknown, status = 200) {
   return NextResponse.json(value, { status, headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } });
 }
@@ -53,7 +61,25 @@ function timelineWrapperUrl(matchId: number, lang = 'en', version = '1') {
   return url.toString();
 }
 
-async function fetchText(url: string, options?: RequestInit) {
+function getSetCookie(headers: Headers) {
+  const getSetCookieFn = (headers as any).getSetCookie;
+  if (typeof getSetCookieFn === 'function') return getSetCookieFn.call(headers) as string[];
+  const single = headers.get('set-cookie');
+  return single ? [single] : [];
+}
+
+function cookieHeaderFrom(fetches: Array<FetchedText | null | undefined>) {
+  const pairs: string[] = [];
+  for (const fetched of fetches) {
+    for (const cookie of fetched?.cookies || []) {
+      const pair = cookie.split(';')[0]?.trim();
+      if (pair && !pairs.includes(pair)) pairs.push(pair);
+    }
+  }
+  return pairs.join('; ');
+}
+
+async function fetchText(url: string, options?: RequestInit): Promise<FetchedText> {
   const response = await fetch(url, {
     cache: 'no-store',
     ...options,
@@ -65,13 +91,14 @@ async function fetchText(url: string, options?: RequestInit) {
     },
   });
   const text = await response.text();
-  return { ok: response.ok, status: response.status, text, contentType: response.headers.get('content-type') };
+  return { ok: response.ok, status: response.status, text, contentType: response.headers.get('content-type'), cookies: getSetCookie(response.headers) };
 }
 
 function extractFrameCredentials(html: string) {
   const ak = lastRegexValue(html, /USER_FEIJING88\.ak\s*=\s*["']([^"']+)["']/g)
     || lastRegexValue(html, /\bak\s*:\s*["']([^"']+)["']/g);
-  const sk = lastRegexValue(html, /USER_FEIJING88\.sk\s*=\s*["']([^"']+)["']/g)
+  const sk = lastRegexValue(html, /USER_FEIJING88\.sk\s*=\s*["']([^"']+)"/g)
+    || lastRegexValue(html, /USER_FEIJING88\.sk\s*=\s*["']([^"']+)["']/g)
     || lastRegexValue(html, /\bsk\s*:\s*["']([^"']+)["']/g);
   if (!ak || !sk) return null;
   return { ak, sk };
@@ -152,6 +179,85 @@ function parseFlashData(data: string) {
   };
 }
 
+function looksLikeHtmlError(text: string) {
+  const sample = String(text || '').slice(0, 1200).toLowerCase();
+  return /<!doctype|<html|error_404|404|<body|<head/.test(sample);
+}
+
+function looksLikeFlashData(text: string, matchId: number) {
+  if (!text || looksLikeHtmlError(text)) return false;
+  const sample = String(text || '').slice(0, 6000);
+  return sample.includes(String(matchId)) && sample.includes(DATA_TYPE) && sample.includes(SPLIT_RECORD);
+}
+
+function buildFrameUrl(input: { wrapperUrl: string; matchId: number; ak: string; sk: string }) {
+  const wrapper = new URL(input.wrapperUrl);
+  const lang = wrapper.searchParams.get('lang') || 'en';
+  const version = wrapper.searchParams.get('v') || '1';
+  const isDark = wrapper.searchParams.get('isDark');
+  const ts = Math.floor(Date.now() / 1000);
+  const auth = md5(`${input.ak}${ts}${input.sk}`);
+  const frame = new URL('/football/process/attackdetail.aspx', wrapper.origin);
+  frame.searchParams.set('matchId', String(input.matchId));
+  frame.searchParams.set('accessKey', input.ak);
+  frame.searchParams.set('ts', String(ts));
+  frame.searchParams.set('auth', auth);
+  frame.searchParams.set('r', String(Date.now()));
+  if (isDark !== null) frame.searchParams.set('isDark', isDark);
+  if (lang) frame.searchParams.set('lang', lang);
+  if (version === '2') frame.searchParams.set('showLogo', '1');
+  return frame.toString();
+}
+
+function maskUrl(value: string) {
+  const url = new URL(value);
+  for (const key of ['accessKey', 'auth', 'ts', 'r', 't']) {
+    if (url.searchParams.has(key)) url.searchParams.set(key, '***');
+  }
+  return url.toString();
+}
+
+function flashUrlCandidates(matchId: number) {
+  const t = Date.now();
+  const id = encodeURIComponent(String(matchId));
+  return [
+    `https://www.isportslive8.com/flashdata/get?id=${id}&t=${t}`,
+    `https://www.isportslive8.com/football/flashdata/get?id=${id}&t=${t}`,
+    `https://zhibo.feijing88.com/flashdata/get?id=${id}&t=${t}`,
+    `https://live.titan007.com/flashdata/get?id=${id}&t=${t}`,
+    `https://www.isportslive8.com/flashdata/${id}.js?t=${t}`,
+    `https://zhibo.feijing88.com/flashdata/${id}.js?t=${t}`,
+  ];
+}
+
+async function pullFlashCandidates(input: { matchId: number; frameUrl: string; cookieHeader: string }) {
+  const results = [];
+  for (const candidateUrl of flashUrlCandidates(input.matchId)) {
+    try {
+      const fetched = await fetchText(candidateUrl, {
+        headers: {
+          referer: input.frameUrl,
+          ...(input.cookieHeader ? { cookie: input.cookieHeader } : {}),
+        },
+      });
+      const parsed = parseFlashData(fetched.text);
+      results.push({
+        sourceUrl: maskUrl(candidateUrl),
+        ok: fetched.ok,
+        status: fetched.status,
+        contentType: fetched.contentType,
+        textLength: fetched.text.length,
+        looksLikeHtmlError: looksLikeHtmlError(fetched.text),
+        looksLikeFlashData: looksLikeFlashData(fetched.text, input.matchId),
+        parsed,
+      });
+    } catch (error: any) {
+      results.push({ sourceUrl: maskUrl(candidateUrl), ok: false, error: String(error?.message || error).slice(0, 260) });
+    }
+  }
+  return results;
+}
+
 async function handler(req: Request) {
   const authz = await requireAdmin(req);
   if (!authz.authorized) return authz.error;
@@ -167,6 +273,10 @@ async function handler(req: Request) {
     const wrapper = await fetchText(wrapperUrl);
     const credentials = extractFrameCredentials(wrapper.text);
     if (!credentials) return json({ ok: false, error: 'Could not extract iSports credentials from wrapper', wrapper: { status: wrapper.status, ok: wrapper.ok, htmlLength: wrapper.text.length } }, 502);
+
+    const frameUrl = buildFrameUrl({ wrapperUrl, matchId, ak: credentials.ak, sk: credentials.sk });
+    const frame = await fetchText(frameUrl, { headers: { referer: wrapperUrl } });
+    const cookieHeader = cookieHeaderFrom([wrapper, frame]);
 
     const ts = Math.floor(Date.now() / 1000);
     const auth = md5(`${credentials.ak}${ts}${credentials.sk}`);
@@ -184,22 +294,27 @@ async function handler(req: Request) {
     const configResponse = await fetchText('https://www.isportslive8.com/iapi', {
       method: 'POST',
       body: JSON.stringify(configBody),
-      headers: { 'content-type': 'application/json;charset=utf8', origin: 'https://www.isportslive8.com' },
+      headers: {
+        'content-type': 'application/json;charset=utf8',
+        origin: 'https://www.isportslive8.com',
+        referer: frameUrl,
+        ...(cookieHeader ? { cookie: cookieHeader } : {}),
+      },
     });
     const configJson = parseJsonSafe(configResponse.text);
-
-    const flashUrl = `https://www.isportslive8.com/flashdata/get?id=${encodeURIComponent(String(matchId))}&t=${Date.now()}`;
-    const flash = await fetchText(flashUrl, { headers: { referer: `https://www.isportslive8.com/football/process/attackdetail.aspx?matchId=${matchId}` } });
-    const parsedFlash = parseFlashData(flash.text);
+    const flashCandidates = await pullFlashCandidates({ matchId, frameUrl, cookieHeader: cookieHeaderFrom([wrapper, frame, configResponse]) || cookieHeader });
+    const selectedFlash = flashCandidates.find((item: any) => item.looksLikeFlashData) || flashCandidates.find((item: any) => item.ok && !item.looksLikeHtmlError) || flashCandidates[0] || null;
 
     return json({
       ok: true,
       mode: 'isports_timeline_pull',
       matchId,
-      wrapper: { sourceUrl: wrapperUrl, ok: wrapper.ok, status: wrapper.status, htmlLength: wrapper.text.length },
-      config: { ok: configResponse.ok, status: configResponse.status, resultCode: configJson?.resultCode ?? null, sample: configResponse.text.slice(0, 1000) },
-      flash: { sourceUrl: flashUrl, ok: flash.ok, status: flash.status, contentType: flash.contentType, textLength: flash.text.length, parsed: parsedFlash },
-      note: 'Diagnostic only. It pulls /flashdata/get?id=matchId and parses schedule/events using the protocol found in event.js.',
+      wrapper: { sourceUrl: wrapperUrl, ok: wrapper.ok, status: wrapper.status, htmlLength: wrapper.text.length, setCookieCount: wrapper.cookies.length },
+      frame: { sourceUrl: maskUrl(frameUrl), ok: frame.ok, status: frame.status, htmlLength: frame.text.length, textSample: frame.text.slice(0, 200), setCookieCount: frame.cookies.length },
+      config: { ok: configResponse.ok, status: configResponse.status, resultCode: configJson?.resultCode ?? null, sample: configResponse.text.slice(0, 700), setCookieCount: configResponse.cookies.length },
+      flash: selectedFlash,
+      flashCandidates,
+      note: 'Diagnostic only. It tries the signed iframe context plus multiple /flashdata/get host/path candidates, then parses schedule/events using the protocol found in event.js.',
     });
   } catch (error: any) {
     return json({ ok: false, error: error?.message || 'Internal Server Error' }, 500);
