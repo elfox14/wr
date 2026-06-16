@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { Activity, AlertTriangle, Clock, CornerDownRight, Database, ShieldAlert, Target, Zap } from 'lucide-react';
+import { Activity, AlertTriangle, CornerDownRight, ShieldAlert, Target, Zap } from 'lucide-react';
 import { getTeamFlagUrl } from '@/lib/teamFlags';
 
 type Team = { id?: string; name?: string; code?: string; image?: string } | null;
@@ -122,38 +122,6 @@ function hasAnyStat(snapshot: Snapshot) {
   ].some((key) => snapshot[key] !== null && snapshot[key] !== undefined);
 }
 
-function hasBasicSnapshot(snapshot: Snapshot) {
-  return Boolean(snapshot?.provider && (snapshot.homeScore !== null || snapshot.awayScore !== null || snapshot.minute !== null));
-}
-
-function isFootballDataProvider(snapshot: Snapshot) {
-  return String(snapshot?.provider || '').startsWith('FOOTBALL_DATA');
-}
-
-function displaySourceName(source?: string | null) {
-  const value = String(source || '').trim();
-  if (!value) return '';
-  if (value === 'FOOTBALL_DATA' || value === 'FOOTBALL_DATA_FALLBACK') return '';
-  if (value === 'MC PRIME Live Monitor') return 'الرصد المباشر';
-  if (value === 'ISPORTS' || value === 'ISPORTS_PAGE') return 'iSports';
-  if (value === 'ISPORTS_TIMELINE') return 'iSports Timeline';
-  return value.replace(/_/g, ' ');
-}
-
-function displaySnapshotProvider(source?: string | null) {
-  const value = String(source || '').trim();
-  if (!value) return '';
-  if (value === 'FOOTBALL_DATA' || value === 'FOOTBALL_DATA_FALLBACK') return 'Football-Data';
-  if (value === 'ISPORTS') return 'iSports';
-  return value.replace(/_/g, ' ');
-}
-
-function scoreSourceLabel(data: LiveStatsResponse | null, latest: Snapshot) {
-  if (data?.scorePolicy?.source === 'snapshot') return displaySnapshotProvider(latest?.provider) || 'آخر لقطة محفوظة';
-  if (data?.scorePolicy?.ignoredMinuteZeroSnapshot) return 'قاعدة البيانات — تم تجاهل لقطة دقيقة 0';
-  return 'قاعدة البيانات';
-}
-
 function cleanEventDetail(detail?: string | null) {
   return String(detail || '')
     .replace(/هدف مؤكد من football-data\.org لـ\s*/gi, 'هدف لـ ')
@@ -161,23 +129,12 @@ function cleanEventDetail(detail?: string | null) {
     .replace(/football-data\.org/gi, 'Football-Data')
     .replace(/FOOTBALL_DATA_FALLBACK/g, '')
     .replace(/FOOTBALL_DATA/g, '')
+    .replace(/iSports Timeline/gi, '')
+    .replace(/ISPORTS_TIMELINE/g, '')
+    .replace(/ISPORTS_PAGE/g, '')
+    .replace(/ISPORTS/g, '')
     .replace(/\s+/g, ' ')
     .trim();
-}
-
-function unavailableStatsMessage(data: LiveStatsResponse | null, hasStats: boolean) {
-  if (hasStats) return null;
-  const syncStatus = data?.sync?.status || '';
-  if (isFootballDataProvider(data?.latest || null) || hasBasicSnapshot(data?.latest || null)) {
-    return 'المتاح الآن هو ملخص موثق من قاعدة البيانات: النتيجة وحالة المباراة فقط. الأرقام التفصيلية مثل الاستحواذ والتسديدات والركنيات تظهر فقط عند وصول مصدر موثق لها.';
-  }
-  if (data?.sourceStatus?.isportsBlocked || syncStatus === 'isports_guard_active') {
-    return 'iSports غير متاح مؤقتًا، ولا توجد لقطة تفصيلية محفوظة بعد. سنعرض الأرقام التفصيلية فقط عند توفر مصدر موثق.';
-  }
-  if (syncStatus === 'failed') {
-    return `مزود الإحصائيات لم يرجع بيانات الآن${data?.sync?.providerStatus ? ` (status ${data.sync.providerStatus})` : ''}.`;
-  }
-  return 'لا توجد أرقام إحصائية محفوظة لهذه المباراة بعد. ستظهر تلقائيًا عند وصول لقطة موثقة من مزود الإحصائيات.';
 }
 
 function buildQueryString(matchId?: string | number | null, dbMatchId?: string | number | null) {
@@ -191,7 +148,6 @@ function fallbackEventFromSnapshot(data: LiveStatsResponse | null): MatchEvent |
   const snapshot = data?.latest || null;
   const match = data?.match;
   if (!snapshot || !match) return null;
-  const provider = String(snapshot.provider || 'DATABASE');
   const homeScore = match.homeScore;
   const awayScore = match.awayScore;
   const minute = validMinute(statValue(snapshot, 'minute'));
@@ -202,7 +158,6 @@ function fallbackEventFromSnapshot(data: LiveStatsResponse | null): MatchEvent |
     minute,
     type: status === 'FINISHED' ? 'status_change' : 'score_snapshot',
     detail: `${statusLabel}: ${match.homeTeam?.name || 'الفريق الأول'} ${homeScore} - ${awayScore} ${match.awayTeam?.name || 'الفريق الثاني'}`,
-    sourceName: provider,
     createdAt: snapshot.capturedAt || data?.updatedAt || null,
   };
 }
@@ -261,7 +216,6 @@ export default function LiveMatchStatsPanel({ matchId, dbMatchId }: Props) {
   const [events, setEvents] = useState<MatchEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [eventsUpdatedAt, setEventsUpdatedAt] = useState<string | null>(null);
   const queryString = useMemo(() => buildQueryString(matchId, dbMatchId), [matchId, dbMatchId]);
 
   async function fetchStats() {
@@ -283,10 +237,7 @@ export default function LiveMatchStatsPanel({ matchId, dbMatchId }: Props) {
     try {
       const response = await fetch(`/api/matches/live-events?${queryString}`, { cache: 'no-store' });
       const json: LiveEventsResponse = await response.json();
-      if (json?.ok) {
-        setEvents(json.events || []);
-        setEventsUpdatedAt(json.updatedAt || new Date().toISOString());
-      }
+      if (json?.ok) setEvents(json.events || []);
     } catch {
       // Keep the latest saved events visible; this endpoint is intentionally lightweight and database-first.
     }
@@ -307,10 +258,7 @@ export default function LiveMatchStatsPanel({ matchId, dbMatchId }: Props) {
   const latest = data?.latest || null;
   const match = data?.match;
   const hasStats = Boolean(data?.hasStats || hasAnyStat(latest));
-  const statusLabel = data?.sync?.status === 'database_only' ? 'قراءة من قاعدة البيانات' : data?.sync?.status === 'cached_recent_snapshot' ? 'آخر لقطة محفوظة' : data?.sync?.status === 'saved' ? 'تم تسجيل لقطة جديدة' : data?.sync?.status || 'متابعة مباشرة';
-  const providerWarning = unavailableStatsMessage(data, hasStats);
   const visibleEvents = events.length ? events : fallbackEventFromSnapshot(data) ? [fallbackEventFromSnapshot(data)!] : [];
-  const snapshotProvider = scoreSourceLabel(data, latest);
   const documentedMinute = validMinute(statValue(latest, 'minute'));
 
   const derived = useMemo(() => {
@@ -323,17 +271,10 @@ export default function LiveMatchStatsPanel({ matchId, dbMatchId }: Props) {
 
   return (
     <section className="rounded-2xl border border-white/10 bg-white/[0.035] p-4 shadow-card">
-      <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+      <div className="mb-4 flex items-center justify-between gap-3">
         <div>
           <p className="inline-flex items-center gap-2 rounded-full border border-[#0FF0FC]/25 bg-[#0FF0FC]/10 px-3 py-1 text-[10px] font-black text-[#0FF0FC]"><Activity size={13} /> Match Data Recorder</p>
           <h2 className="mt-2 text-xl font-black text-white">بيانات المباراة</h2>
-          <p className="mt-1 text-xs leading-5 text-gray-400">لا يتم اختراع أرقام. عند غياب الإحصائيات التفصيلية نعرض النتيجة والحالة والأحداث الموثقة فقط.</p>
-          <p className="mt-2 text-[11px] font-bold leading-5 text-gray-500">الخطة: قاعدة البيانات أولًا، Football-Data للنتيجة والحالة، وiSports Timeline للأحداث عند توفره.</p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2 text-xs font-black">
-          <span className="rounded-full border border-white/10 bg-black/30 px-3 py-1 text-gray-300"><Clock size={13} className="inline" /> بيانات: {data?.updatedAt ? new Date(data.updatedAt).toLocaleTimeString('ar-EG') : '—'}</span>
-          <span className="rounded-full border border-white/10 bg-black/30 px-3 py-1 text-gray-300"><Target size={13} className="inline" /> أحداث: {eventsUpdatedAt ? new Date(eventsUpdatedAt).toLocaleTimeString('ar-EG') : '—'}</span>
-          <span className="rounded-full border border-[#FFD700]/20 bg-[#FFD700]/10 px-3 py-1 text-[#FFD700]"><Database size={13} className="inline" /> {statusLabel}</span>
         </div>
       </div>
 
@@ -354,15 +295,10 @@ export default function LiveMatchStatsPanel({ matchId, dbMatchId }: Props) {
                   <div className="truncate text-lg font-black text-white"><TeamName team={match?.awayTeam || null} fallback="الفريق الثاني" align="left" /></div>
                 </div>
               </div>
-              <div className="mt-3 text-xs font-bold text-gray-500">الدقيقة: {documentedMinute ? displayNumber(documentedMinute) : 'غير موثقة من المصدر'}</div>
-              <div className="mt-1 text-[11px] font-bold text-gray-600">مصدر النتيجة: {snapshotProvider}</div>
+              <div className="mt-3 text-xs font-bold text-gray-500">الدقيقة: {documentedMinute ? displayNumber(documentedMinute) : '—'}</div>
             </div>
 
-            {providerWarning ? (
-              <div className="rounded-2xl border border-[#FFD700]/20 bg-[#FFD700]/10 p-4 text-xs font-bold leading-6 text-[#FFD700]">
-                <AlertTriangle size={15} className="inline" /> {providerWarning}
-              </div>
-            ) : (
+            {hasStats ? (
               <>
                 <StatRow label="الاستحواذ" home={statValue(latest, 'homePossession')} away={statValue(latest, 'awayPossession')} />
                 <StatRow label="الهجمات" home={statValue(latest, 'homeAttacks')} away={statValue(latest, 'awayAttacks')} />
@@ -377,33 +313,29 @@ export default function LiveMatchStatsPanel({ matchId, dbMatchId }: Props) {
                   <StatMini icon={<Zap size={16} />} label="حمراء" home={statValue(latest, 'homeRedCards')} away={statValue(latest, 'awayRedCards')} />
                 </div>
               </>
+            ) : (
+              <div className="rounded-2xl border border-white/10 bg-black/25 p-5 text-center text-sm font-bold text-gray-400">الإحصائيات التفصيلية غير متاحة حاليًا.</div>
             )}
           </div>
 
           <div className="rounded-2xl border border-white/10 bg-black/25 p-4">
             <div className="mb-3 flex items-center justify-between gap-2">
-              <div>
-                <h3 className="font-black text-white">الأحداث والحالة</h3>
-                <p className="text-xs text-gray-500">الأهداف والأحداث التفصيلية عند توفرها، وإلا نعرض آخر حالة ونتيجة موثقة.</p>
-              </div>
+              <h3 className="font-black text-white">الأحداث والحالة</h3>
               <Target className="text-[#FFD700]" size={22} />
             </div>
             <div className="max-h-[520px] space-y-2 overflow-y-auto pr-1">
-              {visibleEvents.length ? visibleEvents.map((event) => {
-                const sourceLabel = displaySourceName(event.sourceName);
-                return (
-                  <div key={event.id} className="rounded-xl border border-white/10 bg-white/[0.035] p-3">
-                    <div className="flex items-start gap-3">
-                      <EventAvatar event={event} data={data} />
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2 text-xs font-black text-[#FFD700]"><span>{eventIcon(event.type)}</span>{event.minute ? `د${event.minute}` : 'حدث'}{sourceLabel ? <><span className="text-gray-600">•</span><span>{sourceLabel}</span></> : null}</div>
-                        {event.playerName ? <p className="mt-1 text-xs font-black text-white">{event.playerName}</p> : null}
-                        <p className="mt-1 text-sm leading-6 text-gray-200">{cleanEventDetail(event.detail)}</p>
-                      </div>
+              {visibleEvents.length ? visibleEvents.map((event) => (
+                <div key={event.id} className="rounded-xl border border-white/10 bg-white/[0.035] p-3">
+                  <div className="flex items-start gap-3">
+                    <EventAvatar event={event} data={data} />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2 text-xs font-black text-[#FFD700]"><span>{eventIcon(event.type)}</span>{event.minute ? `د${event.minute}` : 'حدث'}</div>
+                      {event.playerName ? <p className="mt-1 text-xs font-black text-white">{event.playerName}</p> : null}
+                      <p className="mt-1 text-sm leading-6 text-gray-200">{cleanEventDetail(event.detail)}</p>
                     </div>
                   </div>
-                );
-              }) : (
+                </div>
+              )) : (
                 <div className="rounded-xl border border-dashed border-white/10 p-6 text-center text-sm text-gray-500">لا توجد أحداث تفصيلية محفوظة بعد.</div>
               )}
             </div>
