@@ -66,12 +66,28 @@ function byCapturedDesc(a: any, b: any) {
   const bt = new Date(b?.capturedAt || 0).getTime();
   return (Number.isFinite(bt) ? bt : 0) - (Number.isFinite(at) ? at : 0);
 }
+function pairValues(row: any, homeKey: string, awayKey: string) { return [nullableNumber(row?.[homeKey]), nullableNumber(row?.[awayKey])] as const; }
+function inRange(value: number | null, max: number) { return value === null || (value >= 0 && value <= max); }
+function plausibleSnapshot(row: any) {
+  if (!row) return false;
+  const provider = String(row.provider || '').toUpperCase();
+  if (provider !== 'ISPORTS_REMOTE_LIVE') return true;
+  const [hp, ap] = pairValues(row, 'homePossession', 'awayPossession');
+  if (!inRange(hp, 100) || !inRange(ap, 100)) return false;
+  if (hp !== null && ap !== null && Math.abs(hp + ap - 100) > 5) return false;
+  const [ha, aa] = pairValues(row, 'homeAttacks', 'awayAttacks');
+  if (!inRange(ha, 500) || !inRange(aa, 500)) return false;
+  for (const [h, a] of [pairValues(row, 'homeShots', 'awayShots'), pairValues(row, 'homeShotsOnTarget', 'awayShotsOnTarget'), pairValues(row, 'homeShotsOffTarget', 'awayShotsOffTarget')]) {
+    if (!inRange(h, 100) || !inRange(a, 100)) return false;
+  }
+  return true;
+}
 function firstWithValue(rows: any[], field: string) {
   const preferred = rows.find((row) => row?.[field] !== null && row?.[field] !== undefined);
   return preferred ? preferred[field] : null;
 }
 function mergeSnapshots(rows: any[]) {
-  const ordered = rows.filter(Boolean).sort(byCapturedDesc);
+  const ordered = rows.filter(plausibleSnapshot).sort(byCapturedDesc);
   if (!ordered.length) return null;
   const latest = ordered[0];
   const providers = Array.from(new Set(ordered.map((row) => String(row.provider || '')).filter(Boolean)));
@@ -138,7 +154,7 @@ export async function GET(request: Request) {
       scorePolicy: { source: 'match', ignoredSnapshotScore, ignoredMinuteZeroSnapshot: Boolean(latestPublic && snapshotHasScore(latestPublic) && snapshotMinute(latestPublic) === null) },
       match: { id: match.id, animationMatchId: match.animationMatchId, status: effectiveStatus, matchDate: toIso(match.matchDate), homeScore: match.homeScore ?? 0, awayScore: match.awayScore ?? 0, homeTeam: match.homeTeam, awayTeam: match.awayTeam },
       latest: latestPublic,
-      history: historyRows.map((row) => cleanPublicSnapshot(match, publicSnapshot(row))).reverse(),
+      history: historyRows.filter(plausibleSnapshot).map((row) => cleanPublicSnapshot(match, publicSnapshot(row))).reverse(),
     }, { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } });
   } catch (error: any) {
     console.error('live-stats endpoint error:', error);
