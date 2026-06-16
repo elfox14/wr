@@ -1,0 +1,41 @@
+{
+  "dryRun": true,
+  "teams": [
+    {
+      "teamCode": "NED",
+      "sourceName": "Reuters World Cup 2026 squads",
+      "sourceUrl": "Reuters - World Cup 2026: list of 26-man squads at the finals",
+      "players": [
+        { "name": "Mark Flekken", "position": "Goalkeeper" },
+        { "name": "Robin Roefs", "position": "Goalkeeper" },
+        { "name": "Bart Verbruggen", "position": "Goalkeeper" },
+
+        { "name": "Nathan Ake", "position": "Defender" },
+        { "name": "Denzel Dumfries", "position": "Defender" },
+        { "name": "Jorrel Hato", "position": "Defender" },
+        { "name": "Jurrien Timber", "position": "Defender" },
+        { "name": "Micky van de Ven", "position": "Defender" },
+        { "name": "Virgil van Dijk", "position": "Defender" },
+        { "name": "Jan Paul van Hecke", "position": "Defender" },
+
+        { "name": "Frenkie de Jong", "position": "Midfielder" },
+        { "name": "Marten de Roon", "position": "Midfielder" },
+        { "name": "Ryan Gravenberch", "position": "Midfielder" },
+        { "name": "Justin Kluivert", "position": "Midfielder" },
+        { "name": "Teun Koopmeiners", "position": "Midfielder" },
+        { "name": "Tijjani Reijnders", "position": "Midfielder" },
+        { "name": "Guus Til", "position": "Midfielder" },
+        { "name": "Quinten Timber", "position": "Midfielder" },
+        { "name": "Mats Wieffer", "position": "Midfielder" },
+
+        { "name": "Brian Brobbey", "position": "Forward" },
+        { "name": "Memphis Depay", "position": "Forward" },
+        { "name": "Cody Gakpo", "position": "Forward" },
+        { "name": "Noa Lang", "position": "Forward" },
+        { "name": "Donyell Malen", "position": "Forward" },
+        { "name": "Crysencio Summerville", "position": "Forward" },
+        { "name": "Wout Weghorst", "position": "Forward" }
+      ]
+    }
+  ]
+}
