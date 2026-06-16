@@ -41,6 +41,10 @@ function hasAnimation(match: Match) {
   return Boolean(match.animationMatchId);
 }
 
+function matchCenterHref(match: Match) {
+  return `/match-center/${encodeURIComponent(String(match.id))}`;
+}
+
 function isGroupStage(match: Match) {
   const value = String(match.groupPhase || match.stage || '').toUpperCase();
   return value.includes('GROUP');
@@ -151,6 +155,8 @@ export default function MatchesPage() {
   const today = now;
   const yesterday = addDays(today, -1);
   const tomorrow = addDays(today, 1);
+  const liveMatch = matches.find((match) => isLiveStatus(match, now));
+  const liveBroadcastHref = liveMatch ? matchCenterHref(liveMatch) : '/animation-live';
   const todayMatchesCount = matches.filter((m) => isSameDay(m.matchDate, today)).length;
   const liveMatchesCount = matches.filter((m) => isLiveStatus(m, now)).length;
   const upcomingMatchesCount = matches.filter((m) => String(m.status).toUpperCase() === 'SCHEDULED' && !isFinished(m, now)).length;
@@ -191,7 +197,7 @@ export default function MatchesPage() {
 
         <div className="mb-5 grid grid-cols-2 gap-2 md:grid-cols-4 md:gap-3">
           <SummaryCard icon={<CalendarDays size={18} />} label="مباريات اليوم" value={todayMatchesCount} active={activeTab === 'today'} onClick={() => applySummaryFilter('today')} hint="فلتر اليوم" />
-          <SummaryCard icon={<Play size={18} />} label="مباشرة الآن" value={liveMatchesCount} />
+          <SummaryCard icon={<Play size={18} />} label="مباشرة الآن" value={liveMatchesCount} href={liveBroadcastHref} hint="البث التفاعلي" />
           <SummaryCard icon={<Clock size={18} />} label="المباريات المتبقية" value={upcomingMatchesCount} />
           <SummaryCard icon={<CheckCircle2 size={18} />} label="انتهت" value={finishedMatchesCount} />
         </div>
@@ -270,12 +276,12 @@ function MatchCard({ match, now }: { match: Match; now: Date }) {
   const live = isLiveStatus(match, now);
   const finished = isFinished(match, now);
   const scoreVisible = live || finished;
-  const matchCenterHref = `/match-center/${encodeURIComponent(String(match.id))}`;
+  const centerHref = matchCenterHref(match);
   const title = `${match.homeTeam?.name || 'الفريق الأول'} ضد ${match.awayTeam?.name || 'الفريق الثاني'}`;
 
   return (
     <article className="group relative overflow-hidden rounded-2xl border border-white/5 bg-surface p-4 transition hover:-translate-y-0.5 hover:border-[#0FF0FC]/35 hover:bg-white/[0.04]">
-      <Link href={matchCenterHref} aria-label={`فتح مركز مباراة ${title}`} className="absolute inset-0 z-10 rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#0FF0FC]/40" />
+      <Link href={centerHref} aria-label={`فتح مركز مباراة ${title}`} className="absolute inset-0 z-10 rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#0FF0FC]/40" />
 
       <div className="relative z-0">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -312,7 +318,7 @@ function MatchCard({ match, now }: { match: Match; now: Date }) {
 
       {hasAnimation(match) && !finished ? (
         <Link
-          href={`/animation-live/player?matchId=${encodeURIComponent(String(match.animationMatchId))}&dbMatchId=${encodeURIComponent(String(match.id))}`}
+          href={centerHref}
           className="relative z-20 mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-[#FFD700]/25 bg-[#FFD700]/10 px-4 py-2.5 text-xs font-black text-[#FFD700] transition hover:bg-[#FFD700] hover:text-black"
         >
           <Radio size={15} /> دخول البث التفاعلي
