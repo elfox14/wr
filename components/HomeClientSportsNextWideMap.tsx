@@ -241,6 +241,15 @@ function isScheduled(match?: HomeMatch | null) {
   return ['SCHEDULED', 'TIMED', 'NOT_STARTED', 'NS'].includes(normalizeStatus(match));
 }
 
+function isHalfTime(match?: HomeMatch | null) {
+  return normalizeStatus(match) === 'HT' || Boolean(match?.isHalfTime);
+}
+
+function isLive(match?: HomeMatch | null) {
+  const status = normalizeStatus(match);
+  return ['IN_PLAY', 'LIVE', 'HT'].includes(status) || Boolean(match?.isLiveNow);
+}
+
 function matchKey(match?: HomeMatch | null) {
   return String(match?.id || `${teamLabel(match?.homeTeam)}-${teamLabel(match?.awayTeam)}-${match?.matchDate || ''}`);
 }
@@ -321,7 +330,13 @@ function MatchScore({ match }: { match: HomeMatch }) {
   );
 }
 
-function CountdownPill({ match, now }: { match: HomeMatch; now: Date }) {
+function MatchStatePill({ match, now }: { match: HomeMatch; now: Date }) {
+  if (isHalfTime(match)) return <span className="rounded-xl border border-[#FFD700]/20 bg-[#FFD700]/10 px-2.5 py-1.5 text-[11px] font-black text-[#FFD700]">استراحة</span>;
+  if (isLive(match)) {
+    const label = typeof match.minute === 'number' && Number.isFinite(match.minute) && match.minute > 0 ? `${Math.floor(match.minute)}′` : 'جارية';
+    return <span className="rounded-xl border border-[#00FF88]/25 bg-[#00FF88]/10 px-2.5 py-1.5 text-[11px] font-black text-[#00FF88]">{label}</span>;
+  }
+
   const parts = countdownParts(match, now);
   if (!parts.active) return <span className="rounded-xl border border-[#FFD700]/20 bg-[#FFD700]/10 px-2.5 py-1.5 text-[11px] font-black text-[#FFD700]">بانتظار البداية</span>;
   const visibleParts = parts.days > 0
@@ -337,14 +352,14 @@ function CountdownPill({ match, now }: { match: HomeMatch; now: Date }) {
   );
 }
 
-function MatchRow({ match, now }: { match: HomeMatch; now: Date }) {
+function MatchRow({ match, now, variant = 'normal' }: { match: HomeMatch; now: Date; variant?: 'live' | 'normal' }) {
   return (
-    <article className="relative overflow-hidden rounded-2xl border border-white/10 bg-black/25 p-2.5 transition hover:border-[#0FF0FC]/30">
+    <article className={`relative overflow-hidden rounded-2xl border p-2.5 transition ${variant === 'live' ? 'border-[#00FF88]/25 bg-[radial-gradient(circle_at_top,rgba(0,255,136,0.10),transparent_34%),rgba(0,0,0,0.25)]' : 'border-white/10 bg-black/25 hover:border-[#0FF0FC]/30'}`}>
       <div className="mb-2 flex flex-wrap items-center justify-between gap-1.5">
         <span className="rounded-full border border-[#FFD700]/20 bg-[#FFD700]/10 px-2.5 py-1 text-[10px] font-black text-[#FFD700]">{groupNumberLabel(match)}</span>
         <span className="rounded-full border border-white/10 bg-white/[0.06] px-2.5 py-1 text-[10px] font-black text-gray-200">{formatMatchDate(match.matchDate)}</span>
         <span className="rounded-full border border-[#0FF0FC]/20 bg-[#0FF0FC]/10 px-2.5 py-1 text-[11px] font-black text-[#0FF0FC]">{formatKickoffTime(match.matchDate)}</span>
-        <CountdownPill match={match} now={now} />
+        <MatchStatePill match={match} now={now} />
       </div>
 
       <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-1.5">
@@ -393,10 +408,12 @@ function MatchCenter({ fallbackMatches = [], nextMatch = null }: { fallbackMatch
   }, []);
 
   const mergedMatches = useMemo(() => uniqueMatches([...(nextMatch ? [nextMatch] : []), ...(matches.length ? matches : fallbackMatches)]), [nextMatch, matches, fallbackMatches]);
-  const upcomingMatches = useMemo(() => [...mergedMatches].filter((match) => isScheduled(match) && !isOfficialFinished(match)).sort((a, b) => matchTime(a) - matchTime(b)).slice(0, 2), [mergedMatches]);
+  const sortedMatches = useMemo(() => [...mergedMatches].sort((a, b) => matchTime(a) - matchTime(b)), [mergedMatches]);
+  const liveMatch = sortedMatches.find((match) => isLive(match) && !isOfficialFinished(match)) || null;
+  const upcomingMatches = sortedMatches.filter((match) => isScheduled(match) && !isOfficialFinished(match)).slice(0, 2);
 
   return (
-    <section className="flex h-full min-h-[300px] flex-col overflow-hidden rounded-3xl border border-white/10 bg-white/[0.04] p-3 text-white shadow-[0_14px_38px_rgba(0,0,0,0.2)] backdrop-blur" aria-label="مركز المباريات">
+    <section className="flex h-full min-h-[330px] flex-col overflow-hidden rounded-3xl border border-white/10 bg-white/[0.04] p-3 text-white shadow-[0_14px_38px_rgba(0,0,0,0.2)] backdrop-blur" aria-label="مركز المباريات">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-[11px] font-black uppercase tracking-[0.16em] text-[#FFD700]">Match Center</p>
@@ -405,9 +422,12 @@ function MatchCenter({ fallbackMatches = [], nextMatch = null }: { fallbackMatch
         <Link href="/matches" className="rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-[11px] font-black text-white transition hover:border-[#0FF0FC]/40 hover:bg-white/[0.14]">جدول المباريات</Link>
       </div>
 
-      <div className="grid flex-1 gap-3 md:grid-cols-2">
-        {upcomingMatches.map((match) => <MatchRow key={matchKey(match)} match={match} now={now} />)}
-        {!upcomingMatches.length ? <div className="rounded-2xl border border-dashed border-white/10 bg-black/20 p-4 text-sm font-bold text-gray-400 md:col-span-2">لا توجد مباراتان قادمتان جاهزتان للعرض الآن.</div> : null}
+      <div className="flex flex-1 flex-col gap-3">
+        {liveMatch ? <MatchRow match={liveMatch} now={now} variant="live" /> : null}
+        <div className="grid flex-1 gap-3 md:grid-cols-2">
+          {upcomingMatches.map((match) => <MatchRow key={matchKey(match)} match={match} now={now} />)}
+          {!upcomingMatches.length && !liveMatch ? <div className="rounded-2xl border border-dashed border-white/10 bg-black/20 p-4 text-sm font-bold text-gray-400 md:col-span-2">لا توجد مباريات جاهزة للعرض الآن.</div> : null}
+        </div>
       </div>
     </section>
   );
