@@ -49,7 +49,7 @@ function compactTeam(team: any) {
 }
 
 function flagNode(team: GoalLeader['team']) {
-  const flagUrl = getTeamFlagUrl(team, 80);
+  const flagUrl = team ? getTeamFlagUrl(team, 80) : null;
   return flagUrl ? (
     <img src={flagUrl} alt={`علم ${team?.name || 'منتخب'}`} className="h-full w-full object-cover" loading="lazy" />
   ) : (
@@ -124,173 +124,91 @@ export default async function TeamsPage({ searchParams }: Props) {
     goalLeaders.set(team.id, current);
   };
 
-  scoredMatches.forEach((match) => {
+  for (const match of scoredMatches) {
     addTeamScore(match.homeTeam, match.homeScore, match.awayScore);
     addTeamScore(match.awayTeam, match.awayScore, match.homeScore);
-  });
+  }
 
-  const playedTeams = Array.from(goalLeaders.values()).filter((item) => item.played > 0);
-  const bestScoringTeam = [...playedTeams].sort((a, b) => b.goalsFor - a.goalsFor || a.goalsAgainst - b.goalsAgainst || a.team?.name.localeCompare(b.team?.name || '', 'ar') || 0)[0] || null;
-  const bestDefensiveTeam = [...playedTeams].sort((a, b) => a.goalsAgainst - b.goalsAgainst || b.goalsFor - a.goalsFor || a.team?.name.localeCompare(b.team?.name || '', 'ar') || 0)[0] || null;
+  const leaders = Array.from(goalLeaders.values());
+  const topAttack = leaders.sort((a, b) => b.goalsFor - a.goalsFor || b.played - a.played)[0] || null;
+  const bestDefense = [...leaders].sort((a, b) => a.goalsAgainst - b.goalsAgainst || b.played - a.played)[0] || null;
+  const mostPlayed = [...leaders].sort((a, b) => b.played - a.played || b.goalsFor - a.goalsFor)[0] || null;
 
-  const groups = Array.from(
-    new Set(allTeams.map((team) => team.group).filter((value): value is string => Boolean(value))),
-  ).sort((a, b) => a.localeCompare(b, 'ar'));
+  const groups = Array.from(new Set(allTeams.map((team) => team.group).filter(Boolean))).sort();
+  const continents = Array.from(new Set(allTeams.map((team) => team.continent).filter(Boolean))).sort();
 
-  const continents = Array.from(
-    new Set(allTeams.map((team) => team.continent).filter((value): value is string => Boolean(value))),
-  ).sort((a, b) => a.localeCompare(b, 'ar'));
-
-  const normalizedQuery = query.toLowerCase();
-  const teams = allTeams.filter((team) => {
-    const matchesQuery =
-      !normalizedQuery ||
-      [team.name, team.code, team.group, team.continent, team.coach].some((value) =>
-        toSearchable(value).includes(normalizedQuery),
-      );
-
+  const filteredTeams = allTeams.filter((team) => {
+    const matchesQuery = !query || toSearchable(team.name).includes(toSearchable(query)) || toSearchable(team.code).includes(toSearchable(query));
     const matchesGroup = !selectedGroup || team.group === selectedGroup;
     const matchesContinent = !selectedContinent || team.continent === selectedContinent;
-
     return matchesQuery && matchesGroup && matchesContinent;
   });
 
-  const hasActiveFilters = Boolean(query || selectedGroup || selectedContinent);
-
   return (
-    <main className="mx-auto max-w-7xl px-4 py-8 text-white sm:px-6 lg:px-8">
-      <section className="overflow-hidden rounded-3xl border border-white/10 bg-white/[0.04] p-6 shadow-2xl shadow-black/30">
-        <p className="text-sm font-black uppercase tracking-[0.28em] text-[#0FF0FC]">World Cup Teams</p>
-        <div className="mt-3 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <h1 className="text-2xl font-black md:text-3xl">دليل المنتخبات</h1>
-          </div>
-          <div className="rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm font-bold text-gray-300">
-            <span className="text-2xl font-black text-white">{teams.length}</span> منتخب ظاهر
+    <main className="min-h-screen bg-background px-4 py-8 text-white sm:px-6 lg:px-8" dir="rtl">
+      <section className="mx-auto max-w-7xl space-y-8">
+        <div className="rounded-[2rem] border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(15,240,252,0.16),transparent_34%),linear-gradient(135deg,rgba(255,255,255,0.07),rgba(255,255,255,0.025))] p-6 shadow-card sm:p-8">
+          <span className="inline-flex rounded-full border border-[#0FF0FC]/25 bg-[#0FF0FC]/10 px-4 py-2 text-xs font-black text-[#0FF0FC]">دليل المنتخبات</span>
+          <div className="mt-5 grid gap-6 lg:grid-cols-[1.25fr_0.75fr] lg:items-end">
+            <div>
+              <h1 className="text-3xl font-black leading-tight sm:text-5xl">منتخبات كأس العالم 2026</h1>
+              <p className="mt-4 max-w-3xl text-sm leading-7 text-gray-300 sm:text-base">تصفح المنتخبات، المجموعات، والمدربين، مع مؤشرات سريعة مبنية على نتائج المباريات المحفوظة داخل المنصة.</p>
+            </div>
+            <div className="grid grid-cols-3 gap-3 text-center">
+              <div className="rounded-2xl border border-white/10 bg-black/25 p-4"><p className="text-2xl font-black text-[#FFD700]">{formatCount(allTeams.length)}</p><p className="text-[11px] font-bold text-gray-500">منتخب</p></div>
+              <div className="rounded-2xl border border-white/10 bg-black/25 p-4"><p className="text-2xl font-black text-[#FFD700]">{formatCount(groups.length)}</p><p className="text-[11px] font-bold text-gray-500">مجموعة</p></div>
+              <div className="rounded-2xl border border-white/10 bg-black/25 p-4"><p className="text-2xl font-black text-[#FFD700]">{formatCount(continents.length)}</p><p className="text-[11px] font-bold text-gray-500">قارة</p></div>
+            </div>
           </div>
         </div>
-      </section>
 
-      <section className="mt-6 grid gap-4 md:grid-cols-2">
-        <GoalLeaderCard title="أفضل منتخب تسجيلًا للأهداف" leader={bestScoringTeam} value={bestScoringTeam?.goalsFor} valueLabel="هدف" />
-        <GoalLeaderCard title="أقل منتخب استقبالًا للأهداف" leader={bestDefensiveTeam} value={bestDefensiveTeam?.goalsAgainst} valueLabel="هدف عليه" />
-      </section>
+        <section className="grid gap-4 md:grid-cols-3">
+          <GoalLeaderCard title="أقوى هجوم" leader={topAttack} valueLabel="أهداف" value={topAttack?.goalsFor} />
+          <GoalLeaderCard title="أفضل دفاع" leader={bestDefense} valueLabel="استقبل" value={bestDefense?.goalsAgainst} />
+          <GoalLeaderCard title="الأكثر ظهورًا" leader={mostPlayed} valueLabel="مباريات" value={mostPlayed?.played} />
+        </section>
 
-      <section className="mt-6 rounded-3xl border border-white/10 bg-black/25 p-4">
-        <form className="grid gap-3 md:grid-cols-[minmax(0,1.4fr)_minmax(160px,0.6fr)_minmax(160px,0.6fr)_auto]" method="GET">
-          <label className="flex flex-col gap-2 text-sm font-bold text-gray-300">
-            بحث
-            <input
-              className="rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-3 text-white outline-none placeholder:text-gray-500 focus:border-[#0FF0FC]"
-              defaultValue={query}
-              name="q"
-              placeholder="اسم المنتخب، الكود، المدرب..."
-              type="search"
-            />
-          </label>
-
-          <label className="flex flex-col gap-2 text-sm font-bold text-gray-300">
-            المجموعة
-            <select
-              className="rounded-2xl border border-white/10 bg-[#111] px-4 py-3 text-white outline-none focus:border-[#0FF0FC]"
-              defaultValue={selectedGroup}
-              name="group"
-            >
+        <section className="rounded-3xl border border-white/10 bg-white/[0.035] p-4 sm:p-5">
+          <form className="grid gap-3 lg:grid-cols-[1fr_220px_220px_auto]" action="/teams">
+            <input name="q" defaultValue={query} placeholder="ابحث باسم المنتخب أو الكود..." className="min-h-12 rounded-2xl border border-white/10 bg-black/30 px-4 text-sm font-bold text-white outline-none transition placeholder:text-gray-600 focus:border-[#0FF0FC]/50" />
+            <select name="group" defaultValue={selectedGroup} className="min-h-12 rounded-2xl border border-white/10 bg-black/30 px-4 text-sm font-bold text-white outline-none focus:border-[#0FF0FC]/50">
               <option value="">كل المجموعات</option>
-              {groups.map((group) => (
-                <option key={group} value={group}>
-                  {group}
-                </option>
-              ))}
+              {groups.map((group) => <option key={group || 'group'} value={group || ''}>{group}</option>)}
             </select>
-          </label>
-
-          <label className="flex flex-col gap-2 text-sm font-bold text-gray-300">
-            القارة
-            <select
-              className="rounded-2xl border border-white/10 bg-[#111] px-4 py-3 text-white outline-none focus:border-[#0FF0FC]"
-              defaultValue={selectedContinent}
-              name="continent"
-            >
+            <select name="continent" defaultValue={selectedContinent} className="min-h-12 rounded-2xl border border-white/10 bg-black/30 px-4 text-sm font-bold text-white outline-none focus:border-[#0FF0FC]/50">
               <option value="">كل القارات</option>
-              {continents.map((continent) => (
-                <option key={continent} value={continent}>
-                  {continent}
-                </option>
-              ))}
+              {continents.map((continent) => <option key={continent || 'continent'} value={continent || ''}>{continent}</option>)}
             </select>
-          </label>
+            <button className="min-h-12 rounded-2xl bg-[#0FF0FC] px-6 text-sm font-black text-black transition hover:bg-[#4AFAFF]">تصفية</button>
+          </form>
+        </section>
 
-          <div className="flex items-end gap-2">
-            <button className="h-12 rounded-2xl bg-[#0FF0FC] px-5 text-sm font-black text-black transition hover:scale-[1.02]" type="submit">
-              تطبيق
-            </button>
-            {hasActiveFilters ? (
-              <Link className="flex h-12 items-center rounded-2xl border border-white/10 px-5 text-sm font-black text-white hover:bg-white/10" href="/teams">
-                مسح
-              </Link>
-            ) : null}
-          </div>
-        </form>
+        <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {filteredTeams.map((team) => (
+            <Link key={team.id} href={`/teams/${team.id}`} className="group overflow-hidden rounded-3xl border border-white/10 bg-white/[0.035] p-4 transition hover:-translate-y-1 hover:border-[#0FF0FC]/40 hover:bg-white/[0.06] hover:shadow-[0_18px_45px_rgba(15,240,252,0.08)]">
+              <div className="flex items-center gap-3">
+                <span className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-black/35">
+                  {flagNode(team)}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-lg font-black text-white">{team.name}</span>
+                  <span className="mt-1 block text-xs font-bold text-gray-500">{team.code || 'N/A'} · {team.group || 'Group N/A'}</span>
+                </span>
+              </div>
+              <div className="mt-4 grid grid-cols-2 gap-2 text-xs font-bold text-gray-400">
+                <div className="rounded-2xl border border-white/10 bg-black/25 p-3"><span className="block text-[10px] text-gray-600">القارة</span>{team.continent || 'غير متوفر'}</div>
+                <div className="rounded-2xl border border-white/10 bg-black/25 p-3"><span className="block text-[10px] text-gray-600">المدرب</span>{team.coach || 'غير متوفر'}</div>
+                <div className="rounded-2xl border border-white/10 bg-black/25 p-3"><span className="block text-[10px] text-gray-600">تصنيف FIFA</span>{team.fifaRank ? formatCount(team.fifaRank) : 'غير متوفر'}</div>
+                <div className="rounded-2xl border border-white/10 bg-black/25 p-3"><span className="block text-[10px] text-gray-600">المجموعة</span>{team.group || 'غير متوفر'}</div>
+              </div>
+            </Link>
+          ))}
+        </section>
+
+        {!filteredTeams.length ? (
+          <div className="rounded-3xl border border-dashed border-white/10 bg-black/20 p-8 text-center text-sm font-bold text-gray-500">لا توجد منتخبات مطابقة للفلاتر الحالية.</div>
+        ) : null}
       </section>
-
-      {teams.length ? (
-        <section className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {teams.map((team) => {
-            const flagUrl = getTeamFlagUrl(team, 80);
-
-            return (
-              <Link
-                key={team.id}
-                className="group block rounded-2xl border border-white/10 bg-black/25 p-4 transition hover:-translate-y-1 hover:border-[#0FF0FC]/60 hover:bg-white/[0.06]"
-                href={`/teams/${team.id}`}
-              >
-                <div className="flex items-center gap-3">
-                  <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-white/10 shadow-inner shadow-black/20">
-                    {flagUrl ? (
-                      <img src={flagUrl} alt={`علم ${team.name}`} className="h-full w-full object-cover" loading="lazy" />
-                    ) : (
-                      <span className="text-sm font-black text-gray-300">{team.code || team.name.slice(0, 2)}</span>
-                    )}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <h2 className="truncate font-black text-white group-hover:text-[#0FF0FC]">{team.name}</h2>
-                    <p className="mt-1 text-xs font-bold text-gray-400">
-                      {team.code || 'N/A'} · {team.group || 'Group N/A'}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="mt-4 grid grid-cols-2 gap-2 text-xs font-bold text-gray-400">
-                  <div className="rounded-xl bg-white/[0.04] p-3">
-                    <p className="text-gray-500">القارة</p>
-                    <p className="mt-1 truncate text-white">{team.continent || 'غير متوفر'}</p>
-                  </div>
-                  <div className="rounded-xl bg-white/[0.04] p-3">
-                    <p className="text-gray-500">تصنيف FIFA</p>
-                    <p className="mt-1 text-white">{team.fifaRank ?? 'غير متوفر'}</p>
-                  </div>
-                </div>
-
-                <div className="mt-4 flex items-center justify-between text-xs font-black text-[#0FF0FC]">
-                  <span>افتح صفحة المنتخب</span>
-                  <span aria-hidden="true" className="transition group-hover:translate-x-[-4px]">
-                    ←
-                  </span>
-                </div>
-              </Link>
-            );
-          })}
-        </section>
-      ) : (
-        <section className="mt-6 rounded-3xl border border-dashed border-white/15 bg-black/25 p-8 text-center">
-          <h2 className="text-2xl font-black">لا توجد نتائج مطابقة</h2>
-          <p className="mt-3 text-gray-400">جرّب تغيير اسم البحث أو مسح فلاتر المجموعة والقارة.</p>
-          <Link className="mt-5 inline-flex rounded-2xl bg-white px-5 py-3 text-sm font-black text-black" href="/teams">
-            عرض كل المنتخبات
-          </Link>
-        </section>
-      )}
     </main>
   );
 }
