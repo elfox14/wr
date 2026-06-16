@@ -112,12 +112,21 @@ async function getMatch(input: { dbMatchId?: string | null; providerMatchId: num
   if (input.dbMatchId) return prisma.match.findUnique({ where: { id: input.dbMatchId }, include: { homeTeam: { select: { id: true, name: true, code: true } }, awayTeam: { select: { id: true, name: true, code: true } } } });
   return prisma.match.findFirst({ where: { animationMatchId: input.providerMatchId }, include: { homeTeam: { select: { id: true, name: true, code: true } }, awayTeam: { select: { id: true, name: true, code: true } } } });
 }
+async function updateMatchScore(match: any, stats: NormalizedStats) {
+  const data: any = {};
+  if (typeof stats.homeScore === 'number' && Number.isFinite(stats.homeScore)) data.homeScore = stats.homeScore;
+  if (typeof stats.awayScore === 'number' && Number.isFinite(stats.awayScore)) data.awayScore = stats.awayScore;
+  if (!Object.keys(data).length) return null;
+  const updated = await prisma.match.update({ where: { id: match.id }, data, select: { id: true, homeScore: true, awayScore: true, status: true } });
+  return updated;
+}
 async function saveSnapshot(match: any, providerMatchId: number, stats: NormalizedStats, rawData: any, replace = true) {
   if (!match?.id || !hasUsefulStats(stats)) return { deleted: 0, inserted: 0, snapshotId: null, reason: 'no_useful_flash_stats' };
   await ensureStatsTable(); let deleted = 0;
   if (replace) { const result = await prisma.matchStatsSnapshot.deleteMany({ where: { matchId: match.id, provider: FLASH_SOURCE } }); deleted = result.count; }
   const snapshot = await prisma.matchStatsSnapshot.create({ data: { id: randomUUID(), matchId: match.id, provider: FLASH_SOURCE, providerMatchId, minute: stats.minute, homePossession: stats.homePossession, awayPossession: stats.awayPossession, homeAttacks: stats.homeAttacks, awayAttacks: stats.awayAttacks, homeDangerousAttacks: stats.homeDangerousAttacks, awayDangerousAttacks: stats.awayDangerousAttacks, homeShots: stats.homeShots, awayShots: stats.awayShots, homeShotsOnTarget: stats.homeShotsOnTarget, awayShotsOnTarget: stats.awayShotsOnTarget, homeShotsOffTarget: stats.homeShotsOffTarget, awayShotsOffTarget: stats.awayShotsOffTarget, homeCorners: stats.homeCorners, awayCorners: stats.awayCorners, homeYellowCards: stats.homeYellowCards, awayYellowCards: stats.awayYellowCards, homeRedCards: stats.homeRedCards, awayRedCards: stats.awayRedCards, homeScore: stats.homeScore, awayScore: stats.awayScore, rawData }, select: { id: true } });
-  return { deleted, inserted: 1, snapshotId: snapshot.id };
+  const matchUpdate = await updateMatchScore(match, stats);
+  return { deleted, inserted: 1, snapshotId: snapshot.id, matchUpdate };
 }
 
 export async function GET(req: Request) {
