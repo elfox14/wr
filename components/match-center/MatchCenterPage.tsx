@@ -2,10 +2,9 @@ import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { Activity, ArrowLeft, BarChart3, CalendarDays, CheckCircle2, Clock, Radio, Shield } from 'lucide-react';
+import { Activity, ArrowLeft, CalendarDays, CheckCircle2, Clock, Radio, Shield } from 'lucide-react';
 import prisma from '@/lib/prisma';
 import InternalAnimationPlayer from '@/app/animation-live/player/InternalAnimationPlayer';
-import LiveMatchStatsPanel from '@/app/animation-live/player/LiveMatchStatsPanel';
 import { getTeamFlagUrl } from '@/lib/teamFlags';
 
 export const dynamic = 'force-dynamic';
@@ -162,19 +161,10 @@ export default async function MatchCenterPage({ params }: { params: Promise<{ id
             <InfoTile icon={<StatusIcon size={16} />} label="الحالة" value={status.label} />
             <InfoTile icon={<Radio size={16} />} label="البث" value={match.animationMatchId ? 'متاح' : 'غير متاح'} />
           </div>
-
-          <div className="mt-5 grid grid-cols-2 gap-2">
-            <Link href="#live-broadcast" className="inline-flex min-h-11 items-center justify-center rounded-xl bg-[#0FF0FC] px-3 py-2 text-center text-[11px] font-black text-black transition hover:bg-[#4AFAFF]">البث التفاعلي</Link>
-            <Link href="#match-stats" className="inline-flex min-h-11 items-center justify-center rounded-xl border border-white/10 bg-white/[0.06] px-3 py-2 text-center text-[11px] font-black text-gray-200 transition hover:bg-white/[0.1]">الإحصائيات والأحداث</Link>
-          </div>
         </section>
 
         <Panel id="live-broadcast" title="البث التفاعلي" icon={<Radio className="text-[#FFD700]" />}>
           <InternalAnimationPlayer matchId={animationMatchId} dbMatchId={match.id} />
-        </Panel>
-
-        <Panel id="match-stats" title="إحصائيات ومجريات المباراة" icon={<BarChart3 className="text-[#0FF0FC]" />}>
-          <LiveMatchStatsPanel matchId={animationMatchId || undefined} dbMatchId={match.id} />
         </Panel>
       </section>
     </main>
