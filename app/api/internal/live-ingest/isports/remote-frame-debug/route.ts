@@ -111,7 +111,7 @@ function browserlessFunctionEndpoint() {
 }
 
 function browserlessDebugCode() {
-  return `module.exports = async ({ page, context }) => {
+  return `export default async function ({ page, context }) {
   const logs = [];
   const responses = [];
   const requestsFailed = [];
@@ -183,7 +183,7 @@ function browserlessDebugCode() {
     };
   });
   return { data: { pageData, logs, responses, requestsFailed }, type: 'application/json' };
-};`;
+}`;
 }
 
 async function callBrowserlessFunction(targetUrl: string, timeoutMs: number, waitMs: number) {
