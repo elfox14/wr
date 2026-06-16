@@ -6,7 +6,19 @@ import { getTeamFlagUrl } from '@/lib/teamFlags';
 
 type Team = { id?: string; name?: string; code?: string; image?: string } | null;
 type Snapshot = Record<string, any> | null;
-type MatchEvent = { id: string; minute?: number | null; type: string; detail: string; playerName?: string | null; sourceName?: string | null; createdAt?: string | null };
+type MatchEvent = {
+  id: string;
+  minute?: number | null;
+  type: string;
+  detail: string;
+  teamId?: string | null;
+  playerId?: string | null;
+  playerName?: string | null;
+  playerImage?: string | null;
+  playerAsset?: { id?: string; name?: string; image?: string; code?: string; position?: string | null; teamId?: string | null } | null;
+  sourceName?: string | null;
+  createdAt?: string | null;
+};
 
 type LiveStatsResponse = {
   ok: boolean;
@@ -96,6 +108,7 @@ function eventIcon(type: string) {
   if (value.includes('danger')) return '🔥';
   if (value.includes('shot')) return '🎯';
   if (value.includes('status')) return 'ℹ️';
+  if (value.includes('substitution')) return '🔁';
   return '•';
 }
 
@@ -122,7 +135,8 @@ function displaySourceName(source?: string | null) {
   if (!value) return '';
   if (value === 'FOOTBALL_DATA' || value === 'FOOTBALL_DATA_FALLBACK') return '';
   if (value === 'MC PRIME Live Monitor') return 'الرصد المباشر';
-  if (value === 'ISPORTS') return 'iSports';
+  if (value === 'ISPORTS' || value === 'ISPORTS_PAGE') return 'iSports';
+  if (value === 'ISPORTS_TIMELINE') return 'iSports Timeline';
   return value.replace(/_/g, ' ');
 }
 
@@ -195,6 +209,38 @@ function fallbackEventFromSnapshot(data: LiveStatsResponse | null): MatchEvent |
 
 function teamFlagUrl(team: Team) {
   return getTeamFlagUrl({ code: team?.code, name: team?.name, image: team?.image }, 48);
+}
+
+function teamForEvent(data: LiveStatsResponse | null, event: MatchEvent): Team {
+  const home = data?.match?.homeTeam || null;
+  const away = data?.match?.awayTeam || null;
+  if (event.teamId && home?.id === event.teamId) return home;
+  if (event.teamId && away?.id === event.teamId) return away;
+  const detail = String(event.detail || '').toLowerCase();
+  if (home?.name && detail.includes(home.name.toLowerCase())) return home;
+  if (away?.name && detail.includes(away.name.toLowerCase())) return away;
+  return null;
+}
+
+function EventAvatar({ event, data }: { event: MatchEvent; data: LiveStatsResponse | null }) {
+  const playerImage = event.playerImage || event.playerAsset?.image || null;
+  const playerName = event.playerName || event.playerAsset?.name || '';
+  const team = teamForEvent(data, event);
+  const flag = teamFlagUrl(team);
+  const isGoal = event.type.toLowerCase().includes('goal');
+  const label = playerName || team?.name || event.type;
+
+  return (
+    <span className={`relative inline-flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-2xl border ${isGoal ? 'border-[#FFD700]/40 bg-[#FFD700]/10' : 'border-white/10 bg-black/30'}`}>
+      {playerImage ? (
+        <img src={playerImage} alt={label} className="h-full w-full object-cover" loading="lazy" />
+      ) : flag ? (
+        <img src={flag} alt={`علم ${team?.name || label}`} className="h-full w-full object-cover" loading="lazy" />
+      ) : (
+        <span className="text-base">{eventIcon(event.type)}</span>
+      )}
+    </span>
+  );
 }
 
 function TeamName({ team, fallback, align }: { team: Team; fallback: string; align: 'right' | 'left' }) {
@@ -281,8 +327,8 @@ export default function LiveMatchStatsPanel({ matchId, dbMatchId }: Props) {
         <div>
           <p className="inline-flex items-center gap-2 rounded-full border border-[#0FF0FC]/25 bg-[#0FF0FC]/10 px-3 py-1 text-[10px] font-black text-[#0FF0FC]"><Activity size={13} /> Match Data Recorder</p>
           <h2 className="mt-2 text-xl font-black text-white">بيانات المباراة</h2>
-          <p className="mt-1 text-xs leading-5 text-gray-400">لا يتم اختراع أرقام. عند غياب الإحصائيات التفصيلية نعرض النتيجة والحالة الموثقة فقط.</p>
-          <p className="mt-2 text-[11px] font-bold leading-5 text-gray-500">الخطة: قاعدة البيانات أولًا، Football-Data للنتيجة والحالة، وiSports للإحصائيات التفصيلية عند توفره.</p>
+          <p className="mt-1 text-xs leading-5 text-gray-400">لا يتم اختراع أرقام. عند غياب الإحصائيات التفصيلية نعرض النتيجة والحالة والأحداث الموثقة فقط.</p>
+          <p className="mt-2 text-[11px] font-bold leading-5 text-gray-500">الخطة: قاعدة البيانات أولًا، Football-Data للنتيجة والحالة، وiSports Timeline للأحداث عند توفره.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2 text-xs font-black">
           <span className="rounded-full border border-white/10 bg-black/30 px-3 py-1 text-gray-300"><Clock size={13} className="inline" /> بيانات: {data?.updatedAt ? new Date(data.updatedAt).toLocaleTimeString('ar-EG') : '—'}</span>
@@ -347,8 +393,14 @@ export default function LiveMatchStatsPanel({ matchId, dbMatchId }: Props) {
                 const sourceLabel = displaySourceName(event.sourceName);
                 return (
                   <div key={event.id} className="rounded-xl border border-white/10 bg-white/[0.035] p-3">
-                    <div className="flex items-center gap-2 text-xs font-black text-[#FFD700]"><span>{eventIcon(event.type)}</span>{event.minute ? `د${event.minute}` : 'حدث'}{sourceLabel ? <><span className="text-gray-600">•</span><span>{sourceLabel}</span></> : null}</div>
-                    <p className="mt-1 text-sm leading-6 text-gray-200">{cleanEventDetail(event.detail)}</p>
+                    <div className="flex items-start gap-3">
+                      <EventAvatar event={event} data={data} />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2 text-xs font-black text-[#FFD700]"><span>{eventIcon(event.type)}</span>{event.minute ? `د${event.minute}` : 'حدث'}{sourceLabel ? <><span className="text-gray-600">•</span><span>{sourceLabel}</span></> : null}</div>
+                        {event.playerName ? <p className="mt-1 text-xs font-black text-white">{event.playerName}</p> : null}
+                        <p className="mt-1 text-sm leading-6 text-gray-200">{cleanEventDetail(event.detail)}</p>
+                      </div>
+                    </div>
                   </div>
                 );
               }) : (
