@@ -161,6 +161,13 @@ function normalizeName(value?: string | null) {
     .trim();
 }
 
+function usableImageUrl(value?: string | null) {
+  const image = String(value || '').trim();
+  if (!image) return null;
+  if (image.startsWith('/') || image.startsWith('https://') || image.startsWith('http://')) return image;
+  return null;
+}
+
 export function iso2ToFlag(iso2?: string | null) {
   const code = String(iso2 || '').trim().toUpperCase();
   if (!/^[A-Z]{2}$/.test(code)) return null;
@@ -187,6 +194,9 @@ export function getTeamFlagCode(team: TeamIdentity) {
 }
 
 export function getTeamFlagUrl(team: TeamIdentity, width = 80) {
+  const storedImage = usableImageUrl(team.image);
+  if (storedImage) return storedImage;
+
   const code = getTeamFlagCode(team);
   if (!code) return null;
   return `https://flagcdn.com/w${width}/${code.toLowerCase()}.png`;
