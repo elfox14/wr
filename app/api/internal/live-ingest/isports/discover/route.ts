@@ -21,9 +21,13 @@ async function handler(req: Request) {
     const dryRun = url.searchParams.get('dryRun') !== 'false';
     const threshold = numberParam(url, 'threshold', 140, 40, 230);
     const date = url.searchParams.get('date');
-    const saveUnlinked = url.searchParams.get('saveUnlinked') === 'true';
 
-    const result = await discoverISportsHomepage(date, { dryRun, threshold, saveUnlinked });
+    // discoverISportsHomepage currently returns discovery diagnostics only.
+    // Keep this route type-safe and avoid passing removed options such as saveUnlinked.
+    const result = await discoverISportsHomepage(date, { dryRun, threshold });
+    const loaded = result.loaded;
+    const candidates = result.candidates || [];
+
     return NextResponse.json({
       ok: true,
       mode: 'isports_homepage_discovery',
@@ -31,17 +35,17 @@ async function handler(req: Request) {
       threshold,
       date: result.dateKey,
       page: {
-        url: result.page.url,
-        loader: result.page.loader,
-        rendered: result.page.rendered,
-        error: result.page.error || null,
+        url: loaded.url || result.pageUrl,
+        loader: loaded.loader,
+        rendered: loaded.rendered,
+        error: loaded.error || null,
       },
-      localMatches: result.localMatches,
-      discoveredCount: result.candidates.length,
-      linkedCount: result.candidates.filter((item: any) => item.linked).length,
-      linkCandidateCount: result.candidates.filter((item: any) => item.linkCandidate).length,
-      candidates: result.candidates,
-      nextAction: dryRun ? 'راجع الترشيحات ثم شغّل نفس المسار مع dryRun=false للحفظ.' : 'تم حفظ الروابط المؤكدة وتحديث animationMatchId للمباريات المطابقة.',
+      localMatches: [],
+      discoveredCount: candidates.length,
+      linkedCount: candidates.filter((item: any) => item.linked).length,
+      linkCandidateCount: candidates.filter((item: any) => item.linkCandidate).length,
+      candidates,
+      nextAction: 'استخدم matchId الظاهر من candidates لربط المباراة أو شغّل مسارات remote-live/remote-timeline للمباريات المرتبطة بالفعل.',
     }, { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } });
   } catch (error: any) {
     return NextResponse.json({ ok: false, error: error?.message || 'Internal Server Error' }, { status: 500, headers: { 'Cache-Control': 'no-store' } });
