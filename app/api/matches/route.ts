@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 
-const LIVE_STATUSES = ['IN_PLAY', 'LIVE', 'HT'];
+const LIVE_STATUSES = ['1H', '2H', 'ET', 'BT', 'P', 'IN_PLAY', 'LIVE', 'HT'];
 const SCHEDULED_STATUSES = ['SCHEDULED', 'TIMED', 'NOT_STARTED', 'NS'];
 const FINISHED_STATUSES = ['FINISHED', 'FT', 'AET', 'PEN'];
 const GROUP_STAGE_MAX_LIVE_MINUTES = 115;
@@ -48,7 +48,9 @@ function minutesFromKickoff(match: any, now = Date.now()) {
 }
 
 function isOfficialFinished(match: any) {
-  return FINISHED_STATUSES.includes(normalizeStatus(match.status || match.displayStatus));
+  const status = normalizeStatus(match.status);
+  const displayStatus = normalizeStatus(match.displayStatus);
+  return FINISHED_STATUSES.includes(status) || FINISHED_STATUSES.includes(displayStatus);
 }
 
 function isScheduledStatus(status?: string | null) {
@@ -77,7 +79,18 @@ function normalizeMatchForDisplay(match: any, now = Date.now()) {
   const status = normalizeStatus(match.status);
   const minute = minutesFromKickoff(match, now);
 
-  if (!isOfficialFinished(match) && (isLiveStatus(status) || isScheduledStatus(status)) && isStaleByTime(match, now)) {
+  if (isOfficialFinished(match)) {
+    return {
+      ...match,
+      displayStatus: 'FINISHED',
+      isLiveNow: false,
+      isLikelyLiveByTime: false,
+      minute: null,
+      liveLabel: null,
+    };
+  }
+
+  if ((isLiveStatus(status) || isScheduledStatus(status)) && isStaleByTime(match, now)) {
     return {
       ...match,
       status: 'FINISHED',
@@ -85,6 +98,8 @@ function normalizeMatchForDisplay(match: any, now = Date.now()) {
       isLiveNow: false,
       isLikelyLiveByTime: false,
       isStaleAutoFinished: true,
+      minute: null,
+      liveLabel: null,
     };
   }
 
@@ -114,7 +129,7 @@ function normalizeMatchForDisplay(match: any, now = Date.now()) {
 
 function rankMatch(match: any) {
   const status = normalizeStatus(match.displayStatus || match.status);
-  const statusRank = status === 'IN_PLAY' || status === 'LIVE' || status === 'HT' ? 50 : status === 'FINISHED' ? 30 : 10;
+  const statusRank = isOfficialFinished(match) ? 30 : status === 'IN_PLAY' || status === 'LIVE' || status === 'HT' || status === '1H' || status === '2H' ? 50 : 10;
   const animationRank = match.animationMatchId ? 20 : 0;
   const externalRank = match.externalId ? 5 : 0;
   return statusRank + animationRank + externalRank;
@@ -182,9 +197,11 @@ export async function GET() {
     });
 
     const documentedMinutes = await latestDocumentedMinutes(matches.map((match) => match.id));
+    const now = Date.now();
     const enrichedMatches = matches.map((match) => {
       const minute = documentedMinutes.get(match.id);
-      return minute ? { ...match, minute, displayStatus: 'IN_PLAY', isLiveNow: true, liveLabel: `الدقيقة ${minute}` } : match;
+      const canUseLiveSnapshot = minute && !isOfficialFinished(match) && !isStaleByTime(match, now);
+      return canUseLiveSnapshot ? { ...match, minute, displayStatus: 'IN_PLAY', isLiveNow: true, liveLabel: `الدقيقة ${minute}` } : match;
     });
 
     return NextResponse.json(dedupeMatches(enrichedMatches), { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } });
