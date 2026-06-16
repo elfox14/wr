@@ -199,8 +199,7 @@ function calculatePressureModel(snapshot: Snapshot, events: MatchEvent[], curren
   const maxPressure = Math.max(homePressure, awayPressure);
   const danger = maxPressure >= 220 ? 'مرتفعة' : maxPressure >= 110 ? 'متوسطة' : 'منخفضة';
   return { home: Math.round(homePressure), away: Math.round(awayPressure), leader, rhythm, danger, window5, window15 };
-}
-function momentumRating(total: number) {
+}\nfunction momentumRating(total: number) {
   if (total >= 18) return 'ضغط عالي';
   if (total >= 8) return 'ضغط متوسط';
   if (total > 0) return 'ضغط منخفض';
@@ -486,7 +485,7 @@ export default function InternalAnimationPlayer({ matchId = '', dbMatchId = '' }
 
           <div className="rounded-3xl border border-white/10 bg-black/20 p-4">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-sm font-black text-white"><span className="inline-flex items-center gap-2"><BarChart3 size={18} className="text-[#0FF0FC]" /> إحصائيات المباراة</span><span className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-black/30 px-3 py-1 text-[10px] text-gray-400"><RefreshCw size={12} /> تحديث كل دقيقة</span></div>
-            <div className="grid gap-3 sm:grid-cols-3"><MiniStat label="ركنيات" home={n(latest, 'homeCorners')} away={n(latest, 'awayCorners')} accent /><MiniStat label="صفراء" home={n(latest, 'homeYellowCards')} away={n(latest, 'awayYellowCards')} /><MiniStat label="حمراء" home={n(latest, 'homeRedCards')} away={n(latest, 'homeRedCards')} /></div>
+            <div className="grid gap-3 sm:grid-cols-3"><MiniStat label="ركنيات" home={n(latest, 'homeCorners')} away={n(latest, 'awayCorners')} accent /><MiniStat label="صفراء" home={n(latest, 'homeYellowCards')} away={n(latest, 'awayYellowCards')} /><MiniStat label="حمراء" home={n(latest, 'homeRedCards')} away={n(latest, 'awayRedCards')} /></div>
             <div className="mt-3 grid gap-3 md:grid-cols-2"><StatRow label="الاستحواذ" home={n(latest, 'homePossession')} away={n(latest, 'awayPossession')} /><StatRow label="الهجمات" home={n(latest, 'homeAttacks')} away={n(latest, 'awayAttacks')} /><StatRow label="الهجمات الخطيرة" home={n(latest, 'homeDangerousAttacks')} away={n(latest, 'awayDangerousAttacks')} accent /><StatRow label="التسديدات" home={n(latest, 'homeShots')} away={n(latest, 'awayShots')} /><StatRow label="على المرمى" home={n(latest, 'homeShotsOnTarget')} away={n(latest, 'awayShotsOnTarget')} accent /><StatRow label="خارج المرمى" home={n(latest, 'homeShotsOffTarget')} away={n(latest, 'awayShotsOffTarget')} /></div>
           </div>
         </div>
