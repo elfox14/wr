@@ -96,6 +96,69 @@ function maskSocketUrl(value: string) {
   return url.toString();
 }
 
+function toNumber(value?: string | null) {
+  const cleaned = String(value ?? '').trim().replace(/[^0-9.-]/g, '');
+  if (!cleaned) return null;
+  const n = Number(cleaned);
+  return Number.isFinite(n) ? n : null;
+}
+
+function maybeMinute(value?: string | null) {
+  const text = String(value ?? '').trim();
+  const match = text.match(/^(\d{1,3})(?::\d{1,2})?$/);
+  const n = toNumber(match?.[1] || text);
+  return n !== null && n >= 0 && n <= 130 ? n : null;
+}
+
+function tryJson(value: string) {
+  try { return JSON.parse(value); } catch { return null; }
+}
+
+function parsePayloadValue(value: unknown) {
+  if (Array.isArray(value)) return value.map((item) => String(item ?? '')).join('^');
+  return String(value ?? '');
+}
+
+function splitRecords(value: string) {
+  return String(value || '')
+    .split(/\$\$|\r?\n|;/)
+    .map((record) => record.trim())
+    .filter(Boolean);
+}
+
+function inferPayloadType(fields: string[]) {
+  if (fields.length >= 10 && /^\d{1,3}:\d{1,2}$/.test(fields[2] || '')) return 'timeline_state';
+  if (fields.length >= 5 && fields.some((field) => /^\d{1,3}$/.test(field))) return 'event_record';
+  return 'unknown';
+}
+
+function parseRecord(raw: string) {
+  const fields = String(raw || '').split('^');
+  const numericFields = fields.map((field) => toNumber(field));
+  const providerScheduleId = fields[0] || null;
+  const state = fields[1] || null;
+  const clock = fields.find((field) => /^\d{1,3}:\d{1,2}$/.test(field)) || null;
+  const minute = maybeMinute(clock || fields[2]);
+  const likelyPayload = inferPayloadType(fields);
+  const eventLike = fields.length >= 5 && Boolean(providerScheduleId) && numericFields.filter((v) => v !== null).length >= 4;
+  const fieldMap = Object.fromEntries(fields.map((field, index) => [`f${index}`, field || null]));
+  return { raw, fields, providerScheduleId, state, clock, minute, numericFields, fieldMap, likelyPayload, eventLike };
+}
+
+function parseDecodedPayload(text: string) {
+  const parsed = tryJson(String(text || ''));
+  const inputs = parsed && typeof parsed === 'object'
+    ? Object.entries(parsed as Record<string, unknown>).map(([channel, value]) => ({ channel, payload: parsePayloadValue(value) }))
+    : [{ channel: 'unknown', payload: String(text || '') }];
+
+  const parsedChannels = inputs.map((input) => {
+    const records = splitRecords(input.payload).map(parseRecord);
+    return { channel: input.channel, rawPayload: input.payload.slice(0, 1800), recordCount: records.length, records };
+  });
+  const scheduleIds = [...new Set(parsedChannels.flatMap((item) => item.records.map((record) => record.providerScheduleId).filter(Boolean)))] as string[];
+  return { scheduleIds, parsedChannels };
+}
+
 function qualityScore(text: string | null) {
   if (!text) return 0;
   const sample = text.slice(0, 4000);
@@ -147,9 +210,7 @@ function decodeBuffer(buffer: Buffer) {
     { name: 'inflateRaw', fn: inflateRawSync },
   ];
   for (const decoder of decoders) {
-    try {
-      candidates.push({ encoding: decoder.name, text: asUtf8(decoder.fn(buffer)) });
-    } catch {}
+    try { candidates.push({ encoding: decoder.name, text: asUtf8(decoder.fn(buffer)) }); } catch {}
   }
   candidates.push({ encoding: 'utf8', text: asUtf8(buffer) });
   candidates.push({ encoding: 'latin1', text: cleanString(buffer.toString('latin1')) || null });
@@ -182,10 +243,13 @@ async function messageToDecoded(data: any) {
 
 function summarizeMessage(text: string, matchId: string | null) {
   const sample = String(text || '').slice(0, 2400);
+  const parsedPayload = parseDecodedPayload(String(text || ''));
   return {
     sample,
     length: String(text || '').length,
-    hasMatchId: matchId ? sample.includes(matchId) || String(text || '').includes(matchId) : null,
+    hasMatchId: matchId ? sample.includes(matchId) || String(text || '').includes(matchId) || parsedPayload.scheduleIds.includes(matchId) : null,
+    scheduleIds: parsedPayload.scheduleIds,
+    parsedChannels: parsedPayload.parsedChannels,
     looksJson: /^[\[{]/.test(sample.trim()),
     contains: {
       goal: /goal|进球/i.test(sample),
@@ -197,14 +261,15 @@ function summarizeMessage(text: string, matchId: string | null) {
   };
 }
 
-async function probeSocket(socketUrl: string, channel: string, timeoutMs: number, maxMessages: number, matchId: string | null) {
+async function probeSocket(socketUrl: string, channel: string, timeoutMs: number, maxMessages: number, matchId: string | null, onlyMatching: boolean) {
   const WebSocketCtor = (globalThis as any).WebSocket;
   if (!WebSocketCtor) {
-    return { supported: false, opened: false, closed: false, messages: [], errors: ['WebSocket is not available in this Node runtime'] };
+    return { supported: false, opened: false, closed: false, messages: [], unmatchedSamples: [], errors: ['WebSocket is not available in this Node runtime'] };
   }
 
   return new Promise<any>((resolve) => {
     const messages: any[] = [];
+    const unmatchedSamples: any[] = [];
     const errors: string[] = [];
     let opened = false;
     let closed = false;
@@ -218,7 +283,8 @@ async function probeSocket(socketUrl: string, channel: string, timeoutMs: number
       if (finished) return;
       finished = true;
       try { if (ws && !closed) ws.close(); } catch {}
-      resolve({ supported: true, opened, closed, closeCode, closeReason, durationMs: Date.now() - startedAt, messages, errors });
+      const seenScheduleIds = [...new Set([...messages, ...unmatchedSamples].flatMap((message) => message.scheduleIds || []))];
+      resolve({ supported: true, opened, closed, closeCode, closeReason, durationMs: Date.now() - startedAt, seenScheduleIds, messages, unmatchedSamples, errors });
     };
 
     const timer = setTimeout(finish, timeoutMs);
@@ -231,7 +297,9 @@ async function probeSocket(socketUrl: string, channel: string, timeoutMs: number
       ws.addEventListener('message', async (event: any) => {
         try {
           const decoded = await messageToDecoded(event.data);
-          messages.push({ encoding: decoded.encoding, ...summarizeMessage(decoded.text, matchId) });
+          const summary = { encoding: decoded.encoding, ...summarizeMessage(decoded.text, matchId) };
+          if (!onlyMatching || summary.hasMatchId) messages.push(summary);
+          else if (unmatchedSamples.length < Math.min(10, maxMessages)) unmatchedSamples.push(summary);
           if (messages.length >= maxMessages) {
             clearTimeout(timer);
             finish();
@@ -252,7 +320,7 @@ async function probeSocket(socketUrl: string, channel: string, timeoutMs: number
       });
     } catch (error: any) {
       clearTimeout(timer);
-      resolve({ supported: true, opened, closed, closeCode, closeReason, durationMs: Date.now() - startedAt, messages, errors: [String(error?.message || error).slice(0, 260)] });
+      resolve({ supported: true, opened, closed, closeCode, closeReason, durationMs: Date.now() - startedAt, seenScheduleIds: [], messages, unmatchedSamples, errors: [String(error?.message || error).slice(0, 260)] });
     }
   });
 }
@@ -269,6 +337,7 @@ async function handler(req: Request) {
     const timeoutMs = clamp(url.searchParams.get('timeoutMs'), 9000, 1500, 25000);
     const maxMessages = clamp(url.searchParams.get('maxMessages'), 6, 1, 25);
     const matchId = url.searchParams.get('matchId') || null;
+    const onlyMatching = ['1', 'true', 'yes'].includes(String(url.searchParams.get('onlyMatching') || '').toLowerCase());
     const tokenResult = await fetchToken(config.tokenUrls);
 
     if (!tokenResult.token) {
@@ -276,17 +345,19 @@ async function handler(req: Request) {
     }
 
     const socketUrl = buildSocketUrl(config, channel, tokenResult.token);
-    const probe = await probeSocket(socketUrl, channel, timeoutMs, maxMessages, matchId);
+    const probe = await probeSocket(socketUrl, channel, timeoutMs, maxMessages, matchId, onlyMatching);
 
     return json({
       ok: true,
       mode: 'isports_socket_probe',
       probeMode: mode,
       channel,
+      matchId,
+      onlyMatching,
       socketUrl: maskSocketUrl(socketUrl),
       tokenAttempts: tokenResult.attempts,
       probe,
-      note: 'Diagnostic only: collects a few short websocket message samples so we can map live stats/timeline safely before saving anything.',
+      note: 'Diagnostic only: collects websocket samples and parses schedule ids before saving anything.',
     });
   } catch (error: any) {
     return json({ ok: false, error: error?.message || 'Internal Server Error' }, 500);
