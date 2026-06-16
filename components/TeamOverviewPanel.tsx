@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
-import { BarChart3, CalendarDays, CheckCircle2, ClipboardList, FileText, Goal, ListChecks, Scale, Shield, Sparkles, Trophy, Users, XCircle, Zap } from 'lucide-react';
+import { BarChart3, CalendarDays, CheckCircle2, ClipboardList, FileText, Goal, ListChecks, Scale, Shield, Sparkles, Users, XCircle, Zap } from 'lucide-react';
 import { AssetImage } from '@/components/ui/AssetImage';
 import TeamWorldCupHistory from './TeamWorldCupHistory';
 import { getRealWorldCupData } from '@/lib/realWorldCupData';
