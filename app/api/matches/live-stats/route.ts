@@ -125,6 +125,24 @@ function snapshotHasScore(snapshot: any) {
   return nullableNumber(snapshot?.homeScore) !== null || nullableNumber(snapshot?.awayScore) !== null;
 }
 
+function snapshotStatScore(snapshot: any) {
+  if (!snapshot) return -1;
+  const provider = String(snapshot.provider || '').toUpperCase();
+  let score = 0;
+  if (provider === 'ISPORTS_FLASH') score += 1000;
+  if (provider === 'ISPORTS_TIMELINE') score += 100;
+  if (snapshot.homeAttacks !== null || snapshot.awayAttacks !== null) score += 120;
+  if (snapshot.homeDangerousAttacks !== null || snapshot.awayDangerousAttacks !== null) score += 120;
+  if (snapshot.homeCorners !== null || snapshot.awayCorners !== null) score += 60;
+  if (snapshot.homeScore !== null || snapshot.awayScore !== null) score += 30;
+  const captured = new Date(snapshot.capturedAt || 0).getTime();
+  return score + (Number.isFinite(captured) ? Math.min(29, Math.floor(captured / 60000) % 30) : 0);
+}
+
+function selectBestSnapshot(candidates: any[]) {
+  return candidates.filter(Boolean).sort((a, b) => snapshotStatScore(b) - snapshotStatScore(a))[0] || null;
+}
+
 function cleanPublicSnapshot(match: any, snapshot: any) {
   if (!snapshot) return null;
   if (snapshotMinute(snapshot) !== null) return snapshot;
@@ -188,7 +206,8 @@ export async function GET(request: Request) {
     }
 
     const historyRows = await getSnapshotHistory(match.id, 80);
-    const rawLatestPublic = publicSnapshot(latest);
+    const bestSnapshot = selectBestSnapshot([latest, ...historyRows]);
+    const rawLatestPublic = publicSnapshot(bestSnapshot || latest);
     const latestPublic = cleanPublicSnapshot(match, rawLatestPublic);
     const ignoredSnapshotScore = Boolean(latestPublic && snapshotHasScore(latestPublic));
     const latestHomeScore = match.homeScore;
@@ -214,7 +233,7 @@ export async function GET(request: Request) {
     return NextResponse.json({
       ok: true,
       updatedAt: now.toISOString(),
-      pollingSeconds: 300,
+      pollingSeconds: 60,
       providerSyncEnabled: allowProviderSync,
       autoSyncCandidate,
       hasStats,
