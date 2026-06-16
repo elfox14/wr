@@ -1,24 +1,5392 @@
 {
   "dryRun": true,
+  "generatedAt": "2026-06-16",
+  "sourceNote": "Built from Reuters 2026 World Cup final squad list, with Reuters replacement updates found through 2026-06-16. Review dry-run output before applying.",
+  "sources": [
+    "https://www.reuters.com/sports/soccer/world-cup-2026-list-26-man-squads-finals-2026-06-02/",
+    "https://www.reuters.com/sports/soccer/nelson-replaces-injured-flores-canadas-world-cup-squad-2026-06-09/",
+    "https://www.reuters.com/sports/soccer/brazil-tabs-ederson-replace-wesley-wc-roster--flm-2026-06-07/",
+    "https://www.reuters.com/sports/soccer/japan-captain-endo-withdraws-world-cup-due-injury-retires-internationals-2026-06-11/",
+    "https://www.reuters.com/sports/soccer/makenzie-replaces-injured-yahya-iraqs-world-cup-squad-2026-06-06/",
+    "https://www.reuters.com/sports/soccer/argentinas-balerdi-out-world-cup-with-injury-2026-06-06/",
+    "https://www.reuters.com/sports/soccer/argentina-call-up-senesi-world-cup-after-balerdi-injury-2026-06-11/",
+    "https://www.reuters.com/sports/soccer/ljubicic-replace-baumgartner-austrias-world-cup-squad-2026-06-10/"
+  ],
   "teams": [
     {
-      "teamCode": "NED",
-      "sourceName": "Reuters World Cup 2026 squads",
-      "sourceUrl": "Reuters - World Cup 2026: list of 26-man squads at the finals",
+      "teamCode": "MEX",
+      "teamName": "Mexico",
+      "sourceName": "Reuters World Cup 2026 squads + Reuters replacement updates through 2026-06-16",
+      "sourceUrl": "https://www.reuters.com/sports/soccer/world-cup-2026-list-26-man-squads-finals-2026-06-02/",
       "players": [
-        { "name": "Mark Flekken", "position": "Goalkeeper" },
-        { "name": "Robin Roefs", "position": "Goalkeeper" },
-        { "name": "Bart Verbruggen", "position": "Goalkeeper" }
+        {
+          "name": "Raul Rangel",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Guillermo Ochoa",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Carlos Acevedo",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Jorge Sanchez",
+          "position": "Defender"
+        },
+        {
+          "name": "Israel Reyes",
+          "position": "Defender"
+        },
+        {
+          "name": "Cesar Montes",
+          "position": "Defender"
+        },
+        {
+          "name": "Johan Vasquez",
+          "position": "Defender"
+        },
+        {
+          "name": "Jesus Gallardo",
+          "position": "Defender"
+        },
+        {
+          "name": "Mateo Chavez",
+          "position": "Defender"
+        },
+        {
+          "name": "Erik Lira",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Orbelin Pineda",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Alvaro Fidalgo",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Brian Gutierrez",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Luis Romo",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Edson Alvarez",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Obed Vargas",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Gilberto Mora",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Luis Chavez",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Roberto Alvarado",
+          "position": "Forward"
+        },
+        {
+          "name": "Cesar Huerta",
+          "position": "Forward"
+        },
+        {
+          "name": "Alexis Vega",
+          "position": "Forward"
+        },
+        {
+          "name": "Julian Quinones",
+          "position": "Forward"
+        },
+        {
+          "name": "Guillermo Martinez",
+          "position": "Forward"
+        },
+        {
+          "name": "Armando Gonzalez",
+          "position": "Forward"
+        },
+        {
+          "name": "Santiago Gimenez",
+          "position": "Forward"
+        },
+        {
+          "name": "Raul Jimenez",
+          "position": "Forward"
+        }
+      ]
+    },
+    {
+      "teamCode": "RSA",
+      "teamName": "South Africa",
+      "sourceName": "Reuters World Cup 2026 squads + Reuters replacement updates through 2026-06-16",
+      "sourceUrl": "https://www.reuters.com/sports/soccer/world-cup-2026-list-26-man-squads-finals-2026-06-02/",
+      "players": [
+        {
+          "name": "Ronwen Williams",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Ricardo Goss",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Sipho Chaine",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Khuliso Mudau",
+          "position": "Defender"
+        },
+        {
+          "name": "Aubrey Modiba",
+          "position": "Defender"
+        },
+        {
+          "name": "Khulumani Ndamane",
+          "position": "Defender"
+        },
+        {
+          "name": "Olwethu Makhanya",
+          "position": "Defender"
+        },
+        {
+          "name": "Bradley Cross",
+          "position": "Defender"
+        },
+        {
+          "name": "Thabang Matuludi",
+          "position": "Defender"
+        },
+        {
+          "name": "Nkosinathi Sibisi",
+          "position": "Defender"
+        },
+        {
+          "name": "Kamogelo Sebelebele",
+          "position": "Defender"
+        },
+        {
+          "name": "Ime Okon",
+          "position": "Defender"
+        },
+        {
+          "name": "Samukele Kabini",
+          "position": "Defender"
+        },
+        {
+          "name": "Mbekezeli Mbokazi",
+          "position": "Defender"
+        },
+        {
+          "name": "Teboho Mokoena",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Jayden Adams",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Thalente Mbatha",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Sphephelo Sithole",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Oswin Appollis",
+          "position": "Forward"
+        },
+        {
+          "name": "Tshepang Moremi",
+          "position": "Forward"
+        },
+        {
+          "name": "Evidence Makgopa",
+          "position": "Forward"
+        },
+        {
+          "name": "Relebohile Mofokeng",
+          "position": "Forward"
+        },
+        {
+          "name": "Lyle Foster",
+          "position": "Forward"
+        },
+        {
+          "name": "Iqraam Rayners",
+          "position": "Forward"
+        },
+        {
+          "name": "Themba Zwane",
+          "position": "Forward"
+        },
+        {
+          "name": "Thapelo Maseko",
+          "position": "Forward"
+        }
+      ]
+    },
+    {
+      "teamCode": "KOR",
+      "teamName": "South Korea",
+      "sourceName": "Reuters World Cup 2026 squads + Reuters replacement updates through 2026-06-16",
+      "sourceUrl": "https://www.reuters.com/sports/soccer/world-cup-2026-list-26-man-squads-finals-2026-06-02/",
+      "players": [
+        {
+          "name": "Kim Seung-gyu",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Song Bum-keun",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Jo Hyeon-woo",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Kim Moon-hwan",
+          "position": "Defender"
+        },
+        {
+          "name": "Kim Min-jae",
+          "position": "Defender"
+        },
+        {
+          "name": "Kim Tae-hyeon",
+          "position": "Defender"
+        },
+        {
+          "name": "Park Jin-seop",
+          "position": "Defender"
+        },
+        {
+          "name": "Seol Young-woo",
+          "position": "Defender"
+        },
+        {
+          "name": "Jens Castrop",
+          "position": "Defender"
+        },
+        {
+          "name": "Lee Ki-hyeok",
+          "position": "Defender"
+        },
+        {
+          "name": "Lee Tae-seok",
+          "position": "Defender"
+        },
+        {
+          "name": "Lee Han-beom",
+          "position": "Defender"
+        },
+        {
+          "name": "Cho Yu-min",
+          "position": "Defender"
+        },
+        {
+          "name": "Kim Jin-gyu",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Bae Jun-ho",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Paik Seung-ho",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Yang Hyun-jun",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Eom Ji-sung",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Lee Kang-in",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Lee Dong-gyeong",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Lee Jae-sung",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Hwang In-beom",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Hwang Hee-chan",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Son Heung-min",
+          "position": "Forward"
+        },
+        {
+          "name": "Oh Hyeon-gyu",
+          "position": "Forward"
+        },
+        {
+          "name": "Cho Gue-sung",
+          "position": "Forward"
+        }
+      ]
+    },
+    {
+      "teamCode": "CZE",
+      "teamName": "Czech Republic",
+      "sourceName": "Reuters World Cup 2026 squads + Reuters replacement updates through 2026-06-16",
+      "sourceUrl": "https://www.reuters.com/sports/soccer/world-cup-2026-list-26-man-squads-finals-2026-06-02/",
+      "players": [
+        {
+          "name": "Lukas Hornicek",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Matej Kovar",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Jindrich Stanek",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Vladimir Coufal",
+          "position": "Defender"
+        },
+        {
+          "name": "David Doudera",
+          "position": "Defender"
+        },
+        {
+          "name": "Tomas Holes",
+          "position": "Defender"
+        },
+        {
+          "name": "Robin Hranac",
+          "position": "Defender"
+        },
+        {
+          "name": "Stepan Chaloupek",
+          "position": "Defender"
+        },
+        {
+          "name": "David Jurasek",
+          "position": "Defender"
+        },
+        {
+          "name": "Ladislav Krejci",
+          "position": "Defender"
+        },
+        {
+          "name": "Jaroslav Zeleny",
+          "position": "Defender"
+        },
+        {
+          "name": "David Zima",
+          "position": "Defender"
+        },
+        {
+          "name": "Lukas Cerv",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Vladimir Darida",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Lukas Provod",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Michal Sadilek",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Hugo Sochurek",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Alexandr Sojka",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Tomas Soucek",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Pavel Sulc",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Denis Visinsky",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Adam Hlozek",
+          "position": "Forward"
+        },
+        {
+          "name": "Tomas Chory",
+          "position": "Forward"
+        },
+        {
+          "name": "Mojmir Chytil",
+          "position": "Forward"
+        },
+        {
+          "name": "Jan Kuchta",
+          "position": "Forward"
+        },
+        {
+          "name": "Patrik Schick",
+          "position": "Forward"
+        }
+      ]
+    },
+    {
+      "teamCode": "CAN",
+      "teamName": "Canada",
+      "sourceName": "Reuters World Cup 2026 squads + Reuters replacement updates through 2026-06-16 (Canada: Jayden Nelson replaced Marcelo Flores)",
+      "sourceUrl": "https://www.reuters.com/sports/soccer/world-cup-2026-list-26-man-squads-finals-2026-06-02/",
+      "players": [
+        {
+          "name": "Maxime Crepeau",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Owen Goodman",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Dayne St Clair",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Moise Bombito",
+          "position": "Defender"
+        },
+        {
+          "name": "Derek Cornelius",
+          "position": "Defender"
+        },
+        {
+          "name": "Alphonso Davies",
+          "position": "Defender"
+        },
+        {
+          "name": "Luc de Fougerolles",
+          "position": "Defender"
+        },
+        {
+          "name": "Alistair Johnston",
+          "position": "Defender"
+        },
+        {
+          "name": "Alfie Jones",
+          "position": "Defender"
+        },
+        {
+          "name": "Richie Laryea",
+          "position": "Defender"
+        },
+        {
+          "name": "Niko Sigur",
+          "position": "Defender"
+        },
+        {
+          "name": "Joel Waterman",
+          "position": "Defender"
+        },
+        {
+          "name": "Ali Ahmed",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Tajon Buchanan",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Mathieu Choiniere",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Stephen Eustaquio",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Jayden Nelson",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Ismael Kone",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Liam Millar",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Jonathan Osorio",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Nathan Saliba",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Jacob Shaffelburg",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Jonathan David",
+          "position": "Forward"
+        },
+        {
+          "name": "Promise David",
+          "position": "Forward"
+        },
+        {
+          "name": "Cyle Larin",
+          "position": "Forward"
+        },
+        {
+          "name": "Tani Oluwaseyi",
+          "position": "Forward"
+        }
+      ]
+    },
+    {
+      "teamCode": "BIH",
+      "teamName": "Bosnia & Herzegovina",
+      "sourceName": "Reuters World Cup 2026 squads + Reuters replacement updates through 2026-06-16",
+      "sourceUrl": "https://www.reuters.com/sports/soccer/world-cup-2026-list-26-man-squads-finals-2026-06-02/",
+      "players": [
+        {
+          "name": "Nikola Vasilj",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Martin Zlomislic",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Osman Hadzikic",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Sead Kolasinac",
+          "position": "Defender"
+        },
+        {
+          "name": "Amar Dedic",
+          "position": "Defender"
+        },
+        {
+          "name": "Nihad Mujakic",
+          "position": "Defender"
+        },
+        {
+          "name": "Nikola Katic",
+          "position": "Defender"
+        },
+        {
+          "name": "Tarik Muharemovic",
+          "position": "Defender"
+        },
+        {
+          "name": "Stjepan Radeljic",
+          "position": "Defender"
+        },
+        {
+          "name": "Dennis Hadzikadunic",
+          "position": "Defender"
+        },
+        {
+          "name": "Nidal Celik",
+          "position": "Defender"
+        },
+        {
+          "name": "Amir Hadziahmetovic",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Ivan Sunjic",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Ivan Basic",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Dzenis Burnic",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Ermin Mahmic",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Benjamin Tahirovic",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Amar Memic",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Armin Gigovic",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Kerim Alajbegovic",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Esmir Bajraktarevic",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Ermedin Demirovic",
+          "position": "Forward"
+        },
+        {
+          "name": "Jovo Lukic",
+          "position": "Forward"
+        },
+        {
+          "name": "Samed Bazdar",
+          "position": "Forward"
+        },
+        {
+          "name": "Haris Tabakovic",
+          "position": "Forward"
+        },
+        {
+          "name": "Edin Dzeko",
+          "position": "Forward"
+        }
+      ]
+    },
+    {
+      "teamCode": "QAT",
+      "teamName": "Qatar",
+      "sourceName": "Reuters World Cup 2026 squads + Reuters replacement updates through 2026-06-16",
+      "sourceUrl": "https://www.reuters.com/sports/soccer/world-cup-2026-list-26-man-squads-finals-2026-06-02/",
+      "players": [
+        {
+          "name": "Salah Zakaria",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Mahmoud Abunada",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Meshaal Barsham",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Hashmi Hussein",
+          "position": "Defender"
+        },
+        {
+          "name": "Ayoub Alawi",
+          "position": "Defender"
+        },
+        {
+          "name": "Boualem Khoukhi",
+          "position": "Defender"
+        },
+        {
+          "name": "Pedro Miguel",
+          "position": "Defender"
+        },
+        {
+          "name": "Issa Laaye",
+          "position": "Defender"
+        },
+        {
+          "name": "Lucas Mendes",
+          "position": "Defender"
+        },
+        {
+          "name": "Sultan Al-Brake",
+          "position": "Defender"
+        },
+        {
+          "name": "Homam Al-Amin",
+          "position": "Defender"
+        },
+        {
+          "name": "Mohammed Al-Manai",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Jassem Jaber",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Karim Boudiaf",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Ahmed Fathi",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Abdulaziz Hatem",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Assim Madibo",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Tahseen Mohammed",
+          "position": "Forward"
+        },
+        {
+          "name": "Edmilson Junior",
+          "position": "Forward"
+        },
+        {
+          "name": "Almoez Ali",
+          "position": "Forward"
+        },
+        {
+          "name": "Akram Afif",
+          "position": "Forward"
+        },
+        {
+          "name": "Mohammed Muntari",
+          "position": "Forward"
+        },
+        {
+          "name": "Youssef Abdulrazzaq",
+          "position": "Forward"
+        },
+        {
+          "name": "Ahmed Alaa",
+          "position": "Forward"
+        },
+        {
+          "name": "Hassan Al-Haydos",
+          "position": "Forward"
+        },
+        {
+          "name": "Ahmed Al-Janahi",
+          "position": "Forward"
+        }
+      ]
+    },
+    {
+      "teamCode": "SUI",
+      "teamName": "Switzerland",
+      "sourceName": "Reuters World Cup 2026 squads + Reuters replacement updates through 2026-06-16",
+      "sourceUrl": "https://www.reuters.com/sports/soccer/world-cup-2026-list-26-man-squads-finals-2026-06-02/",
+      "players": [
+        {
+          "name": "Marvin Keller",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Gregor Kobel",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Yvon Mvogo",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Manuel Akanji",
+          "position": "Defender"
+        },
+        {
+          "name": "Aurele Amenda",
+          "position": "Defender"
+        },
+        {
+          "name": "Eray Comert",
+          "position": "Defender"
+        },
+        {
+          "name": "Nico Elvedi",
+          "position": "Defender"
+        },
+        {
+          "name": "Luca Jaquez",
+          "position": "Defender"
+        },
+        {
+          "name": "Miro Muheim",
+          "position": "Defender"
+        },
+        {
+          "name": "Ricardo Rodriguez",
+          "position": "Defender"
+        },
+        {
+          "name": "Silvan Widmer",
+          "position": "Defender"
+        },
+        {
+          "name": "Michel Aebischer",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Christian Fassnacht",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Remo Freuler",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Ardon Jashari",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Johan Manzambi",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Fabian Rieder",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Djibril Sow",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Ruben Vargas",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Granit Xhaka",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Denis Zakaria",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Zeki Amdouni",
+          "position": "Forward"
+        },
+        {
+          "name": "Breel Embolo",
+          "position": "Forward"
+        },
+        {
+          "name": "Cedric Itten",
+          "position": "Forward"
+        },
+        {
+          "name": "Dan Ndoye",
+          "position": "Forward"
+        },
+        {
+          "name": "Noah Okafor",
+          "position": "Forward"
+        }
+      ]
+    },
+    {
+      "teamCode": "BRA",
+      "teamName": "Brazil",
+      "sourceName": "Reuters World Cup 2026 squads + Reuters replacement updates through 2026-06-16 (Brazil: Ederson replaced Wesley)",
+      "sourceUrl": "https://www.reuters.com/sports/soccer/world-cup-2026-list-26-man-squads-finals-2026-06-02/",
+      "players": [
+        {
+          "name": "Alisson",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Ederson Moraes",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Weverton",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Alex Sandro",
+          "position": "Defender"
+        },
+        {
+          "name": "Bremer",
+          "position": "Defender"
+        },
+        {
+          "name": "Danilo",
+          "position": "Defender"
+        },
+        {
+          "name": "Douglas Santos",
+          "position": "Defender"
+        },
+        {
+          "name": "Gabriel Magalhaes",
+          "position": "Defender"
+        },
+        {
+          "name": "Ibanez",
+          "position": "Defender"
+        },
+        {
+          "name": "Leo Pereira",
+          "position": "Defender"
+        },
+        {
+          "name": "Marquinhos",
+          "position": "Defender"
+        },
+        {
+          "name": "Bruno Guimaraes",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Casemiro",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Danilo Santos",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Fabinho",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Lucas Paqueta",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Ederson Jose",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Endrick",
+          "position": "Forward"
+        },
+        {
+          "name": "Gabriel Martinelli",
+          "position": "Forward"
+        },
+        {
+          "name": "Igor Thiago",
+          "position": "Forward"
+        },
+        {
+          "name": "Luiz Henrique",
+          "position": "Forward"
+        },
+        {
+          "name": "Matheus Cunha",
+          "position": "Forward"
+        },
+        {
+          "name": "Neymar",
+          "position": "Forward"
+        },
+        {
+          "name": "Raphinha",
+          "position": "Forward"
+        },
+        {
+          "name": "Rayan",
+          "position": "Forward"
+        },
+        {
+          "name": "Vinicius Jr",
+          "position": "Forward"
+        }
+      ]
+    },
+    {
+      "teamCode": "MAR",
+      "teamName": "Morocco",
+      "sourceName": "Reuters World Cup 2026 squads + Reuters replacement updates through 2026-06-16",
+      "sourceUrl": "https://www.reuters.com/sports/soccer/world-cup-2026-list-26-man-squads-finals-2026-06-02/",
+      "players": [
+        {
+          "name": "Yassine Bounou",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Munir Mohamedi",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Ahmed Tagnaouti",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Noussair Mazraoui",
+          "position": "Defender"
+        },
+        {
+          "name": "Anass Salah-Eddine",
+          "position": "Defender"
+        },
+        {
+          "name": "Youssef Belammari",
+          "position": "Defender"
+        },
+        {
+          "name": "Nayef Aguerd",
+          "position": "Defender"
+        },
+        {
+          "name": "Chadi Riad",
+          "position": "Defender"
+        },
+        {
+          "name": "Issa Diop",
+          "position": "Defender"
+        },
+        {
+          "name": "Redouane Halhal",
+          "position": "Defender"
+        },
+        {
+          "name": "Achraf Hakimi",
+          "position": "Defender"
+        },
+        {
+          "name": "Zakaria El Ouahdi",
+          "position": "Defender"
+        },
+        {
+          "name": "Samir El Mourabet",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Ayyoub Bouaddi",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Neil El Aynaoui",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Sofyan Amrabat",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Azzedine Ounahi",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Bilal El Khannouss",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Ismael Saibari",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Abdessamad Ezzalzouli",
+          "position": "Forward"
+        },
+        {
+          "name": "Chemsdine Talbi",
+          "position": "Forward"
+        },
+        {
+          "name": "Soufiane Rahimi",
+          "position": "Forward"
+        },
+        {
+          "name": "Ayoub El Kaabi",
+          "position": "Forward"
+        },
+        {
+          "name": "Brahim Diaz",
+          "position": "Forward"
+        },
+        {
+          "name": "Yassine Gessime",
+          "position": "Forward"
+        },
+        {
+          "name": "Ayoub Amaimouni-Echghouyabe",
+          "position": "Forward"
+        }
+      ]
+    },
+    {
+      "teamCode": "HAI",
+      "teamName": "Haiti",
+      "sourceName": "Reuters World Cup 2026 squads + Reuters replacement updates through 2026-06-16",
+      "sourceUrl": "https://www.reuters.com/sports/soccer/world-cup-2026-list-26-man-squads-finals-2026-06-02/",
+      "players": [
+        {
+          "name": "Johny Placide",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Alexandre Pierre",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Josue Duverger",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Carlens Arcus",
+          "position": "Defender"
+        },
+        {
+          "name": "Wilguens Paugain",
+          "position": "Defender"
+        },
+        {
+          "name": "Duke Lacroix",
+          "position": "Defender"
+        },
+        {
+          "name": "Martin Experience",
+          "position": "Defender"
+        },
+        {
+          "name": "JK Duverne",
+          "position": "Defender"
+        },
+        {
+          "name": "Ricardo Ade",
+          "position": "Defender"
+        },
+        {
+          "name": "Hannes Delcroix",
+          "position": "Defender"
+        },
+        {
+          "name": "Keeto Thermoncy",
+          "position": "Defender"
+        },
+        {
+          "name": "Leverton Pierre",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Carl-Fred Sainte",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Danley Jean-Jacques",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Jean-Ricner Bellegarde",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Woodensky Pierre",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Simon Dominique",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Louicius Deedson",
+          "position": "Forward"
+        },
+        {
+          "name": "Ruben Providence",
+          "position": "Forward"
+        },
+        {
+          "name": "Josue Casimir",
+          "position": "Forward"
+        },
+        {
+          "name": "Derrick Etienne",
+          "position": "Forward"
+        },
+        {
+          "name": "Wilson Isidor",
+          "position": "Forward"
+        },
+        {
+          "name": "Duckens Nazon",
+          "position": "Forward"
+        },
+        {
+          "name": "Frantzdy Pierrot",
+          "position": "Forward"
+        },
+        {
+          "name": "Yassin Fortune",
+          "position": "Forward"
+        },
+        {
+          "name": "Lenny Joseph",
+          "position": "Forward"
+        }
+      ]
+    },
+    {
+      "teamCode": "SCO",
+      "teamName": "Scotland",
+      "sourceName": "Reuters World Cup 2026 squads + Reuters replacement updates through 2026-06-16",
+      "sourceUrl": "https://www.reuters.com/sports/soccer/world-cup-2026-list-26-man-squads-finals-2026-06-02/",
+      "players": [
+        {
+          "name": "Craig Gordon",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Angus Gunn",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Liam Kelly",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Grant Hanley",
+          "position": "Defender"
+        },
+        {
+          "name": "Jack Hendry",
+          "position": "Defender"
+        },
+        {
+          "name": "Aaron Hickey",
+          "position": "Defender"
+        },
+        {
+          "name": "Dom Hyam",
+          "position": "Defender"
+        },
+        {
+          "name": "Scott McKenna",
+          "position": "Defender"
+        },
+        {
+          "name": "Nathan Patterson",
+          "position": "Defender"
+        },
+        {
+          "name": "Anthony Ralston",
+          "position": "Defender"
+        },
+        {
+          "name": "Andy Robertson",
+          "position": "Defender"
+        },
+        {
+          "name": "John Souttar",
+          "position": "Defender"
+        },
+        {
+          "name": "Kieran Tierney",
+          "position": "Defender"
+        },
+        {
+          "name": "Ryan Christie",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Finlay Curtis",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Lewis Ferguson",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Ben Gannon-Doak",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Tyler Fletcher",
+          "position": "Midfielder"
+        },
+        {
+          "name": "John McGinn",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Kenny McLean",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Scott McTominay",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Che Adams",
+          "position": "Forward"
+        },
+        {
+          "name": "Lyndon Dykes",
+          "position": "Forward"
+        },
+        {
+          "name": "George Hirst",
+          "position": "Forward"
+        },
+        {
+          "name": "Lawrence Shankland",
+          "position": "Forward"
+        },
+        {
+          "name": "Ross Stewart",
+          "position": "Forward"
+        }
+      ]
+    },
+    {
+      "teamCode": "USA",
+      "teamName": "United States",
+      "sourceName": "Reuters World Cup 2026 squads + Reuters replacement updates through 2026-06-16",
+      "sourceUrl": "https://www.reuters.com/sports/soccer/world-cup-2026-list-26-man-squads-finals-2026-06-02/",
+      "players": [
+        {
+          "name": "Chris Brady",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Matt Freese",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Matt Turner",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Max Arfsten",
+          "position": "Defender"
+        },
+        {
+          "name": "Sergino Dest",
+          "position": "Defender"
+        },
+        {
+          "name": "Alex Freeman",
+          "position": "Defender"
+        },
+        {
+          "name": "Mark McKenzie",
+          "position": "Defender"
+        },
+        {
+          "name": "Tim Ream",
+          "position": "Defender"
+        },
+        {
+          "name": "Chris Richards",
+          "position": "Defender"
+        },
+        {
+          "name": "Antonee Robinson",
+          "position": "Defender"
+        },
+        {
+          "name": "Miles Robinson",
+          "position": "Defender"
+        },
+        {
+          "name": "Joe Scally",
+          "position": "Defender"
+        },
+        {
+          "name": "Auston Trusty",
+          "position": "Defender"
+        },
+        {
+          "name": "Tyler Adams",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Sebastian Berhalter",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Weston McKennie",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Gio Reyna",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Cristian Roldan",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Malik Tillman",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Brenden Aaronson",
+          "position": "Forward"
+        },
+        {
+          "name": "Folarin Balogun",
+          "position": "Forward"
+        },
+        {
+          "name": "Ricardo Pepi",
+          "position": "Forward"
+        },
+        {
+          "name": "Christian Pulisic",
+          "position": "Forward"
+        },
+        {
+          "name": "Tim Weah",
+          "position": "Forward"
+        },
+        {
+          "name": "Haji Wright",
+          "position": "Forward"
+        },
+        {
+          "name": "Alejandro Zendejas",
+          "position": "Forward"
+        }
+      ]
+    },
+    {
+      "teamCode": "PAR",
+      "teamName": "Paraguay",
+      "sourceName": "Reuters World Cup 2026 squads + Reuters replacement updates through 2026-06-16",
+      "sourceUrl": "https://www.reuters.com/sports/soccer/world-cup-2026-list-26-man-squads-finals-2026-06-02/",
+      "players": [
+        {
+          "name": "Orlando Gill",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Roberto Junior Fernandez",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Gaston Olveira",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Juan Caceres",
+          "position": "Defender"
+        },
+        {
+          "name": "Gustavo Velazquez",
+          "position": "Defender"
+        },
+        {
+          "name": "Gustavo Gomez",
+          "position": "Defender"
+        },
+        {
+          "name": "Junior Alonso",
+          "position": "Defender"
+        },
+        {
+          "name": "Jose Canale",
+          "position": "Defender"
+        },
+        {
+          "name": "Omar Alderete",
+          "position": "Defender"
+        },
+        {
+          "name": "Alexandro Maidana",
+          "position": "Defender"
+        },
+        {
+          "name": "Fabian Balbuena",
+          "position": "Defender"
+        },
+        {
+          "name": "Diego Gomez",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Mauricio Magalhaes",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Damian Bobadilla",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Braian Ojeda",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Andres Cubas",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Matias Galarza",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Alejandro Romero Gamarra",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Gustavo Caballero",
+          "position": "Forward"
+        },
+        {
+          "name": "Ramon Sosa",
+          "position": "Forward"
+        },
+        {
+          "name": "Alex Arce",
+          "position": "Forward"
+        },
+        {
+          "name": "Gabriel Avalos",
+          "position": "Forward"
+        },
+        {
+          "name": "Isidro Pitta",
+          "position": "Forward"
+        },
+        {
+          "name": "Miguel Almiron",
+          "position": "Forward"
+        },
+        {
+          "name": "Julio Enciso",
+          "position": "Forward"
+        },
+        {
+          "name": "Antonio Sanabria",
+          "position": "Forward"
+        }
+      ]
+    },
+    {
+      "teamCode": "AUS",
+      "teamName": "Australia",
+      "sourceName": "Reuters World Cup 2026 squads + Reuters replacement updates through 2026-06-16",
+      "sourceUrl": "https://www.reuters.com/sports/soccer/world-cup-2026-list-26-man-squads-finals-2026-06-02/",
+      "players": [
+        {
+          "name": "Mathew Ryan",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Paul Izzo",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Patrick Beach",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Aziz Behich",
+          "position": "Defender"
+        },
+        {
+          "name": "Jordan Bos",
+          "position": "Defender"
+        },
+        {
+          "name": "Cameron Burgess",
+          "position": "Defender"
+        },
+        {
+          "name": "Alessandro Circati",
+          "position": "Defender"
+        },
+        {
+          "name": "Milos Degenek",
+          "position": "Defender"
+        },
+        {
+          "name": "Jason Geria",
+          "position": "Defender"
+        },
+        {
+          "name": "Lucas Herrington",
+          "position": "Defender"
+        },
+        {
+          "name": "Jacob Italiano",
+          "position": "Defender"
+        },
+        {
+          "name": "Harry Souttar",
+          "position": "Defender"
+        },
+        {
+          "name": "Kai Trewin",
+          "position": "Defender"
+        },
+        {
+          "name": "Cameron Devlin",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Ajdin Hrustic",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Jackson Irvine",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Connor Metcalfe",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Aiden O'Neill",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Paul Okon-Engstler",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Nestory Irankunda",
+          "position": "Forward"
+        },
+        {
+          "name": "Mathew Leckie",
+          "position": "Forward"
+        },
+        {
+          "name": "Awer Mabil",
+          "position": "Forward"
+        },
+        {
+          "name": "Mohamed Toure",
+          "position": "Forward"
+        },
+        {
+          "name": "Nishan Velupillary",
+          "position": "Forward"
+        },
+        {
+          "name": "Cristian Volpato",
+          "position": "Forward"
+        },
+        {
+          "name": "Tete Yengi",
+          "position": "Forward"
+        }
+      ]
+    },
+    {
+      "teamCode": "TUR",
+      "teamName": "Turkey",
+      "sourceName": "Reuters World Cup 2026 squads + Reuters replacement updates through 2026-06-16",
+      "sourceUrl": "https://www.reuters.com/sports/soccer/world-cup-2026-list-26-man-squads-finals-2026-06-02/",
+      "players": [
+        {
+          "name": "Altay Bayindir",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Mert Gunok",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Ugurcan Cakir",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Abdulkerim Bardakci",
+          "position": "Defender"
+        },
+        {
+          "name": "Caglar Soyuncu",
+          "position": "Defender"
+        },
+        {
+          "name": "Eren Elmali",
+          "position": "Defender"
+        },
+        {
+          "name": "Ferdi Kadioglu",
+          "position": "Defender"
+        },
+        {
+          "name": "Merih Demiral",
+          "position": "Defender"
+        },
+        {
+          "name": "Mert Muldur",
+          "position": "Defender"
+        },
+        {
+          "name": "Ozan Kabak",
+          "position": "Defender"
+        },
+        {
+          "name": "Samet Akaydin",
+          "position": "Defender"
+        },
+        {
+          "name": "Zeki Celik",
+          "position": "Defender"
+        },
+        {
+          "name": "Hakan Calhanoglu",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Ismail Yuksek",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Kaan Ayhan",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Orkun Kokcu",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Salih Ozcan",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Arda Guler",
+          "position": "Forward"
+        },
+        {
+          "name": "Baris Alper Yilmaz",
+          "position": "Forward"
+        },
+        {
+          "name": "Can Uzun",
+          "position": "Forward"
+        },
+        {
+          "name": "Deniz Gul",
+          "position": "Forward"
+        },
+        {
+          "name": "Irfan Can Kahveci",
+          "position": "Forward"
+        },
+        {
+          "name": "Kenan Yildiz",
+          "position": "Forward"
+        },
+        {
+          "name": "Kerem Akturkoglu",
+          "position": "Forward"
+        },
+        {
+          "name": "Oguz Aydin",
+          "position": "Forward"
+        },
+        {
+          "name": "Yunus Akgun",
+          "position": "Forward"
+        }
+      ]
+    },
+    {
+      "teamCode": "GER",
+      "teamName": "Germany",
+      "sourceName": "Reuters World Cup 2026 squads + Reuters replacement updates through 2026-06-16",
+      "sourceUrl": "https://www.reuters.com/sports/soccer/world-cup-2026-list-26-man-squads-finals-2026-06-02/",
+      "players": [
+        {
+          "name": "Manuel Neuer",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Oliver Baumann",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Alexander Nubel",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Antonio Rudiger",
+          "position": "Defender"
+        },
+        {
+          "name": "Jonathan Tah",
+          "position": "Defender"
+        },
+        {
+          "name": "David Raum",
+          "position": "Defender"
+        },
+        {
+          "name": "Nico Schlotterbeck",
+          "position": "Defender"
+        },
+        {
+          "name": "Waldemar Anton",
+          "position": "Defender"
+        },
+        {
+          "name": "Malick Thiaw",
+          "position": "Defender"
+        },
+        {
+          "name": "Nathaniel Brown",
+          "position": "Defender"
+        },
+        {
+          "name": "Felix Nmecha",
+          "position": "Defender"
+        },
+        {
+          "name": "Joshua Kimmich",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Leroy Sane",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Leon Goretzka",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Jamal Musiala",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Florian Wirtz",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Pascal Gross",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Nadiem Amiri",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Aleksandar Pavlovic",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Angelo Stiller",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Lennart Karl",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Kai Havertz",
+          "position": "Forward"
+        },
+        {
+          "name": "Jamie Leweling",
+          "position": "Forward"
+        },
+        {
+          "name": "Nick Woltemade",
+          "position": "Forward"
+        },
+        {
+          "name": "Deniz Undav",
+          "position": "Forward"
+        },
+        {
+          "name": "Maximilian Beier",
+          "position": "Forward"
+        }
+      ]
+    },
+    {
+      "teamCode": "CUW",
+      "teamName": "Curacao",
+      "sourceName": "Reuters World Cup 2026 squads + Reuters replacement updates through 2026-06-16",
+      "sourceUrl": "https://www.reuters.com/sports/soccer/world-cup-2026-list-26-man-squads-finals-2026-06-02/",
+      "players": [
+        {
+          "name": "Tyrick Bodak",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Trevor Doornbusch",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Eloy Room",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Riechedly Bazoer",
+          "position": "Defender"
+        },
+        {
+          "name": "Joshua Brenet",
+          "position": "Defender"
+        },
+        {
+          "name": "Sherel Floranus",
+          "position": "Defender"
+        },
+        {
+          "name": "Deveron Fonville",
+          "position": "Defender"
+        },
+        {
+          "name": "Jurien Gaari",
+          "position": "Defender"
+        },
+        {
+          "name": "Armando Obispo",
+          "position": "Defender"
+        },
+        {
+          "name": "Shurandy Sambo",
+          "position": "Defender"
+        },
+        {
+          "name": "Roshon van Eijma",
+          "position": "Defender"
+        },
+        {
+          "name": "Juninho Bacuna",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Leandro Bacuna",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Livano Comenencia",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Kevin Felida",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Arjany Martha",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Tyrese Noslin",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Godfried Roemeratoe",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Jeremy Antonisse",
+          "position": "Forward"
+        },
+        {
+          "name": "Tahith Chong",
+          "position": "Forward"
+        },
+        {
+          "name": "Kenji Gorre",
+          "position": "Forward"
+        },
+        {
+          "name": "Sontje Hansen",
+          "position": "Forward"
+        },
+        {
+          "name": "Gervane Kastaneer",
+          "position": "Forward"
+        },
+        {
+          "name": "Brandley Kuwas",
+          "position": "Forward"
+        },
+        {
+          "name": "Jurgen Locadia",
+          "position": "Forward"
+        },
+        {
+          "name": "Jearl Margaritha",
+          "position": "Forward"
+        }
+      ]
+    },
+    {
+      "teamCode": "CIV",
+      "teamName": "Ivory Coast",
+      "sourceName": "Reuters World Cup 2026 squads + Reuters replacement updates through 2026-06-16",
+      "sourceUrl": "https://www.reuters.com/sports/soccer/world-cup-2026-list-26-man-squads-finals-2026-06-02/",
+      "players": [
+        {
+          "name": "Yahia Fofana",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Mohamed Kone",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Alban Lafont",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Emmanuel Agbadou",
+          "position": "Defender"
+        },
+        {
+          "name": "Clement Akpa",
+          "position": "Defender"
+        },
+        {
+          "name": "Ousmane Diomande",
+          "position": "Defender"
+        },
+        {
+          "name": "Guela Doue",
+          "position": "Defender"
+        },
+        {
+          "name": "Ghislain Konan",
+          "position": "Defender"
+        },
+        {
+          "name": "Odilon Kossonou",
+          "position": "Defender"
+        },
+        {
+          "name": "Evan Ndicka",
+          "position": "Defender"
+        },
+        {
+          "name": "Wilfried Singo",
+          "position": "Defender"
+        },
+        {
+          "name": "Seko Fofana",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Parfait Guiagon",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Franck Kessie",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Christ Oulai",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Ibrahim Sangare",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Jean-Michael Seri",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Simon Adingra",
+          "position": "Forward"
+        },
+        {
+          "name": "Ange-Yoan Bonny",
+          "position": "Forward"
+        },
+        {
+          "name": "Amad Diallo",
+          "position": "Forward"
+        },
+        {
+          "name": "Oumar Diakite",
+          "position": "Forward"
+        },
+        {
+          "name": "Yan Diomande",
+          "position": "Forward"
+        },
+        {
+          "name": "Evann Guessand",
+          "position": "Forward"
+        },
+        {
+          "name": "Nicolas Pepe",
+          "position": "Forward"
+        },
+        {
+          "name": "Bazoumana Toure",
+          "position": "Forward"
+        },
+        {
+          "name": "Elye Wahi",
+          "position": "Forward"
+        }
+      ]
+    },
+    {
+      "teamCode": "ECU",
+      "teamName": "Ecuador",
+      "sourceName": "Reuters World Cup 2026 squads + Reuters replacement updates through 2026-06-16",
+      "sourceUrl": "https://www.reuters.com/sports/soccer/world-cup-2026-list-26-man-squads-finals-2026-06-02/",
+      "players": [
+        {
+          "name": "Hernan Galindez",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Moises Ramirez",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Gonzalo Valle",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Piero Hincapie",
+          "position": "Defender"
+        },
+        {
+          "name": "Willian Pacho",
+          "position": "Defender"
+        },
+        {
+          "name": "Pervis Estupinan",
+          "position": "Defender"
+        },
+        {
+          "name": "Felix Torres",
+          "position": "Defender"
+        },
+        {
+          "name": "Joel Ordonez",
+          "position": "Defender"
+        },
+        {
+          "name": "Jackson Porozo",
+          "position": "Defender"
+        },
+        {
+          "name": "Angelo Preciado",
+          "position": "Defender"
+        },
+        {
+          "name": "Moises Caicedo",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Alan Franco",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Kendry Paez",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Pedro Vite",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Jordy Alcivar",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Denil Castillo",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Yaimar Medina",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Enner Valencia",
+          "position": "Forward"
+        },
+        {
+          "name": "Gonzalo Plata",
+          "position": "Forward"
+        },
+        {
+          "name": "Alan Minda",
+          "position": "Forward"
+        },
+        {
+          "name": "John Yeboah",
+          "position": "Forward"
+        },
+        {
+          "name": "Kevin Rodriguez",
+          "position": "Forward"
+        },
+        {
+          "name": "Jordy Caicedo",
+          "position": "Forward"
+        },
+        {
+          "name": "Nilson Angulo",
+          "position": "Forward"
+        },
+        {
+          "name": "Anthony Valencia",
+          "position": "Forward"
+        },
+        {
+          "name": "Jeremy Arevalo",
+          "position": "Forward"
+        }
+      ]
+    },
+    {
+      "teamCode": "NED",
+      "teamName": "Netherlands",
+      "sourceName": "Reuters World Cup 2026 squads + Reuters replacement updates through 2026-06-16",
+      "sourceUrl": "https://www.reuters.com/sports/soccer/world-cup-2026-list-26-man-squads-finals-2026-06-02/",
+      "players": [
+        {
+          "name": "Mark Flekken",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Robin Roefs",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Bart Verbruggen",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Nathan Ake",
+          "position": "Defender"
+        },
+        {
+          "name": "Denzel Dumfries",
+          "position": "Defender"
+        },
+        {
+          "name": "Jorrel Hato",
+          "position": "Defender"
+        },
+        {
+          "name": "Jurrien Timber",
+          "position": "Defender"
+        },
+        {
+          "name": "Micky van de Ven",
+          "position": "Defender"
+        },
+        {
+          "name": "Virgil van Dijk",
+          "position": "Defender"
+        },
+        {
+          "name": "Jan Paul van Hecke",
+          "position": "Defender"
+        },
+        {
+          "name": "Frenkie de Jong",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Marten de Roon",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Ryan Gravenberch",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Justin Kluivert",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Teun Koopmeiners",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Tijjani Reijnders",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Guus Til",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Quinten Timber",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Mats Wieffer",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Brian Brobbey",
+          "position": "Forward"
+        },
+        {
+          "name": "Memphis Depay",
+          "position": "Forward"
+        },
+        {
+          "name": "Cody Gakpo",
+          "position": "Forward"
+        },
+        {
+          "name": "Noa Lang",
+          "position": "Forward"
+        },
+        {
+          "name": "Donyell Malen",
+          "position": "Forward"
+        },
+        {
+          "name": "Crysencio Summerville",
+          "position": "Forward"
+        },
+        {
+          "name": "Wout Weghorst",
+          "position": "Forward"
+        }
+      ]
+    },
+    {
+      "teamCode": "JPN",
+      "teamName": "Japan",
+      "sourceName": "Reuters World Cup 2026 squads + Reuters replacement updates through 2026-06-16 (Japan: Shuto Machino replaced Wataru Endo)",
+      "sourceUrl": "https://www.reuters.com/sports/soccer/world-cup-2026-list-26-man-squads-finals-2026-06-02/",
+      "players": [
+        {
+          "name": "Zion Suzuki",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Tomoki Hayakawa",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Keisuke Osako",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Yuto Nagatomo",
+          "position": "Defender"
+        },
+        {
+          "name": "Shogo Taniguchi",
+          "position": "Defender"
+        },
+        {
+          "name": "Ko Itakura",
+          "position": "Defender"
+        },
+        {
+          "name": "Tsuyoshi Watanabe",
+          "position": "Defender"
+        },
+        {
+          "name": "Takehiro Tomiyasu",
+          "position": "Defender"
+        },
+        {
+          "name": "Hiroki Ito",
+          "position": "Defender"
+        },
+        {
+          "name": "Ayumu Seko",
+          "position": "Defender"
+        },
+        {
+          "name": "Yukinari Sugawara",
+          "position": "Defender"
+        },
+        {
+          "name": "Junnoske Suzuki",
+          "position": "Defender"
+        },
+        {
+          "name": "Junya Ito",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Daichi Kamada",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Koki Ogawa",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Daizen Maeda",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Ritsu Doan",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Ayase Ueda",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Ao Tanaka",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Keito Nakamura",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Kaishu Sano",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Takefusa Kubo",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Yuito Suzuki",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Kento Shoigai",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Keisuke Goto",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Shuto Machino",
+          "position": "Forward"
+        }
+      ]
+    },
+    {
+      "teamCode": "SWE",
+      "teamName": "Sweden",
+      "sourceName": "Reuters World Cup 2026 squads + Reuters replacement updates through 2026-06-16",
+      "sourceUrl": "https://www.reuters.com/sports/soccer/world-cup-2026-list-26-man-squads-finals-2026-06-02/",
+      "players": [
+        {
+          "name": "Kristoffer Nordfeldt",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Viktor Johansson",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Jacob Widell Zetterstrom",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Daniel Svensson",
+          "position": "Defender"
+        },
+        {
+          "name": "Victor Lindelof",
+          "position": "Defender"
+        },
+        {
+          "name": "Isak Hien",
+          "position": "Defender"
+        },
+        {
+          "name": "Carl Starfelt",
+          "position": "Defender"
+        },
+        {
+          "name": "Elliot Stroud",
+          "position": "Defender"
+        },
+        {
+          "name": "Gustaf Lagerbielke",
+          "position": "Defender"
+        },
+        {
+          "name": "Gabriel Gudmundsson",
+          "position": "Defender"
+        },
+        {
+          "name": "Herman Johansson",
+          "position": "Defender"
+        },
+        {
+          "name": "Hjalmar Ekdal",
+          "position": "Defender"
+        },
+        {
+          "name": "Erik Smith",
+          "position": "Defender"
+        },
+        {
+          "name": "Taha Ali",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Yasin Ayari",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Lucas Bergvall",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Jesper Karlstrom",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Mattias Svanberg",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Besfort Zeneli",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Alexander Bernhardsson",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Ken Sema",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Anthony Elanga",
+          "position": "Forward"
+        },
+        {
+          "name": "Viktor Gyokeres",
+          "position": "Forward"
+        },
+        {
+          "name": "Gustaf Nilsson",
+          "position": "Forward"
+        },
+        {
+          "name": "Benjamin Nygren",
+          "position": "Forward"
+        },
+        {
+          "name": "Alexander Isak",
+          "position": "Forward"
+        }
+      ]
+    },
+    {
+      "teamCode": "TUN",
+      "teamName": "Tunisia",
+      "sourceName": "Reuters World Cup 2026 squads + Reuters replacement updates through 2026-06-16",
+      "sourceUrl": "https://www.reuters.com/sports/soccer/world-cup-2026-list-26-man-squads-finals-2026-06-02/",
+      "players": [
+        {
+          "name": "Sabri Ben Hessen",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Abdelmouhib Chamakh",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Aymen Dahman",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Ali Abdi",
+          "position": "Defender"
+        },
+        {
+          "name": "Adem Arous",
+          "position": "Defender"
+        },
+        {
+          "name": "Mohamed Amine Ben Hamida",
+          "position": "Defender"
+        },
+        {
+          "name": "Dylan Bronn",
+          "position": "Defender"
+        },
+        {
+          "name": "Raed Chikhaoui",
+          "position": "Defender"
+        },
+        {
+          "name": "Moutaz Neffati",
+          "position": "Defender"
+        },
+        {
+          "name": "Omar Rekik",
+          "position": "Defender"
+        },
+        {
+          "name": "Montassar Talbi",
+          "position": "Defender"
+        },
+        {
+          "name": "Yan Valery",
+          "position": "Defender"
+        },
+        {
+          "name": "Mortadha Ben Ouanes",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Anis Ben Slimane",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Ismael Gharbi",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Rani Khedira",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Mohamed Hadj Mahmoud",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Hannibal Mejbri",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Ellyes Skhiri",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Elias Achouri",
+          "position": "Forward"
+        },
+        {
+          "name": "Khalil Ayari",
+          "position": "Forward"
+        },
+        {
+          "name": "Firas Chaouat",
+          "position": "Forward"
+        },
+        {
+          "name": "Rayan Elloumi",
+          "position": "Forward"
+        },
+        {
+          "name": "Hazem Mastouri",
+          "position": "Forward"
+        },
+        {
+          "name": "Elias Saad",
+          "position": "Forward"
+        },
+        {
+          "name": "Sebastian Tounekti",
+          "position": "Forward"
+        }
+      ]
+    },
+    {
+      "teamCode": "BEL",
+      "teamName": "Belgium",
+      "sourceName": "Reuters World Cup 2026 squads + Reuters replacement updates through 2026-06-16",
+      "sourceUrl": "https://www.reuters.com/sports/soccer/world-cup-2026-list-26-man-squads-finals-2026-06-02/",
+      "players": [
+        {
+          "name": "Thibaut Courtois",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Senne Lammens",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Mike Penders",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Timothy Castagne",
+          "position": "Defender"
+        },
+        {
+          "name": "Zeno Debast",
+          "position": "Defender"
+        },
+        {
+          "name": "Maxim De Cuyper",
+          "position": "Defender"
+        },
+        {
+          "name": "Koni De Winter",
+          "position": "Defender"
+        },
+        {
+          "name": "Brandon Mechele",
+          "position": "Defender"
+        },
+        {
+          "name": "Thomas Meunier",
+          "position": "Defender"
+        },
+        {
+          "name": "Nathan Ngoy",
+          "position": "Defender"
+        },
+        {
+          "name": "Joaquin Seys",
+          "position": "Defender"
+        },
+        {
+          "name": "Arthur Theate",
+          "position": "Defender"
+        },
+        {
+          "name": "Kevin De Bruyne",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Amadou Onana",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Nicolas Raskin",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Youri Tielemans",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Hans Vanaken",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Axel Witsel",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Charles De Ketelaere",
+          "position": "Forward"
+        },
+        {
+          "name": "Jeremy Doku",
+          "position": "Forward"
+        },
+        {
+          "name": "Matias Fernandez-Pardo",
+          "position": "Forward"
+        },
+        {
+          "name": "Romelu Lukaku",
+          "position": "Forward"
+        },
+        {
+          "name": "Dodi Lukebakio",
+          "position": "Forward"
+        },
+        {
+          "name": "Diego Moreira",
+          "position": "Forward"
+        },
+        {
+          "name": "Alexis Saelemaekers",
+          "position": "Forward"
+        },
+        {
+          "name": "Leandro Trossard",
+          "position": "Forward"
+        }
+      ]
+    },
+    {
+      "teamCode": "EGY",
+      "teamName": "Egypt",
+      "sourceName": "Reuters World Cup 2026 squads + Reuters replacement updates through 2026-06-16",
+      "sourceUrl": "https://www.reuters.com/sports/soccer/world-cup-2026-list-26-man-squads-finals-2026-06-02/",
+      "players": [
+        {
+          "name": "Mohamed El-Shenawy",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Mostafa Shobeir",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "El-Mahdi Soliman",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Mohamed Alaa",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Mohamed Abdelmonem",
+          "position": "Defender"
+        },
+        {
+          "name": "Mohamed Hany",
+          "position": "Defender"
+        },
+        {
+          "name": "Yasser Ibrahim",
+          "position": "Defender"
+        },
+        {
+          "name": "Hossam Abdelmaguid",
+          "position": "Defender"
+        },
+        {
+          "name": "Ahmed Fattouh",
+          "position": "Defender"
+        },
+        {
+          "name": "Tarek Alaa",
+          "position": "Defender"
+        },
+        {
+          "name": "Rami Rabia",
+          "position": "Defender"
+        },
+        {
+          "name": "Hamdi Fathi",
+          "position": "Defender"
+        },
+        {
+          "name": "Karim Hafez",
+          "position": "Defender"
+        },
+        {
+          "name": "Mohamed Salah",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Marwan Attia",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Ahmed Mostafa Zizo",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Mahmoud Hassan Trezeguet",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Emam Ashour",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Mostafa Abdel Raouf",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Mohannad Lasheen",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Haitham Hassan",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Mahmoud Saber",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Ibrahim Adel",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Nabil Emad",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Omar Marmoush",
+          "position": "Forward"
+        },
+        {
+          "name": "Hamza Abdel Karim",
+          "position": "Forward"
+        }
+      ]
+    },
+    {
+      "teamCode": "IRN",
+      "teamName": "Iran",
+      "sourceName": "Reuters World Cup 2026 squads + Reuters replacement updates through 2026-06-16",
+      "sourceUrl": "https://www.reuters.com/sports/soccer/world-cup-2026-list-26-man-squads-finals-2026-06-02/",
+      "players": [
+        {
+          "name": "Alireza Beiranvand",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Seyed Hossein Hosseini",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Payam Niazmand",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Danial Eiri",
+          "position": "Defender"
+        },
+        {
+          "name": "Ehsan Hajsafi",
+          "position": "Defender"
+        },
+        {
+          "name": "Saleh Hardani",
+          "position": "Defender"
+        },
+        {
+          "name": "Hossein Kanaani",
+          "position": "Defender"
+        },
+        {
+          "name": "Shoja Khalilzadeh",
+          "position": "Defender"
+        },
+        {
+          "name": "Milad Mohammadi",
+          "position": "Defender"
+        },
+        {
+          "name": "Ali Nemati",
+          "position": "Defender"
+        },
+        {
+          "name": "Ramin Rezaeian",
+          "position": "Defender"
+        },
+        {
+          "name": "Rouzbeh Cheshmi",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Saeid Ezatolahi",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Mehdi Ghaedi",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Saman Ghoddos",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Mohammad Ghorbani",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Alireza Jahanbakhsh",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Mohammad Mohebi",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Amir Mohammad Razzaghinia",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Mehdi Torabi",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Aria Yousefi",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Ali Alipour",
+          "position": "Forward"
+        },
+        {
+          "name": "Dennis Dargahi",
+          "position": "Forward"
+        },
+        {
+          "name": "Amirhossein Hosseinzadeh",
+          "position": "Forward"
+        },
+        {
+          "name": "Mehdi Taremi",
+          "position": "Forward"
+        },
+        {
+          "name": "Shahriar Moghanlou",
+          "position": "Forward"
+        }
       ]
     },
     {
       "teamCode": "NZL",
-      "sourceName": "Reuters World Cup 2026 squads",
-      "sourceUrl": "Reuters - World Cup 2026: list of 26-man squads at the finals",
+      "teamName": "New Zealand",
+      "sourceName": "Reuters World Cup 2026 squads + Reuters replacement updates through 2026-06-16",
+      "sourceUrl": "https://www.reuters.com/sports/soccer/world-cup-2026-list-26-man-squads-finals-2026-06-02/",
       "players": [
-        { "name": "Max Crocombe", "position": "Goalkeeper" },
-        { "name": "Alex Paulsen", "position": "Goalkeeper" },
-        { "name": "Michael Woud", "position": "Goalkeeper" }
+        {
+          "name": "Max Crocombe",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Alex Paulsen",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Michael Woud",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Tim Payne",
+          "position": "Defender"
+        },
+        {
+          "name": "Francis De Vries",
+          "position": "Defender"
+        },
+        {
+          "name": "Tyler Bindon",
+          "position": "Defender"
+        },
+        {
+          "name": "Michael Boxall",
+          "position": "Defender"
+        },
+        {
+          "name": "Liberato Cacace",
+          "position": "Defender"
+        },
+        {
+          "name": "Nando Pijnaker",
+          "position": "Defender"
+        },
+        {
+          "name": "Finn Surman",
+          "position": "Defender"
+        },
+        {
+          "name": "Callan Elliot",
+          "position": "Defender"
+        },
+        {
+          "name": "Tommy Smith",
+          "position": "Defender"
+        },
+        {
+          "name": "Lachlan Bayliss",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Joe Bell",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Matt Garbett",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Eli Just",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Ben Old",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Alex Rufer",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Sarpreet Singh",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Marko Stamenic",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Ryan Thomas",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Kosta Barbarouses",
+          "position": "Forward"
+        },
+        {
+          "name": "Callum McCowatt",
+          "position": "Forward"
+        },
+        {
+          "name": "Jesse Randall",
+          "position": "Forward"
+        },
+        {
+          "name": "Ben Waine",
+          "position": "Forward"
+        },
+        {
+          "name": "Chris Wood",
+          "position": "Forward"
+        }
+      ]
+    },
+    {
+      "teamCode": "ESP",
+      "teamName": "Spain",
+      "sourceName": "Reuters World Cup 2026 squads + Reuters replacement updates through 2026-06-16",
+      "sourceUrl": "https://www.reuters.com/sports/soccer/world-cup-2026-list-26-man-squads-finals-2026-06-02/",
+      "players": [
+        {
+          "name": "Unai Simon",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "David Raya",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Joan Garcia",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Pedro Porro",
+          "position": "Defender"
+        },
+        {
+          "name": "Marcos Llorente",
+          "position": "Defender"
+        },
+        {
+          "name": "Pau Cubarsi",
+          "position": "Defender"
+        },
+        {
+          "name": "Marc Pubill",
+          "position": "Defender"
+        },
+        {
+          "name": "Aymeric Laporte",
+          "position": "Defender"
+        },
+        {
+          "name": "Eric Garcia",
+          "position": "Defender"
+        },
+        {
+          "name": "Alex Grimaldo",
+          "position": "Defender"
+        },
+        {
+          "name": "Marc Cucurella",
+          "position": "Defender"
+        },
+        {
+          "name": "Rodri",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Martin Zubimendi",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Gavi",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Pedri",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Fabian Ruiz",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Mikel Merino",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Alex Baena",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Dani Olmo",
+          "position": "Forward"
+        },
+        {
+          "name": "Lamine Yamal",
+          "position": "Forward"
+        },
+        {
+          "name": "Ferran Torres",
+          "position": "Forward"
+        },
+        {
+          "name": "Yeremy Pino",
+          "position": "Forward"
+        },
+        {
+          "name": "Nico Williams",
+          "position": "Forward"
+        },
+        {
+          "name": "Victor Munoz",
+          "position": "Forward"
+        },
+        {
+          "name": "Mikel Oyarzabal",
+          "position": "Forward"
+        },
+        {
+          "name": "Borja Iglesias",
+          "position": "Forward"
+        }
+      ]
+    },
+    {
+      "teamCode": "CPV",
+      "teamName": "Cape Verde",
+      "sourceName": "Reuters World Cup 2026 squads + Reuters replacement updates through 2026-06-16",
+      "sourceUrl": "https://www.reuters.com/sports/soccer/world-cup-2026-list-26-man-squads-finals-2026-06-02/",
+      "players": [
+        {
+          "name": "Carlos dos Santos",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Marcio Rosa",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Vozinha",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Sidny Cabral",
+          "position": "Defender"
+        },
+        {
+          "name": "Diney Borges",
+          "position": "Defender"
+        },
+        {
+          "name": "Logan Costa",
+          "position": "Defender"
+        },
+        {
+          "name": "Roberto Lopes",
+          "position": "Defender"
+        },
+        {
+          "name": "Steven Moreira",
+          "position": "Defender"
+        },
+        {
+          "name": "Wagner Pina",
+          "position": "Defender"
+        },
+        {
+          "name": "Kelvin Pires",
+          "position": "Defender"
+        },
+        {
+          "name": "Stopira",
+          "position": "Defender"
+        },
+        {
+          "name": "Telmo Arcanjo",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Deroy Duarte",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Laros Duarte",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Joao Paulo Fernandes",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Jamiro Monteiro",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Kevin Pina",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Yannick Semedo",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Gilson Benchimol",
+          "position": "Forward"
+        },
+        {
+          "name": "Jovane Cabral",
+          "position": "Forward"
+        },
+        {
+          "name": "Dailon Livramento",
+          "position": "Forward"
+        },
+        {
+          "name": "Ryan Mendes",
+          "position": "Forward"
+        },
+        {
+          "name": "Nuno da Costa",
+          "position": "Forward"
+        },
+        {
+          "name": "Garry Rodrigues",
+          "position": "Forward"
+        },
+        {
+          "name": "Willy Semedo",
+          "position": "Forward"
+        },
+        {
+          "name": "Helio Varela",
+          "position": "Forward"
+        }
+      ]
+    },
+    {
+      "teamCode": "KSA",
+      "teamName": "Saudi Arabia",
+      "sourceName": "Reuters World Cup 2026 squads + Reuters replacement updates through 2026-06-16",
+      "sourceUrl": "https://www.reuters.com/sports/soccer/world-cup-2026-list-26-man-squads-finals-2026-06-02/",
+      "players": [
+        {
+          "name": "Nawaf Al Aqidi",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Mohamed Al Owais",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Ahmed Alkassar",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Saud Abdulhamid",
+          "position": "Defender"
+        },
+        {
+          "name": "Jehad Thakri",
+          "position": "Defender"
+        },
+        {
+          "name": "Abdulelah Al Amri",
+          "position": "Defender"
+        },
+        {
+          "name": "Hassan Tambakti",
+          "position": "Defender"
+        },
+        {
+          "name": "Ali Lajami",
+          "position": "Defender"
+        },
+        {
+          "name": "Hassan Kadesh",
+          "position": "Defender"
+        },
+        {
+          "name": "Moteb Al Harbi",
+          "position": "Defender"
+        },
+        {
+          "name": "Nawaf Boushal",
+          "position": "Defender"
+        },
+        {
+          "name": "Ali Majrashi",
+          "position": "Defender"
+        },
+        {
+          "name": "Mohammed Abu Alshamat",
+          "position": "Defender"
+        },
+        {
+          "name": "Ziyad Al Johani",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Nasser Al Dawsari",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Mohamed Kanno",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Abdullah Al Khaibari",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Alaa Al Hejji",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Musab Al Juwayr",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Sultan Mandash",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Ayman Yahya",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Khalid Al Ghannam",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Salem Al Dawsari",
+          "position": "Forward"
+        },
+        {
+          "name": "Abdullah Al Hamdan",
+          "position": "Forward"
+        },
+        {
+          "name": "Feras Al Brikan",
+          "position": "Forward"
+        },
+        {
+          "name": "Saleh Al Shehri",
+          "position": "Forward"
+        }
+      ]
+    },
+    {
+      "teamCode": "URU",
+      "teamName": "Uruguay",
+      "sourceName": "Reuters World Cup 2026 squads + Reuters replacement updates through 2026-06-16",
+      "sourceUrl": "https://www.reuters.com/sports/soccer/world-cup-2026-list-26-man-squads-finals-2026-06-02/",
+      "players": [
+        {
+          "name": "Sergio Rochet",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Fernando Muslera",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Santiago Mele",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Guillermo Varela",
+          "position": "Defender"
+        },
+        {
+          "name": "Ronald Araujo",
+          "position": "Defender"
+        },
+        {
+          "name": "Jose Maria Gimenez",
+          "position": "Defender"
+        },
+        {
+          "name": "Santiago Bueno",
+          "position": "Defender"
+        },
+        {
+          "name": "Sebastian Caceres",
+          "position": "Defender"
+        },
+        {
+          "name": "Mathias Olivera",
+          "position": "Defender"
+        },
+        {
+          "name": "Joaquin Piquerez",
+          "position": "Defender"
+        },
+        {
+          "name": "Matias Vina",
+          "position": "Defender"
+        },
+        {
+          "name": "Manuel Ugarte",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Emiliano Martinez",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Rodrigo Bentancur",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Federico Valverde",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Agustin Canobbio",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Juan Manuel Sanabria",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Giorgian De Arrascaeta",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Nicolas De La Cruz",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Rodrigo Zalazar",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Facundo Pellistri",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Maximiliano Araujo",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Brian Rodriguez",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Rodrigo Aguirre",
+          "position": "Forward"
+        },
+        {
+          "name": "Federico Vinas",
+          "position": "Forward"
+        },
+        {
+          "name": "Darwin Nunez",
+          "position": "Forward"
+        }
+      ]
+    },
+    {
+      "teamCode": "FRA",
+      "teamName": "France",
+      "sourceName": "Reuters World Cup 2026 squads + Reuters replacement updates through 2026-06-16",
+      "sourceUrl": "https://www.reuters.com/sports/soccer/world-cup-2026-list-26-man-squads-finals-2026-06-02/",
+      "players": [
+        {
+          "name": "Mike Maignan",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Robin Risser",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Brice Samba",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Lucas Digne",
+          "position": "Defender"
+        },
+        {
+          "name": "Malo Gusto",
+          "position": "Defender"
+        },
+        {
+          "name": "Lucas Hernandez",
+          "position": "Defender"
+        },
+        {
+          "name": "Theo Hernandez",
+          "position": "Defender"
+        },
+        {
+          "name": "Ibrahima Konate",
+          "position": "Defender"
+        },
+        {
+          "name": "Jules Kounde",
+          "position": "Defender"
+        },
+        {
+          "name": "Maxence Lacroix",
+          "position": "Defender"
+        },
+        {
+          "name": "William Saliba",
+          "position": "Defender"
+        },
+        {
+          "name": "Dayot Upamecano",
+          "position": "Defender"
+        },
+        {
+          "name": "N'Golo Kante",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Manu Kone",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Adrien Rabiot",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Aurelien Tchouameni",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Warren Zaire-Emery",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Maghnes Akliouche",
+          "position": "Forward"
+        },
+        {
+          "name": "Bradley Barcola",
+          "position": "Forward"
+        },
+        {
+          "name": "Rayan Cherki",
+          "position": "Forward"
+        },
+        {
+          "name": "Ousmane Dembele",
+          "position": "Forward"
+        },
+        {
+          "name": "Desire Doue",
+          "position": "Forward"
+        },
+        {
+          "name": "Jean-Philippe Mateta",
+          "position": "Forward"
+        },
+        {
+          "name": "Kylian Mbappe",
+          "position": "Forward"
+        },
+        {
+          "name": "Michael Olise",
+          "position": "Forward"
+        },
+        {
+          "name": "Marcus Thuram",
+          "position": "Forward"
+        }
+      ]
+    },
+    {
+      "teamCode": "SEN",
+      "teamName": "Senegal",
+      "sourceName": "Reuters World Cup 2026 squads + Reuters replacement updates through 2026-06-16",
+      "sourceUrl": "https://www.reuters.com/sports/soccer/world-cup-2026-list-26-man-squads-finals-2026-06-02/",
+      "players": [
+        {
+          "name": "Edouard Mendy",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Mory Diaw",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Yehvann Diouf",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Krepin Diatta",
+          "position": "Defender"
+        },
+        {
+          "name": "Antoine Mendy",
+          "position": "Defender"
+        },
+        {
+          "name": "Kalidou Koulibaly",
+          "position": "Defender"
+        },
+        {
+          "name": "El Hadji Malick Diouf",
+          "position": "Defender"
+        },
+        {
+          "name": "Mamadou Sarr",
+          "position": "Defender"
+        },
+        {
+          "name": "Moussa Niakhate",
+          "position": "Defender"
+        },
+        {
+          "name": "Abdoulaye Seck",
+          "position": "Defender"
+        },
+        {
+          "name": "Ismail Jakobs",
+          "position": "Defender"
+        },
+        {
+          "name": "Idrissa Gana Gueye",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Pape Gueye",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Lamine Camara",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Habib Diarra",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Pathe Ciss",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Pape Matar Sarr",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Bara Sapoko Ndiaye",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Sadio Mane",
+          "position": "Forward"
+        },
+        {
+          "name": "Ismaila Sarr",
+          "position": "Forward"
+        },
+        {
+          "name": "Iliman Ndiaye",
+          "position": "Forward"
+        },
+        {
+          "name": "Assane Diao",
+          "position": "Forward"
+        },
+        {
+          "name": "Ibrahim Mbaye",
+          "position": "Forward"
+        },
+        {
+          "name": "Nicolas Jackson",
+          "position": "Forward"
+        },
+        {
+          "name": "Bamba Dieng",
+          "position": "Forward"
+        },
+        {
+          "name": "Cherif Ndiaye",
+          "position": "Forward"
+        }
+      ]
+    },
+    {
+      "teamCode": "IRQ",
+      "teamName": "Iraq",
+      "sourceName": "Reuters World Cup 2026 squads + Reuters replacement updates through 2026-06-16 (Iraq: Ahmed Hassan Makenzie replaced Ahmed Yahya)",
+      "sourceUrl": "https://www.reuters.com/sports/soccer/world-cup-2026-list-26-man-squads-finals-2026-06-02/",
+      "players": [
+        {
+          "name": "Fahad Talib",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Jalal Hassan",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Ahmed Basil",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Hussein Ali",
+          "position": "Defender"
+        },
+        {
+          "name": "Manaf Younis",
+          "position": "Defender"
+        },
+        {
+          "name": "Zaid Tahseen",
+          "position": "Defender"
+        },
+        {
+          "name": "Rebin Sulaka",
+          "position": "Defender"
+        },
+        {
+          "name": "Akam Hashem",
+          "position": "Defender"
+        },
+        {
+          "name": "Merchas Doski",
+          "position": "Defender"
+        },
+        {
+          "name": "Ahmed Hassan Makenzie",
+          "position": "Defender"
+        },
+        {
+          "name": "Zaid Ismail",
+          "position": "Defender"
+        },
+        {
+          "name": "Frans Putros",
+          "position": "Defender"
+        },
+        {
+          "name": "Mustafa Saadoon",
+          "position": "Defender"
+        },
+        {
+          "name": "Amir Al Ammari",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Kevin Yakob",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Zidane Iqbal",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Aimar Sher",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Ibrahim Bayesh",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Ahmed Qasim",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Youssef Amyn",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Marko Farji",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Ali Jassim",
+          "position": "Forward"
+        },
+        {
+          "name": "Ali Al Hamadi",
+          "position": "Forward"
+        },
+        {
+          "name": "Ali Yousef",
+          "position": "Forward"
+        },
+        {
+          "name": "Aymen Hussein",
+          "position": "Forward"
+        },
+        {
+          "name": "Mohanad Ali",
+          "position": "Forward"
+        }
+      ]
+    },
+    {
+      "teamCode": "NOR",
+      "teamName": "Norway",
+      "sourceName": "Reuters World Cup 2026 squads + Reuters replacement updates through 2026-06-16",
+      "sourceUrl": "https://www.reuters.com/sports/soccer/world-cup-2026-list-26-man-squads-finals-2026-06-02/",
+      "players": [
+        {
+          "name": "Orjan Haskjold Nyland",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Egil Selvik",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Sander Tangvik",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Julian Ryerson",
+          "position": "Defender"
+        },
+        {
+          "name": "Marcus Holmgren Pedersen",
+          "position": "Defender"
+        },
+        {
+          "name": "David Moller Wolfe",
+          "position": "Defender"
+        },
+        {
+          "name": "Fredrik Bjorkan",
+          "position": "Defender"
+        },
+        {
+          "name": "Kristoffer Ajer",
+          "position": "Defender"
+        },
+        {
+          "name": "Torbjorn Heggem",
+          "position": "Defender"
+        },
+        {
+          "name": "Leo Skiri Ostigard",
+          "position": "Defender"
+        },
+        {
+          "name": "Sondre Langas",
+          "position": "Defender"
+        },
+        {
+          "name": "Henrik Falchener",
+          "position": "Defender"
+        },
+        {
+          "name": "Martin Odegaard",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Sander Berge",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Fredrik Aursnes",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Patrick Berg",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Kristian Thorstvedt",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Morten Thorsby",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Thelo Aasgaard",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Erling Haaland",
+          "position": "Forward"
+        },
+        {
+          "name": "Alexander Sorloth",
+          "position": "Forward"
+        },
+        {
+          "name": "Jorgen Strand Larsen",
+          "position": "Forward"
+        },
+        {
+          "name": "Antonio Nusa",
+          "position": "Forward"
+        },
+        {
+          "name": "Oscar Bobb",
+          "position": "Forward"
+        },
+        {
+          "name": "Andreas Schjelderup",
+          "position": "Forward"
+        },
+        {
+          "name": "Jens Petter Hauge",
+          "position": "Forward"
+        }
+      ]
+    },
+    {
+      "teamCode": "ARG",
+      "teamName": "Argentina",
+      "sourceName": "Reuters World Cup 2026 squads + Reuters replacement updates through 2026-06-16 (Argentina: Marcos Senesi replaced Leonardo Balerdi)",
+      "sourceUrl": "https://www.reuters.com/sports/soccer/world-cup-2026-list-26-man-squads-finals-2026-06-02/",
+      "players": [
+        {
+          "name": "Emiliano Martinez",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Geronimo Rulli",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Juan Musso",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Marcos Senesi",
+          "position": "Defender"
+        },
+        {
+          "name": "Gonzalo Montiel",
+          "position": "Defender"
+        },
+        {
+          "name": "Nicolas Tagliafico",
+          "position": "Defender"
+        },
+        {
+          "name": "Lisandro Martinez",
+          "position": "Defender"
+        },
+        {
+          "name": "Cristian Romero",
+          "position": "Defender"
+        },
+        {
+          "name": "Nicolas Otamendi",
+          "position": "Defender"
+        },
+        {
+          "name": "Facundo Medina",
+          "position": "Defender"
+        },
+        {
+          "name": "Nahuel Molina",
+          "position": "Defender"
+        },
+        {
+          "name": "Leandro Paredes",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Rodrigo De Paul",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Valentin Barco",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Giovani Lo Celso",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Exequiel Palacios",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Alexis Mac Allister",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Enzo Fernandez",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Julian Alvarez",
+          "position": "Forward"
+        },
+        {
+          "name": "Lionel Messi",
+          "position": "Forward"
+        },
+        {
+          "name": "Nicolas Gonzalez",
+          "position": "Forward"
+        },
+        {
+          "name": "Thiago Almada",
+          "position": "Forward"
+        },
+        {
+          "name": "Giuliano Simeone",
+          "position": "Forward"
+        },
+        {
+          "name": "Nicolas Paz",
+          "position": "Forward"
+        },
+        {
+          "name": "Jose Manuel Lopez",
+          "position": "Forward"
+        },
+        {
+          "name": "Lautaro Martinez",
+          "position": "Forward"
+        }
+      ]
+    },
+    {
+      "teamCode": "ALG",
+      "teamName": "Algeria",
+      "sourceName": "Reuters World Cup 2026 squads + Reuters replacement updates through 2026-06-16",
+      "sourceUrl": "https://www.reuters.com/sports/soccer/world-cup-2026-list-26-man-squads-finals-2026-06-02/",
+      "players": [
+        {
+          "name": "Oussama Benbot",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Melvin Masstil",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Luca Zidane",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Achraf Abada",
+          "position": "Defender"
+        },
+        {
+          "name": "Rayan Ait Nouri",
+          "position": "Defender"
+        },
+        {
+          "name": "Zinedine Belaid",
+          "position": "Defender"
+        },
+        {
+          "name": "Rafik Belghali",
+          "position": "Defender"
+        },
+        {
+          "name": "Ramy Bensebaini",
+          "position": "Defender"
+        },
+        {
+          "name": "Samir Chergui",
+          "position": "Defender"
+        },
+        {
+          "name": "Jaouen Hadjam",
+          "position": "Defender"
+        },
+        {
+          "name": "Aissa Mandi",
+          "position": "Defender"
+        },
+        {
+          "name": "Mohamed Amine Tougai",
+          "position": "Defender"
+        },
+        {
+          "name": "Houssem Aouar",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Nabil Bentaleb",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Hicham Boudaoui",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Fares Chaibi",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Ibrahim Maza",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Yassine Titraoui",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Ramiz Zerrouki",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Mohamed Amine Amoura",
+          "position": "Forward"
+        },
+        {
+          "name": "Nadir Benbouali",
+          "position": "Forward"
+        },
+        {
+          "name": "Adil Boulbina",
+          "position": "Forward"
+        },
+        {
+          "name": "Fares Ghedjemis",
+          "position": "Forward"
+        },
+        {
+          "name": "Amine Gouiri",
+          "position": "Forward"
+        },
+        {
+          "name": "Riyad Mahrez",
+          "position": "Forward"
+        },
+        {
+          "name": "Anis Hadj Moussa",
+          "position": "Forward"
+        }
+      ]
+    },
+    {
+      "teamCode": "AUT",
+      "teamName": "Austria",
+      "sourceName": "Reuters World Cup 2026 squads + Reuters replacement updates through 2026-06-16 (Austria: Dejan Ljubicic added after Baumgartner injury)",
+      "sourceUrl": "https://www.reuters.com/sports/soccer/world-cup-2026-list-26-man-squads-finals-2026-06-02/",
+      "players": [
+        {
+          "name": "Patrick Pentz",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Alexander Schlager",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Florian Wiegele",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "David Affengruber",
+          "position": "Defender"
+        },
+        {
+          "name": "David Alaba",
+          "position": "Defender"
+        },
+        {
+          "name": "Kevin Danso",
+          "position": "Defender"
+        },
+        {
+          "name": "Marco Friedl",
+          "position": "Defender"
+        },
+        {
+          "name": "Philipp Lienhart",
+          "position": "Defender"
+        },
+        {
+          "name": "Phillipp Mwene",
+          "position": "Defender"
+        },
+        {
+          "name": "Stefan Posch",
+          "position": "Defender"
+        },
+        {
+          "name": "Alexander Prass",
+          "position": "Defender"
+        },
+        {
+          "name": "Michael Svoboda",
+          "position": "Defender"
+        },
+        {
+          "name": "Carney Chukwuemeka",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Florian Grillitsch",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Konrad Laimer",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Marcel Sabitzer",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Xaver Schlager",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Romano Schmid",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Alessandro Schopf",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Nicolas Seiwald",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Paul Wanner",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Patrick Wimmer",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Dejan Ljubicic",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Marko Arnautovic",
+          "position": "Forward"
+        },
+        {
+          "name": "Michael Gregoritsch",
+          "position": "Forward"
+        },
+        {
+          "name": "Sasa Kalajdzic",
+          "position": "Forward"
+        }
+      ]
+    },
+    {
+      "teamCode": "JOR",
+      "teamName": "Jordan",
+      "sourceName": "Reuters World Cup 2026 squads + Reuters replacement updates through 2026-06-16",
+      "sourceUrl": "https://www.reuters.com/sports/soccer/world-cup-2026-list-26-man-squads-finals-2026-06-02/",
+      "players": [
+        {
+          "name": "Yazeed Abu Laila",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Abdullah Al-Fakhouri",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Noor Bani Attieh",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Abdullah Nasib",
+          "position": "Defender"
+        },
+        {
+          "name": "Saad Al-Rosan",
+          "position": "Defender"
+        },
+        {
+          "name": "Yazan Al-Arab",
+          "position": "Defender"
+        },
+        {
+          "name": "Saleem Obeid",
+          "position": "Defender"
+        },
+        {
+          "name": "Mohammad Abu Al-Nadi",
+          "position": "Defender"
+        },
+        {
+          "name": "Hossam Abu Al-Dahab",
+          "position": "Defender"
+        },
+        {
+          "name": "Ehsan Haddad",
+          "position": "Defender"
+        },
+        {
+          "name": "Anas Bani",
+          "position": "Defender"
+        },
+        {
+          "name": "Muhannad Abu Taha",
+          "position": "Defender"
+        },
+        {
+          "name": "Mohammad Abu Hasheesh",
+          "position": "Defender"
+        },
+        {
+          "name": "Noor Al-Rawabdeh",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Nizar Al-Rashdan",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Ibrahim Saadeh",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Rajaei Ayed",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Amer Jamous",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Mohammad Al-Daoud",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Mahmoud Al-Mardi",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Mousa Al-Tamari",
+          "position": "Forward"
+        },
+        {
+          "name": "Ouda Al-Fakhouri",
+          "position": "Forward"
+        },
+        {
+          "name": "Mohammad Abu Zraiq",
+          "position": "Forward"
+        },
+        {
+          "name": "Ali Azaizeh",
+          "position": "Forward"
+        },
+        {
+          "name": "Ibrahim Sabra",
+          "position": "Forward"
+        },
+        {
+          "name": "Ali Olwan",
+          "position": "Forward"
+        }
+      ]
+    },
+    {
+      "teamCode": "POR",
+      "teamName": "Portugal",
+      "sourceName": "Reuters World Cup 2026 squads + Reuters replacement updates through 2026-06-16",
+      "sourceUrl": "https://www.reuters.com/sports/soccer/world-cup-2026-list-26-man-squads-finals-2026-06-02/",
+      "players": [
+        {
+          "name": "Diogo Costa",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Jose Sa",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Rui Silva",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Diogo Dalot",
+          "position": "Defender"
+        },
+        {
+          "name": "Matheus Nunes",
+          "position": "Defender"
+        },
+        {
+          "name": "Nelson Semedo",
+          "position": "Defender"
+        },
+        {
+          "name": "Joao Cancelo",
+          "position": "Defender"
+        },
+        {
+          "name": "Nuno Mendes",
+          "position": "Defender"
+        },
+        {
+          "name": "Goncalo Inacio",
+          "position": "Defender"
+        },
+        {
+          "name": "Renato Veiga",
+          "position": "Defender"
+        },
+        {
+          "name": "Ruben Dias",
+          "position": "Defender"
+        },
+        {
+          "name": "Tomas Araujo",
+          "position": "Defender"
+        },
+        {
+          "name": "Ruben Neves",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Samuel Costa",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Joao Neves",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Vitinha",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Bruno Fernandes",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Bernardo Silva",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Joao Felix",
+          "position": "Forward"
+        },
+        {
+          "name": "Francisco Trincao",
+          "position": "Forward"
+        },
+        {
+          "name": "Francisco Conceicao",
+          "position": "Forward"
+        },
+        {
+          "name": "Pedro Neto",
+          "position": "Forward"
+        },
+        {
+          "name": "Rafael Leao",
+          "position": "Forward"
+        },
+        {
+          "name": "Goncalo Guedes",
+          "position": "Forward"
+        },
+        {
+          "name": "Goncalo Ramos",
+          "position": "Forward"
+        },
+        {
+          "name": "Cristiano Ronaldo",
+          "position": "Forward"
+        }
+      ]
+    },
+    {
+      "teamCode": "COD",
+      "teamName": "DR Congo",
+      "sourceName": "Reuters World Cup 2026 squads + Reuters replacement updates through 2026-06-16",
+      "sourceUrl": "https://www.reuters.com/sports/soccer/world-cup-2026-list-26-man-squads-finals-2026-06-02/",
+      "players": [
+        {
+          "name": "Matthieu Epolo",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Timothy Fayulu",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Lionel Mpasi",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Dylan Batubinsika",
+          "position": "Defender"
+        },
+        {
+          "name": "Rocky Bushiri",
+          "position": "Defender"
+        },
+        {
+          "name": "Gedoon Kalulu",
+          "position": "Defender"
+        },
+        {
+          "name": "Steve Kapuadi",
+          "position": "Defender"
+        },
+        {
+          "name": "Joris Kayembe",
+          "position": "Defender"
+        },
+        {
+          "name": "Arthur Masuaku",
+          "position": "Defender"
+        },
+        {
+          "name": "Chancel Mbemba",
+          "position": "Defender"
+        },
+        {
+          "name": "Axel Tuanzebe",
+          "position": "Defender"
+        },
+        {
+          "name": "Aaron Wan-Bissaka",
+          "position": "Defender"
+        },
+        {
+          "name": "Theo Bongonda",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Brian Cipenga",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Meshack Elia",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Gael Kakuta",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Edo Kayembe",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Nathanael Mbuku",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Samuel Moutoussamy",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Ngal'ayel Mukau",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Charles Pickel",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Noah Sadiki",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Cedric Bakambu",
+          "position": "Forward"
+        },
+        {
+          "name": "Simon Banza",
+          "position": "Forward"
+        },
+        {
+          "name": "Fiston Mayele",
+          "position": "Forward"
+        },
+        {
+          "name": "Yoane Wissa",
+          "position": "Forward"
+        }
+      ]
+    },
+    {
+      "teamCode": "UZB",
+      "teamName": "Uzbekistan",
+      "sourceName": "Reuters World Cup 2026 squads + Reuters replacement updates through 2026-06-16",
+      "sourceUrl": "https://www.reuters.com/sports/soccer/world-cup-2026-list-26-man-squads-finals-2026-06-02/",
+      "players": [
+        {
+          "name": "Utkir Yusupov",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Abduvohid Nematov",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Botirali Ergashev",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Rustam Ashurmatov",
+          "position": "Defender"
+        },
+        {
+          "name": "Farrukh Sayfiev",
+          "position": "Defender"
+        },
+        {
+          "name": "Khojiakbar Alijonov",
+          "position": "Defender"
+        },
+        {
+          "name": "Sherzod Nasrullaev",
+          "position": "Defender"
+        },
+        {
+          "name": "Umar Eshmurodov",
+          "position": "Defender"
+        },
+        {
+          "name": "Abdukodir Khusanov",
+          "position": "Defender"
+        },
+        {
+          "name": "Abdulla Abdullaev",
+          "position": "Defender"
+        },
+        {
+          "name": "Bekhruz Karimov",
+          "position": "Defender"
+        },
+        {
+          "name": "Jakhongir Urozov",
+          "position": "Defender"
+        },
+        {
+          "name": "Avazbek Ulmasaliev",
+          "position": "Defender"
+        },
+        {
+          "name": "Otabek Shukurov",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Jaloliddin Masharipov",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Odiljon Hamrobekov",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Oston Urunov",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Jamshid Iskanderov",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Dostonbek Khamdamov",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Abbosbek Fayzullaev",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Akmal Mozgovoy",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Azizjon Ganiev",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Sherzod Esanov",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Eldor Shomurodov",
+          "position": "Forward"
+        },
+        {
+          "name": "Igor Sergeev",
+          "position": "Forward"
+        },
+        {
+          "name": "Azizbek Amonov",
+          "position": "Forward"
+        }
+      ]
+    },
+    {
+      "teamCode": "COL",
+      "teamName": "Colombia",
+      "sourceName": "Reuters World Cup 2026 squads + Reuters replacement updates through 2026-06-16",
+      "sourceUrl": "https://www.reuters.com/sports/soccer/world-cup-2026-list-26-man-squads-finals-2026-06-02/",
+      "players": [
+        {
+          "name": "Camilo Vargas",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Alvaro Montero",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "David Ospina",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Davinson Sanchez",
+          "position": "Defender"
+        },
+        {
+          "name": "Jhon Lucumi",
+          "position": "Defender"
+        },
+        {
+          "name": "Yerry Mina",
+          "position": "Defender"
+        },
+        {
+          "name": "Willer Ditta",
+          "position": "Defender"
+        },
+        {
+          "name": "Daniel Munoz",
+          "position": "Defender"
+        },
+        {
+          "name": "Santiago Arias",
+          "position": "Defender"
+        },
+        {
+          "name": "Johan Mojica",
+          "position": "Defender"
+        },
+        {
+          "name": "Deiver Machado",
+          "position": "Defender"
+        },
+        {
+          "name": "Richard Rios",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Jefferson Lerma",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Kevin Castano",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Juan Camilo Portilla",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Gustavo Puerta",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Jhon Arias",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Jorge Carrascal",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Juan Fernando Quintero",
+          "position": "Midfielder"
+        },
+        {
+          "name": "James Rodriguez",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Jaminton Campaz",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Juan Camilo Hernandez",
+          "position": "Forward"
+        },
+        {
+          "name": "Luis Diaz",
+          "position": "Forward"
+        },
+        {
+          "name": "Luis Suarez",
+          "position": "Forward"
+        },
+        {
+          "name": "Carlos Andres Gomez",
+          "position": "Forward"
+        },
+        {
+          "name": "Jhon Cordoba",
+          "position": "Forward"
+        }
+      ]
+    },
+    {
+      "teamCode": "ENG",
+      "teamName": "England",
+      "sourceName": "Reuters World Cup 2026 squads + Reuters replacement updates through 2026-06-16",
+      "sourceUrl": "https://www.reuters.com/sports/soccer/world-cup-2026-list-26-man-squads-finals-2026-06-02/",
+      "players": [
+        {
+          "name": "Jordan Pickford",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Dean Henderson",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "James Trafford",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Reece James",
+          "position": "Defender"
+        },
+        {
+          "name": "Ezri Konsa",
+          "position": "Defender"
+        },
+        {
+          "name": "Jarell Quansah",
+          "position": "Defender"
+        },
+        {
+          "name": "John Stones",
+          "position": "Defender"
+        },
+        {
+          "name": "Marc Guehi",
+          "position": "Defender"
+        },
+        {
+          "name": "Dan Burn",
+          "position": "Defender"
+        },
+        {
+          "name": "Nico O'Reilly",
+          "position": "Defender"
+        },
+        {
+          "name": "Djed Spence",
+          "position": "Defender"
+        },
+        {
+          "name": "Tino Livramento",
+          "position": "Defender"
+        },
+        {
+          "name": "Declan Rice",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Elliot Anderson",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Kobbie Mainoo",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Jordan Henderson",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Morgan Rogers",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Jude Bellingham",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Eberechi Eze",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Harry Kane",
+          "position": "Forward"
+        },
+        {
+          "name": "Ivan Toney",
+          "position": "Forward"
+        },
+        {
+          "name": "Ollie Watkins",
+          "position": "Forward"
+        },
+        {
+          "name": "Bukayo Saka",
+          "position": "Forward"
+        },
+        {
+          "name": "Marcus Rashford",
+          "position": "Forward"
+        },
+        {
+          "name": "Anthony Gordon",
+          "position": "Forward"
+        },
+        {
+          "name": "Noni Madueke",
+          "position": "Forward"
+        }
+      ]
+    },
+    {
+      "teamCode": "CRO",
+      "teamName": "Croatia",
+      "sourceName": "Reuters World Cup 2026 squads + Reuters replacement updates through 2026-06-16",
+      "sourceUrl": "https://www.reuters.com/sports/soccer/world-cup-2026-list-26-man-squads-finals-2026-06-02/",
+      "players": [
+        {
+          "name": "Dominik Livakovic",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Dominik Kotarski",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Ivor Pandur",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Josko Gvardiol",
+          "position": "Defender"
+        },
+        {
+          "name": "Duje Caleta-Car",
+          "position": "Defender"
+        },
+        {
+          "name": "Josip Sutalo",
+          "position": "Defender"
+        },
+        {
+          "name": "Josip Stanisic",
+          "position": "Defender"
+        },
+        {
+          "name": "Marin Pongracic",
+          "position": "Defender"
+        },
+        {
+          "name": "Kristijan Jakic",
+          "position": "Defender"
+        },
+        {
+          "name": "Martin Erlic",
+          "position": "Defender"
+        },
+        {
+          "name": "Luka Vuskovic",
+          "position": "Defender"
+        },
+        {
+          "name": "Luka Modric",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Mateo Kovacic",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Mario Pasalic",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Nikola Vlasic",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Luka Sucic",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Martin Baturina",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Petar Sucic",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Nikola Moro",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Toni Fruk",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Ivan Perisic",
+          "position": "Forward"
+        },
+        {
+          "name": "Andrej Kramaric",
+          "position": "Forward"
+        },
+        {
+          "name": "Ante Budimir",
+          "position": "Forward"
+        },
+        {
+          "name": "Marco Pasalic",
+          "position": "Forward"
+        },
+        {
+          "name": "Petar Musa",
+          "position": "Forward"
+        },
+        {
+          "name": "Igor Matanovic",
+          "position": "Forward"
+        }
+      ]
+    },
+    {
+      "teamCode": "GHA",
+      "teamName": "Ghana",
+      "sourceName": "Reuters World Cup 2026 squads + Reuters replacement updates through 2026-06-16",
+      "sourceUrl": "https://www.reuters.com/sports/soccer/world-cup-2026-list-26-man-squads-finals-2026-06-02/",
+      "players": [
+        {
+          "name": "Joseph Anang",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Benjamin Asare",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Lawrence Ati-Zigi",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Jonas Adjetey",
+          "position": "Defender"
+        },
+        {
+          "name": "Derrick Luckassen",
+          "position": "Defender"
+        },
+        {
+          "name": "Gideon Mensah",
+          "position": "Defender"
+        },
+        {
+          "name": "Abdul Mumin",
+          "position": "Defender"
+        },
+        {
+          "name": "Jerome Opoku",
+          "position": "Defender"
+        },
+        {
+          "name": "Kojo Oppong Preprah",
+          "position": "Defender"
+        },
+        {
+          "name": "Baba Abdul Rahman",
+          "position": "Defender"
+        },
+        {
+          "name": "Alidu Seidu",
+          "position": "Defender"
+        },
+        {
+          "name": "Marvin Senaya",
+          "position": "Defender"
+        },
+        {
+          "name": "Augustine Boakye",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Abdul Fatawu Issahaku",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Elisha Owusu",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Thomas Partey",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Kwasi Sibo",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Kamal Deen Sulemana",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Caleb Yirenkyi",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Prince Kwabena Adu",
+          "position": "Forward"
+        },
+        {
+          "name": "Jordan Ayew",
+          "position": "Forward"
+        },
+        {
+          "name": "Christopher Bonsu Baah",
+          "position": "Forward"
+        },
+        {
+          "name": "Ernest Nuamah",
+          "position": "Forward"
+        },
+        {
+          "name": "Antoine Semenyo",
+          "position": "Forward"
+        },
+        {
+          "name": "Brandon Thomas-Asante",
+          "position": "Forward"
+        },
+        {
+          "name": "Inaki Williams",
+          "position": "Forward"
+        }
+      ]
+    },
+    {
+      "teamCode": "PAN",
+      "teamName": "Panama",
+      "sourceName": "Reuters World Cup 2026 squads + Reuters replacement updates through 2026-06-16",
+      "sourceUrl": "https://www.reuters.com/sports/soccer/world-cup-2026-list-26-man-squads-finals-2026-06-02/",
+      "players": [
+        {
+          "name": "Orlando Mosquera",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Luis Mejia",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Cesar Samudio",
+          "position": "Goalkeeper"
+        },
+        {
+          "name": "Cesar Blackman",
+          "position": "Defender"
+        },
+        {
+          "name": "Jorge Gutierrez",
+          "position": "Defender"
+        },
+        {
+          "name": "Amir Murillo",
+          "position": "Defender"
+        },
+        {
+          "name": "Fidel Escobar",
+          "position": "Defender"
+        },
+        {
+          "name": "Andres Andrade",
+          "position": "Defender"
+        },
+        {
+          "name": "Edgardo Farina",
+          "position": "Defender"
+        },
+        {
+          "name": "Jose Cordoba",
+          "position": "Defender"
+        },
+        {
+          "name": "Eric Davis",
+          "position": "Defender"
+        },
+        {
+          "name": "Jiovany Ramos",
+          "position": "Defender"
+        },
+        {
+          "name": "Roderick Miller",
+          "position": "Defender"
+        },
+        {
+          "name": "Anibal Godoy",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Adalberto Carrasquilla",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Carlos Harvey",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Cristian Martinez",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Jose Luis Rodriguez",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Cesar Yanis",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Yoel Barcenas",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Alberto Quintero",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Azarias Londono",
+          "position": "Midfielder"
+        },
+        {
+          "name": "Ismael Diaz",
+          "position": "Forward"
+        },
+        {
+          "name": "Cecilio Waterman",
+          "position": "Forward"
+        },
+        {
+          "name": "Jose Fajardo",
+          "position": "Forward"
+        },
+        {
+          "name": "Tomas Rodriguez",
+          "position": "Forward"
+        }
       ]
     }
   ]
