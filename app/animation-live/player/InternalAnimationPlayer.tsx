@@ -6,6 +6,9 @@ import { getTeamFlagUrl } from '@/lib/teamFlags';
 
 type Team = { id?: string; name?: string; code?: string; image?: string } | null;
 type Snapshot = Record<string, any> | null;
+type EventSide = 'home' | 'away' | 'neutral';
+type EventFilterKey = 'all' | 'goals' | 'corners' | 'shots' | 'cards' | 'danger';
+type EventCategory = Exclude<EventFilterKey, 'all'> | 'other';
 type MatchEvent = { id: string; minute?: number | null; type: string; detail: string; playerName?: string | null; sourceName?: string | null; createdAt?: string | null };
 type LiveStatsResponse = {
   ok: boolean;
@@ -23,6 +26,14 @@ const STATS_POLL_MS = 60_000;
 const EVENTS_POLL_MS = 30_000;
 const FINISHED_STATUSES = ['FINISHED', 'FT', 'AET', 'PEN'];
 const HALF_TIME_STATUSES = ['HT', 'HALFTIME', 'HALF_TIME', 'HALF-TIME'];
+const EVENT_FILTERS: { key: EventFilterKey; label: string }[] = [
+  { key: 'all', label: 'الكل' },
+  { key: 'goals', label: 'الأهداف' },
+  { key: 'corners', label: 'الركنيات' },
+  { key: 'shots', label: 'التسديدات' },
+  { key: 'cards', label: 'الكروت' },
+  { key: 'danger', label: 'الهجمات الخطيرة' },
+];
 
 function normalizeStatus(status?: string | null) { return String(status || '').toUpperCase(); }
 function isFinishedStatus(status?: string | null) { return FINISHED_STATUSES.includes(normalizeStatus(status)); }
@@ -85,10 +96,37 @@ function eventLabel(type: string) {
   if (value.includes('substitution')) return 'تبديل';
   return 'حدث';
 }
+function eventCategory(type: string): EventCategory {
+  const value = type.toLowerCase();
+  if (value.includes('goal')) return 'goals';
+  if (value.includes('corner')) return 'corners';
+  if (value.includes('yellow') || value.includes('red') || value.includes('card')) return 'cards';
+  if (value.includes('danger')) return 'danger';
+  if (value.includes('shot') || value.includes('on-target') || value.includes('off-target')) return 'shots';
+  return 'other';
+}
+function eventMatchesFilter(event: MatchEvent, filter: EventFilterKey) {
+  if (filter === 'all') return true;
+  return eventCategory(event.type) === filter;
+}
 function cleanEventDetail(detail?: string | null) {
   return String(detail || '').replace(/FOOTBALL_DATA_FALLBACK|FOOTBALL_DATA|ISPORTS_TIMELINE|ISPORTS_PAGE|ISPORTS/gi, '').replace(/football-data\.org/gi, '').replace(/\s+/g, ' ').trim();
 }
-function eventSide(event?: MatchEvent | null, home?: Team, away?: Team) {
+function eventMinute(event?: MatchEvent | null) {
+  const value = Number(event?.minute);
+  return Number.isFinite(value) ? value : null;
+}
+function bounded(value: number, min: number, max: number) { return Math.min(max, Math.max(min, value)); }
+function timelineLeft(minute?: number | null) {
+  if (minute === null || minute === undefined) return 0;
+  return bounded((bounded(minute, 0, 90) / 90) * 100, 0, 100);
+}
+function stableOffset(seed?: string | number | null, range = 8) {
+  const text = String(seed ?? '0');
+  const total = text.split('').reduce((sum, char) => sum + char.charCodeAt(0), 0);
+  return (total % (range * 2 + 1)) - range;
+}
+function eventSide(event?: MatchEvent | null, home?: Team, away?: Team): EventSide {
   const text = `${event?.detail || ''} ${event?.sourceName || ''}`.toLowerCase();
   const awayName = String(away?.name || '').toLowerCase();
   const awayCode = String(away?.code || '').toLowerCase();
@@ -98,18 +136,41 @@ function eventSide(event?: MatchEvent | null, home?: Team, away?: Team) {
   if ((homeName && text.includes(homeName)) || (homeCode && text.includes(homeCode)) || text.includes('home') || text.includes('صاحب الأرض') || text.includes('صاحب الارض')) return 'home';
   return 'neutral';
 }
+function sortEventsByMinute(a: MatchEvent, b: MatchEvent) {
+  const ma = eventMinute(a) ?? 999;
+  const mb = eventMinute(b) ?? 999;
+  if (ma !== mb) return ma - mb;
+  return String(a.createdAt || a.id).localeCompare(String(b.createdAt || b.id));
+}
 function ballPosition(event?: MatchEvent | null, home?: Team, away?: Team) {
-  if (!event) return { left: 50, top: 50, label: 'منتصف الملعب', side: 'neutral' };
+  if (!event) return { left: 50, top: 50, label: 'منتصف الملعب', side: 'neutral' as EventSide };
   const type = event.type.toLowerCase();
   const side = eventSide(event, home, away);
-  const isAway = side === 'away';
-  const attack = isAway ? 24 : side === 'home' ? 76 : 50;
-  if (type.includes('goal')) return { left: attack, top: 50, label: 'مكان الهدف', side };
-  if (type.includes('corner')) return { left: isAway ? 7 : side === 'home' ? 93 : 50, top: isAway ? 14 : 86, label: 'منطقة الركنية', side };
-  if (type.includes('danger')) return { left: attack, top: 38, label: 'هجمة خطيرة', side };
-  if (type.includes('shot')) return { left: attack, top: 58, label: 'تسديدة', side };
-  if (type.includes('yellow') || type.includes('red') || type.includes('card')) return { left: side === 'neutral' ? 50 : attack, top: 50, label: 'مكان البطاقة', side };
-  if (type.includes('substitution')) return { left: 50, top: side === 'away' ? 20 : 80, label: 'منطقة التبديل', side };
+  const seed = event.id || event.minute || type;
+  const vertical = bounded(50 + stableOffset(seed, 18), 16, 84);
+  const homeAttackX = 84 + stableOffset(seed, 4);
+  const awayAttackX = 16 + stableOffset(seed, 4);
+  const attackX = side === 'away' ? awayAttackX : side === 'home' ? homeAttackX : 50 + stableOffset(seed, 12);
+
+  if (type.includes('goal')) {
+    return { left: side === 'away' ? 9 : side === 'home' ? 91 : 50, top: bounded(50 + stableOffset(seed, 9), 39, 61), label: 'داخل منطقة الجزاء', side };
+  }
+  if (type.includes('corner')) {
+    const top = (eventMinute(event) ?? 0) % 2 === 0 ? 9 : 91;
+    return { left: side === 'away' ? 4 : side === 'home' ? 96 : 50, top, label: 'زاوية الركنية', side };
+  }
+  if (type.includes('danger')) {
+    return { left: side === 'away' ? bounded(28 + stableOffset(seed, 5), 21, 35) : side === 'home' ? bounded(72 + stableOffset(seed, 5), 65, 79) : attackX, top: vertical, label: 'الثلث الهجومي', side };
+  }
+  if (type.includes('shot')) {
+    return { left: side === 'away' ? bounded(22 + stableOffset(seed, 5), 14, 31) : side === 'home' ? bounded(78 + stableOffset(seed, 5), 69, 86) : attackX, top: bounded(50 + stableOffset(seed, 16), 28, 72), label: 'أمام منطقة الجزاء', side };
+  }
+  if (type.includes('yellow') || type.includes('red') || type.includes('card')) {
+    return { left: side === 'away' ? 38 : side === 'home' ? 62 : 50, top: bounded(50 + stableOffset(seed, 20), 22, 78), label: 'منطقة الاحتكاك', side };
+  }
+  if (type.includes('substitution')) {
+    return { left: 50 + stableOffset(seed, 22), top: side === 'away' ? 8 : side === 'home' ? 92 : 50, label: 'خط التماس', side };
+  }
   return { left: 50, top: 50, label: 'مكان الحدث', side };
 }
 function flagUrl(team: Team) { return getTeamFlagUrl({ code: team?.code, name: team?.name, image: team?.image }, 80); }
@@ -147,6 +208,8 @@ export default function InternalAnimationPlayer({ matchId = '', dbMatchId = '' }
   const [stats, setStats] = useState<LiveStatsResponse | null>(null);
   const [events, setEvents] = useState<MatchEvent[]>([]);
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
+  const [eventFilter, setEventFilter] = useState<EventFilterKey>('all');
+  const [isReplaying, setIsReplaying] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const query = useMemo(() => { const params = new URLSearchParams(); if (matchId) params.set('matchId', matchId); if (dbMatchId) params.set('dbMatchId', dbMatchId); return params.toString(); }, [matchId, dbMatchId]);
@@ -176,18 +239,54 @@ export default function InternalAnimationPlayer({ matchId = '', dbMatchId = '' }
     const eventsTimer = window.setInterval(fetchEvents, EVENTS_POLL_MS);
     return () => { window.clearInterval(statsTimer); window.clearInterval(eventsTimer); };
   }, [query]);
-  useEffect(() => {
-    if (!selectedEventId && events[0]?.id) setSelectedEventId(events[0].id);
-  }, [events, selectedEventId]);
 
   const latest = resolvedSnapshot(stats);
   const match = stats?.match;
-  const selectedEvent = events.find((event) => event.id === selectedEventId) || events[0] || null;
+  const filteredEvents = useMemo(() => events.filter((event) => eventMatchesFilter(event, eventFilter)), [events, eventFilter]);
+  const replayEvents = useMemo(() => filteredEvents.slice().sort(sortEventsByMinute), [filteredEvents]);
+  const filterCounts = useMemo(() => EVENT_FILTERS.reduce((acc, filter) => {
+    acc[filter.key] = filter.key === 'all' ? events.length : events.filter((event) => eventMatchesFilter(event, filter.key)).length;
+    return acc;
+  }, {} as Record<EventFilterKey, number>), [events]);
+  const selectedEvent = filteredEvents.find((event) => event.id === selectedEventId) || filteredEvents[0] || null;
   const ball = ballPosition(selectedEvent, match?.homeTeam || null, match?.awayTeam || null);
   const homeScore = n(latest, 'homeScore') ?? match?.homeScore ?? 0;
   const awayScore = n(latest, 'awayScore') ?? match?.awayScore ?? 0;
   const minute = n(latest, 'minute') ?? (isFinishedStatus(match?.status) ? 90 : null);
   const provider = sourceLabel(latest?.provider || stats?.sourceStatus?.statsProvider);
+
+  useEffect(() => {
+    if (!filteredEvents.length) {
+      if (selectedEventId) setSelectedEventId(null);
+      return;
+    }
+    if (!selectedEventId || !filteredEvents.some((event) => event.id === selectedEventId)) setSelectedEventId(filteredEvents[0].id);
+  }, [filteredEvents, selectedEventId]);
+  useEffect(() => {
+    if (!isReplaying) return;
+    if (!replayEvents.length) { setIsReplaying(false); return; }
+    const currentIndex = selectedEventId ? replayEvents.findIndex((event) => event.id === selectedEventId) : -1;
+    if (currentIndex < 0) { setSelectedEventId(replayEvents[0].id); return; }
+    const timer = window.setTimeout(() => {
+      if (currentIndex >= replayEvents.length - 1) setIsReplaying(false);
+      else setSelectedEventId(replayEvents[currentIndex + 1].id);
+    }, 1300);
+    return () => window.clearTimeout(timer);
+  }, [isReplaying, replayEvents, selectedEventId]);
+
+  function selectEvent(id: string) {
+    setIsReplaying(false);
+    setSelectedEventId(id);
+  }
+  function startReplay() {
+    if (!replayEvents.length) return;
+    setSelectedEventId(replayEvents[0].id);
+    setIsReplaying(true);
+  }
+  function changeFilter(filter: EventFilterKey) {
+    setIsReplaying(false);
+    setEventFilter(filter);
+  }
 
   if (loading) return <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.03] p-10 text-center text-sm text-gray-400">جاري تحميل المشغل...</div>;
   if (error) return <div className="rounded-2xl border border-red-400/20 bg-red-500/10 p-5 text-sm text-red-200"><AlertTriangle className="mb-2" /> {error}</div>;
@@ -201,18 +300,56 @@ export default function InternalAnimationPlayer({ matchId = '', dbMatchId = '' }
             <div className="mt-3 grid gap-2 sm:grid-cols-3"><div className="rounded-xl border border-white/10 bg-black/25 px-3 py-2"><div className="text-[10px] font-black text-gray-500">موعد المباراة</div><div className="mt-1 text-sm font-black text-white">{formatDate(match?.matchDate)}</div></div><div className="rounded-xl border border-[#00FF88]/20 bg-[#00FF88]/10 px-3 py-2"><div className="text-[10px] font-black text-[#00FF88]/80">الحالة</div><div className="mt-1 text-sm font-black text-[#00FF88]">{displayMatchStatus(match?.status)} {minute ? `- ${ar(minute)}′` : ''}</div></div><div className="rounded-xl border border-[#FFD700]/20 bg-[#FFD700]/10 px-3 py-2"><div className="text-[10px] font-black text-[#FFD700]/80">مصدر البيانات</div><div className="mt-1 text-sm font-black text-[#FFD700]">{provider}</div></div></div>
           </div>
 
-          <div className="relative h-[420px] overflow-hidden rounded-3xl border border-emerald-300/25 bg-[linear-gradient(90deg,rgba(15,121,67,0.95),rgba(14,145,79,0.95))] shadow-inner">
-            <div className="absolute inset-0 bg-[repeating-linear-gradient(90deg,rgba(255,255,255,0.045)_0,rgba(255,255,255,0.045)_1px,transparent_1px,transparent_14.285%)]" />
-            <div className="absolute left-1/2 top-0 h-full w-px -translate-x-1/2 bg-white/45" /><div className="absolute left-1/2 top-1/2 h-28 w-28 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white/45" /><div className="absolute left-0 top-1/2 h-44 w-24 -translate-y-1/2 rounded-r-3xl border-y-2 border-r-2 border-white/45" /><div className="absolute right-0 top-1/2 h-44 w-24 -translate-y-1/2 rounded-l-3xl border-y-2 border-l-2 border-white/45" />
-            <div className="absolute left-[15%] top-[20%] h-3 w-3 rounded-full bg-white/70" /><div className="absolute left-[25%] top-[40%] h-3 w-3 rounded-full bg-white/70" /><div className="absolute left-[18%] top-[65%] h-3 w-3 rounded-full bg-white/70" /><div className="absolute left-[38%] top-[52%] h-3 w-3 rounded-full bg-white/70" /><div className="absolute right-[15%] top-[20%] h-3 w-3 rounded-full bg-[#FFD700]/80" /><div className="absolute right-[25%] top-[40%] h-3 w-3 rounded-full bg-[#FFD700]/80" /><div className="absolute right-[18%] top-[65%] h-3 w-3 rounded-full bg-[#FFD700]/80" /><div className="absolute right-[38%] top-[52%] h-3 w-3 rounded-full bg-[#FFD700]/80" />
-            <div className="absolute z-20 -translate-x-1/2 -translate-y-1/2 transition-all duration-500 ease-out" style={{ left: `${ball.left}%`, top: `${ball.top}%` }}>
-              <div className="absolute inset-0 h-14 w-14 -translate-x-1 -translate-y-1 animate-ping rounded-full bg-[#FFD700]/25" />
-              <div className="relative flex h-12 w-12 items-center justify-center rounded-full border-2 border-white bg-black text-xl shadow-[0_0_35px_rgba(255,255,255,0.55)]">{selectedEvent ? eventIcon(selectedEvent.type) : '⚽'}</div>
-              <div className="absolute left-1/2 top-14 w-40 -translate-x-1/2 rounded-full border border-black/20 bg-black/75 px-3 py-1 text-center text-[10px] font-black text-white">{ball.label}</div>
+          <div className="rounded-3xl border border-white/10 bg-black/20 p-3">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <div className="flex flex-wrap gap-2">
+                {EVENT_FILTERS.map((filter) => {
+                  const active = eventFilter === filter.key;
+                  return (
+                    <button key={filter.key} type="button" onClick={() => changeFilter(filter.key)} className={`rounded-full border px-3 py-1.5 text-[11px] font-black transition ${active ? 'border-[#FFD700]/70 bg-[#FFD700]/15 text-[#FFD700]' : 'border-white/10 bg-black/25 text-gray-300 hover:border-[#0FF0FC]/45 hover:text-white'}`}>
+                      {filter.label} <span className="text-[10px] opacity-70">{ar(filterCounts[filter.key])}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              <button type="button" onClick={startReplay} disabled={!replayEvents.length || isReplaying} className="rounded-full border border-[#00FF88]/35 bg-[#00FF88]/10 px-4 py-1.5 text-[11px] font-black text-[#00FF88] transition hover:bg-[#00FF88]/15 disabled:cursor-not-allowed disabled:opacity-45">
+                {isReplaying ? 'Replay يعمل...' : '▶ Replay الأحداث'}
+              </button>
             </div>
-            <div className="absolute left-4 top-4 rounded-2xl border border-white/10 bg-black/50 px-3 py-2 text-xs font-black text-white">الدقيقة: <span className="text-[#FFD700]">{ar(selectedEvent?.minute ?? minute, '—')}</span></div>
-            <div className="absolute right-4 top-4 rounded-2xl border border-white/10 bg-black/50 px-3 py-2 text-xs font-black text-white">الحالة: <span className="text-[#FFD700]">{displayMatchStatus(match?.status)}</span></div>
-            <div className="absolute bottom-4 left-4 right-4 rounded-2xl border border-white/10 bg-black/60 p-3"><div className="flex items-center gap-2 text-xs font-black text-[#FFD700]"><Radio size={14} /> الحدث المحدد على الملعب</div><p className="mt-1 text-sm leading-6 text-white">{selectedEvent ? `${eventIcon(selectedEvent.type)} ${selectedEvent.minute ? `د${selectedEvent.minute} - ` : ''}${eventLabel(selectedEvent.type)}: ${cleanEventDetail(selectedEvent.detail)}` : 'اضغط على أي حدث من القائمة لإظهار مكانه على الملعب.'}</p></div>
+
+            <div className="relative h-[420px] overflow-hidden rounded-3xl border border-emerald-300/25 bg-[linear-gradient(90deg,rgba(15,121,67,0.95),rgba(14,145,79,0.95))] shadow-inner">
+              <div className="absolute inset-0 bg-[repeating-linear-gradient(90deg,rgba(255,255,255,0.045)_0,rgba(255,255,255,0.045)_1px,transparent_1px,transparent_14.285%)]" />
+              <div className="absolute left-1/2 top-0 h-full w-px -translate-x-1/2 bg-white/45" /><div className="absolute left-1/2 top-1/2 h-28 w-28 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white/45" /><div className="absolute left-0 top-1/2 h-44 w-24 -translate-y-1/2 rounded-r-3xl border-y-2 border-r-2 border-white/45" /><div className="absolute right-0 top-1/2 h-44 w-24 -translate-y-1/2 rounded-l-3xl border-y-2 border-l-2 border-white/45" />
+              <div className="absolute left-[15%] top-[20%] h-3 w-3 rounded-full bg-white/70" /><div className="absolute left-[25%] top-[40%] h-3 w-3 rounded-full bg-white/70" /><div className="absolute left-[18%] top-[65%] h-3 w-3 rounded-full bg-white/70" /><div className="absolute left-[38%] top-[52%] h-3 w-3 rounded-full bg-white/70" /><div className="absolute right-[15%] top-[20%] h-3 w-3 rounded-full bg-[#FFD700]/80" /><div className="absolute right-[25%] top-[40%] h-3 w-3 rounded-full bg-[#FFD700]/80" /><div className="absolute right-[18%] top-[65%] h-3 w-3 rounded-full bg-[#FFD700]/80" /><div className="absolute right-[38%] top-[52%] h-3 w-3 rounded-full bg-[#FFD700]/80" />
+              <div className="absolute z-20 -translate-x-1/2 -translate-y-1/2 transition-all duration-500 ease-out" style={{ left: `${ball.left}%`, top: `${ball.top}%` }}>
+                <div className="absolute inset-0 h-14 w-14 -translate-x-1 -translate-y-1 animate-ping rounded-full bg-[#FFD700]/25" />
+                <div className="relative flex h-12 w-12 items-center justify-center rounded-full border-2 border-white bg-black text-xl shadow-[0_0_35px_rgba(255,255,255,0.55)]">{selectedEvent ? eventIcon(selectedEvent.type) : '⚽'}</div>
+                <div className="absolute left-1/2 top-14 w-40 -translate-x-1/2 rounded-full border border-black/20 bg-black/75 px-3 py-1 text-center text-[10px] font-black text-white">{ball.label}</div>
+              </div>
+              <div className="absolute left-4 top-4 rounded-2xl border border-white/10 bg-black/50 px-3 py-2 text-xs font-black text-white">الدقيقة: <span className="text-[#FFD700]">{ar(selectedEvent?.minute ?? minute, '—')}</span></div>
+              <div className="absolute right-4 top-4 rounded-2xl border border-white/10 bg-black/50 px-3 py-2 text-xs font-black text-white">الحالة: <span className="text-[#FFD700]">{displayMatchStatus(match?.status)}</span></div>
+              <div className="absolute bottom-4 left-4 right-4 rounded-2xl border border-white/10 bg-black/60 p-3"><div className="flex items-center gap-2 text-xs font-black text-[#FFD700]"><Radio size={14} /> الحدث المحدد على الملعب</div><p className="mt-1 text-sm leading-6 text-white">{selectedEvent ? `${eventIcon(selectedEvent.type)} ${selectedEvent.minute ? `د${selectedEvent.minute} - ` : ''}${eventLabel(selectedEvent.type)}: ${cleanEventDetail(selectedEvent.detail)}` : 'اختر فلترًا به أحداث أو اضغط على أي حدث من القائمة لإظهاره على الملعب.'}</p></div>
+            </div>
+
+            <div className="mt-3 rounded-2xl border border-white/10 bg-black/35 p-3">
+              <div className="mb-2 flex items-center justify-between gap-2 text-[11px] font-black text-gray-300"><span>Timeline الأحداث 0–90</span><span className="text-[#FFD700]">{replayEvents.length ? `${ar(replayEvents.length)} حدث` : 'لا توجد أحداث في هذا الفلتر'}</span></div>
+              <div className="relative h-16 px-2">
+                <div className="absolute left-2 right-2 top-7 h-1 rounded-full bg-white/15" />
+                {[0, 15, 30, 45, 60, 75, 90].map((mark) => (
+                  <div key={mark} className="absolute top-5 h-5 w-px bg-white/20" style={{ left: `${timelineLeft(mark)}%` }} />
+                ))}
+                {replayEvents.map((event) => {
+                  const active = event.id === selectedEvent?.id;
+                  const left = timelineLeft(eventMinute(event));
+                  return (
+                    <button key={event.id} type="button" onClick={() => selectEvent(event.id)} title={`${event.minute ? `د${event.minute}` : 'حدث'} - ${eventLabel(event.type)}`} className={`absolute top-4 flex h-7 w-7 -translate-x-1/2 items-center justify-center rounded-full border text-xs transition ${active ? 'z-20 scale-110 border-[#FFD700] bg-[#FFD700] text-black shadow-[0_0_24px_rgba(255,215,0,0.45)]' : 'z-10 border-white/40 bg-black/80 text-white hover:border-[#0FF0FC] hover:bg-[#0FF0FC]/20'}`} style={{ left: `${left}%` }}>
+                      {eventIcon(event.type)}
+                    </button>
+                  );
+                })}
+                <div className="absolute bottom-0 left-2 right-2 flex justify-between text-[10px] font-black text-gray-500"><span>0</span><span>15</span><span>30</span><span>HT</span><span>60</span><span>75</span><span>90+</span></div>
+              </div>
+            </div>
           </div>
 
           <div className="rounded-3xl border border-white/10 bg-black/20 p-4">
@@ -224,8 +361,14 @@ export default function InternalAnimationPlayer({ matchId = '', dbMatchId = '' }
 
         <aside className="rounded-2xl border border-white/10 bg-black/25 p-4">
           <div className="mb-3 flex items-center justify-between gap-2"><h3 className="font-black text-white">الأحداث والحالة</h3><Goal className="text-[#FFD700]" size={22} /></div>
-          <div className="max-h-[860px] space-y-2 overflow-y-auto pr-1">{events.length ? events.map((event) => { const active = event.id === selectedEvent?.id; return (<button key={event.id} type="button" onClick={() => setSelectedEventId(event.id)} className={`block w-full rounded-xl border p-3 text-right transition ${active ? 'border-[#FFD700]/60 bg-[#FFD700]/12 shadow-[0_0_24px_rgba(255,215,0,0.10)]' : 'border-white/8 bg-white/[0.035] hover:border-[#0FF0FC]/35 hover:bg-white/[0.06]'}`}><div className="flex items-center gap-2 text-xs font-black text-[#FFD700]"><span>{eventIcon(event.type)}</span>{event.minute ? `د${event.minute}` : 'حدث'}<span className="mr-auto rounded-full border border-white/10 bg-black/25 px-2 py-0.5 text-[9px] text-gray-400">اضغط للعرض</span></div><p className="mt-1 text-sm leading-6 text-gray-200">{cleanEventDetail(event.detail)}</p></button>); }) : (<div className="rounded-xl border border-dashed border-white/10 p-6 text-center text-sm text-gray-500">لا توجد أحداث مهمة محفوظة بعد.</div>)}</div>
-          <div className="mt-3 flex items-center gap-2 rounded-xl border border-[#00FF88]/20 bg-[#00FF88]/10 px-3 py-2 text-[11px] font-bold text-[#00FF88]"><CheckCircle2 size={14} /> اضغط على أي حدث لتحريك العلامة إلى مكانه التقريبي على الملعب.</div>
+          <div className="mb-3 grid grid-cols-2 gap-2 text-[10px] font-black sm:grid-cols-3 xl:grid-cols-2">
+            {EVENT_FILTERS.map((filter) => {
+              const active = eventFilter === filter.key;
+              return <button key={filter.key} type="button" onClick={() => changeFilter(filter.key)} className={`rounded-xl border px-2 py-2 transition ${active ? 'border-[#FFD700]/60 bg-[#FFD700]/12 text-[#FFD700]' : 'border-white/10 bg-white/[0.035] text-gray-400 hover:text-white'}`}>{filter.label} · {ar(filterCounts[filter.key])}</button>;
+            })}
+          </div>
+          <div className="max-h-[860px] space-y-2 overflow-y-auto pr-1">{filteredEvents.length ? filteredEvents.map((event) => { const active = event.id === selectedEvent?.id; return (<button key={event.id} type="button" onClick={() => selectEvent(event.id)} className={`block w-full rounded-xl border p-3 text-right transition ${active ? 'border-[#FFD700]/60 bg-[#FFD700]/12 shadow-[0_0_24px_rgba(255,215,0,0.10)]' : 'border-white/8 bg-white/[0.035] hover:border-[#0FF0FC]/35 hover:bg-white/[0.06]'}`}><div className="flex items-center gap-2 text-xs font-black text-[#FFD700]"><span>{eventIcon(event.type)}</span>{event.minute ? `د${event.minute}` : 'حدث'}<span className="mr-auto rounded-full border border-white/10 bg-black/25 px-2 py-0.5 text-[9px] text-gray-400">اضغط للعرض</span></div><p className="mt-1 text-sm leading-6 text-gray-200">{cleanEventDetail(event.detail)}</p></button>); }) : (<div className="rounded-xl border border-dashed border-white/10 p-6 text-center text-sm text-gray-500">لا توجد أحداث محفوظة لهذا الفلتر.</div>)}</div>
+          <div className="mt-3 flex items-center gap-2 rounded-xl border border-[#00FF88]/20 bg-[#00FF88]/10 px-3 py-2 text-[11px] font-bold text-[#00FF88]"><CheckCircle2 size={14} /> الفلتر والـ Replay يعملان من أحداث المباراة المحفوظة فقط.</div>
         </aside>
       </div>
     </section>
