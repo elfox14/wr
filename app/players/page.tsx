@@ -37,7 +37,7 @@ type PlayerCardProps = {
   };
 };
 
-type TopScorer = {
+type TopPlayerMetric = {
   player: {
     id: string;
     name: string;
@@ -51,7 +51,7 @@ type TopScorer = {
       image: string | null;
     } | null;
   };
-  goals: number;
+  value: number;
 } | null;
 
 function firstParam(value?: string | string[]) {
@@ -70,28 +70,42 @@ function formatCount(value?: number | null, fallback = '٠') {
   return typeof value === 'number' && Number.isFinite(value) ? value.toLocaleString('ar-EG') : fallback;
 }
 
-function TopScorerCard({ topScorer }: { topScorer: TopScorer }) {
+function TopMetricCard({ metric, title, label, tone = 'gold' }: { metric: TopPlayerMetric; title: string; label: string; tone?: 'gold' | 'cyan' }) {
+  const styles = tone === 'cyan'
+    ? {
+        card: 'border-[#0FF0FC]/20 bg-[#0FF0FC]/10 shadow-[0_0_25px_rgba(15,240,252,0.08)]',
+        accent: 'text-[#0FF0FC]',
+        hover: 'hover:border-[#0FF0FC]/40',
+        empty: 'border-[#0FF0FC]/20',
+      }
+    : {
+        card: 'border-[#FFD700]/20 bg-[#FFD700]/10 shadow-[0_0_25px_rgba(255,215,0,0.08)]',
+        accent: 'text-[#FFD700]',
+        hover: 'hover:border-[#FFD700]/40',
+        empty: 'border-[#FFD700]/20',
+      };
+
   return (
-    <div className="rounded-3xl border border-[#FFD700]/20 bg-[#FFD700]/10 p-5 shadow-[0_0_25px_rgba(255,215,0,0.08)]">
-      <div className="mb-3 flex items-center gap-2 text-xs font-black uppercase tracking-[0.16em] text-[#FFD700]">
-        <Trophy size={15} /> الأكثر تهديفًا
+    <div className={`rounded-3xl border p-5 ${styles.card}`}>
+      <div className={`mb-3 flex items-center gap-2 text-xs font-black uppercase tracking-[0.16em] ${styles.accent}`}>
+        <Trophy size={15} /> {title}
       </div>
-      {topScorer?.player ? (
-        <Link href={topScorer.player.teamId ? `/teams/${topScorer.player.teamId}?player=${topScorer.player.id}` : '/players'} className="flex items-center gap-4 rounded-2xl border border-white/10 bg-black/30 p-4 transition hover:border-[#FFD700]/40 hover:bg-black/45">
+      {metric?.player ? (
+        <Link href={metric.player.teamId ? `/teams/${metric.player.teamId}?player=${metric.player.id}` : '/players'} className={`flex items-center gap-4 rounded-2xl border border-white/10 bg-black/30 p-4 transition ${styles.hover} hover:bg-black/45`}>
           <span className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-black/50">
-            {hasUsablePlayerImage(topScorer.player.image) ? <img src={topScorer.player.image as string} alt={topScorer.player.name} className="h-full w-full object-cover" loading="lazy" /> : <span className="text-lg font-black text-white/60">{topScorer.player.code || topScorer.player.name.slice(0, 2)}</span>}
+            {hasUsablePlayerImage(metric.player.image) ? <img src={metric.player.image as string} alt={metric.player.name} className="h-full w-full object-cover" loading="lazy" /> : <span className="text-lg font-black text-white/60">{metric.player.code || metric.player.name.slice(0, 2)}</span>}
           </span>
           <span className="min-w-0 flex-1">
-            <span className="block truncate text-lg font-black text-white">{topScorer.player.name}</span>
-            <span className="mt-1 block truncate text-xs font-bold text-gray-400">{topScorer.player.team?.name || 'غير متوفر'}</span>
+            <span className="block truncate text-lg font-black text-white">{metric.player.name}</span>
+            <span className="mt-1 block truncate text-xs font-bold text-gray-400">{metric.player.team?.name || 'غير متوفر'}</span>
           </span>
           <span className="text-left">
-            <span className="block text-3xl font-black text-[#FFD700]">{formatCount(topScorer.goals)}</span>
-            <span className="text-[10px] font-bold text-gray-500">هدف</span>
+            <span className={`block text-3xl font-black ${styles.accent}`}>{formatCount(metric.value)}</span>
+            <span className="text-[10px] font-bold text-gray-500">{label}</span>
           </span>
         </Link>
       ) : (
-        <div className="rounded-2xl border border-dashed border-[#FFD700]/20 bg-black/25 p-4 text-sm font-bold text-gray-400">لا توجد أهداف موثقة بعد.</div>
+        <div className={`rounded-2xl border border-dashed bg-black/25 p-4 text-sm font-bold text-gray-400 ${styles.empty}`}>لا توجد بيانات موثقة بعد.</div>
       )}
     </div>
   );
@@ -203,7 +217,7 @@ export default async function PlayersPage({ searchParams }: Props) {
   const selectedGroup = cleanParam(firstParam(resolvedSearchParams.group));
   const selectedImage = cleanParam(firstParam(resolvedSearchParams.image));
 
-  const [allPlayers, scoringPerformances] = await Promise.all([
+  const [allPlayers, performanceRows] = await Promise.all([
     prisma.asset.findMany({
       where: {
         type: 'PLAYER',
@@ -232,9 +246,10 @@ export default async function PlayersPage({ searchParams }: Props) {
       },
     }),
     prisma.playerPerformance.findMany({
-      where: { goals: { gt: 0 } },
+      where: { OR: [{ goals: { gt: 0 } }, { assists: { gt: 0 } }] },
       select: {
         goals: true,
+        assists: true,
         asset: {
           select: {
             id: true,
@@ -249,14 +264,30 @@ export default async function PlayersPage({ searchParams }: Props) {
     }),
   ]);
 
-  const scorerMap = new Map<string, { player: NonNullable<TopScorer>['player']; goals: number }>();
-  scoringPerformances.forEach((row) => {
+  const scorerMap = new Map<string, { player: NonNullable<TopPlayerMetric>['player']; value: number }>();
+  const assistMap = new Map<string, { player: NonNullable<TopPlayerMetric>['player']; value: number }>();
+
+  performanceRows.forEach((row) => {
     if (!row.asset?.id) return;
-    const current = scorerMap.get(row.asset.id) || { player: row.asset, goals: 0 };
-    current.goals += Number(row.goals || 0);
-    scorerMap.set(row.asset.id, current);
+    const goals = Number(row.goals || 0);
+    const assists = Number(row.assists || 0);
+
+    if (goals > 0) {
+      const current = scorerMap.get(row.asset.id) || { player: row.asset, value: 0 };
+      current.value += goals;
+      scorerMap.set(row.asset.id, current);
+    }
+
+    if (assists > 0) {
+      const current = assistMap.get(row.asset.id) || { player: row.asset, value: 0 };
+      current.value += assists;
+      assistMap.set(row.asset.id, current);
+    }
   });
-  const topScorer = Array.from(scorerMap.values()).sort((a, b) => b.goals - a.goals || a.player.name.localeCompare(b.player.name, 'ar'))[0] || null;
+
+  const sortMetrics = (a: NonNullable<TopPlayerMetric>, b: NonNullable<TopPlayerMetric>) => b.value - a.value || a.player.name.localeCompare(b.player.name, 'ar');
+  const topScorer = Array.from(scorerMap.values()).sort(sortMetrics)[0] || null;
+  const topAssister = Array.from(assistMap.values()).sort(sortMetrics)[0] || null;
 
   const teams = Array.from(
     new Map(
@@ -304,7 +335,7 @@ export default async function PlayersPage({ searchParams }: Props) {
         <div className="absolute -bottom-40 -left-40 h-[500px] w-[500px] rounded-full bg-blue-600/10 blur-[120px] pointer-events-none" />
         <div className="absolute inset-0 bg-[url('/noise.png')] opacity-[0.03] mix-blend-overlay pointer-events-none" />
 
-        <div className="relative z-10 flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+        <div className="relative z-10 flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
           <div className="max-w-3xl">
             <div className="inline-flex items-center gap-2 rounded-full border border-[#0FF0FC]/30 bg-[#0FF0FC]/10 px-4 py-1.5 text-xs font-black uppercase tracking-widest text-[#0FF0FC] shadow-[0_0_15px_rgba(15,240,252,0.2)]">
               <span className="relative flex h-2 w-2">
@@ -318,8 +349,9 @@ export default async function PlayersPage({ searchParams }: Props) {
             </h1>
           </div>
 
-          <div className="w-full lg:w-[360px]">
-            <TopScorerCard topScorer={topScorer} />
+          <div className="grid w-full gap-4 xl:w-[760px] md:grid-cols-2">
+            <TopMetricCard metric={topScorer} title="الأكثر تهديفًا" label="هدف" />
+            <TopMetricCard metric={topAssister} title="الأكثر صناعة للأهداف" label="أسيست" tone="cyan" />
           </div>
         </div>
       </section>
