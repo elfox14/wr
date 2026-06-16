@@ -101,33 +101,56 @@ function parseVisualStats(text: string) {
   applyPair(stats, 'homeAttacks', 'awayAttacks', find(['Attack', 'ATT', 'Attacks']));
   applyPair(stats, 'homeShots', 'awayShots', find(['Shots', 'Shot']));
   applyPair(stats, 'homePossession', 'awayPossession', find(['Possession', 'Poss']));
-  applyPair(stats, 'homeShotsOnTarget', 'awayShotsOnTarget', find(['On Target', 'On-TGT', 'On TGT']));
-  applyPair(stats, 'homeShotsOffTarget', 'awayShotsOffTarget', find(['Off Target', 'Off-TGT', 'Off TGT']));
+  applyPair(stats, 'homeShotsOnTarget', 'awayShotsOnTarget', find(['On Target', 'On-TGT', 'On TGT', 'On-TARGET']));
+  applyPair(stats, 'homeShotsOffTarget', 'awayShotsOffTarget', find(['Off Target', 'Off-TGT', 'Off TGT', 'Off-TARGET']));
   return stats;
 }
 function browserlessCode() {
   return `export default async function ({ page, context }) {
     const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+    async function clickStatsInFrame(frame) {
+      try {
+        const handles = await frame.$$('button,a,div,span,li');
+        for (const handle of handles.slice(0, 250)) {
+          try {
+            const txt = await handle.evaluate((el) => (el.textContent || '').trim());
+            if (/statistics|stats/i.test(txt)) {
+              await handle.click({ timeout: 1000 });
+              await sleep(700);
+            }
+          } catch {}
+        }
+      } catch {}
+    }
+    async function readFrame(frame, index) {
+      try {
+        return await frame.evaluate((idx) => {
+          const text = document.body ? document.body.innerText : '';
+          const html = document.documentElement ? document.documentElement.outerHTML.slice(0, 12000) : '';
+          const nodes = Array.from(document.querySelectorAll('body *')).map((el) => ({
+            tag: el.tagName,
+            text: (el.textContent || '').trim(),
+            cls: el.getAttribute('class') || '',
+            style: el.getAttribute('style') || '',
+          })).filter((x) => x.text && /statistics|stats|attack|shots|possession|on target|off target|\\d+%?/i.test(x.text)).slice(0, 180);
+          return { index: idx, url: location.href, title: document.title, text, html, nodes };
+        }, index);
+      } catch (error) {
+        return { index, url: frame.url(), title: '', text: '', html: '', nodes: [], error: String(error && error.message || error) };
+      }
+    }
     await page.setViewport({ width: 1280, height: 720, deviceScaleFactor: 1 });
     await page.goto(context.url, { waitUntil: 'networkidle2', timeout: context.timeoutMs });
     await sleep(context.waitMs || 12000);
-    await page.evaluate(async () => {
-      const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-      const candidates = Array.from(document.querySelectorAll('button,a,div,span,li')).filter((el) => /statistics|stats/i.test((el.textContent || '').trim()));
-      for (const el of candidates.slice(0, 3)) { try { el.click(); await sleep(700); } catch {} }
-    });
+    for (const frame of page.frames()) await clickStatsInFrame(frame);
+    await sleep(1800);
+    for (const frame of page.frames()) await clickStatsInFrame(frame);
     await sleep(1200);
-    const data = await page.evaluate(() => {
-      const text = document.body ? document.body.innerText : '';
-      const nodes = Array.from(document.querySelectorAll('body *')).map((el) => ({
-        tag: el.tagName,
-        text: (el.textContent || '').trim(),
-        cls: el.getAttribute('class') || '',
-        style: el.getAttribute('style') || '',
-      })).filter((x) => x.text && /attack|shots|possession|on target|off target|\\d+%?/i.test(x.text)).slice(0, 200);
-      return { title: document.title, href: location.href, text, nodes };
-    });
-    return { data, type: 'application/json' };
+    const frames = [];
+    let idx = 0;
+    for (const frame of page.frames()) frames.push(await readFrame(frame, idx++));
+    const text = frames.map((frame) => ['FRAME ' + frame.index, frame.url, frame.title, frame.text, frame.nodes.map((n) => n.text).join('\\n')].filter(Boolean).join('\\n')).join('\\n---FRAME---\\n');
+    return { data: { title: await page.title(), href: page.url(), frameCount: frames.length, text, frames }, type: 'application/json' };
   }`;
 }
 async function callBrowserless(url: string, timeoutMs: number, waitMs: number) {
@@ -161,16 +184,16 @@ export async function GET(req: Request) {
     if (String(process.env.LIVE_STATS_REMOTE_BROWSER || '').toLowerCase() !== 'browserless' || !process.env.BROWSERLESS_TOKEN) return json({ ok: false, error: 'Browserless is not configured' }, 400);
     const providerMatchId = Math.floor(rawMatchId);
     const wrapperUrl = explicitSourceUrl ? safeUrl(explicitSourceUrl) : defaultWrapperUrl(providerMatchId, url.searchParams.get('lang') || 'en', url.searchParams.get('v') || '1');
-    const timeoutMs = clamp(url.searchParams.get('timeoutMs'), 35000, 5000, 70000);
-    const waitMs = clamp(url.searchParams.get('waitMs'), 12000, 1000, 30000);
+    const timeoutMs = clamp(url.searchParams.get('timeoutMs'), 45000, 5000, 80000);
+    const waitMs = clamp(url.searchParams.get('waitMs'), 15000, 1000, 35000);
     const save = boolParam(url.searchParams.get('save'), false);
     const rendered = await callBrowserless(wrapperUrl, timeoutMs, waitMs);
     const text = String(rendered.data?.text || '');
     const stats = parseVisualStats(text);
     const reliable = hasUsefulStats(stats) && !hasUndefinedPlaceholder(text);
     const match = (save || url.searchParams.get('includeMatch') === 'true') ? await getMatch({ dbMatchId: url.searchParams.get('dbMatchId'), providerMatchId }) : null;
-    const saveResult = save ? match ? await saveSnapshot(match, providerMatchId, stats, { source: VISUAL_SOURCE, wrapperUrl, textSample: text.slice(0, 2400), nodesSample: rendered.data?.nodes?.slice?.(0, 40) || [], capturedBy: 'browserless_function_visual_stats' }, reliable) : { inserted: 0, snapshotId: null, error: 'No local match found' } : null;
-    return json({ ok: true, mode: 'isports_remote_visual_stats_pull', remoteBrowser: { ok: rendered.ok, status: rendered.status, rawLength: rendered.rawLength, error: rendered.rawSample || null }, wrapper: { sourceUrl: wrapperUrl }, hasStats: reliable, stats, validation: { hasUsefulStats: hasUsefulStats(stats), reliable, rejectedPlaceholder: hasUndefinedPlaceholder(text) }, textSample: text.slice(0, 1600), nodesPreview: rendered.data?.nodes?.slice?.(0, 20) || [], match: match ? { id: match.id, status: match.status, homeTeam: match.homeTeam, awayTeam: match.awayTeam } : null, save: saveResult, note: 'Parses the visible Statistics panel from iSports pc.html after clicking Statistics/Stats when available.' });
+    const saveResult = save ? match ? await saveSnapshot(match, providerMatchId, stats, { source: VISUAL_SOURCE, wrapperUrl, textSample: text.slice(0, 4000), framesSample: rendered.data?.frames?.map?.((frame: any) => ({ url: frame.url, title: frame.title, text: String(frame.text || '').slice(0, 1200), nodes: frame.nodes?.slice?.(0, 30) || [] })) || [], capturedBy: 'browserless_function_visual_stats_frames' }, reliable) : { inserted: 0, snapshotId: null, error: 'No local match found' } : null;
+    return json({ ok: true, mode: 'isports_remote_visual_stats_pull', remoteBrowser: { ok: rendered.ok, status: rendered.status, rawLength: rendered.rawLength, error: rendered.rawSample || null }, wrapper: { sourceUrl: wrapperUrl }, hasStats: reliable, stats, validation: { hasUsefulStats: hasUsefulStats(stats), reliable, rejectedPlaceholder: hasUndefinedPlaceholder(text), frameCount: rendered.data?.frameCount || 0 }, textSample: text.slice(0, 2200), framesPreview: rendered.data?.frames?.map?.((frame: any) => ({ url: frame.url, title: frame.title, text: String(frame.text || '').slice(0, 600), nodes: frame.nodes?.slice?.(0, 12) || [], error: frame.error || null })) || [], match: match ? { id: match.id, status: match.status, homeTeam: match.homeTeam, awayTeam: match.awayTeam } : null, save: saveResult, note: 'Parses Statistics from all frames in iSports pc.html after clicking Statistics/Stats where available.' });
   } catch (error: any) {
     return json({ ok: false, error: error?.message || 'Internal Server Error' }, 500);
   }
