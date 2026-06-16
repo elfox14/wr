@@ -136,6 +136,16 @@ function timelineType(title: string, cssClass?: string | null) {
   return 'timeline_event';
 }
 
+function arabicEventType(type: string) {
+  if (type === 'goal') return 'هدف';
+  if (type === 'corner') return 'ركنية';
+  if (type === 'yellow_card') return 'بطاقة صفراء';
+  if (type === 'red_card') return 'بطاقة حمراء';
+  if (type === 'substitution') return 'تبديل';
+  if (type === 'dangerous_attack') return 'هجمة خطيرة';
+  return 'حدث';
+}
+
 function parseMinute(title: string) {
   const injury = title.match(/injury\s*time\s+(\d{1,3})\s*\+\s*(\d{1,2})['`′]?/i);
   if (injury) {
@@ -162,6 +172,12 @@ function sideForIcon(html: string, index: number): 'home' | 'away' | null {
   return home > guest ? 'home' : 'away';
 }
 
+function teamNameForSide(side: 'home' | 'away' | null, match?: any) {
+  if (side === 'home') return match?.homeTeam?.name || 'الفريق الأول';
+  if (side === 'away') return match?.awayTeam?.name || 'الفريق الثاني';
+  return 'غير محدد';
+}
+
 function extractTimelineEvents(html: string, match?: any): TimelineEvent[] {
   const events = new Map<string, TimelineEvent>();
   const iconRegex = /<i\b([^>]*)>/gi;
@@ -174,7 +190,8 @@ function extractTimelineEvents(html: string, match?: any): TimelineEvent[] {
     const { minute, displayMinute } = parseMinute(title);
     const type = timelineType(title, cssClass);
     const teamId = side === 'home' ? match?.homeTeamId || match?.homeTeam?.id || null : side === 'away' ? match?.awayTeamId || match?.awayTeam?.id || null : null;
-    const detail = `${side ? (side === 'home' ? 'Home' : 'Away') + ' - ' : ''}${title}`;
+    const minuteLabel = displayMinute ? `د${displayMinute}` : 'دقيقة غير محددة';
+    const detail = `${teamNameForSide(side, match)} - ${minuteLabel} - ${arabicEventType(type)}`;
     const event: TimelineEvent = { side, teamId, minute, displayMinute, type, title, detail, cssClass };
     const key = `${side || 'n'}:${minute ?? 'x'}:${type}:${title}`.toLowerCase();
     events.set(key, event);
