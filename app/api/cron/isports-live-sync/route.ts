@@ -67,17 +67,18 @@ export async function GET(req: Request) {
           const timeline = await callRoute(remoteTimelinePullGET, timelineUrl, adminSecret);
           item.timelineHttpStatus = timeline.status; item.timeline = compactTimeline(timeline.result);
         }
-        if (includeLive) {
-          const liveUrl = new URL('/api/internal/live-ingest/isports/remote-visual-stats-pull', origin);
-          liveUrl.searchParams.set('matchId', String(providerMatchId)); liveUrl.searchParams.set('dbMatchId', match.id); liveUrl.searchParams.set('save', save ? 'true' : 'false'); liveUrl.searchParams.set('timeoutMs', String(timeoutMs)); liveUrl.searchParams.set('waitMs', String(waitMs));
-          const live = await callRoute(remoteVisualStatsPullGET, liveUrl, adminSecret);
-          item.liveHttpStatus = live.status; item.live = compactLive(live.result);
-        }
         if (includeFlash) {
           const flashUrl = new URL('/api/internal/live-ingest/isports/remote-flash-pull', origin);
           flashUrl.searchParams.set('matchId', String(providerMatchId)); flashUrl.searchParams.set('dbMatchId', match.id); flashUrl.searchParams.set('mode', 'timeline'); flashUrl.searchParams.set('save', save ? 'true' : 'false'); flashUrl.searchParams.set('replace', replace ? 'true' : 'false'); flashUrl.searchParams.set('timeoutMs', String(timeoutMs)); flashUrl.searchParams.set('waitMs', String(waitMs));
           const flash = await callRoute(remoteFlashPullGET, flashUrl, adminSecret);
           item.flashHttpStatus = flash.status; item.flash = compactFlash(flash.result);
+        }
+        // Visual stats run last so possession/shots/visible attack numbers become the newest snapshot when available.
+        if (includeLive) {
+          const liveUrl = new URL('/api/internal/live-ingest/isports/remote-visual-stats-pull', origin);
+          liveUrl.searchParams.set('matchId', String(providerMatchId)); liveUrl.searchParams.set('dbMatchId', match.id); liveUrl.searchParams.set('save', save ? 'true' : 'false'); liveUrl.searchParams.set('timeoutMs', String(timeoutMs)); liveUrl.searchParams.set('waitMs', String(waitMs));
+          const live = await callRoute(remoteVisualStatsPullGET, liveUrl, adminSecret);
+          item.liveHttpStatus = live.status; item.live = compactLive(live.result);
         }
         item.ok = Boolean(item.flash?.ok || item.timeline?.ok || item.live?.ok);
         item.dataMode = item.live?.hasStats ? 'visual_stats_flash_and_timeline' : item.flash?.hasStats ? 'flash_stats_and_timeline' : item.timeline?.eventsCount ? 'timeline_events_only' : 'no_reliable_data';
@@ -85,7 +86,7 @@ export async function GET(req: Request) {
       results.push(item);
     }
 
-    return json({ ok: true, mode: 'cron_isports_live_sync', save, includeFlash, includeTimeline, includeLive, processed: results.length, durationMs: Date.now() - startedAt, window: { start: start.toISOString(), end: end.toISOString() }, results, note: 'Cron-safe route. Timeline saves events, visual stats read the broadcast Statistics panel, and flash keeps event-derived attacks/corners as fallback.' });
+    return json({ ok: true, mode: 'cron_isports_live_sync', save, includeFlash, includeTimeline, includeLive, processed: results.length, durationMs: Date.now() - startedAt, window: { start: start.toISOString(), end: end.toISOString() }, results, note: 'Cron-safe route. Timeline saves events, flash saves event-derived details, and visual stats run last for possession/shots/visible attack totals.' });
   } catch (error: any) {
     return json({ ok: false, error: error?.message || 'Internal Server Error' }, 500);
   }
