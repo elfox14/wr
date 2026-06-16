@@ -53,7 +53,7 @@ export default function HomeGroupStandingsWidget() {
   const selectedGroup = groups.find((g) => g.key === selectedGroupKey);
 
   return (
-    <section className="flex h-full min-h-[30rem] flex-col rounded-3xl border border-white/10 bg-white/[0.04] p-3 text-white shadow-[0_14px_38px_rgba(0,0,0,0.2)] backdrop-blur">
+    <section className="flex h-auto flex-col rounded-3xl border border-white/10 bg-white/[0.04] p-3 text-white shadow-[0_14px_38px_rgba(0,0,0,0.2)] backdrop-blur">
       <div className="mb-3 flex items-center justify-between gap-2">
         <div>
           <p className="text-[11px] font-black uppercase tracking-[0.16em] text-[#FFD700]">Tournament Tables</p>
@@ -65,15 +65,15 @@ export default function HomeGroupStandingsWidget() {
       </div>
 
       {loading ? (
-        <div className="flex flex-1 items-center justify-center">
+        <div className="flex min-h-[12rem] items-center justify-center">
           <div className="h-6 w-6 animate-spin rounded-full border-2 border-[#0FF0FC] border-t-transparent" />
         </div>
       ) : groups.length === 0 ? (
-        <div className="flex flex-1 items-center justify-center rounded-2xl border border-white/10 bg-black/20 p-4 text-center text-xs font-bold text-gray-500">
+        <div className="flex items-center justify-center rounded-2xl border border-white/10 bg-black/20 p-4 text-center text-xs font-bold text-gray-500">
           جدول الترتيب غير متوفر حالياً.
         </div>
       ) : (
-        <div className="flex min-h-0 flex-1 flex-col">
+        <div className="flex flex-col">
           <div className="mb-3 flex gap-1.5 overflow-x-auto pb-2 scrollbar-none">
             {groups.map((group) => (
               <button
@@ -90,7 +90,7 @@ export default function HomeGroupStandingsWidget() {
             ))}
           </div>
 
-          <div className="min-h-0 flex-1 overflow-x-auto rounded-2xl border border-white/10 bg-black/20 px-2">
+          <div className="overflow-x-auto rounded-2xl border border-white/10 bg-black/20 px-2">
             <AnimatePresence mode="wait">
               {selectedGroup && (
                 <motion.table
