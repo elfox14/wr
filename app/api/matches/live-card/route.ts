@@ -21,9 +21,11 @@ const MATCH_SELECT = {
 };
 
 const LIVE_STATUSES = ['1H', '2H', 'ET', 'BT', 'P', 'LIVE', 'IN_PLAY', 'HT'];
+const SCHEDULED_STATUSES = ['SCHEDULED', 'TIMED', 'NOT_STARTED', 'NS'];
 const FINISHED_STATUSES = ['FT', 'AET', 'PEN', 'FINISHED'];
 const GROUP_STAGE_MAX_LIVE_MINUTES = 115;
 const KNOCKOUT_MAX_LIVE_MINUTES = 150;
+const FRESH_LIVE_SNAPSHOT_MS = 4 * 60 * 1000;
 const STALE_FINAL_SNAPSHOT_MS = 7 * 60 * 1000;
 const FINAL_MINUTE_FLOOR = 85;
 const FINAL_LOCAL_MINUTE_FALLBACK = 100;
@@ -46,6 +48,10 @@ function isHalftimeStatus(status: string) {
 
 function isProviderLiveStatus(status: string) {
   return LIVE_STATUSES.includes(status) || isHalftimeStatus(status);
+}
+
+function isScheduledStatus(status: string) {
+  return SCHEDULED_STATUSES.includes(status);
 }
 
 function isFinishedStatus(status: string) {
@@ -105,6 +111,12 @@ function isFinalSnapshotStale(snapshotState: any, now: Date) {
   return Boolean(minute !== null && minute >= FINAL_MINUTE_FLOOR && age !== null && age >= STALE_FINAL_SNAPSHOT_MS);
 }
 
+function isFreshLiveSnapshot(snapshotState: any, now: Date) {
+  const minute = nullableNumber(snapshotState?.minute);
+  const age = snapshotAgeMs(snapshotState, now);
+  return Boolean(minute !== null && age !== null && age <= FRESH_LIVE_SNAPSHOT_MS && !isFinalSnapshotStale(snapshotState, now));
+}
+
 async function fetchLatestScoreSnapshots(matchIds: string[]) {
   if (!matchIds.length) return new Map<string, any>();
   try {
@@ -157,37 +169,38 @@ function decorateMatch(match: any, now: Date, providerState?: any, snapshotState
   const providerHasState = Boolean(providerStatus);
   const providerHasMinute = providerState?.minute != null;
   const snapshotMinute = nullableNumber(snapshotState?.minute);
+  const freshSnapshot = isFreshLiveSnapshot(snapshotState, now);
   const staleByTime = isStaleByTime(match, localMinute);
   const staleFinalSnapshot = !providerHasState && isFinalSnapshotStale(snapshotState, now);
   const noProviderFinalFallback = !providerHasState && (dbStatus === 'IN_PLAY' || dbStatus === 'LIVE') && localMinute >= FINAL_LOCAL_MINUTE_FALLBACK;
   const isFinished = staleByTime || staleFinalSnapshot || noProviderFinalFallback || isFinishedStatus(dbStatus) || isFinishedStatus(effectiveStatus);
   const isHalfTimeFromProvider = !isFinished && isHalftimeStatus(effectiveStatus);
-  const isLocalHalftimeFallback = !isFinished && !providerHasState && dbStatus === 'SCHEDULED' && localMinute >= 46 && localMinute <= 65;
+  const isLocalHalftimeFallback = !isFinished && !providerHasState && freshSnapshot && snapshotMinute !== null && snapshotMinute >= 45 && localMinute >= 46 && localMinute <= 70;
   const isHalfTime = isHalfTimeFromProvider || isLocalHalftimeFallback;
-  const isDbLive = !isFinished && (dbStatus === 'IN_PLAY' || dbStatus === 'LIVE' || dbStatus === 'HT');
   const isProviderLive = !isFinished && isProviderLiveStatus(providerStatus);
-  const isLikelyLiveByTime = !isFinished && !providerHasState && dbStatus === 'SCHEDULED' && localMinute >= 1 && localMinute < maxLiveMinutes(match);
-  const isLiveNow = !isFinished && (isDbLive || isProviderLive || isLikelyLiveByTime);
+  const isDbLive = !isFinished && !isHalfTime && (dbStatus === 'IN_PLAY' || dbStatus === 'LIVE') && (providerHasState || freshSnapshot || localMinute < FINAL_LOCAL_MINUTE_FALLBACK);
+  const isLikelyLiveByFreshSnapshot = !isFinished && !isHalfTime && !providerHasState && isScheduledStatus(dbStatus) && freshSnapshot && localMinute >= 1 && localMinute < maxLiveMinutes(match);
+  const isLiveNow = !isFinished && !isHalfTime && (isDbLive || isProviderLive || isLikelyLiveByFreshSnapshot);
   const localSafeMinute = isLiveNow && localMinute >= 1 && localMinute < maxLiveMinutes(match) ? Math.max(1, Math.min(150, localMinute)) : null;
-  const displayMinute = isHalfTime ? null : (providerHasMinute && !staleByTime ? providerState.minute : (snapshotMinute ?? localSafeMinute));
+  const displayMinute = isHalfTime ? null : (providerHasMinute && !staleByTime ? providerState.minute : (freshSnapshot ? snapshotMinute : localSafeMinute));
   const fallbackLabel = isLiveNow && localSafeMinute && localSafeMinute > 65 ? 'الشوط الثاني جارٍ' : null;
   const providerHasScore = hasAnyNumber(providerState?.homeScore, providerState?.awayScore);
   const snapshotHasScore = hasAnyNumber(snapshotState?.homeScore, snapshotState?.awayScore);
-  const useSnapshotScore = !providerHasScore && snapshotHasScore && (isLiveNow || isFinished);
+  const useSnapshotScore = !providerHasScore && snapshotHasScore && (isLiveNow || isHalfTime || isFinished);
   const scoreSource = providerHasScore ? 'provider' : useSnapshotScore ? 'snapshot' : 'match';
 
   return {
     ...match,
-    status: isFinished ? 'FINISHED' : isHalfTime ? 'HT' : (isProviderLive ? 'IN_PLAY' : match.status),
+    status: isFinished ? 'FINISHED' : isHalfTime ? 'HT' : (isProviderLive || isLikelyLiveByFreshSnapshot ? 'IN_PLAY' : match.status),
     homeScore: pickLiveScore(providerState?.homeScore, useSnapshotScore ? snapshotState?.homeScore : null, match.homeScore),
     awayScore: pickLiveScore(providerState?.awayScore, useSnapshotScore ? snapshotState?.awayScore : null, match.awayScore),
     scoreSource,
     isLiveNow,
     isHalfTime,
-    isLikelyLiveByTime,
+    isLikelyLiveByTime: isLikelyLiveByFreshSnapshot,
     isStaleAutoFinished: isFinished && (staleByTime || staleFinalSnapshot || noProviderFinalFallback),
     displayStatus: isFinished ? 'FINISHED' : isHalfTime ? 'HT' : (isLiveNow ? 'IN_PLAY' : match.status),
-    minute: isFinished ? null : displayMinute,
+    minute: isFinished || isHalfTime ? null : displayMinute,
     liveLabel: isFinished ? 'انتهت المباراة' : isHalfTime ? 'استراحة بين الشوطين' : (isLiveNow ? (displayMinute ? `الدقيقة ${displayMinute}` : (fallbackLabel || 'جارية الآن')) : null),
   };
 }
@@ -211,11 +224,11 @@ export async function GET() {
   const [windowMatches, recentlyFinished, providerStates] = await Promise.all([
     prisma.match.findMany({
       where: {
-        status: { in: ['SCHEDULED', 'IN_PLAY', 'LIVE', 'HT'] },
+        status: { in: ['SCHEDULED', 'TIMED', 'NOT_STARTED', 'NS', 'IN_PLAY', 'LIVE', 'HT'] },
         matchDate: { gte: liveWindowStart, lte: upcomingUntil },
       },
       orderBy: { matchDate: 'asc' },
-      take: 16,
+      take: 20,
       select: MATCH_SELECT,
     }),
     prisma.match.findMany({
@@ -232,27 +245,30 @@ export async function GET() {
   const decoratedWindow = windowMatches.map((match) => decorateMatch(match, now, match.animationMatchId ? providerStates.get(Number(match.animationMatchId)) : null, scoreSnapshots.get(match.id)));
   const decoratedFinished = recentlyFinished.map((match) => decorateMatch(match, now, match.animationMatchId ? providerStates.get(Number(match.animationMatchId)) : null, scoreSnapshots.get(match.id)));
 
-  const live = decoratedWindow.filter((match) => match.isLiveNow);
-  const upcoming = decoratedWindow.filter((match) => !match.isLiveNow && match.status === 'SCHEDULED' && new Date(match.matchDate).getTime() > now.getTime());
-  const other = decoratedWindow.filter((match) => !live.includes(match) && !upcoming.includes(match));
+  const live = decoratedWindow.filter((match) => match.isLiveNow || match.isHalfTime);
+  const waitingForStart = decoratedWindow.filter((match) => !match.isLiveNow && !match.isHalfTime && SCHEDULED_STATUSES.includes(String(match.status || '').toUpperCase()) && new Date(match.matchDate).getTime() <= now.getTime());
+  const upcoming = decoratedWindow.filter((match) => !match.isLiveNow && !match.isHalfTime && SCHEDULED_STATUSES.includes(String(match.status || '').toUpperCase()) && new Date(match.matchDate).getTime() > now.getTime());
+  const other = decoratedWindow.filter((match) => !live.includes(match) && !waitingForStart.includes(match) && !upcoming.includes(match));
 
-  const primaryLive = live[0] ? [live[0]] : [];
-  const nextAfterLive = upcoming.filter((match) => !primaryLive.some((liveMatch) => liveMatch.id === match.id))[0];
-  const fallbackSecond = [...decoratedFinished, ...other].filter((match) => !primaryLive.some((liveMatch) => liveMatch.id === match.id))[0];
-  const matches = uniqueById([...primaryLive, ...(nextAfterLive ? [nextAfterLive] : []), ...(primaryLive.length === 0 ? upcoming.slice(0, 2) : []), ...(nextAfterLive ? [] : fallbackSecond ? [fallbackSecond] : [])]).slice(0, 2);
+  const primary = live[0] || waitingForStart[0] || upcoming[0] || decoratedFinished[0] || other[0];
+  const nextTwo = upcoming.filter((match) => !primary || match.id !== primary.id).slice(0, 2);
+  const filler = [...decoratedFinished, ...other].filter((match) => !primary || match.id !== primary.id).filter((match) => !nextTwo.some((next) => next.id === match.id));
+  const matches = uniqueById([...(primary ? [primary] : []), ...nextTwo, ...filler]).slice(0, 3);
 
   return NextResponse.json({
     matches,
     meta: {
       liveCount: live.length,
+      waitingForStartCount: waitingForStart.length,
       upcomingCount: upcoming.length,
       recentlyFinishedCount: decoratedFinished.length,
       recentFinishedWindowHours: 6,
-      liveDetection: 'provider_or_fresh_snapshot_then_safe_time_window',
+      liveDetection: 'provider_or_fresh_snapshot_no_time_only_start',
+      freshLiveSnapshotMinutes: FRESH_LIVE_SNAPSHOT_MS / 60_000,
+      staleFinalSnapshotMinutes: STALE_FINAL_SNAPSHOT_MS / 60_000,
       groupStageMaxLiveMinutes: GROUP_STAGE_MAX_LIVE_MINUTES,
       knockoutMaxLiveMinutes: KNOCKOUT_MAX_LIVE_MINUTES,
-      staleFinalSnapshotMinutes: STALE_FINAL_SNAPSHOT_MS / 60_000,
-      selectionMode: 'one_live_plus_one_next',
+      selectionMode: 'primary_focus_plus_next_two',
       updatedEverySeconds: 15,
     },
     updatedAt: now.toISOString(),
