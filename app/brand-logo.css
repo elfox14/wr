@@ -1,8 +1,9 @@
-/* Brand logo override: replace any old MC PRIME icon references with the current World Cup 2026 platform logo. */
+/* Brand logo override: replace any old MC PRIME / World Cup icon references with the current Borsa El Mondial sports logo. */
 img[src*="/brand/logo-horizontal.png"],
 img[src*="/brand/logo-icon.png"],
 img[src*="/brand/logo-icon-new.svg"],
-img[src*="/brand/worldcup-2026-logo.svg"] {
-  content: url('/brand/worldcup-2026-logo-upload.svg?v=20260615a') !important;
+img[src*="/brand/worldcup-2026-logo.svg"],
+img[src*="/brand/worldcup-2026-logo-upload.svg"] {
+  content: url('/brand/borsa-mondial-sport-logo-icon.svg?v=20260616sport') !important;
   object-fit: contain !important;
 }
