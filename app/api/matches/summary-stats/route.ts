@@ -5,18 +5,22 @@ import { dedupePlayers } from '@/lib/playerDedupe';
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
+function normalizeStatus(status?: string | null) {
+  return String(status || '').toUpperCase();
+}
+
 function isLiveStatus(status?: string | null) {
-  const value = String(status || '').toUpperCase();
-  return value === 'IN_PLAY' || value === 'LIVE' || value === 'HT';
+  const value = normalizeStatus(status);
+  return value === 'IN_PLAY' || value === 'LIVE' || value === 'HT' || value === '1H' || value === '2H';
 }
 
 function isFinishedStatus(status?: string | null) {
-  const value = String(status || '').toUpperCase();
+  const value = normalizeStatus(status);
   return value === 'FINISHED' || value === 'FT' || value === 'AET' || value === 'PEN';
 }
 
 function isScheduledStatus(status?: string | null) {
-  const value = String(status || '').toUpperCase();
+  const value = normalizeStatus(status);
   return value === 'SCHEDULED' || value === 'TIMED' || value === 'NOT_STARTED' || value === 'NS';
 }
 
@@ -159,6 +163,71 @@ function bestPenaltyTotalsFromSnapshots(snapshots: any[]) {
   return { total: 0, scored: 0, missed: 0, unknown: 0, source: 'no_penalty_data', capturedAt: snapshots[0]?.capturedAt || null };
 }
 
+function latestFinalStatsFromSnapshots(snapshots: any[]) {
+  for (const snapshot of snapshots) {
+    const stats = {
+      shots: safeNumber(snapshot.homeShots) + safeNumber(snapshot.awayShots),
+      shotsOnTarget: safeNumber(snapshot.homeShotsOnTarget) + safeNumber(snapshot.awayShotsOnTarget),
+      corners: safeNumber(snapshot.homeCorners) + safeNumber(snapshot.awayCorners),
+      attacks: safeNumber(snapshot.homeAttacks) + safeNumber(snapshot.awayAttacks),
+      dangerousAttacks: safeNumber(snapshot.homeDangerousAttacks) + safeNumber(snapshot.awayDangerousAttacks),
+      possessionSamples: [nullableNumber(snapshot.homePossession), nullableNumber(snapshot.awayPossession)].filter((value) => value !== null) as number[],
+    };
+    const hasData = stats.shots > 0 || stats.shotsOnTarget > 0 || stats.corners > 0 || stats.attacks > 0 || stats.dangerousAttacks > 0 || stats.possessionSamples.length > 0;
+    if (hasData) return { ...stats, hasData: true, capturedAt: snapshot.capturedAt };
+  }
+  return { shots: 0, shotsOnTarget: 0, corners: 0, attacks: 0, dangerousAttacks: 0, possessionSamples: [] as number[], hasData: false, capturedAt: snapshots[0]?.capturedAt || null };
+}
+
+type TeamAggregate = {
+  id: string;
+  name: string;
+  code: string;
+  played: number;
+  wins: number;
+  draws: number;
+  losses: number;
+  goalsFor: number;
+  goalsAgainst: number;
+  cleanSheets: number;
+};
+
+function getTeamAggregate(map: Map<string, TeamAggregate>, team: any) {
+  const id = String(team?.id || team?.code || team?.name || 'unknown');
+  const existing = map.get(id);
+  if (existing) return existing;
+  const created: TeamAggregate = {
+    id,
+    name: team?.name || team?.code || 'غير متوفر',
+    code: team?.code || '',
+    played: 0,
+    wins: 0,
+    draws: 0,
+    losses: 0,
+    goalsFor: 0,
+    goalsAgainst: 0,
+    cleanSheets: 0,
+  };
+  map.set(id, created);
+  return created;
+}
+
+function applyResult(team: TeamAggregate, goalsFor: number, goalsAgainst: number) {
+  team.played += 1;
+  team.goalsFor += goalsFor;
+  team.goalsAgainst += goalsAgainst;
+  if (goalsAgainst === 0) team.cleanSheets += 1;
+  if (goalsFor > goalsAgainst) team.wins += 1;
+  else if (goalsFor === goalsAgainst) team.draws += 1;
+  else team.losses += 1;
+}
+
+function pickTopTeam(teams: TeamAggregate[], primary: keyof TeamAggregate, secondary: keyof TeamAggregate = 'played') {
+  return [...teams]
+    .filter((team) => team.played > 0)
+    .sort((a, b) => Number(b[primary]) - Number(a[primary]) || Number(b[secondary]) - Number(a[secondary]) || a.name.localeCompare(b.name))[0] || null;
+}
+
 export async function GET() {
   try {
     const [matches, yellowEventCount, redEventCount, snapshotsCount, rawPlayers, teamCount, matchEvents] = await Promise.all([
@@ -169,13 +238,26 @@ export async function GET() {
           homeScore: true,
           awayScore: true,
           matchDate: true,
-          homeTeam: { select: { name: true, code: true } },
-          awayTeam: { select: { name: true, code: true } },
+          homeTeam: { select: { id: true, name: true, code: true } },
+          awayTeam: { select: { id: true, name: true, code: true } },
           statsSnapshots: {
             orderBy: { capturedAt: 'desc' },
             take: 10,
             select: {
               provider: true,
+              minute: true,
+              homePossession: true,
+              awayPossession: true,
+              homeAttacks: true,
+              awayAttacks: true,
+              homeDangerousAttacks: true,
+              awayDangerousAttacks: true,
+              homeShots: true,
+              awayShots: true,
+              homeShotsOnTarget: true,
+              awayShotsOnTarget: true,
+              homeCorners: true,
+              awayCorners: true,
               homeYellowCards: true,
               awayYellowCards: true,
               homeRedCards: true,
@@ -227,6 +309,7 @@ export async function GET() {
     let liveMatches = 0;
     let scheduledMatches = 0;
     let totalGoals = 0;
+    let liveGoals = 0;
     let snapshotYellowCards = 0;
     let snapshotRedCards = 0;
     let rawPenaltyTotal = 0;
@@ -235,10 +318,20 @@ export async function GET() {
     let rawPenaltyUnknown = 0;
     let matchesWithCardSnapshots = 0;
     let matchesWithPenaltySnapshots = 0;
+    let matchesWithFinalSnapshots = 0;
+    let totalShots = 0;
+    let totalShotsOnTarget = 0;
+    let totalCorners = 0;
+    let totalAttacks = 0;
+    let totalDangerousAttacks = 0;
+    let possessionSampleTotal = 0;
+    let possessionSampleCount = 0;
     let latestCardsUpdatedAt: string | null = null;
     let latestPenaltyUpdatedAt: string | null = null;
+    let latestFinalStatsUpdatedAt: string | null = null;
     let cardRawBookingsMatches = 0;
     let cardSnapshotStatsMatches = 0;
+    const teamAggregates = new Map<string, TeamAggregate>();
     let biggestScore: null | {
       matchId: string;
       homeTeam: { name: string; code: string };
@@ -258,12 +351,17 @@ export async function GET() {
       if (live) liveMatches += 1;
       if (isScheduledStatus(match.status)) scheduledMatches += 1;
 
-      if (finished || live) {
-        const homeScore = safeNumber(match.homeScore);
-        const awayScore = safeNumber(match.awayScore);
-        const matchGoals = homeScore + awayScore;
-        const goalDifference = Math.abs(homeScore - awayScore);
+      const homeScore = safeNumber(match.homeScore);
+      const awayScore = safeNumber(match.awayScore);
+      const matchGoals = homeScore + awayScore;
+      const goalDifference = Math.abs(homeScore - awayScore);
+
+      if (finished) {
         totalGoals += matchGoals;
+        const homeAgg = getTeamAggregate(teamAggregates, match.homeTeam);
+        const awayAgg = getTeamAggregate(teamAggregates, match.awayTeam);
+        applyResult(homeAgg, homeScore, awayScore);
+        applyResult(awayAgg, awayScore, homeScore);
 
         if (matchGoals > 0 && (!biggestScore || matchGoals > biggestScore.totalGoals || (matchGoals === biggestScore.totalGoals && goalDifference > biggestScore.goalDifference))) {
           biggestScore = {
@@ -277,7 +375,23 @@ export async function GET() {
             matchDate: match.matchDate instanceof Date ? match.matchDate.toISOString() : String(match.matchDate || ''),
           };
         }
+      } else if (live) {
+        liveGoals += matchGoals;
       }
+
+      const finalStats = latestFinalStatsFromSnapshots(match.statsSnapshots);
+      if (finalStats.hasData) {
+        matchesWithFinalSnapshots += 1;
+        totalShots += finalStats.shots;
+        totalShotsOnTarget += finalStats.shotsOnTarget;
+        totalCorners += finalStats.corners;
+        totalAttacks += finalStats.attacks;
+        totalDangerousAttacks += finalStats.dangerousAttacks;
+        possessionSampleTotal += finalStats.possessionSamples.reduce((sum, value) => sum + value, 0);
+        possessionSampleCount += finalStats.possessionSamples.length;
+      }
+      const finalStatsCapturedAt = finalStats.capturedAt instanceof Date ? finalStats.capturedAt.toISOString() : String(finalStats.capturedAt || '');
+      if (finalStatsCapturedAt && (!latestFinalStatsUpdatedAt || finalStatsCapturedAt > latestFinalStatsUpdatedAt)) latestFinalStatsUpdatedAt = finalStatsCapturedAt;
 
       const cardTotals = bestCardTotalsFromSnapshots(match.statsSnapshots);
       snapshotYellowCards += cardTotals.yellow;
@@ -300,7 +414,6 @@ export async function GET() {
 
     const yellowCards = Math.max(snapshotYellowCards, yellowEventCount);
     const redCards = Math.max(snapshotRedCards, redEventCount);
-
     const penaltyEvents = matchEvents.filter((event) => isPenaltyEvent(event.type, event.detail));
     const eventPenaltiesScored = penaltyEvents.filter((event) => isPenaltyScored(event.type, event.detail)).length;
     const eventPenaltiesMissed = penaltyEvents.filter((event) => isPenaltyMissed(event.type, event.detail)).length;
@@ -315,6 +428,15 @@ export async function GET() {
       .filter(Boolean)
       .sort()
       .pop() || null;
+
+    const teamRows = Array.from(teamAggregates.values());
+    const topScoringTeam = pickTopTeam(teamRows, 'goalsFor', 'played');
+    const mostConcedingTeam = pickTopTeam(teamRows, 'goalsAgainst', 'played');
+    const bestCleanSheetTeam = pickTopTeam(teamRows, 'cleanSheets', 'played');
+    const cleanSheets = teamRows.reduce((sum, team) => sum + team.cleanSheets, 0);
+    const averageGoalsPerFinishedMatch = finishedMatches > 0 ? Number((totalGoals / finishedMatches).toFixed(2)) : null;
+    const averageShotsPerFinishedMatch = finishedMatches > 0 && totalShots > 0 ? Number((totalShots / finishedMatches).toFixed(1)) : null;
+    const averagePossessionSample = possessionSampleCount > 0 ? Number((possessionSampleTotal / possessionSampleCount).toFixed(1)) : null;
 
     return NextResponse.json({
       ok: true,
@@ -331,6 +453,8 @@ export async function GET() {
       estimatedFinalSquadCapacity,
       overEstimatedCapacityBy: Math.max(0, playerCount - estimatedFinalSquadCapacity),
       totalGoals,
+      liveGoals,
+      averageGoalsPerFinishedMatch,
       yellowCards,
       redCards,
       penalties: {
@@ -342,6 +466,22 @@ export async function GET() {
         source: useRawPenalties ? 'MatchStatsSnapshot.rawData' : 'MatchEvent fallback',
       },
       biggestScore,
+      teamLeaders: {
+        topScoringTeam,
+        mostConcedingTeam,
+        bestCleanSheetTeam,
+      },
+      cleanSheets,
+      finalStats: {
+        matchesWithFinalSnapshots,
+        totalShots,
+        totalShotsOnTarget,
+        totalCorners,
+        totalAttacks,
+        totalDangerousAttacks,
+        averageShotsPerFinishedMatch,
+        averagePossessionSample,
+      },
       snapshotsCount,
       cardsSource: {
         yellow: snapshotYellowCards >= yellowEventCount ? 'MatchStatsSnapshot/rawData' : 'MatchEvent fallback',
@@ -367,8 +507,9 @@ export async function GET() {
       matchesWithCardSnapshots,
       latestCardsUpdatedAt,
       latestPenaltyUpdatedAt,
+      latestFinalStatsUpdatedAt,
       latestEventUpdatedAt,
-      latestUpdatedAt: maxIsoDate(latestCardsUpdatedAt, latestPenaltyUpdatedAt, latestEventUpdatedAt),
+      latestUpdatedAt: maxIsoDate(latestCardsUpdatedAt, latestPenaltyUpdatedAt, latestFinalStatsUpdatedAt, latestEventUpdatedAt),
     }, { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } });
   } catch (error: any) {
     console.error('summary-stats endpoint error:', error);
