@@ -149,6 +149,8 @@ const ARABIC_NAME_TO_ISO2: Record<string, string> = {
   'ويلز': 'GB-WLS',
 };
 
+const FLAGCDN_WIDTHS = [20, 40, 80, 160, 320, 640] as const;
+
 function normalizeName(value?: string | null) {
   return String(value || '')
     .trim()
@@ -166,6 +168,12 @@ function usableImageUrl(value?: string | null) {
   if (!image) return null;
   if (image.startsWith('/') || image.startsWith('https://') || image.startsWith('http://')) return image;
   return null;
+}
+
+function normalizeFlagCdnWidth(width = 80) {
+  const requested = Number(width);
+  if (!Number.isFinite(requested) || requested <= 0) return 80;
+  return FLAGCDN_WIDTHS.find((candidate) => candidate >= requested) || 640;
 }
 
 export function iso2ToFlag(iso2?: string | null) {
@@ -199,7 +207,7 @@ export function getTeamFlagUrl(team: TeamIdentity, width = 80) {
 
   const code = getTeamFlagCode(team);
   if (!code) return null;
-  return `https://flagcdn.com/w${width}/${code.toLowerCase()}.png`;
+  return `https://flagcdn.com/w${normalizeFlagCdnWidth(width)}/${code.toLowerCase()}.png`;
 }
 
 export function getTeamFlag(team: TeamIdentity) {
