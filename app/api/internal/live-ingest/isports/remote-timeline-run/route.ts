@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/adminAuth';
 import prisma from '@/lib/prisma';
+import { GET as remoteFramePullGET } from '@/app/api/internal/live-ingest/isports/remote-frame-pull/route';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -39,6 +40,17 @@ function adminSecretFromRequest(req: Request) {
   return process.env.ADMIN_API_SECRET || req.headers.get('x-admin-secret') || bearer || url.searchParams.get('adminSecret') || '';
 }
 
+function requestOrigin(req: Request) {
+  const fallback = new URL(req.url).origin;
+  const configured = process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_SITE_URL || process.env.PUBLIC_SITE_URL;
+  if (configured) {
+    try { return new URL(configured).origin; } catch {}
+  }
+  const host = req.headers.get('x-forwarded-host') || req.headers.get('host');
+  const proto = req.headers.get('x-forwarded-proto') || (fallback.startsWith('https:') ? 'https' : 'http');
+  return host ? `${proto}://${host}` : fallback;
+}
+
 function compactPullResult(result: any) {
   return {
     ok: Boolean(result?.ok),
@@ -68,11 +80,13 @@ async function callRemoteFramePull(origin: string, adminSecret: string, input: {
   url.searchParams.set('save', input.save ? 'true' : 'false');
   url.searchParams.set('replace', input.replace ? 'true' : 'false');
 
-  const response = await fetch(url.toString(), {
+  // Important: do not make an HTTP request back to this same Next.js server.
+  // On some hosts that self-fetch fails quickly with "fetch failed". Calling the route handler
+  // directly keeps the batch runner inside the same process and still reuses the tested logic.
+  const response = await remoteFramePullGET(new Request(url.toString(), {
     method: 'GET',
-    cache: 'no-store',
     headers: adminSecret ? { 'x-admin-secret': adminSecret } : {},
-  });
+  }));
   const text = await response.text();
   let parsed: any = null;
   try { parsed = JSON.parse(text); } catch {}
@@ -113,12 +127,13 @@ export async function GET(req: Request) {
     });
 
     const adminSecret = adminSecretFromRequest(req);
+    const origin = requestOrigin(req);
     const results: any[] = [];
     for (const match of matches) {
       const providerMatchId = Number(match.animationMatchId);
       if (!Number.isFinite(providerMatchId) || providerMatchId <= 0) continue;
       try {
-        const pull = await callRemoteFramePull(url.origin, adminSecret, {
+        const pull = await callRemoteFramePull(origin, adminSecret, {
           providerMatchId,
           dbMatchId: match.id,
           timeoutMs,
@@ -151,6 +166,7 @@ export async function GET(req: Request) {
     return json({
       ok: true,
       mode: 'isports_remote_timeline_run',
+      runner: 'direct_route_handler',
       save,
       replace,
       take,
