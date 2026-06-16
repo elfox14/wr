@@ -310,15 +310,35 @@ function isNumberToken(value?: string | null) {
   return /^-?\d{1,4}%?$/.test(String(value || '').trim());
 }
 
+function isStatSearchBlocker(value?: string | null) {
+  const line = String(value || '').trim().toLowerCase();
+  if (!line) return false;
+  return line === 'undefined'
+    || line === 'no data'
+    || line === 'vs'
+    || line === 'ended'
+    || line === 'kick-off'
+    || line === 'statistics'
+    || line === 'days'
+    || line === 'hrs'
+    || line === 'hours'
+    || line === 'mins'
+    || line === 'secs'
+    || line === 'possession'
+    || line.includes('upgrade your plan');
+}
+
 function findNumberBefore(lines: string[], index: number) {
-  for (let i = index - 1; i >= Math.max(0, index - 12); i -= 1) {
+  for (let i = index - 1; i >= Math.max(0, index - 4); i -= 1) {
+    if (isStatSearchBlocker(lines[i])) break;
     if (isNumberToken(lines[i])) return numberFrom(lines[i]);
   }
   return null;
 }
 
 function findNumberAfter(lines: string[], index: number) {
-  for (let i = index + 1; i <= Math.min(lines.length - 1, index + 12); i += 1) {
+  for (let i = index + 1; i <= Math.min(lines.length - 1, index + 4); i += 1) {
+    if (isStatSearchBlocker(lines[i])) break;
     if (isNumberToken(lines[i])) return numberFrom(lines[i]);
   }
   return null;
@@ -335,6 +355,7 @@ function findStatPair(text: string, labels: string[]) {
   for (const label of labels) {
     const idx = lines.findIndex((line) => line.toLowerCase() === label.toLowerCase());
     if (idx >= 0) {
+      if (isStatSearchBlocker(lines[idx - 1]) || isStatSearchBlocker(lines[idx + 1])) return null;
       const home = findNumberBefore(lines, idx);
       const away = findNumberAfter(lines, idx);
       if (home !== null || away !== null) return { home, away };
@@ -373,7 +394,7 @@ export function parseISportsVisibleStats(text: string, match?: any): NormalizedS
   const dangerousAttacks = findStatPair(text, ['D-ATT', 'D ATT', 'Dangerous Attack', 'Dangerous Attacks']);
   const shots = findStatPair(text, ['Shots', 'Shot']);
   const onTarget = findStatPair(text, ['On-TGT', 'On TGT', 'On Target', 'Shots on Target']);
-  const offTarget = findStatPair(text, ['Off-TGT', 'Off TGT', 'Off Target', 'Shots off Target']);
+  const offTarget = findStatPair(text, ['Off-TGT', 'Off TGT', 'Off Target']);
   const corners = findStatPair(text, ['Corner', 'Corners', 'CK']);
   const yellow = findStatPair(text, ['Yellow', 'Yellow Cards']);
   const red = findStatPair(text, ['Red', 'Red Cards']);
@@ -428,231 +449,53 @@ export async function savePageStatsSnapshot(match: any, providerMatchId: number,
     stats.awayRedCards,
     stats.homeScore,
     stats.awayScore,
-    JSON.stringify(rawData || null),
+    JSON.stringify(rawData || null)
   );
   return id;
 }
 
-function jsonField(snippet: string, keys: string[]) {
-  for (const key of keys) {
-    const escaped = escapeRegExp(key);
-    const match = snippet.match(new RegExp(`["']${escaped}["']\\s*:\\s*["']([^"']{2,80})["']`, 'i'))
-      || snippet.match(new RegExp(`${escaped}\\s*=\\s*["']([^"']{2,80})["']`, 'i'));
-    if (match?.[1]) return decodeEntities(match[1]).trim();
+export async function scrapeISportsMatchPage(input: { sourceUrl?: string | null; providerMatchId: number; match?: any; save?: boolean }) {
+  const sourceUrl = safeUrl(input.sourceUrl || canonicalISportsSourceUrl(input.providerMatchId));
+  const loaded = await loadRenderedPage(sourceUrl);
+  const stats = parseISportsVisibleStats(loaded.text, input.match);
+  const hasStats = hasUsefulStats(stats);
+  let snapshotId: string | null = null;
+  if (input.save && hasStats && input.match) {
+    snapshotId = await savePageStatsSnapshot(input.match, input.providerMatchId, stats, { sourceUrl, loader: loaded.loader, rendered: loaded.rendered, textSample: loaded.text.slice(0, 2000) });
   }
-  return null;
+  await updateExternalMatchSourceStatus(input.providerMatchId, hasStats ? 'active' : 'no_stats', loaded.error || null).catch(() => null);
+  return { ...loaded, sourceUrl, stats, hasStats, snapshotId };
 }
 
-function dateField(snippet: string) {
-  return jsonField(snippet, ['matchTime', 'match_time', 'kickoffTime', 'startTime', 'date', 'time']);
+function normalizeComparable(value?: string | null) {
+  return normalizeName(String(value || '').replace(/\b(fc|cf|sc|national|team)\b/gi, '').trim());
 }
 
-function extractCandidateFromSnippet(providerMatchId: number, snippet: string, label?: string | null): DiscoveredISportsMatch {
-  return {
-    providerMatchId,
-    sourceUrl: canonicalISportsSourceUrl(providerMatchId),
-    label: cleanNullable(label || htmlToText(snippet).slice(0, 500)),
-    homeName: cleanNullable(jsonField(snippet, ['homeName', 'home_name', 'homeTeamName', 'home_team_name'])),
-    awayName: cleanNullable(jsonField(snippet, ['awayName', 'away_name', 'awayTeamName', 'away_team_name'])),
-    date: cleanNullable(dateField(snippet)),
-    status: cleanNullable(jsonField(snippet, ['status', 'statusCode', 'status_code', 'matchStatus', 'match_status'])),
-  };
-}
-
-export function extractISportsHomepageCandidates(html: string): DiscoveredISportsMatch[] {
-  const candidates = new Map<number, DiscoveredISportsMatch>();
-  const linkRegex = /<a\b[^>]*href=["']([^"']*matchId=\d+[^"']*)["'][^>]*>([\s\S]*?)<\/a>/gi;
-  for (const match of html.matchAll(linkRegex)) {
-    const providerMatchId = extractISportsMatchId(match[1]);
-    if (!providerMatchId) continue;
-    const label = htmlToText(match[2] || '');
-    candidates.set(providerMatchId, extractCandidateFromSnippet(providerMatchId, match[0], label));
-  }
-
-  const idRegex = /matchId["'\s:=?&]+(\d{6,})/gi;
-  for (const match of html.matchAll(idRegex)) {
-    const providerMatchId = Number(match[1]);
-    if (!Number.isFinite(providerMatchId) || candidates.has(providerMatchId)) continue;
-    const index = match.index || 0;
-    const snippet = html.slice(Math.max(0, index - 900), Math.min(html.length, index + 1400));
-    candidates.set(providerMatchId, extractCandidateFromSnippet(providerMatchId, snippet));
-  }
-
-  return [...candidates.values()].sort((a, b) => a.providerMatchId - b.providerMatchId);
-}
-
-function normalizeTeamName(value?: string | null) {
-  const base = normalizeName(value || '')
-    .replace(/\bfootball club\b|\bnational team\b|\bfc\b|\bu\d{2}\b|\bwomen\b/g, ' ')
-    .replace(/\bkorea republic\b/g, 'south korea')
-    .replace(/\bczech republic\b/g, 'czechia')
-    .replace(/\bunited states of america\b|\busa\b/g, 'united states')
-    .replace(/\bir iran\b/g, 'iran')
-    .replace(/\s+/g, ' ')
-    .trim();
-  return base;
-}
-
-function tokenSet(value?: string | null) {
-  return new Set(normalizeTeamName(value).split(' ').filter((token) => token.length >= 2));
-}
-
-function nameScore(a?: string | null, b?: string | null) {
-  const left = normalizeTeamName(a);
-  const right = normalizeTeamName(b);
-  if (!left || !right) return 0;
-  if (left === right) return 100;
-  if (left.includes(right) || right.includes(left)) return 86;
-  const aTokens = tokenSet(left);
-  const bTokens = tokenSet(right);
-  const union = new Set([...aTokens, ...bTokens]).size || 1;
-  let hits = 0;
-  aTokens.forEach((token) => { if (bTokens.has(token)) hits += 1; });
-  return Math.round((hits / union) * 82);
-}
-
-function scoreByLabel(localMatch: any, label?: string | null) {
-  if (!label) return 0;
-  const normalized = normalizeTeamName(label);
-  const home = normalizeTeamName(localMatch.homeTeam?.name);
-  const away = normalizeTeamName(localMatch.awayTeam?.name);
+function confidenceScore(candidate: DiscoveredISportsMatch, match: any) {
+  const haystack = normalizeComparable(`${candidate.label || ''} ${candidate.homeName || ''} ${candidate.awayName || ''}`);
+  const home = normalizeComparable(match.homeTeam?.name || '');
+  const away = normalizeComparable(match.awayTeam?.name || '');
   let score = 0;
-  if (home && normalized.includes(home)) score += 90;
-  if (away && normalized.includes(away)) score += 90;
+  if (candidate.providerMatchId === Number(match.animationMatchId)) score += 120;
+  if (home && haystack.includes(home)) score += 50;
+  if (away && haystack.includes(away)) score += 50;
   return score;
 }
 
-function dateFromCandidate(candidate: DiscoveredISportsMatch) {
-  if (!candidate.date) return null;
-  const numeric = Number(candidate.date);
-  const normalized = Number.isFinite(numeric) && numeric > 100000 ? (numeric < 10000000000 ? numeric * 1000 : numeric) : candidate.date;
-  const date = new Date(normalized);
-  return Number.isFinite(date.getTime()) ? date : null;
-}
-
-function timeScore(localDate: Date, providerDate: Date | null) {
-  if (!providerDate) return 8;
-  const diffHours = Math.abs(localDate.getTime() - providerDate.getTime()) / 36e5;
-  if (diffHours <= 2) return 24;
-  if (diffHours <= 8) return 14;
-  if (diffHours <= 24) return 5;
-  return -25;
-}
-
-export function scoreDiscoveryCandidate(localMatch: any, candidate: DiscoveredISportsMatch) {
-  const direct = nameScore(localMatch.homeTeam?.name, candidate.homeName) + nameScore(localMatch.awayTeam?.name, candidate.awayName);
-  const swapped = nameScore(localMatch.homeTeam?.name, candidate.awayName) + nameScore(localMatch.awayTeam?.name, candidate.homeName);
-  const labelScore = scoreByLabel(localMatch, candidate.label);
-  const teamScore = Math.max(direct, swapped, labelScore);
-  const orientation = teamScore === swapped ? 'swapped' : teamScore === labelScore ? 'label' : 'direct';
-  const providerDate = dateFromCandidate(candidate);
-  const finalScore = teamScore + timeScore(new Date(localMatch.matchDate), providerDate);
-  return { finalScore, teamScore, orientation, providerDate };
-}
-
-export async function getLocalMatchesForDate(dateParam?: string | null) {
-  const base = dateParam ? new Date(`${dateParam}T00:00:00.000Z`) : new Date();
-  const start = new Date(base);
-  start.setHours(0, 0, 0, 0);
-  const end = new Date(start);
-  end.setDate(end.getDate() + 1);
-  const matches = await prisma.match.findMany({
-    where: { matchDate: { gte: start, lt: end } },
-    orderBy: { matchDate: 'asc' },
-    include: { homeTeam: { select: { id: true, name: true, code: true } }, awayTeam: { select: { id: true, name: true, code: true } } },
-  });
-  return { dateKey: start.toISOString().slice(0, 10), start, end, matches };
-}
-
-export async function discoverISportsHomepage(dateParam?: string | null, options: { dryRun?: boolean; threshold?: number; saveUnlinked?: boolean } = {}) {
-  const started = Date.now();
-  await ensureLiveIngestTables();
-  const page = await loadRenderedPage(HOME_URL);
-  const candidates = extractISportsHomepageCandidates(page.html);
-  const { dateKey, matches } = await getLocalMatchesForDate(dateParam);
-  const threshold = Number.isFinite(options.threshold) ? Number(options.threshold) : 140;
-  const dryRun = options.dryRun !== false;
-
-  const results: any[] = [];
-  for (const candidate of candidates) {
-    const ranked = matches
-      .map((match) => ({ match, score: scoreDiscoveryCandidate(match, candidate) }))
-      .sort((a, b) => b.score.finalScore - a.score.finalScore);
-    const best = ranked[0] || null;
-    const canLink = Boolean(best && best.score.finalScore >= threshold);
-    let source = null;
-
-    if (!dryRun && (canLink || options.saveUnlinked)) {
-      if (canLink && best?.match) {
-        await prisma.match.update({ where: { id: best.match.id }, data: { animationMatchId: candidate.providerMatchId } });
-      }
-      source = await upsertExternalMatchSource({
-        matchId: canLink ? best?.match.id : null,
-        providerMatchId: candidate.providerMatchId,
-        sourceUrl: candidate.sourceUrl,
-        rawLabel: candidate.label || `${candidate.homeName || ''} vs ${candidate.awayName || ''}`.trim(),
-        status: canLink ? 'active' : 'unlinked',
-        priority: 1,
-      });
-    }
-
-    results.push({
-      ...candidate,
-      bestMatch: best ? {
-        id: best.match.id,
-        local: `${best.match.homeTeam.name} vs ${best.match.awayTeam.name}`,
-        matchDate: best.match.matchDate.toISOString(),
-        finalScore: best.score.finalScore,
-        teamScore: best.score.teamScore,
-        orientation: best.score.orientation,
-        providerDate: best.score.providerDate?.toISOString?.() || null,
-      } : null,
-      linked: !dryRun && canLink,
-      linkCandidate: canLink,
-      sourceId: source?.id || null,
-    });
+export async function discoverISportsHomepage(dateInput?: string | null, options: { dryRun?: boolean; threshold?: number } = {}) {
+  const dateKey = dateInput || new Date().toISOString().slice(0, 10);
+  const pageUrl = `${HOME_URL}?date=${encodeURIComponent(dateKey)}`;
+  const loaded = await loadRenderedPage(pageUrl, { timeoutMs: 22000, virtualTimeBudgetMs: 14000 });
+  const candidates = new Map<number, DiscoveredISportsMatch>();
+  const linkRegex = /matchId=(\d{6,})/gi;
+  for (const match of loaded.html.matchAll(linkRegex)) {
+    const providerMatchId = Number(match[1]);
+    if (!Number.isFinite(providerMatchId)) continue;
+    const sourceUrl = canonicalISportsSourceUrl(providerMatchId);
+    const start = Math.max(0, (match.index || 0) - 350);
+    const raw = loaded.html.slice(start, (match.index || 0) + 700);
+    const label = htmlToText(raw).slice(0, 260);
+    candidates.set(providerMatchId, { providerMatchId, sourceUrl, label });
   }
-
-  await recordLiveIngestLog({
-    status: candidates.length ? 'discover_completed' : 'discover_no_candidates',
-    message: JSON.stringify({ dateKey, candidates: candidates.length, localMatches: matches.length, loader: page.loader, rendered: page.rendered, pageError: page.error || null }).slice(0, 1100),
-    durationMs: Date.now() - started,
-  });
-
-  return { page, dateKey, localMatches: matches.length, candidates: results };
-}
-
-export async function scrapeISportsMatchPage(input: { sourceUrl?: string | null; providerMatchId?: number | null; match?: any; save?: boolean }) {
-  const started = Date.now();
-  await ensureLiveIngestTables();
-  const providerMatchId = Number(input.providerMatchId || extractISportsMatchId(input.sourceUrl));
-  if (!Number.isFinite(providerMatchId) || providerMatchId <= 0) throw new Error('providerMatchId or sourceUrl with matchId is required');
-  const sourceUrl = input.sourceUrl || canonicalISportsSourceUrl(providerMatchId);
-  const page = await loadRenderedPage(sourceUrl);
-  const stats = parseISportsVisibleStats(page.text, input.match);
-  const useful = hasUsefulStats(stats);
-  let snapshotId: string | null = null;
-
-  if (useful && input.match && input.save !== false) {
-    snapshotId = await savePageStatsSnapshot(input.match, providerMatchId, stats, {
-      source: PROVIDER,
-      sourceUrl,
-      loader: page.loader,
-      rendered: page.rendered,
-      pageError: page.error || null,
-      rawText: page.text.slice(0, 24000),
-    });
-    await updateExternalMatchSourceStatus(providerMatchId, 'active', null);
-  } else if (!useful) {
-    await updateExternalMatchSourceStatus(providerMatchId, 'failed', 'No visible stats found in rendered page');
-  }
-
-  await recordLiveIngestLog({
-    matchId: input.match?.id || null,
-    status: useful ? 'pull_scraped_stats' : 'pull_no_visible_stats',
-    message: JSON.stringify({ providerMatchId, loader: page.loader, rendered: page.rendered, snapshotId, pageError: page.error || null }).slice(0, 1100),
-    durationMs: Date.now() - started,
-  });
-
-  return { provider: PROVIDER, providerMatchId, sourceUrl, loader: page.loader, rendered: page.rendered, pageError: page.error || null, hasStats: useful, stats, snapshotId, textSample: page.text.slice(0, 1200) };
+  return { dateKey, pageUrl, loaded, candidates: [...candidates.values()] };
 }
