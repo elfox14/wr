@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { AlertTriangle, BarChart3, CheckCircle2, Goal, Radio } from 'lucide-react';
 import { getTeamFlagUrl } from '@/lib/teamFlags';
 
@@ -42,6 +43,7 @@ type LiveEventsResponse = { ok: boolean; updatedAt?: string; pollingSeconds?: nu
 
 const STATS_POLL_MS = 60 * 1000;
 const EVENTS_POLL_MS = 30 * 1000;
+const PAGE_REFRESH_MS = 30 * 1000;
 const HALF_TIME_STATUSES = ['HT', 'HALFTIME', 'HALF_TIME', 'HALF-TIME'];
 const FINISHED_STATUSES = ['FINISHED', 'FT', 'AET', 'PEN'];
 const LIVE_STATUSES = ['IN_PLAY', 'LIVE', '1H', '2H', 'ET', 'BT', 'P'];
@@ -61,6 +63,10 @@ function isFinishedStatus(status?: string | null) {
 
 function isLiveStatus(status?: string | null) {
   return LIVE_STATUSES.includes(normalizeStatus(status));
+}
+
+function isSecondHalfStatus(status?: string | null) {
+  return normalizeStatus(status) === '2H';
 }
 
 function isScheduledStatus(status?: string | null) {
@@ -86,6 +92,23 @@ function eventConfirmsHalfTime(event?: MatchEvent | null) {
 
 function isConfirmedHalfTime(match?: LiveStatsResponse['match'], lastEvent?: MatchEvent | null) {
   return isHalfTimeStatus(match?.status) || eventConfirmsHalfTime(lastEvent);
+}
+
+function normalizeConfirmedMinute(status?: string | null, minute?: number | null) {
+  const isSecondHalf = isSecondHalfStatus(status);
+  const value = Number(minute);
+
+  if (!Number.isFinite(value) || value <= 0) {
+    return isSecondHalf ? 45 : null;
+  }
+
+  const rounded = Math.round(value);
+  if (isSecondHalf) {
+    if (rounded < 45) return Math.max(45, Math.min(135, 45 + rounded));
+    return Math.max(45, Math.min(135, rounded));
+  }
+
+  return Math.max(1, Math.min(135, rounded));
 }
 
 function displayMatchStatus(status?: string | null) {
@@ -191,9 +214,14 @@ function inferBallPosition(event?: MatchEvent | null) {
 function confirmedMinute(match?: LiveStatsResponse['match'], latest?: Snapshot, lastEvent?: MatchEvent | null) {
   const status = normalizeStatus(match?.status);
   if (isHalfTimeStatus(status) || eventConfirmsHalfTime(lastEvent)) return 45;
-  const snapshotMinute = statValue(latest || null, 'minute');
-  if (snapshotMinute !== null && snapshotMinute > 0) return Math.max(1, Math.min(135, snapshotMinute));
-  if (lastEvent?.minute && lastEvent.minute > 0) return Math.max(1, Math.min(135, lastEvent.minute));
+
+  const snapshotMinute = normalizeConfirmedMinute(status, statValue(latest || null, 'minute'));
+  if (snapshotMinute !== null) return snapshotMinute;
+
+  const eventMinute = normalizeConfirmedMinute(status, lastEvent?.minute ?? null);
+  if (eventMinute !== null) return eventMinute;
+
+  if (isSecondHalfStatus(status)) return 45;
   if (isFinishedStatus(status)) return 90;
   return null;
 }
@@ -205,7 +233,7 @@ function confirmedClockLabel(match?: LiveStatsResponse['match'], latest?: Snapsh
   if (minute !== null && isLiveStatus(status)) return `الدقيقة ${displayNumber(minute)}`;
   if (minute !== null && isFinishedStatus(status)) return `انتهت - ${displayNumber(minute)}′`;
   if (status === '1H') return 'الشوط الأول مؤكد';
-  if (status === '2H') return 'الشوط الثاني مؤكد';
+  if (status === '2H') return 'الدقيقة ٤٥';
   if (isLiveStatus(status)) return 'مباشرة الآن - بانتظار دقيقة مؤكدة';
   if (isScheduledStatus(status)) return 'بانتظار تأكيد البداية';
   return 'بانتظار حالة موثقة';
@@ -251,6 +279,7 @@ function StatRow({ label, home, away, accent = false }: { label: string; home: n
 }
 
 export default function InternalAnimationPlayer({ matchId = '', dbMatchId = '' }: { matchId?: string; dbMatchId?: string }) {
+  const router = useRouter();
   const [stats, setStats] = useState<LiveStatsResponse | null>(null);
   const [events, setEvents] = useState<MatchEvent[]>([]);
   const [loading, setLoading] = useState(true);
@@ -282,8 +311,9 @@ export default function InternalAnimationPlayer({ matchId = '', dbMatchId = '' }
     fetchStats(); fetchEvents();
     const statsTimer = window.setInterval(fetchStats, STATS_POLL_MS);
     const eventsTimer = window.setInterval(fetchEvents, EVENTS_POLL_MS);
-    return () => { window.clearInterval(statsTimer); window.clearInterval(eventsTimer); };
-  }, [query]);
+    const pageRefreshTimer = window.setInterval(() => router.refresh(), PAGE_REFRESH_MS);
+    return () => { window.clearInterval(statsTimer); window.clearInterval(eventsTimer); window.clearInterval(pageRefreshTimer); };
+  }, [query, router]);
 
   const latest = bestSnapshot(stats);
   const match = stats?.match;
