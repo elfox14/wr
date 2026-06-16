@@ -139,29 +139,16 @@ export async function GET(req: Request) {
     for (const match of matches) {
       const providerMatchId = Number(match.animationMatchId);
       if (!Number.isFinite(providerMatchId) || providerMatchId <= 0) continue;
-      const base = {
+      const item: any = {
         dbMatchId: match.id,
         providerMatchId,
         local: `${match.homeTeam.name} vs ${match.awayTeam.name}`,
         status: match.status,
         matchDate: match.matchDate.toISOString(),
       };
-      const item: any = { ...base };
-      try {
-        if (includeFlash) {
-          const flashUrl = new URL('/api/internal/live-ingest/isports/remote-flash-pull', origin);
-          flashUrl.searchParams.set('matchId', String(providerMatchId));
-          flashUrl.searchParams.set('dbMatchId', match.id);
-          flashUrl.searchParams.set('mode', 'timeline');
-          flashUrl.searchParams.set('save', save ? 'true' : 'false');
-          flashUrl.searchParams.set('replace', replace ? 'true' : 'false');
-          flashUrl.searchParams.set('timeoutMs', String(timeoutMs));
-          flashUrl.searchParams.set('waitMs', String(waitMs));
-          const flash = await callRoute(remoteFlashPullGET, flashUrl, adminSecret);
-          item.flashHttpStatus = flash.status;
-          item.flash = compactFlash(flash.result);
-        }
 
+      try {
+        // Timeline first: it saves events/corners/cards. Flash runs last so the latest stats snapshot keeps attacks and dangerous attacks.
         if (includeTimeline) {
           const timelineUrl = new URL('/api/internal/live-ingest/isports/remote-frame-pull', origin);
           timelineUrl.searchParams.set('matchId', String(providerMatchId));
@@ -188,6 +175,20 @@ export async function GET(req: Request) {
           item.live = compactLive(live.result);
         }
 
+        if (includeFlash) {
+          const flashUrl = new URL('/api/internal/live-ingest/isports/remote-flash-pull', origin);
+          flashUrl.searchParams.set('matchId', String(providerMatchId));
+          flashUrl.searchParams.set('dbMatchId', match.id);
+          flashUrl.searchParams.set('mode', 'timeline');
+          flashUrl.searchParams.set('save', save ? 'true' : 'false');
+          flashUrl.searchParams.set('replace', replace ? 'true' : 'false');
+          flashUrl.searchParams.set('timeoutMs', String(timeoutMs));
+          flashUrl.searchParams.set('waitMs', String(waitMs));
+          const flash = await callRoute(remoteFlashPullGET, flashUrl, adminSecret);
+          item.flashHttpStatus = flash.status;
+          item.flash = compactFlash(flash.result);
+        }
+
         item.ok = Boolean(item.flash?.ok || item.timeline?.ok || item.live?.ok);
         item.dataMode = item.flash?.hasStats ? 'flash_stats_and_timeline' : item.timeline?.eventsCount ? 'timeline_events_only' : item.live?.hasStats ? 'live_stats' : 'no_reliable_data';
       } catch (error: any) {
@@ -208,7 +209,7 @@ export async function GET(req: Request) {
       durationMs: Date.now() - startedAt,
       window: { start: start.toISOString(), end: end.toISOString() },
       results,
-      note: 'Cron-safe route. Run every minute to update flash stats, timeline events, and optional live stats for current linked matches.',
+      note: 'Cron-safe route. Timeline saves events first; flash stats run last so the page receives full attack stats as the latest snapshot.',
     });
   } catch (error: any) {
     return json({ ok: false, error: error?.message || 'Internal Server Error' }, 500);
