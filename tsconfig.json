@@ -19,6 +19,7 @@
       }
     ],
     "paths": {
+      "@/app/animation-live/player/LiveMatchStatsPanel": ["./app/match-center/[id]/MatchDataPanel.tsx"],
       "@/*": ["./*"]
     }
   },
