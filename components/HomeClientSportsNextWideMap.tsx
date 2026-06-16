@@ -240,31 +240,12 @@ export default function HomeClientSportsNextWideMap(props: HomeProps) {
           grid-column: 1 / -1;
         }
 
-        .home-wide-map-override main section[aria-label='مركز المباريات'] {
-          padding: 0.75rem !important;
-        }
-
-        .home-wide-map-override main section[aria-label='مركز المباريات'] h1 {
-          font-size: 1.15rem !important;
-          line-height: 1.45 !important;
-        }
-
-        .home-wide-map-override main section[aria-label='مركز المباريات'] h2 {
-          font-size: 1rem !important;
-        }
-
-        .home-wide-map-override main section[aria-label='مركز المباريات'] article {
-          border-radius: 1.25rem !important;
-          padding: 0.85rem !important;
-        }
-
-        .home-wide-map-override main section[aria-label='مركز المباريات'] [aria-label='العد التنازلي للمباراة المرتقبة'] {
+        .home-wide-map-override main section[aria-label='مركز المباريات'] > article:first-of-type {
           display: none !important;
         }
 
-        .home-wide-map-override main section[aria-label='مركز المباريات'] article + div {
-          margin-top: 0.75rem !important;
-          margin-bottom: 0.75rem !important;
+        .home-wide-map-override main section[aria-label='مركز المباريات'] > div:first-child p:last-child {
+          display: none !important;
         }
       `}</style>
       <HomeClientSportsNext {...props} />
