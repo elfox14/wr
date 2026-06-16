@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/adminAuth';
 import prisma from '@/lib/prisma';
 import { GET as remoteLivePullGET } from '@/app/api/internal/live-ingest/isports/remote-live-pull/route';
+import { GET as remoteTimelinePullGET } from '@/app/api/internal/live-ingest/isports/remote-frame-pull/route';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -42,6 +43,14 @@ function requestOrigin(req: Request) {
   return host ? `${proto}://${host}` : fallback;
 }
 
+async function routeJson(response: Response | undefined) {
+  if (!response) return { status: 500, ok: false, result: { ok: false, error: 'route returned no response' } };
+  const text = await response.text();
+  let parsed: any = null;
+  try { parsed = JSON.parse(text); } catch {}
+  return { status: response.status, ok: response.ok, result: parsed || { rawSample: text.slice(0, 1000) } };
+}
+
 async function callRemoteLivePull(origin: string, adminSecret: string, input: { providerMatchId: number; dbMatchId: string; timeoutMs: number; waitMs: number; save: boolean }) {
   const url = new URL('/api/internal/live-ingest/isports/remote-live-pull', origin);
   url.searchParams.set('matchId', String(input.providerMatchId));
@@ -53,14 +62,26 @@ async function callRemoteLivePull(origin: string, adminSecret: string, input: { 
     method: 'GET',
     headers: adminSecret ? { 'x-admin-secret': adminSecret } : {},
   }));
-  if (!response) return { status: 500, ok: false, result: { ok: false, error: 'remote-live-pull returned no response' } };
-  const text = await response.text();
-  let parsed: any = null;
-  try { parsed = JSON.parse(text); } catch {}
-  return { status: response.status, ok: response.ok, result: parsed || { rawSample: text.slice(0, 1000) } };
+  return routeJson(response);
 }
 
-function compact(result: any) {
+async function callRemoteTimelinePull(origin: string, adminSecret: string, input: { providerMatchId: number; dbMatchId: string; timeoutMs: number; waitMs: number; save: boolean }) {
+  const url = new URL('/api/internal/live-ingest/isports/remote-frame-pull', origin);
+  url.searchParams.set('matchId', String(input.providerMatchId));
+  url.searchParams.set('dbMatchId', input.dbMatchId);
+  url.searchParams.set('mode', 'timeline');
+  url.searchParams.set('timeoutMs', String(input.timeoutMs));
+  url.searchParams.set('waitMs', String(input.waitMs));
+  url.searchParams.set('save', input.save ? 'true' : 'false');
+  url.searchParams.set('replace', 'true');
+  const response = await remoteTimelinePullGET(new Request(url.toString(), {
+    method: 'GET',
+    headers: adminSecret ? { 'x-admin-secret': adminSecret } : {},
+  }));
+  return routeJson(response);
+}
+
+function compactLive(result: any) {
   return {
     ok: Boolean(result?.ok),
     remoteBrowser: result?.remoteBrowser ? {
@@ -70,9 +91,27 @@ function compact(result: any) {
       error: result.remoteBrowser.error || null,
     } : null,
     hasStats: Boolean(result?.hasStats),
+    validation: result?.validation || null,
     stats: result?.stats || null,
     save: result?.save || null,
     textSample: result?.frame?.textSample || null,
+    error: result?.error || null,
+  };
+}
+
+function compactTimeline(result: any) {
+  return {
+    ok: Boolean(result?.ok),
+    remoteBrowser: result?.remoteBrowser ? {
+      ok: result.remoteBrowser.ok,
+      status: result.remoteBrowser.status,
+      rawLength: result.remoteBrowser.rawLength,
+      error: result.remoteBrowser.error || null,
+    } : null,
+    eventsCount: result?.timeline?.eventsCount || 0,
+    save: result?.timeline?.save || null,
+    statsSave: result?.timeline?.statsSave || null,
+    eventsPreview: Array.isArray(result?.timeline?.events) ? result.timeline.events.slice(0, 5) : [],
     error: result?.error || null,
   };
 }
@@ -87,7 +126,9 @@ export async function GET(req: Request) {
     const take = clampInt(url.searchParams.get('take'), 3, 1, 8);
     const timeoutMs = clampInt(url.searchParams.get('timeoutMs'), Number(process.env.LIVE_STATS_REMOTE_BROWSER_TIMEOUT_MS || 25000), 5000, 60000);
     const waitMs = clampInt(url.searchParams.get('waitMs'), Number(process.env.LIVE_STATS_REMOTE_BROWSER_WAIT_MS || 8000), 1000, 25000);
+    const timelineWaitMs = clampInt(url.searchParams.get('timelineWaitMs'), waitMs, 1000, 25000);
     const save = boolFromParam(url.searchParams.get('save'), true);
+    const includeTimeline = boolFromParam(url.searchParams.get('includeTimeline'), true);
     const explicitDbMatchId = url.searchParams.get('dbMatchId') || url.searchParams.get('id');
     const explicitProviderMatchId = Number(url.searchParams.get('matchId') || url.searchParams.get('providerMatchId') || 0);
     const windowBeforeMinutes = clampInt(url.searchParams.get('windowBeforeMinutes'), 210, 15, 720);
@@ -119,15 +160,21 @@ export async function GET(req: Request) {
       const providerMatchId = Number(match.animationMatchId);
       if (!Number.isFinite(providerMatchId) || providerMatchId <= 0) continue;
       try {
-        const pull = await callRemoteLivePull(origin, adminSecret, { providerMatchId, dbMatchId: match.id, timeoutMs, waitMs, save });
+        const livePull = await callRemoteLivePull(origin, adminSecret, { providerMatchId, dbMatchId: match.id, timeoutMs, waitMs, save });
+        const timelinePull = includeTimeline
+          ? await callRemoteTimelinePull(origin, adminSecret, { providerMatchId, dbMatchId: match.id, timeoutMs, waitMs: timelineWaitMs, save })
+          : null;
+        const live = compactLive(livePull.result);
         results.push({
           dbMatchId: match.id,
           providerMatchId,
           local: `${match.homeTeam.name} vs ${match.awayTeam.name}`,
           status: match.status,
           matchDate: match.matchDate.toISOString(),
-          httpStatus: pull.status,
-          ...compact(pull.result),
+          httpStatus: livePull.status,
+          ...live,
+          timeline: timelinePull ? compactTimeline(timelinePull.result) : null,
+          dataMode: live.hasStats ? 'live_stats' : timelinePull?.result?.timeline?.eventsCount ? 'timeline_events_only' : 'no_reliable_live_data',
         });
       } catch (error: any) {
         results.push({
@@ -147,11 +194,12 @@ export async function GET(req: Request) {
       mode: 'isports_remote_live_run',
       runner: 'direct_route_handler',
       save,
+      includeTimeline,
       processed: results.length,
       durationMs: Date.now() - startedAt,
       window: { start: start.toISOString(), end: end.toISOString() },
       results,
-      note: 'Tests and saves Browserless-rendered iSports live stats for current/near-live linked matches.',
+      note: 'Tests live stats first. If iSports returns placeholder/undefined stats, the runner also saves timeline events as the reliable fallback.',
     });
   } catch (error: any) {
     return json({ ok: false, error: error?.message || 'Internal Server Error' }, 500);
