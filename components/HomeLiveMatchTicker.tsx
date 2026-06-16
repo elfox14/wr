@@ -56,9 +56,9 @@ function isFinished(match: TickerMatch) {
 function liveStatusText(match: TickerMatch) {
   if (isHalfTime(match)) return 'استراحة';
   const label = String(match.liveLabel || '').trim();
-  if (label && !/^الدقيقة\s*\d+$/i.test(label)) return label;
-  if (typeof match.minute === 'number' && Number.isFinite(match.minute) && match.minute > 0) return `مباشر ${Math.floor(match.minute)}′`;
-  return 'مباشر الآن';
+  if (label && !/^الدقيقة\s*\d+$/i.test(label) && label !== 'مباشر الآن') return label;
+  if (typeof match.minute === 'number' && Number.isFinite(match.minute) && match.minute > 0) return `${Math.floor(match.minute)}′`;
+  return 'جارية';
 }
 
 export default function HomeLiveMatchTicker({ matches = [] }: Props) {
