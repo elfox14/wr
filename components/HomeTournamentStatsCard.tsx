@@ -27,6 +27,15 @@ function read(obj: any, key: string) {
   return obj?.[key];
 }
 
+function usefulNumber(value: unknown) {
+  const number = Number(value);
+  return Number.isFinite(number) && number > 0 ? number : null;
+}
+
+function pickNumber(primary: unknown, fallback: unknown) {
+  return usefulNumber(primary) ?? usefulNumber(fallback) ?? (typeof primary === 'number' && Number.isFinite(primary) ? primary : typeof fallback === 'number' && Number.isFinite(fallback) ? fallback : null);
+}
+
 function formatCount(value?: number | null, unavailable = 'غير متوفر') {
   if (typeof value !== 'number' || !Number.isFinite(value)) return unavailable;
   return new Intl.NumberFormat('ar-EG').format(value);
@@ -61,6 +70,10 @@ function shortTeamStat(team: any, statKey: string, suffix = '') {
   return `${teamName(team)} · ${value}${suffix}`;
 }
 
+function fallbackNote(base: string, isFbrefFallback: boolean) {
+  return isFbrefFallback ? `${base} · من لقطة FBref المحفوظة` : base;
+}
+
 function StatTile({ value, label, note, href, tone = 'default', loading = false }: Tile) {
   const valueClass = loading
     ? 'animate-pulse text-gray-400'
@@ -86,6 +99,7 @@ function StatTile({ value, label, note, href, tone = 'default', loading = false 
 
 export default function HomeTournamentStatsCard({ playersCount: serverPlayersCount, teamsCount, upcomingMatchesCount }: Props) {
   const [stats, setStats] = useState<any>(null);
+  const [fbrefStats, setFbrefStats] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [lastClientRefresh, setLastClientRefresh] = useState<Date | null>(null);
 
@@ -96,15 +110,24 @@ export default function HomeTournamentStatsCard({ playersCount: serverPlayersCou
       if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
 
       try {
-        const response = await fetch('/api/matches/summary-stats', { cache: 'no-store' });
-        if (!response.ok) return;
-        const data = await response.json();
-        if (!cancelled && data?.ok) {
-          setStats(data);
-          setLastClientRefresh(new Date());
+        const [databaseResponse, fbrefResponse] = await Promise.all([
+          fetch('/api/matches/summary-stats', { cache: 'no-store' }),
+          fetch('/api/matches/fbref-summary-stats', { cache: 'no-store' }),
+        ]);
+
+        if (databaseResponse.ok) {
+          const data = await databaseResponse.json();
+          if (!cancelled && data?.ok) setStats(data);
         }
+
+        if (fbrefResponse.ok) {
+          const data = await fbrefResponse.json();
+          if (!cancelled && data?.ok) setFbrefStats(data);
+        }
+
+        if (!cancelled) setLastClientRefresh(new Date());
       } catch {
-        // Keep the card readable if the endpoint is temporarily unavailable.
+        // Keep the card readable if the endpoints are temporarily unavailable.
       } finally {
         if (!cancelled) setIsLoading(false);
       }
@@ -118,40 +141,54 @@ export default function HomeTournamentStatsCard({ playersCount: serverPlayersCou
     };
   }, []);
 
-  const isInitialLoading = isLoading && !stats;
-  const loadingNote = 'جاري تحميل بيانات الإحصائيات من قاعدة البيانات...';
-  const playerCount = stats?.playerCount ?? serverPlayersCount;
-  const cardTotalYellow = read(stats, 'yellow' + 'Cards');
-  const cardTotalRed = read(stats, 'red' + 'Cards');
-  const kickStats = read(stats, 'penal' + 'ties');
+  const isInitialLoading = isLoading && !stats && !fbrefStats;
+  const loadingNote = 'جاري تحميل بيانات الإحصائيات من قاعدة البيانات ولقطة FBref...';
+  const playerCount = pickNumber(stats?.playerCount, fbrefStats?.playerCount) ?? serverPlayersCount;
+  const totalGoals = pickNumber(stats?.totalGoals, fbrefStats?.totalGoals);
+  const averageGoals = pickNumber(stats?.averageGoalsPerFinishedMatch, fbrefStats?.averageGoalsPerFinishedMatch);
+  const finishedMatches = pickNumber(stats?.finishedMatches, fbrefStats?.finishedMatches);
+  const liveMatches = pickNumber(stats?.liveMatches, fbrefStats?.liveMatches) ?? 0;
+  const scheduledMatches = pickNumber(stats?.scheduledMatches, fbrefStats?.scheduledMatches ?? upcomingMatchesCount);
+  const cardTotalYellow = pickNumber(read(stats, 'yellow' + 'Cards'), read(fbrefStats, 'yellow' + 'Cards'));
+  const cardTotalRed = pickNumber(read(stats, 'red' + 'Cards'), read(fbrefStats, 'red' + 'Cards'));
+  const kickStats = read(stats, 'penal' + 'ties') || read(fbrefStats, 'penal' + 'ties');
   const kicksAvailable = Boolean(kickStats?.available);
-  const biggestScore = stats?.biggestScore || null;
-  const topScoringTeam = stats?.teamLeaders?.topScoringTeam || null;
-  const bestCleanSheetTeam = stats?.teamLeaders?.bestCleanSheetTeam || null;
-  const sourceUpdatedAt = stats?.latestUpdatedAt || stats?.latestFinalStatsUpdatedAt || stats?.latestCardsUpdatedAt || stats?.latestEventUpdatedAt;
+  const biggestScore = stats?.biggestScore || fbrefStats?.biggestScore || null;
+  const topScoringTeam = stats?.teamLeaders?.topScoringTeam || fbrefStats?.teamLeaders?.topScoringTeam || null;
+  const bestCleanSheetTeam = stats?.teamLeaders?.bestCleanSheetTeam || fbrefStats?.teamLeaders?.bestCleanSheetTeam || null;
+  const sourceUpdatedAt = stats?.latestUpdatedAt || stats?.latestFinalStatsUpdatedAt || stats?.latestCardsUpdatedAt || stats?.latestEventUpdatedAt || fbrefStats?.latestUpdatedAt;
   const finalStats = stats?.finalStats || {};
+  const fbrefFinalStats = fbrefStats?.finalStats || {};
+  const totalShots = pickNumber(finalStats?.totalShots, fbrefFinalStats?.totalShots);
+  const totalShotsOnTarget = pickNumber(finalStats?.totalShotsOnTarget, fbrefFinalStats?.totalShotsOnTarget);
+  const matchesWithFinalSnapshots = pickNumber(finalStats?.matchesWithFinalSnapshots, fbrefFinalStats?.matchesWithFinalSnapshots);
+  const cleanSheets = pickNumber(stats?.cleanSheets, fbrefStats?.cleanSheets);
+  const usingFbrefShots = !usefulNumber(finalStats?.totalShots) && usefulNumber(fbrefFinalStats?.totalShots) !== null;
+  const usingFbrefCards = (!usefulNumber(read(stats, 'yellow' + 'Cards')) && usefulNumber(read(fbrefStats, 'yellow' + 'Cards')) !== null) || (!usefulNumber(read(stats, 'red' + 'Cards')) && usefulNumber(read(fbrefStats, 'red' + 'Cards')) !== null);
+  const usingFbrefGoals = !usefulNumber(stats?.totalGoals) && usefulNumber(fbrefStats?.totalGoals) !== null;
+  const usingFbrefTeams = !stats?.teamLeaders?.topScoringTeam && Boolean(fbrefStats?.teamLeaders?.topScoringTeam);
 
   const tiles = useMemo<Tile[]>(() => ([
     {
       label: 'عدد اللاعبين',
       value: isInitialLoading ? LOADING_VALUE : formatCount(playerCount),
-      note: isInitialLoading ? loadingNote : 'من اللاعبين المرتبطين بالمنتخبات في قاعدة البيانات',
+      note: isInitialLoading ? loadingNote : fbrefStats?.playerCount && !stats?.playerCount ? 'من قوائم FBref المحفوظة' : 'من اللاعبين المرتبطين بالمنتخبات في قاعدة البيانات',
       href: '/players',
       tone: 'default',
       loading: isInitialLoading,
     },
     {
       label: 'أهداف البطولة',
-      value: isInitialLoading ? LOADING_VALUE : formatCount(stats?.totalGoals),
-      note: isInitialLoading ? loadingNote : `من ${formatCount(stats?.finishedMatches)} مباراة منتهية${stats?.liveGoals ? ` · أهداف مباشرة غير نهائية: ${formatCount(stats.liveGoals)}` : ''}`,
+      value: isInitialLoading ? LOADING_VALUE : formatCount(totalGoals),
+      note: isInitialLoading ? loadingNote : fallbackNote(`من ${formatCount(finishedMatches)} مباراة منتهية${stats?.liveGoals ? ` · أهداف مباشرة غير نهائية: ${formatCount(stats.liveGoals)}` : ''}`, usingFbrefGoals),
       href: '/matches',
       tone: 'gold',
       loading: isInitialLoading,
     },
     {
       label: 'متوسط الأهداف',
-      value: isInitialLoading ? LOADING_VALUE : formatDecimal(stats?.averageGoalsPerFinishedMatch),
-      note: isInitialLoading ? loadingNote : 'هدف لكل مباراة منتهية فقط',
+      value: isInitialLoading ? LOADING_VALUE : formatDecimal(averageGoals),
+      note: isInitialLoading ? loadingNote : fallbackNote('هدف لكل مباراة منتهية فقط', usingFbrefGoals),
       href: '/matches',
       tone: 'cyan',
       loading: isInitialLoading,
@@ -159,23 +196,23 @@ export default function HomeTournamentStatsCard({ playersCount: serverPlayersCou
     {
       label: 'أكثر منتخب تسجيلًا',
       value: isInitialLoading ? LOADING_VALUE : topScoringTeam ? formatCount(topScoringTeam.goalsFor) : 'غير متوفر',
-      note: isInitialLoading ? loadingNote : topScoringTeam ? shortTeamStat(topScoringTeam, 'played', ' مباريات') : 'يظهر بعد انتهاء مباريات كافية',
+      note: isInitialLoading ? loadingNote : topScoringTeam ? fallbackNote(shortTeamStat(topScoringTeam, 'played', ' مباريات'), usingFbrefTeams) : 'يظهر بعد انتهاء مباريات كافية',
       href: topScoringTeam?.id ? `/teams/${encodeURIComponent(topScoringTeam.id)}` : '/teams',
       tone: 'gold',
       loading: isInitialLoading,
     },
     {
       label: 'شباك نظيفة',
-      value: isInitialLoading ? LOADING_VALUE : formatCount(stats?.cleanSheets),
-      note: isInitialLoading ? loadingNote : bestCleanSheetTeam ? `الأبرز: ${shortTeamStat(bestCleanSheetTeam, 'cleanSheets')}` : 'إجمالي الشباك النظيفة بعد المباريات',
+      value: isInitialLoading ? LOADING_VALUE : formatCount(cleanSheets),
+      note: isInitialLoading ? loadingNote : bestCleanSheetTeam ? fallbackNote(`الأبرز: ${shortTeamStat(bestCleanSheetTeam, 'cleanSheets')}`, usingFbrefTeams) : 'إجمالي الشباك النظيفة بعد المباريات',
       href: '/matches',
       tone: 'default',
       loading: isInitialLoading,
     },
     {
       label: 'تسديدات / على المرمى',
-      value: isInitialLoading ? LOADING_VALUE : finalStats?.totalShots ? `${formatCount(finalStats.totalShots)} / ${formatCount(finalStats.totalShotsOnTarget)}` : 'غير متوفر',
-      note: isInitialLoading ? loadingNote : finalStats?.matchesWithFinalSnapshots ? `من ${formatCount(finalStats.matchesWithFinalSnapshots)} مباراة بها إحصائيات نهائية` : 'تظهر بعد مزامنة إحصائيات المباراة',
+      value: isInitialLoading ? LOADING_VALUE : totalShots ? `${formatCount(totalShots)} / ${formatCount(totalShotsOnTarget)}` : 'غير متوفر',
+      note: isInitialLoading ? loadingNote : matchesWithFinalSnapshots ? fallbackNote(`من ${formatCount(matchesWithFinalSnapshots)} مباراة بها إحصائيات`, usingFbrefShots) : 'تظهر بعد مزامنة إحصائيات المباراة',
       href: '/matches',
       tone: 'cyan',
       loading: isInitialLoading,
@@ -183,7 +220,7 @@ export default function HomeTournamentStatsCard({ playersCount: serverPlayersCou
     {
       label: 'كروت صفراء / حمراء',
       value: isInitialLoading ? LOADING_VALUE : `${formatCount(cardTotalYellow)} / ${formatCount(cardTotalRed)}`,
-      note: isInitialLoading ? loadingNote : 'من snapshots أو أحداث المباراة المتاحة',
+      note: isInitialLoading ? loadingNote : fallbackNote('من snapshots أو أحداث المباراة أو FBref عند عدم توفرها في قاعدة البيانات', usingFbrefCards),
       href: '/matches',
       tone: 'alert',
       loading: isInitialLoading,
@@ -191,7 +228,7 @@ export default function HomeTournamentStatsCard({ playersCount: serverPlayersCou
     {
       label: 'ركلات الجزاء',
       value: isInitialLoading ? LOADING_VALUE : kicksAvailable ? formatCount(kickStats?.total) : 'غير متوفر',
-      note: isInitialLoading ? loadingNote : kicksAvailable ? `مسجلة: ${formatCount(kickStats?.scored)} · ضائعة: ${formatCount(kickStats?.missed)}` : 'غير متوفر في المصادر الحالية',
+      note: isInitialLoading ? loadingNote : kicksAvailable ? `مسجلة: ${formatCount(kickStats?.scored)} · ضائعة: ${formatCount(kickStats?.missed)}` : 'غير متوفر في لقطة FBref الحالية ولا في أحداث قاعدة البيانات',
       href: '/matches',
       tone: 'default',
       loading: isInitialLoading,
@@ -206,13 +243,13 @@ export default function HomeTournamentStatsCard({ playersCount: serverPlayersCou
     },
     {
       label: 'مباريات منتهية',
-      value: isInitialLoading ? LOADING_VALUE : formatCount(stats?.finishedMatches),
-      note: isInitialLoading ? loadingNote : `مباشر الآن: ${formatCount(stats?.liveMatches)} / متبقية: ${formatCount(stats?.scheduledMatches ?? upcomingMatchesCount)}`,
+      value: isInitialLoading ? LOADING_VALUE : formatCount(finishedMatches),
+      note: isInitialLoading ? loadingNote : `مباشر الآن: ${formatCount(liveMatches)} / متبقية: ${formatCount(scheduledMatches)}`,
       href: '/matches',
       tone: 'default',
       loading: isInitialLoading,
     },
-  ]), [stats, upcomingMatchesCount, kicksAvailable, biggestScore, isInitialLoading, cardTotalYellow, cardTotalRed, kickStats, playerCount, topScoringTeam, bestCleanSheetTeam, finalStats]);
+  ]), [stats, fbrefStats, upcomingMatchesCount, kicksAvailable, biggestScore, isInitialLoading, cardTotalYellow, cardTotalRed, kickStats, playerCount, topScoringTeam, bestCleanSheetTeam, finalStats, fbrefFinalStats, totalGoals, averageGoals, finishedMatches, liveMatches, scheduledMatches, totalShots, totalShotsOnTarget, matchesWithFinalSnapshots, cleanSheets, usingFbrefShots, usingFbrefCards, usingFbrefGoals, usingFbrefTeams]);
 
   return (
     <section className="mx-auto mb-4 max-w-7xl overflow-hidden rounded-2xl border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(255,215,0,0.13),transparent_28%),linear-gradient(135deg,rgba(7,24,18,0.94),rgba(4,17,13,0.98))] p-3 text-white shadow-[0_18px_46px_rgba(0,0,0,0.32)] backdrop-blur sm:p-4" aria-label="إحصائيات البطولة">
@@ -224,7 +261,7 @@ export default function HomeTournamentStatsCard({ playersCount: serverPlayersCou
           </div>
           <h1 className="mt-3 text-xl font-black leading-snug tracking-tight text-white md:text-2xl lg:text-3xl">الإحصائيات</h1>
           <p className="mt-2 max-w-4xl text-xs font-semibold leading-6 text-gray-300 md:text-sm md:leading-7">
-            ملخص البطولة بعد المباريات من قاعدة البيانات: الأهداف، المتوسطات، المنتخبات الأبرز، التسديدات، البطاقات، ركلات الجزاء، وحالة المباريات.
+            ملخص البطولة من قاعدة البيانات مع استخدام لقطة FBref المحفوظة كبديل عند غياب snapshots أو أحداث المباراة.
           </p>
         </div>
         <div className="rounded-2xl border border-white/10 bg-black/25 px-3 py-2 text-left text-[10px] font-bold leading-5 text-gray-400">
@@ -239,8 +276,8 @@ export default function HomeTournamentStatsCard({ playersCount: serverPlayersCou
       </div>
 
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-[10px] font-bold text-gray-500">
-        <span>الفرق المسجلة: {formatCount(stats?.teamCount ?? teamsCount, isInitialLoading ? LOADING_VALUE : 'غير متوفر')} منتخب</span>
-        <span>مصدر اللاعبين: قاعدة البيانات · إحصائيات المباريات تظهر بعد توفر snapshots أو أحداث نهائية</span>
+        <span>الفرق المسجلة: {formatCount(stats?.teamCount ?? fbrefStats?.teamCount ?? teamsCount, isInitialLoading ? LOADING_VALUE : 'غير متوفر')} منتخب</span>
+        <span>الأولوية: قاعدة البيانات الحية والنهائية · البديل: FBref copied snapshot</span>
       </div>
     </section>
   );
