@@ -116,13 +116,17 @@ function browserlessDebugCode() {
   const responses = [];
   const requestsFailed = [];
   const maxItems = 80;
-  const interesting = /(flashdata|get\?|\/api\b|\/iapi\b|commoninterface|sockethelper|event\.js|pako|stream|attackdetail|detail\.html)/i;
+  const interestingTerms = ['flashdata', 'get?', '/api', '/iapi', 'commoninterface', 'sockethelper', 'event.js', 'pako', 'stream', 'attackdetail', 'detail.html'];
+  const isInteresting = (url) => {
+    const lower = String(url || '').toLowerCase();
+    return interestingTerms.some((term) => lower.includes(term));
+  };
   const pushLimited = (arr, value) => { if (arr.length < maxItems) arr.push(value); };
   page.on('console', (msg) => pushLimited(logs, { type: msg.type(), text: msg.text().slice(0, 600) }));
   page.on('requestfailed', (request) => pushLimited(requestsFailed, { url: request.url(), method: request.method(), failure: request.failure() ? request.failure().errorText : null }));
   page.on('response', async (response) => {
     const url = response.url();
-    if (!interesting.test(url)) return;
+    if (!isInteresting(url)) return;
     const item = { url, status: response.status(), contentType: response.headers()['content-type'] || null, sample: null };
     try {
       const ct = item.contentType || '';
