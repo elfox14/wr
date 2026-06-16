@@ -4,6 +4,10 @@ import prisma from '@/lib/prisma';
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
+const LIVE_STATUSES = ['LIVE', 'IN_PLAY', 'HT'];
+const SCHEDULED_STATUSES = ['SCHEDULED', 'TIMED', 'NOT_STARTED', 'NS'];
+const ACTIVE_HOME_STATUSES = [...SCHEDULED_STATUSES, ...LIVE_STATUSES];
+
 export default async function Home() {
   const now = new Date();
   const tickerStart = new Date(now.getTime() - 24 * 60 * 60 * 1000);
@@ -25,19 +29,20 @@ export default async function Home() {
       totalUpcomingMatches,
       upcomingMatchesRaw,
       tickerMatchesRaw,
+      liveMatchRaw,
       nextMatchRaw
     ] = await Promise.all([
       prisma.asset.count({ where: { type: 'PLAYER' } }),
       prisma.asset.count({ where: { type: 'TEAM' } }),
       prisma.match.count({
         where: {
-          status: { in: ['SCHEDULED', 'IN_PLAY', 'LIVE', 'HT'] },
+          status: { in: ACTIVE_HOME_STATUSES },
           matchDate: { gte: liveWindowStart, lte: upcomingUntil },
         },
       }),
       prisma.match.findMany({
         where: {
-          status: { in: ['SCHEDULED', 'IN_PLAY', 'LIVE', 'HT'] },
+          status: { in: ACTIVE_HOME_STATUSES },
           matchDate: { gte: liveWindowStart, lte: upcomingUntil },
         },
         orderBy: { matchDate: 'asc' },
@@ -54,7 +59,15 @@ export default async function Home() {
       }),
       prisma.match.findFirst({
         where: {
-          status: { in: ['SCHEDULED', 'TIMED', 'NOT_STARTED', 'NS'] },
+          status: { in: LIVE_STATUSES },
+          matchDate: { gte: liveWindowStart, lte: upcomingUntil },
+        },
+        orderBy: { matchDate: 'desc' },
+        include: { homeTeam: true, awayTeam: true },
+      }),
+      prisma.match.findFirst({
+        where: {
+          status: { in: SCHEDULED_STATUSES },
           matchDate: { gte: now },
         },
         orderBy: { matchDate: 'asc' },
@@ -67,7 +80,7 @@ export default async function Home() {
     upcomingMatchesCount = totalUpcomingMatches;
     upcomingMatches = JSON.parse(JSON.stringify(upcomingMatchesRaw));
     tickerMatches = JSON.parse(JSON.stringify(tickerMatchesRaw));
-    nextMarqueeMatch = nextMatchRaw ? JSON.parse(JSON.stringify(nextMatchRaw)) : null;
+    nextMarqueeMatch = liveMatchRaw || nextMatchRaw ? JSON.parse(JSON.stringify(liveMatchRaw || nextMatchRaw)) : null;
   } catch (error) {
     console.error('Error fetching dashboard data:', error);
     upcomingMatches = [];
