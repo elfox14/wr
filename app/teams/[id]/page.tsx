@@ -112,7 +112,7 @@ export default async function TeamPage({ params }: Props) {
 
     if (team) {
       players = await prisma.asset.findMany({
-        where: { teamId: team.id, type: 'PLAYER' },
+        where: { teamId: team.id, type: 'PLAYER', isAvailable: true },
         include: {
           performances: { take: 20, orderBy: { matchDate: 'desc' } },
         },
