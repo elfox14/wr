@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import prisma from '@/lib/prisma';
 import { hasUsablePlayerImage } from '@/lib/playerDedupe';
-import { Search, User, Trophy, Shield, ChevronLeft, MapPin, Image as ImageIcon, Users, Filter } from 'lucide-react';
+import { Search, User, Trophy, Shield, ChevronLeft, MapPin, Image as ImageIcon, Filter } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
 
@@ -37,6 +37,23 @@ type PlayerCardProps = {
   };
 };
 
+type TopScorer = {
+  player: {
+    id: string;
+    name: string;
+    code: string | null;
+    image: string | null;
+    teamId: string | null;
+    team: {
+      id: string;
+      name: string;
+      code: string | null;
+      image: string | null;
+    } | null;
+  };
+  goals: number;
+} | null;
+
 function firstParam(value?: string | string[]) {
   return Array.isArray(value) ? value[0] : value;
 }
@@ -47,6 +64,37 @@ function cleanParam(value?: string) {
 
 function toSearchable(value?: string | null) {
   return String(value || '').toLowerCase();
+}
+
+function formatCount(value?: number | null, fallback = '٠') {
+  return typeof value === 'number' && Number.isFinite(value) ? value.toLocaleString('ar-EG') : fallback;
+}
+
+function TopScorerCard({ topScorer }: { topScorer: TopScorer }) {
+  return (
+    <div className="rounded-3xl border border-[#FFD700]/20 bg-[#FFD700]/10 p-5 shadow-[0_0_25px_rgba(255,215,0,0.08)]">
+      <div className="mb-3 flex items-center gap-2 text-xs font-black uppercase tracking-[0.16em] text-[#FFD700]">
+        <Trophy size={15} /> الأكثر تهديفًا
+      </div>
+      {topScorer?.player ? (
+        <Link href={topScorer.player.teamId ? `/teams/${topScorer.player.teamId}?player=${topScorer.player.id}` : '/players'} className="flex items-center gap-4 rounded-2xl border border-white/10 bg-black/30 p-4 transition hover:border-[#FFD700]/40 hover:bg-black/45">
+          <span className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-black/50">
+            {hasUsablePlayerImage(topScorer.player.image) ? <img src={topScorer.player.image as string} alt={topScorer.player.name} className="h-full w-full object-cover" loading="lazy" /> : <span className="text-lg font-black text-white/60">{topScorer.player.code || topScorer.player.name.slice(0, 2)}</span>}
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-lg font-black text-white">{topScorer.player.name}</span>
+            <span className="mt-1 block truncate text-xs font-bold text-gray-400">{topScorer.player.team?.name || 'غير متوفر'}</span>
+          </span>
+          <span className="text-left">
+            <span className="block text-3xl font-black text-[#FFD700]">{formatCount(topScorer.goals)}</span>
+            <span className="text-[10px] font-bold text-gray-500">هدف</span>
+          </span>
+        </Link>
+      ) : (
+        <div className="rounded-2xl border border-dashed border-[#FFD700]/20 bg-black/25 p-4 text-sm font-bold text-gray-400">لا توجد أهداف موثقة بعد.</div>
+      )}
+    </div>
+  );
 }
 
 function PlayerCard({ player }: PlayerCardProps) {
@@ -155,37 +203,60 @@ export default async function PlayersPage({ searchParams }: Props) {
   const selectedGroup = cleanParam(firstParam(resolvedSearchParams.group));
   const selectedImage = cleanParam(firstParam(resolvedSearchParams.image));
 
-  const allPlayers = await prisma.asset.findMany({
-    where: {
-      type: 'PLAYER',
-      isAvailable: true,
-      teamId: { not: null },
-    },
-    orderBy: [{ team: { name: 'asc' } }, { position: 'asc' }, { name: 'asc' }],
-    select: {
-      id: true,
-      name: true,
-      code: true,
-      image: true,
-      position: true,
-      age: true,
-      club: true,
-      teamId: true,
-      team: {
-        select: {
-          id: true,
-          name: true,
-          code: true,
-          image: true,
-          group: true,
+  const [allPlayers, scoringPerformances] = await Promise.all([
+    prisma.asset.findMany({
+      where: {
+        type: 'PLAYER',
+        isAvailable: true,
+        teamId: { not: null },
+      },
+      orderBy: [{ team: { name: 'asc' } }, { position: 'asc' }, { name: 'asc' }],
+      select: {
+        id: true,
+        name: true,
+        code: true,
+        image: true,
+        position: true,
+        age: true,
+        club: true,
+        teamId: true,
+        team: {
+          select: {
+            id: true,
+            name: true,
+            code: true,
+            image: true,
+            group: true,
+          },
         },
       },
-    },
-  });
+    }),
+    prisma.playerPerformance.findMany({
+      where: { goals: { gt: 0 } },
+      select: {
+        goals: true,
+        asset: {
+          select: {
+            id: true,
+            name: true,
+            code: true,
+            image: true,
+            teamId: true,
+            team: { select: { id: true, name: true, code: true, image: true } },
+          },
+        },
+      },
+    }),
+  ]);
 
-  const officialPlayerCount = allPlayers.length;
-  const playersWithImages = allPlayers.filter((player) => hasUsablePlayerImage(player.image)).length;
-  const playersMissingImages = officialPlayerCount - playersWithImages;
+  const scorerMap = new Map<string, { player: NonNullable<TopScorer>['player']; goals: number }>();
+  scoringPerformances.forEach((row) => {
+    if (!row.asset?.id) return;
+    const current = scorerMap.get(row.asset.id) || { player: row.asset, goals: 0 };
+    current.goals += Number(row.goals || 0);
+    scorerMap.set(row.asset.id, current);
+  });
+  const topScorer = Array.from(scorerMap.values()).sort((a, b) => b.goals - a.goals || a.player.name.localeCompare(b.player.name, 'ar'))[0] || null;
 
   const teams = Array.from(
     new Map(
@@ -228,12 +299,12 @@ export default async function PlayersPage({ searchParams }: Props) {
 
   return (
     <main className="mx-auto max-w-[90rem] px-4 py-8 sm:px-6 lg:px-8 xl:py-12">
-      <section className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-[#0a0a0a] px-6 py-12 sm:px-12 sm:py-16 shadow-2xl">
+      <section className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-[#0a0a0a] px-6 py-10 shadow-2xl sm:px-12 sm:py-12">
         <div className="absolute -top-40 -right-40 h-[500px] w-[500px] rounded-full bg-[#0FF0FC]/10 blur-[120px] pointer-events-none" />
         <div className="absolute -bottom-40 -left-40 h-[500px] w-[500px] rounded-full bg-blue-600/10 blur-[120px] pointer-events-none" />
         <div className="absolute inset-0 bg-[url('/noise.png')] opacity-[0.03] mix-blend-overlay pointer-events-none" />
 
-        <div className="relative z-10 flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between">
+        <div className="relative z-10 flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-3xl">
             <div className="inline-flex items-center gap-2 rounded-full border border-[#0FF0FC]/30 bg-[#0FF0FC]/10 px-4 py-1.5 text-xs font-black uppercase tracking-widest text-[#0FF0FC] shadow-[0_0_15px_rgba(15,240,252,0.2)]">
               <span className="relative flex h-2 w-2">
@@ -242,31 +313,13 @@ export default async function PlayersPage({ searchParams }: Props) {
               </span>
               Official World Cup Squads
             </div>
-            <h1 className="mt-6 text-4xl font-black tracking-tight text-white sm:text-5xl lg:text-6xl">
+            <h1 className="mt-5 text-2xl font-black tracking-tight text-white sm:text-3xl lg:text-4xl">
               دليل اللاعبين <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#0FF0FC] to-blue-400">الرسمي</span>
             </h1>
-            <p className="mt-6 text-lg leading-relaxed text-gray-400">
-              هذه الصفحة تعرض اللاعبين الرسميين المتاحين فقط بعد قفل القوائم. العدد بالأعلى محسوب مباشرة من قاعدة البيانات بعد فلترة اللاعبين غير الرسميين.
-            </p>
           </div>
 
-          <div className="grid w-full shrink-0 gap-3 sm:grid-cols-2 lg:w-auto lg:grid-cols-2">
-            <div className="rounded-2xl border border-white/10 bg-black/40 px-6 py-5 backdrop-blur-md shadow-inner">
-              <span className="flex items-center gap-2 text-xs font-black uppercase tracking-wider text-gray-500"><Users size={14}/> إجمالي رسمي</span>
-              <span className="mt-2 block text-4xl font-black text-white drop-shadow-[0_0_10px_rgba(255,255,255,0.3)]">{officialPlayerCount}</span>
-            </div>
-            <div className="rounded-2xl border border-white/10 bg-black/40 px-6 py-5 backdrop-blur-md shadow-inner">
-              <span className="flex items-center gap-2 text-xs font-black uppercase tracking-wider text-gray-500"><Filter size={14}/> نتائج الفلتر</span>
-              <span className="mt-2 block text-4xl font-black text-[#0FF0FC] drop-shadow-[0_0_10px_rgba(15,240,252,0.35)]">{players.length}</span>
-            </div>
-            <div className="rounded-2xl border border-white/10 bg-black/40 px-6 py-5 backdrop-blur-md shadow-inner">
-              <span className="flex items-center gap-2 text-xs font-black uppercase tracking-wider text-gray-500"><ImageIcon size={14}/> بصور متاحة</span>
-              <span className="mt-2 block text-3xl font-black text-emerald-300">{playersWithImages}</span>
-            </div>
-            <div className="rounded-2xl border border-white/10 bg-black/40 px-6 py-5 backdrop-blur-md shadow-inner">
-              <span className="flex items-center gap-2 text-xs font-black uppercase tracking-wider text-gray-500"><ImageIcon size={14}/> بدون صورة</span>
-              <span className="mt-2 block text-3xl font-black text-amber-200">{playersMissingImages}</span>
-            </div>
+          <div className="w-full lg:w-[360px]">
+            <TopScorerCard topScorer={topScorer} />
           </div>
         </div>
       </section>
