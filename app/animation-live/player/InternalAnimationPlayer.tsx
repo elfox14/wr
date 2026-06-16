@@ -24,6 +24,8 @@ type LiveStatsResponse = {
 type LiveEventsResponse = { ok: boolean; updatedAt?: string; events?: MatchEvent[]; error?: string };
 type PressureWindow = { available: boolean; home: number; away: number; homeEvents: number; awayEvents: number; leader: PressureSide };
 type PressureModel = { home: number; away: number; leader: PressureSide; rhythm: string; danger: string; window5: PressureWindow; window15: PressureWindow };
+type MomentumDefinition = { key: string; label: string; start: number; end: number };
+type MomentumSegment = MomentumDefinition & { available: boolean; home: number; away: number; homeEvents: number; awayEvents: number; homeDangerEvents: number; awayDangerEvents: number; leader: PressureSide; rating: string; topEvent: MatchEvent | null };
 
 const STATS_POLL_MS = 60_000;
 const EVENTS_POLL_MS = 30_000;
@@ -36,6 +38,14 @@ const EVENT_FILTERS: { key: EventFilterKey; label: string }[] = [
   { key: 'shots', label: 'التسديدات' },
   { key: 'cards', label: 'الكروت' },
   { key: 'danger', label: 'الهجمات الخطيرة' },
+];
+const MOMENTUM_SEGMENTS: MomentumDefinition[] = [
+  { key: 'm0_15', label: '0–15', start: 0, end: 15 },
+  { key: 'm15_30', label: '15–30', start: 15, end: 30 },
+  { key: 'm30_ht', label: '30–HT', start: 30, end: 45 },
+  { key: 'm45_60', label: '45–60', start: 45, end: 60 },
+  { key: 'm60_75', label: '60–75', start: 60, end: 75 },
+  { key: 'm75_90', label: '75–90+', start: 75, end: 130 },
 ];
 
 function normalizeStatus(status?: string | null) { return String(status || '').toUpperCase(); }
@@ -190,6 +200,31 @@ function calculatePressureModel(snapshot: Snapshot, events: MatchEvent[], curren
   const danger = maxPressure >= 220 ? 'مرتفعة' : maxPressure >= 110 ? 'متوسطة' : 'منخفضة';
   return { home: Math.round(homePressure), away: Math.round(awayPressure), leader, rhythm, danger, window5, window15 };
 }
+function momentumRating(total: number) {
+  if (total >= 18) return 'ضغط عالي';
+  if (total >= 8) return 'ضغط متوسط';
+  if (total > 0) return 'ضغط منخفض';
+  return 'غير متوفر';
+}
+function calculateMomentumSegments(events: MatchEvent[], homeTeam: Team, awayTeam: Team): MomentumSegment[] {
+  return MOMENTUM_SEGMENTS.map((segment) => {
+    const segmentEvents = events.filter((event) => {
+      const minute = eventMinute(event);
+      if (minute === null) return false;
+      return minute >= segment.start && minute < segment.end;
+    }).sort(sortEventsByMinute);
+    const result = segmentEvents.reduce((acc, event) => {
+      const side = eventSide(event, homeTeam, awayTeam);
+      const weight = pressureEventWeight(event.type);
+      if (side === 'home') { acc.home += weight; acc.homeEvents += 1; if (eventCategory(event.type) === 'danger') acc.homeDangerEvents += 1; }
+      if (side === 'away') { acc.away += weight; acc.awayEvents += 1; if (eventCategory(event.type) === 'danger') acc.awayDangerEvents += 1; }
+      if (!acc.topEvent || pressureEventWeight(event.type) > pressureEventWeight(acc.topEvent.type)) acc.topEvent = event;
+      return acc;
+    }, { home: 0, away: 0, homeEvents: 0, awayEvents: 0, homeDangerEvents: 0, awayDangerEvents: 0, topEvent: null as MatchEvent | null });
+    const total = result.home + result.away;
+    return { ...segment, ...result, available: segmentEvents.length > 0, leader: pressureLeader(result.home, result.away), rating: momentumRating(total) };
+  });
+}
 function sideName(side: PressureSide, home?: Team, away?: Team) {
   if (side === 'home') return home?.name || 'الفريق الأول';
   if (side === 'away') return away?.name || 'الفريق الثاني';
@@ -264,6 +299,19 @@ function StatRow({ label, home, away, accent = false }: { label: string; home: n
 function IntelligenceTile({ label, value, hint, accent = false }: { label: string; value: string; hint?: string; accent?: boolean }) {
   return <div className={`rounded-2xl border p-3 ${accent ? 'border-[#FFD700]/25 bg-[#FFD700]/10' : 'border-white/10 bg-black/25'}`}><div className="text-[10px] font-black text-gray-500">{label}</div><div className={`mt-1 text-lg font-black ${accent ? 'text-[#FFD700]' : 'text-white'}`}>{value}</div>{hint ? <div className="mt-1 text-[10px] font-bold text-gray-500">{hint}</div> : null}</div>;
 }
+function MomentumCard({ segment, home, away, onSelectEvent }: { segment: MomentumSegment; home: Team; away: Team; onSelectEvent: (id: string) => void }) {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-black/25 p-3">
+      <div className="mb-2 flex items-center justify-between gap-2"><span className="rounded-full border border-white/10 bg-black/30 px-2 py-1 text-[10px] font-black text-[#FFD700]">د {segment.label}</span><span className="text-[10px] font-black text-gray-500">{segment.rating}</span></div>
+      <div className="text-sm font-black text-white">الأكثر ضغطًا: <span className="text-[#FFD700]">{sideName(segment.leader, home, away)}</span></div>
+      <div className="mt-2 grid grid-cols-2 gap-2 text-[10px] font-bold text-gray-400"><div>أحداث ضغط: <span className="text-white">{segment.available ? `${ar(segment.homeEvents)} - ${ar(segment.awayEvents)}` : 'غير متوفر'}</span></div><div>هجمات خطيرة: <span className="text-white">{segment.available ? `${ar(segment.homeDangerEvents)} - ${ar(segment.awayDangerEvents)}` : 'غير متوفر'}</span></div></div>
+      <div className="mt-2 rounded-xl border border-white/10 bg-black/25 p-2 text-[11px] leading-5 text-gray-300">
+        <span className="font-black text-gray-500">أهم حدث: </span>
+        {segment.topEvent ? <button type="button" onClick={() => onSelectEvent(segment.topEvent!.id)} className="text-right font-bold text-[#0FF0FC] hover:text-[#FFD700]">{segment.topEvent.minute ? `د${segment.topEvent.minute} - ` : ''}{eventIcon(segment.topEvent.type)} {eventLabel(segment.topEvent.type)}</button> : 'غير متوفر'}
+      </div>
+    </div>
+  );
+}
 
 export default function InternalAnimationPlayer({ matchId = '', dbMatchId = '' }: { matchId?: string; dbMatchId?: string }) {
   const [stats, setStats] = useState<LiveStatsResponse | null>(null);
@@ -316,6 +364,7 @@ export default function InternalAnimationPlayer({ matchId = '', dbMatchId = '' }
   const minute = n(latest, 'minute') ?? (isFinishedStatus(match?.status) ? 90 : null);
   const provider = sourceLabel(latest?.provider || stats?.sourceStatus?.statsProvider);
   const pressure = useMemo(() => calculatePressureModel(latest, events, minute, match?.homeTeam || null, match?.awayTeam || null), [latest, events, minute, match?.homeTeam, match?.awayTeam]);
+  const momentumSegments = useMemo(() => calculateMomentumSegments(events, match?.homeTeam || null, match?.awayTeam || null), [events, match?.homeTeam, match?.awayTeam]);
 
   useEffect(() => {
     if (!filteredEvents.length) {
@@ -376,6 +425,13 @@ export default function InternalAnimationPlayer({ matchId = '', dbMatchId = '' }
             </div>
           </div>
 
+          <div className="rounded-3xl border border-[#FFD700]/20 bg-[#FFD700]/[0.04] p-4">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2"><div><div className="text-sm font-black text-white">Match Momentum</div><div className="mt-1 text-[11px] font-bold text-gray-500">فترات السيطرة محسوبة من الأحداث المحفوظة. أرقام الهجمات التفصيلية لكل فترة تظهر غير متوفر إن لم تصل من المصدر.</div></div><span className="rounded-full border border-white/10 bg-black/30 px-3 py-1 text-[10px] font-black text-gray-400">تقسيم 15 دقيقة</span></div>
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              {momentumSegments.map((segment) => <MomentumCard key={segment.key} segment={segment} home={match?.homeTeam || null} away={match?.awayTeam || null} onSelectEvent={selectEvent} />)}
+            </div>
+          </div>
+
           <div className="rounded-3xl border border-white/10 bg-black/20 p-3">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <div className="flex flex-wrap gap-2">
@@ -430,7 +486,7 @@ export default function InternalAnimationPlayer({ matchId = '', dbMatchId = '' }
 
           <div className="rounded-3xl border border-white/10 bg-black/20 p-4">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-sm font-black text-white"><span className="inline-flex items-center gap-2"><BarChart3 size={18} className="text-[#0FF0FC]" /> إحصائيات المباراة</span><span className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-black/30 px-3 py-1 text-[10px] text-gray-400"><RefreshCw size={12} /> تحديث كل دقيقة</span></div>
-            <div className="grid gap-3 sm:grid-cols-3"><MiniStat label="ركنيات" home={n(latest, 'homeCorners')} away={n(latest, 'awayCorners')} accent /><MiniStat label="صفراء" home={n(latest, 'homeYellowCards')} away={n(latest, 'awayYellowCards')} /><MiniStat label="حمراء" home={n(latest, 'homeRedCards')} away={n(latest, 'awayRedCards')} /></div>
+            <div className="grid gap-3 sm:grid-cols-3"><MiniStat label="ركنيات" home={n(latest, 'homeCorners')} away={n(latest, 'awayCorners')} accent /><MiniStat label="صفراء" home={n(latest, 'homeYellowCards')} away={n(latest, 'awayYellowCards')} /><MiniStat label="حمراء" home={n(latest, 'homeRedCards')} away={n(latest, 'homeRedCards')} /></div>
             <div className="mt-3 grid gap-3 md:grid-cols-2"><StatRow label="الاستحواذ" home={n(latest, 'homePossession')} away={n(latest, 'awayPossession')} /><StatRow label="الهجمات" home={n(latest, 'homeAttacks')} away={n(latest, 'awayAttacks')} /><StatRow label="الهجمات الخطيرة" home={n(latest, 'homeDangerousAttacks')} away={n(latest, 'awayDangerousAttacks')} accent /><StatRow label="التسديدات" home={n(latest, 'homeShots')} away={n(latest, 'awayShots')} /><StatRow label="على المرمى" home={n(latest, 'homeShotsOnTarget')} away={n(latest, 'awayShotsOnTarget')} accent /><StatRow label="خارج المرمى" home={n(latest, 'homeShotsOffTarget')} away={n(latest, 'awayShotsOffTarget')} /></div>
           </div>
         </div>
