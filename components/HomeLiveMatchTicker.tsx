@@ -85,13 +85,13 @@ export default function HomeLiveMatchTicker({ matches = [] }: Props) {
   if (safeMatches.length === 0) return null;
 
   return (
-    <div className="relative w-full overflow-hidden py-1">
-      <div className="pointer-events-none absolute bottom-0 left-0 top-0 z-10 w-8 bg-gradient-to-r from-black/80 to-transparent" />
-      <div className="pointer-events-none absolute bottom-0 right-0 top-0 z-10 w-8 bg-gradient-to-l from-black/80 to-transparent" />
+    <div className="relative -mx-3 w-[calc(100%+1.5rem)] overflow-hidden py-1 sm:mx-0 sm:w-full">
+      <div className="pointer-events-none absolute bottom-0 left-0 top-0 z-10 w-6 bg-gradient-to-r from-[#04110D] to-transparent sm:w-8" />
+      <div className="pointer-events-none absolute bottom-0 right-0 top-0 z-10 w-6 bg-gradient-to-l from-[#04110D] to-transparent sm:w-8" />
 
       <div
         ref={scrollContainerRef}
-        className="scrollbar-none flex cursor-grab snap-x snap-mandatory gap-3 overflow-x-auto px-4 py-2 active:cursor-grabbing"
+        className="scrollbar-none flex cursor-grab snap-x snap-mandatory gap-2.5 overflow-x-auto px-3 py-2 active:cursor-grabbing sm:gap-3 sm:px-4"
       >
         {safeMatches.map((match) => {
           const live = isLive(match);
@@ -102,10 +102,10 @@ export default function HomeLiveMatchTicker({ matches = [] }: Props) {
           const matchHref = match.id ? `/matches/${match.id}` : '/matches';
 
           return (
-            <Link key={match.id} href={matchHref} className="flex-shrink-0 snap-center">
+            <Link key={match.id} href={matchHref} className="shrink-0 snap-center">
               <motion.div
                 whileHover={{ y: -2 }}
-                className={`relative flex w-60 items-center justify-between gap-4 rounded-xl border bg-black/40 p-3 backdrop-blur-md transition-all duration-300 ${
+                className={`relative flex min-h-[104px] w-[min(17.25rem,calc(100vw-2rem))] items-center justify-between gap-3 rounded-2xl border bg-black/45 p-3 backdrop-blur-md transition-all duration-300 sm:w-64 ${
                   live
                     ? 'border-[#00FF88]/40 shadow-[0_0_12px_rgba(0,255,136,0.06)]'
                     : 'border-white/10 hover:border-[#0FF0FC]/30'
@@ -132,23 +132,23 @@ export default function HomeLiveMatchTicker({ matches = [] }: Props) {
                   </span>
                 </div>
 
-                <div className="flex flex-1 flex-col gap-1">
+                <div className="flex min-w-0 flex-1 flex-col gap-1.5">
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex min-w-0 items-center gap-1.5">
-                      <img src={homeFlag || undefined} alt="" className="h-4 w-4 rounded-sm object-cover" />
-                      <span className="truncate text-xs font-bold text-white">{match.homeTeam?.name}</span>
+                      <img src={homeFlag || undefined} alt="" className="h-5 w-5 shrink-0 rounded-md object-cover" />
+                      <span className="truncate text-[12px] font-bold text-white">{match.homeTeam?.name}</span>
                     </div>
                     {(live || finished) && (
-                      <span className="text-xs font-black text-white">{match.homeScore}</span>
+                      <span className="text-sm font-black text-white">{match.homeScore}</span>
                     )}
                   </div>
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex min-w-0 items-center gap-1.5">
-                      <img src={awayFlag || undefined} alt="" className="h-4 w-4 rounded-sm object-cover" />
-                      <span className="truncate text-xs font-bold text-white">{match.awayTeam?.name}</span>
+                      <img src={awayFlag || undefined} alt="" className="h-5 w-5 shrink-0 rounded-md object-cover" />
+                      <span className="truncate text-[12px] font-bold text-white">{match.awayTeam?.name}</span>
                     </div>
                     {(live || finished) && (
-                      <span className="text-xs font-black text-white">{match.awayScore}</span>
+                      <span className="text-sm font-black text-white">{match.awayScore}</span>
                     )}
                   </div>
                 </div>
