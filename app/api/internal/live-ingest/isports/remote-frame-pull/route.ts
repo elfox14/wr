@@ -2,6 +2,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/adminAuth';
 import { extractISportsMatchId, htmlToText, parseISportsVisibleStats } from '@/lib/live-ingest/isports-page';
+import { ensureStatsTable } from '@/lib/live-match-stats';
 import prisma from '@/lib/prisma';
 
 export const dynamic = 'force-dynamic';
@@ -199,6 +200,74 @@ function extractTimelineEvents(html: string, match?: any): TimelineEvent[] {
   return [...events.values()].sort((a, b) => (a.minute ?? 999) - (b.minute ?? 999) || a.detail.localeCompare(b.detail));
 }
 
+function timelineStatCounts(events: TimelineEvent[]) {
+  const counts = {
+    minute: events.reduce<number | null>((max, event) => typeof event.minute === 'number' ? Math.max(max ?? 0, event.minute) : max, null),
+    homeScore: 0,
+    awayScore: 0,
+    homeCorners: 0,
+    awayCorners: 0,
+    homeYellowCards: 0,
+    awayYellowCards: 0,
+    homeRedCards: 0,
+    awayRedCards: 0,
+  };
+
+  for (const event of events) {
+    const prefix = event.side === 'home' ? 'home' : event.side === 'away' ? 'away' : null;
+    if (!prefix) continue;
+    if (event.type === 'goal') counts[`${prefix}Score` as 'homeScore' | 'awayScore'] += 1;
+    if (event.type === 'corner') counts[`${prefix}Corners` as 'homeCorners' | 'awayCorners'] += 1;
+    if (event.type === 'yellow_card') counts[`${prefix}YellowCards` as 'homeYellowCards' | 'awayYellowCards'] += 1;
+    if (event.type === 'red_card') counts[`${prefix}RedCards` as 'homeRedCards' | 'awayRedCards'] += 1;
+  }
+
+  return counts;
+}
+
+async function saveTimelineStatsSnapshot(match: any, providerMatchId: number, events: TimelineEvent[], replace = true) {
+  if (!match?.id || !events.length) return { deleted: 0, inserted: 0, snapshotId: null };
+  await ensureStatsTable();
+  let deleted = 0;
+  if (replace) {
+    const result = await prisma.matchStatsSnapshot.deleteMany({ where: { matchId: match.id, provider: TIMELINE_SOURCE } });
+    deleted = result.count;
+  }
+  const counts = timelineStatCounts(events);
+  const snapshot = await prisma.matchStatsSnapshot.create({
+    data: {
+      id: randomUUID(),
+      matchId: match.id,
+      provider: TIMELINE_SOURCE,
+      providerMatchId,
+      minute: counts.minute,
+      homePossession: null,
+      awayPossession: null,
+      homeAttacks: null,
+      awayAttacks: null,
+      homeDangerousAttacks: null,
+      awayDangerousAttacks: null,
+      homeShots: null,
+      awayShots: null,
+      homeShotsOnTarget: null,
+      awayShotsOnTarget: null,
+      homeShotsOffTarget: null,
+      awayShotsOffTarget: null,
+      homeCorners: counts.homeCorners,
+      awayCorners: counts.awayCorners,
+      homeYellowCards: counts.homeYellowCards,
+      awayYellowCards: counts.awayYellowCards,
+      homeRedCards: counts.homeRedCards,
+      awayRedCards: counts.awayRedCards,
+      homeScore: counts.homeScore,
+      awayScore: counts.awayScore,
+      rawData: { source: TIMELINE_SOURCE, derivedFrom: 'timeline_icons', counts, eventsCount: events.length },
+    },
+    select: { id: true },
+  });
+  return { deleted, inserted: 1, snapshotId: snapshot.id, counts };
+}
+
 async function getMatchForTimeline(input: { dbMatchId?: string | null; providerMatchId: number }) {
   if (input.dbMatchId) {
     return prisma.match.findUnique({
@@ -341,6 +410,9 @@ async function handler(req: Request) {
     const saveResult = save && mode === 'timeline'
       ? match ? await saveTimelineEvents(match, timelineEvents, wrapperUrl, replace) : { error: 'No local match found by dbMatchId or animationMatchId', deleted: 0, inserted: 0 }
       : null;
+    const statsSaveResult = save && mode === 'timeline'
+      ? match ? await saveTimelineStatsSnapshot(match, matchId, timelineEvents, replace) : { error: 'No local match found by dbMatchId or animationMatchId', deleted: 0, inserted: 0, snapshotId: null }
+      : null;
 
     return json({
       ok: true,
@@ -377,8 +449,9 @@ async function handler(req: Request) {
         eventsCount: timelineEvents.length,
         events: timelineEvents,
         save: saveResult,
+        statsSave: statsSaveResult,
       },
-      note: save ? 'Rendered with Browserless, parsed timeline icons, and saved MatchEvent rows when a local match was found.' : 'Diagnostic only unless save=true. This renders the signed iframe through Browserless /content without requiring Chromium on Render.',
+      note: save ? 'Rendered with Browserless, parsed timeline icons, saved MatchEvent rows, and saved derived timeline stats when a local match was found.' : 'Diagnostic only unless save=true. This renders the signed iframe through Browserless /content without requiring Chromium on Render.',
     });
   } catch (error: any) {
     return json({ ok: false, error: error?.message || 'Internal Server Error' }, 500);
