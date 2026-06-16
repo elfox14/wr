@@ -87,6 +87,15 @@ async function callRemoteFramePull(origin: string, adminSecret: string, input: {
     method: 'GET',
     headers: adminSecret ? { 'x-admin-secret': adminSecret } : {},
   }));
+
+  if (!response) {
+    return {
+      status: 500,
+      ok: false,
+      result: { ok: false, error: 'remote-frame-pull returned no response' },
+    };
+  }
+
   const text = await response.text();
   let parsed: any = null;
   try { parsed = JSON.parse(text); } catch {}
