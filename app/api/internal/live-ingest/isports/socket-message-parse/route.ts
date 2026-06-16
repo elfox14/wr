@@ -12,9 +12,9 @@ type ParsedRecord = {
   state: string | null;
   clock: string | null;
   minute: number | null;
-  homeScore: number | null;
-  awayScore: number | null;
   numericFields: Array<number | null>;
+  fieldMap: Record<string, string | null>;
+  likelyPayload: 'timeline_state' | 'event_record' | 'unknown';
   eventLike: boolean;
 };
 
@@ -23,12 +23,14 @@ function json(value: unknown, status = 200) {
 }
 
 function toNumber(value?: string | null) {
-  const n = Number(String(value ?? '').replace(/[^0-9.-]/g, ''));
+  const cleaned = String(value ?? '').trim().replace(/[^0-9.-]/g, '');
+  if (!cleaned) return null;
+  const n = Number(cleaned);
   return Number.isFinite(n) ? n : null;
 }
 
 function maybeMinute(value?: string | null) {
-  const text = String(value ?? '');
+  const text = String(value ?? '').trim();
   const match = text.match(/^(\d{1,3})(?::\d{1,2})?$/);
   const n = toNumber(match?.[1] || text);
   return n !== null && n >= 0 && n <= 130 ? n : null;
@@ -50,6 +52,12 @@ function splitRecords(value: string) {
     .filter(Boolean);
 }
 
+function inferPayloadType(fields: string[]) {
+  if (fields.length >= 10 && /^\d{1,3}:\d{1,2}$/.test(fields[2] || '')) return 'timeline_state' as const;
+  if (fields.length >= 5 && fields.some((field) => /^\d{1,3}$/.test(field))) return 'event_record' as const;
+  return 'unknown' as const;
+}
+
 function parseRecord(raw: string): ParsedRecord {
   const fields = String(raw || '').split('^');
   const numericFields = fields.map((field) => toNumber(field));
@@ -57,14 +65,11 @@ function parseRecord(raw: string): ParsedRecord {
   const state = fields[1] || null;
   const clock = fields.find((field) => /^\d{1,3}:\d{1,2}$/.test(field)) || null;
   const minute = maybeMinute(clock || fields[2]);
-  const scoreCandidates = fields
-    .map((field, index) => ({ index, value: toNumber(field) }))
-    .filter((item) => item.value !== null && item.value >= 0 && item.value <= 30);
-  const homeScore = scoreCandidates.length >= 2 ? scoreCandidates[scoreCandidates.length - 2].value : null;
-  const awayScore = scoreCandidates.length >= 2 ? scoreCandidates[scoreCandidates.length - 1].value : null;
+  const likelyPayload = inferPayloadType(fields);
   const eventLike = fields.length >= 5 && Boolean(providerScheduleId) && numericFields.filter((v) => v !== null).length >= 4;
+  const fieldMap = Object.fromEntries(fields.map((field, index) => [`f${index}`, field || null]));
 
-  return { raw, fields, providerScheduleId, state, clock, minute, homeScore, awayScore, numericFields, eventLike };
+  return { raw, fields, providerScheduleId, state, clock, minute, numericFields, fieldMap, likelyPayload, eventLike };
 }
 
 function normalizeInput(reqUrl: URL, bodyText: string | null) {
@@ -103,7 +108,7 @@ async function handler(req: Request) {
       mode: 'isports_socket_message_parse',
       scheduleIds,
       parsedChannels,
-      note: 'Diagnostic parser for decoded websocket payloads. It identifies provider schedule ids and record fields before we map them to local matches/events.',
+      note: 'Diagnostic parser for decoded websocket payloads. It does not infer score from timeline-state fields until the column protocol is confirmed.',
     });
   } catch (error: any) {
     return json({ ok: false, error: error?.message || 'Internal Server Error' }, 500);
