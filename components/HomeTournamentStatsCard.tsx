@@ -39,18 +39,6 @@ function formatDecimal(value?: number | null, unavailable = 'غير متوفر')
   return new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 2 }).format(value);
 }
 
-function formatPercent(value?: number | null) {
-  if (typeof value !== 'number' || !Number.isFinite(value)) return 'غير متوفر';
-  return `${new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 1 }).format(value)}%`;
-}
-
-function formatUpdateTime(value?: string | null) {
-  if (!value) return 'بانتظار أول تحديث';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return 'بانتظار أول تحديث';
-  return new Intl.DateTimeFormat('ar-EG', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).format(date);
-}
-
 function teamName(team?: { name?: string; code?: string | null } | null) {
   return team?.name || team?.code || 'غير متوفر';
 }
@@ -211,11 +199,10 @@ function PenaltyMiniCard({ kickStats, usingFbref }: { kickStats: any; usingFbref
   );
 }
 
-export default function HomeTournamentStatsCard({ playersCount: serverPlayersCount, teamsCount, upcomingMatchesCount }: Props) {
+export default function HomeTournamentStatsCard({ playersCount: serverPlayersCount, teamsCount }: Props) {
   const [stats, setStats] = useState<any>(null);
   const [fbrefStats, setFbrefStats] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [lastClientRefresh, setLastClientRefresh] = useState<Date | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -234,7 +221,6 @@ export default function HomeTournamentStatsCard({ playersCount: serverPlayersCou
           const data = await fbrefResponse.json();
           if (!cancelled && data?.ok) setFbrefStats(data);
         }
-        if (!cancelled) setLastClientRefresh(new Date());
       } catch {
         // Keep the card readable if the endpoints are temporarily unavailable.
       } finally {
@@ -262,7 +248,6 @@ export default function HomeTournamentStatsCard({ playersCount: serverPlayersCou
   const usingFbrefPenalties = !dbPenalties?.available && Boolean(fbrefPenalties?.available);
   const biggestScore = stats?.biggestScore || fbrefStats?.biggestScore || null;
   const bestCleanSheetTeam = stats?.teamLeaders?.bestCleanSheetTeam || fbrefStats?.teamLeaders?.bestCleanSheetTeam || null;
-  const sourceUpdatedAt = stats?.latestUpdatedAt || stats?.latestFinalStatsUpdatedAt || stats?.latestCardsUpdatedAt || stats?.latestEventUpdatedAt || fbrefStats?.latestUpdatedAt;
   const finalStats = stats?.finalStats || {};
   const fbrefFinalStats = fbrefStats?.finalStats || {};
   const totalShots = pickNumber(finalStats?.totalShots, fbrefFinalStats?.totalShots);
@@ -285,11 +270,6 @@ export default function HomeTournamentStatsCard({ playersCount: serverPlayersCou
           </div>
           <h1 className="mt-1.5 text-lg font-black leading-tight text-white md:text-xl">الإحصائيات</h1>
         </div>
-        <div className="rounded-xl border border-white/10 bg-black/25 px-2 py-1 text-left text-[8px] font-bold leading-3 text-gray-400">
-          <div className="font-black text-[#FFD700]">60s refresh</div>
-          <div>{isInitialLoading ? 'جاري التحميل...' : formatUpdateTime(sourceUpdatedAt)}</div>
-          <div>{lastClientRefresh ? formatUpdateTime(lastClientRefresh.toISOString()) : isLoading ? 'جاري التحميل...' : 'غير متوفر'}</div>
-        </div>
       </div>
 
       {isInitialLoading ? (
@@ -308,11 +288,6 @@ export default function HomeTournamentStatsCard({ playersCount: serverPlayersCou
           <PenaltyMiniCard kickStats={kickStats} usingFbref={usingFbrefPenalties} />
         </div>
       )}
-
-      <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-white/10 bg-black/20 px-2.5 py-1 text-[8px] font-bold text-gray-500">
-        <span>الفرق: {formatCount(teamCountValue, isInitialLoading ? LOADING_VALUE : 'غير متوفر')}</span>
-        <span>أُلغي كارت حالة المباريات · الأرقام من DB ثم FBref · بدون أرقام غير موثقة</span>
-      </div>
     </section>
   );
 }
