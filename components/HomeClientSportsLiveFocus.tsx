@@ -253,9 +253,8 @@ function MatchRow({ match, now, variant = 'normal' }: { match: HomeMatch; now: D
         <TeamBadge team={match.awayTeam} align="left" />
       </div>
 
-      <div className="mt-3 grid gap-2">
+      <div className="mt-3">
         <Link href={getBroadcastHref(match)} className="mobile-tap inline-flex w-full items-center justify-center rounded-xl bg-[#0FF0FC] px-3 py-2.5 text-center text-[11px] font-black text-black transition hover:bg-[#4AFAFF]">البث التفاعلي</Link>
-        <Link href="/matches" className="mobile-tap inline-flex w-full items-center justify-center rounded-xl border border-white/10 bg-white/[0.06] px-3 py-2 text-center text-[11px] font-black text-gray-200 transition hover:bg-white/[0.1]">باقي المباريات</Link>
       </div>
     </article>
   );
