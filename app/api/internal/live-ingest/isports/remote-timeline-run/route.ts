@@ -64,6 +64,7 @@ function compactPullResult(result: any) {
     timeline: result?.timeline ? {
       eventsCount: result.timeline.eventsCount,
       save: result.timeline.save || null,
+      statsSave: result.timeline.statsSave || null,
       eventsPreview: Array.isArray(result.timeline.events) ? result.timeline.events.slice(0, 5) : [],
     } : null,
     error: result?.error || null,
@@ -110,6 +111,7 @@ export async function GET(req: Request) {
     const startedAt = Date.now();
     const url = new URL(req.url);
     const take = clampInt(url.searchParams.get('take'), DEFAULT_TAKE, 1, MAX_TAKE);
+    const skip = clampInt(url.searchParams.get('skip'), 0, 0, 500);
     const timeoutMs = clampInt(url.searchParams.get('timeoutMs'), Number(process.env.LIVE_STATS_REMOTE_BROWSER_TIMEOUT_MS || 25000), 5000, 60000);
     const waitMs = clampInt(url.searchParams.get('waitMs'), Number(process.env.LIVE_STATS_REMOTE_BROWSER_WAIT_MS || 12000), 1000, 30000);
     const save = boolFromParam(url.searchParams.get('save'), true);
@@ -131,6 +133,7 @@ export async function GET(req: Request) {
           ? { animationMatchId: Math.floor(explicitProviderMatchId) }
           : { animationMatchId: { not: null }, matchDate: { gte: dateFrom, lte: dateTo } },
       orderBy: [{ matchDate: 'desc' }],
+      skip: explicitDbMatchId || (Number.isFinite(explicitProviderMatchId) && explicitProviderMatchId > 0) ? 0 : skip,
       take,
       include: { homeTeam: { select: { id: true, name: true, code: true } }, awayTeam: { select: { id: true, name: true, code: true } } },
     });
@@ -179,12 +182,14 @@ export async function GET(req: Request) {
       save,
       replace,
       take,
+      skip,
+      nextSkip: skip + results.length,
       dateFrom: dateFrom.toISOString(),
       dateTo: dateTo.toISOString(),
       processed: results.length,
       durationMs: Date.now() - startedAt,
       results,
-      note: 'Runs Browserless timeline ingestion for linked matches only. Use take/dateFrom/dateTo to control Browserless usage.',
+      note: 'Runs Browserless timeline ingestion for linked matches only. Use take/skip/dateFrom/dateTo to control Browserless usage.',
     });
   } catch (error: any) {
     return json({ ok: false, error: error?.message || 'Internal Server Error' }, 500);
