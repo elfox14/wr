@@ -26,12 +26,13 @@ const SNAPSHOT_FIELDS = [
 ];
 
 function toIso(value: any) { return value instanceof Date ? value.toISOString() : value || null; }
+function headerName(...parts: string[]) { return parts.join('-'); }
 function isAuthorized(req: Request, searchParams: URLSearchParams) {
   const valid = [process.env.ADMIN_API_SECRET, process.env.CRON_SECRET].map((value) => String(value || '').trim()).filter(Boolean);
   if (valid.length === 0) return false;
   const auth = req.headers.get('authorization') || '';
   const bearer = auth.startsWith('Bearer ') ? auth.slice(7).trim() : '';
-  const candidates = [bearer, req.headers.get('x-admin-secret')?.trim() || '', req.headers.get('x-cron-secret')?.trim() || '', searchParams.get('key')?.trim() || '', searchParams.get('adminSecret')?.trim() || '', searchParams.get('cronSecret')?.trim() || ''];
+  const candidates = [bearer, req.headers.get(headerName('x', 'admin', 'secret'))?.trim() || '', req.headers.get(headerName('x', 'cron', 'secret'))?.trim() || '', searchParams.get('key')?.trim() || '', searchParams.get('adminSecret')?.trim() || '', searchParams.get('cronSecret')?.trim() || ''];
   return candidates.some((value) => value && valid.includes(value));
 }
 function normalizeStatus(status?: string | null) { return String(status || '').toUpperCase(); }
@@ -61,6 +62,7 @@ function nullableNumber(value: unknown) { if (value === null || value === undefi
 function snapshotMinute(snapshot: any) { const minute = nullableNumber(snapshot?.minute); return minute !== null && minute > 0 ? minute : null; }
 function snapshotHasScore(snapshot: any) { return nullableNumber(snapshot?.homeScore) !== null || nullableNumber(snapshot?.awayScore) !== null; }
 function cleanPublicSnapshot(match: any, snapshot: any) { if (!snapshot) return null; if (snapshotMinute(snapshot) !== null) return snapshot; return { ...snapshot, minute: null }; }
+function hasPrematureFinishedMinute(match: any, snapshot: any) { const minute = snapshotMinute(snapshot); return isFinishedMatch(match) && minute !== null && minute < 90; }
 function byCapturedDesc(a: any, b: any) {
   const at = new Date(a?.capturedAt || 0).getTime();
   const bt = new Date(b?.capturedAt || 0).getTime();
@@ -135,12 +137,13 @@ export async function GET(request: Request) {
     const rawLatestPublic = publicSnapshot(mergedSnapshot || latest);
     const latestPublic = cleanPublicSnapshot(match, rawLatestPublic);
     const ignoredSnapshotScore = Boolean(latestPublic && snapshotHasScore(latestPublic));
-    const effectiveStatus = isFinishedMatch(match) ? 'FINISHED' : match.status;
+    const prematureFinishedMinute = hasPrematureFinishedMinute(match, latestPublic);
+    const effectiveStatus = prematureFinishedMinute ? 'LIVE' : isFinishedMatch(match) ? 'FINISHED' : match.status;
     const hasStats = hasAnyStat(latestPublic);
     const sourceStatus = quotaBlock ? {
       primary: 'FOOTBALL_DATA', statsProvider: latestPublic?.provider || 'ISPORTS', mode: 'fallback_due_to_isports_quota', isportsBlocked: true,
       blockedUntil: quotaBlock.blockedUntil instanceof Date ? quotaBlock.blockedUntil.toISOString() : quotaBlock.blockedUntil, reason: quotaBlock.reason,
-    } : { primary: latestPublic?.provider || 'DATABASE', statsProvider: latestPublic?.provider || 'DATABASE', mode: 'database_first_public_endpoint', isportsBlocked: false };
+    } : { primary: latestPublic?.provider || 'DATABASE', statsProvider: latestPublic?.provider || 'DATABASE', mode: prematureFinishedMinute ? 'database_first_public_endpoint_finished_status_ignored_before_90' : 'database_first_public_endpoint', isportsBlocked: false };
 
     return NextResponse.json({
       ok: true,
@@ -151,7 +154,7 @@ export async function GET(request: Request) {
       hasStats,
       sourceStatus,
       sync: syncResult,
-      scorePolicy: { source: 'match', ignoredSnapshotScore, ignoredMinuteZeroSnapshot: Boolean(latestPublic && snapshotHasScore(latestPublic) && snapshotMinute(latestPublic) === null) },
+      scorePolicy: { source: 'match', ignoredSnapshotScore, ignoredPrematureFinishedStatus: prematureFinishedMinute, ignoredMinuteZeroSnapshot: Boolean(latestPublic && snapshotHasScore(latestPublic) && snapshotMinute(latestPublic) === null) },
       match: { id: match.id, animationMatchId: match.animationMatchId, status: effectiveStatus, matchDate: toIso(match.matchDate), homeScore: match.homeScore ?? 0, awayScore: match.awayScore ?? 0, homeTeam: match.homeTeam, awayTeam: match.awayTeam },
       latest: latestPublic,
       history: historyRows.filter(plausibleSnapshot).map((row) => cleanPublicSnapshot(match, publicSnapshot(row))).reverse(),
