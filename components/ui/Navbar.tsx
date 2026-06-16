@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { Menu, X } from 'lucide-react';
 
@@ -34,7 +35,7 @@ export function Navbar() {
           <div className="flex min-h-[68px] items-center justify-between gap-3 lg:min-h-[84px]">
             <Link href="/" onClick={closeMenu} className="group flex shrink-0 items-center gap-2" aria-label="MC PRIME World Cup الرئيسية">
               <span className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-[#FFD700]/25 bg-white p-1 shadow-[0_0_20px_rgba(255,215,0,0.13)] transition group-hover:scale-[1.02] lg:h-14 lg:w-14">
-                <img src={logoSrc} alt="World Cup 2026" className="h-full w-full object-contain" />
+                <Image src={logoSrc} alt="World Cup 2026" width={56} height={56} className="h-full w-full object-contain" priority />
               </span>
             </Link>
 
