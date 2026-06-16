@@ -98,9 +98,9 @@ function MiniCard({
 }) {
   const style = toneStyles(tone);
   const body = (
-    <article className={`group relative h-[104px] overflow-hidden rounded-2xl border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.052),rgba(0,0,0,0.25))] p-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_8px_22px_rgba(0,0,0,0.16)] transition hover:-translate-y-0.5 ${style.border}`}>
+    <article className={`group relative h-[118px] overflow-hidden rounded-2xl border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.052),rgba(0,0,0,0.25))] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_8px_22px_rgba(0,0,0,0.16)] transition hover:-translate-y-0.5 ${style.border}`}>
       <div className={`absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent ${style.line} to-transparent`} />
-      <div className="relative z-10 flex h-full flex-col justify-between gap-1">
+      <div className="relative z-10 flex h-full flex-col justify-between gap-1.5">
         <div className="flex items-start justify-between gap-1.5">
           <div className={`truncate text-[9px] font-black ${style.value}`}>{title}</div>
           <SourceBadge source={source} />
@@ -120,7 +120,7 @@ function MiniCard({
 
 function MiniChip({ label, value, className = '' }: { label: string; value: string; className?: string }) {
   return (
-    <div className={`rounded-lg border px-1.5 py-1 text-center ${className}`}>
+    <div className={`rounded-lg border px-2 py-1.5 text-center ${className}`}>
       <div className="truncate text-sm font-black leading-none">{value}</div>
       <div className="mt-0.5 truncate text-[7px] font-bold opacity-75">{label}</div>
     </div>
@@ -135,15 +135,15 @@ function DisciplineMiniCard({ yellow, red, source }: { yellow: number | null; re
   return (
     <MiniCard title="الانضباط" source={source} tone="red" href="/matches">
       <div className="grid grid-cols-2 gap-1.5">
-        <div className="h-[64px] rounded-xl border border-[#FFD700]/35 bg-[#FFD700] p-1.5 text-black shadow-[0_5px_14px_rgba(255,215,0,0.12)] transition group-hover:-rotate-1">
+        <div className="h-[76px] rounded-xl border border-[#FFD700]/35 bg-[#FFD700] p-2 text-black shadow-[0_5px_14px_rgba(255,215,0,0.12)] transition group-hover:-rotate-1">
           <div className="text-[7px] font-black uppercase tracking-[0.12em] text-black/55">Yellow</div>
-          <div className="mt-1 text-3xl font-black leading-none">{formatCount(yellow)}</div>
-          <div className="mt-0.5 text-[8px] font-black text-black/65">صفراء</div>
+          <div className="mt-1.5 text-3xl font-black leading-none">{formatCount(yellow)}</div>
+          <div className="mt-1 text-[8px] font-black text-black/65">صفراء</div>
         </div>
-        <div className="h-[64px] rounded-xl border border-red-300/35 bg-red-600 p-1.5 text-white shadow-[0_5px_14px_rgba(248,113,113,0.13)] transition group-hover:rotate-1">
+        <div className="h-[76px] rounded-xl border border-red-300/35 bg-red-600 p-2 text-white shadow-[0_5px_14px_rgba(248,113,113,0.13)] transition group-hover:rotate-1">
           <div className="text-[7px] font-black uppercase tracking-[0.12em] text-white/65">Red</div>
-          <div className="mt-1 text-3xl font-black leading-none">{formatCount(red)}</div>
-          <div className="mt-0.5 text-[8px] font-black text-white/75">حمراء</div>
+          <div className="mt-1.5 text-3xl font-black leading-none">{formatCount(red)}</div>
+          <div className="mt-1 text-[8px] font-black text-white/75">حمراء</div>
         </div>
       </div>
     </MiniCard>
@@ -156,15 +156,15 @@ function ShotsMiniCard({ totalShots, onTarget, matches, source }: { totalShots: 
     <MiniCard title="التسديدات" source={source} tone="cyan" href="/matches">
       <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-1.5">
         <MiniChip label="تسديدة" value={formatCount(totalShots)} className="border-white/10 bg-black/20 text-white" />
-        <div className="relative h-8 w-8 rounded-full border border-[#0FF0FC]/45 bg-[#0FF0FC]/10">
+        <div className="relative h-9 w-9 rounded-full border border-[#0FF0FC]/45 bg-[#0FF0FC]/10">
           <span className="absolute inset-2 rounded-full border border-[#0FF0FC]/30" />
           <span className="absolute left-1/2 top-1/2 h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#0FF0FC]" />
         </div>
         <MiniChip label="على المرمى" value={formatCount(onTarget)} className="border-[#0FF0FC]/18 bg-[#0FF0FC]/10 text-[#0FF0FC]" />
       </div>
-      <div className="mt-1.5">
+      <div className="mt-2">
         <div className="mb-0.5 flex justify-between text-[7px] font-bold text-gray-500"><span>الدقة</span><span>{accuracy !== null ? formatPercent(accuracy) : 'غير متوفر'}</span></div>
-        <div className="h-1 overflow-hidden rounded-full bg-white/[0.08]"><div className="h-full rounded-full bg-[#0FF0FC]" style={{ width: `${accuracy || 0}%` }} /></div>
+        <div className="h-1.5 overflow-hidden rounded-full bg-white/[0.08]"><div className="h-full rounded-full bg-[#0FF0FC]" style={{ width: `${accuracy || 0}%` }} /></div>
         <div className="mt-0.5 text-[7px] font-bold text-gray-500">{formatCount(matches)} مباراة</div>
       </div>
     </MiniCard>
@@ -181,15 +181,15 @@ function PenaltyMiniCard({ kickStats, usingFbref }: { kickStats: any; usingFbref
     <MiniCard title="ركلات الجزاء" source={usingFbref ? 'FBref' : available ? 'DB/Event' : '—'} tone="gold">
       {available ? (
         <>
-          <div className="grid grid-cols-3 gap-1">
+          <div className="grid grid-cols-3 gap-1.5">
             <MiniChip label="إجمالي" value={formatCount(total)} className="border-white/10 bg-black/20 text-white" />
             <MiniChip label="مسجلة" value={formatCount(scored)} className="border-[#00FF88]/18 bg-[#00FF88]/10 text-[#00FF88]" />
             <MiniChip label="ضائعة" value={formatCount(missed)} className="border-red-300/18 bg-red-400/10 text-red-100" />
           </div>
-          <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-white/[0.08]"><div className="h-full rounded-full bg-[#00FF88]" style={{ width: `${conversion || 0}%` }} /></div>
+          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/[0.08]"><div className="h-full rounded-full bg-[#00FF88]" style={{ width: `${conversion || 0}%` }} /></div>
         </>
       ) : (
-        <div className="rounded-lg border border-dashed border-[#FFD700]/18 bg-black/20 p-2 text-center">
+        <div className="rounded-lg border border-dashed border-[#FFD700]/18 bg-black/20 p-2.5 text-center">
           <div className="text-xs font-black text-gray-200">بانتظار توثيق</div>
           <div className="mt-0.5 text-[7px] font-bold text-gray-500">لا يوجد رقم مؤكد</div>
         </div>
@@ -214,7 +214,7 @@ function MatchFlowMiniCard({ finished, live, scheduled, source }: { finished: nu
           <div>متبقية <span className="text-white">{formatCount(scheduled)}</span></div>
         </div>
       </div>
-      <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white/[0.08]">
+      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/[0.08]">
         <div className="h-full rounded-full bg-[#00FF88]" style={{ width: `${finishedPct}%` }} />
         <div className="-mt-1.5 h-full rounded-full bg-[#FFD700]" style={{ width: `${Math.min(100, finishedPct + livePct)}%`, opacity: livePct > 0 ? 0.9 : 0 }} />
       </div>
@@ -236,7 +236,7 @@ function CleanSheetMiniCard({ cleanSheets, bestTeam, usingFbref }: { cleanSheets
   return (
     <MiniCard title="الشباك النظيفة" source={sourceFrom(usingFbref, true)} tone="green" href="/matches">
       <div className="flex items-center gap-2">
-        <div className="relative h-9 w-12 shrink-0 rounded-lg border border-[#00FF88]/35"><span className="absolute inset-x-2 top-1/2 h-px bg-[#00FF88]/25" /><span className="absolute left-1/3 top-0 h-full w-px bg-[#00FF88]/20" /><span className="absolute right-1/3 top-0 h-full w-px bg-[#00FF88]/20" /></div>
+        <div className="relative h-10 w-14 shrink-0 rounded-lg border border-[#00FF88]/35"><span className="absolute inset-x-2 top-1/2 h-px bg-[#00FF88]/25" /><span className="absolute left-1/3 top-0 h-full w-px bg-[#00FF88]/20" /><span className="absolute right-1/3 top-0 h-full w-px bg-[#00FF88]/20" /></div>
         <div className="min-w-0">
           <div className="text-3xl font-black leading-none text-[#00FF88]">{formatCount(cleanSheets)}</div>
           <div className="truncate text-[8px] font-bold text-gray-500">{bestTeam ? shortText(teamName(bestTeam), 18) : 'غير متوفر'}</div>
@@ -332,11 +332,11 @@ export default function HomeTournamentStatsCard({ playersCount: serverPlayersCou
       </div>
 
       {isInitialLoading ? (
-        <div className="grid auto-rows-[104px] grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-10">
+        <div className="grid auto-rows-[118px] grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-10">
           {['الأهداف', 'الحالة', 'اللاعبون', 'الهجوم', 'التسديدات', 'الانضباط', 'الجزاءات', 'الشباك', 'أكبر نتيجة', 'المتوسط'].map((label) => <LoadingBox key={label} label={label} />)}
         </div>
       ) : (
-        <div className="grid auto-rows-[104px] grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-10">
+        <div className="grid auto-rows-[118px] grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-10">
           <MiniCard title="أهداف البطولة" value={formatCount(totalGoals)} subtitle={`${formatCount(finishedMatches)} مباراة منتهية`} source={sourceFrom(usingFbrefGoals, true)} tone="gold" href="/matches" />
           <MiniCard title="متوسط الأهداف" value={formatDecimal(averageGoals)} subtitle="هدف لكل مباراة" source={sourceFrom(usingFbrefGoals, true)} tone="cyan" href="/matches" />
           <MatchFlowMiniCard finished={finishedMatches} live={liveMatches} scheduled={scheduledMatches} source={stats?.finishedMatches ? 'DB' : 'FBref'} />
