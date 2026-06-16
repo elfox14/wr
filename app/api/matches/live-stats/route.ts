@@ -13,7 +13,7 @@ import { getProviderQuotaBlock } from '@/lib/provider-quota-guard';
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-const LIVE_STATUSES = ['IN_PLAY', 'LIVE', 'HT'];
+const LIVE_STATUSES = ['IN_PLAY', 'LIVE', '1H', '2H', 'HT'];
 const FINISHED_STATUSES = ['FINISHED', 'FT', 'AET', 'PEN'];
 const GROUP_STAGE_MAX_LIVE_MINUTES = 115;
 const KNOCKOUT_MAX_LIVE_MINUTES = 150;
