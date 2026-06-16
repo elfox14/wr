@@ -96,15 +96,50 @@ function maskSocketUrl(value: string) {
   return url.toString();
 }
 
-function asString(buffer: Buffer) {
-  const text = buffer.toString('utf8');
-  const printable = text.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '').trim();
-  return printable || null;
+function qualityScore(text: string | null) {
+  if (!text) return 0;
+  const sample = text.slice(0, 4000);
+  if (!sample) return 0;
+  let score = 0;
+  for (const char of sample) {
+    const code = char.charCodeAt(0);
+    if (char === '\ufffd') score -= 8;
+    else if (code === 9 || code === 10 || code === 13 || (code >= 32 && code <= 126)) score += 2;
+    else if (code >= 0x4e00 && code <= 0x9fff) score += 2;
+    else if (code >= 32 && code !== 127) score += 1;
+    else score -= 3;
+  }
+  if (/^[\[{]/.test(sample.trim())) score += 20;
+  if (/\d+[,^!$]{1,2}\d+/.test(sample)) score += 12;
+  if (/goal|corner|attack|danger|stats?|进球|角球|进攻/i.test(sample)) score += 18;
+  return score;
+}
+
+function cleanString(text: string) {
+  return text.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '').trim();
+}
+
+function asUtf8(buffer: Buffer) {
+  const text = cleanString(buffer.toString('utf8'));
+  return text || null;
+}
+
+function asLatin1StringBuffer(text: string) {
+  const bytes = new Uint8Array(text.length);
+  for (let i = 0; i < text.length; i += 1) bytes[i] = text.charCodeAt(i) & 0xff;
+  return Buffer.from(bytes);
+}
+
+function bestDecoded(candidates: Array<{ encoding: string; text: string | null }>) {
+  const valid = candidates.filter((candidate) => candidate.text);
+  if (!valid.length) return null;
+  return valid
+    .map((candidate) => ({ ...candidate, score: qualityScore(candidate.text) }))
+    .sort((a, b) => b.score - a.score)[0];
 }
 
 function decodeBuffer(buffer: Buffer) {
-  const direct = asString(buffer);
-  if (direct && direct.length >= Math.min(2, buffer.length)) return { encoding: 'utf8', text: direct };
+  const candidates: Array<{ encoding: string; text: string | null }> = [];
   const decoders = [
     { name: 'unzip', fn: unzipSync },
     { name: 'gunzip', fn: gunzipSync },
@@ -113,15 +148,31 @@ function decodeBuffer(buffer: Buffer) {
   ];
   for (const decoder of decoders) {
     try {
-      const text = asString(decoder.fn(buffer));
-      if (text) return { encoding: decoder.name, text };
+      candidates.push({ encoding: decoder.name, text: asUtf8(decoder.fn(buffer)) });
     } catch {}
   }
-  return { encoding: 'binary', text: buffer.subarray(0, 120).toString('hex') };
+  candidates.push({ encoding: 'utf8', text: asUtf8(buffer) });
+  candidates.push({ encoding: 'latin1', text: cleanString(buffer.toString('latin1')) || null });
+
+  const best = bestDecoded(candidates);
+  if (best && best.score > 0) return { encoding: best.encoding, text: best.text || '' };
+  return { encoding: 'binary', text: buffer.subarray(0, 180).toString('hex') };
+}
+
+function decodeStringPayload(value: string) {
+  const direct = cleanString(value);
+  const binaryBuffer = asLatin1StringBuffer(value);
+  const decodedBinary = decodeBuffer(binaryBuffer);
+  const best = bestDecoded([
+    { encoding: 'text', text: direct || null },
+    { encoding: `binaryString:${decodedBinary.encoding}`, text: decodedBinary.text },
+  ]);
+  if (best && best.score > 0) return { encoding: best.encoding, text: best.text || '' };
+  return { encoding: 'text', text: direct || value };
 }
 
 async function messageToDecoded(data: any) {
-  if (typeof data === 'string') return { encoding: 'text', text: data };
+  if (typeof data === 'string') return decodeStringPayload(data);
   if (Buffer.isBuffer(data)) return decodeBuffer(data);
   if (data instanceof ArrayBuffer) return decodeBuffer(Buffer.from(data));
   if (ArrayBuffer.isView(data)) return decodeBuffer(Buffer.from(data.buffer, data.byteOffset, data.byteLength));
@@ -160,9 +211,12 @@ async function probeSocket(socketUrl: string, channel: string, timeoutMs: number
     let closeCode: number | null = null;
     let closeReason: string | null = null;
     let ws: any = null;
+    let finished = false;
     const startedAt = Date.now();
 
     const finish = () => {
+      if (finished) return;
+      finished = true;
       try { if (ws && !closed) ws.close(); } catch {}
       resolve({ supported: true, opened, closed, closeCode, closeReason, durationMs: Date.now() - startedAt, messages, errors });
     };
