@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { Activity, ArrowLeft, BarChart3, CalendarDays, CheckCircle2, Clock, Radio, Shield } from 'lucide-react';
 import prisma from '@/lib/prisma';
+import InternalAnimationPlayer from '@/app/animation-live/player/InternalAnimationPlayer';
 import LiveMatchStatsPanel from '@/app/animation-live/player/LiveMatchStatsPanel';
 import { getTeamFlagUrl } from '@/lib/teamFlags';
 
@@ -11,8 +12,8 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 export const metadata: Metadata = {
-  title: 'مركز المباراة | MC PRIME World Cup',
-  description: 'مركز المباراة: بطاقة المباراة، البث التفاعلي، وإحصائيات المباراة عند توفر البيانات.',
+  title: 'البث التفاعلي | MC PRIME World Cup',
+  description: 'البث التفاعلي للمباراة: بطاقة المباراة، الملعب التفاعلي، الإحصائيات، والأحداث المهمة.',
 };
 
 const LIVE_STATUSES = ['IN_PLAY', 'LIVE', 'HT'];
@@ -126,9 +127,7 @@ export default async function MatchCenterPage({ params }: { params: Promise<{ id
   const rawStatus = matchStatusValue(match);
   const finished = isFinishedMatch(match);
   const showScore = finished || !NOT_STARTED_STATUSES.includes(rawStatus);
-  const animationHref = match.animationMatchId
-    ? `/animation-live/player?matchId=${encodeURIComponent(String(match.animationMatchId))}&dbMatchId=${encodeURIComponent(String(match.id))}&lang=en&statsPanel=simple&teamPanel=1`
-    : '/animation-live';
+  const animationMatchId = match.animationMatchId ? String(match.animationMatchId) : '';
 
   return (
     <main className="min-h-screen bg-background px-3 py-4 text-white sm:px-6 sm:py-6 lg:px-8" dir="rtl">
@@ -137,7 +136,7 @@ export default async function MatchCenterPage({ params }: { params: Promise<{ id
           <Link href="/matches" className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-white/10 bg-black/20 px-3 text-sm font-black text-gray-300 transition hover:border-[#0FF0FC]/30 hover:text-white">
             <ArrowLeft size={16} /> العودة إلى المباريات
           </Link>
-          <span className="rounded-xl border border-[#FFD700]/20 bg-[#FFD700]/10 px-3 py-2 text-[11px] font-black text-[#FFD700]">مركز المباراة</span>
+          <span className="rounded-xl border border-[#FFD700]/20 bg-[#FFD700]/10 px-3 py-2 text-[11px] font-black text-[#FFD700]">البث التفاعلي</span>
         </div>
 
         <section className="relative overflow-hidden rounded-[1.45rem] border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(15,240,252,0.12),transparent_30%),radial-gradient(circle_at_bottom_left,rgba(255,215,0,0.10),transparent_34%),linear-gradient(145deg,rgba(7,24,18,0.96),rgba(3,12,11,0.99))] p-3 shadow-[0_18px_50px_rgba(0,0,0,0.28)] backdrop-blur sm:rounded-[2rem] sm:p-6">
@@ -165,13 +164,17 @@ export default async function MatchCenterPage({ params }: { params: Promise<{ id
           </div>
 
           <div className="mt-5 grid grid-cols-2 gap-2">
-            <Link href="#match-stats" className="inline-flex min-h-11 items-center justify-center rounded-xl border border-white/10 bg-white/[0.06] px-3 py-2 text-center text-[11px] font-black text-gray-200 transition hover:bg-white/[0.1]">تفاصيل المباراة</Link>
-            {!finished ? <Link href={animationHref} className="inline-flex min-h-11 items-center justify-center rounded-xl bg-[#0FF0FC] px-3 py-2 text-center text-[11px] font-black text-black transition hover:bg-[#4AFAFF]">البث التفاعلي</Link> : <span className="inline-flex min-h-11 items-center justify-center rounded-xl border border-[#FFD700]/20 bg-[#FFD700]/10 px-3 py-2 text-center text-[11px] font-black text-[#FFD700]">أرشيف المباراة</span>}
+            <Link href="#live-broadcast" className="inline-flex min-h-11 items-center justify-center rounded-xl bg-[#0FF0FC] px-3 py-2 text-center text-[11px] font-black text-black transition hover:bg-[#4AFAFF]">البث التفاعلي</Link>
+            <Link href="#match-stats" className="inline-flex min-h-11 items-center justify-center rounded-xl border border-white/10 bg-white/[0.06] px-3 py-2 text-center text-[11px] font-black text-gray-200 transition hover:bg-white/[0.1]">الإحصائيات والأحداث</Link>
           </div>
         </section>
 
-        <Panel id="match-stats" title="إحصائيات ومجريات المباراة" icon={<BarChart3 className="text-[#0FF0FC]" />} action={<Link href={animationHref} className="text-xs font-black text-[#0FF0FC]">فتح البث</Link>}>
-          <LiveMatchStatsPanel matchId={match.animationMatchId ? String(match.animationMatchId) : undefined} dbMatchId={match.id} />
+        <Panel id="live-broadcast" title="البث التفاعلي" icon={<Radio className="text-[#FFD700]" />}>
+          <InternalAnimationPlayer matchId={animationMatchId} dbMatchId={match.id} />
+        </Panel>
+
+        <Panel id="match-stats" title="إحصائيات ومجريات المباراة" icon={<BarChart3 className="text-[#0FF0FC]" />}>
+          <LiveMatchStatsPanel matchId={animationMatchId || undefined} dbMatchId={match.id} />
         </Panel>
       </section>
     </main>
@@ -192,6 +195,6 @@ function InfoTile({ icon, label, value }: { icon: ReactNode; label: string; valu
   return <div className="rounded-2xl border border-white/10 bg-black/25 px-3 py-2.5"><div className="mb-1 flex items-center gap-1.5 text-[10px] font-black text-gray-500"><span className="text-[#0FF0FC]">{icon}</span>{label}</div><div className="truncate text-xs font-black text-white sm:text-sm">{value}</div></div>;
 }
 
-function Panel({ id, title, icon, action, children }: { id?: string; title: string; icon?: ReactNode; action?: ReactNode; children: ReactNode }) {
-  return <section id={id} className="rounded-[1.45rem] border border-white/10 bg-white/[0.035] p-3 shadow-card sm:rounded-[1.5rem] sm:p-5"><div className="mb-4 flex items-center justify-between gap-4"><h3 className="flex min-w-0 items-center gap-2 text-base font-black text-white sm:text-xl">{icon}{title}</h3>{action}</div>{children}</section>;
+function Panel({ id, title, icon, children }: { id?: string; title: string; icon?: ReactNode; children: ReactNode }) {
+  return <section id={id} className="rounded-[1.45rem] border border-white/10 bg-white/[0.035] p-3 shadow-card sm:rounded-[1.5rem] sm:p-5"><div className="mb-4 flex items-center justify-between gap-4"><h3 className="flex min-w-0 items-center gap-2 text-base font-black text-white sm:text-xl">{icon}{title}</h3></div>{children}</section>;
 }
