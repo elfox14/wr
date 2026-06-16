@@ -110,21 +110,6 @@ function isConfirmedLive(match?: HomeMatch | null) {
   return !isFinished(match) && !isHalfTime(match) && (LIVE_STATUSES.includes(status) || Boolean(match?.isLiveNow));
 }
 
-function inferRealMatchMinute(match: HomeMatch, now: Date) {
-  if (isFinished(match)) return 90;
-  if (isHalfTime(match)) return 45;
-
-  const kickoff = match.matchDate ? new Date(match.matchDate).getTime() : NaN;
-  if (Number.isFinite(kickoff)) {
-    const minute = Math.floor((now.getTime() - kickoff) / 60_000) + 1;
-    if (minute >= 1) return Math.max(1, Math.min(135, minute));
-  }
-
-  return typeof match.minute === 'number' && Number.isFinite(match.minute) && match.minute > 0
-    ? Math.max(1, Math.min(135, Math.floor(match.minute)))
-    : null;
-}
-
 function isScheduled(match?: HomeMatch | null) {
   return !isFinished(match) && SCHEDULED_STATUSES.includes(normalizeStatus(match));
 }
@@ -218,12 +203,11 @@ function MatchStatePill({ match, now }: { match: HomeMatch; now: Date }) {
   }
 
   if (isHalfTime(match)) {
-    return <span className="rounded-xl border border-[#FFD700]/20 bg-[#FFD700]/10 px-2.5 py-1.5 text-[11px] font-black text-[#FFD700]">استراحة - 45′</span>;
+    return <span className="rounded-xl border border-[#FFD700]/20 bg-[#FFD700]/10 px-2.5 py-1.5 text-[11px] font-black text-[#FFD700]">استراحة</span>;
   }
 
   if (isConfirmedLive(match)) {
-    const minute = inferRealMatchMinute(match, now);
-    return <span className="rounded-xl border border-[#00FF88]/25 bg-[#00FF88]/10 px-2.5 py-1.5 text-[11px] font-black text-[#00FF88]">{minute ? `${minute}′` : match.liveLabel || 'جارية الآن'}</span>;
+    return <span className="rounded-xl border border-[#00FF88]/25 bg-[#00FF88]/10 px-2.5 py-1.5 text-[11px] font-black text-[#00FF88]">جارية الآن</span>;
   }
 
   if (isWaitingForStartConfirmation(match, now)) {
@@ -269,8 +253,9 @@ function MatchRow({ match, now, variant = 'normal' }: { match: HomeMatch; now: D
         <TeamBadge team={match.awayTeam} align="left" />
       </div>
 
-      <div className="mt-3">
+      <div className="mt-3 grid gap-2">
         <Link href={getBroadcastHref(match)} className="mobile-tap inline-flex w-full items-center justify-center rounded-xl bg-[#0FF0FC] px-3 py-2.5 text-center text-[11px] font-black text-black transition hover:bg-[#4AFAFF]">البث التفاعلي</Link>
+        <Link href="/matches" className="mobile-tap inline-flex w-full items-center justify-center rounded-xl border border-white/10 bg-white/[0.06] px-3 py-2 text-center text-[11px] font-black text-gray-200 transition hover:bg-white/[0.1]">باقي المباريات</Link>
       </div>
     </article>
   );
@@ -321,19 +306,8 @@ function MatchCenter({ fallbackMatches = [], nextMatch = null }: { fallbackMatch
 
   return (
     <section className="flex h-auto flex-col overflow-hidden rounded-[1.45rem] border border-white/10 bg-white/[0.04] p-3 text-white shadow-[0_14px_38px_rgba(0,0,0,0.2)] backdrop-blur sm:rounded-3xl sm:p-4" aria-label="مباريات كأس العالم">
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#FFD700]">Match Center</p>
-          <h2 className="mt-1 truncate text-lg font-black text-white sm:text-xl">مركز المباريات</h2>
-        </div>
-        <Link href="/matches" className="mobile-tap shrink-0 rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-[11px] font-black text-white transition hover:border-[#0FF0FC]/40 hover:bg-white/[0.14]">جدول المباريات</Link>
-      </div>
-
       <div className="flex flex-col gap-4">
         <div>
-          {primaryMatch && (isConfirmedLive(primaryMatch) || isHalfTime(primaryMatch)) ? (
-            <div className="mb-2 text-[10px] font-black uppercase tracking-[0.14em] text-gray-400">المباراة الجارية</div>
-          ) : null}
           {primaryMatch ? (
             <MatchRow match={primaryMatch} now={now} variant={isConfirmedLive(primaryMatch) || isHalfTime(primaryMatch) ? 'live' : 'primary'} />
           ) : (
