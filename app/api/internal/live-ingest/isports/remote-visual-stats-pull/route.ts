@@ -12,6 +12,8 @@ export const runtime = 'nodejs';
 const HOSTS = new Set(['isportslive8.com', 'www.isportslive8.com']);
 const VISUAL_SOURCE = 'ISPORTS_REMOTE_LIVE';
 
+type VisualPair = { label: string; home: string | number | null; away: string | number | null; sourceUrl?: string | null };
+
 function json(value: unknown, status = 200) {
   return NextResponse.json(value, { status, headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } });
 }
@@ -49,7 +51,29 @@ function maskUrl(value: string) {
   return url.toString();
 }
 function emptyStats(): NormalizedStats {
-  return { minute: null, homePossession: null, awayPossession: null, homeAttacks: null, awayAttacks: null, homeDangerousAttacks: null, awayDangerousAttacks: null, homeShots: null, awayShots: null, homeShotsOnTarget: null, awayShotsOnTarget: null, homeShotsOffTarget: null, awayShotsOffTarget: null, homeCorners: null, awayCorners: null, homeYellowCards: null, awayYellowCards: null, homeRedCards: null, awayRedCards: null, homeScore: null, awayScore: null };
+  return {
+    minute: null,
+    homePossession: null,
+    awayPossession: null,
+    homeAttacks: null,
+    awayAttacks: null,
+    homeDangerousAttacks: null,
+    awayDangerousAttacks: null,
+    homeShots: null,
+    awayShots: null,
+    homeShotsOnTarget: null,
+    awayShotsOnTarget: null,
+    homeShotsOffTarget: null,
+    awayShotsOffTarget: null,
+    homeCorners: null,
+    awayCorners: null,
+    homeYellowCards: null,
+    awayYellowCards: null,
+    homeRedCards: null,
+    awayRedCards: null,
+    homeScore: null,
+    awayScore: null,
+  };
 }
 function numberFrom(value: unknown) {
   const text = String(value ?? '').replace('%', '').replace(/[^0-9.-]/g, '');
@@ -61,48 +85,60 @@ function hasUndefinedPlaceholder(text: string) {
   const compact = String(text || '').replace(/\s+/g, ' ').toLowerCase();
   return compact.includes('undefined attack undefined') || compact.includes('undefined shots undefined') || compact.includes('undefined% possession undefined%');
 }
+function sameLabel(value: string, aliases: string[]) {
+  const normalized = String(value || '').trim().toLowerCase();
+  return aliases.some((alias) => normalized === alias.toLowerCase());
+}
+function validRange(label: string, home: number | null, away: number | null) {
+  if (home === null || away === null) return false;
+  const name = label.toLowerCase();
+  if (name.includes('possession') || name === 'poss') return home >= 0 && away >= 0 && home <= 100 && away <= 100 && Math.abs(home + away - 100) <= 5;
+  if (name.includes('attack') || name === 'att' || name.includes('shots') || name.includes('target')) return home >= 0 && away >= 0 && home <= 500 && away <= 500;
+  return home >= 0 && away >= 0 && home <= 1000 && away <= 1000;
+}
 function valueToken(value: string) {
   return /^\d+(?:\.\d+)?%?$/.test(String(value || '').trim());
 }
-function parseByRegex(text: string, label: string) {
-  const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const match = String(text || '').match(new RegExp(`(\\d+(?:\\.\\d+)?%?)\\s*${escaped}\\s*(\\d+(?:\\.\\d+)?%?)`, 'i'))
-    || String(text || '').match(new RegExp(`${escaped}\\s*(\\d+(?:\\.\\d+)?%?)\\s*(\\d+(?:\\.\\d+)?%?)`, 'i'));
-  return match ? [numberFrom(match[1]), numberFrom(match[2])] as const : [null, null] as const;
-}
 function parseByLines(lines: string[], aliases: string[]) {
-  const isLabel = (value: string) => aliases.some((alias) => value.toLowerCase() === alias.toLowerCase());
   for (let i = 0; i < lines.length; i += 1) {
-    if (!isLabel(lines[i])) continue;
-    const prev = [...lines.slice(0, i)].reverse().find(valueToken);
-    const next = lines.slice(i + 1).find(valueToken);
+    if (!sameLabel(lines[i], aliases)) continue;
+    const prev = [...lines.slice(Math.max(0, i - 8), i)].reverse().find(valueToken);
+    const next = lines.slice(i + 1, i + 9).find(valueToken);
     if (prev && next) return [numberFrom(prev), numberFrom(next)] as const;
-    const nextValues = lines.slice(i + 1).filter(valueToken).slice(0, 2);
-    if (nextValues.length === 2) return [numberFrom(nextValues[0]), numberFrom(nextValues[1])] as const;
   }
   return [null, null] as const;
 }
-function applyPair(stats: NormalizedStats, homeKey: keyof NormalizedStats, awayKey: keyof NormalizedStats, pair: readonly [number | null, number | null]) {
-  if (pair[0] !== null) (stats as any)[homeKey] = pair[0];
-  if (pair[1] !== null) (stats as any)[awayKey] = pair[1];
-}
-function parseVisualStats(text: string) {
-  const stats = emptyStats();
+function parsePairFromText(text: string, aliases: string[]) {
   const normalized = String(text || '').replace(/\r/g, '\n').replace(/[ \t]+/g, ' ').replace(/\n{2,}/g, '\n');
   const lines = normalized.split(/\n/).map((line) => line.trim()).filter(Boolean);
-  const find = (aliases: string[]) => {
-    for (const alias of aliases) {
-      const pair = parseByRegex(normalized, alias);
-      if (pair[0] !== null || pair[1] !== null) return pair;
-    }
-    return parseByLines(lines, aliases);
-  };
-
-  applyPair(stats, 'homeAttacks', 'awayAttacks', find(['Attack', 'ATT', 'Attacks']));
-  applyPair(stats, 'homeShots', 'awayShots', find(['Shots', 'Shot']));
-  applyPair(stats, 'homePossession', 'awayPossession', find(['Possession', 'Poss']));
-  applyPair(stats, 'homeShotsOnTarget', 'awayShotsOnTarget', find(['On Target', 'On-TGT', 'On TGT', 'On-TARGET']));
-  applyPair(stats, 'homeShotsOffTarget', 'awayShotsOffTarget', find(['Off Target', 'Off-TGT', 'Off TGT', 'Off-TARGET']));
+  const byLines = parseByLines(lines, aliases);
+  if (byLines[0] !== null || byLines[1] !== null) return byLines;
+  for (const alias of aliases) {
+    const escaped = alias.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const line = lines.find((item) => new RegExp(`(^|\\b)${escaped}(\\b|$)`, 'i').test(item));
+    if (!line) continue;
+    const nums = line.match(/\d+(?:\.\d+)?%?/g) || [];
+    if (nums.length >= 2) return [numberFrom(nums[0]), numberFrom(nums[1])] as const;
+  }
+  return [null, null] as const;
+}
+function choosePair(pairs: VisualPair[], aliases: string[], fallbackText: string) {
+  const visual = pairs.find((pair) => sameLabel(pair.label, aliases));
+  if (visual) return [numberFrom(visual.home), numberFrom(visual.away)] as const;
+  return parsePairFromText(fallbackText, aliases);
+}
+function applyPair(stats: NormalizedStats, homeKey: keyof NormalizedStats, awayKey: keyof NormalizedStats, label: string, pair: readonly [number | null, number | null]) {
+  if (!validRange(label, pair[0], pair[1])) return;
+  (stats as any)[homeKey] = pair[0];
+  (stats as any)[awayKey] = pair[1];
+}
+function parseVisualStats(text: string, pairs: VisualPair[]) {
+  const stats = emptyStats();
+  applyPair(stats, 'homeAttacks', 'awayAttacks', 'Attack', choosePair(pairs, ['Attack', 'ATT', 'Attacks'], text));
+  applyPair(stats, 'homeShots', 'awayShots', 'Shots', choosePair(pairs, ['Shots', 'Shot'], text));
+  applyPair(stats, 'homePossession', 'awayPossession', 'Possession', choosePair(pairs, ['Possession', 'Poss'], text));
+  applyPair(stats, 'homeShotsOnTarget', 'awayShotsOnTarget', 'On Target', choosePair(pairs, ['On Target', 'On-TGT', 'On TGT', 'On-TARGET'], text));
+  applyPair(stats, 'homeShotsOffTarget', 'awayShotsOffTarget', 'Off Target', choosePair(pairs, ['Off Target', 'Off-TGT', 'Off TGT', 'Off-TARGET'], text));
   return stats;
 }
 function browserlessCode() {
@@ -111,13 +147,10 @@ function browserlessCode() {
     async function clickStatsInFrame(frame) {
       try {
         const handles = await frame.$$('button,a,div,span,li');
-        for (const handle of handles.slice(0, 250)) {
+        for (const handle of handles.slice(0, 260)) {
           try {
             const txt = await handle.evaluate((el) => (el.textContent || '').trim());
-            if (/statistics|stats/i.test(txt)) {
-              await handle.click({ timeout: 1000 });
-              await sleep(700);
-            }
+            if (/statistics|stats/i.test(txt)) { await handle.click({ timeout: 1000 }); await sleep(700); }
           } catch {}
         }
       } catch {}
@@ -125,23 +158,40 @@ function browserlessCode() {
     async function readFrame(frame, index) {
       try {
         return await frame.evaluate((idx) => {
-          const text = document.body ? document.body.innerText : '';
-          const html = document.documentElement ? document.documentElement.outerHTML.slice(0, 12000) : '';
-          const nodes = Array.from(document.querySelectorAll('body *')).map((el) => ({
-            tag: el.tagName,
-            text: (el.textContent || '').trim(),
-            cls: el.getAttribute('class') || '',
-            style: el.getAttribute('style') || '',
-          })).filter((x) => x.text && /statistics|stats|attack|shots|possession|on target|off target|\\d+%?/i.test(x.text)).slice(0, 180);
-          return { index: idx, url: location.href, title: document.title, text, html, nodes };
+          const visible = (el) => {
+            const tag = el.tagName;
+            if (tag === 'SCRIPT' || tag === 'STYLE' || tag === 'NOSCRIPT') return false;
+            const rect = el.getBoundingClientRect();
+            const style = window.getComputedStyle(el);
+            return rect.width > 0 && rect.height > 0 && style.visibility !== 'hidden' && style.display !== 'none' && Number(style.opacity || 1) !== 0;
+          };
+          const clean = (value) => String(value || '').replace(/\\s+/g, ' ').trim();
+          const rawNodes = Array.from(document.querySelectorAll('body *'))
+            .filter(visible)
+            .map((el) => {
+              const rect = el.getBoundingClientRect();
+              return { tag: el.tagName, text: clean(el.textContent), x: rect.left + rect.width / 2, y: rect.top + rect.height / 2, w: rect.width, h: rect.height, cls: el.getAttribute('class') || '' };
+            })
+            .filter((node) => node.text && node.text.length <= 40);
+          const labels = rawNodes.filter((node) => /^(Attack|ATT|Attacks|Shots|Shot|Possession|Poss|On Target|On-TGT|On TGT|Off Target|Off-TGT|Off TGT)$/i.test(node.text));
+          const values = rawNodes.filter((node) => /^\\d+(?:\\.\\d+)?%?$/.test(node.text));
+          const pairs = labels.map((label) => {
+            const rowValues = values.filter((value) => Math.abs(value.y - label.y) <= Math.max(12, label.h + 8));
+            const left = rowValues.filter((value) => value.x < label.x).sort((a, b) => Math.abs(b.x - label.x) - Math.abs(a.x - label.x)).pop();
+            const right = rowValues.filter((value) => value.x > label.x).sort((a, b) => Math.abs(a.x - label.x) - Math.abs(b.x - label.x))[0];
+            return { label: label.text, home: left ? left.text : null, away: right ? right.text : null, sourceUrl: location.href };
+          }).filter((pair) => pair.home || pair.away);
+          const text = rawNodes.map((node) => node.text).join('\\n');
+          const nodes = rawNodes.filter((x) => /statistics|stats|attack|shots|possession|target|\\d+%?/i.test(x.text)).slice(0, 160);
+          return { index: idx, url: location.href, title: document.title, text, nodes, pairs };
         }, index);
       } catch (error) {
-        return { index, url: frame.url(), title: '', text: '', html: '', nodes: [], error: String(error && error.message || error) };
+        return { index, url: frame.url(), title: '', text: '', nodes: [], pairs: [], error: String(error && error.message || error) };
       }
     }
     await page.setViewport({ width: 1280, height: 720, deviceScaleFactor: 1 });
     await page.goto(context.url, { waitUntil: 'networkidle2', timeout: context.timeoutMs });
-    await sleep(context.waitMs || 12000);
+    await sleep(context.waitMs || 15000);
     for (const frame of page.frames()) await clickStatsInFrame(frame);
     await sleep(1800);
     for (const frame of page.frames()) await clickStatsInFrame(frame);
@@ -149,8 +199,9 @@ function browserlessCode() {
     const frames = [];
     let idx = 0;
     for (const frame of page.frames()) frames.push(await readFrame(frame, idx++));
-    const text = frames.map((frame) => ['FRAME ' + frame.index, frame.url, frame.title, frame.text, frame.nodes.map((n) => n.text).join('\\n')].filter(Boolean).join('\\n')).join('\\n---FRAME---\\n');
-    return { data: { title: await page.title(), href: page.url(), frameCount: frames.length, text, frames }, type: 'application/json' };
+    const pairs = frames.flatMap((frame) => frame.pairs || []);
+    const text = frames.map((frame) => ['FRAME ' + frame.index, frame.url, frame.title, frame.text].filter(Boolean).join('\\n')).join('\\n---FRAME---\\n');
+    return { data: { title: await page.title(), href: page.url(), frameCount: frames.length, text, frames, pairs }, type: 'application/json' };
   }`;
 }
 async function callBrowserless(url: string, timeoutMs: number, waitMs: number) {
@@ -189,11 +240,12 @@ export async function GET(req: Request) {
     const save = boolParam(url.searchParams.get('save'), false);
     const rendered = await callBrowserless(wrapperUrl, timeoutMs, waitMs);
     const text = String(rendered.data?.text || '');
-    const stats = parseVisualStats(text);
+    const pairs = Array.isArray(rendered.data?.pairs) ? rendered.data.pairs : [];
+    const stats = parseVisualStats(text, pairs);
     const reliable = hasUsefulStats(stats) && !hasUndefinedPlaceholder(text);
     const match = (save || url.searchParams.get('includeMatch') === 'true') ? await getMatch({ dbMatchId: url.searchParams.get('dbMatchId'), providerMatchId }) : null;
-    const saveResult = save ? match ? await saveSnapshot(match, providerMatchId, stats, { source: VISUAL_SOURCE, wrapperUrl, textSample: text.slice(0, 4000), framesSample: rendered.data?.frames?.map?.((frame: any) => ({ url: frame.url, title: frame.title, text: String(frame.text || '').slice(0, 1200), nodes: frame.nodes?.slice?.(0, 30) || [] })) || [], capturedBy: 'browserless_function_visual_stats_frames' }, reliable) : { inserted: 0, snapshotId: null, error: 'No local match found' } : null;
-    return json({ ok: true, mode: 'isports_remote_visual_stats_pull', remoteBrowser: { ok: rendered.ok, status: rendered.status, rawLength: rendered.rawLength, error: rendered.rawSample || null }, wrapper: { sourceUrl: wrapperUrl }, hasStats: reliable, stats, validation: { hasUsefulStats: hasUsefulStats(stats), reliable, rejectedPlaceholder: hasUndefinedPlaceholder(text), frameCount: rendered.data?.frameCount || 0 }, textSample: text.slice(0, 2200), framesPreview: rendered.data?.frames?.map?.((frame: any) => ({ url: frame.url, title: frame.title, text: String(frame.text || '').slice(0, 600), nodes: frame.nodes?.slice?.(0, 12) || [], error: frame.error || null })) || [], match: match ? { id: match.id, status: match.status, homeTeam: match.homeTeam, awayTeam: match.awayTeam } : null, save: saveResult, note: 'Parses Statistics from all frames in iSports pc.html after clicking Statistics/Stats where available.' });
+    const saveResult = save ? match ? await saveSnapshot(match, providerMatchId, stats, { source: VISUAL_SOURCE, wrapperUrl, visualPairs: pairs, textSample: text.slice(0, 4000), framesSample: rendered.data?.frames?.map?.((frame: any) => ({ url: frame.url, title: frame.title, pairs: frame.pairs || [], text: String(frame.text || '').slice(0, 900), nodes: frame.nodes?.slice?.(0, 30) || [] })) || [], capturedBy: 'browserless_function_visual_stats_frames' }, reliable) : { inserted: 0, snapshotId: null, error: 'No local match found' } : null;
+    return json({ ok: true, mode: 'isports_remote_visual_stats_pull', remoteBrowser: { ok: rendered.ok, status: rendered.status, rawLength: rendered.rawLength, error: rendered.rawSample || null }, wrapper: { sourceUrl: wrapperUrl }, hasStats: reliable, stats, validation: { hasUsefulStats: hasUsefulStats(stats), reliable, rejectedPlaceholder: hasUndefinedPlaceholder(text), frameCount: rendered.data?.frameCount || 0, pairs }, textSample: text.slice(0, 2200), framesPreview: rendered.data?.frames?.map?.((frame: any) => ({ url: frame.url, title: frame.title, pairs: frame.pairs || [], text: String(frame.text || '').slice(0, 500), nodes: frame.nodes?.slice?.(0, 10) || [], error: frame.error || null })) || [], match: match ? { id: match.id, status: match.status, homeTeam: match.homeTeam, awayTeam: match.awayTeam } : null, save: saveResult, note: 'Parses Statistics from all visible frame nodes in iSports pc.html. It uses element positions to avoid merged numbers like 99+11.' });
   } catch (error: any) {
     return json({ ok: false, error: error?.message || 'Internal Server Error' }, 500);
   }
