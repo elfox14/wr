@@ -168,12 +168,15 @@ function TeamBadge({ team, align }: { team?: Team | null; align: 'right' | 'left
   const src = team?.image?.startsWith('http') ? team.image : getTeamFlagUrl({ code: team?.code, name: team?.name, image: team?.image }, 80);
 
   return (
-    <Link href={getTeamHref(team)} className={`flex min-w-0 items-center gap-2 rounded-xl border border-transparent p-1.5 transition hover:border-[#FFD700]/25 hover:bg-white/[0.055] ${align === 'left' ? 'flex-row-reverse text-left' : 'text-right'}`}>
-      <span className="h-8 w-8 shrink-0 rounded-lg border border-white/10 bg-cover bg-center bg-no-repeat" style={src ? { backgroundImage: `url(${src})` } : undefined}>
+    <Link
+      href={getTeamHref(team)}
+      className={`group/team flex min-w-0 items-center gap-2 rounded-2xl border border-white/10 bg-white/[0.04] px-2.5 py-2 transition hover:border-[#FFD700]/25 hover:bg-white/[0.07] sm:border-transparent sm:bg-transparent sm:p-1.5 ${align === 'left' ? 'flex-row-reverse text-left' : 'text-right'}`}
+    >
+      <span className="h-8 w-8 shrink-0 rounded-xl border border-white/10 bg-cover bg-center bg-no-repeat shadow-[0_8px_18px_rgba(0,0,0,0.22)] sm:h-9 sm:w-9" style={src ? { backgroundImage: `url(${src})` } : undefined}>
         {!src ? <span className="flex h-full w-full items-center justify-center text-[10px] font-black text-[#FFD700]">{teamCode(team)}</span> : null}
       </span>
       <span className="min-w-0">
-        <span className="block truncate text-xs font-black text-white">{teamLabel(team)}</span>
+        <span className="block truncate text-[11px] font-black leading-4 text-white sm:text-xs">{teamLabel(team)}</span>
         <span className="mt-0.5 block text-[9px] font-bold text-gray-500">{teamCode(team)}</span>
       </span>
     </Link>
@@ -181,14 +184,14 @@ function TeamBadge({ team, align }: { team?: Team | null; align: 'right' | 'left
 }
 
 function ScoreBox({ value }: { value?: number | null }) {
-  return <span className="flex h-9 min-w-9 items-center justify-center rounded-lg border border-[#FFD700]/35 bg-[#FFD700]/10 px-2 text-lg font-black leading-none text-[#FFD700]" dir="ltr">{formatScore(value)}</span>;
+  return <span className="flex h-9 min-w-9 items-center justify-center rounded-xl border border-[#FFD700]/35 bg-[#FFD700]/10 px-2 text-lg font-black leading-none text-[#FFD700] sm:h-10 sm:min-w-10 sm:text-xl" dir="ltr">{formatScore(value)}</span>;
 }
 
 function MatchScore({ match }: { match: HomeMatch }) {
   return (
-    <div className="flex items-center justify-center gap-1 rounded-xl border border-white/10 bg-black/35 px-1.5 py-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]" dir="rtl" aria-label="النتيجة: صاحب الأرض يمين والضيف يسار">
+    <div className="flex items-center justify-center gap-1 rounded-2xl border border-white/10 bg-black/40 px-1.5 py-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]" dir="rtl" aria-label="النتيجة: صاحب الأرض يمين والضيف يسار">
       <ScoreBox value={match.homeScore} />
-      <span className="h-6 w-px rounded-full bg-white/15" />
+      <span className="h-7 w-px rounded-full bg-white/15" />
       <ScoreBox value={match.awayScore} />
     </div>
   );
@@ -230,30 +233,30 @@ function MatchStatePill({ match, now }: { match: HomeMatch; now: Date }) {
 function MatchRow({ match, now, variant = 'normal' }: { match: HomeMatch; now: Date; variant?: 'live' | 'primary' | 'normal' }) {
   const isPrimary = variant === 'primary' || variant === 'live';
   const shell = variant === 'live'
-    ? 'border-[#00FF88]/25 bg-[radial-gradient(circle_at_top,rgba(0,255,136,0.12),transparent_34%),rgba(0,0,0,0.28)]'
+    ? 'border-[#00FF88]/25 bg-[radial-gradient(circle_at_top,rgba(0,255,136,0.12),transparent_34%),rgba(0,0,0,0.30)]'
     : isPrimary
-      ? 'border-[#FFD700]/25 bg-[radial-gradient(circle_at_top,rgba(255,215,0,0.12),transparent_34%),rgba(0,0,0,0.28)]'
+      ? 'border-[#FFD700]/25 bg-[radial-gradient(circle_at_top,rgba(255,215,0,0.12),transparent_34%),rgba(0,0,0,0.30)]'
       : 'border-white/10 bg-black/25 hover:border-[#0FF0FC]/30';
 
   return (
-    <article className={`relative overflow-hidden rounded-2xl border p-2.5 transition ${shell}`}>
+    <article className={`relative overflow-hidden rounded-[1.35rem] border p-3 transition sm:rounded-3xl sm:p-3.5 ${shell}`}>
       {isPrimary ? <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#FFD700]/60 to-transparent" /> : null}
-      <div className="mb-2 flex flex-wrap items-center justify-between gap-1.5">
-        <span className="rounded-full border border-[#FFD700]/20 bg-[#FFD700]/10 px-2.5 py-1 text-[10px] font-black text-[#FFD700]">{groupNumberLabel(match)}</span>
-        <span className="rounded-full border border-white/10 bg-white/[0.06] px-2.5 py-1 text-[10px] font-black text-gray-200">{formatMatchDate(match.matchDate)}</span>
-        <span className="rounded-full border border-[#0FF0FC]/20 bg-[#0FF0FC]/10 px-2.5 py-1 text-[11px] font-black text-[#0FF0FC]">{formatKickoffTime(match.matchDate)}</span>
-        <MatchStatePill match={match} now={now} />
+      <div className="mb-3 grid grid-cols-2 gap-1.5 sm:flex sm:flex-wrap sm:items-center sm:justify-between">
+        <span className="rounded-full border border-[#FFD700]/20 bg-[#FFD700]/10 px-2.5 py-1 text-center text-[10px] font-black text-[#FFD700]">{groupNumberLabel(match)}</span>
+        <span className="rounded-full border border-white/10 bg-white/[0.06] px-2.5 py-1 text-center text-[10px] font-black text-gray-200">{formatMatchDate(match.matchDate)}</span>
+        <span className="rounded-full border border-[#0FF0FC]/20 bg-[#0FF0FC]/10 px-2.5 py-1 text-center text-[11px] font-black text-[#0FF0FC]">{formatKickoffTime(match.matchDate)}</span>
+        <span className="flex justify-center sm:block"><MatchStatePill match={match} now={now} /></span>
       </div>
 
-      <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-1.5">
+      <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-1.5 sm:gap-2.5">
         <TeamBadge team={match.homeTeam} align="right" />
         <MatchScore match={match} />
         <TeamBadge team={match.awayTeam} align="left" />
       </div>
 
-      <div className="mt-2 grid grid-cols-2 gap-2">
-        <Link href={getMatchHref(match)} className="rounded-lg border border-white/10 bg-white/[0.05] px-2.5 py-1.5 text-center text-[10px] font-black text-gray-200 transition hover:bg-white/[0.1]">تفاصيل</Link>
-        <Link href={getBroadcastHref(match)} className="rounded-lg bg-[#0FF0FC] px-2.5 py-1.5 text-center text-[10px] font-black text-black transition hover:bg-[#4AFAFF]">بث المباراة</Link>
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <Link href={getMatchHref(match)} className="mobile-tap inline-flex items-center justify-center rounded-xl border border-white/10 bg-white/[0.06] px-3 py-2 text-center text-[11px] font-black text-gray-200 transition hover:bg-white/[0.1]">تفاصيل</Link>
+        <Link href={getBroadcastHref(match)} className="mobile-tap inline-flex items-center justify-center rounded-xl bg-[#0FF0FC] px-3 py-2 text-center text-[11px] font-black text-black transition hover:bg-[#4AFAFF]">بث المباراة</Link>
       </div>
     </article>
   );
@@ -303,12 +306,16 @@ function MatchCenter({ fallbackMatches = [], nextMatch = null }: { fallbackMatch
     .slice(0, 2);
 
   return (
-    <section className="flex h-auto flex-col overflow-hidden rounded-3xl border border-white/10 bg-white/[0.04] p-3 text-white shadow-[0_14px_38px_rgba(0,0,0,0.2)] backdrop-blur" aria-label="مباريات كأس العالم">
-      <div className="mb-3 flex justify-end">
-        <Link href="/matches" className="rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-[11px] font-black text-white transition hover:border-[#0FF0FC]/40 hover:bg-white/[0.14]">جدول المباريات</Link>
+    <section className="flex h-auto flex-col overflow-hidden rounded-[1.45rem] border border-white/10 bg-white/[0.04] p-3 text-white shadow-[0_14px_38px_rgba(0,0,0,0.2)] backdrop-blur sm:rounded-3xl sm:p-4" aria-label="مباريات كأس العالم">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#FFD700]">Match Center</p>
+          <h2 className="mt-1 truncate text-lg font-black text-white sm:text-xl">مركز المباريات</h2>
+        </div>
+        <Link href="/matches" className="mobile-tap shrink-0 rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-[11px] font-black text-white transition hover:border-[#0FF0FC]/40 hover:bg-white/[0.14]">جدول المباريات</Link>
       </div>
 
-      <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-4">
         <div>
           {primaryMatch && (isConfirmedLive(primaryMatch) || isHalfTime(primaryMatch)) ? (
             <div className="mb-2 text-[10px] font-black uppercase tracking-[0.14em] text-gray-400">المباراة الجارية</div>
@@ -340,15 +347,15 @@ function ContentHubCard() {
   ] as const;
 
   return (
-    <section className="rounded-3xl border border-white/10 bg-white/[0.04] p-4 shadow-card backdrop-blur">
+    <section className="rounded-[1.45rem] border border-white/10 bg-white/[0.04] p-4 shadow-card backdrop-blur sm:rounded-3xl">
       <div className="mb-4">
-        <p className="text-xs font-black uppercase tracking-[0.16em] text-[#FFD700]">Content Hub</p>
-        <h2 className="mt-1 text-2xl font-black text-white">مركز المحتوى</h2>
-        <p className="mt-1 text-sm font-semibold text-gray-400">كل ما يخص البطولة من مباريات، منتخبات، وتحليل.</p>
+        <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#FFD700] sm:text-xs">Content Hub</p>
+        <h2 className="mt-1 text-xl font-black text-white sm:text-2xl">مركز المحتوى</h2>
+        <p className="mt-1 text-sm font-semibold leading-6 text-gray-400">كل ما يخص البطولة من مباريات، منتخبات، وتحليل.</p>
       </div>
       <div className="grid gap-3 md:grid-cols-3">
         {items.map(([title, body, href]) => (
-          <Link key={title} href={href} className="rounded-2xl border border-white/10 bg-black/25 p-4 transition hover:-translate-y-0.5 hover:border-[#0FF0FC]/30 hover:bg-white/[0.07]">
+          <Link key={title} href={href} className="mobile-tap rounded-2xl border border-white/10 bg-black/25 p-4 transition hover:-translate-y-0.5 hover:border-[#0FF0FC]/30 hover:bg-white/[0.07]">
             <h3 className="font-black text-white">{title}</h3>
             <p className="mt-2 text-xs font-bold leading-6 text-gray-400">{body}</p>
           </Link>
@@ -366,15 +373,15 @@ function QuickLinksCard() {
   ] as const;
 
   return (
-    <section className="rounded-3xl border border-white/10 bg-white/[0.04] p-4 shadow-card backdrop-blur">
+    <section className="rounded-[1.45rem] border border-white/10 bg-white/[0.04] p-4 shadow-card backdrop-blur sm:rounded-3xl">
       <div className="mb-4">
-        <p className="text-xs font-black uppercase tracking-[0.16em] text-[#FFD700]">World Cup Hub</p>
-        <h2 className="mt-1 text-2xl font-black text-white">دليل المنصة</h2>
-        <p className="mt-1 text-sm font-semibold text-gray-400">روابط سريعة لأهم أقسام كأس العالم.</p>
+        <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#FFD700] sm:text-xs">World Cup Hub</p>
+        <h2 className="mt-1 text-xl font-black text-white sm:text-2xl">دليل المنصة</h2>
+        <p className="mt-1 text-sm font-semibold leading-6 text-gray-400">روابط سريعة لأهم أقسام كأس العالم.</p>
       </div>
       <div className="grid gap-3 md:grid-cols-3">
         {links.map(([title, body, href]) => (
-          <Link key={title} href={href} className="rounded-2xl border border-white/10 bg-black/25 p-4 transition hover:-translate-y-0.5 hover:border-[#FFD700]/30 hover:bg-white/[0.07]">
+          <Link key={title} href={href} className="mobile-tap rounded-2xl border border-white/10 bg-black/25 p-4 transition hover:-translate-y-0.5 hover:border-[#FFD700]/30 hover:bg-white/[0.07]">
             <h3 className="font-black text-white">{title}</h3>
             <p className="mt-2 text-xs font-bold leading-6 text-gray-400">{body}</p>
           </Link>
@@ -397,10 +404,10 @@ export default function HomeClientSportsLiveFocus({
   const safeNextMatch = nextMarqueeMatch as HomeMatch | null;
 
   return (
-    <main dir="rtl" className="mx-auto max-w-7xl space-y-6 px-3 py-4 sm:px-4 lg:px-6">
+    <main dir="rtl" className="mx-auto max-w-7xl space-y-4 px-3 pb-8 pt-3 sm:space-y-6 sm:px-4 sm:py-5 lg:px-6">
       <HomeLiveMatchTicker matches={safeTickerMatches} />
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3 lg:items-start">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3 lg:items-start lg:gap-6">
         <div className="lg:col-span-2">
           <MatchCenter fallbackMatches={safeUpcomingMatches} nextMatch={safeNextMatch} />
         </div>
@@ -411,7 +418,7 @@ export default function HomeClientSportsLiveFocus({
 
       <HomeTournamentStatsCard playersCount={playersCount} teamsCount={teamsCount} upcomingMatchesCount={upcomingMatchesCount} />
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:gap-6">
         <ContentHubCard />
         <QuickLinksCard />
       </div>
