@@ -161,44 +161,40 @@ export default async function MatchCenterPage({ params }: { params: Promise<{ id
           <ArrowLeft size={16} /> العودة إلى المباريات
         </Link>
 
-        <section className="relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.04] p-3 shadow-[0_14px_38px_rgba(0,0,0,0.2)] backdrop-blur sm:p-4">
+        <section className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-[radial-gradient(circle_at_top,rgba(15,240,252,0.10),rgba(255,255,255,0.035)_42%,rgba(0,0,0,0.20))] p-4 shadow-[0_18px_50px_rgba(0,0,0,0.28)] backdrop-blur sm:p-6">
           <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#0FF0FC]/55 to-transparent opacity-70" />
-          <div className="mb-3 grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2">
-            <span className="rounded-full border border-[#FFD700]/20 bg-[#FFD700]/10 px-2.5 py-1 text-[11px] font-black text-[#FFD700]">{groupLabel(match)}</span>
-            <span className={`min-w-0 truncate rounded-full border px-2.5 py-1 text-center text-[11px] font-black ${status.className}`}>
+          <div className="mb-4 grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2">
+            <span className="rounded-full border border-[#FFD700]/20 bg-[#FFD700]/10 px-3 py-1 text-[11px] font-black text-[#FFD700]">{groupLabel(match)}</span>
+            <span className={`min-w-0 truncate rounded-full border px-3 py-1 text-center text-[11px] font-black ${status.className}`}>
               <StatusIcon size={13} className="inline" /> {status.label}
             </span>
-            <span className="rounded-full border border-white/10 bg-white/[0.05] px-2.5 py-1 text-[11px] font-black text-gray-300">{formatDate(match.matchDate)}</span>
+            <span className="rounded-full border border-white/10 bg-white/[0.05] px-3 py-1 text-[11px] font-black text-gray-300">{formatDate(match.matchDate)}</span>
           </div>
 
-          <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+          <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 sm:gap-5">
             <TeamBlock asset={home} align="right" fallback="الفريق الأول" />
-            <div className={`flex min-h-10 min-w-10 items-center justify-center rounded-xl border px-3 text-xs font-black ${showScore ? 'border-[#FFD700]/25 bg-[#FFD700]/10 text-[#FFD700]' : 'border-[#0FF0FC]/20 bg-[#0FF0FC]/10 text-[#0FF0FC]'}`}>
+            <div className={`flex min-h-16 min-w-20 items-center justify-center rounded-2xl border px-4 text-lg font-black sm:text-3xl ${showScore ? 'border-[#FFD700]/25 bg-[#FFD700]/10 text-[#FFD700]' : 'border-[#0FF0FC]/20 bg-[#0FF0FC]/10 text-[#0FF0FC]'}`}>
               {showScore ? <RtlScore homeScore={match.homeScore} awayScore={match.awayScore} /> : 'VS'}
             </div>
             <TeamBlock asset={away} align="left" fallback="الفريق الثاني" />
           </div>
 
-          <div className="mt-3 grid grid-cols-2 gap-2">
+          <div className="mt-5 grid grid-cols-2 gap-2">
             <Link href="#match-stats" className="rounded-xl border border-white/10 bg-white/[0.05] px-3 py-2 text-center text-[11px] font-black text-gray-200 transition hover:bg-white/[0.1]">تفاصيل المباراة</Link>
             {!finished ? (
               <Link href={animationHref} className="rounded-xl bg-[#0FF0FC] px-3 py-2 text-center text-[11px] font-black text-black transition hover:bg-[#4AFAFF]">البث التفاعلي</Link>
             ) : (
-              <span className="rounded-xl border border-gray-500/20 bg-gray-500/10 px-3 py-2 text-center text-[11px] font-black text-gray-300">البث مغلق</span>
+              <span className="rounded-xl border border-[#FFD700]/20 bg-[#FFD700]/10 px-3 py-2 text-center text-[11px] font-black text-[#FFD700]">أرشيف المباراة</span>
             )}
           </div>
         </section>
 
         <div id="match-stats">
-          {!finished ? (
-            <LiveMatchStatsPanel matchId={match.animationMatchId ? String(match.animationMatchId) : undefined} dbMatchId={match.id} />
-          ) : (
-            <EmptyText text="انتهت المباراة، لذلك تم إيقاف لوحة البث الحي لهذه المباراة. ستظهر هنا الإحصائيات النهائية عند توفر مصدر موثق." />
-          )}
+          <LiveMatchStatsPanel matchId={match.animationMatchId ? String(match.animationMatchId) : undefined} dbMatchId={match.id} />
         </div>
 
         <Panel title="مرصد المباراة الإخباري ومجريات اللعب" icon={<Newspaper className="text-[#FFD700]" />} action={<Link href="/news" className="text-xs font-black text-[#0FF0FC]">غرفة الأخبار</Link>}>
-          <EmptyText text="مجريات اللعب اللحظية تظهر في كارت الإحصائيات عند توفر مصدر موثق." />
+          <EmptyText text="الأحداث المحفوظة من iSports Timeline تظهر الآن داخل كارت بيانات المباراة. التحليل الصحفي المنفصل سيظهر هنا عند ربط مصادر الأخبار." />
         </Panel>
       </section>
     </main>
@@ -208,9 +204,9 @@ export default async function MatchCenterPage({ params }: { params: Promise<{ id
 function TeamBlock({ asset, align, fallback }: { asset: any; align: 'right' | 'left'; fallback: string }) {
   return (
     <div className={`min-w-0 ${align === 'right' ? 'text-right' : 'text-left'}`}>
-      <div className="mb-1.5 inline-flex h-9 w-9 items-center justify-center overflow-hidden rounded-xl border border-white/10 bg-white/[0.07]">{safeImage(asset)}</div>
-      <h2 className="truncate text-sm font-black text-white"><TeamInlineName asset={asset} fallback={fallback} /></h2>
-      <p className="mt-0.5 text-[11px] font-bold text-gray-500">{teamCode(asset)}</p>
+      <div className="mb-2 inline-flex h-14 w-14 items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-white/[0.07] shadow-[0_8px_24px_rgba(0,0,0,0.24)] sm:h-16 sm:w-16">{safeImage(asset)}</div>
+      <h2 className="truncate text-base font-black text-white sm:text-xl"><TeamInlineName asset={asset} fallback={fallback} /></h2>
+      <p className="mt-1 text-[11px] font-bold text-gray-500 sm:text-xs">{teamCode(asset)}</p>
     </div>
   );
 }
