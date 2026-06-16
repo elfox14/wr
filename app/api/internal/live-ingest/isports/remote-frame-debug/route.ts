@@ -121,6 +121,7 @@ function browserlessDebugCode() {
     const lower = String(url || '').toLowerCase();
     return interestingTerms.some((term) => lower.includes(term));
   };
+  const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   const pushLimited = (arr, value) => { if (arr.length < maxItems) arr.push(value); };
   page.on('console', (msg) => pushLimited(logs, { type: msg.type(), text: msg.text().slice(0, 600) }));
   page.on('requestfailed', (request) => pushLimited(requestsFailed, { url: request.url(), method: request.method(), failure: request.failure() ? request.failure().errorText : null }));
@@ -136,7 +137,7 @@ function browserlessDebugCode() {
   });
   await page.setViewport({ width: context.width || 1280, height: context.height || 720, deviceScaleFactor: 1 });
   await page.goto(context.url, { waitUntil: 'domcontentloaded', timeout: context.timeoutMs });
-  await page.waitForTimeout(context.waitMs);
+  await sleep(context.waitMs || 12000);
   const pageData = await page.evaluate(() => {
     const css = (selector) => {
       const el = document.querySelector(selector);
