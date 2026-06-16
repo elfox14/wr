@@ -6,6 +6,9 @@ const SCHEDULED_STATUSES = ['SCHEDULED', 'TIMED', 'NOT_STARTED', 'NS'];
 const FINISHED_STATUSES = ['FINISHED', 'FT', 'AET', 'PEN'];
 const GROUP_STAGE_MAX_LIVE_MINUTES = 115;
 const KNOCKOUT_MAX_LIVE_MINUTES = 150;
+const STALE_FINAL_SNAPSHOT_MS = 7 * 60 * 1000;
+const FINAL_MINUTE_FLOOR = 85;
+const FINAL_LOCAL_MINUTE_FALLBACK = 100;
 
 function dayHourKey(value: Date | string) {
   const date = new Date(value);
@@ -67,8 +70,22 @@ function isStaleByTime(match: any, now = Date.now()) {
   return minute >= maxLiveMinutes(match);
 }
 
+function isFinalSnapshotStale(match: any, now = Date.now()) {
+  const minute = Number(match.latestStatsMinute);
+  const capturedAt = match.latestStatsCapturedAt ? new Date(match.latestStatsCapturedAt).getTime() : NaN;
+  if (!Number.isFinite(minute) || minute < FINAL_MINUTE_FLOOR || !Number.isFinite(capturedAt)) return false;
+  return now - capturedAt >= STALE_FINAL_SNAPSHOT_MS;
+}
+
+function isFinishedByNoProviderFallback(match: any, now = Date.now()) {
+  const status = normalizeStatus(match.status);
+  if (status !== 'IN_PLAY' && status !== 'LIVE') return false;
+  const minute = minutesFromKickoff(match, now);
+  return minute !== null && minute >= FINAL_LOCAL_MINUTE_FALLBACK;
+}
+
 function isLikelyLiveByTime(match: any, now = Date.now()) {
-  if (isOfficialFinished(match)) return false;
+  if (isOfficialFinished(match) || isFinalSnapshotStale(match, now) || isFinishedByNoProviderFallback(match, now)) return false;
   if (!isScheduledStatus(match.status)) return false;
   const minute = minutesFromKickoff(match, now);
   if (minute === null) return false;
@@ -78,6 +95,7 @@ function isLikelyLiveByTime(match: any, now = Date.now()) {
 function normalizeMatchForDisplay(match: any, now = Date.now()) {
   const status = normalizeStatus(match.status);
   const minute = minutesFromKickoff(match, now);
+  const shouldAutoFinish = isStaleByTime(match, now) || isFinalSnapshotStale(match, now) || isFinishedByNoProviderFallback(match, now);
 
   if (isOfficialFinished(match)) {
     return {
@@ -90,7 +108,7 @@ function normalizeMatchForDisplay(match: any, now = Date.now()) {
     };
   }
 
-  if ((isLiveStatus(status) || isScheduledStatus(status)) && isStaleByTime(match, now)) {
+  if ((isLiveStatus(status) || isScheduledStatus(status)) && shouldAutoFinish) {
     return {
       ...match,
       status: 'FINISHED',
@@ -161,8 +179,10 @@ function validMinute(value: unknown) {
   return Math.max(1, Math.min(130, Math.floor(minute)));
 }
 
-async function latestDocumentedMinutes(matchIds: string[]) {
-  if (matchIds.length === 0) return new Map<string, number>();
+type SnapshotState = { minute: number; capturedAt: Date };
+
+async function latestDocumentedSnapshots(matchIds: string[]) {
+  if (matchIds.length === 0) return new Map<string, SnapshotState>();
 
   const snapshots = await prisma.matchStatsSnapshot.findMany({
     where: {
@@ -177,11 +197,11 @@ async function latestDocumentedMinutes(matchIds: string[]) {
     orderBy: { capturedAt: 'desc' },
   });
 
-  const latestByMatch = new Map<string, number>();
+  const latestByMatch = new Map<string, SnapshotState>();
   for (const snapshot of snapshots) {
     if (latestByMatch.has(snapshot.matchId)) continue;
     const minute = validMinute(snapshot.minute);
-    if (minute !== null) latestByMatch.set(snapshot.matchId, minute);
+    if (minute !== null) latestByMatch.set(snapshot.matchId, { minute, capturedAt: snapshot.capturedAt });
   }
   return latestByMatch;
 }
@@ -196,12 +216,13 @@ export async function GET() {
       orderBy: { matchDate: 'asc' },
     });
 
-    const documentedMinutes = await latestDocumentedMinutes(matches.map((match) => match.id));
+    const documentedSnapshots = await latestDocumentedSnapshots(matches.map((match) => match.id));
     const now = Date.now();
     const enrichedMatches = matches.map((match) => {
-      const minute = documentedMinutes.get(match.id);
-      const canUseLiveSnapshot = minute && !isOfficialFinished(match) && !isStaleByTime(match, now);
-      return canUseLiveSnapshot ? { ...match, minute, displayStatus: 'IN_PLAY', isLiveNow: true, liveLabel: `الدقيقة ${minute}` } : match;
+      const snapshot = documentedSnapshots.get(match.id);
+      const matchWithSnapshot = snapshot ? { ...match, latestStatsMinute: snapshot.minute, latestStatsCapturedAt: snapshot.capturedAt } : match;
+      const canUseLiveSnapshot = snapshot && !isOfficialFinished(matchWithSnapshot) && !isStaleByTime(matchWithSnapshot, now) && !isFinalSnapshotStale(matchWithSnapshot, now);
+      return canUseLiveSnapshot ? { ...matchWithSnapshot, minute: snapshot.minute, displayStatus: 'IN_PLAY', isLiveNow: true, liveLabel: `الدقيقة ${snapshot.minute}` } : matchWithSnapshot;
     });
 
     return NextResponse.json(dedupeMatches(enrichedMatches), { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } });
