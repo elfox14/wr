@@ -140,9 +140,13 @@ function statusLabel(match: any, now = new Date()) {
 }
 
 function getBroadcastHref(match: any) {
-  if (match?.animationMatchId) return `/animation-live/player?matchId=${encodeURIComponent(String(match.animationMatchId))}&dbMatchId=${encodeURIComponent(String(match.id))}`;
-  if (match?.id) return `/animation-live/player?dbMatchId=${encodeURIComponent(String(match.id))}`;
+  if (match?.id) return `/match-center/${encodeURIComponent(String(match.id))}`;
   return '/animation-live/player';
+}
+
+function getMatchDetailsHref(match: any) {
+  if (match?.id) return `/match-center/${encodeURIComponent(String(match.id))}`;
+  return '/matches';
 }
 
 function MatchCard({ match, now }: { match: any; now: Date }) {
@@ -181,7 +185,9 @@ function MatchCard({ match, now }: { match: any; now: Date }) {
           <Radio size={16} /> {hasAnimationId ? 'دخول البث' : 'دخول البث الداخلي'}
         </Link>
       ) : (
-        <div className="mt-4 rounded-2xl border border-gray-500/15 bg-gray-500/10 px-4 py-3 text-center text-sm font-black text-gray-300">انتهت المباراة — تم إغلاق رابط البث</div>
+        <Link href={getMatchDetailsHref(match)} className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-[#0FF0FC]/25 bg-[#0FF0FC]/10 px-4 py-3 text-sm font-black text-[#0FF0FC] transition hover:bg-[#0FF0FC] hover:text-black">
+          تفاصيل المباراة
+        </Link>
       )}
     </article>
   );
