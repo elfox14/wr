@@ -1,4 +1,4 @@
-import HomeClientSportsNextWideMap from '@/components/HomeClientSportsNextWideMap';
+import HomeClientSportsLiveFocus from '@/components/HomeClientSportsLiveFocus';
 import prisma from '@/lib/prisma';
 
 export const dynamic = 'force-dynamic';
@@ -141,7 +141,7 @@ export default async function Home() {
       prisma.match.findFirst({
         where: {
           status: { in: SCHEDULED_STATUSES },
-          matchDate: { gte: now },
+          matchDate: { gte: liveWindowStart, lte: upcomingUntil },
         },
         orderBy: { matchDate: 'asc' },
         include: { homeTeam: true, awayTeam: true },
@@ -163,7 +163,7 @@ export default async function Home() {
   }
 
   return (
-    <HomeClientSportsNextWideMap
+    <HomeClientSportsLiveFocus
       upcomingMatches={upcomingMatches}
       tickerMatches={tickerMatches}
       nextMarqueeMatch={nextMarqueeMatch}
