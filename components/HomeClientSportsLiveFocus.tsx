@@ -110,6 +110,21 @@ function isConfirmedLive(match?: HomeMatch | null) {
   return !isFinished(match) && !isHalfTime(match) && (LIVE_STATUSES.includes(status) || Boolean(match?.isLiveNow));
 }
 
+function inferRealMatchMinute(match: HomeMatch, now: Date) {
+  if (isFinished(match)) return 90;
+  if (isHalfTime(match)) return 45;
+
+  const kickoff = match.matchDate ? new Date(match.matchDate).getTime() : NaN;
+  if (Number.isFinite(kickoff)) {
+    const minute = Math.floor((now.getTime() - kickoff) / 60_000) + 1;
+    if (minute >= 1) return Math.max(1, Math.min(135, minute));
+  }
+
+  return typeof match.minute === 'number' && Number.isFinite(match.minute) && match.minute > 0
+    ? Math.max(1, Math.min(135, Math.floor(match.minute)))
+    : null;
+}
+
 function isScheduled(match?: HomeMatch | null) {
   return !isFinished(match) && SCHEDULED_STATUSES.includes(normalizeStatus(match));
 }
@@ -203,12 +218,12 @@ function MatchStatePill({ match, now }: { match: HomeMatch; now: Date }) {
   }
 
   if (isHalfTime(match)) {
-    return <span className="rounded-xl border border-[#FFD700]/20 bg-[#FFD700]/10 px-2.5 py-1.5 text-[11px] font-black text-[#FFD700]">استراحة - الوقت متوقف</span>;
+    return <span className="rounded-xl border border-[#FFD700]/20 bg-[#FFD700]/10 px-2.5 py-1.5 text-[11px] font-black text-[#FFD700]">استراحة - 45′</span>;
   }
 
   if (isConfirmedLive(match)) {
-    const minute = typeof match.minute === 'number' && Number.isFinite(match.minute) && match.minute > 0 ? `${Math.floor(match.minute)}′` : null;
-    return <span className="rounded-xl border border-[#00FF88]/25 bg-[#00FF88]/10 px-2.5 py-1.5 text-[11px] font-black text-[#00FF88]">{minute || match.liveLabel || 'جارية الآن'}</span>;
+    const minute = inferRealMatchMinute(match, now);
+    return <span className="rounded-xl border border-[#00FF88]/25 bg-[#00FF88]/10 px-2.5 py-1.5 text-[11px] font-black text-[#00FF88]">{minute ? `${minute}′` : match.liveLabel || 'جارية الآن'}</span>;
   }
 
   if (isWaitingForStartConfirmation(match, now)) {
@@ -254,9 +269,8 @@ function MatchRow({ match, now, variant = 'normal' }: { match: HomeMatch; now: D
         <TeamBadge team={match.awayTeam} align="left" />
       </div>
 
-      <div className="mt-3 grid grid-cols-2 gap-2">
-        <Link href={getMatchHref(match)} className="mobile-tap inline-flex items-center justify-center rounded-xl border border-white/10 bg-white/[0.06] px-3 py-2 text-center text-[11px] font-black text-gray-200 transition hover:bg-white/[0.1]">تفاصيل</Link>
-        <Link href={getBroadcastHref(match)} className="mobile-tap inline-flex items-center justify-center rounded-xl bg-[#0FF0FC] px-3 py-2 text-center text-[11px] font-black text-black transition hover:bg-[#4AFAFF]">بث المباراة</Link>
+      <div className="mt-3">
+        <Link href={getBroadcastHref(match)} className="mobile-tap inline-flex w-full items-center justify-center rounded-xl bg-[#0FF0FC] px-3 py-2.5 text-center text-[11px] font-black text-black transition hover:bg-[#4AFAFF]">البث التفاعلي</Link>
       </div>
     </article>
   );
