@@ -15,25 +15,31 @@ const cairo = Cairo({
 });
 
 const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://worldcup.mcprim.com';
-const description = 'MC PRIME World Cup: live World Cup matches, verified news, teams, players, groups, and interactive match center.';
+const description = 'بورصة المونديال من MC PRIME: مباريات كأس العالم مباشرة، أخبار موثقة، منتخبات ولاعبون ومجموعات، وتحليل كروي مع بورصة افتراضية ترفيهية.';
+const brandIcon = '/brand/borsa-mondial-sport-logo-icon.svg?v=20260616sport';
 
 export const metadata: Metadata = {
   metadataBase: new URL(baseUrl),
-  title: { default: "MC PRIME World Cup", template: "%s | MC PRIME World Cup" },
+  title: { default: "بورصة المونديال | MC PRIME", template: "%s | بورصة المونديال" },
   description,
-  keywords: ["World Cup", "football news", "live matches", "teams", "players"],
-  authors: [{ name: "MC PRIME World Cup Team" }],
+  keywords: ["كأس العالم", "بورصة المونديال", "مباريات مباشرة", "تحليل كروي", "منتخبات", "World Cup", "football news", "live matches", "teams", "players"],
+  authors: [{ name: "MC PRIME Sports Exchange" }],
+  icons: {
+    icon: [{ url: brandIcon, type: 'image/svg+xml' }],
+    shortcut: [{ url: brandIcon, type: 'image/svg+xml' }],
+    apple: [{ url: brandIcon, type: 'image/svg+xml' }],
+  },
   openGraph: {
-    title: "MC PRIME World Cup",
+    title: "بورصة المونديال | MC PRIME",
     description,
     url: baseUrl,
-    siteName: "MC PRIME World Cup",
-    images: [{ url: "/og-image.jpg", width: 1200, height: 630, alt: "MC PRIME World Cup" }],
+    siteName: "بورصة المونديال",
+    images: [{ url: "/og-image.jpg", width: 1200, height: 630, alt: "بورصة المونديال" }],
     locale: "ar_EG",
     type: "website",
   },
   alternates: { canonical: '/', languages: { ar: '/', en: '/' } },
-  twitter: { card: "summary_large_image", title: "MC PRIME World Cup", description, images: ["/og-image.jpg"] },
+  twitter: { card: "summary_large_image", title: "بورصة المونديال | MC PRIME", description, images: ["/og-image.jpg"] },
   robots: { index: true, follow: true, googleBot: { index: true, follow: true, 'max-video-preview': -1, 'max-image-preview': 'large', 'max-snippet': -1 } },
 };
 
