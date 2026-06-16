@@ -26,14 +26,31 @@ type TickerMatch = {
   minute?: number | null;
   liveLabel?: string | null;
   groupPhase?: string | null;
+  group?: string | null;
+  stage?: string | null;
 };
 
 type Props = {
   matches: TickerMatch[] | unknown[];
 };
 
+const GROUP_LETTERS = 'ABCDEFGHIJKL'.split('');
+
 function normalizeStatus(status?: string | null) {
   return String(status || '').toUpperCase();
+}
+
+function formatCount(value: number) {
+  return new Intl.NumberFormat('ar-EG').format(value);
+}
+
+function groupNumberLabel(match: TickerMatch) {
+  const raw = String(match.groupPhase || match.group || match.stage || '').trim().toUpperCase();
+  const letter = raw.match(/GROUP[_\s-]*([A-L])/)?.[1] || raw.match(/المجموعة\s*([A-L])/i)?.[1]?.toUpperCase() || (/^[A-L]$/.test(raw) ? raw : '');
+  if (letter) return `المجموعة ${formatCount(GROUP_LETTERS.indexOf(letter) + 1)}`;
+  const number = raw.match(/(?:GROUP|المجموعة)?[_\s-]*(\d{1,2})/)?.[1];
+  if (number) return `المجموعة ${formatCount(Number(number))}`;
+  return 'كأس العالم';
 }
 
 function matchStatus(match: TickerMatch) {
@@ -94,7 +111,7 @@ export default function HomeLiveMatchTicker({ matches = [] }: Props) {
                     : 'border-white/10 hover:border-[#0FF0FC]/30'
                 }`}
               >
-                <div className="flex min-w-[3.5rem] flex-col gap-1.5">
+                <div className="flex min-w-[3.8rem] flex-col gap-1.5">
                   {live ? (
                     <span className={`inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-wide ${halfTime ? 'text-[#FFD700]' : 'text-[#00FF88]'}`}>
                       <span className={`h-1.5 w-1.5 rounded-full ${halfTime ? 'bg-[#FFD700]' : 'animate-pulse bg-[#00FF88]'}`} />
@@ -110,8 +127,8 @@ export default function HomeLiveMatchTicker({ matches = [] }: Props) {
                       }).format(new Date(match.matchDate)) : 'قريباً'}
                     </span>
                   )}
-                  <span className="max-w-[4rem] truncate text-[9px] font-bold text-gray-400">
-                    {match.groupPhase ? match.groupPhase.replace('Group ', 'المجموعة ') : 'كأس العالم'}
+                  <span className="max-w-[4.2rem] truncate text-[9px] font-bold text-gray-400">
+                    {groupNumberLabel(match)}
                   </span>
                 </div>
 
