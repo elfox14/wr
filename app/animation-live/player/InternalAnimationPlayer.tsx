@@ -67,6 +67,27 @@ function isScheduledStatus(status?: string | null) {
   return SCHEDULED_STATUSES.includes(normalizeStatus(status));
 }
 
+function eventConfirmsHalfTime(event?: MatchEvent | null) {
+  if (!event) return false;
+  const value = `${event.type || ''} ${event.detail || ''}`.toLowerCase();
+  const hasEnglishHalfTime = /\b(ht|half[-_\s]?time)\b/i.test(value);
+  const hasArabicHalfTime = [
+    'استراحة',
+    'بين الشوطين',
+    'نهاية الشوط الأول',
+    'نهاية الشوط الاول',
+    'انتهاء الشوط الأول',
+    'انتهاء الشوط الاول',
+    'الشوط الأول انتهى',
+    'الشوط الاول انتهى',
+  ].some((phrase) => value.includes(phrase));
+  return hasEnglishHalfTime || hasArabicHalfTime;
+}
+
+function isConfirmedHalfTime(match?: LiveStatsResponse['match'], lastEvent?: MatchEvent | null) {
+  return isHalfTimeStatus(match?.status) || eventConfirmsHalfTime(lastEvent);
+}
+
 function displayMatchStatus(status?: string | null) {
   const value = normalizeStatus(status);
   if (isHalfTimeStatus(value)) return 'استراحة';
@@ -168,11 +189,11 @@ function inferBallPosition(event?: MatchEvent | null) {
 }
 
 function confirmedMinute(match?: LiveStatsResponse['match'], latest?: Snapshot, lastEvent?: MatchEvent | null) {
+  const status = normalizeStatus(match?.status);
+  if (isHalfTimeStatus(status) || eventConfirmsHalfTime(lastEvent)) return 45;
   const snapshotMinute = statValue(latest || null, 'minute');
   if (snapshotMinute !== null && snapshotMinute > 0) return Math.max(1, Math.min(135, snapshotMinute));
   if (lastEvent?.minute && lastEvent.minute > 0) return Math.max(1, Math.min(135, lastEvent.minute));
-  const status = normalizeStatus(match?.status);
-  if (isHalfTimeStatus(status)) return 45;
   if (isFinishedStatus(status)) return 90;
   return null;
 }
@@ -180,8 +201,8 @@ function confirmedMinute(match?: LiveStatsResponse['match'], latest?: Snapshot, 
 function confirmedClockLabel(match?: LiveStatsResponse['match'], latest?: Snapshot, lastEvent?: MatchEvent | null) {
   const status = normalizeStatus(match?.status);
   const minute = confirmedMinute(match, latest, lastEvent);
+  if (isConfirmedHalfTime(match, lastEvent)) return 'استراحة';
   if (minute !== null && isLiveStatus(status)) return `الدقيقة ${displayNumber(minute)}`;
-  if (minute !== null && isHalfTimeStatus(status)) return `استراحة - ${displayNumber(minute)}′`;
   if (minute !== null && isFinishedStatus(status)) return `انتهت - ${displayNumber(minute)}′`;
   if (status === '1H') return 'الشوط الأول مؤكد';
   if (status === '2H') return 'الشوط الثاني مؤكد';
@@ -271,9 +292,9 @@ export default function InternalAnimationPlayer({ matchId = '', dbMatchId = '' }
   const homeScore = statValue(latest, 'homeScore') ?? match?.homeScore ?? 0;
   const awayScore = statValue(latest, 'awayScore') ?? match?.awayScore ?? 0;
   const minute = confirmedMinute(match, latest, lastEvent);
-  const statusLabel = displayMatchStatus(match?.status);
+  const isHalfTime = isConfirmedHalfTime(match, lastEvent);
+  const statusLabel = isHalfTime ? 'استراحة' : displayMatchStatus(match?.status);
   const clockLabel = confirmedClockLabel(match, latest, lastEvent);
-  const isHalfTime = isHalfTimeStatus(match?.status);
 
   if (loading) return <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.03] p-10 text-center text-sm text-gray-400">جاري تحميل المشغل...</div>;
   if (error) return <div className="rounded-2xl border border-red-400/20 bg-red-500/10 p-5 text-sm text-red-200"><AlertTriangle className="mb-2" /> {error}</div>;
