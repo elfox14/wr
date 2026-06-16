@@ -20,8 +20,17 @@ const links = [
 const primaryMobileLinks = [
   ['/matches', 'المباريات'],
   ['/groups', 'المجموعات'],
+  ['/players', 'اللاعبون'],
   ['/animation-live', 'LIVE'],
 ] as const;
+
+function NavItem({ href, label, className, onClick }: { href: string; label: string; className: string; onClick?: () => void }) {
+  if (href === '/players') {
+    return <a href={href} onClick={onClick} className={className}>{label}</a>;
+  }
+
+  return <Link href={href} onClick={onClick} className={className}>{label}</Link>;
+}
 
 export function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
@@ -45,23 +54,20 @@ export function Navbar() {
 
             <div className="hidden items-center justify-center gap-1 rounded-2xl border border-white/10 bg-white/[0.035] p-1 text-sm font-black text-gray-300 lg:flex">
               {links.map(([href, label]) => (
-                <Link key={href} href={href} className="rounded-xl px-3 py-2.5 transition hover:bg-white/10 hover:text-white xl:px-3.5">
-                  {label}
-                </Link>
+                <NavItem key={href} href={href} label={label} className="rounded-xl px-3 py-2.5 transition hover:bg-white/10 hover:text-white xl:px-3.5" />
               ))}
             </div>
 
             <div className="flex min-w-0 flex-1 items-center justify-end gap-1.5 lg:hidden">
               <div className="flex min-w-0 items-center gap-1 overflow-x-auto rounded-2xl border border-white/10 bg-white/[0.04] p-1 mobile-scrollbar">
                 {primaryMobileLinks.map(([href, label]) => (
-                  <Link
+                  <NavItem
                     key={href}
                     href={href}
+                    label={label}
                     onClick={closeMenu}
                     className={`mobile-tap inline-flex shrink-0 items-center rounded-xl px-2.5 py-2 text-[11px] font-black transition active:scale-95 ${href === '/animation-live' ? 'bg-red-500/15 text-red-100 ring-1 ring-red-300/10' : 'text-gray-200 hover:bg-white/10 hover:text-white'}`}
-                  >
-                    {label}
-                  </Link>
+                  />
                 ))}
               </div>
 
@@ -82,14 +88,13 @@ export function Navbar() {
               <div className="overflow-hidden rounded-[1.35rem] border border-white/10 bg-[#07111f]/97 shadow-[0_18px_42px_rgba(0,0,0,0.38)] backdrop-blur-2xl">
                 <div className="grid grid-cols-2 gap-1.5 p-2">
                   {links.map(([href, label]) => (
-                    <Link
+                    <NavItem
                       key={href}
                       href={href}
+                      label={label}
                       onClick={closeMenu}
                       className={`mobile-tap rounded-xl border px-3 py-3 text-center text-xs font-black transition active:scale-[0.98] ${href === '/animation-live' ? 'border-red-300/20 bg-red-500/10 text-red-100' : 'border-white/10 bg-white/[0.045] text-gray-100 hover:border-[#0FF0FC]/30 hover:bg-white/[0.075]'}`}
-                    >
-                      {label}
-                    </Link>
+                    />
                   ))}
                 </div>
                 <div className="border-t border-white/10 px-3 py-2 text-center text-[10px] font-bold text-gray-500">
