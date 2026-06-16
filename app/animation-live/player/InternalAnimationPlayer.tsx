@@ -1,11 +1,20 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, Goal, Radio } from 'lucide-react';
+import { AlertTriangle, BarChart3, Goal, Radio } from 'lucide-react';
+import { getTeamFlagUrl } from '@/lib/teamFlags';
 
 type Team = { id?: string; name?: string; code?: string; image?: string } | null;
 type Snapshot = Record<string, any> | null;
-type MatchEvent = { id: string; minute?: number | null; type: string; detail: string; playerName?: string | null; sourceName?: string | null; createdAt?: string | null };
+type MatchEvent = {
+  id: string;
+  minute?: number | null;
+  type: string;
+  detail: string;
+  playerName?: string | null;
+  sourceName?: string | null;
+  createdAt?: string | null;
+};
 
 type LiveStatsResponse = {
   ok: boolean;
@@ -38,14 +47,6 @@ type LiveEventsResponse = {
 
 const STATS_POLL_MS = 5 * 60 * 1000;
 const EVENTS_POLL_MS = 30 * 1000;
-
-const STAT_KEYS = [
-  'homePossession', 'awayPossession', 'homeAttacks', 'awayAttacks',
-  'homeDangerousAttacks', 'awayDangerousAttacks', 'homeShots', 'awayShots',
-  'homeShotsOnTarget', 'awayShotsOnTarget', 'homeShotsOffTarget', 'awayShotsOffTarget',
-  'homeCorners', 'awayCorners', 'homeYellowCards', 'awayYellowCards', 'homeRedCards', 'awayRedCards',
-];
-
 const HALF_TIME_STATUSES = ['HT', 'HALFTIME', 'HALF_TIME', 'HALF-TIME'];
 const FINISHED_STATUSES = ['FINISHED', 'FT', 'AET', 'PEN'];
 
@@ -75,12 +76,7 @@ function statValue(snapshot: Snapshot, key: string) {
   return Number.isFinite(value) ? value : null;
 }
 
-function hasAnyDetailedStat(snapshot: Snapshot) {
-  if (!snapshot) return false;
-  return STAT_KEYS.some((key) => snapshot[key] !== null && snapshot[key] !== undefined);
-}
-
-function displayNumber(value: number | null, fallback = '—') {
+function displayNumber(value: number | null, fallback = '٠') {
   return value === null ? fallback : value.toLocaleString('ar-EG');
 }
 
@@ -93,6 +89,7 @@ function eventIcon(type: string) {
   if (value.includes('danger')) return '🔥';
   if (value.includes('shot')) return '🎯';
   if (value.includes('penalty')) return '🥅';
+  if (value.includes('substitution')) return '🔁';
   return '•';
 }
 
@@ -105,6 +102,7 @@ function eventLabel(type: string) {
   if (value.includes('danger')) return 'هجمة خطيرة';
   if (value.includes('shot')) return 'تسديدة مؤثرة';
   if (value.includes('penalty')) return 'ركلة جزاء';
+  if (value.includes('substitution')) return 'تبديل';
   if (value.includes('status')) return 'تحديث الحالة';
   return 'حدث مهم';
 }
@@ -119,6 +117,7 @@ function cleanEventDetail(detail?: string | null) {
     .replace(/ISPORTS/g, '')
     .replace(/iSports Timeline/gi, '')
     .replace(/\s+/g, ' ')
+    .replace(/\s+-\s+$/g, '')
     .trim();
 }
 
@@ -153,9 +152,24 @@ function inferLiveMinute(match?: LiveStatsResponse['match'], latest?: Snapshot) 
   return Math.max(1, Math.min(135, minute));
 }
 
-function statsNotice(stats: LiveStatsResponse | null, latest: Snapshot) {
-  if (hasAnyDetailedStat(latest) || stats?.hasStats) return null;
-  return 'الإحصائيات التفصيلية غير متاحة الآن.';
+function teamFlagUrl(team: Team) {
+  return getTeamFlagUrl({ code: team?.code, name: team?.name, image: team?.image }, 80);
+}
+
+function TeamName({ team, fallback, align }: { team: Team; fallback: string; align: 'right' | 'left' }) {
+  const name = team?.name || fallback;
+  const flag = teamFlagUrl(team);
+  return (
+    <div className={`flex min-w-0 items-center gap-2 ${align === 'left' ? 'flex-row-reverse text-left' : 'text-right'}`}>
+      <span className="flex h-8 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-white/10 bg-black/30 text-[10px] font-black text-[#FFD700]">
+        {flag ? <img src={flag} alt={`علم ${name}`} className="h-full w-full object-cover" loading="lazy" /> : team?.code || '---'}
+      </span>
+      <span className="min-w-0">
+        <span className="block truncate text-base font-black text-white md:text-xl">{name}</span>
+        <span className="mt-0.5 block text-[10px] font-bold uppercase text-gray-500">{team?.code || (align === 'right' ? 'Home' : 'Away')}</span>
+      </span>
+    </div>
+  );
 }
 
 function MiniStat({ label, home, away, accent = false }: { label: string; home: number | null; away: number | null; accent?: boolean }) {
@@ -165,6 +179,27 @@ function MiniStat({ label, home, away, accent = false }: { label: string; home: 
         <span className={accent ? 'text-[#FFD700]' : 'text-white'}>{displayNumber(home)}</span>
         <span className="text-center text-gray-500">{label}</span>
         <span className={accent ? 'text-[#FFD700]' : 'text-white'}>{displayNumber(away)}</span>
+      </div>
+    </div>
+  );
+}
+
+function StatRow({ label, home, away, accent = false }: { label: string; home: number | null; away: number | null; accent?: boolean }) {
+  const h = home ?? 0;
+  const a = away ?? 0;
+  const total = h + a;
+  const homePct = total > 0 ? Math.max(6, Math.round((h / total) * 100)) : 50;
+  const awayPct = total > 0 ? Math.max(6, Math.round((a / total) * 100)) : 50;
+  return (
+    <div className="rounded-2xl border border-white/10 bg-black/25 p-3">
+      <div className="mb-2 grid grid-cols-[44px_1fr_44px] items-center gap-3 text-xs font-black">
+        <span className={accent ? 'text-[#FFD700]' : 'text-white'}>{displayNumber(home)}</span>
+        <span className="text-center text-gray-400">{label}</span>
+        <span className={accent ? 'text-[#FFD700]' : 'text-white'}>{displayNumber(away)}</span>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <div className="h-2 overflow-hidden rounded-full bg-white/10" dir="rtl"><div className={`h-full rounded-full ${accent ? 'bg-[#FFD700]' : 'bg-[#0FF0FC]'}`} style={{ width: `${homePct}%` }} /></div>
+        <div className="h-2 overflow-hidden rounded-full bg-white/10"><div className={`h-full rounded-full ${accent ? 'bg-[#FFD700]' : 'bg-[#0FF0FC]'}`} style={{ width: `${awayPct}%` }} /></div>
       </div>
     </div>
   );
@@ -228,12 +263,9 @@ export default function InternalAnimationPlayer({ matchId = '', dbMatchId = '' }
   const match = stats?.match;
   const lastEvent = events[0] || null;
   const ball = useMemo(() => inferBallPosition(lastEvent), [lastEvent]);
-  const homeName = match?.homeTeam?.name || 'الفريق الأول';
-  const awayName = match?.awayTeam?.name || 'الفريق الثاني';
   const homeScore = statValue(latest, 'homeScore') ?? match?.homeScore ?? 0;
   const awayScore = statValue(latest, 'awayScore') ?? match?.awayScore ?? 0;
   const minute = inferLiveMinute(match, latest);
-  const unavailableStatsNotice = statsNotice(stats, latest);
   const statusLabel = displayMatchStatus(match?.status);
   const isHalfTime = isHalfTimeStatus(match?.status);
 
@@ -247,18 +279,12 @@ export default function InternalAnimationPlayer({ matchId = '', dbMatchId = '' }
 
   return (
     <section className="overflow-hidden rounded-3xl border border-white/10 bg-[radial-gradient(circle_at_top,rgba(15,240,252,0.12),transparent_34%),linear-gradient(180deg,rgba(255,255,255,0.055),rgba(255,255,255,0.015))] shadow-[0_25px_90px_rgba(0,0,0,0.45)]">
-      <div className="grid gap-4 p-4 xl:grid-cols-[1.35fr_0.65fr]">
+      <div className="grid gap-4 p-4 xl:grid-cols-[1.28fr_0.72fr]">
         <div className="space-y-4">
-          <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 rounded-2xl border border-white/10 bg-black/30 p-4 text-center">
-            <div className="min-w-0 text-right">
-              <div className="truncate text-base font-black text-white md:text-xl">{homeName}</div>
-              <div className="mt-1 text-[10px] font-bold uppercase text-gray-500">Home</div>
-            </div>
-            <div className="rounded-3xl border border-[#FFD700]/25 bg-[#FFD700]/10 px-6 py-3 text-4xl font-black text-[#FFD700] tabular-nums">{homeScore} - {awayScore}</div>
-            <div className="min-w-0 text-left">
-              <div className="truncate text-base font-black text-white md:text-xl">{awayName}</div>
-              <div className="mt-1 text-[10px] font-bold uppercase text-gray-500">Away</div>
-            </div>
+          <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 rounded-2xl border border-white/10 bg-black/30 p-3 text-center sm:p-4">
+            <TeamName team={match?.homeTeam || null} fallback="الفريق الأول" align="right" />
+            <div className="rounded-3xl border border-[#FFD700]/25 bg-[#FFD700]/10 px-4 py-3 text-3xl font-black text-[#FFD700] tabular-nums sm:px-6 sm:text-4xl">{displayNumber(homeScore)} - {displayNumber(awayScore)}</div>
+            <TeamName team={match?.awayTeam || null} fallback="الفريق الثاني" align="left" />
           </div>
 
           <div className="relative h-[420px] overflow-hidden rounded-3xl border border-emerald-300/25 bg-[linear-gradient(90deg,rgba(15,121,67,0.95),rgba(14,145,79,0.95))] shadow-inner">
@@ -285,7 +311,7 @@ export default function InternalAnimationPlayer({ matchId = '', dbMatchId = '' }
             </div>
 
             <div className="absolute left-4 top-4 rounded-2xl border border-white/10 bg-black/50 px-3 py-2 text-xs font-black text-white">
-              الدقيقة: <span className="text-[#FFD700]">{displayNumber(minute)}</span>
+              الدقيقة: <span className="text-[#FFD700]">{displayNumber(minute, '—')}</span>
             </div>
             <div className="absolute right-4 top-4 rounded-2xl border border-white/10 bg-black/50 px-3 py-2 text-xs font-black text-white">
               الحالة: <span className="text-[#FFD700]">{statusLabel}</span>
@@ -296,28 +322,30 @@ export default function InternalAnimationPlayer({ matchId = '', dbMatchId = '' }
             </div>
           </div>
 
-          {unavailableStatsNotice ? (
-            <div className="rounded-2xl border border-[#FFD700]/20 bg-[#FFD700]/10 p-4 text-xs font-bold leading-6 text-[#FFD700]">
-              <AlertTriangle size={15} className="inline" /> {unavailableStatsNotice}
+          <div className="rounded-3xl border border-white/10 bg-black/20 p-4">
+            <div className="mb-3 flex items-center gap-2 text-sm font-black text-white"><BarChart3 size={18} className="text-[#0FF0FC]" /> إحصائيات المباراة</div>
+            <div className="grid gap-3 sm:grid-cols-3">
+              <MiniStat label="ركنيات" home={statValue(latest, 'homeCorners')} away={statValue(latest, 'awayCorners')} accent />
+              <MiniStat label="صفراء" home={statValue(latest, 'homeYellowCards')} away={statValue(latest, 'awayYellowCards')} />
+              <MiniStat label="حمراء" home={statValue(latest, 'homeRedCards')} away={statValue(latest, 'awayRedCards')} />
             </div>
-          ) : (
-            <div className="grid gap-3 md:grid-cols-3">
-              <MiniStat label="استحواذ" home={statValue(latest, 'homePossession')} away={statValue(latest, 'awayPossession')} />
-              <MiniStat label="هجمات خطيرة" home={statValue(latest, 'homeDangerousAttacks')} away={statValue(latest, 'awayDangerousAttacks')} accent />
-              <MiniStat label="على المرمى" home={statValue(latest, 'homeShotsOnTarget')} away={statValue(latest, 'awayShotsOnTarget')} accent />
-              <MiniStat label="تسديدات" home={statValue(latest, 'homeShots')} away={statValue(latest, 'awayShots')} />
-              <MiniStat label="ركنيات" home={statValue(latest, 'homeCorners')} away={statValue(latest, 'awayCorners')} />
-              <MiniStat label="كروت" home={(statValue(latest, 'homeYellowCards') ?? 0) + (statValue(latest, 'homeRedCards') ?? 0)} away={(statValue(latest, 'awayYellowCards') ?? 0) + (statValue(latest, 'awayRedCards') ?? 0)} />
+            <div className="mt-3 grid gap-3 md:grid-cols-2">
+              <StatRow label="الاستحواذ" home={statValue(latest, 'homePossession')} away={statValue(latest, 'awayPossession')} />
+              <StatRow label="الهجمات" home={statValue(latest, 'homeAttacks')} away={statValue(latest, 'awayAttacks')} />
+              <StatRow label="الهجمات الخطيرة" home={statValue(latest, 'homeDangerousAttacks')} away={statValue(latest, 'awayDangerousAttacks')} accent />
+              <StatRow label="التسديدات" home={statValue(latest, 'homeShots')} away={statValue(latest, 'awayShots')} />
+              <StatRow label="على المرمى" home={statValue(latest, 'homeShotsOnTarget')} away={statValue(latest, 'awayShotsOnTarget')} accent />
+              <StatRow label="خارج المرمى" home={statValue(latest, 'homeShotsOffTarget')} away={statValue(latest, 'awayShotsOffTarget')} />
             </div>
-          )}
+          </div>
         </div>
 
         <aside className="rounded-2xl border border-white/10 bg-black/25 p-4">
           <div className="mb-3 flex items-center justify-between gap-2">
-            <h3 className="font-black text-white">Timeline الأحداث المهمة</h3>
+            <h3 className="font-black text-white">الأحداث والحالة</h3>
             <Goal className="text-[#FFD700]" size={22} />
           </div>
-          <div className="max-h-[670px] space-y-2 overflow-y-auto pr-1">
+          <div className="max-h-[860px] space-y-2 overflow-y-auto pr-1">
             {events.length ? events.map((event) => (
               <div key={event.id} className="rounded-xl border border-white/8 bg-white/[0.035] p-3">
                 <div className="flex items-center gap-2 text-xs font-black text-[#FFD700]"><span>{eventIcon(event.type)}</span>{event.minute ? `د${event.minute}` : 'حدث'}</div>
