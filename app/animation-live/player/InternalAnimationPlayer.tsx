@@ -176,19 +176,19 @@ function pressureWindow(events: MatchEvent[], currentMinute: number | null, span
     return acc;
   }, { available: false, home: 0, away: 0, homeEvents: 0, awayEvents: 0, leader: 'unknown' as PressureSide });
 }
-function calculatePressureModel(snapshot: Snapshot, events: MatchEvent[], currentMinute: number | null, home: Team, away: Team): PressureModel {
+function calculatePressureModel(snapshot: Snapshot, events: MatchEvent[], currentMinute: number | null, homeTeam: Team, awayTeam: Team): PressureModel {
   const homeBase = (n(snapshot, 'homeAttacks') ?? 0) + ((n(snapshot, 'homeDangerousAttacks') ?? 0) * 3) + ((n(snapshot, 'homeShots') ?? 0) * 4) + ((n(snapshot, 'homeShotsOnTarget') ?? 0) * 6) + ((n(snapshot, 'homeCorners') ?? 0) * 2);
   const awayBase = (n(snapshot, 'awayAttacks') ?? 0) + ((n(snapshot, 'awayDangerousAttacks') ?? 0) * 3) + ((n(snapshot, 'awayShots') ?? 0) * 4) + ((n(snapshot, 'awayShotsOnTarget') ?? 0) * 6) + ((n(snapshot, 'awayCorners') ?? 0) * 2);
-  const window5 = pressureWindow(events, currentMinute, 5, home, away);
-  const window15 = pressureWindow(events, currentMinute, 15, home, away);
-  const home = homeBase + (window15.home * 2) + (window5.home * 2);
-  const away = awayBase + (window15.away * 2) + (window5.away * 2);
-  const leader = pressureLeader(home, away);
+  const window5 = pressureWindow(events, currentMinute, 5, homeTeam, awayTeam);
+  const window15 = pressureWindow(events, currentMinute, 15, homeTeam, awayTeam);
+  const homePressure = homeBase + (window15.home * 2) + (window5.home * 2);
+  const awayPressure = awayBase + (window15.away * 2) + (window5.away * 2);
+  const leader = pressureLeader(homePressure, awayPressure);
   const rhythmScore = window15.available ? window15.home + window15.away : ((homeBase + awayBase) / Math.max(1, currentMinute ?? 90)) * 15;
   const rhythm = rhythmScore >= 35 ? 'عالي' : rhythmScore >= 18 ? 'متوسط' : 'هادئ';
-  const maxPressure = Math.max(home, away);
+  const maxPressure = Math.max(homePressure, awayPressure);
   const danger = maxPressure >= 220 ? 'مرتفعة' : maxPressure >= 110 ? 'متوسطة' : 'منخفضة';
-  return { home: Math.round(home), away: Math.round(away), leader, rhythm, danger, window5, window15 };
+  return { home: Math.round(homePressure), away: Math.round(awayPressure), leader, rhythm, danger, window5, window15 };
 }
 function sideName(side: PressureSide, home?: Team, away?: Team) {
   if (side === 'home') return home?.name || 'الفريق الأول';
@@ -370,8 +370,8 @@ export default function InternalAnimationPlayer({ matchId = '', dbMatchId = '' }
               <IntelligenceTile label="الخطورة اللحظية" value={pressure.danger} hint="منخفضة / متوسطة / مرتفعة" />
               <IntelligenceTile label="آخر ٥ دقائق" value={windowLabel(pressure.window5)} hint={pressure.window5.available ? `${ar(pressure.window5.homeEvents)} - ${ar(pressure.window5.awayEvents)} أحداث مرصودة` : 'غير متوفر من الأحداث'} />
               <IntelligenceTile label="آخر ١٥ دقيقة" value={windowLabel(pressure.window15)} hint={pressure.window15.available ? `${ar(pressure.window15.homeEvents)} - ${ar(pressure.window15.awayEvents)} أحداث مرصودة` : 'غير متوفر من الأحداث'} />
-              <IntelligenceTile label="ضغط فرنسا/الأول" value={ar(pressure.home)} hint={match?.homeTeam?.name || 'الفريق الأول'} />
-              <IntelligenceTile label="ضغط السنغال/الثاني" value={ar(pressure.away)} hint={match?.awayTeam?.name || 'الفريق الثاني'} />
+              <IntelligenceTile label="ضغط الفريق الأول" value={ar(pressure.home)} hint={match?.homeTeam?.name || 'الفريق الأول'} />
+              <IntelligenceTile label="ضغط الفريق الثاني" value={ar(pressure.away)} hint={match?.awayTeam?.name || 'الفريق الثاني'} />
               <IntelligenceTile label="مصدر الذكاء" value="Live + Events" hint="بدون تخزين جديد في قاعدة البيانات" />
             </div>
           </div>
