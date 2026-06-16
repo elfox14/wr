@@ -74,20 +74,43 @@ function eventIcon(type: string) {
   if (value.includes('substitution')) return '🔁';
   return '•';
 }
+function eventLabel(type: string) {
+  const value = type.toLowerCase();
+  if (value.includes('goal')) return 'هدف';
+  if (value.includes('corner')) return 'ركنية';
+  if (value.includes('yellow')) return 'بطاقة صفراء';
+  if (value.includes('red')) return 'بطاقة حمراء';
+  if (value.includes('danger')) return 'هجمة خطيرة';
+  if (value.includes('shot')) return 'تسديدة';
+  if (value.includes('substitution')) return 'تبديل';
+  return 'حدث';
+}
 function cleanEventDetail(detail?: string | null) {
   return String(detail || '').replace(/FOOTBALL_DATA_FALLBACK|FOOTBALL_DATA|ISPORTS_TIMELINE|ISPORTS_PAGE|ISPORTS/gi, '').replace(/football-data\.org/gi, '').replace(/\s+/g, ' ').trim();
 }
-function ballPosition(event?: MatchEvent | null) {
-  if (!event) return { left: 50, top: 50, label: 'منتصف الملعب' };
+function eventSide(event?: MatchEvent | null, home?: Team, away?: Team) {
+  const text = `${event?.detail || ''} ${event?.sourceName || ''}`.toLowerCase();
+  const awayName = String(away?.name || '').toLowerCase();
+  const awayCode = String(away?.code || '').toLowerCase();
+  const homeName = String(home?.name || '').toLowerCase();
+  const homeCode = String(home?.code || '').toLowerCase();
+  if ((awayName && text.includes(awayName)) || (awayCode && text.includes(awayCode)) || text.includes('away') || text.includes('الضيف')) return 'away';
+  if ((homeName && text.includes(homeName)) || (homeCode && text.includes(homeCode)) || text.includes('home') || text.includes('صاحب الأرض') || text.includes('صاحب الارض')) return 'home';
+  return 'neutral';
+}
+function ballPosition(event?: MatchEvent | null, home?: Team, away?: Team) {
+  if (!event) return { left: 50, top: 50, label: 'منتصف الملعب', side: 'neutral' };
   const type = event.type.toLowerCase();
-  const detail = event.detail.toLowerCase();
-  const away = detail.includes('senegal') || detail.includes('away') || detail.includes('الضيف');
-  const attack = away ? 24 : 76;
-  if (type.includes('goal')) return { left: attack, top: 50, label: 'هدف' };
-  if (type.includes('corner')) return { left: away ? 7 : 93, top: 12, label: 'ركنية' };
-  if (type.includes('danger')) return { left: attack, top: 38, label: 'هجمة خطيرة' };
-  if (type.includes('shot')) return { left: attack, top: 58, label: 'تسديدة' };
-  return { left: 50, top: 50, label: 'منتصف الملعب' };
+  const side = eventSide(event, home, away);
+  const isAway = side === 'away';
+  const attack = isAway ? 24 : side === 'home' ? 76 : 50;
+  if (type.includes('goal')) return { left: attack, top: 50, label: 'مكان الهدف', side };
+  if (type.includes('corner')) return { left: isAway ? 7 : side === 'home' ? 93 : 50, top: isAway ? 14 : 86, label: 'منطقة الركنية', side };
+  if (type.includes('danger')) return { left: attack, top: 38, label: 'هجمة خطيرة', side };
+  if (type.includes('shot')) return { left: attack, top: 58, label: 'تسديدة', side };
+  if (type.includes('yellow') || type.includes('red') || type.includes('card')) return { left: side === 'neutral' ? 50 : attack, top: 50, label: 'مكان البطاقة', side };
+  if (type.includes('substitution')) return { left: 50, top: side === 'away' ? 20 : 80, label: 'منطقة التبديل', side };
+  return { left: 50, top: 50, label: 'مكان الحدث', side };
 }
 function flagUrl(team: Team) { return getTeamFlagUrl({ code: team?.code, name: team?.name, image: team?.image }, 80); }
 function TeamName({ team, fallback, align }: { team: Team; fallback: string; align: 'right' | 'left' }) {
@@ -123,6 +146,7 @@ function StatRow({ label, home, away, accent = false }: { label: string; home: n
 export default function InternalAnimationPlayer({ matchId = '', dbMatchId = '' }: { matchId?: string; dbMatchId?: string }) {
   const [stats, setStats] = useState<LiveStatsResponse | null>(null);
   const [events, setEvents] = useState<MatchEvent[]>([]);
+  const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const query = useMemo(() => { const params = new URLSearchParams(); if (matchId) params.set('matchId', matchId); if (dbMatchId) params.set('dbMatchId', dbMatchId); return params.toString(); }, [matchId, dbMatchId]);
@@ -152,11 +176,14 @@ export default function InternalAnimationPlayer({ matchId = '', dbMatchId = '' }
     const eventsTimer = window.setInterval(fetchEvents, EVENTS_POLL_MS);
     return () => { window.clearInterval(statsTimer); window.clearInterval(eventsTimer); };
   }, [query]);
+  useEffect(() => {
+    if (!selectedEventId && events[0]?.id) setSelectedEventId(events[0].id);
+  }, [events, selectedEventId]);
 
   const latest = resolvedSnapshot(stats);
   const match = stats?.match;
-  const lastEvent = events[0] || null;
-  const ball = ballPosition(lastEvent);
+  const selectedEvent = events.find((event) => event.id === selectedEventId) || events[0] || null;
+  const ball = ballPosition(selectedEvent, match?.homeTeam || null, match?.awayTeam || null);
   const homeScore = n(latest, 'homeScore') ?? match?.homeScore ?? 0;
   const awayScore = n(latest, 'awayScore') ?? match?.awayScore ?? 0;
   const minute = n(latest, 'minute') ?? (isFinishedStatus(match?.status) ? 90 : null);
@@ -178,10 +205,14 @@ export default function InternalAnimationPlayer({ matchId = '', dbMatchId = '' }
             <div className="absolute inset-0 bg-[repeating-linear-gradient(90deg,rgba(255,255,255,0.045)_0,rgba(255,255,255,0.045)_1px,transparent_1px,transparent_14.285%)]" />
             <div className="absolute left-1/2 top-0 h-full w-px -translate-x-1/2 bg-white/45" /><div className="absolute left-1/2 top-1/2 h-28 w-28 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white/45" /><div className="absolute left-0 top-1/2 h-44 w-24 -translate-y-1/2 rounded-r-3xl border-y-2 border-r-2 border-white/45" /><div className="absolute right-0 top-1/2 h-44 w-24 -translate-y-1/2 rounded-l-3xl border-y-2 border-l-2 border-white/45" />
             <div className="absolute left-[15%] top-[20%] h-3 w-3 rounded-full bg-white/70" /><div className="absolute left-[25%] top-[40%] h-3 w-3 rounded-full bg-white/70" /><div className="absolute left-[18%] top-[65%] h-3 w-3 rounded-full bg-white/70" /><div className="absolute left-[38%] top-[52%] h-3 w-3 rounded-full bg-white/70" /><div className="absolute right-[15%] top-[20%] h-3 w-3 rounded-full bg-[#FFD700]/80" /><div className="absolute right-[25%] top-[40%] h-3 w-3 rounded-full bg-[#FFD700]/80" /><div className="absolute right-[18%] top-[65%] h-3 w-3 rounded-full bg-[#FFD700]/80" /><div className="absolute right-[38%] top-[52%] h-3 w-3 rounded-full bg-[#FFD700]/80" />
-            <div className="absolute z-20 -translate-x-1/2 -translate-y-1/2" style={{ left: `${ball.left}%`, top: `${ball.top}%` }}><div className="relative flex h-12 w-12 items-center justify-center rounded-full border-2 border-white bg-black text-xl shadow-[0_0_35px_rgba(255,255,255,0.55)]">⚽</div><div className="absolute left-1/2 top-14 w-36 -translate-x-1/2 rounded-full border border-black/20 bg-black/70 px-3 py-1 text-center text-[10px] font-black text-white">{ball.label}</div></div>
-            <div className="absolute left-4 top-4 rounded-2xl border border-white/10 bg-black/50 px-3 py-2 text-xs font-black text-white">الدقيقة: <span className="text-[#FFD700]">{ar(minute, '—')}</span></div>
+            <div className="absolute z-20 -translate-x-1/2 -translate-y-1/2 transition-all duration-500 ease-out" style={{ left: `${ball.left}%`, top: `${ball.top}%` }}>
+              <div className="absolute inset-0 h-14 w-14 -translate-x-1 -translate-y-1 animate-ping rounded-full bg-[#FFD700]/25" />
+              <div className="relative flex h-12 w-12 items-center justify-center rounded-full border-2 border-white bg-black text-xl shadow-[0_0_35px_rgba(255,255,255,0.55)]">{selectedEvent ? eventIcon(selectedEvent.type) : '⚽'}</div>
+              <div className="absolute left-1/2 top-14 w-40 -translate-x-1/2 rounded-full border border-black/20 bg-black/75 px-3 py-1 text-center text-[10px] font-black text-white">{ball.label}</div>
+            </div>
+            <div className="absolute left-4 top-4 rounded-2xl border border-white/10 bg-black/50 px-3 py-2 text-xs font-black text-white">الدقيقة: <span className="text-[#FFD700]">{ar(selectedEvent?.minute ?? minute, '—')}</span></div>
             <div className="absolute right-4 top-4 rounded-2xl border border-white/10 bg-black/50 px-3 py-2 text-xs font-black text-white">الحالة: <span className="text-[#FFD700]">{displayMatchStatus(match?.status)}</span></div>
-            <div className="absolute bottom-4 left-4 right-4 rounded-2xl border border-white/10 bg-black/60 p-3"><div className="flex items-center gap-2 text-xs font-black text-[#FFD700]"><Radio size={14} /> آخر حدث</div><p className="mt-1 text-sm leading-6 text-white">{lastEvent ? `${eventIcon(lastEvent.type)} ${lastEvent.minute ? `د${lastEvent.minute} - ` : ''}${cleanEventDetail(lastEvent.detail)}` : 'لا توجد أحداث مهمة محفوظة بعد.'}</p></div>
+            <div className="absolute bottom-4 left-4 right-4 rounded-2xl border border-white/10 bg-black/60 p-3"><div className="flex items-center gap-2 text-xs font-black text-[#FFD700]"><Radio size={14} /> الحدث المحدد على الملعب</div><p className="mt-1 text-sm leading-6 text-white">{selectedEvent ? `${eventIcon(selectedEvent.type)} ${selectedEvent.minute ? `د${selectedEvent.minute} - ` : ''}${eventLabel(selectedEvent.type)}: ${cleanEventDetail(selectedEvent.detail)}` : 'اضغط على أي حدث من القائمة لإظهار مكانه على الملعب.'}</p></div>
           </div>
 
           <div className="rounded-3xl border border-white/10 bg-black/20 p-4">
@@ -191,7 +222,11 @@ export default function InternalAnimationPlayer({ matchId = '', dbMatchId = '' }
           </div>
         </div>
 
-        <aside className="rounded-2xl border border-white/10 bg-black/25 p-4"><div className="mb-3 flex items-center justify-between gap-2"><h3 className="font-black text-white">الأحداث والحالة</h3><Goal className="text-[#FFD700]" size={22} /></div><div className="max-h-[860px] space-y-2 overflow-y-auto pr-1">{events.length ? events.map((event) => (<div key={event.id} className="rounded-xl border border-white/8 bg-white/[0.035] p-3"><div className="flex items-center gap-2 text-xs font-black text-[#FFD700]"><span>{eventIcon(event.type)}</span>{event.minute ? `د${event.minute}` : 'حدث'}</div><p className="mt-1 text-sm leading-6 text-gray-200">{cleanEventDetail(event.detail)}</p></div>)) : (<div className="rounded-xl border border-dashed border-white/10 p-6 text-center text-sm text-gray-500">لا توجد أحداث مهمة محفوظة بعد.</div>)}</div><div className="mt-3 flex items-center gap-2 rounded-xl border border-[#00FF88]/20 bg-[#00FF88]/10 px-3 py-2 text-[11px] font-bold text-[#00FF88]"><CheckCircle2 size={14} /> البيانات محفوظة بعد نهاية المباراة وتظهر من قاعدة البيانات.</div></aside>
+        <aside className="rounded-2xl border border-white/10 bg-black/25 p-4">
+          <div className="mb-3 flex items-center justify-between gap-2"><h3 className="font-black text-white">الأحداث والحالة</h3><Goal className="text-[#FFD700]" size={22} /></div>
+          <div className="max-h-[860px] space-y-2 overflow-y-auto pr-1">{events.length ? events.map((event) => { const active = event.id === selectedEvent?.id; return (<button key={event.id} type="button" onClick={() => setSelectedEventId(event.id)} className={`block w-full rounded-xl border p-3 text-right transition ${active ? 'border-[#FFD700]/60 bg-[#FFD700]/12 shadow-[0_0_24px_rgba(255,215,0,0.10)]' : 'border-white/8 bg-white/[0.035] hover:border-[#0FF0FC]/35 hover:bg-white/[0.06]'}`}><div className="flex items-center gap-2 text-xs font-black text-[#FFD700]"><span>{eventIcon(event.type)}</span>{event.minute ? `د${event.minute}` : 'حدث'}<span className="mr-auto rounded-full border border-white/10 bg-black/25 px-2 py-0.5 text-[9px] text-gray-400">اضغط للعرض</span></div><p className="mt-1 text-sm leading-6 text-gray-200">{cleanEventDetail(event.detail)}</p></button>); }) : (<div className="rounded-xl border border-dashed border-white/10 p-6 text-center text-sm text-gray-500">لا توجد أحداث مهمة محفوظة بعد.</div>)}</div>
+          <div className="mt-3 flex items-center gap-2 rounded-xl border border-[#00FF88]/20 bg-[#00FF88]/10 px-3 py-2 text-[11px] font-bold text-[#00FF88]"><CheckCircle2 size={14} /> اضغط على أي حدث لتحريك العلامة إلى مكانه التقريبي على الملعب.</div>
+        </aside>
       </div>
     </section>
   );
