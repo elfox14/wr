@@ -9,7 +9,7 @@ type Props = {
   upcomingMatchesCount?: number;
 };
 
-type TileTone = 'default' | 'gold' | 'alert';
+type TileTone = 'default' | 'gold' | 'alert' | 'cyan';
 
 type Tile = {
   label: string;
@@ -22,7 +22,6 @@ type Tile = {
 
 const STATS_REFRESH_MS = 60_000;
 const LOADING_VALUE = '...';
-const PINNED_PLAYERS_COUNT = 1248;
 
 function read(obj: any, key: string) {
   return obj?.[key];
@@ -31,6 +30,11 @@ function read(obj: any, key: string) {
 function formatCount(value?: number | null, unavailable = 'غير متوفر') {
   if (typeof value !== 'number' || !Number.isFinite(value)) return unavailable;
   return new Intl.NumberFormat('ar-EG').format(value);
+}
+
+function formatDecimal(value?: number | null, unavailable = 'غير متوفر') {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return unavailable;
+  return new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 2 }).format(value);
 }
 
 function formatUpdateTime(value?: string | null) {
@@ -51,6 +55,12 @@ function teamName(team?: { name?: string; code?: string | null } | null) {
   return team?.name || team?.code || 'منتخب غير متوفر';
 }
 
+function shortTeamStat(team: any, statKey: string, suffix = '') {
+  if (!team) return 'غير متوفر';
+  const value = formatCount(Number(team?.[statKey] ?? 0));
+  return `${teamName(team)} · ${value}${suffix}`;
+}
+
 function StatTile({ value, label, note, href, tone = 'default', loading = false }: Tile) {
   const valueClass = loading
     ? 'animate-pulse text-gray-400'
@@ -58,7 +68,9 @@ function StatTile({ value, label, note, href, tone = 'default', loading = false 
       ? 'text-red-200'
       : tone === 'gold'
         ? 'text-[#FFD700]'
-        : 'text-white';
+        : tone === 'cyan'
+          ? 'text-[#0FF0FC]'
+          : 'text-white';
 
   const content = (
     <div className="group relative h-full overflow-hidden rounded-2xl border border-white/10 bg-black/25 p-3 transition hover:-translate-y-0.5 hover:border-[#FFD700]/35 hover:bg-white/[0.06]">
@@ -72,7 +84,7 @@ function StatTile({ value, label, note, href, tone = 'default', loading = false 
   return href ? <Link href={href}>{content}</Link> : content;
 }
 
-export default function HomeTournamentStatsCard({ teamsCount, upcomingMatchesCount }: Props) {
+export default function HomeTournamentStatsCard({ playersCount: serverPlayersCount, teamsCount, upcomingMatchesCount }: Props) {
   const [stats, setStats] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [lastClientRefresh, setLastClientRefresh] = useState<Date | null>(null);
@@ -108,40 +120,69 @@ export default function HomeTournamentStatsCard({ teamsCount, upcomingMatchesCou
 
   const isInitialLoading = isLoading && !stats;
   const loadingNote = 'جاري تحميل بيانات الإحصائيات من قاعدة البيانات...';
+  const playerCount = stats?.playerCount ?? serverPlayersCount;
   const cardTotalYellow = read(stats, 'yellow' + 'Cards');
   const cardTotalRed = read(stats, 'red' + 'Cards');
   const kickStats = read(stats, 'penal' + 'ties');
   const kicksAvailable = Boolean(kickStats?.available);
   const biggestScore = stats?.biggestScore || null;
-  const sourceUpdatedAt = stats?.latestUpdatedAt || stats?.latestCardsUpdatedAt || stats?.latestEventUpdatedAt;
+  const topScoringTeam = stats?.teamLeaders?.topScoringTeam || null;
+  const bestCleanSheetTeam = stats?.teamLeaders?.bestCleanSheetTeam || null;
+  const sourceUpdatedAt = stats?.latestUpdatedAt || stats?.latestFinalStatsUpdatedAt || stats?.latestCardsUpdatedAt || stats?.latestEventUpdatedAt;
+  const finalStats = stats?.finalStats || {};
 
   const tiles = useMemo<Tile[]>(() => ([
     {
       label: 'عدد اللاعبين',
-      value: formatCount(PINNED_PLAYERS_COUNT),
-      note: 'رقم مثبت للقوائم داخل المنصة؛ باقي المؤشرات من قاعدة البيانات',
+      value: isInitialLoading ? LOADING_VALUE : formatCount(playerCount),
+      note: isInitialLoading ? loadingNote : 'من اللاعبين المرتبطين بالمنتخبات في قاعدة البيانات',
       href: '/players',
       tone: 'default',
+      loading: isInitialLoading,
     },
     {
       label: 'أهداف البطولة',
       value: isInitialLoading ? LOADING_VALUE : formatCount(stats?.totalGoals),
-      note: isInitialLoading ? loadingNote : 'من نتائج المباريات المسجلة في قاعدة البيانات',
+      note: isInitialLoading ? loadingNote : `من ${formatCount(stats?.finishedMatches)} مباراة منتهية${stats?.liveGoals ? ` · أهداف مباشرة غير نهائية: ${formatCount(stats.liveGoals)}` : ''}`,
       href: '/matches',
       tone: 'gold',
       loading: isInitialLoading,
     },
     {
-      label: 'كروت صفراء',
-      value: isInitialLoading ? LOADING_VALUE : formatCount(cardTotalYellow),
-      note: isInitialLoading ? loadingNote : 'من snapshots أو أحداث المباراة المتاحة',
+      label: 'متوسط الأهداف',
+      value: isInitialLoading ? LOADING_VALUE : formatDecimal(stats?.averageGoalsPerFinishedMatch),
+      note: isInitialLoading ? loadingNote : 'هدف لكل مباراة منتهية فقط',
       href: '/matches',
+      tone: 'cyan',
+      loading: isInitialLoading,
+    },
+    {
+      label: 'أكثر منتخب تسجيلًا',
+      value: isInitialLoading ? LOADING_VALUE : topScoringTeam ? formatCount(topScoringTeam.goalsFor) : 'غير متوفر',
+      note: isInitialLoading ? loadingNote : topScoringTeam ? shortTeamStat(topScoringTeam, 'played', ' مباريات') : 'يظهر بعد انتهاء مباريات كافية',
+      href: topScoringTeam?.id ? `/teams/${encodeURIComponent(topScoringTeam.id)}` : '/teams',
       tone: 'gold',
       loading: isInitialLoading,
     },
     {
-      label: 'كروت حمراء',
-      value: isInitialLoading ? LOADING_VALUE : formatCount(cardTotalRed),
+      label: 'شباك نظيفة',
+      value: isInitialLoading ? LOADING_VALUE : formatCount(stats?.cleanSheets),
+      note: isInitialLoading ? loadingNote : bestCleanSheetTeam ? `الأبرز: ${shortTeamStat(bestCleanSheetTeam, 'cleanSheets')}` : 'إجمالي الشباك النظيفة بعد المباريات',
+      href: '/matches',
+      tone: 'default',
+      loading: isInitialLoading,
+    },
+    {
+      label: 'تسديدات / على المرمى',
+      value: isInitialLoading ? LOADING_VALUE : finalStats?.totalShots ? `${formatCount(finalStats.totalShots)} / ${formatCount(finalStats.totalShotsOnTarget)}` : 'غير متوفر',
+      note: isInitialLoading ? loadingNote : finalStats?.matchesWithFinalSnapshots ? `من ${formatCount(finalStats.matchesWithFinalSnapshots)} مباراة بها إحصائيات نهائية` : 'تظهر بعد مزامنة إحصائيات المباراة',
+      href: '/matches',
+      tone: 'cyan',
+      loading: isInitialLoading,
+    },
+    {
+      label: 'كروت صفراء / حمراء',
+      value: isInitialLoading ? LOADING_VALUE : `${formatCount(cardTotalYellow)} / ${formatCount(cardTotalRed)}`,
       note: isInitialLoading ? loadingNote : 'من snapshots أو أحداث المباراة المتاحة',
       href: '/matches',
       tone: 'alert',
@@ -150,17 +191,9 @@ export default function HomeTournamentStatsCard({ teamsCount, upcomingMatchesCou
     {
       label: 'ركلات الجزاء',
       value: isInitialLoading ? LOADING_VALUE : kicksAvailable ? formatCount(kickStats?.total) : 'غير متوفر',
-      note: isInitialLoading ? loadingNote : kicksAvailable ? 'مرصودة من أحداث المباراة' : 'غير متوفر في المصادر الحالية',
+      note: isInitialLoading ? loadingNote : kicksAvailable ? `مسجلة: ${formatCount(kickStats?.scored)} · ضائعة: ${formatCount(kickStats?.missed)}` : 'غير متوفر في المصادر الحالية',
       href: '/matches',
       tone: 'default',
-      loading: isInitialLoading,
-    },
-    {
-      label: 'جزاء مسجل',
-      value: isInitialLoading ? LOADING_VALUE : kicksAvailable ? formatCount(kickStats?.scored) : 'غير متوفر',
-      note: isInitialLoading ? loadingNote : kicksAvailable ? `غير مسجلة: ${formatCount(kickStats?.missed)} / غير مصنفة: ${formatCount(kickStats?.unknown)}` : 'يظهر عند توفر أحداث الجزاءات',
-      href: '/matches',
-      tone: 'gold',
       loading: isInitialLoading,
     },
     {
@@ -179,19 +212,19 @@ export default function HomeTournamentStatsCard({ teamsCount, upcomingMatchesCou
       tone: 'default',
       loading: isInitialLoading,
     },
-  ]), [stats, upcomingMatchesCount, kicksAvailable, biggestScore, isInitialLoading, cardTotalYellow, cardTotalRed, kickStats]);
+  ]), [stats, upcomingMatchesCount, kicksAvailable, biggestScore, isInitialLoading, cardTotalYellow, cardTotalRed, kickStats, playerCount, topScoringTeam, bestCleanSheetTeam, finalStats]);
 
   return (
-    <section className="mx-auto mb-4 max-w-7xl overflow-hidden rounded-2xl border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(255,215,0,0.13),transparent_28%),linear-gradient(135deg,rgba(7,24,18,0.94),rgba(4,17,13,0.98))] p-3 text-white shadow-[0_18px_46px_rgba(0,0,0,0.32)] backdrop-blur sm:p-4" aria-label="إحصائيات البطولة الحية">
+    <section className="mx-auto mb-4 max-w-7xl overflow-hidden rounded-2xl border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(255,215,0,0.13),transparent_28%),linear-gradient(135deg,rgba(7,24,18,0.94),rgba(4,17,13,0.98))] p-3 text-white shadow-[0_18px_46px_rgba(0,0,0,0.32)] backdrop-blur sm:p-4" aria-label="إحصائيات البطولة">
       <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
         <div>
           <div className="inline-flex items-center gap-2 rounded-full border border-[#FFD700]/25 bg-[#FFD700]/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-[#FFD700]">
             <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#FFD700]" />
-            LIVE TOURNAMENT STATS
+            TOURNAMENT STATS
           </div>
           <h1 className="mt-3 text-xl font-black leading-snug tracking-tight text-white md:text-2xl lg:text-3xl">الإحصائيات</h1>
           <p className="mt-2 max-w-4xl text-xs font-semibold leading-6 text-gray-300 md:text-sm md:leading-7">
-            ملخص محدث للبطولة من قاعدة البيانات والمصادر المتاحة: اللاعبين، الأهداف، البطاقات، ركلات الجزاء، أكبر نتيجة، وحالة المباريات.
+            ملخص البطولة بعد المباريات من قاعدة البيانات: الأهداف، المتوسطات، المنتخبات الأبرز، التسديدات، البطاقات، ركلات الجزاء، وحالة المباريات.
           </p>
         </div>
         <div className="rounded-2xl border border-white/10 bg-black/25 px-3 py-2 text-left text-[10px] font-bold leading-5 text-gray-400">
@@ -201,13 +234,13 @@ export default function HomeTournamentStatsCard({ teamsCount, upcomingMatchesCou
         </div>
       </div>
 
-      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
         {tiles.map((tile) => <StatTile key={tile.label} {...tile} />)}
       </div>
 
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-[10px] font-bold text-gray-500">
         <span>الفرق المسجلة: {formatCount(stats?.teamCount ?? teamsCount, isInitialLoading ? LOADING_VALUE : 'غير متوفر')} منتخب</span>
-        <span>اللاعبون مثبتون على {formatCount(PINNED_PLAYERS_COUNT)} لاعب · باقي المؤشرات من قاعدة البيانات والمصادر</span>
+        <span>مصدر اللاعبين: قاعدة البيانات · إحصائيات المباريات تظهر بعد توفر snapshots أو أحداث نهائية</span>
       </div>
     </section>
   );
