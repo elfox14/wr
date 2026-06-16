@@ -303,12 +303,12 @@ function MatchCenter({ fallbackMatches = [], nextMatch = null }: { fallbackMatch
     .slice(0, 2);
 
   return (
-    <section className="flex h-full min-h-[30rem] flex-col overflow-hidden rounded-3xl border border-white/10 bg-white/[0.04] p-3 text-white shadow-[0_14px_38px_rgba(0,0,0,0.2)] backdrop-blur" aria-label="مباريات كأس العالم">
+    <section className="flex h-auto flex-col overflow-hidden rounded-3xl border border-white/10 bg-white/[0.04] p-3 text-white shadow-[0_14px_38px_rgba(0,0,0,0.2)] backdrop-blur" aria-label="مباريات كأس العالم">
       <div className="mb-3 flex justify-end">
         <Link href="/matches" className="rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-[11px] font-black text-white transition hover:border-[#0FF0FC]/40 hover:bg-white/[0.14]">جدول المباريات</Link>
       </div>
 
-      <div className="flex flex-1 flex-col gap-3">
+      <div className="flex flex-col gap-3">
         <div>
           {primaryMatch && (isConfirmedLive(primaryMatch) || isHalfTime(primaryMatch)) ? (
             <div className="mb-2 text-[10px] font-black uppercase tracking-[0.14em] text-gray-400">المباراة الجارية</div>
@@ -320,7 +320,7 @@ function MatchCenter({ fallbackMatches = [], nextMatch = null }: { fallbackMatch
           )}
         </div>
 
-        <div className="flex-1">
+        <div>
           <div className="mb-2 text-[10px] font-black uppercase tracking-[0.14em] text-gray-400">المباراتان القادمتان</div>
           <div className="grid gap-3 md:grid-cols-2">
             {secondaryMatches.map((match) => <MatchRow key={matchKey(match)} match={match} now={now} />)}
@@ -400,7 +400,7 @@ export default function HomeClientSportsLiveFocus({
     <main dir="rtl" className="mx-auto max-w-7xl space-y-6 px-3 py-4 sm:px-4 lg:px-6">
       <HomeLiveMatchTicker matches={safeTickerMatches} />
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3 lg:items-stretch">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3 lg:items-start">
         <div className="lg:col-span-2">
           <MatchCenter fallbackMatches={safeUpcomingMatches} nextMatch={safeNextMatch} />
         </div>
