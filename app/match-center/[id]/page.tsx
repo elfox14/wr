@@ -1,7 +1,8 @@
 import type { Metadata } from 'next';
+import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { Activity, ArrowLeft, CheckCircle2, Clock, Newspaper } from 'lucide-react';
+import { Activity, ArrowLeft, BarChart3, CalendarDays, CheckCircle2, Clock, Newspaper, Radio, Shield } from 'lucide-react';
 import prisma from '@/lib/prisma';
 import LiveMatchStatsPanel from '@/app/animation-live/player/LiveMatchStatsPanel';
 import { getTeamFlagUrl } from '@/lib/teamFlags';
@@ -16,6 +17,7 @@ export const metadata: Metadata = {
 
 const LIVE_STATUSES = ['IN_PLAY', 'LIVE', 'HT'];
 const FINISHED_STATUSES = ['FINISHED', 'FT', 'AET', 'PEN'];
+const NOT_STARTED_STATUSES = ['SCHEDULED', 'TIMED', 'NOT_STARTED', 'NS'];
 const GROUP_STAGE_MAX_LIVE_MINUTES = 115;
 const KNOCKOUT_MAX_LIVE_MINUTES = 150;
 
@@ -29,6 +31,12 @@ function formatDate(value: Date | string) {
     hour: '2-digit',
     minute: '2-digit',
   });
+}
+
+function formatShortDate(value: Date | string) {
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return 'غير محدد';
+  return date.toLocaleString('ar-EG', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
 }
 
 function formatScoreNumber(value?: number | null) {
@@ -66,8 +74,12 @@ function elapsedMinutes(match: any, now = new Date()) {
   return Math.floor((now.getTime() - matchTime) / 60_000);
 }
 
+function matchStatusValue(match: any) {
+  return String(match.displayStatus || match.status || '').toUpperCase();
+}
+
 function isStaleLive(match: any, now = new Date()) {
-  const status = String(match.status || '').toUpperCase();
+  const status = matchStatusValue(match);
   if (!LIVE_STATUSES.includes(status)) return false;
   const elapsed = elapsedMinutes(match, now);
   if (elapsed === null) return false;
@@ -75,12 +87,12 @@ function isStaleLive(match: any, now = new Date()) {
 }
 
 function isFinishedMatch(match: any, now = new Date()) {
-  const status = String(match.status || '').toUpperCase();
-  return FINISHED_STATUSES.includes(status) || isStaleLive(match, now);
+  const status = matchStatusValue(match);
+  return FINISHED_STATUSES.includes(status) || Boolean(match.isStaleAutoFinished) || isStaleLive(match, now);
 }
 
 function statusInfo(match: any) {
-  const value = String(match.status || '').toUpperCase();
+  const value = matchStatusValue(match);
   if (isFinishedMatch(match)) {
     return { label: 'انتهت', className: 'border-[#FFD700]/25 bg-[#FFD700]/10 text-[#FFD700]', icon: CheckCircle2 };
   }
@@ -92,30 +104,35 @@ function statusInfo(match: any) {
 }
 
 function teamFlagUrl(asset: any) {
-  return getTeamFlagUrl({ code: asset?.code, name: asset?.name, image: asset?.image }, 96);
+  return getTeamFlagUrl({ code: asset?.code, name: asset?.name, image: asset?.image, continent: asset?.continent }, 128);
 }
 
-function safeImage(asset: any) {
-  const src = teamFlagUrl(asset);
-  if (src) return <img src={src} alt={`علم ${asset?.name || asset?.code || 'منتخب'}`} className="h-full w-full object-cover" loading="lazy" />;
-  return <span className="text-sm font-black text-[#FFD700]">{asset?.code || '🏳️'}</span>;
-}
-
-function TeamInlineName({ asset, fallback }: { asset: any; fallback: string }) {
-  const src = teamFlagUrl(asset);
-  const name = asset?.name || fallback;
-  return (
-    <span className="inline-flex max-w-full items-center gap-1.5">
-      <span className="inline-flex h-4 w-5 shrink-0 overflow-hidden rounded-[3px] border border-white/10 bg-black/30">
-        {src ? <img src={src} alt={`علم ${name}`} className="h-full w-full object-cover" loading="lazy" /> : null}
-      </span>
-      <span className="truncate">{name}</span>
-    </span>
-  );
+function teamName(asset: any, fallback: string) {
+  return asset?.name || fallback;
 }
 
 function teamCode(asset: any) {
   return asset?.code || asset?.name?.slice?.(0, 3) || '---';
+}
+
+function safeImage(asset: any, fallback: string) {
+  const name = teamName(asset, fallback);
+  const src = teamFlagUrl(asset);
+  if (src) return <img src={src} alt={`علم ${name}`} className="h-full w-full object-cover" loading="lazy" />;
+  return <span className="text-sm font-black text-[#FFD700]">{teamCode(asset)}</span>;
+}
+
+function TeamInlineName({ asset, fallback }: { asset: any; fallback: string }) {
+  const src = teamFlagUrl(asset);
+  const name = teamName(asset, fallback);
+  return (
+    <span className="inline-flex max-w-full items-center gap-1.5">
+      <span className="inline-flex h-4 w-5 shrink-0 items-center justify-center overflow-hidden rounded-[3px] border border-white/10 bg-black/30 text-[8px] font-black text-[#FFD700]">
+        {src ? <img src={src} alt={`علم ${name}`} className="h-full w-full object-cover" loading="lazy" /> : teamCode(asset)}
+      </span>
+      <span className="truncate">{name}</span>
+    </span>
+  );
 }
 
 function groupLabel(match: any) {
@@ -149,49 +166,64 @@ export default async function MatchCenterPage({ params }: { params: Promise<{ id
   const finished = isFinishedMatch(match);
   const status = statusInfo(match);
   const StatusIcon = status.icon;
-  const showScore = finished || !['SCHEDULED', 'TIMED', 'NOT_STARTED'].includes(String(match.status).toUpperCase());
+  const rawStatus = matchStatusValue(match);
+  const showScore = finished || !NOT_STARTED_STATUSES.includes(rawStatus);
   const animationHref = match.animationMatchId
     ? `/animation-live/player?matchId=${encodeURIComponent(String(match.animationMatchId))}&dbMatchId=${encodeURIComponent(String(match.id))}&lang=en&statsPanel=simple&teamPanel=1`
     : '/animation-live';
 
   return (
-    <main className="min-h-screen bg-background px-4 py-6 text-white sm:px-6 lg:px-8" dir="rtl">
-      <section className="mx-auto max-w-7xl space-y-5">
-        <Link href="/matches" className="inline-flex items-center gap-2 text-sm font-black text-gray-400 transition hover:text-white">
-          <ArrowLeft size={16} /> العودة إلى المباريات
-        </Link>
+    <main className="min-h-screen bg-background px-3 py-4 text-white sm:px-6 sm:py-6 lg:px-8" dir="rtl">
+      <section className="mx-auto max-w-7xl space-y-4 sm:space-y-5">
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/[0.035] px-3 py-2.5 sm:px-4">
+          <Link href="/matches" className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-white/10 bg-black/20 px-3 text-sm font-black text-gray-300 transition hover:border-[#0FF0FC]/30 hover:text-white">
+            <ArrowLeft size={16} /> العودة إلى المباريات
+          </Link>
+          <span className="rounded-xl border border-[#FFD700]/20 bg-[#FFD700]/10 px-3 py-2 text-[11px] font-black text-[#FFD700]">مركز المباراة</span>
+        </div>
 
-        <section className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-[radial-gradient(circle_at_top,rgba(15,240,252,0.10),rgba(255,255,255,0.035)_42%,rgba(0,0,0,0.20))] p-4 shadow-[0_18px_50px_rgba(0,0,0,0.28)] backdrop-blur sm:p-6">
+        <section className="relative overflow-hidden rounded-[1.45rem] border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(15,240,252,0.12),transparent_30%),radial-gradient(circle_at_bottom_left,rgba(255,215,0,0.10),transparent_34%),linear-gradient(145deg,rgba(7,24,18,0.96),rgba(3,12,11,0.99))] p-3 shadow-[0_18px_50px_rgba(0,0,0,0.28)] backdrop-blur sm:rounded-[2rem] sm:p-6">
           <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#0FF0FC]/55 to-transparent opacity-70" />
-          <div className="mb-4 grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2">
-            <span className="rounded-full border border-[#FFD700]/20 bg-[#FFD700]/10 px-3 py-1 text-[11px] font-black text-[#FFD700]">{groupLabel(match)}</span>
-            <span className={`min-w-0 truncate rounded-full border px-3 py-1 text-center text-[11px] font-black ${status.className}`}>
+
+          <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:items-center">
+            <span className="rounded-full border border-[#FFD700]/20 bg-[#FFD700]/10 px-3 py-1.5 text-center text-[11px] font-black text-[#FFD700]">{groupLabel(match)}</span>
+            <span className={`min-w-0 truncate rounded-full border px-3 py-1.5 text-center text-[11px] font-black ${status.className}`}>
               <StatusIcon size={13} className="inline" /> {status.label}
             </span>
-            <span className="rounded-full border border-white/10 bg-white/[0.05] px-3 py-1 text-[11px] font-black text-gray-300">{formatDate(match.matchDate)}</span>
+            <span className="col-span-2 rounded-full border border-white/10 bg-white/[0.05] px-3 py-1.5 text-center text-[11px] font-black text-gray-300 sm:col-span-1">{formatDate(match.matchDate)}</span>
           </div>
 
-          <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 sm:gap-5">
+          <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 sm:gap-5">
             <TeamBlock asset={home} align="right" fallback="الفريق الأول" />
-            <div className={`flex min-h-16 min-w-20 items-center justify-center rounded-2xl border px-4 text-lg font-black sm:text-3xl ${showScore ? 'border-[#FFD700]/25 bg-[#FFD700]/10 text-[#FFD700]' : 'border-[#0FF0FC]/20 bg-[#0FF0FC]/10 text-[#0FF0FC]'}`}>
-              {showScore ? <RtlScore homeScore={match.homeScore} awayScore={match.awayScore} /> : 'VS'}
+            <div className="flex flex-col items-center gap-2">
+              <div className={`flex min-h-16 min-w-20 items-center justify-center rounded-2xl border px-3 text-lg font-black shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] sm:min-h-20 sm:min-w-28 sm:px-5 sm:text-3xl ${showScore ? 'border-[#FFD700]/25 bg-[#FFD700]/10 text-[#FFD700]' : 'border-[#0FF0FC]/20 bg-[#0FF0FC]/10 text-[#0FF0FC]'}`}>
+                {showScore ? <RtlScore homeScore={match.homeScore} awayScore={match.awayScore} /> : 'VS'}
+              </div>
+              <span className="hidden rounded-full border border-white/10 bg-black/25 px-2.5 py-1 text-[10px] font-bold text-gray-400 sm:inline-flex">{rawStatus || 'SCHEDULED'}</span>
             </div>
             <TeamBlock asset={away} align="left" fallback="الفريق الثاني" />
           </div>
 
+          <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <InfoTile icon={<CalendarDays size={16} />} label="الموعد" value={formatShortDate(match.matchDate)} />
+            <InfoTile icon={<Shield size={16} />} label="المرحلة" value={groupLabel(match)} />
+            <InfoTile icon={<StatusIcon size={16} />} label="الحالة" value={status.label} />
+            <InfoTile icon={<Radio size={16} />} label="البث" value={match.animationMatchId ? 'متاح' : 'غير متاح'} />
+          </div>
+
           <div className="mt-5 grid grid-cols-2 gap-2">
-            <Link href="#match-stats" className="rounded-xl border border-white/10 bg-white/[0.05] px-3 py-2 text-center text-[11px] font-black text-gray-200 transition hover:bg-white/[0.1]">تفاصيل المباراة</Link>
+            <Link href="#match-stats" className="inline-flex min-h-11 items-center justify-center rounded-xl border border-white/10 bg-white/[0.06] px-3 py-2 text-center text-[11px] font-black text-gray-200 transition hover:bg-white/[0.1]">تفاصيل المباراة</Link>
             {!finished ? (
-              <Link href={animationHref} className="rounded-xl bg-[#0FF0FC] px-3 py-2 text-center text-[11px] font-black text-black transition hover:bg-[#4AFAFF]">البث التفاعلي</Link>
+              <Link href={animationHref} className="inline-flex min-h-11 items-center justify-center rounded-xl bg-[#0FF0FC] px-3 py-2 text-center text-[11px] font-black text-black transition hover:bg-[#4AFAFF]">البث التفاعلي</Link>
             ) : (
-              <span className="rounded-xl border border-[#FFD700]/20 bg-[#FFD700]/10 px-3 py-2 text-center text-[11px] font-black text-[#FFD700]">أرشيف المباراة</span>
+              <span className="inline-flex min-h-11 items-center justify-center rounded-xl border border-[#FFD700]/20 bg-[#FFD700]/10 px-3 py-2 text-center text-[11px] font-black text-[#FFD700]">أرشيف المباراة</span>
             )}
           </div>
         </section>
 
-        <div id="match-stats">
+        <Panel id="match-stats" title="إحصائيات ومجريات المباراة" icon={<BarChart3 className="text-[#0FF0FC]" />} action={<Link href={animationHref} className="text-xs font-black text-[#0FF0FC]">فتح البث</Link>}>
           <LiveMatchStatsPanel matchId={match.animationMatchId ? String(match.animationMatchId) : undefined} dbMatchId={match.id} />
-        </div>
+        </Panel>
 
         <Panel title="مرصد المباراة الإخباري ومجريات اللعب" icon={<Newspaper className="text-[#FFD700]" />} action={<Link href="/news" className="text-xs font-black text-[#0FF0FC]">غرفة الأخبار</Link>}>
           <EmptyText text="الأحداث المحفوظة من iSports Timeline تظهر الآن داخل كارت بيانات المباراة. التحليل الصحفي المنفصل سيظهر هنا عند ربط مصادر الأخبار." />
@@ -204,18 +236,34 @@ export default async function MatchCenterPage({ params }: { params: Promise<{ id
 function TeamBlock({ asset, align, fallback }: { asset: any; align: 'right' | 'left'; fallback: string }) {
   return (
     <div className={`min-w-0 ${align === 'right' ? 'text-right' : 'text-left'}`}>
-      <div className="mb-2 inline-flex h-14 w-14 items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-white/[0.07] shadow-[0_8px_24px_rgba(0,0,0,0.24)] sm:h-16 sm:w-16">{safeImage(asset)}</div>
-      <h2 className="truncate text-base font-black text-white sm:text-xl"><TeamInlineName asset={asset} fallback={fallback} /></h2>
+      <div className="mb-2 inline-flex h-16 w-16 items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-white/[0.07] p-0.5 shadow-[0_8px_24px_rgba(0,0,0,0.24)] sm:h-20 sm:w-20">
+        <div className="flex h-full w-full items-center justify-center overflow-hidden rounded-[0.9rem] bg-black/25">
+          {safeImage(asset, fallback)}
+        </div>
+      </div>
+      <h2 className="truncate text-sm font-black text-white sm:text-xl"><TeamInlineName asset={asset} fallback={fallback} /></h2>
       <p className="mt-1 text-[11px] font-bold text-gray-500 sm:text-xs">{teamCode(asset)}</p>
     </div>
   );
 }
 
-function Panel({ title, icon, action, children }: { title: string; icon?: React.ReactNode; action?: React.ReactNode; children: React.ReactNode }) {
+function InfoTile({ icon, label, value }: { icon: ReactNode; label: string; value: ReactNode }) {
   return (
-    <section className="rounded-[1.5rem] border border-white/10 bg-white/[0.035] p-5 shadow-card">
+    <div className="rounded-2xl border border-white/10 bg-black/25 px-3 py-2.5">
+      <div className="mb-1 flex items-center gap-1.5 text-[10px] font-black text-gray-500">
+        <span className="text-[#0FF0FC]">{icon}</span>
+        {label}
+      </div>
+      <div className="truncate text-xs font-black text-white sm:text-sm">{value}</div>
+    </div>
+  );
+}
+
+function Panel({ id, title, icon, action, children }: { id?: string; title: string; icon?: ReactNode; action?: ReactNode; children: ReactNode }) {
+  return (
+    <section id={id} className="rounded-[1.45rem] border border-white/10 bg-white/[0.035] p-3 shadow-card sm:rounded-[1.5rem] sm:p-5">
       <div className="mb-4 flex items-center justify-between gap-4">
-        <h3 className="flex items-center gap-2 text-xl font-black text-white">{icon}{title}</h3>
+        <h3 className="flex min-w-0 items-center gap-2 text-base font-black text-white sm:text-xl">{icon}{title}</h3>
         {action}
       </div>
       {children}
@@ -224,5 +272,5 @@ function Panel({ title, icon, action, children }: { title: string; icon?: React.
 }
 
 function EmptyText({ text }: { text: string }) {
-  return <div className="rounded-2xl border border-dashed border-white/10 bg-black/20 p-6 text-center text-sm font-bold leading-7 text-gray-400">{text}</div>;
+  return <div className="rounded-2xl border border-dashed border-white/10 bg-black/20 p-5 text-center text-sm font-bold leading-7 text-gray-400 sm:p-6">{text}</div>;
 }
