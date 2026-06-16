@@ -66,11 +66,11 @@ function sourceFrom(useFallback: boolean, hasDbValue = true): SourceName {
 
 function toneStyles(tone: Tone) {
   return {
-    gold: { line: 'via-[#FFD700]/70', border: 'hover:border-[#FFD700]/35', value: 'text-[#FFD700]', soft: 'bg-[#FFD700]/10 border-[#FFD700]/15' },
-    cyan: { line: 'via-[#0FF0FC]/55', border: 'hover:border-[#0FF0FC]/35', value: 'text-[#0FF0FC]', soft: 'bg-[#0FF0FC]/10 border-[#0FF0FC]/15' },
-    green: { line: 'via-[#00FF88]/50', border: 'hover:border-[#00FF88]/30', value: 'text-[#00FF88]', soft: 'bg-[#00FF88]/10 border-[#00FF88]/15' },
-    red: { line: 'via-red-300/55', border: 'hover:border-red-300/30', value: 'text-red-100', soft: 'bg-red-400/10 border-red-300/15' },
-    neutral: { line: 'via-white/35', border: 'hover:border-white/25', value: 'text-white', soft: 'bg-white/[0.06] border-white/10' },
+    gold: { line: 'via-[#FFD700]/70', border: 'hover:border-[#FFD700]/35', value: 'text-[#FFD700]' },
+    cyan: { line: 'via-[#0FF0FC]/55', border: 'hover:border-[#0FF0FC]/35', value: 'text-[#0FF0FC]' },
+    green: { line: 'via-[#00FF88]/50', border: 'hover:border-[#00FF88]/30', value: 'text-[#00FF88]' },
+    red: { line: 'via-red-300/55', border: 'hover:border-red-300/30', value: 'text-red-100' },
+    neutral: { line: 'via-white/35', border: 'hover:border-white/25', value: 'text-white' },
   }[tone];
 }
 
@@ -86,6 +86,7 @@ function MiniCard({
   source,
   tone = 'neutral',
   href,
+  itemClassName = '',
   children,
 }: {
   title: string;
@@ -94,11 +95,12 @@ function MiniCard({
   source?: SourceName | string;
   tone?: Tone;
   href?: string;
+  itemClassName?: string;
   children?: ReactNode;
 }) {
   const style = toneStyles(tone);
   const body = (
-    <article className={`group relative h-[138px] overflow-hidden rounded-2xl border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.052),rgba(0,0,0,0.25))] p-3.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_8px_22px_rgba(0,0,0,0.16)] transition hover:-translate-y-0.5 ${style.border}`}>
+    <article className={`group relative h-full min-h-[128px] overflow-hidden rounded-2xl border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.052),rgba(0,0,0,0.25))] p-3.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_8px_22px_rgba(0,0,0,0.16)] transition hover:-translate-y-0.5 ${style.border}`}>
       <div className={`absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent ${style.line} to-transparent`} />
       <div className="relative z-10 flex h-full flex-col justify-between gap-2">
         <div className="flex items-start justify-between gap-1.5">
@@ -115,7 +117,7 @@ function MiniCard({
     </article>
   );
 
-  return href ? <Link href={href}>{body}</Link> : body;
+  return href ? <Link className={`block ${itemClassName}`} href={href}>{body}</Link> : <div className={itemClassName}>{body}</div>;
 }
 
 function MiniChip({ label, value, className = '' }: { label: string; value: string; className?: string }) {
@@ -128,22 +130,22 @@ function MiniChip({ label, value, className = '' }: { label: string; value: stri
 }
 
 function LoadingBox({ label }: { label: string }) {
-  return <MiniCard title={label} value={LOADING_VALUE} subtitle="جاري التحميل" />;
+  return <MiniCard title={label} value={LOADING_VALUE} subtitle="جاري التحميل" itemClassName="col-span-1 sm:col-span-2 lg:col-span-2 xl:col-span-2" />;
 }
 
 function DisciplineMiniCard({ yellow, red, source }: { yellow: number | null; red: number | null; source: SourceName }) {
   return (
-    <MiniCard title="الانضباط" source={source} tone="red" href="/matches">
+    <MiniCard title="الانضباط" source={source} tone="red" href="/matches" itemClassName="col-span-2 sm:col-span-4 lg:col-span-4 xl:col-span-3">
       <div className="grid grid-cols-2 gap-2">
-        <div className="h-[92px] rounded-xl border border-[#FFD700]/35 bg-[#FFD700] p-2.5 text-black shadow-[0_5px_14px_rgba(255,215,0,0.12)] transition group-hover:-rotate-1">
+        <div className="h-[82px] rounded-xl border border-[#FFD700]/35 bg-[#FFD700] p-2.5 text-black shadow-[0_5px_14px_rgba(255,215,0,0.12)] transition group-hover:-rotate-1">
           <div className="text-[8px] font-black uppercase tracking-[0.12em] text-black/55">Yellow</div>
-          <div className="mt-2 text-4xl font-black leading-none">{formatCount(yellow)}</div>
-          <div className="mt-1 text-[9px] font-black text-black/65">صفراء</div>
+          <div className="mt-1.5 text-4xl font-black leading-none">{formatCount(yellow)}</div>
+          <div className="mt-1 text-[9px] font-black text-black/65">بطاقات صفراء</div>
         </div>
-        <div className="h-[92px] rounded-xl border border-red-300/35 bg-red-600 p-2.5 text-white shadow-[0_5px_14px_rgba(248,113,113,0.13)] transition group-hover:rotate-1">
+        <div className="h-[82px] rounded-xl border border-red-300/35 bg-red-600 p-2.5 text-white shadow-[0_5px_14px_rgba(248,113,113,0.13)] transition group-hover:rotate-1">
           <div className="text-[8px] font-black uppercase tracking-[0.12em] text-white/65">Red</div>
-          <div className="mt-2 text-4xl font-black leading-none">{formatCount(red)}</div>
-          <div className="mt-1 text-[9px] font-black text-white/75">حمراء</div>
+          <div className="mt-1.5 text-4xl font-black leading-none">{formatCount(red)}</div>
+          <div className="mt-1 text-[9px] font-black text-white/75">بطاقات حمراء</div>
         </div>
       </div>
     </MiniCard>
@@ -153,7 +155,7 @@ function DisciplineMiniCard({ yellow, red, source }: { yellow: number | null; re
 function ShotsMiniCard({ totalShots, onTarget, matches, source }: { totalShots: number | null; onTarget: number | null; matches: number | null; source: SourceName }) {
   const accuracy = totalShots && onTarget !== null ? Math.max(0, Math.min(100, (onTarget / totalShots) * 100)) : null;
   return (
-    <MiniCard title="التسديدات" source={source} tone="cyan" href="/matches">
+    <MiniCard title="التسديدات" source={source} tone="cyan" href="/matches" itemClassName="col-span-2 sm:col-span-4 lg:col-span-4 xl:col-span-3">
       <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
         <MiniChip label="تسديدة" value={formatCount(totalShots)} className="border-white/10 bg-black/20 text-white" />
         <div className="relative h-11 w-11 rounded-full border border-[#0FF0FC]/45 bg-[#0FF0FC]/10">
@@ -165,7 +167,7 @@ function ShotsMiniCard({ totalShots, onTarget, matches, source }: { totalShots: 
       <div className="mt-2">
         <div className="mb-1 flex justify-between text-[8px] font-bold text-gray-500"><span>الدقة</span><span>{accuracy !== null ? formatPercent(accuracy) : 'غير متوفر'}</span></div>
         <div className="h-1.5 overflow-hidden rounded-full bg-white/[0.08]"><div className="h-full rounded-full bg-[#0FF0FC]" style={{ width: `${accuracy || 0}%` }} /></div>
-        <div className="mt-1 text-[8px] font-bold text-gray-500">{formatCount(matches)} مباراة</div>
+        <div className="mt-1 text-[8px] font-bold text-gray-500">{formatCount(matches)} مباراة بها إحصائيات</div>
       </div>
     </MiniCard>
   );
@@ -178,7 +180,7 @@ function PenaltyMiniCard({ kickStats, usingFbref }: { kickStats: any; usingFbref
   const missed = available ? Number(kickStats?.missed || 0) : null;
   const conversion = total && scored !== null ? Math.max(0, Math.min(100, (scored / total) * 100)) : null;
   return (
-    <MiniCard title="ركلات الجزاء" source={usingFbref ? 'FBref' : available ? 'DB/Event' : '—'} tone="gold">
+    <MiniCard title="ركلات الجزاء" source={usingFbref ? 'FBref' : available ? 'DB/Event' : '—'} tone="gold" itemClassName="col-span-2 sm:col-span-4 lg:col-span-4 xl:col-span-3">
       {available ? (
         <>
           <div className="grid grid-cols-3 gap-1.5">
@@ -191,7 +193,7 @@ function PenaltyMiniCard({ kickStats, usingFbref }: { kickStats: any; usingFbref
       ) : (
         <div className="rounded-xl border border-dashed border-[#FFD700]/18 bg-black/20 p-3 text-center">
           <div className="text-sm font-black text-gray-200">بانتظار توثيق</div>
-          <div className="mt-1 text-[8px] font-bold text-gray-500">لا يوجد رقم مؤكد</div>
+          <div className="mt-1 text-[8px] font-bold text-gray-500">لا يوجد رقم مؤكد لركلات الجزاء</div>
         </div>
       )}
     </MiniCard>
@@ -203,7 +205,7 @@ function MatchFlowMiniCard({ finished, live, scheduled, source }: { finished: nu
   const finishedPct = Math.max(0, Math.min(100, (Number(finished || 0) / total) * 100));
   const livePct = Math.max(0, Math.min(100, (Number(live || 0) / total) * 100));
   return (
-    <MiniCard title="حالة المباريات" source={source} href="/matches">
+    <MiniCard title="حالة المباريات" source={source} href="/matches" itemClassName="col-span-1 sm:col-span-2 lg:col-span-2 xl:col-span-2">
       <div className="flex items-end justify-between gap-2">
         <div>
           <div className="text-3xl font-black leading-none text-white">{formatCount(finished)}</div>
@@ -224,7 +226,7 @@ function MatchFlowMiniCard({ finished, live, scheduled, source }: { finished: nu
 
 function GoalLeaderMiniCard({ team, usingFbref }: { team: any; usingFbref: boolean }) {
   return (
-    <MiniCard title="أقوى هجوم" source={sourceFrom(usingFbref, Boolean(team))} tone="gold" href={team?.id ? `/teams/${encodeURIComponent(team.id)}` : '/teams'}>
+    <MiniCard title="أقوى هجوم" source={sourceFrom(usingFbref, Boolean(team))} tone="gold" href={team?.id ? `/teams/${encodeURIComponent(team.id)}` : '/teams'} itemClassName="col-span-1 sm:col-span-2 lg:col-span-2 xl:col-span-2">
       <div className="truncate text-base font-black text-white">{team ? shortText(teamName(team), 18) : 'غير متوفر'}</div>
       <div className="text-4xl font-black leading-none text-[#FFD700]">{team ? formatCount(team.goalsFor) : '—'}</div>
       <div className="truncate text-[9px] font-bold text-gray-500">هدف · {team ? formatCount(Number(team.played || 0)) : '—'} مباريات</div>
@@ -234,7 +236,7 @@ function GoalLeaderMiniCard({ team, usingFbref }: { team: any; usingFbref: boole
 
 function CleanSheetMiniCard({ cleanSheets, bestTeam, usingFbref }: { cleanSheets: number | null; bestTeam: any; usingFbref: boolean }) {
   return (
-    <MiniCard title="الشباك النظيفة" source={sourceFrom(usingFbref, true)} tone="green" href="/matches">
+    <MiniCard title="الشباك النظيفة" source={sourceFrom(usingFbref, true)} tone="green" href="/matches" itemClassName="col-span-1 sm:col-span-2 lg:col-span-2 xl:col-span-2">
       <div className="flex items-center gap-2">
         <div className="relative h-12 w-16 shrink-0 rounded-xl border border-[#00FF88]/35"><span className="absolute inset-x-2 top-1/2 h-px bg-[#00FF88]/25" /><span className="absolute left-1/3 top-0 h-full w-px bg-[#00FF88]/20" /><span className="absolute right-1/3 top-0 h-full w-px bg-[#00FF88]/20" /></div>
         <div className="min-w-0">
@@ -332,21 +334,21 @@ export default function HomeTournamentStatsCard({ playersCount: serverPlayersCou
       </div>
 
       {isInitialLoading ? (
-        <div className="grid auto-rows-[138px] grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-10">
+        <div className="grid auto-rows-[128px] grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-8 xl:grid-cols-12">
           {['الأهداف', 'الحالة', 'اللاعبون', 'الهجوم', 'التسديدات', 'الانضباط', 'الجزاءات', 'الشباك', 'أكبر نتيجة', 'المتوسط'].map((label) => <LoadingBox key={label} label={label} />)}
         </div>
       ) : (
-        <div className="grid auto-rows-[138px] grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-10">
-          <MiniCard title="أهداف البطولة" value={formatCount(totalGoals)} subtitle={`${formatCount(finishedMatches)} مباراة منتهية`} source={sourceFrom(usingFbrefGoals, true)} tone="gold" href="/matches" />
-          <MiniCard title="متوسط الأهداف" value={formatDecimal(averageGoals)} subtitle="هدف لكل مباراة" source={sourceFrom(usingFbrefGoals, true)} tone="cyan" href="/matches" />
+        <div className="grid auto-rows-[128px] grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-8 xl:grid-cols-12">
+          <MiniCard title="أهداف البطولة" value={formatCount(totalGoals)} subtitle={`${formatCount(finishedMatches)} مباراة منتهية`} source={sourceFrom(usingFbrefGoals, true)} tone="gold" href="/matches" itemClassName="col-span-1 sm:col-span-2 lg:col-span-2 xl:col-span-2" />
+          <MiniCard title="متوسط الأهداف" value={formatDecimal(averageGoals)} subtitle="هدف لكل مباراة" source={sourceFrom(usingFbrefGoals, true)} tone="cyan" href="/matches" itemClassName="col-span-1 sm:col-span-2 lg:col-span-2 xl:col-span-2" />
           <MatchFlowMiniCard finished={finishedMatches} live={liveMatches} scheduled={scheduledMatches} source={stats?.finishedMatches ? 'DB' : 'FBref'} />
-          <MiniCard title="اللاعبون" value={formatCount(playerCount)} subtitle={`${formatCount(teamCountValue)} منتخب`} source={playerSource} tone="green" href="/players" />
+          <MiniCard title="اللاعبون" value={formatCount(playerCount)} subtitle={`${formatCount(teamCountValue)} منتخب`} source={playerSource} tone="green" href="/players" itemClassName="col-span-1 sm:col-span-2 lg:col-span-2 xl:col-span-2" />
           <GoalLeaderMiniCard team={topScoringTeam} usingFbref={usingFbrefTeams} />
           <ShotsMiniCard totalShots={totalShots} onTarget={totalShotsOnTarget} matches={matchesWithFinalSnapshots} source={sourceFrom(usingFbrefShots, true)} />
           <DisciplineMiniCard yellow={cardTotalYellow} red={cardTotalRed} source={sourceFrom(usingFbrefCards, true)} />
           <PenaltyMiniCard kickStats={kickStats} usingFbref={usingFbrefPenalties} />
           <CleanSheetMiniCard cleanSheets={cleanSheets} bestTeam={bestCleanSheetTeam} usingFbref={usingFbrefTeams} />
-          <MiniCard title="أكبر نتيجة" value={biggestScore ? `${formatCount(biggestScore.homeScore)}-${formatCount(biggestScore.awayScore)}` : '—'} subtitle={biggestScore ? shortText(`${teamName(biggestScore.homeTeam)} ضد ${teamName(biggestScore.awayTeam)}`, 22) : 'تظهر بعد التسجيل'} href={biggestScore?.matchId ? `/matches/${encodeURIComponent(biggestScore.matchId)}` : '/matches'} />
+          <MiniCard title="أكبر نتيجة" value={biggestScore ? `${formatCount(biggestScore.homeScore)}-${formatCount(biggestScore.awayScore)}` : '—'} subtitle={biggestScore ? shortText(`${teamName(biggestScore.homeTeam)} ضد ${teamName(biggestScore.awayTeam)}`, 22) : 'تظهر بعد التسجيل'} href={biggestScore?.matchId ? `/matches/${encodeURIComponent(biggestScore.matchId)}` : '/matches'} itemClassName="col-span-1 sm:col-span-2 lg:col-span-2 xl:col-span-2" />
         </div>
       )}
 
