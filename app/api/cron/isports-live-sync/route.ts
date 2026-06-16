@@ -11,6 +11,8 @@ export const runtime = 'nodejs';
 
 const LIVE_STATUSES = ['IN_PLAY', 'LIVE', 'HT', '1H', '2H', 'ET'];
 
+type RouteHandler = (req: Request) => Promise<Response | undefined>;
+
 function json(value: unknown, status = 200) {
   return NextResponse.json(value, { status, headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } });
 }
@@ -51,7 +53,7 @@ async function routeJson(response: Response | undefined) {
   return { status: response.status, ok: response.ok, result: parsed || { rawSample: text.slice(0, 1000) } };
 }
 
-async function callRoute(handler: (req: Request) => Promise<Response>, url: URL, adminSecret: string) {
+async function callRoute(handler: RouteHandler, url: URL, adminSecret: string) {
   const response = await handler(new Request(url.toString(), {
     method: 'GET',
     headers: adminSecret ? { 'x-admin-secret': adminSecret } : {},
