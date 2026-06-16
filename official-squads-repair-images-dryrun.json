@@ -1,0 +1,1991 @@
+﻿{
+    "ok":  true,
+    "dryRun":  true,
+    "lockedTeams":  48,
+    "missingOfficialImages":  279,
+    "imageCandidates":  1257,
+    "repairable":  198,
+    "updated":  0,
+    "repairs":  [
+                    {
+                        "playerId":  "fbref-mex-erik-lira",
+                        "playerName":  "Erik Lira",
+                        "teamCode":  "MEX",
+                        "teamName":  "Mexico",
+                        "fromCandidateId":  "official-player-team-mex-e-lira",
+                        "fromCandidateName":  "Ã. Lira",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/266345.png"
+                    },
+                    {
+                        "playerId":  "fbref-mex-carlos-acevedo",
+                        "playerName":  "Carlos Acevedo",
+                        "teamCode":  "MEX",
+                        "teamName":  "Mexico",
+                        "fromCandidateId":  "official-player-team-mex-c-acevedo",
+                        "fromCandidateName":  "C. Acevedo",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/35769.png"
+                    },
+                    {
+                        "playerId":  "fbref-mex-mateo-chavez",
+                        "playerName":  "Mateo Chavez",
+                        "teamCode":  "MEX",
+                        "teamName":  "Mexico",
+                        "fromCandidateId":  "official-player-team-mex-m-chavez",
+                        "fromCandidateName":  "M. ChÃ¡vez",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/390002.png"
+                    },
+                    {
+                        "playerId":  "fbref-mex-raul-jimenez",
+                        "playerName":  "Raul Jimenez",
+                        "teamCode":  "MEX",
+                        "teamName":  "Mexico",
+                        "fromCandidateId":  "official-player-team-mex-r-jimenez",
+                        "fromCandidateName":  "R. JimÃ©nez",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/2887.png"
+                    },
+                    {
+                        "playerId":  "fbref-mex-santiago-gimenez",
+                        "playerName":  "Santiago Gimenez",
+                        "teamCode":  "MEX",
+                        "teamName":  "Mexico",
+                        "fromCandidateId":  "official-player-team-mex-s-gimenez",
+                        "fromCandidateName":  "S. GimÃ©nez",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/94562.png"
+                    },
+                    {
+                        "playerId":  "fbref-mex-luis-romo",
+                        "playerName":  "Luis Romo",
+                        "teamCode":  "MEX",
+                        "teamName":  "Mexico",
+                        "fromCandidateId":  "official-player-team-mex-l-romo",
+                        "fromCandidateName":  "L. Romo",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/35970.png"
+                    },
+                    {
+                        "playerId":  "fbref-mex-alexis-vega",
+                        "playerName":  "Alexis Vega",
+                        "teamCode":  "MEX",
+                        "teamName":  "Mexico",
+                        "fromCandidateId":  "official-player-team-mex-a-vega",
+                        "fromCandidateName":  "A. Vega",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/2889.png"
+                    },
+                    {
+                        "playerId":  "fbref-kor-song-bum-keun",
+                        "playerName":  "Song Bum-keun",
+                        "teamCode":  "KOR",
+                        "teamName":  "South Korea",
+                        "fromCandidateId":  "official-player-team-kor-song-bum-keun",
+                        "fromCandidateName":  "Song Bum-Keun",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/34374.png"
+                    },
+                    {
+                        "playerId":  "fbref-mex-orbelin-pineda",
+                        "playerName":  "Orbelin Pineda",
+                        "teamCode":  "MEX",
+                        "teamName":  "Mexico",
+                        "fromCandidateId":  "official-player-team-mex-o-pineda",
+                        "fromCandidateName":  "O. Pineda",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/35576.png"
+                    },
+                    {
+                        "playerId":  "fbref-mex-jesus-gallardo",
+                        "playerName":  "Jesus Gallardo",
+                        "teamCode":  "MEX",
+                        "teamName":  "Mexico",
+                        "fromCandidateId":  "official-player-team-mex-j-gallardo",
+                        "fromCandidateName":  "J. Gallardo",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/2881.png"
+                    },
+                    {
+                        "playerId":  "fbref-mex-luis-chavez",
+                        "playerName":  "Luis Chavez",
+                        "teamCode":  "MEX",
+                        "teamName":  "Mexico",
+                        "fromCandidateId":  "official-player-team-mex-l-chavez",
+                        "fromCandidateName":  "L. ChÃ¡vez",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/35690.png"
+                    },
+                    {
+                        "playerId":  "fbref-mex-israel-reyes",
+                        "playerName":  "Israel Reyes",
+                        "teamCode":  "MEX",
+                        "teamName":  "Mexico",
+                        "fromCandidateId":  "official-player-team-mex-i-reyes",
+                        "fromCandidateName":  "I. Reyes",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/127227.png"
+                    },
+                    {
+                        "playerId":  "fbref-mex-armando-gonzalez",
+                        "playerName":  "Armando Gonzalez",
+                        "teamCode":  "MEX",
+                        "teamName":  "Mexico",
+                        "fromCandidateId":  "official-player-team-mex-a-gonzalez",
+                        "fromCandidateName":  "A. GonzÃ¡lez",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/291713.png"
+                    },
+                    {
+                        "playerId":  "fbref-mex-cesar-montes",
+                        "playerName":  "Cesar Montes",
+                        "teamCode":  "MEX",
+                        "teamName":  "Mexico",
+                        "fromCandidateId":  "official-player-team-mex-c-montes",
+                        "fromCandidateName":  "C. Montes",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/2873.png"
+                    },
+                    {
+                        "playerId":  "fbref-mex-brian-gutierrez",
+                        "playerName":  "Brian Gutierrez",
+                        "teamCode":  "MEX",
+                        "teamName":  "Mexico",
+                        "fromCandidateId":  "official-player-team-mex-b-gutierrez",
+                        "fromCandidateName":  "B. GutiÃ©rrez",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/212233.png"
+                    },
+                    {
+                        "playerId":  "fbref-mex-edson-alvarez",
+                        "playerName":  "Edson Alvarez",
+                        "teamCode":  "MEX",
+                        "teamName":  "Mexico",
+                        "fromCandidateId":  "official-player-team-mex-e-alvarez",
+                        "fromCandidateName":  "E. Ãlvarez",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/2869.png"
+                    },
+                    {
+                        "playerId":  "fbref-mex-julian-quinones",
+                        "playerName":  "Julian Quinones",
+                        "teamCode":  "MEX",
+                        "teamName":  "Mexico",
+                        "fromCandidateId":  "official-player-team-mex-j-quinones",
+                        "fromCandidateName":  "J. QuiÃ±ones",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/35532.png"
+                    },
+                    {
+                        "playerId":  "fbref-mex-gilberto-mora",
+                        "playerName":  "Gilberto Mora",
+                        "teamCode":  "MEX",
+                        "teamName":  "Mexico",
+                        "fromCandidateId":  "official-player-team-mex-g-mora",
+                        "fromCandidateName":  "G. Mora",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/482605.png"
+                    },
+                    {
+                        "playerId":  "fbref-mex-roberto-alvarado",
+                        "playerName":  "Roberto Alvarado",
+                        "teamCode":  "MEX",
+                        "teamName":  "Mexico",
+                        "fromCandidateId":  "official-player-team-mex-r-alvarado",
+                        "fromCandidateName":  "R. Alvarado",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/2879.png"
+                    },
+                    {
+                        "playerId":  "fbref-mex-cesar-huerta",
+                        "playerName":  "Cesar Huerta",
+                        "teamCode":  "MEX",
+                        "teamName":  "Mexico",
+                        "fromCandidateId":  "official-player-team-mex-c-huerta",
+                        "fromCandidateName":  "C. Huerta",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/36111.png"
+                    },
+                    {
+                        "playerId":  "fbref-cze-stepan-chaloupek",
+                        "playerName":  "Stepan Chaloupek",
+                        "teamCode":  "CZE",
+                        "teamName":  "Czech Republic",
+                        "fromCandidateId":  "official-player-team-cze-s-chaloupek",
+                        "fromCandidateName":  "S. Chaloupek",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/337740.png"
+                    },
+                    {
+                        "playerId":  "fbref-kor-kim-jin-gyu",
+                        "playerName":  "Kim Jin-gyu",
+                        "teamCode":  "KOR",
+                        "teamName":  "South Korea",
+                        "fromCandidateId":  "official-player-team-kor-kim-seung-gyu",
+                        "fromCandidateName":  "Kim Seung-Gyu",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/2892.png"
+                    },
+                    {
+                        "playerId":  "fbref-kor-son-heung-min",
+                        "playerName":  "Son Heung-min",
+                        "teamCode":  "KOR",
+                        "teamName":  "South Korea",
+                        "fromCandidateId":  "official-player-team-kor-son-heung-min",
+                        "fromCandidateName":  "Son Heung-Min",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/186.png"
+                    },
+                    {
+                        "playerId":  "fbref-kor-oh-hyeon-gyu",
+                        "playerName":  "Oh Hyeon-gyu",
+                        "teamCode":  "KOR",
+                        "teamName":  "South Korea",
+                        "fromCandidateId":  "official-player-team-kor-oh-hyeon-gyu",
+                        "fromCandidateName":  "Oh Hyeon-Gyu",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/34710.png"
+                    },
+                    {
+                        "playerId":  "fbref-kor-cho-gue-sung",
+                        "playerName":  "Cho Gue-sung",
+                        "teamCode":  "KOR",
+                        "teamName":  "South Korea",
+                        "fromCandidateId":  "official-player-team-kor-cho-gue-sung",
+                        "fromCandidateName":  "Cho Gue-Sung",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/34211.png"
+                    },
+                    {
+                        "playerId":  "fbref-kor-kim-moon-hwan",
+                        "playerName":  "Kim Moon-hwan",
+                        "teamCode":  "KOR",
+                        "teamName":  "South Korea",
+                        "fromCandidateId":  "official-player-team-kor-kim-moon-hwan",
+                        "fromCandidateName":  "Kim Moon-Hwan",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/2912.png"
+                    },
+                    {
+                        "playerId":  "fbref-kor-eom-ji-sung",
+                        "playerName":  "Eom Ji-sung",
+                        "teamCode":  "KOR",
+                        "teamName":  "South Korea",
+                        "fromCandidateId":  "official-player-team-kor-eom-ji-sung",
+                        "fromCandidateName":  "Eom Ji-Sung",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/237050.png"
+                    },
+                    {
+                        "playerId":  "fbref-kor-hwang-hee-chan",
+                        "playerName":  "Hwang Hee-chan",
+                        "teamCode":  "KOR",
+                        "teamName":  "South Korea",
+                        "fromCandidateId":  "official-player-team-kor-hwang-hee-chan",
+                        "fromCandidateName":  "Hwang Hee-Chan",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/24888.png"
+                    },
+                    {
+                        "playerId":  "fbref-kor-hwang-in-beom",
+                        "playerName":  "Hwang In-beom",
+                        "teamCode":  "KOR",
+                        "teamName":  "South Korea",
+                        "fromCandidateId":  "official-player-team-kor-hwang-in-beom",
+                        "fromCandidateName":  "Hwang In-Beom",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/2901.png"
+                    },
+                    {
+                        "playerId":  "fbref-kor-lee-kang-in",
+                        "playerName":  "Lee Kang-in",
+                        "teamCode":  "KOR",
+                        "teamName":  "South Korea",
+                        "fromCandidateId":  "official-player-team-kor-lee-kang-in",
+                        "fromCandidateName":  "Lee Kang-In",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/927.png"
+                    },
+                    {
+                        "playerId":  "fbref-kor-bae-jun-ho",
+                        "playerName":  "Bae Jun-ho",
+                        "teamCode":  "KOR",
+                        "teamName":  "South Korea",
+                        "fromCandidateId":  "official-player-team-kor-bae-jun-ho",
+                        "fromCandidateName":  "Bae Jun-Ho",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/357286.png"
+                    },
+                    {
+                        "playerId":  "fbref-cze-lukas-cerv",
+                        "playerName":  "Lukas Cerv",
+                        "teamCode":  "CZE",
+                        "teamName":  "Czech Republic",
+                        "fromCandidateId":  "official-player-team-cze-l-cerv",
+                        "fromCandidateName":  "L. Cerv",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/162194.png"
+                    },
+                    {
+                        "playerId":  "fbref-kor-paik-seung-ho",
+                        "playerName":  "Paik Seung-ho",
+                        "teamCode":  "KOR",
+                        "teamName":  "South Korea",
+                        "fromCandidateId":  "official-player-team-kor-paik-seung-ho",
+                        "fromCandidateName":  "Paik Seung-Ho",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/2909.png"
+                    },
+                    {
+                        "playerId":  "fbref-kor-lee-dong-gyeong",
+                        "playerName":  "Lee Dong-gyeong",
+                        "teamCode":  "KOR",
+                        "teamName":  "South Korea",
+                        "fromCandidateId":  "official-player-team-kor-lee-dong-gyeong",
+                        "fromCandidateName":  "Lee Dong-Gyeong",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/34431.png"
+                    },
+                    {
+                        "playerId":  "fbref-kor-kim-tae-hyeon",
+                        "playerName":  "Kim Tae-hyeon",
+                        "teamCode":  "KOR",
+                        "teamName":  "South Korea",
+                        "fromCandidateId":  "official-player-team-kor-kim-tae-hyeon",
+                        "fromCandidateName":  "Kim Tae-Hyeon",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/34418.png"
+                    },
+                    {
+                        "playerId":  "fbref-kor-seol-young-woo",
+                        "playerName":  "Seol Young-woo",
+                        "teamCode":  "KOR",
+                        "teamName":  "South Korea",
+                        "fromCandidateId":  "official-player-team-kor-seol-young-woo",
+                        "fromCandidateName":  "Seol Young-Woo",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/197985.png"
+                    },
+                    {
+                        "playerId":  "fbref-kor-jo-hyeon-woo",
+                        "playerName":  "Jo Hyeon-woo",
+                        "teamCode":  "KOR",
+                        "teamName":  "South Korea",
+                        "fromCandidateId":  "official-player-team-kor-jo-hyeon-woo",
+                        "fromCandidateName":  "Jo Hyeon-Woo",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/2890.png"
+                    },
+                    {
+                        "playerId":  "fbref-kor-yang-hyun-jun",
+                        "playerName":  "Yang Hyun-jun",
+                        "teamCode":  "KOR",
+                        "teamName":  "South Korea",
+                        "fromCandidateId":  "official-player-team-kor-yang-hyun-jun",
+                        "fromCandidateName":  "Yang Hyun-Jun",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/304958.png"
+                    },
+                    {
+                        "playerId":  "fbref-kor-lee-tae-seok",
+                        "playerName":  "Lee Tae-seok",
+                        "teamCode":  "KOR",
+                        "teamName":  "South Korea",
+                        "fromCandidateId":  "official-player-team-kor-lee-tae-seok",
+                        "fromCandidateName":  "Lee Tae-Seok",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/237220.png"
+                    },
+                    {
+                        "playerId":  "fbref-kor-lee-han-beom",
+                        "playerName":  "Lee Han-beom",
+                        "teamCode":  "KOR",
+                        "teamName":  "South Korea",
+                        "fromCandidateId":  "official-player-team-kor-lee-han-beom",
+                        "fromCandidateName":  "Lee Han-Beom",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/237218.png"
+                    },
+                    {
+                        "playerId":  "fbref-kor-lee-jae-sung",
+                        "playerName":  "Lee Jae-sung",
+                        "teamCode":  "KOR",
+                        "teamName":  "South Korea",
+                        "fromCandidateId":  "official-player-team-kor-lee-jae-sung",
+                        "fromCandidateName":  "Lee Jae-Sung",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/2906.png"
+                    },
+                    {
+                        "playerId":  "fbref-kor-kim-seung-gyu",
+                        "playerName":  "Kim Seung-gyu",
+                        "teamCode":  "KOR",
+                        "teamName":  "South Korea",
+                        "fromCandidateId":  "official-player-team-kor-kim-seung-gyu",
+                        "fromCandidateName":  "Kim Seung-Gyu",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/2892.png"
+                    },
+                    {
+                        "playerId":  "fbref-cze-michal-sadilek",
+                        "playerName":  "Michal Sadilek",
+                        "teamCode":  "CZE",
+                        "teamName":  "Czech Republic",
+                        "fromCandidateId":  "official-player-team-cze-m-sadilek",
+                        "fromCandidateName":  "M. SadÃ­lek",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/241.png"
+                    },
+                    {
+                        "playerId":  "fbref-rsa-sipho-chaine",
+                        "playerName":  "Sipho Chaine",
+                        "teamCode":  "RSA",
+                        "teamName":  "South Africa",
+                        "fromCandidateId":  "official-player-team-rsa-s-chaine",
+                        "fromCandidateName":  "S. Chaine",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/46417.png"
+                    },
+                    {
+                        "playerId":  "fbref-cze-vladimir-darida",
+                        "playerName":  "Vladimir Darida",
+                        "teamCode":  "CZE",
+                        "teamName":  "Czech Republic",
+                        "fromCandidateId":  "official-player-team-cze-v-darida",
+                        "fromCandidateName":  "V. Darida",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/25348.png"
+                    },
+                    {
+                        "playerId":  "fbref-cze-tomas-soucek",
+                        "playerName":  "Tomas Soucek",
+                        "teamCode":  "CZE",
+                        "teamName":  "Czech Republic",
+                        "fromCandidateId":  "official-player-team-cze-t-soucek",
+                        "fromCandidateName":  "T. Soucek",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/1243.png"
+                    },
+                    {
+                        "playerId":  "fbref-cze-robin-hranac",
+                        "playerName":  "Robin Hranac",
+                        "teamCode":  "CZE",
+                        "teamName":  "Czech Republic",
+                        "fromCandidateId":  "official-player-team-cze-r-hranac",
+                        "fromCandidateName":  "R. HranÃ¡c",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/162964.png"
+                    },
+                    {
+                        "playerId":  "fbref-cze-matej-kovar",
+                        "playerName":  "Matej Kovar",
+                        "teamCode":  "CZE",
+                        "teamName":  "Czech Republic",
+                        "fromCandidateId":  "official-player-team-cze-m-kovar",
+                        "fromCandidateName":  "M. KovÃ¡r",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/138804.png"
+                    },
+                    {
+                        "playerId":  "fbref-cze-ladislav-krejci",
+                        "playerName":  "Ladislav Krejci",
+                        "teamCode":  "CZE",
+                        "teamName":  "Czech Republic",
+                        "fromCandidateId":  "official-player-team-cze-l-krejci",
+                        "fromCandidateName":  "L. KrejcÃ­",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/66407.png"
+                    },
+                    {
+                        "playerId":  "fbref-cze-vladimir-coufal",
+                        "playerName":  "Vladimir Coufal",
+                        "teamCode":  "CZE",
+                        "teamName":  "Czech Republic",
+                        "fromCandidateId":  "official-player-team-cze-v-coufal",
+                        "fromCandidateName":  "V. Coufal",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/1231.png"
+                    },
+                    {
+                        "playerId":  "fbref-cze-tomas-holes",
+                        "playerName":  "Tomas Holes",
+                        "teamCode":  "CZE",
+                        "teamName":  "Czech Republic",
+                        "fromCandidateId":  "official-player-team-cze-t-holes",
+                        "fromCandidateName":  "T. Holes",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/2252.png"
+                    },
+                    {
+                        "playerId":  "fbref-cze-pavel-sulc",
+                        "playerName":  "Pavel Sulc",
+                        "teamCode":  "CZE",
+                        "teamName":  "Czech Republic",
+                        "fromCandidateId":  "official-player-team-cze-p-sulc",
+                        "fromCandidateName":  "P. Sulc",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/66387.png"
+                    },
+                    {
+                        "playerId":  "fbref-rsa-bradley-cross",
+                        "playerName":  "Bradley Cross",
+                        "teamCode":  "RSA",
+                        "teamName":  "South Africa",
+                        "fromCandidateId":  "official-player-team-rsa-b-cross",
+                        "fromCandidateName":  "B. Cross",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/163041.png"
+                    },
+                    {
+                        "playerId":  "fbref-rsa-jayden-adams",
+                        "playerName":  "Jayden Adams",
+                        "teamCode":  "RSA",
+                        "teamName":  "South Africa",
+                        "fromCandidateId":  "official-player-team-rsa-j-adams",
+                        "fromCandidateName":  "J. Adams",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/268710.png"
+                    },
+                    {
+                        "playerId":  "fbref-rsa-oswin-appollis",
+                        "playerName":  "Oswin Appollis",
+                        "teamCode":  "RSA",
+                        "teamName":  "South Africa",
+                        "fromCandidateId":  "official-player-team-rsa-o-appollis",
+                        "fromCandidateName":  "O. Appollis",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/179893.png"
+                    },
+                    {
+                        "playerId":  "fbref-cze-lukas-hornicek",
+                        "playerName":  "Lukas Hornicek",
+                        "teamCode":  "CZE",
+                        "teamName":  "Czech Republic",
+                        "fromCandidateId":  "official-player-team-cze-l-hornicek",
+                        "fromCandidateName":  "L. HornÃ­cek",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/269349.png"
+                    },
+                    {
+                        "playerId":  "fbref-mex-jorge-sanchez",
+                        "playerName":  "Jorge Sanchez",
+                        "teamCode":  "MEX",
+                        "teamName":  "Mexico",
+                        "fromCandidateId":  "official-player-team-mex-j-sanchez",
+                        "fromCandidateName":  "J. SÃ¡nchez",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/2878.png"
+                    },
+                    {
+                        "playerId":  "fbref-rsa-thapelo-maseko",
+                        "playerName":  "Thapelo Maseko",
+                        "teamCode":  "RSA",
+                        "teamName":  "South Africa",
+                        "fromCandidateId":  "official-player-team-rsa-t-maseko",
+                        "fromCandidateName":  "T. Maseko",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/354831.png"
+                    },
+                    {
+                        "playerId":  "fbref-rsa-thabang-matuludi",
+                        "playerName":  "Thabang Matuludi",
+                        "teamCode":  "RSA",
+                        "teamName":  "South Africa",
+                        "fromCandidateId":  "official-player-team-rsa-t-matuludi",
+                        "fromCandidateName":  "T. Matuludi",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/330174.png"
+                    },
+                    {
+                        "playerId":  "fbref-sui-marvin-keller",
+                        "playerName":  "Marvin Keller",
+                        "teamCode":  "SUI",
+                        "teamName":  "Switzerland",
+                        "fromCandidateId":  "official-player-team-sui-m-keller",
+                        "fromCandidateName":  "M. Keller",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/123468.png"
+                    },
+                    {
+                        "playerId":  "fbref-rsa-samukele-kabini",
+                        "playerName":  "Samukele Kabini",
+                        "teamCode":  "RSA",
+                        "teamName":  "South Africa",
+                        "fromCandidateId":  "official-player-team-rsa-s-kabini",
+                        "fromCandidateName":  "S. Kabini",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/430078.png"
+                    },
+                    {
+                        "playerId":  "fbref-sui-nico-elvedi",
+                        "playerName":  "Nico Elvedi",
+                        "teamCode":  "SUI",
+                        "teamName":  "Switzerland",
+                        "fromCandidateId":  "official-player-team-sui-n-elvedi",
+                        "fromCandidateName":  "N. Elvedi",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/2803.png"
+                    },
+                    {
+                        "playerId":  "fbref-sui-luca-jaquez",
+                        "playerName":  "Luca Jaquez",
+                        "teamCode":  "SUI",
+                        "teamName":  "Switzerland",
+                        "fromCandidateId":  "official-player-team-sui-l-jaquez",
+                        "fromCandidateName":  "L. Jaquez",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/349344.png"
+                    },
+                    {
+                        "playerId":  "fbref-sui-cedric-itten",
+                        "playerName":  "Cedric Itten",
+                        "teamCode":  "SUI",
+                        "teamName":  "Switzerland",
+                        "fromCandidateId":  "official-player-team-sui-c-itten",
+                        "fromCandidateName":  "C. Itten",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/48497.png"
+                    },
+                    {
+                        "playerId":  "fbref-sui-remo-freuler",
+                        "playerName":  "Remo Freuler",
+                        "teamCode":  "SUI",
+                        "teamName":  "Switzerland",
+                        "fromCandidateId":  "official-player-team-sui-r-freuler",
+                        "fromCandidateName":  "R. Freuler",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/2807.png"
+                    },
+                    {
+                        "playerId":  "fbref-sui-ardon-jashari",
+                        "playerName":  "Ardon Jashari",
+                        "teamCode":  "SUI",
+                        "teamName":  "Switzerland",
+                        "fromCandidateId":  "official-player-team-sui-a-jashari",
+                        "fromCandidateName":  "A. Jashari",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/264705.png"
+                    },
+                    {
+                        "playerId":  "fbref-sui-dan-ndoye",
+                        "playerName":  "Dan Ndoye",
+                        "teamCode":  "SUI",
+                        "teamName":  "Switzerland",
+                        "fromCandidateId":  "official-player-team-sui-d-ndoye",
+                        "fromCandidateName":  "D. Ndoye",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/48648.png"
+                    },
+                    {
+                        "playerId":  "fbref-sui-miro-muheim",
+                        "playerName":  "Miro Muheim",
+                        "teamCode":  "SUI",
+                        "teamName":  "Switzerland",
+                        "fromCandidateId":  "official-player-team-sui-m-muheim",
+                        "fromCandidateName":  "M. Muheim",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/48489.png"
+                    },
+                    {
+                        "playerId":  "fbref-sui-johan-manzambi",
+                        "playerName":  "Johan Manzambi",
+                        "teamCode":  "SUI",
+                        "teamName":  "Switzerland",
+                        "fromCandidateId":  "official-player-team-sui-j-manzambi",
+                        "fromCandidateName":  "J. Manzambi",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/406244.png"
+                    },
+                    {
+                        "playerId":  "fbref-sui-gregor-kobel",
+                        "playerName":  "Gregor Kobel",
+                        "teamCode":  "SUI",
+                        "teamName":  "Switzerland",
+                        "fromCandidateId":  "official-player-team-sui-g-kobel",
+                        "fromCandidateName":  "G. Kobel",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/25282.png"
+                    },
+                    {
+                        "playerId":  "fbref-sui-fabian-rieder",
+                        "playerName":  "Fabian Rieder",
+                        "teamCode":  "SUI",
+                        "teamName":  "Switzerland",
+                        "fromCandidateId":  "official-player-team-sui-f-rieder",
+                        "fromCandidateName":  "F. Rieder",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/163032.png"
+                    },
+                    {
+                        "playerId":  "fbref-sui-ricardo-rodriguez",
+                        "playerName":  "Ricardo Rodriguez",
+                        "teamCode":  "SUI",
+                        "teamName":  "Switzerland",
+                        "fromCandidateId":  "official-player-team-sui-r-rodriguez",
+                        "fromCandidateName":  "R. RodrÃ­guez",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/1631.png"
+                    },
+                    {
+                        "playerId":  "fbref-sui-eray-comert",
+                        "playerName":  "Eray Comert",
+                        "teamCode":  "SUI",
+                        "teamName":  "Switzerland",
+                        "fromCandidateId":  "official-player-team-sui-e-comert",
+                        "fromCandidateName":  "E. CÃ¶mert",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/48372.png"
+                    },
+                    {
+                        "playerId":  "fbref-sui-noah-okafor",
+                        "playerName":  "Noah Okafor",
+                        "teamCode":  "SUI",
+                        "teamName":  "Switzerland",
+                        "fromCandidateId":  "official-player-team-sui-n-okafor",
+                        "fromCandidateName":  "N. Okafor",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/48389.png"
+                    },
+                    {
+                        "playerId":  "fbref-sui-djibril-sow",
+                        "playerName":  "Djibril Sow",
+                        "teamCode":  "SUI",
+                        "teamName":  "Switzerland",
+                        "fromCandidateId":  "official-player-team-sui-d-sow",
+                        "fromCandidateName":  "D. Sow",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/957.png"
+                    },
+                    {
+                        "playerId":  "fbref-sui-silvan-widmer",
+                        "playerName":  "Silvan Widmer",
+                        "teamCode":  "SUI",
+                        "teamName":  "Switzerland",
+                        "fromCandidateId":  "official-player-team-sui-s-widmer",
+                        "fromCandidateName":  "S. Widmer",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/48378.png"
+                    },
+                    {
+                        "playerId":  "fbref-sui-ruben-vargas",
+                        "playerName":  "Ruben Vargas",
+                        "teamCode":  "SUI",
+                        "teamName":  "Switzerland",
+                        "fromCandidateId":  "official-player-team-sui-r-vargas",
+                        "fromCandidateName":  "R. Vargas",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/48471.png"
+                    },
+                    {
+                        "playerId":  "fbref-sui-granit-xhaka",
+                        "playerName":  "Granit Xhaka",
+                        "teamCode":  "SUI",
+                        "teamName":  "Switzerland",
+                        "fromCandidateId":  "official-player-team-sui-g-xhaka",
+                        "fromCandidateName":  "G. Xhaka",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/1464.png"
+                    },
+                    {
+                        "playerId":  "fbref-sui-christian-fassnacht",
+                        "playerName":  "Christian Fassnacht",
+                        "teamCode":  "SUI",
+                        "teamName":  "Switzerland",
+                        "fromCandidateId":  "official-player-team-sui-c-fassnacht",
+                        "fromCandidateName":  "C. Fassnacht",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/952.png"
+                    },
+                    {
+                        "playerId":  "fbref-sui-breel-embolo",
+                        "playerName":  "Breel Embolo",
+                        "teamCode":  "SUI",
+                        "teamName":  "Switzerland",
+                        "fromCandidateId":  "official-player-team-sui-b-embolo",
+                        "fromCandidateName":  "B. Embolo",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/421.png"
+                    },
+                    {
+                        "playerId":  "fbref-rsa-evidence-makgopa",
+                        "playerName":  "Evidence Makgopa",
+                        "teamCode":  "RSA",
+                        "teamName":  "South Africa",
+                        "fromCandidateId":  "official-player-team-rsa-e-makgopa",
+                        "fromCandidateName":  "E. Makgopa",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/201354.png"
+                    },
+                    {
+                        "playerId":  "fbref-rsa-thalente-mbatha",
+                        "playerName":  "Thalente Mbatha",
+                        "teamCode":  "RSA",
+                        "teamName":  "South Africa",
+                        "fromCandidateId":  "official-player-team-rsa-t-mbatha",
+                        "fromCandidateName":  "T. Mbatha",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/194430.png"
+                    },
+                    {
+                        "playerId":  "fbref-rsa-relebohile-mofokeng",
+                        "playerName":  "Relebohile Mofokeng",
+                        "teamCode":  "RSA",
+                        "teamName":  "South Africa",
+                        "fromCandidateId":  "official-player-team-rsa-r-mofokeng",
+                        "fromCandidateName":  "R. Mofokeng",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/414149.png"
+                    },
+                    {
+                        "playerId":  "fbref-rsa-teboho-mokoena",
+                        "playerName":  "Teboho Mokoena",
+                        "teamCode":  "RSA",
+                        "teamName":  "South Africa",
+                        "fromCandidateId":  "official-player-team-rsa-t-mokoena",
+                        "fromCandidateName":  "T. Mokoena",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/3287.png"
+                    },
+                    {
+                        "playerId":  "fbref-rsa-khulumani-ndamane",
+                        "playerName":  "Khulumani Ndamane",
+                        "teamCode":  "RSA",
+                        "teamName":  "South Africa",
+                        "fromCandidateId":  "official-player-team-rsa-k-ndamane",
+                        "fromCandidateName":  "K. Ndamane",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/474630.png"
+                    },
+                    {
+                        "playerId":  "fbref-rsa-iqraam-rayners",
+                        "playerName":  "Iqraam Rayners",
+                        "teamCode":  "RSA",
+                        "teamName":  "South Africa",
+                        "fromCandidateId":  "official-player-team-rsa-i-rayners",
+                        "fromCandidateName":  "I. Rayners",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/127429.png"
+                    },
+                    {
+                        "playerId":  "fbref-rsa-nkosinathi-sibisi",
+                        "playerName":  "Nkosinathi Sibisi",
+                        "teamCode":  "RSA",
+                        "teamName":  "South Africa",
+                        "fromCandidateId":  "official-player-team-rsa-n-sibisi",
+                        "fromCandidateName":  "N. Sibisi",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/46458.png"
+                    },
+                    {
+                        "playerId":  "fbref-rsa-kamogelo-sebelebele",
+                        "playerName":  "Kamogelo Sebelebele",
+                        "teamCode":  "RSA",
+                        "teamName":  "South Africa",
+                        "fromCandidateId":  "official-player-team-rsa-k-sebelebele",
+                        "fromCandidateName":  "K. Sebelebele",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/359561.png"
+                    },
+                    {
+                        "playerId":  "fbref-rsa-mbekezeli-mbokazi",
+                        "playerName":  "Mbekezeli Mbokazi",
+                        "teamCode":  "RSA",
+                        "teamName":  "South Africa",
+                        "fromCandidateId":  "official-player-team-rsa-m-mbokazi",
+                        "fromCandidateName":  "M. Mbokazi",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/510799.png"
+                    },
+                    {
+                        "playerId":  "fbref-rsa-themba-zwane",
+                        "playerName":  "Themba Zwane",
+                        "teamCode":  "RSA",
+                        "teamName":  "South Africa",
+                        "fromCandidateId":  "official-player-team-rsa-t-zwane",
+                        "fromCandidateName":  "T. Zwane",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/3289.png"
+                    },
+                    {
+                        "playerId":  "fbref-rsa-ime-okon",
+                        "playerName":  "Ime Okon",
+                        "teamCode":  "RSA",
+                        "teamName":  "South Africa",
+                        "fromCandidateId":  "official-player-team-rsa-i-okon",
+                        "fromCandidateName":  "I. Okon",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/406752.png"
+                    },
+                    {
+                        "playerId":  "fbref-rsa-sphephelo-sithole",
+                        "playerName":  "Sphephelo Sithole",
+                        "teamCode":  "RSA",
+                        "teamName":  "South Africa",
+                        "fromCandidateId":  "official-player-team-rsa-s-sithole",
+                        "fromCandidateName":  "S. Sithole",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/158433.png"
+                    },
+                    {
+                        "playerId":  "fbref-rsa-tshepang-moremi",
+                        "playerName":  "Tshepang Moremi",
+                        "teamCode":  "RSA",
+                        "teamName":  "South Africa",
+                        "fromCandidateId":  "official-player-team-rsa-t-moremi",
+                        "fromCandidateName":  "T. Moremi",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/295977.png"
+                    },
+                    {
+                        "playerId":  "fbref-rsa-ricardo-goss",
+                        "playerName":  "Ricardo Goss",
+                        "teamCode":  "RSA",
+                        "teamName":  "South Africa",
+                        "fromCandidateId":  "official-player-team-rsa-r-goss",
+                        "fromCandidateName":  "R. Goss",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/46245.png"
+                    },
+                    {
+                        "playerId":  "fbref-sui-zeki-amdouni",
+                        "playerName":  "Zeki Amdouni",
+                        "teamCode":  "SUI",
+                        "teamName":  "Switzerland",
+                        "fromCandidateId":  "official-player-team-sui-z-amdouni",
+                        "fromCandidateName":  "Z. Amdouni",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/123469.png"
+                    },
+                    {
+                        "playerId":  "fbref-sui-aurele-amenda",
+                        "playerName":  "Aurele Amenda",
+                        "teamCode":  "SUI",
+                        "teamName":  "Switzerland",
+                        "fromCandidateId":  "official-player-team-sui-a-amenda",
+                        "fromCandidateName":  "A. Amenda",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/162414.png"
+                    },
+                    {
+                        "playerId":  "fbref-sui-michel-aebischer",
+                        "playerName":  "Michel Aebischer",
+                        "teamCode":  "SUI",
+                        "teamName":  "Switzerland",
+                        "fromCandidateId":  "official-player-team-sui-m-aebischer",
+                        "fromCandidateName":  "M. Aebischer",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/951.png"
+                    },
+                    {
+                        "playerId":  "fbref-rsa-ronwen-williams",
+                        "playerName":  "Ronwen Williams",
+                        "teamCode":  "RSA",
+                        "teamName":  "South Africa",
+                        "fromCandidateId":  "official-player-team-rsa-r-williams",
+                        "fromCandidateName":  "R. Williams",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/3275.png"
+                    },
+                    {
+                        "playerId":  "fbref-mex-obed-vargas",
+                        "playerName":  "Obed Vargas",
+                        "teamCode":  "MEX",
+                        "teamName":  "Mexico",
+                        "fromCandidateId":  "official-player-team-mex-o-vargas",
+                        "fromCandidateName":  "O. Vargas",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/313383.png"
+                    },
+                    {
+                        "playerId":  "fbref-rsa-khuliso-mudau",
+                        "playerName":  "Khuliso Mudau",
+                        "teamCode":  "RSA",
+                        "teamName":  "South Africa",
+                        "fromCandidateId":  "official-player-team-rsa-k-mudau",
+                        "fromCandidateName":  "K. Mudau",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/46601.png"
+                    },
+                    {
+                        "playerId":  "fbref-cze-mojmir-chytil",
+                        "playerName":  "Mojmir Chytil",
+                        "teamCode":  "CZE",
+                        "teamName":  "Czech Republic",
+                        "fromCandidateId":  "official-player-team-cze-m-chytil",
+                        "fromCandidateName":  "M. Chytil",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/66275.png"
+                    },
+                    {
+                        "playerId":  "fbref-sui-manuel-akanji",
+                        "playerName":  "Manuel Akanji",
+                        "teamCode":  "SUI",
+                        "teamName":  "Switzerland",
+                        "fromCandidateId":  "official-player-team-sui-m-akanji",
+                        "fromCandidateName":  "M. Akanji",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/5.png"
+                    },
+                    {
+                        "playerId":  "fbref-can-mathieu-choiniere",
+                        "playerName":  "Mathieu Choiniere",
+                        "teamCode":  "CAN",
+                        "teamName":  "Canada",
+                        "fromCandidateId":  "official-player-team-can-m-choiniere",
+                        "fromCandidateName":  "M. ChoiniÃ¨re",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/50788.png"
+                    },
+                    {
+                        "playerId":  "fbref-can-stephen-eustaquio",
+                        "playerName":  "Stephen Eustaquio",
+                        "teamCode":  "CAN",
+                        "teamName":  "Canada",
+                        "fromCandidateId":  "official-player-team-can-s-eustaquio",
+                        "fromCandidateName":  "S. EustÃ¡quio",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/35570.png"
+                    },
+                    {
+                        "playerId":  "fbref-can-alphonso-davies",
+                        "playerName":  "Alphonso Davies",
+                        "teamCode":  "CAN",
+                        "teamName":  "Canada",
+                        "fromCandidateId":  "official-player-team-can-a-davies",
+                        "fromCandidateName":  "A. Davies",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/509.png"
+                    },
+                    {
+                        "playerId":  "fbref-can-owen-goodman",
+                        "playerName":  "Owen Goodman",
+                        "teamCode":  "CAN",
+                        "teamName":  "Canada",
+                        "fromCandidateId":  "official-player-team-can-o-goodman",
+                        "fromCandidateName":  "O. Goodman",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/284554.png"
+                    },
+                    {
+                        "playerId":  "fbref-can-promise-david",
+                        "playerName":  "Promise David",
+                        "teamCode":  "CAN",
+                        "teamName":  "Canada",
+                        "fromCandidateId":  "official-player-team-can-p-david",
+                        "fromCandidateName":  "P. David",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/313353.png"
+                    },
+                    {
+                        "playerId":  "fbref-can-cyle-larin",
+                        "playerName":  "Cyle Larin",
+                        "teamCode":  "CAN",
+                        "teamName":  "Canada",
+                        "fromCandidateId":  "official-player-team-can-c-larin",
+                        "fromCandidateName":  "C. Larin",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/2001.png"
+                    },
+                    {
+                        "playerId":  "fbref-can-luc-de-fougerolles",
+                        "playerName":  "Luc de Fougerolles",
+                        "teamCode":  "CAN",
+                        "teamName":  "Canada",
+                        "fromCandidateId":  "official-player-team-can-l-de-fougerolles",
+                        "fromCandidateName":  "L. De Fougerolles",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/327738.png"
+                    },
+                    {
+                        "playerId":  "fbref-can-alistair-johnston",
+                        "playerName":  "Alistair Johnston",
+                        "teamCode":  "CAN",
+                        "teamName":  "Canada",
+                        "fromCandidateId":  "official-player-team-can-a-johnston",
+                        "fromCandidateName":  "A. Johnston",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/78547.png"
+                    },
+                    {
+                        "playerId":  "fbref-can-ismael-kone",
+                        "playerName":  "Ismael Kone",
+                        "teamCode":  "CAN",
+                        "teamName":  "Canada",
+                        "fromCandidateId":  "official-player-team-can-i-kone",
+                        "fromCandidateName":  "I. KonÃ©",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/328046.png"
+                    },
+                    {
+                        "playerId":  "fbref-bih-kerim-alajbegovic",
+                        "playerName":  "Kerim Alajbegovic",
+                        "teamCode":  "BIH",
+                        "teamName":  "Bosnia and Herzegovina",
+                        "fromCandidateId":  "official-player-team-bih-kerim-sam-alajbegovic",
+                        "fromCandidateName":  "Kerim-Sam Alajbegovic",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/395559.png"
+                    },
+                    {
+                        "playerId":  "fbref-can-derek-cornelius",
+                        "playerName":  "Derek Cornelius",
+                        "teamCode":  "CAN",
+                        "teamName":  "Canada",
+                        "fromCandidateId":  "official-player-team-can-d-cornelius",
+                        "fromCandidateName":  "D. Cornelius",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/51295.png"
+                    },
+                    {
+                        "playerId":  "fbref-can-alfie-jones",
+                        "playerName":  "Alfie Jones",
+                        "teamCode":  "CAN",
+                        "teamName":  "Canada",
+                        "fromCandidateId":  "official-player-team-can-a-jones",
+                        "fromCandidateName":  "A. Jones",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/18938.png"
+                    },
+                    {
+                        "playerId":  "fbref-can-richie-laryea",
+                        "playerName":  "Richie Laryea",
+                        "teamCode":  "CAN",
+                        "teamName":  "Canada",
+                        "fromCandidateId":  "official-player-team-can-r-laryea",
+                        "fromCandidateName":  "R. Laryea",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/50816.png"
+                    },
+                    {
+                        "playerId":  "fbref-can-nathan-saliba",
+                        "playerName":  "Nathan Saliba",
+                        "teamCode":  "CAN",
+                        "teamName":  "Canada",
+                        "fromCandidateId":  "official-player-team-can-n-saliba",
+                        "fromCandidateName":  "N. Saliba",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/294824.png"
+                    },
+                    {
+                        "playerId":  "fbref-can-joel-waterman",
+                        "playerName":  "Joel Waterman",
+                        "teamCode":  "CAN",
+                        "teamName":  "Canada",
+                        "fromCandidateId":  "official-player-team-can-j-waterman",
+                        "fromCandidateName":  "J. Waterman",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/78494.png"
+                    },
+                    {
+                        "playerId":  "fbref-qat-mahmoud-abunada",
+                        "playerName":  "Mahmoud Abunada",
+                        "teamCode":  "QAT",
+                        "teamName":  "Qatar",
+                        "fromCandidateId":  "official-player-team-qat-mahmud-abunada",
+                        "fromCandidateName":  "Mahmud Abunada",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/42207.png"
+                    },
+                    {
+                        "playerId":  "fbref-can-jonathan-david",
+                        "playerName":  "Jonathan David",
+                        "teamCode":  "CAN",
+                        "teamName":  "Canada",
+                        "fromCandidateId":  "official-player-team-can-j-david",
+                        "fromCandidateName":  "J. David",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/8489.png"
+                    },
+                    {
+                        "playerId":  "fbref-can-jacob-shaffelburg",
+                        "playerName":  "Jacob Shaffelburg",
+                        "teamCode":  "CAN",
+                        "teamName":  "Canada",
+                        "fromCandidateId":  "official-player-team-can-j-shaffelburg",
+                        "fromCandidateName":  "J. Shaffelburg",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/50826.png"
+                    },
+                    {
+                        "playerId":  "fbref-can-ali-ahmed",
+                        "playerName":  "Ali Ahmed",
+                        "teamCode":  "CAN",
+                        "teamName":  "Canada",
+                        "fromCandidateId":  "official-player-team-can-a-ahmed",
+                        "fromCandidateName":  "A. Ahmed",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/362145.png"
+                    },
+                    {
+                        "playerId":  "fbref-can-tajon-buchanan",
+                        "playerName":  "Tajon Buchanan",
+                        "teamCode":  "CAN",
+                        "teamName":  "Canada",
+                        "fromCandidateId":  "official-player-team-can-t-buchanan",
+                        "fromCandidateName":  "T. Buchanan",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/51016.png"
+                    },
+                    {
+                        "playerId":  "fbref-bih-esmir-bajraktarevic",
+                        "playerName":  "Esmir Bajraktarevic",
+                        "teamCode":  "BIH",
+                        "teamName":  "Bosnia and Herzegovina",
+                        "fromCandidateId":  "official-player-team-bih-e-bajraktarevic",
+                        "fromCandidateName":  "E. Bajraktarevic",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/329409.png"
+                    },
+                    {
+                        "playerId":  "fbref-can-moise-bombito",
+                        "playerName":  "Moise Bombito",
+                        "teamCode":  "CAN",
+                        "teamName":  "Canada",
+                        "fromCandidateId":  "official-player-team-can-m-bombito",
+                        "fromCandidateName":  "M. Bombito",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/407017.png"
+                    },
+                    {
+                        "playerId":  "fbref-bih-ermedin-demirovic",
+                        "playerName":  "Ermedin Demirovic",
+                        "teamCode":  "BIH",
+                        "teamName":  "Bosnia and Herzegovina",
+                        "fromCandidateId":  "official-player-team-bih-e-demirovic",
+                        "fromCandidateName":  "E. Demirovic",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/46930.png"
+                    },
+                    {
+                        "playerId":  "fbref-bih-samed-bazdar",
+                        "playerName":  "Samed Bazdar",
+                        "teamCode":  "BIH",
+                        "teamName":  "Bosnia and Herzegovina",
+                        "fromCandidateId":  "official-player-team-bih-s-bazdar",
+                        "fromCandidateName":  "S. Bazdar",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/314377.png"
+                    },
+                    {
+                        "playerId":  "fbref-bih-amar-dedic",
+                        "playerName":  "Amar Dedic",
+                        "teamCode":  "BIH",
+                        "teamName":  "Bosnia and Herzegovina",
+                        "fromCandidateId":  "official-player-team-bih-a-dedic",
+                        "fromCandidateName":  "A. Dedic",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/7318.png"
+                    },
+                    {
+                        "playerId":  "fbref-bih-nidal-celik",
+                        "playerName":  "Nidal Celik",
+                        "teamCode":  "BIH",
+                        "teamName":  "Bosnia and Herzegovina",
+                        "fromCandidateId":  "official-player-team-bih-n-celik",
+                        "fromCandidateName":  "N. Celik",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/395589.png"
+                    },
+                    {
+                        "playerId":  "fbref-bih-ivan-basic",
+                        "playerName":  "Ivan Basic",
+                        "teamCode":  "BIH",
+                        "teamName":  "Bosnia and Herzegovina",
+                        "fromCandidateId":  "official-player-team-bih-i-basic",
+                        "fromCandidateName":  "I. Basic",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/162222.png"
+                    },
+                    {
+                        "playerId":  "fbref-bih-dzenis-burnic",
+                        "playerName":  "Dzenis Burnic",
+                        "teamCode":  "BIH",
+                        "teamName":  "Bosnia and Herzegovina",
+                        "fromCandidateId":  "official-player-team-bih-d-burnic",
+                        "fromCandidateName":  "D. Burnic",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/25129.png"
+                    },
+                    {
+                        "playerId":  "fbref-bih-edin-dzeko",
+                        "playerName":  "Edin Dzeko",
+                        "teamCode":  "BIH",
+                        "teamName":  "Bosnia and Herzegovina",
+                        "fromCandidateId":  "official-player-team-bih-e-dzeko",
+                        "fromCandidateName":  "E. Dzeko",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/790.png"
+                    },
+                    {
+                        "playerId":  "fbref-qat-hassan-al-haydos",
+                        "playerName":  "Hassan Al-Haydos",
+                        "teamCode":  "QAT",
+                        "teamName":  "Qatar",
+                        "fromCandidateId":  "official-player-team-qat-hassan-al-haydos",
+                        "fromCandidateName":  "Hassan Al Haydos",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/2545.png"
+                    },
+                    {
+                        "playerId":  "fbref-bih-benjamin-tahirovic",
+                        "playerName":  "Benjamin Tahirovic",
+                        "teamCode":  "BIH",
+                        "teamName":  "Bosnia and Herzegovina",
+                        "fromCandidateId":  "official-player-team-bih-b-tahirovic",
+                        "fromCandidateName":  "B. Tahirovic",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/264094.png"
+                    },
+                    {
+                        "playerId":  "fbref-bih-amir-hadziahmetovic",
+                        "playerName":  "Amir Hadziahmetovic",
+                        "teamCode":  "BIH",
+                        "teamName":  "Bosnia and Herzegovina",
+                        "fromCandidateId":  "official-player-team-bih-a-hadziahmetovic",
+                        "fromCandidateName":  "A. Hadziahmetovic",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/50006.png"
+                    },
+                    {
+                        "playerId":  "fbref-bih-sead-kolasinac",
+                        "playerName":  "Sead Kolasinac",
+                        "teamCode":  "BIH",
+                        "teamName":  "Bosnia and Herzegovina",
+                        "fromCandidateId":  "official-player-team-bih-s-kolasinac",
+                        "fromCandidateName":  "S. Kolasinac",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/1442.png"
+                    },
+                    {
+                        "playerId":  "fbref-bih-tarik-muharemovic",
+                        "playerName":  "Tarik Muharemovic",
+                        "teamCode":  "BIH",
+                        "teamName":  "Bosnia and Herzegovina",
+                        "fromCandidateId":  "official-player-team-bih-t-muharemovic",
+                        "fromCandidateName":  "T. Muharemovic",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/271350.png"
+                    },
+                    {
+                        "playerId":  "fbref-bih-nikola-katic",
+                        "playerName":  "Nikola Katic",
+                        "teamCode":  "BIH",
+                        "teamName":  "Bosnia and Herzegovina",
+                        "fromCandidateId":  "official-player-team-bih-n-katic",
+                        "fromCandidateName":  "N. Katic",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/1741.png"
+                    },
+                    {
+                        "playerId":  "fbref-cro-dominik-kotarski",
+                        "playerName":  "Dominik Kotarski",
+                        "teamCode":  "CRO",
+                        "teamName":  "Croatia",
+                        "fromCandidateId":  "official-player-team-cro-d-kotarski",
+                        "fromCandidateName":  "D. Kotarski",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/524.png"
+                    },
+                    {
+                        "playerId":  "fbref-cro-josko-gvardiol",
+                        "playerName":  "Josko Gvardiol",
+                        "teamCode":  "CRO",
+                        "teamName":  "Croatia",
+                        "fromCandidateId":  "official-player-team-cro-j-gvardiol",
+                        "fromCandidateName":  "J. Gvardiol",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/129033.png"
+                    },
+                    {
+                        "playerId":  "fbref-bih-dennis-hadzikadunic",
+                        "playerName":  "Dennis Hadzikadunic",
+                        "teamCode":  "BIH",
+                        "teamName":  "Bosnia and Herzegovina",
+                        "fromCandidateId":  "official-player-team-bih-d-hadzikadunic",
+                        "fromCandidateName":  "D. Hadzikadunic",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/53517.png"
+                    },
+                    {
+                        "playerId":  "fbref-cro-duje-caleta-car",
+                        "playerName":  "Duje Caleta-Car",
+                        "teamCode":  "CRO",
+                        "teamName":  "Croatia",
+                        "fromCandidateId":  "official-player-team-cro-d-caleta-car",
+                        "fromCandidateName":  "D. Caleta-Car",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/1902.png"
+                    },
+                    {
+                        "playerId":  "fbref-cro-kristijan-jakic",
+                        "playerName":  "Kristijan Jakic",
+                        "teamCode":  "CRO",
+                        "teamName":  "Croatia",
+                        "fromCandidateId":  "official-player-team-cro-k-jakic",
+                        "fromCandidateName":  "K. Jakic",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/14395.png"
+                    },
+                    {
+                        "playerId":  "fbref-bih-amar-memic",
+                        "playerName":  "Amar Memic",
+                        "teamCode":  "BIH",
+                        "teamName":  "Bosnia and Herzegovina",
+                        "fromCandidateId":  "official-player-team-bih-a-memic",
+                        "fromCandidateName":  "A. Memic",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/322101.png"
+                    },
+                    {
+                        "playerId":  "fbref-bih-armin-gigovic",
+                        "playerName":  "Armin Gigovic",
+                        "teamCode":  "BIH",
+                        "teamName":  "Bosnia and Herzegovina",
+                        "fromCandidateId":  "official-player-team-bih-a-gigovic",
+                        "fromCandidateName":  "A. Gigovic",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/70514.png"
+                    },
+                    {
+                        "playerId":  "fbref-cro-andrej-kramaric",
+                        "playerName":  "Andrej Kramaric",
+                        "teamCode":  "CRO",
+                        "teamName":  "Croatia",
+                        "fromCandidateId":  "official-player-team-cro-a-kramaric",
+                        "fromCandidateName":  "A. Kramaric",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/726.png"
+                    },
+                    {
+                        "playerId":  "fbref-cro-mateo-kovacic",
+                        "playerName":  "Mateo Kovacic",
+                        "teamCode":  "CRO",
+                        "teamName":  "Croatia",
+                        "fromCandidateId":  "official-player-team-cro-m-kovacic",
+                        "fromCandidateName":  "M. Kovacic",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/2291.png"
+                    },
+                    {
+                        "playerId":  "fbref-cro-martin-baturina",
+                        "playerName":  "Martin Baturina",
+                        "teamCode":  "CRO",
+                        "teamName":  "Croatia",
+                        "fromCandidateId":  "official-player-team-cro-m-baturina",
+                        "fromCandidateName":  "M. Baturina",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/295026.png"
+                    },
+                    {
+                        "playerId":  "fbref-cro-ante-budimir",
+                        "playerName":  "Ante Budimir",
+                        "teamCode":  "CRO",
+                        "teamName":  "Croatia",
+                        "fromCandidateId":  "official-player-team-cro-a-budimir",
+                        "fromCandidateName":  "A. Budimir",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/46746.png"
+                    },
+                    {
+                        "playerId":  "fbref-cro-martin-erlic",
+                        "playerName":  "Martin Erlic",
+                        "teamCode":  "CRO",
+                        "teamName":  "Croatia",
+                        "fromCandidateId":  "official-player-team-cro-m-erlic",
+                        "fromCandidateName":  "M. Erlic",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/30827.png"
+                    },
+                    {
+                        "playerId":  "fbref-cro-toni-fruk",
+                        "playerName":  "Toni Fruk",
+                        "teamCode":  "CRO",
+                        "teamName":  "Croatia",
+                        "fromCandidateId":  "official-player-team-cro-t-fruk",
+                        "fromCandidateName":  "T. Fruk",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/284869.png"
+                    },
+                    {
+                        "playerId":  "fbref-bih-jovo-lukic",
+                        "playerName":  "Jovo Lukic",
+                        "teamCode":  "BIH",
+                        "teamName":  "Bosnia and Herzegovina",
+                        "fromCandidateId":  "official-player-team-bih-j-lukic",
+                        "fromCandidateName":  "J. Lukic",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/77037.png"
+                    },
+                    {
+                        "playerId":  "fbref-cro-mario-pasalic",
+                        "playerName":  "Mario Pasalic",
+                        "teamCode":  "CRO",
+                        "teamName":  "Croatia",
+                        "fromCandidateId":  "official-player-team-cro-m-pasalic",
+                        "fromCandidateName":  "M. Pasalic",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/260865.png"
+                    },
+                    {
+                        "playerId":  "fbref-cro-petar-sucic",
+                        "playerName":  "Petar Sucic",
+                        "teamCode":  "CRO",
+                        "teamName":  "Croatia",
+                        "fromCandidateId":  "official-player-team-cro-p-sucic",
+                        "fromCandidateName":  "P. Sucic",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/348205.png"
+                    },
+                    {
+                        "playerId":  "fbref-cro-marco-pasalic",
+                        "playerName":  "Marco Pasalic",
+                        "teamCode":  "CRO",
+                        "teamName":  "Croatia",
+                        "fromCandidateId":  "official-player-team-cro-m-pasalic",
+                        "fromCandidateName":  "M. Pasalic",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/260865.png"
+                    },
+                    {
+                        "playerId":  "fbref-sui-denis-zakaria",
+                        "playerName":  "Denis Zakaria",
+                        "teamCode":  "SUI",
+                        "teamName":  "Switzerland",
+                        "fromCandidateId":  "official-player-team-sui-d-zakaria",
+                        "fromCandidateName":  "D. Zakaria",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/2810.png"
+                    },
+                    {
+                        "playerId":  "fbref-cro-dominik-livakovic",
+                        "playerName":  "Dominik Livakovic",
+                        "teamCode":  "CRO",
+                        "teamName":  "Croatia",
+                        "fromCandidateId":  "official-player-team-cro-d-livakovic",
+                        "fromCandidateName":  "D. Livakovic",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/1305.png"
+                    },
+                    {
+                        "playerId":  "fbref-cro-ivor-pandur",
+                        "playerName":  "Ivor Pandur",
+                        "teamCode":  "CRO",
+                        "teamName":  "Croatia",
+                        "fromCandidateId":  "official-player-team-cro-i-pandur",
+                        "fromCandidateName":  "I. Pandur",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/14268.png"
+                    },
+                    {
+                        "playerId":  "fbref-cro-josip-stanisic",
+                        "playerName":  "Josip Stanisic",
+                        "teamCode":  "CRO",
+                        "teamName":  "Croatia",
+                        "fromCandidateId":  "official-player-team-cro-j-stanisic",
+                        "fromCandidateName":  "J. Stanisic",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/125171.png"
+                    },
+                    {
+                        "playerId":  "fbref-cro-marin-pongracic",
+                        "playerName":  "Marin Pongracic",
+                        "teamCode":  "CRO",
+                        "teamName":  "Croatia",
+                        "fromCandidateId":  "official-player-team-cro-m-pongracic",
+                        "fromCandidateName":  "M. Pongracic",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/1084.png"
+                    },
+                    {
+                        "playerId":  "fbref-cro-luka-modric",
+                        "playerName":  "Luka Modric",
+                        "teamCode":  "CRO",
+                        "teamName":  "Croatia",
+                        "fromCandidateId":  "official-player-team-cro-l-modric",
+                        "fromCandidateName":  "L. Modric",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/754.png"
+                    },
+                    {
+                        "playerId":  "fbref-cro-nikola-moro",
+                        "playerName":  "Nikola Moro",
+                        "teamCode":  "CRO",
+                        "teamName":  "Croatia",
+                        "fromCandidateId":  "official-player-team-cro-n-moro",
+                        "fromCandidateName":  "N. Moro",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/1322.png"
+                    },
+                    {
+                        "playerId":  "fbref-cro-petar-musa",
+                        "playerName":  "Petar Musa",
+                        "teamCode":  "CRO",
+                        "teamName":  "Croatia",
+                        "fromCandidateId":  "official-player-team-cro-p-musa",
+                        "fromCandidateName":  "P. Musa",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/66055.png"
+                    },
+                    {
+                        "playerId":  "fbref-cro-igor-matanovic",
+                        "playerName":  "Igor Matanovic",
+                        "teamCode":  "CRO",
+                        "teamName":  "Croatia",
+                        "fromCandidateId":  "official-player-team-cro-i-matanovic",
+                        "fromCandidateName":  "I. Matanovic",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/202696.png"
+                    },
+                    {
+                        "playerId":  "fbref-cro-ivan-perisic",
+                        "playerName":  "Ivan Perisic",
+                        "teamCode":  "CRO",
+                        "teamName":  "Croatia",
+                        "fromCandidateId":  "official-player-team-cro-i-perisic",
+                        "fromCandidateName":  "I. Perisic",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/207.png"
+                    },
+                    {
+                        "playerId":  "fbref-mex-guillermo-ochoa",
+                        "playerName":  "Guillermo Ochoa",
+                        "teamCode":  "MEX",
+                        "teamName":  "Mexico",
+                        "fromCandidateId":  "official-player-team-mex-g-ochoa",
+                        "fromCandidateName":  "G. Ochoa",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/2098.png"
+                    },
+                    {
+                        "playerId":  "fbref-mex-johan-vasquez",
+                        "playerName":  "Johan Vasquez",
+                        "teamCode":  "MEX",
+                        "teamName":  "Mexico",
+                        "fromCandidateId":  "official-player-team-mex-j-vasquez",
+                        "fromCandidateName":  "J. VÃ¡squez",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/35544.png"
+                    },
+                    {
+                        "playerId":  "fbref-rsa-aubrey-modiba",
+                        "playerName":  "Aubrey Modiba",
+                        "teamCode":  "RSA",
+                        "teamName":  "South Africa",
+                        "fromCandidateId":  "official-player-team-rsa-a-modiba",
+                        "fromCandidateName":  "A. Modiba",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/46334.png"
+                    },
+                    {
+                        "playerId":  "fbref-rsa-olwethu-makhanya",
+                        "playerName":  "Olwethu Makhanya",
+                        "teamCode":  "RSA",
+                        "teamName":  "South Africa",
+                        "fromCandidateId":  "official-player-team-rsa-o-makhanya",
+                        "fromCandidateName":  "O. Makhanya",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/392387.png"
+                    },
+                    {
+                        "playerId":  "fbref-rsa-lyle-foster",
+                        "playerName":  "Lyle Foster",
+                        "teamCode":  "RSA",
+                        "teamName":  "South Africa",
+                        "fromCandidateId":  "official-player-team-rsa-l-foster",
+                        "fromCandidateName":  "L. Foster",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/98936.png"
+                    },
+                    {
+                        "playerId":  "fbref-kor-kim-min-jae",
+                        "playerName":  "Kim Min-jae",
+                        "teamCode":  "KOR",
+                        "teamName":  "South Korea",
+                        "fromCandidateId":  "official-player-team-kor-kim-min-jae",
+                        "fromCandidateName":  "Kim Min-Jae",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/2897.png"
+                    },
+                    {
+                        "playerId":  "fbref-kor-jens-castrop",
+                        "playerName":  "Jens Castrop",
+                        "teamCode":  "KOR",
+                        "teamName":  "South Korea",
+                        "fromCandidateId":  "official-player-team-kor-j-castrop",
+                        "fromCandidateName":  "J. Castrop",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/280358.png"
+                    },
+                    {
+                        "playerId":  "official-player-team-sen-bara-sapoko-ndiaye",
+                        "playerName":  "Bara Sapoko Ndiaye",
+                        "teamCode":  "SEN",
+                        "teamName":  "Senegal",
+                        "fromCandidateId":  "official-player-team-sen-bara-ndiaye",
+                        "fromCandidateName":  "Bara Ndiaye",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/630895.png"
+                    },
+                    {
+                        "playerId":  "official-player-team-irq-manaf-younis",
+                        "playerName":  "Manaf Younis",
+                        "teamCode":  "IRQ",
+                        "teamName":  "Iraq",
+                        "fromCandidateId":  "official-player-team-irq-munaf-younus",
+                        "fromCandidateName":  "Munaf Younus",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/295394.png"
+                    },
+                    {
+                        "playerId":  "official-player-team-irq-zaid-tahseen",
+                        "playerName":  "Zaid Tahseen",
+                        "teamCode":  "IRQ",
+                        "teamName":  "Iraq",
+                        "fromCandidateId":  "official-player-team-irq-zayed-tahseen",
+                        "fromCandidateName":  "Zayed Tahseen",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/296373.png"
+                    },
+                    {
+                        "playerId":  "official-player-team-irq-rebin-sulaka",
+                        "playerName":  "Rebin Sulaka",
+                        "teamCode":  "IRQ",
+                        "teamName":  "Iraq",
+                        "fromCandidateId":  "official-player-team-irq-rebin-solaka",
+                        "fromCandidateName":  "Rebin Solaka",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/42261.png"
+                    },
+                    {
+                        "playerId":  "official-player-team-irq-mustafa-saadoon",
+                        "playerName":  "Mustafa Saadoon",
+                        "teamCode":  "IRQ",
+                        "teamName":  "Iraq",
+                        "fromCandidateId":  "official-player-team-irq-mustafa-saadoun",
+                        "fromCandidateName":  "Mustafa Saadoun",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/427187.png"
+                    },
+                    {
+                        "playerId":  "official-player-team-irq-ibrahim-bayesh",
+                        "playerName":  "Ibrahim Bayesh",
+                        "teamCode":  "IRQ",
+                        "teamName":  "Iraq",
+                        "fromCandidateId":  "official-player-team-irq-ibraheem-bayesh",
+                        "fromCandidateName":  "Ibraheem Bayesh",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/140747.png"
+                    },
+                    {
+                        "playerId":  "fbref-can-maxime-crepeau",
+                        "playerName":  "Maxime Crepeau",
+                        "teamCode":  "CAN",
+                        "teamName":  "Canada",
+                        "fromCandidateId":  "official-player-team-can-m-crepeau",
+                        "fromCandidateName":  "M. CrÃ©peau",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/51274.png"
+                    },
+                    {
+                        "playerId":  "fbref-bih-nikola-vasilj",
+                        "playerName":  "Nikola Vasilj",
+                        "teamCode":  "BIH",
+                        "teamName":  "Bosnia and Herzegovina",
+                        "fromCandidateId":  "official-player-team-bih-n-vasilj",
+                        "fromCandidateName":  "N. Vasilj",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/9026.png"
+                    },
+                    {
+                        "playerId":  "official-player-team-qat-mohammed-al-manai",
+                        "playerName":  "Mohammed Al-Manai",
+                        "teamCode":  "QAT",
+                        "teamName":  "Qatar",
+                        "fromCandidateId":  "official-player-team-qat-mohamed-al-manai",
+                        "fromCandidateName":  "Mohamed Al Manai",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/283174.png"
+                    },
+                    {
+                        "playerId":  "official-player-team-qat-jassem-jaber",
+                        "playerName":  "Jassem Jaber",
+                        "teamCode":  "QAT",
+                        "teamName":  "Qatar",
+                        "fromCandidateId":  "fbref-qat-jassem-gaber",
+                        "fromCandidateName":  "Jassem Gaber",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/200981.png"
+                    },
+                    {
+                        "playerId":  "official-player-team-sco-finlay-curtis",
+                        "playerName":  "Finlay Curtis",
+                        "teamCode":  "SCO",
+                        "teamName":  "Scotland",
+                        "fromCandidateId":  "official-player-team-sco-findlay-curtis",
+                        "fromCandidateName":  "Findlay Curtis",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/433272.png"
+                    },
+                    {
+                        "playerId":  "official-player-team-egy-el-mahdi-soliman",
+                        "playerName":  "El-Mahdi Soliman",
+                        "teamCode":  "EGY",
+                        "teamName":  "Egypt",
+                        "fromCandidateId":  "official-player-team-egy-al-mahdi-soliman",
+                        "fromCandidateName":  "Al Mahdi Soliman",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/16831.png"
+                    },
+                    {
+                        "playerId":  "official-player-team-egy-ahmed-fattouh",
+                        "playerName":  "Ahmed Fattouh",
+                        "teamCode":  "EGY",
+                        "teamName":  "Egypt",
+                        "fromCandidateId":  "official-player-team-egy-ahmed-fatouh",
+                        "fromCandidateName":  "Ahmed Fatouh",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/2649.png"
+                    },
+                    {
+                        "playerId":  "official-player-team-egy-hamdi-fathi",
+                        "playerName":  "Hamdi Fathi",
+                        "teamCode":  "EGY",
+                        "teamName":  "Egypt",
+                        "fromCandidateId":  "official-player-team-egy-hamdi-fathy",
+                        "fromCandidateName":  "Hamdi Fathy",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/16813.png"
+                    },
+                    {
+                        "playerId":  "official-player-team-egy-ahmed-mostafa-zizo",
+                        "playerName":  "Ahmed Mostafa Zizo",
+                        "teamCode":  "EGY",
+                        "teamName":  "Egypt",
+                        "fromCandidateId":  "official-player-team-egy-ahmed-zizo",
+                        "fromCandidateName":  "Ahmed Zizo",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/664079.png"
+                    },
+                    {
+                        "playerId":  "official-player-team-egy-mohannad-lasheen",
+                        "playerName":  "Mohannad Lasheen",
+                        "teamCode":  "EGY",
+                        "teamName":  "Egypt",
+                        "fromCandidateId":  "official-player-team-egy-mohanad-lasheen",
+                        "fromCandidateName":  "Mohanad Lasheen",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/16841.png"
+                    },
+                    {
+                        "playerId":  "official-player-team-ksa-mohamed-al-owais",
+                        "playerName":  "Mohamed Al Owais",
+                        "teamCode":  "KSA",
+                        "teamName":  "Saudi Arabia",
+                        "fromCandidateId":  "official-player-team-ksa-mohammed-al-owais",
+                        "fromCandidateName":  "Mohammed Al Owais",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/44411.png"
+                    },
+                    {
+                        "playerId":  "official-player-team-ksa-ahmed-alkassar",
+                        "playerName":  "Ahmed Alkassar",
+                        "teamCode":  "KSA",
+                        "teamName":  "Saudi Arabia",
+                        "fromCandidateId":  "official-player-team-ksa-ahmed-al-kassar",
+                        "fromCandidateName":  "Ahmed Al Kassar",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/44449.png"
+                    },
+                    {
+                        "playerId":  "official-player-team-ksa-mohammed-abu-alshamat",
+                        "playerName":  "Mohammed Abu Alshamat",
+                        "teamCode":  "KSA",
+                        "teamName":  "Saudi Arabia",
+                        "fromCandidateId":  "official-player-team-ksa-mohammed-abu-al-shamat",
+                        "fromCandidateName":  "Mohammed Abu Al Shamat",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/403087.png"
+                    },
+                    {
+                        "playerId":  "official-player-team-jor-abdullah-al-fakhouri",
+                        "playerName":  "Abdullah Al-Fakhouri",
+                        "teamCode":  "JOR",
+                        "teamName":  "Jordan",
+                        "fromCandidateId":  "official-player-team-jor-abdallah-al-fakhouri",
+                        "fromCandidateName":  "Abdallah Al Fakhouri",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/163884.png"
+                    },
+                    {
+                        "playerId":  "official-player-team-jor-saad-al-rosan",
+                        "playerName":  "Saad Al-Rosan",
+                        "teamCode":  "JOR",
+                        "teamName":  "Jordan",
+                        "fromCandidateId":  "official-player-team-jor-saed-al-rosan",
+                        "fromCandidateName":  "Saed Al Rosan",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/213978.png"
+                    },
+                    {
+                        "playerId":  "official-player-team-jor-saleem-obeid",
+                        "playerName":  "Saleem Obeid",
+                        "teamCode":  "JOR",
+                        "teamName":  "Jordan",
+                        "fromCandidateId":  "official-player-team-jor-saleem-obaid",
+                        "fromCandidateName":  "Saleem Obaid",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/72140.png"
+                    },
+                    {
+                        "playerId":  "official-player-team-jor-muhannad-abu-taha",
+                        "playerName":  "Muhannad Abu Taha",
+                        "teamCode":  "JOR",
+                        "teamName":  "Jordan",
+                        "fromCandidateId":  "official-player-team-jor-mohannad-abu-taha",
+                        "fromCandidateName":  "Mohannad Abu Taha",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/310785.png"
+                    },
+                    {
+                        "playerId":  "official-player-team-jor-ibrahim-saadeh",
+                        "playerName":  "Ibrahim Saadeh",
+                        "teamCode":  "JOR",
+                        "teamName":  "Jordan",
+                        "fromCandidateId":  "official-player-team-jor-ibrahim-sa-deh",
+                        "fromCandidateName":  "Ibrahim Sa\u0027deh",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/542768.png"
+                    },
+                    {
+                        "playerId":  "official-player-team-jor-mousa-al-tamari",
+                        "playerName":  "Mousa Al-Tamari",
+                        "teamCode":  "JOR",
+                        "teamName":  "Jordan",
+                        "fromCandidateId":  "official-player-team-jor-mousa-tamari",
+                        "fromCandidateName":  "Mousa Tamari",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/15286.png"
+                    },
+                    {
+                        "playerId":  "official-player-team-por-samuel-costa",
+                        "playerName":  "Samuel Costa",
+                        "teamCode":  "POR",
+                        "teamName":  "Portugal",
+                        "fromCandidateId":  "official-player-team-por-samu-costa",
+                        "fromCandidateName":  "SamÃº Costa",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/190485.png"
+                    },
+                    {
+                        "playerId":  "official-player-team-gha-caleb-yirenkyi",
+                        "playerName":  "Caleb Yirenkyi",
+                        "teamCode":  "GHA",
+                        "teamName":  "Ghana",
+                        "fromCandidateId":  "official-player-team-gha-caleb-marfo-yirenkyi",
+                        "fromCandidateName":  "Caleb Marfo Yirenkyi",
+                        "fromCandidateAvailable":  false,
+                        "image":  "https://media.api-sports.io/football/players/475575.png"
+                    }
+                ]
+}

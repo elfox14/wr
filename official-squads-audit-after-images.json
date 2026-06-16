@@ -1,0 +1,1872 @@
+﻿{
+    "ok":  true,
+    "lockedOfficialTeams":  48,
+    "expectedOfficialTeams":  48,
+    "expectedPlayersPerTeam":  26,
+    "expectedOfficialPlayers":  1248,
+    "totalOfficialPlayers":  1248,
+    "totalWithImages":  1167,
+    "totalMissingImages":  81,
+    "teamsWith26Players":  48,
+    "teamsNeedingCountReview":  [
+
+                                ],
+    "teamsMissingImages":  [
+                               {
+                                   "id":  "team-mex",
+                                   "code":  "MEX",
+                                   "name":  "Mexico",
+                                   "group":  "A",
+                                   "lockedOfficialSquad":  true,
+                                   "playerCount":  26,
+                                   "withImages":  25,
+                                   "missingImagesCount":  1,
+                                   "status":  "OK_26_PLAYERS",
+                                   "missingImages":  [
+                                                         {
+                                                             "id":  "fbref-mex-raul-rangel",
+                                                             "name":  "Raul Rangel",
+                                                             "position":  "Goalkeeper"
+                                                         }
+                                                     ]
+                               },
+                               {
+                                   "id":  "team-kor",
+                                   "code":  "KOR",
+                                   "name":  "South Korea",
+                                   "group":  "A",
+                                   "lockedOfficialSquad":  true,
+                                   "playerCount":  26,
+                                   "withImages":  24,
+                                   "missingImagesCount":  2,
+                                   "status":  "OK_26_PLAYERS",
+                                   "missingImages":  [
+                                                         {
+                                                             "id":  "official-player-team-kor-cho-yu-min",
+                                                             "name":  "Cho Yu-min",
+                                                             "position":  "Defender"
+                                                         },
+                                                         {
+                                                             "id":  "official-player-team-kor-lee-ki-hyeok",
+                                                             "name":  "Lee Ki-hyeok",
+                                                             "position":  "Defender"
+                                                         }
+                                                     ]
+                               },
+                               {
+                                   "id":  "team-bih",
+                                   "code":  "BIH",
+                                   "name":  "Bosnia and Herzegovina",
+                                   "group":  "B",
+                                   "lockedOfficialSquad":  true,
+                                   "playerCount":  26,
+                                   "withImages":  25,
+                                   "missingImagesCount":  1,
+                                   "status":  "OK_26_PLAYERS",
+                                   "missingImages":  [
+                                                         {
+                                                             "id":  "fbref-bih-osman-hadzikic",
+                                                             "name":  "Osman Hadzikic",
+                                                             "position":  "Goalkeeper"
+                                                         }
+                                                     ]
+                               },
+                               {
+                                   "id":  "team-can",
+                                   "code":  "CAN",
+                                   "name":  "Canada",
+                                   "group":  "B",
+                                   "lockedOfficialSquad":  true,
+                                   "playerCount":  26,
+                                   "withImages":  25,
+                                   "missingImagesCount":  1,
+                                   "status":  "OK_26_PLAYERS",
+                                   "missingImages":  [
+                                                         {
+                                                             "id":  "official-player-team-can-jayden-nelson",
+                                                             "name":  "Jayden Nelson",
+                                                             "position":  "Midfielder"
+                                                         }
+                                                     ]
+                               },
+                               {
+                                   "id":  "team-qat",
+                                   "code":  "QAT",
+                                   "name":  "Qatar",
+                                   "group":  "B",
+                                   "lockedOfficialSquad":  true,
+                                   "playerCount":  26,
+                                   "withImages":  18,
+                                   "missingImagesCount":  8,
+                                   "status":  "OK_26_PLAYERS",
+                                   "missingImages":  [
+                                                         {
+                                                             "id":  "official-player-team-qat-ayoub-alawi",
+                                                             "name":  "Ayoub Alawi",
+                                                             "position":  "Defender"
+                                                         },
+                                                         {
+                                                             "id":  "official-player-team-qat-hashmi-hussein",
+                                                             "name":  "Hashmi Hussein",
+                                                             "position":  "Defender"
+                                                         },
+                                                         {
+                                                             "id":  "official-player-team-qat-homam-al-amin",
+                                                             "name":  "Homam Al-Amin",
+                                                             "position":  "Defender"
+                                                         },
+                                                         {
+                                                             "id":  "official-player-team-qat-issa-laaye",
+                                                             "name":  "Issa Laaye",
+                                                             "position":  "Defender"
+                                                         },
+                                                         {
+                                                             "id":  "fbref-qat-sultan-al-brake",
+                                                             "name":  "Sultan Al-Brake",
+                                                             "position":  "Defender"
+                                                         },
+                                                         {
+                                                             "id":  "official-player-team-qat-ahmed-al-janahi",
+                                                             "name":  "Ahmed Al-Janahi",
+                                                             "position":  "Forward"
+                                                         },
+                                                         {
+                                                             "id":  "official-player-team-qat-tahseen-mohammed",
+                                                             "name":  "Tahseen Mohammed",
+                                                             "position":  "Forward"
+                                                         },
+                                                         {
+                                                             "id":  "official-player-team-qat-youssef-abdulrazzaq",
+                                                             "name":  "Youssef Abdulrazzaq",
+                                                             "position":  "Forward"
+                                                         }
+                                                     ]
+                               },
+                               {
+                                   "id":  "team-sui",
+                                   "code":  "SUI",
+                                   "name":  "Switzerland",
+                                   "group":  "B",
+                                   "lockedOfficialSquad":  true,
+                                   "playerCount":  26,
+                                   "withImages":  25,
+                                   "missingImagesCount":  1,
+                                   "status":  "OK_26_PLAYERS",
+                                   "missingImages":  [
+                                                         {
+                                                             "id":  "fbref-sui-yvon-mvogo",
+                                                             "name":  "Yvon Mvogo",
+                                                             "position":  "Goalkeeper"
+                                                         }
+                                                     ]
+                               },
+                               {
+                                   "id":  "team-bra",
+                                   "code":  "BRA",
+                                   "name":  "Brazil",
+                                   "group":  "C",
+                                   "lockedOfficialSquad":  true,
+                                   "playerCount":  26,
+                                   "withImages":  21,
+                                   "missingImagesCount":  5,
+                                   "status":  "OK_26_PLAYERS",
+                                   "missingImages":  [
+                                                         {
+                                                             "id":  "official-player-team-bra-igor-thiago",
+                                                             "name":  "Igor Thiago",
+                                                             "position":  "Forward"
+                                                         },
+                                                         {
+                                                             "id":  "official-player-team-bra-vinicius-jr",
+                                                             "name":  "Vinicius Jr",
+                                                             "position":  "Forward"
+                                                         },
+                                                         {
+                                                             "id":  "official-player-team-bra-alisson",
+                                                             "name":  "Alisson",
+                                                             "position":  "Goalkeeper"
+                                                         },
+                                                         {
+                                                             "id":  "official-player-team-bra-ederson-moraes",
+                                                             "name":  "Ederson Moraes",
+                                                             "position":  "Goalkeeper"
+                                                         },
+                                                         {
+                                                             "id":  "official-player-team-bra-ederson-jose",
+                                                             "name":  "Ederson Jose",
+                                                             "position":  "Midfielder"
+                                                         }
+                                                     ]
+                               },
+                               {
+                                   "id":  "team-hai",
+                                   "code":  "HAI",
+                                   "name":  "Haiti",
+                                   "group":  "C",
+                                   "lockedOfficialSquad":  true,
+                                   "playerCount":  26,
+                                   "withImages":  25,
+                                   "missingImagesCount":  1,
+                                   "status":  "OK_26_PLAYERS",
+                                   "missingImages":  [
+                                                         {
+                                                             "id":  "official-player-team-hai-simon-dominique",
+                                                             "name":  "Simon Dominique",
+                                                             "position":  "Midfielder"
+                                                         }
+                                                     ]
+                               },
+                               {
+                                   "id":  "team-mar",
+                                   "code":  "MAR",
+                                   "name":  "Morocco",
+                                   "group":  "C",
+                                   "lockedOfficialSquad":  true,
+                                   "playerCount":  26,
+                                   "withImages":  24,
+                                   "missingImagesCount":  2,
+                                   "status":  "OK_26_PLAYERS",
+                                   "missingImages":  [
+                                                         {
+                                                             "id":  "official-player-team-mar-ayoub-amaimouni-echghouyabe",
+                                                             "name":  "Ayoub Amaimouni-Echghouyabe",
+                                                             "position":  "Forward"
+                                                         },
+                                                         {
+                                                             "id":  "official-player-team-mar-yassine-gessime",
+                                                             "name":  "Yassine Gessime",
+                                                             "position":  "Forward"
+                                                         }
+                                                     ]
+                               },
+                               {
+                                   "id":  "team-aus",
+                                   "code":  "AUS",
+                                   "name":  "Australia",
+                                   "group":  "D",
+                                   "lockedOfficialSquad":  true,
+                                   "playerCount":  26,
+                                   "withImages":  24,
+                                   "missingImagesCount":  2,
+                                   "status":  "OK_26_PLAYERS",
+                                   "missingImages":  [
+                                                         {
+                                                             "id":  "official-player-team-aus-nishan-velupillary",
+                                                             "name":  "Nishan Velupillary",
+                                                             "position":  "Forward"
+                                                         },
+                                                         {
+                                                             "id":  "official-player-team-aus-aiden-oneill",
+                                                             "name":  "Aiden O\u0027Neill",
+                                                             "position":  "Midfielder"
+                                                         }
+                                                     ]
+                               },
+                               {
+                                   "id":  "team-par",
+                                   "code":  "PAR",
+                                   "name":  "Paraguay",
+                                   "group":  "D",
+                                   "lockedOfficialSquad":  true,
+                                   "playerCount":  26,
+                                   "withImages":  24,
+                                   "missingImagesCount":  2,
+                                   "status":  "OK_26_PLAYERS",
+                                   "missingImages":  [
+                                                         {
+                                                             "id":  "official-player-team-par-alejandro-romero-gamarra",
+                                                             "name":  "Alejandro Romero Gamarra",
+                                                             "position":  "Midfielder"
+                                                         },
+                                                         {
+                                                             "id":  "official-player-team-par-mauricio-magalhaes",
+                                                             "name":  "Mauricio Magalhaes",
+                                                             "position":  "Midfielder"
+                                                         }
+                                                     ]
+                               },
+                               {
+                                   "id":  "team-ger",
+                                   "code":  "GER",
+                                   "name":  "Germany",
+                                   "group":  "E",
+                                   "lockedOfficialSquad":  true,
+                                   "playerCount":  26,
+                                   "withImages":  25,
+                                   "missingImagesCount":  1,
+                                   "status":  "OK_26_PLAYERS",
+                                   "missingImages":  [
+                                                         {
+                                                             "id":  "official-player-team-ger-pascal-gross",
+                                                             "name":  "Pascal Gross",
+                                                             "position":  "Midfielder"
+                                                         }
+                                                     ]
+                               },
+                               {
+                                   "id":  "team-civ",
+                                   "code":  "CIV",
+                                   "name":  "Ivory Coast",
+                                   "group":  "E",
+                                   "lockedOfficialSquad":  true,
+                                   "playerCount":  26,
+                                   "withImages":  24,
+                                   "missingImagesCount":  2,
+                                   "status":  "OK_26_PLAYERS",
+                                   "missingImages":  [
+                                                         {
+                                                             "id":  "official-player-team-civ-clement-akpa",
+                                                             "name":  "Clement Akpa",
+                                                             "position":  "Defender"
+                                                         },
+                                                         {
+                                                             "id":  "official-player-team-civ-odilon-kossonou",
+                                                             "name":  "Odilon Kossonou",
+                                                             "position":  "Defender"
+                                                         }
+                                                     ]
+                               },
+                               {
+                                   "id":  "team-jpn",
+                                   "code":  "JPN",
+                                   "name":  "Japan",
+                                   "group":  "F",
+                                   "lockedOfficialSquad":  true,
+                                   "playerCount":  26,
+                                   "withImages":  24,
+                                   "missingImagesCount":  2,
+                                   "status":  "OK_26_PLAYERS",
+                                   "missingImages":  [
+                                                         {
+                                                             "id":  "official-player-team-jpn-shuto-machino",
+                                                             "name":  "Shuto Machino",
+                                                             "position":  "Forward"
+                                                         },
+                                                         {
+                                                             "id":  "official-player-team-jpn-kento-shoigai",
+                                                             "name":  "Kento Shoigai",
+                                                             "position":  "Midfielder"
+                                                         }
+                                                     ]
+                               },
+                               {
+                                   "id":  "team-tun",
+                                   "code":  "TUN",
+                                   "name":  "Tunisia",
+                                   "group":  "F",
+                                   "lockedOfficialSquad":  true,
+                                   "playerCount":  26,
+                                   "withImages":  21,
+                                   "missingImagesCount":  5,
+                                   "status":  "OK_26_PLAYERS",
+                                   "missingImages":  [
+                                                         {
+                                                             "id":  "official-player-team-tun-mohamed-amine-ben-hamida",
+                                                             "name":  "Mohamed Amine Ben Hamida",
+                                                             "position":  "Defender"
+                                                         },
+                                                         {
+                                                             "id":  "official-player-team-tun-abdelmouhib-chamakh",
+                                                             "name":  "Abdelmouhib Chamakh",
+                                                             "position":  "Goalkeeper"
+                                                         },
+                                                         {
+                                                             "id":  "official-player-team-tun-aymen-dahman",
+                                                             "name":  "Aymen Dahman",
+                                                             "position":  "Goalkeeper"
+                                                         },
+                                                         {
+                                                             "id":  "official-player-team-tun-sabri-ben-hessen",
+                                                             "name":  "Sabri Ben Hessen",
+                                                             "position":  "Goalkeeper"
+                                                         },
+                                                         {
+                                                             "id":  "official-player-team-tun-mohamed-hadj-mahmoud",
+                                                             "name":  "Mohamed Hadj Mahmoud",
+                                                             "position":  "Midfielder"
+                                                         }
+                                                     ]
+                               },
+                               {
+                                   "id":  "team-egy",
+                                   "code":  "EGY",
+                                   "name":  "Egypt",
+                                   "group":  "G",
+                                   "lockedOfficialSquad":  true,
+                                   "playerCount":  26,
+                                   "withImages":  22,
+                                   "missingImagesCount":  4,
+                                   "status":  "OK_26_PLAYERS",
+                                   "missingImages":  [
+                                                         {
+                                                             "id":  "official-player-team-egy-hamza-abdel-karim",
+                                                             "name":  "Hamza Abdel Karim",
+                                                             "position":  "Forward"
+                                                         },
+                                                         {
+                                                             "id":  "official-player-team-egy-mahmoud-hassan-trezeguet",
+                                                             "name":  "Mahmoud Hassan Trezeguet",
+                                                             "position":  "Midfielder"
+                                                         },
+                                                         {
+                                                             "id":  "official-player-team-egy-mostafa-abdel-raouf",
+                                                             "name":  "Mostafa Abdel Raouf",
+                                                             "position":  "Midfielder"
+                                                         },
+                                                         {
+                                                             "id":  "official-player-team-egy-nabil-emad",
+                                                             "name":  "Nabil Emad",
+                                                             "position":  "Midfielder"
+                                                         }
+                                                     ]
+                               },
+                               {
+                                   "id":  "team-irn",
+                                   "code":  "IRN",
+                                   "name":  "Iran",
+                                   "group":  "G",
+                                   "lockedOfficialSquad":  true,
+                                   "playerCount":  26,
+                                   "withImages":  22,
+                                   "missingImagesCount":  4,
+                                   "status":  "OK_26_PLAYERS",
+                                   "missingImages":  [
+                                                         {
+                                                             "id":  "official-player-team-irn-ehsan-hajsafi",
+                                                             "name":  "Ehsan Hajsafi",
+                                                             "position":  "Defender"
+                                                         },
+                                                         {
+                                                             "id":  "official-player-team-irn-hossein-kanaani",
+                                                             "name":  "Hossein Kanaani",
+                                                             "position":  "Defender"
+                                                         },
+                                                         {
+                                                             "id":  "official-player-team-irn-dennis-dargahi",
+                                                             "name":  "Dennis Dargahi",
+                                                             "position":  "Forward"
+                                                         },
+                                                         {
+                                                             "id":  "official-player-team-irn-seyed-hossein-hosseini",
+                                                             "name":  "Seyed Hossein Hosseini",
+                                                             "position":  "Goalkeeper"
+                                                         }
+                                                     ]
+                               },
+                               {
+                                   "id":  "team-cpv",
+                                   "code":  "CPV",
+                                   "name":  "Cape Verde",
+                                   "group":  "H",
+                                   "lockedOfficialSquad":  true,
+                                   "playerCount":  26,
+                                   "withImages":  24,
+                                   "missingImagesCount":  2,
+                                   "status":  "OK_26_PLAYERS",
+                                   "missingImages":  [
+                                                         {
+                                                             "id":  "official-player-team-cpv-roberto-lopes",
+                                                             "name":  "Roberto Lopes",
+                                                             "position":  "Defender"
+                                                         },
+                                                         {
+                                                             "id":  "official-player-team-cpv-joao-paulo-fernandes",
+                                                             "name":  "Joao Paulo Fernandes",
+                                                             "position":  "Midfielder"
+                                                         }
+                                                     ]
+                               },
+                               {
+                                   "id":  "team-ksa",
+                                   "code":  "KSA",
+                                   "name":  "Saudi Arabia",
+                                   "group":  "H",
+                                   "lockedOfficialSquad":  true,
+                                   "playerCount":  26,
+                                   "withImages":  25,
+                                   "missingImagesCount":  1,
+                                   "status":  "OK_26_PLAYERS",
+                                   "missingImages":  [
+                                                         {
+                                                             "id":  "official-player-team-ksa-alaa-al-hejji",
+                                                             "name":  "Alaa Al Hejji",
+                                                             "position":  "Midfielder"
+                                                         }
+                                                     ]
+                               },
+                               {
+                                   "id":  "team-esp",
+                                   "code":  "ESP",
+                                   "name":  "Spain",
+                                   "group":  "H",
+                                   "lockedOfficialSquad":  true,
+                                   "playerCount":  26,
+                                   "withImages":  25,
+                                   "missingImagesCount":  1,
+                                   "status":  "OK_26_PLAYERS",
+                                   "missingImages":  [
+                                                         {
+                                                             "id":  "official-player-team-esp-pau-cubarsi",
+                                                             "name":  "Pau Cubarsi",
+                                                             "position":  "Defender"
+                                                         }
+                                                     ]
+                               },
+                               {
+                                   "id":  "team-irq",
+                                   "code":  "IRQ",
+                                   "name":  "Iraq",
+                                   "group":  "I",
+                                   "lockedOfficialSquad":  true,
+                                   "playerCount":  26,
+                                   "withImages":  18,
+                                   "missingImagesCount":  8,
+                                   "status":  "OK_26_PLAYERS",
+                                   "missingImages":  [
+                                                         {
+                                                             "id":  "official-player-team-irq-ahmed-hassan-makenzie",
+                                                             "name":  "Ahmed Hassan Makenzie",
+                                                             "position":  "Defender"
+                                                         },
+                                                         {
+                                                             "id":  "official-player-team-irq-akam-hashem",
+                                                             "name":  "Akam Hashem",
+                                                             "position":  "Defender"
+                                                         },
+                                                         {
+                                                             "id":  "official-player-team-irq-zaid-ismail",
+                                                             "name":  "Zaid Ismail",
+                                                             "position":  "Defender"
+                                                         },
+                                                         {
+                                                             "id":  "official-player-team-irq-ali-jassim",
+                                                             "name":  "Ali Jassim",
+                                                             "position":  "Forward"
+                                                         },
+                                                         {
+                                                             "id":  "official-player-team-irq-ali-yousef",
+                                                             "name":  "Ali Yousef",
+                                                             "position":  "Forward"
+                                                         },
+                                                         {
+                                                             "id":  "official-player-team-irq-mohanad-ali",
+                                                             "name":  "Mohanad Ali",
+                                                             "position":  "Forward"
+                                                         },
+                                                         {
+                                                             "id":  "official-player-team-irq-jalal-hassan",
+                                                             "name":  "Jalal Hassan",
+                                                             "position":  "Goalkeeper"
+                                                         },
+                                                         {
+                                                             "id":  "official-player-team-irq-ahmed-qasim",
+                                                             "name":  "Ahmed Qasim",
+                                                             "position":  "Midfielder"
+                                                         }
+                                                     ]
+                               },
+                               {
+                                   "id":  "team-nor",
+                                   "code":  "NOR",
+                                   "name":  "Norway",
+                                   "group":  "I",
+                                   "lockedOfficialSquad":  true,
+                                   "playerCount":  26,
+                                   "withImages":  21,
+                                   "missingImagesCount":  5,
+                                   "status":  "OK_26_PLAYERS",
+                                   "missingImages":  [
+                                                         {
+                                                             "id":  "official-player-team-nor-fredrik-bjorkan",
+                                                             "name":  "Fredrik Bjorkan",
+                                                             "position":  "Defender"
+                                                         },
+                                                         {
+                                                             "id":  "official-player-team-nor-leo-skiri-ostigard",
+                                                             "name":  "Leo Skiri Ostigard",
+                                                             "position":  "Defender"
+                                                         },
+                                                         {
+                                                             "id":  "official-player-team-nor-alexander-sorloth",
+                                                             "name":  "Alexander Sorloth",
+                                                             "position":  "Forward"
+                                                         },
+                                                         {
+                                                             "id":  "official-player-team-nor-orjan-haskjold-nyland",
+                                                             "name":  "Orjan Haskjold Nyland",
+                                                             "position":  "Goalkeeper"
+                                                         },
+                                                         {
+                                                             "id":  "official-player-team-nor-martin-odegaard",
+                                                             "name":  "Martin Odegaard",
+                                                             "position":  "Midfielder"
+                                                         }
+                                                     ]
+                               },
+                               {
+                                   "id":  "team-alg",
+                                   "code":  "ALG",
+                                   "name":  "Algeria",
+                                   "group":  "J",
+                                   "lockedOfficialSquad":  true,
+                                   "playerCount":  26,
+                                   "withImages":  24,
+                                   "missingImagesCount":  2,
+                                   "status":  "OK_26_PLAYERS",
+                                   "missingImages":  [
+                                                         {
+                                                             "id":  "official-player-team-alg-nadir-benbouali",
+                                                             "name":  "Nadir Benbouali",
+                                                             "position":  "Forward"
+                                                         },
+                                                         {
+                                                             "id":  "official-player-team-alg-melvin-masstil",
+                                                             "name":  "Melvin Masstil",
+                                                             "position":  "Goalkeeper"
+                                                         }
+                                                     ]
+                               },
+                               {
+                                   "id":  "team-arg",
+                                   "code":  "ARG",
+                                   "name":  "Argentina",
+                                   "group":  "J",
+                                   "lockedOfficialSquad":  true,
+                                   "playerCount":  26,
+                                   "withImages":  25,
+                                   "missingImagesCount":  1,
+                                   "status":  "OK_26_PLAYERS",
+                                   "missingImages":  [
+                                                         {
+                                                             "id":  "official-player-team-arg-marcos-senesi",
+                                                             "name":  "Marcos Senesi",
+                                                             "position":  "Defender"
+                                                         }
+                                                     ]
+                               },
+                               {
+                                   "id":  "team-aut",
+                                   "code":  "AUT",
+                                   "name":  "Austria",
+                                   "group":  "J",
+                                   "lockedOfficialSquad":  true,
+                                   "playerCount":  26,
+                                   "withImages":  25,
+                                   "missingImagesCount":  1,
+                                   "status":  "OK_26_PLAYERS",
+                                   "missingImages":  [
+                                                         {
+                                                             "id":  "official-player-team-aut-dejan-ljubicic",
+                                                             "name":  "Dejan Ljubicic",
+                                                             "position":  "Midfielder"
+                                                         }
+                                                     ]
+                               },
+                               {
+                                   "id":  "team-jor",
+                                   "code":  "JOR",
+                                   "name":  "Jordan",
+                                   "group":  "J",
+                                   "lockedOfficialSquad":  true,
+                                   "playerCount":  26,
+                                   "withImages":  20,
+                                   "missingImagesCount":  6,
+                                   "status":  "OK_26_PLAYERS",
+                                   "missingImages":  [
+                                                         {
+                                                             "id":  "official-player-team-jor-abdullah-nasib",
+                                                             "name":  "Abdullah Nasib",
+                                                             "position":  "Defender"
+                                                         },
+                                                         {
+                                                             "id":  "official-player-team-jor-anas-bani",
+                                                             "name":  "Anas Bani",
+                                                             "position":  "Defender"
+                                                         },
+                                                         {
+                                                             "id":  "official-player-team-jor-mohammad-abu-al-nadi",
+                                                             "name":  "Mohammad Abu Al-Nadi",
+                                                             "position":  "Defender"
+                                                         },
+                                                         {
+                                                             "id":  "official-player-team-jor-mohammad-abu-zraiq",
+                                                             "name":  "Mohammad Abu Zraiq",
+                                                             "position":  "Forward"
+                                                         },
+                                                         {
+                                                             "id":  "official-player-team-jor-noor-bani-attieh",
+                                                             "name":  "Noor Bani Attieh",
+                                                             "position":  "Goalkeeper"
+                                                         },
+                                                         {
+                                                             "id":  "official-player-team-jor-yazeed-abu-laila",
+                                                             "name":  "Yazeed Abu Laila",
+                                                             "position":  "Goalkeeper"
+                                                         }
+                                                     ]
+                               },
+                               {
+                                   "id":  "team-col",
+                                   "code":  "COL",
+                                   "name":  "Colombia",
+                                   "group":  "K",
+                                   "lockedOfficialSquad":  true,
+                                   "playerCount":  26,
+                                   "withImages":  24,
+                                   "missingImagesCount":  2,
+                                   "status":  "OK_26_PLAYERS",
+                                   "missingImages":  [
+                                                         {
+                                                             "id":  "official-player-team-col-carlos-andres-gomez",
+                                                             "name":  "Carlos Andres Gomez",
+                                                             "position":  "Forward"
+                                                         },
+                                                         {
+                                                             "id":  "official-player-team-col-juan-camilo-hernandez",
+                                                             "name":  "Juan Camilo Hernandez",
+                                                             "position":  "Forward"
+                                                         }
+                                                     ]
+                               },
+                               {
+                                   "id":  "team-cod",
+                                   "code":  "COD",
+                                   "name":  "DR Congo",
+                                   "group":  "K",
+                                   "lockedOfficialSquad":  true,
+                                   "playerCount":  26,
+                                   "withImages":  25,
+                                   "missingImagesCount":  1,
+                                   "status":  "OK_26_PLAYERS",
+                                   "missingImages":  [
+                                                         {
+                                                             "id":  "official-player-team-cod-rocky-bushiri",
+                                                             "name":  "Rocky Bushiri",
+                                                             "position":  "Defender"
+                                                         }
+                                                     ]
+                               },
+                               {
+                                   "id":  "team-por",
+                                   "code":  "POR",
+                                   "name":  "Portugal",
+                                   "group":  "K",
+                                   "lockedOfficialSquad":  true,
+                                   "playerCount":  26,
+                                   "withImages":  25,
+                                   "missingImagesCount":  1,
+                                   "status":  "OK_26_PLAYERS",
+                                   "missingImages":  [
+                                                         {
+                                                             "id":  "official-player-team-por-francisco-trincao",
+                                                             "name":  "Francisco Trincao",
+                                                             "position":  "Forward"
+                                                         }
+                                                     ]
+                               },
+                               {
+                                   "id":  "team-uzb",
+                                   "code":  "UZB",
+                                   "name":  "Uzbekistan",
+                                   "group":  "K",
+                                   "lockedOfficialSquad":  true,
+                                   "playerCount":  26,
+                                   "withImages":  23,
+                                   "missingImagesCount":  3,
+                                   "status":  "OK_26_PLAYERS",
+                                   "missingImages":  [
+                                                         {
+                                                             "id":  "official-player-team-uzb-sherzod-nasrullaev",
+                                                             "name":  "Sherzod Nasrullaev",
+                                                             "position":  "Defender"
+                                                         },
+                                                         {
+                                                             "id":  "official-player-team-uzb-azizjon-ganiev",
+                                                             "name":  "Azizjon Ganiev",
+                                                             "position":  "Midfielder"
+                                                         },
+                                                         {
+                                                             "id":  "official-player-team-uzb-oston-urunov",
+                                                             "name":  "Oston Urunov",
+                                                             "position":  "Midfielder"
+                                                         }
+                                                     ]
+                               },
+                               {
+                                   "id":  "team-gha",
+                                   "code":  "GHA",
+                                   "name":  "Ghana",
+                                   "group":  "L",
+                                   "lockedOfficialSquad":  true,
+                                   "playerCount":  26,
+                                   "withImages":  23,
+                                   "missingImagesCount":  3,
+                                   "status":  "OK_26_PLAYERS",
+                                   "missingImages":  [
+                                                         {
+                                                             "id":  "official-player-team-gha-baba-abdul-rahman",
+                                                             "name":  "Baba Abdul Rahman",
+                                                             "position":  "Defender"
+                                                         },
+                                                         {
+                                                             "id":  "official-player-team-gha-kojo-oppong-preprah",
+                                                             "name":  "Kojo Oppong Preprah",
+                                                             "position":  "Defender"
+                                                         },
+                                                         {
+                                                             "id":  "official-player-team-gha-abdul-fatawu-issahaku",
+                                                             "name":  "Abdul Fatawu Issahaku",
+                                                             "position":  "Midfielder"
+                                                         }
+                                                     ]
+                               }
+                           ],
+    "teams":  [
+                  {
+                      "id":  "team-cze",
+                      "code":  "CZE",
+                      "name":  "Czech Republic",
+                      "group":  "A",
+                      "lockedOfficialSquad":  true,
+                      "playerCount":  26,
+                      "withImages":  26,
+                      "missingImagesCount":  0,
+                      "status":  "OK_26_PLAYERS",
+                      "missingImages":  [
+
+                                        ]
+                  },
+                  {
+                      "id":  "team-mex",
+                      "code":  "MEX",
+                      "name":  "Mexico",
+                      "group":  "A",
+                      "lockedOfficialSquad":  true,
+                      "playerCount":  26,
+                      "withImages":  25,
+                      "missingImagesCount":  1,
+                      "status":  "OK_26_PLAYERS",
+                      "missingImages":  [
+                                            {
+                                                "id":  "fbref-mex-raul-rangel",
+                                                "name":  "Raul Rangel",
+                                                "position":  "Goalkeeper"
+                                            }
+                                        ]
+                  },
+                  {
+                      "id":  "team-rsa",
+                      "code":  "RSA",
+                      "name":  "South Africa",
+                      "group":  "A",
+                      "lockedOfficialSquad":  true,
+                      "playerCount":  26,
+                      "withImages":  26,
+                      "missingImagesCount":  0,
+                      "status":  "OK_26_PLAYERS",
+                      "missingImages":  [
+
+                                        ]
+                  },
+                  {
+                      "id":  "team-kor",
+                      "code":  "KOR",
+                      "name":  "South Korea",
+                      "group":  "A",
+                      "lockedOfficialSquad":  true,
+                      "playerCount":  26,
+                      "withImages":  24,
+                      "missingImagesCount":  2,
+                      "status":  "OK_26_PLAYERS",
+                      "missingImages":  [
+                                            {
+                                                "id":  "official-player-team-kor-cho-yu-min",
+                                                "name":  "Cho Yu-min",
+                                                "position":  "Defender"
+                                            },
+                                            {
+                                                "id":  "official-player-team-kor-lee-ki-hyeok",
+                                                "name":  "Lee Ki-hyeok",
+                                                "position":  "Defender"
+                                            }
+                                        ]
+                  },
+                  {
+                      "id":  "team-bih",
+                      "code":  "BIH",
+                      "name":  "Bosnia and Herzegovina",
+                      "group":  "B",
+                      "lockedOfficialSquad":  true,
+                      "playerCount":  26,
+                      "withImages":  25,
+                      "missingImagesCount":  1,
+                      "status":  "OK_26_PLAYERS",
+                      "missingImages":  [
+                                            {
+                                                "id":  "fbref-bih-osman-hadzikic",
+                                                "name":  "Osman Hadzikic",
+                                                "position":  "Goalkeeper"
+                                            }
+                                        ]
+                  },
+                  {
+                      "id":  "team-can",
+                      "code":  "CAN",
+                      "name":  "Canada",
+                      "group":  "B",
+                      "lockedOfficialSquad":  true,
+                      "playerCount":  26,
+                      "withImages":  25,
+                      "missingImagesCount":  1,
+                      "status":  "OK_26_PLAYERS",
+                      "missingImages":  [
+                                            {
+                                                "id":  "official-player-team-can-jayden-nelson",
+                                                "name":  "Jayden Nelson",
+                                                "position":  "Midfielder"
+                                            }
+                                        ]
+                  },
+                  {
+                      "id":  "team-qat",
+                      "code":  "QAT",
+                      "name":  "Qatar",
+                      "group":  "B",
+                      "lockedOfficialSquad":  true,
+                      "playerCount":  26,
+                      "withImages":  18,
+                      "missingImagesCount":  8,
+                      "status":  "OK_26_PLAYERS",
+                      "missingImages":  [
+                                            {
+                                                "id":  "official-player-team-qat-ayoub-alawi",
+                                                "name":  "Ayoub Alawi",
+                                                "position":  "Defender"
+                                            },
+                                            {
+                                                "id":  "official-player-team-qat-hashmi-hussein",
+                                                "name":  "Hashmi Hussein",
+                                                "position":  "Defender"
+                                            },
+                                            {
+                                                "id":  "official-player-team-qat-homam-al-amin",
+                                                "name":  "Homam Al-Amin",
+                                                "position":  "Defender"
+                                            },
+                                            {
+                                                "id":  "official-player-team-qat-issa-laaye",
+                                                "name":  "Issa Laaye",
+                                                "position":  "Defender"
+                                            },
+                                            {
+                                                "id":  "fbref-qat-sultan-al-brake",
+                                                "name":  "Sultan Al-Brake",
+                                                "position":  "Defender"
+                                            },
+                                            {
+                                                "id":  "official-player-team-qat-ahmed-al-janahi",
+                                                "name":  "Ahmed Al-Janahi",
+                                                "position":  "Forward"
+                                            },
+                                            {
+                                                "id":  "official-player-team-qat-tahseen-mohammed",
+                                                "name":  "Tahseen Mohammed",
+                                                "position":  "Forward"
+                                            },
+                                            {
+                                                "id":  "official-player-team-qat-youssef-abdulrazzaq",
+                                                "name":  "Youssef Abdulrazzaq",
+                                                "position":  "Forward"
+                                            }
+                                        ]
+                  },
+                  {
+                      "id":  "team-sui",
+                      "code":  "SUI",
+                      "name":  "Switzerland",
+                      "group":  "B",
+                      "lockedOfficialSquad":  true,
+                      "playerCount":  26,
+                      "withImages":  25,
+                      "missingImagesCount":  1,
+                      "status":  "OK_26_PLAYERS",
+                      "missingImages":  [
+                                            {
+                                                "id":  "fbref-sui-yvon-mvogo",
+                                                "name":  "Yvon Mvogo",
+                                                "position":  "Goalkeeper"
+                                            }
+                                        ]
+                  },
+                  {
+                      "id":  "team-bra",
+                      "code":  "BRA",
+                      "name":  "Brazil",
+                      "group":  "C",
+                      "lockedOfficialSquad":  true,
+                      "playerCount":  26,
+                      "withImages":  21,
+                      "missingImagesCount":  5,
+                      "status":  "OK_26_PLAYERS",
+                      "missingImages":  [
+                                            {
+                                                "id":  "official-player-team-bra-igor-thiago",
+                                                "name":  "Igor Thiago",
+                                                "position":  "Forward"
+                                            },
+                                            {
+                                                "id":  "official-player-team-bra-vinicius-jr",
+                                                "name":  "Vinicius Jr",
+                                                "position":  "Forward"
+                                            },
+                                            {
+                                                "id":  "official-player-team-bra-alisson",
+                                                "name":  "Alisson",
+                                                "position":  "Goalkeeper"
+                                            },
+                                            {
+                                                "id":  "official-player-team-bra-ederson-moraes",
+                                                "name":  "Ederson Moraes",
+                                                "position":  "Goalkeeper"
+                                            },
+                                            {
+                                                "id":  "official-player-team-bra-ederson-jose",
+                                                "name":  "Ederson Jose",
+                                                "position":  "Midfielder"
+                                            }
+                                        ]
+                  },
+                  {
+                      "id":  "team-hai",
+                      "code":  "HAI",
+                      "name":  "Haiti",
+                      "group":  "C",
+                      "lockedOfficialSquad":  true,
+                      "playerCount":  26,
+                      "withImages":  25,
+                      "missingImagesCount":  1,
+                      "status":  "OK_26_PLAYERS",
+                      "missingImages":  [
+                                            {
+                                                "id":  "official-player-team-hai-simon-dominique",
+                                                "name":  "Simon Dominique",
+                                                "position":  "Midfielder"
+                                            }
+                                        ]
+                  },
+                  {
+                      "id":  "team-mar",
+                      "code":  "MAR",
+                      "name":  "Morocco",
+                      "group":  "C",
+                      "lockedOfficialSquad":  true,
+                      "playerCount":  26,
+                      "withImages":  24,
+                      "missingImagesCount":  2,
+                      "status":  "OK_26_PLAYERS",
+                      "missingImages":  [
+                                            {
+                                                "id":  "official-player-team-mar-ayoub-amaimouni-echghouyabe",
+                                                "name":  "Ayoub Amaimouni-Echghouyabe",
+                                                "position":  "Forward"
+                                            },
+                                            {
+                                                "id":  "official-player-team-mar-yassine-gessime",
+                                                "name":  "Yassine Gessime",
+                                                "position":  "Forward"
+                                            }
+                                        ]
+                  },
+                  {
+                      "id":  "team-sco",
+                      "code":  "SCO",
+                      "name":  "Scotland",
+                      "group":  "C",
+                      "lockedOfficialSquad":  true,
+                      "playerCount":  26,
+                      "withImages":  26,
+                      "missingImagesCount":  0,
+                      "status":  "OK_26_PLAYERS",
+                      "missingImages":  [
+
+                                        ]
+                  },
+                  {
+                      "id":  "team-aus",
+                      "code":  "AUS",
+                      "name":  "Australia",
+                      "group":  "D",
+                      "lockedOfficialSquad":  true,
+                      "playerCount":  26,
+                      "withImages":  24,
+                      "missingImagesCount":  2,
+                      "status":  "OK_26_PLAYERS",
+                      "missingImages":  [
+                                            {
+                                                "id":  "official-player-team-aus-nishan-velupillary",
+                                                "name":  "Nishan Velupillary",
+                                                "position":  "Forward"
+                                            },
+                                            {
+                                                "id":  "official-player-team-aus-aiden-oneill",
+                                                "name":  "Aiden O\u0027Neill",
+                                                "position":  "Midfielder"
+                                            }
+                                        ]
+                  },
+                  {
+                      "id":  "team-par",
+                      "code":  "PAR",
+                      "name":  "Paraguay",
+                      "group":  "D",
+                      "lockedOfficialSquad":  true,
+                      "playerCount":  26,
+                      "withImages":  24,
+                      "missingImagesCount":  2,
+                      "status":  "OK_26_PLAYERS",
+                      "missingImages":  [
+                                            {
+                                                "id":  "official-player-team-par-alejandro-romero-gamarra",
+                                                "name":  "Alejandro Romero Gamarra",
+                                                "position":  "Midfielder"
+                                            },
+                                            {
+                                                "id":  "official-player-team-par-mauricio-magalhaes",
+                                                "name":  "Mauricio Magalhaes",
+                                                "position":  "Midfielder"
+                                            }
+                                        ]
+                  },
+                  {
+                      "id":  "team-tur",
+                      "code":  "TUR",
+                      "name":  "Turkey",
+                      "group":  "D",
+                      "lockedOfficialSquad":  true,
+                      "playerCount":  26,
+                      "withImages":  26,
+                      "missingImagesCount":  0,
+                      "status":  "OK_26_PLAYERS",
+                      "missingImages":  [
+
+                                        ]
+                  },
+                  {
+                      "id":  "team-usa",
+                      "code":  "USA",
+                      "name":  "United States",
+                      "group":  "D",
+                      "lockedOfficialSquad":  true,
+                      "playerCount":  26,
+                      "withImages":  26,
+                      "missingImagesCount":  0,
+                      "status":  "OK_26_PLAYERS",
+                      "missingImages":  [
+
+                                        ]
+                  },
+                  {
+                      "id":  "team-cuw",
+                      "code":  "CUW",
+                      "name":  "CuraÃ§ao",
+                      "group":  "E",
+                      "lockedOfficialSquad":  true,
+                      "playerCount":  26,
+                      "withImages":  26,
+                      "missingImagesCount":  0,
+                      "status":  "OK_26_PLAYERS",
+                      "missingImages":  [
+
+                                        ]
+                  },
+                  {
+                      "id":  "team-ecu",
+                      "code":  "ECU",
+                      "name":  "Ecuador",
+                      "group":  "E",
+                      "lockedOfficialSquad":  true,
+                      "playerCount":  26,
+                      "withImages":  26,
+                      "missingImagesCount":  0,
+                      "status":  "OK_26_PLAYERS",
+                      "missingImages":  [
+
+                                        ]
+                  },
+                  {
+                      "id":  "team-ger",
+                      "code":  "GER",
+                      "name":  "Germany",
+                      "group":  "E",
+                      "lockedOfficialSquad":  true,
+                      "playerCount":  26,
+                      "withImages":  25,
+                      "missingImagesCount":  1,
+                      "status":  "OK_26_PLAYERS",
+                      "missingImages":  [
+                                            {
+                                                "id":  "official-player-team-ger-pascal-gross",
+                                                "name":  "Pascal Gross",
+                                                "position":  "Midfielder"
+                                            }
+                                        ]
+                  },
+                  {
+                      "id":  "team-civ",
+                      "code":  "CIV",
+                      "name":  "Ivory Coast",
+                      "group":  "E",
+                      "lockedOfficialSquad":  true,
+                      "playerCount":  26,
+                      "withImages":  24,
+                      "missingImagesCount":  2,
+                      "status":  "OK_26_PLAYERS",
+                      "missingImages":  [
+                                            {
+                                                "id":  "official-player-team-civ-clement-akpa",
+                                                "name":  "Clement Akpa",
+                                                "position":  "Defender"
+                                            },
+                                            {
+                                                "id":  "official-player-team-civ-odilon-kossonou",
+                                                "name":  "Odilon Kossonou",
+                                                "position":  "Defender"
+                                            }
+                                        ]
+                  },
+                  {
+                      "id":  "team-jpn",
+                      "code":  "JPN",
+                      "name":  "Japan",
+                      "group":  "F",
+                      "lockedOfficialSquad":  true,
+                      "playerCount":  26,
+                      "withImages":  24,
+                      "missingImagesCount":  2,
+                      "status":  "OK_26_PLAYERS",
+                      "missingImages":  [
+                                            {
+                                                "id":  "official-player-team-jpn-shuto-machino",
+                                                "name":  "Shuto Machino",
+                                                "position":  "Forward"
+                                            },
+                                            {
+                                                "id":  "official-player-team-jpn-kento-shoigai",
+                                                "name":  "Kento Shoigai",
+                                                "position":  "Midfielder"
+                                            }
+                                        ]
+                  },
+                  {
+                      "id":  "team-ned",
+                      "code":  "NED",
+                      "name":  "Netherlands",
+                      "group":  "F",
+                      "lockedOfficialSquad":  true,
+                      "playerCount":  26,
+                      "withImages":  26,
+                      "missingImagesCount":  0,
+                      "status":  "OK_26_PLAYERS",
+                      "missingImages":  [
+
+                                        ]
+                  },
+                  {
+                      "id":  "team-swe",
+                      "code":  "SWE",
+                      "name":  "Sweden",
+                      "group":  "F",
+                      "lockedOfficialSquad":  true,
+                      "playerCount":  26,
+                      "withImages":  26,
+                      "missingImagesCount":  0,
+                      "status":  "OK_26_PLAYERS",
+                      "missingImages":  [
+
+                                        ]
+                  },
+                  {
+                      "id":  "team-tun",
+                      "code":  "TUN",
+                      "name":  "Tunisia",
+                      "group":  "F",
+                      "lockedOfficialSquad":  true,
+                      "playerCount":  26,
+                      "withImages":  21,
+                      "missingImagesCount":  5,
+                      "status":  "OK_26_PLAYERS",
+                      "missingImages":  [
+                                            {
+                                                "id":  "official-player-team-tun-mohamed-amine-ben-hamida",
+                                                "name":  "Mohamed Amine Ben Hamida",
+                                                "position":  "Defender"
+                                            },
+                                            {
+                                                "id":  "official-player-team-tun-abdelmouhib-chamakh",
+                                                "name":  "Abdelmouhib Chamakh",
+                                                "position":  "Goalkeeper"
+                                            },
+                                            {
+                                                "id":  "official-player-team-tun-aymen-dahman",
+                                                "name":  "Aymen Dahman",
+                                                "position":  "Goalkeeper"
+                                            },
+                                            {
+                                                "id":  "official-player-team-tun-sabri-ben-hessen",
+                                                "name":  "Sabri Ben Hessen",
+                                                "position":  "Goalkeeper"
+                                            },
+                                            {
+                                                "id":  "official-player-team-tun-mohamed-hadj-mahmoud",
+                                                "name":  "Mohamed Hadj Mahmoud",
+                                                "position":  "Midfielder"
+                                            }
+                                        ]
+                  },
+                  {
+                      "id":  "team-bel",
+                      "code":  "BEL",
+                      "name":  "Belgium",
+                      "group":  "G",
+                      "lockedOfficialSquad":  true,
+                      "playerCount":  26,
+                      "withImages":  26,
+                      "missingImagesCount":  0,
+                      "status":  "OK_26_PLAYERS",
+                      "missingImages":  [
+
+                                        ]
+                  },
+                  {
+                      "id":  "team-egy",
+                      "code":  "EGY",
+                      "name":  "Egypt",
+                      "group":  "G",
+                      "lockedOfficialSquad":  true,
+                      "playerCount":  26,
+                      "withImages":  22,
+                      "missingImagesCount":  4,
+                      "status":  "OK_26_PLAYERS",
+                      "missingImages":  [
+                                            {
+                                                "id":  "official-player-team-egy-hamza-abdel-karim",
+                                                "name":  "Hamza Abdel Karim",
+                                                "position":  "Forward"
+                                            },
+                                            {
+                                                "id":  "official-player-team-egy-mahmoud-hassan-trezeguet",
+                                                "name":  "Mahmoud Hassan Trezeguet",
+                                                "position":  "Midfielder"
+                                            },
+                                            {
+                                                "id":  "official-player-team-egy-mostafa-abdel-raouf",
+                                                "name":  "Mostafa Abdel Raouf",
+                                                "position":  "Midfielder"
+                                            },
+                                            {
+                                                "id":  "official-player-team-egy-nabil-emad",
+                                                "name":  "Nabil Emad",
+                                                "position":  "Midfielder"
+                                            }
+                                        ]
+                  },
+                  {
+                      "id":  "team-irn",
+                      "code":  "IRN",
+                      "name":  "Iran",
+                      "group":  "G",
+                      "lockedOfficialSquad":  true,
+                      "playerCount":  26,
+                      "withImages":  22,
+                      "missingImagesCount":  4,
+                      "status":  "OK_26_PLAYERS",
+                      "missingImages":  [
+                                            {
+                                                "id":  "official-player-team-irn-ehsan-hajsafi",
+                                                "name":  "Ehsan Hajsafi",
+                                                "position":  "Defender"
+                                            },
+                                            {
+                                                "id":  "official-player-team-irn-hossein-kanaani",
+                                                "name":  "Hossein Kanaani",
+                                                "position":  "Defender"
+                                            },
+                                            {
+                                                "id":  "official-player-team-irn-dennis-dargahi",
+                                                "name":  "Dennis Dargahi",
+                                                "position":  "Forward"
+                                            },
+                                            {
+                                                "id":  "official-player-team-irn-seyed-hossein-hosseini",
+                                                "name":  "Seyed Hossein Hosseini",
+                                                "position":  "Goalkeeper"
+                                            }
+                                        ]
+                  },
+                  {
+                      "id":  "team-nzl",
+                      "code":  "NZL",
+                      "name":  "New Zealand",
+                      "group":  "G",
+                      "lockedOfficialSquad":  true,
+                      "playerCount":  26,
+                      "withImages":  26,
+                      "missingImagesCount":  0,
+                      "status":  "OK_26_PLAYERS",
+                      "missingImages":  [
+
+                                        ]
+                  },
+                  {
+                      "id":  "team-cpv",
+                      "code":  "CPV",
+                      "name":  "Cape Verde",
+                      "group":  "H",
+                      "lockedOfficialSquad":  true,
+                      "playerCount":  26,
+                      "withImages":  24,
+                      "missingImagesCount":  2,
+                      "status":  "OK_26_PLAYERS",
+                      "missingImages":  [
+                                            {
+                                                "id":  "official-player-team-cpv-roberto-lopes",
+                                                "name":  "Roberto Lopes",
+                                                "position":  "Defender"
+                                            },
+                                            {
+                                                "id":  "official-player-team-cpv-joao-paulo-fernandes",
+                                                "name":  "Joao Paulo Fernandes",
+                                                "position":  "Midfielder"
+                                            }
+                                        ]
+                  },
+                  {
+                      "id":  "team-ksa",
+                      "code":  "KSA",
+                      "name":  "Saudi Arabia",
+                      "group":  "H",
+                      "lockedOfficialSquad":  true,
+                      "playerCount":  26,
+                      "withImages":  25,
+                      "missingImagesCount":  1,
+                      "status":  "OK_26_PLAYERS",
+                      "missingImages":  [
+                                            {
+                                                "id":  "official-player-team-ksa-alaa-al-hejji",
+                                                "name":  "Alaa Al Hejji",
+                                                "position":  "Midfielder"
+                                            }
+                                        ]
+                  },
+                  {
+                      "id":  "team-esp",
+                      "code":  "ESP",
+                      "name":  "Spain",
+                      "group":  "H",
+                      "lockedOfficialSquad":  true,
+                      "playerCount":  26,
+                      "withImages":  25,
+                      "missingImagesCount":  1,
+                      "status":  "OK_26_PLAYERS",
+                      "missingImages":  [
+                                            {
+                                                "id":  "official-player-team-esp-pau-cubarsi",
+                                                "name":  "Pau Cubarsi",
+                                                "position":  "Defender"
+                                            }
+                                        ]
+                  },
+                  {
+                      "id":  "team-ury",
+                      "code":  "URU",
+                      "name":  "Uruguay",
+                      "group":  "H",
+                      "lockedOfficialSquad":  true,
+                      "playerCount":  26,
+                      "withImages":  26,
+                      "missingImagesCount":  0,
+                      "status":  "OK_26_PLAYERS",
+                      "missingImages":  [
+
+                                        ]
+                  },
+                  {
+                      "id":  "team-fra",
+                      "code":  "FRA",
+                      "name":  "France",
+                      "group":  "I",
+                      "lockedOfficialSquad":  true,
+                      "playerCount":  26,
+                      "withImages":  26,
+                      "missingImagesCount":  0,
+                      "status":  "OK_26_PLAYERS",
+                      "missingImages":  [
+
+                                        ]
+                  },
+                  {
+                      "id":  "team-irq",
+                      "code":  "IRQ",
+                      "name":  "Iraq",
+                      "group":  "I",
+                      "lockedOfficialSquad":  true,
+                      "playerCount":  26,
+                      "withImages":  18,
+                      "missingImagesCount":  8,
+                      "status":  "OK_26_PLAYERS",
+                      "missingImages":  [
+                                            {
+                                                "id":  "official-player-team-irq-ahmed-hassan-makenzie",
+                                                "name":  "Ahmed Hassan Makenzie",
+                                                "position":  "Defender"
+                                            },
+                                            {
+                                                "id":  "official-player-team-irq-akam-hashem",
+                                                "name":  "Akam Hashem",
+                                                "position":  "Defender"
+                                            },
+                                            {
+                                                "id":  "official-player-team-irq-zaid-ismail",
+                                                "name":  "Zaid Ismail",
+                                                "position":  "Defender"
+                                            },
+                                            {
+                                                "id":  "official-player-team-irq-ali-jassim",
+                                                "name":  "Ali Jassim",
+                                                "position":  "Forward"
+                                            },
+                                            {
+                                                "id":  "official-player-team-irq-ali-yousef",
+                                                "name":  "Ali Yousef",
+                                                "position":  "Forward"
+                                            },
+                                            {
+                                                "id":  "official-player-team-irq-mohanad-ali",
+                                                "name":  "Mohanad Ali",
+                                                "position":  "Forward"
+                                            },
+                                            {
+                                                "id":  "official-player-team-irq-jalal-hassan",
+                                                "name":  "Jalal Hassan",
+                                                "position":  "Goalkeeper"
+                                            },
+                                            {
+                                                "id":  "official-player-team-irq-ahmed-qasim",
+                                                "name":  "Ahmed Qasim",
+                                                "position":  "Midfielder"
+                                            }
+                                        ]
+                  },
+                  {
+                      "id":  "team-nor",
+                      "code":  "NOR",
+                      "name":  "Norway",
+                      "group":  "I",
+                      "lockedOfficialSquad":  true,
+                      "playerCount":  26,
+                      "withImages":  21,
+                      "missingImagesCount":  5,
+                      "status":  "OK_26_PLAYERS",
+                      "missingImages":  [
+                                            {
+                                                "id":  "official-player-team-nor-fredrik-bjorkan",
+                                                "name":  "Fredrik Bjorkan",
+                                                "position":  "Defender"
+                                            },
+                                            {
+                                                "id":  "official-player-team-nor-leo-skiri-ostigard",
+                                                "name":  "Leo Skiri Ostigard",
+                                                "position":  "Defender"
+                                            },
+                                            {
+                                                "id":  "official-player-team-nor-alexander-sorloth",
+                                                "name":  "Alexander Sorloth",
+                                                "position":  "Forward"
+                                            },
+                                            {
+                                                "id":  "official-player-team-nor-orjan-haskjold-nyland",
+                                                "name":  "Orjan Haskjold Nyland",
+                                                "position":  "Goalkeeper"
+                                            },
+                                            {
+                                                "id":  "official-player-team-nor-martin-odegaard",
+                                                "name":  "Martin Odegaard",
+                                                "position":  "Midfielder"
+                                            }
+                                        ]
+                  },
+                  {
+                      "id":  "team-sen",
+                      "code":  "SEN",
+                      "name":  "Senegal",
+                      "group":  "I",
+                      "lockedOfficialSquad":  true,
+                      "playerCount":  26,
+                      "withImages":  26,
+                      "missingImagesCount":  0,
+                      "status":  "OK_26_PLAYERS",
+                      "missingImages":  [
+
+                                        ]
+                  },
+                  {
+                      "id":  "team-alg",
+                      "code":  "ALG",
+                      "name":  "Algeria",
+                      "group":  "J",
+                      "lockedOfficialSquad":  true,
+                      "playerCount":  26,
+                      "withImages":  24,
+                      "missingImagesCount":  2,
+                      "status":  "OK_26_PLAYERS",
+                      "missingImages":  [
+                                            {
+                                                "id":  "official-player-team-alg-nadir-benbouali",
+                                                "name":  "Nadir Benbouali",
+                                                "position":  "Forward"
+                                            },
+                                            {
+                                                "id":  "official-player-team-alg-melvin-masstil",
+                                                "name":  "Melvin Masstil",
+                                                "position":  "Goalkeeper"
+                                            }
+                                        ]
+                  },
+                  {
+                      "id":  "team-arg",
+                      "code":  "ARG",
+                      "name":  "Argentina",
+                      "group":  "J",
+                      "lockedOfficialSquad":  true,
+                      "playerCount":  26,
+                      "withImages":  25,
+                      "missingImagesCount":  1,
+                      "status":  "OK_26_PLAYERS",
+                      "missingImages":  [
+                                            {
+                                                "id":  "official-player-team-arg-marcos-senesi",
+                                                "name":  "Marcos Senesi",
+                                                "position":  "Defender"
+                                            }
+                                        ]
+                  },
+                  {
+                      "id":  "team-aut",
+                      "code":  "AUT",
+                      "name":  "Austria",
+                      "group":  "J",
+                      "lockedOfficialSquad":  true,
+                      "playerCount":  26,
+                      "withImages":  25,
+                      "missingImagesCount":  1,
+                      "status":  "OK_26_PLAYERS",
+                      "missingImages":  [
+                                            {
+                                                "id":  "official-player-team-aut-dejan-ljubicic",
+                                                "name":  "Dejan Ljubicic",
+                                                "position":  "Midfielder"
+                                            }
+                                        ]
+                  },
+                  {
+                      "id":  "team-jor",
+                      "code":  "JOR",
+                      "name":  "Jordan",
+                      "group":  "J",
+                      "lockedOfficialSquad":  true,
+                      "playerCount":  26,
+                      "withImages":  20,
+                      "missingImagesCount":  6,
+                      "status":  "OK_26_PLAYERS",
+                      "missingImages":  [
+                                            {
+                                                "id":  "official-player-team-jor-abdullah-nasib",
+                                                "name":  "Abdullah Nasib",
+                                                "position":  "Defender"
+                                            },
+                                            {
+                                                "id":  "official-player-team-jor-anas-bani",
+                                                "name":  "Anas Bani",
+                                                "position":  "Defender"
+                                            },
+                                            {
+                                                "id":  "official-player-team-jor-mohammad-abu-al-nadi",
+                                                "name":  "Mohammad Abu Al-Nadi",
+                                                "position":  "Defender"
+                                            },
+                                            {
+                                                "id":  "official-player-team-jor-mohammad-abu-zraiq",
+                                                "name":  "Mohammad Abu Zraiq",
+                                                "position":  "Forward"
+                                            },
+                                            {
+                                                "id":  "official-player-team-jor-noor-bani-attieh",
+                                                "name":  "Noor Bani Attieh",
+                                                "position":  "Goalkeeper"
+                                            },
+                                            {
+                                                "id":  "official-player-team-jor-yazeed-abu-laila",
+                                                "name":  "Yazeed Abu Laila",
+                                                "position":  "Goalkeeper"
+                                            }
+                                        ]
+                  },
+                  {
+                      "id":  "team-col",
+                      "code":  "COL",
+                      "name":  "Colombia",
+                      "group":  "K",
+                      "lockedOfficialSquad":  true,
+                      "playerCount":  26,
+                      "withImages":  24,
+                      "missingImagesCount":  2,
+                      "status":  "OK_26_PLAYERS",
+                      "missingImages":  [
+                                            {
+                                                "id":  "official-player-team-col-carlos-andres-gomez",
+                                                "name":  "Carlos Andres Gomez",
+                                                "position":  "Forward"
+                                            },
+                                            {
+                                                "id":  "official-player-team-col-juan-camilo-hernandez",
+                                                "name":  "Juan Camilo Hernandez",
+                                                "position":  "Forward"
+                                            }
+                                        ]
+                  },
+                  {
+                      "id":  "team-cod",
+                      "code":  "COD",
+                      "name":  "DR Congo",
+                      "group":  "K",
+                      "lockedOfficialSquad":  true,
+                      "playerCount":  26,
+                      "withImages":  25,
+                      "missingImagesCount":  1,
+                      "status":  "OK_26_PLAYERS",
+                      "missingImages":  [
+                                            {
+                                                "id":  "official-player-team-cod-rocky-bushiri",
+                                                "name":  "Rocky Bushiri",
+                                                "position":  "Defender"
+                                            }
+                                        ]
+                  },
+                  {
+                      "id":  "team-por",
+                      "code":  "POR",
+                      "name":  "Portugal",
+                      "group":  "K",
+                      "lockedOfficialSquad":  true,
+                      "playerCount":  26,
+                      "withImages":  25,
+                      "missingImagesCount":  1,
+                      "status":  "OK_26_PLAYERS",
+                      "missingImages":  [
+                                            {
+                                                "id":  "official-player-team-por-francisco-trincao",
+                                                "name":  "Francisco Trincao",
+                                                "position":  "Forward"
+                                            }
+                                        ]
+                  },
+                  {
+                      "id":  "team-uzb",
+                      "code":  "UZB",
+                      "name":  "Uzbekistan",
+                      "group":  "K",
+                      "lockedOfficialSquad":  true,
+                      "playerCount":  26,
+                      "withImages":  23,
+                      "missingImagesCount":  3,
+                      "status":  "OK_26_PLAYERS",
+                      "missingImages":  [
+                                            {
+                                                "id":  "official-player-team-uzb-sherzod-nasrullaev",
+                                                "name":  "Sherzod Nasrullaev",
+                                                "position":  "Defender"
+                                            },
+                                            {
+                                                "id":  "official-player-team-uzb-azizjon-ganiev",
+                                                "name":  "Azizjon Ganiev",
+                                                "position":  "Midfielder"
+                                            },
+                                            {
+                                                "id":  "official-player-team-uzb-oston-urunov",
+                                                "name":  "Oston Urunov",
+                                                "position":  "Midfielder"
+                                            }
+                                        ]
+                  },
+                  {
+                      "id":  "team-cro",
+                      "code":  "CRO",
+                      "name":  "Croatia",
+                      "group":  "L",
+                      "lockedOfficialSquad":  true,
+                      "playerCount":  26,
+                      "withImages":  26,
+                      "missingImagesCount":  0,
+                      "status":  "OK_26_PLAYERS",
+                      "missingImages":  [
+
+                                        ]
+                  },
+                  {
+                      "id":  "team-eng",
+                      "code":  "ENG",
+                      "name":  "England",
+                      "group":  "L",
+                      "lockedOfficialSquad":  true,
+                      "playerCount":  26,
+                      "withImages":  26,
+                      "missingImagesCount":  0,
+                      "status":  "OK_26_PLAYERS",
+                      "missingImages":  [
+
+                                        ]
+                  },
+                  {
+                      "id":  "team-gha",
+                      "code":  "GHA",
+                      "name":  "Ghana",
+                      "group":  "L",
+                      "lockedOfficialSquad":  true,
+                      "playerCount":  26,
+                      "withImages":  23,
+                      "missingImagesCount":  3,
+                      "status":  "OK_26_PLAYERS",
+                      "missingImages":  [
+                                            {
+                                                "id":  "official-player-team-gha-baba-abdul-rahman",
+                                                "name":  "Baba Abdul Rahman",
+                                                "position":  "Defender"
+                                            },
+                                            {
+                                                "id":  "official-player-team-gha-kojo-oppong-preprah",
+                                                "name":  "Kojo Oppong Preprah",
+                                                "position":  "Defender"
+                                            },
+                                            {
+                                                "id":  "official-player-team-gha-abdul-fatawu-issahaku",
+                                                "name":  "Abdul Fatawu Issahaku",
+                                                "position":  "Midfielder"
+                                            }
+                                        ]
+                  },
+                  {
+                      "id":  "team-pan",
+                      "code":  "PAN",
+                      "name":  "Panama",
+                      "group":  "L",
+                      "lockedOfficialSquad":  true,
+                      "playerCount":  26,
+                      "withImages":  26,
+                      "missingImagesCount":  0,
+                      "status":  "OK_26_PLAYERS",
+                      "missingImages":  [
+
+                                        ]
+                  }
+              ]
+}
