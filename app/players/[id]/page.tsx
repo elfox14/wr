@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ArrowRight, Building2, CalendarDays, Shield, Target, Trophy, User } from 'lucide-react';
@@ -57,7 +58,7 @@ function teamName(team?: { name?: string | null; code?: string | null } | null) 
   return team?.name || team?.code || 'غير متوفر';
 }
 
-function InfoCard({ title, value, icon }: { title: string; value: string | number | null | undefined; icon: React.ReactNode }) {
+function InfoCard({ title, value, icon }: { title: string; value: string | number | null | undefined; icon: ReactNode }) {
   return (
     <div className="rounded-2xl border border-white/10 bg-white/[0.035] p-4">
       <div className="mb-2 flex items-center gap-2 text-[11px] font-black text-gray-500">{icon}{title}</div>
