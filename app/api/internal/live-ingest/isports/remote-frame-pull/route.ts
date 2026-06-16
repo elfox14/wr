@@ -117,13 +117,22 @@ function unescapeHtml(value: string) {
     .trim();
 }
 
+function attrValue(attrs: string, name: string) {
+  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const doubleQuoted = attrs.match(new RegExp(`\\b${escaped}\\s*=\\s*"([^"]*)"`, 'i'));
+  if (doubleQuoted?.[1] !== undefined) return unescapeHtml(doubleQuoted[1]);
+  const singleQuoted = attrs.match(new RegExp(`\\b${escaped}\\s*=\\s*'([^']*)'`, 'i'));
+  if (singleQuoted?.[1] !== undefined) return unescapeHtml(singleQuoted[1]);
+  return null;
+}
+
 function timelineType(title: string, cssClass?: string | null) {
   const lower = `${title} ${cssClass || ''}`.toLowerCase().replace(/\s+/g, ' ');
-  if (lower.includes('goal') || /\bb\b/.test(lower)) return 'goal';
-  if (lower.includes('corner') || /\bf\b/.test(lower)) return 'corner';
-  if (lower.includes('yellow')) return 'yellow_card';
-  if (lower.includes('red')) return 'red_card';
-  if (lower.includes('substitution') || /\bc\b/.test(lower)) return 'substitution';
+  if (lower.includes('yellow') || /(^|\s)yc(\s|$)/.test(lower)) return 'yellow_card';
+  if (lower.includes('red') || /(^|\s)rc(\s|$)/.test(lower)) return 'red_card';
+  if (lower.includes('goal') || /(^|\s)b(\s|$)/.test(lower)) return 'goal';
+  if (lower.includes('corner') || /(^|\s)f(\s|$)/.test(lower)) return 'corner';
+  if (lower.includes('substitution') || /(^|\s)c(\s|$)/.test(lower)) return 'substitution';
   return 'timeline_event';
 }
 
@@ -155,12 +164,12 @@ function sideForIcon(html: string, index: number): 'home' | 'away' | null {
 
 function extractTimelineEvents(html: string, match?: any): TimelineEvent[] {
   const events = new Map<string, TimelineEvent>();
-  const iconRegex = /<i\b([^>]*\btitle\s*=\s*["']([^"']+)["'][^>]*)>/gi;
+  const iconRegex = /<i\b([^>]*)>/gi;
   for (const item of html.matchAll(iconRegex)) {
     const attrs = item[1] || '';
-    const title = unescapeHtml(item[2] || '');
+    const title = attrValue(attrs, 'title');
     if (!title) continue;
-    const cssClass = unescapeHtml(attrs.match(/\bclass\s*=\s*["']([^"']+)["']/i)?.[1] || '') || null;
+    const cssClass = attrValue(attrs, 'class') || null;
     const side = sideForIcon(html, item.index || 0);
     const { minute, displayMinute } = parseMinute(title);
     const type = timelineType(title, cssClass);
