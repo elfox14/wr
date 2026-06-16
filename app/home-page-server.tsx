@@ -4,58 +4,9 @@ import prisma from '@/lib/prisma';
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-const GROUP_STAGE_MAX_LIVE_MINUTES = 115;
-const KNOCKOUT_MAX_LIVE_MINUTES = 150;
+const LIVE_STATUSES = ['LIVE', 'IN_PLAY', 'HT'];
 const SCHEDULED_STATUSES = ['SCHEDULED', 'TIMED', 'NOT_STARTED', 'NS'];
-const FINISHED_STATUSES = ['FINISHED', 'FT', 'AET', 'PEN'];
-
-function normalizeStatus(value?: string | null) {
-  return String(value || '').toUpperCase();
-}
-
-function isGroupStage(match: any) {
-  const value = String(match?.groupPhase || match?.group || match?.stage || '').toUpperCase();
-  return value.includes('GROUP');
-}
-
-function maxLiveMinutes(match: any) {
-  return isGroupStage(match) ? GROUP_STAGE_MAX_LIVE_MINUTES : KNOCKOUT_MAX_LIVE_MINUTES;
-}
-
-function minutesFromKickoff(match: any, now: Date) {
-  const matchTime = new Date(match?.matchDate).getTime();
-  if (!Number.isFinite(matchTime)) return null;
-  return Math.floor((now.getTime() - matchTime) / 60_000) + 1;
-}
-
-function decorateInitialMatch(match: any, now: Date) {
-  const status = normalizeStatus(match?.status);
-  if (FINISHED_STATUSES.includes(status)) return match;
-  if (!SCHEDULED_STATUSES.includes(status)) return match;
-
-  const minute = minutesFromKickoff(match, now);
-  if (minute === null || minute < 1) return match;
-  if (minute >= maxLiveMinutes(match)) {
-    return {
-      ...match,
-      status: 'FINISHED',
-      displayStatus: 'FINISHED',
-      isLiveNow: false,
-      isLikelyLiveByTime: false,
-      isStaleAutoFinished: true,
-    };
-  }
-
-  const safeMinute = Math.max(1, Math.min(130, minute));
-  return {
-    ...match,
-    displayStatus: 'IN_PLAY',
-    isLiveNow: true,
-    isLikelyLiveByTime: true,
-    minute: safeMinute,
-    liveLabel: `الدقيقة ${safeMinute}`,
-  };
-}
+const ACTIVE_HOME_STATUSES = [...SCHEDULED_STATUSES, ...LIVE_STATUSES];
 
 export default async function Home() {
   const now = new Date();
@@ -78,19 +29,20 @@ export default async function Home() {
       totalUpcomingMatches,
       upcomingMatchesRaw,
       tickerMatchesRaw,
+      liveMatchRaw,
       nextMatchRaw
     ] = await Promise.all([
       prisma.asset.count({ where: { type: 'PLAYER' } }),
       prisma.asset.count({ where: { type: 'TEAM' } }),
       prisma.match.count({
         where: {
-          status: { in: ['SCHEDULED', 'IN_PLAY', 'LIVE', 'HT'] },
+          status: { in: ACTIVE_HOME_STATUSES },
           matchDate: { gte: liveWindowStart, lte: upcomingUntil },
         },
       }),
       prisma.match.findMany({
         where: {
-          status: { in: ['SCHEDULED', 'IN_PLAY', 'LIVE', 'HT'] },
+          status: { in: ACTIVE_HOME_STATUSES },
           matchDate: { gte: liveWindowStart, lte: upcomingUntil },
         },
         orderBy: { matchDate: 'asc' },
@@ -107,7 +59,15 @@ export default async function Home() {
       }),
       prisma.match.findFirst({
         where: {
-          status: { in: ['SCHEDULED', 'TIMED', 'NOT_STARTED', 'NS'] },
+          status: { in: LIVE_STATUSES },
+          matchDate: { gte: liveWindowStart, lte: upcomingUntil },
+        },
+        orderBy: { matchDate: 'desc' },
+        include: { homeTeam: true, awayTeam: true },
+      }),
+      prisma.match.findFirst({
+        where: {
+          status: { in: SCHEDULED_STATUSES },
           matchDate: { gte: now },
         },
         orderBy: { matchDate: 'asc' },
@@ -118,9 +78,9 @@ export default async function Home() {
     playersCount = totalPlayers;
     teamsCount = totalTeams;
     upcomingMatchesCount = totalUpcomingMatches;
-    upcomingMatches = JSON.parse(JSON.stringify(upcomingMatchesRaw.map((match) => decorateInitialMatch(match, now))));
-    tickerMatches = JSON.parse(JSON.stringify(tickerMatchesRaw.map((match) => decorateInitialMatch(match, now))));
-    nextMarqueeMatch = nextMatchRaw ? JSON.parse(JSON.stringify(decorateInitialMatch(nextMatchRaw, now))) : null;
+    upcomingMatches = JSON.parse(JSON.stringify(upcomingMatchesRaw));
+    tickerMatches = JSON.parse(JSON.stringify(tickerMatchesRaw));
+    nextMarqueeMatch = liveMatchRaw || nextMatchRaw ? JSON.parse(JSON.stringify(liveMatchRaw || nextMatchRaw)) : null;
   } catch (error) {
     console.error('Error fetching dashboard data:', error);
     upcomingMatches = [];
