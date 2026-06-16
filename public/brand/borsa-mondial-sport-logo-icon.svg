@@ -1,0 +1,87 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
+<title id="title">بورصة المونديال - أيقونة رياضية</title>
+<desc id="desc">شعار رياضي لمنصة بورصة المونديال يجمع كرة القدم والكأس وخط صعود افتراضي مع روح MC PRIME الهندسية.</desc>
+<defs>
+  <radialGradient id="bg" cx="50%" cy="42%" r="62%">
+    <stop offset="0%" stop-color="#143D52"/>
+    <stop offset="48%" stop-color="#081625"/>
+    <stop offset="100%" stop-color="#020712"/>
+  </radialGradient>
+  <linearGradient id="cyan" x1="0%" y1="0%" x2="100%" y2="100%">
+    <stop offset="0%" stop-color="#70F7FF"/>
+    <stop offset="45%" stop-color="#0FF0FC"/>
+    <stop offset="100%" stop-color="#0A8ED6"/>
+  </linearGradient>
+  <linearGradient id="gold" x1="0%" y1="0%" x2="100%" y2="100%">
+    <stop offset="0%" stop-color="#FFF4A8"/>
+    <stop offset="50%" stop-color="#FFD700"/>
+    <stop offset="100%" stop-color="#F59E0B"/>
+  </linearGradient>
+  <linearGradient id="red" x1="0%" y1="0%" x2="100%" y2="100%">
+    <stop offset="0%" stop-color="#FF7A7A"/>
+    <stop offset="100%" stop-color="#EF233C"/>
+  </linearGradient>
+  <filter id="glow" x="-35%" y="-35%" width="170%" height="170%">
+    <feGaussianBlur stdDeviation="10" result="blur"/>
+    <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+  </filter>
+  <filter id="softShadow" x="-40%" y="-40%" width="180%" height="180%">
+    <feDropShadow dx="0" dy="24" stdDeviation="28" flood-color="#000" flood-opacity="0.55"/>
+  </filter>
+</defs>
+
+<circle cx="512" cy="512" r="452" fill="url(#bg)" filter="url(#softShadow)"/>
+<circle cx="512" cy="512" r="452" fill="none" stroke="rgba(255,255,255,.10)" stroke-width="14"/>
+<path d="M166 356 A382 382 0 0 1 378 158" fill="none" stroke="url(#cyan)" stroke-width="44" stroke-linecap="round"/>
+<path d="M646 158 A382 382 0 0 1 858 356" fill="none" stroke="url(#cyan)" stroke-width="44" stroke-linecap="round"/>
+<path d="M858 668 A382 382 0 0 1 646 866" fill="none" stroke="url(#gold)" stroke-width="44" stroke-linecap="round"/>
+<path d="M378 866 A382 382 0 0 1 166 668" fill="none" stroke="url(#gold)" stroke-width="44" stroke-linecap="round"/>
+
+<!-- MC PRIME inspired split arrows -->
+<g opacity="0.95">
+  <path d="M504 132 L504 328 L344 328 Z" fill="url(#cyan)" opacity=".42"/>
+  <path d="M520 132 L680 328 L520 328 Z" fill="url(#cyan)" opacity=".42"/>
+  <path d="M504 892 L344 696 L504 696 Z" fill="url(#gold)" opacity=".42"/>
+  <path d="M520 892 L520 696 L680 696 Z" fill="url(#gold)" opacity=".42"/>
+</g>
+
+<!-- pitch lines -->
+<g opacity=".22" fill="none" stroke="#E9F7FF" stroke-width="7">
+  <rect x="235" y="292" width="554" height="440" rx="55"/>
+  <line x1="512" y1="292" x2="512" y2="732"/>
+  <circle cx="512" cy="512" r="78"/>
+</g>
+
+<!-- trophy -->
+<g transform="translate(0 28)" filter="url(#glow)">
+  <path d="M389 474 C390 418 435 382 512 382 C589 382 634 418 635 474 L624 590 C618 657 569 694 512 694 C455 694 406 657 400 590 Z" fill="url(#gold)" stroke="#FFF4A8" stroke-width="10"/>
+  <path d="M399 478 C328 474 301 438 306 394 C313 337 377 345 397 386" fill="none" stroke="url(#gold)" stroke-width="34" stroke-linecap="round"/>
+  <path d="M625 478 C696 474 723 438 718 394 C711 337 647 345 627 386" fill="none" stroke="url(#gold)" stroke-width="34" stroke-linecap="round"/>
+  <rect x="474" y="690" width="76" height="82" rx="20" fill="url(#gold)"/>
+  <rect x="391" y="758" width="242" height="58" rx="26" fill="url(#gold)"/>
+</g>
+
+<!-- football -->
+<g transform="translate(512 413)" filter="url(#softShadow)">
+  <circle r="126" fill="#F7FAFC" stroke="#07111F" stroke-width="12"/>
+  <path d="M0-49 L47-15 L29 43 L-29 43 L-47-15 Z" fill="#07111F"/>
+  <path d="M0-126 L0-49 M47-15 L113-37 M29 43 L72 101 M-29 43 L-72 101 M-47-15 L-113-37" stroke="#07111F" stroke-width="15" stroke-linecap="round" fill="none"/>
+  <path d="M-118 24 C-72 4 -45 -18 -33 -75 M118 24 C72 4 45 -18 33 -75" stroke="#07111F" stroke-width="12" fill="none" opacity=".55"/>
+</g>
+
+<!-- market momentum line -->
+<g filter="url(#glow)">
+  <path d="M238 665 L356 607 L451 635 L572 544 L678 564 L785 439" fill="none" stroke="url(#cyan)" stroke-width="28" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M745 434 L789 434 L789 478" fill="none" stroke="url(#cyan)" stroke-width="28" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="238" cy="665" r="18" fill="url(#gold)"/>
+  <circle cx="451" cy="635" r="18" fill="url(#gold)"/>
+  <circle cx="678" cy="564" r="18" fill="url(#gold)"/>
+</g>
+
+<g opacity=".95">
+  <rect x="286" y="714" width="34" height="92" rx="12" fill="url(#red)"/>
+  <rect x="350" y="674" width="34" height="132" rx="12" fill="url(#gold)"/>
+  <rect x="414" y="702" width="34" height="104" rx="12" fill="url(#cyan)"/>
+  <rect x="478" y="626" width="34" height="180" rx="12" fill="url(#gold)"/>
+</g>
+</svg>
