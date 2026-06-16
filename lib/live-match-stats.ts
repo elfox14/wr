@@ -240,8 +240,15 @@ export function normalizeStats(payload: any): NormalizedStats {
   return stats;
 }
 
+const LIVE_STAT_FIELDS: (keyof NormalizedStats)[] = [
+  'homePossession', 'awayPossession', 'homeAttacks', 'awayAttacks',
+  'homeDangerousAttacks', 'awayDangerousAttacks', 'homeShots', 'awayShots',
+  'homeShotsOnTarget', 'awayShotsOnTarget', 'homeShotsOffTarget', 'awayShotsOffTarget',
+  'homeCorners', 'awayCorners', 'homeYellowCards', 'awayYellowCards', 'homeRedCards', 'awayRedCards',
+];
+
 export function hasUsefulStats(stats: NormalizedStats) {
-  return Object.entries(stats).some(([key, value]) => key !== 'minute' && value !== null && value !== undefined);
+  return LIVE_STAT_FIELDS.some((key) => stats[key] !== null && stats[key] !== undefined);
 }
 
 function quoteSql(value: string) {
