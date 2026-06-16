@@ -5,7 +5,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { Menu, X } from 'lucide-react';
 
-const logoSrc = '/brand/worldcup-2026-logo-upload.svg?v=20260615a';
+const logoSrc = '/brand/borsa-mondial-sport-logo-icon.svg?v=20260616sport';
 
 const links = [
   ['/', 'الرئيسية'],
@@ -33,9 +33,13 @@ export function Navbar() {
       <nav className="fixed top-0 z-50 w-full border-b border-white/10 bg-black/90 shadow-[0_14px_34px_rgba(0,0,0,0.28)] backdrop-blur-2xl">
         <div className="mx-auto max-w-[1400px] px-3 sm:px-6 lg:px-8">
           <div className="flex min-h-[68px] items-center justify-between gap-3 lg:min-h-[84px]">
-            <Link href="/" onClick={closeMenu} className="group flex shrink-0 items-center gap-2" aria-label="MC PRIME World Cup الرئيسية">
-              <span className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-[#FFD700]/25 bg-white p-1 shadow-[0_0_20px_rgba(255,215,0,0.13)] transition group-hover:scale-[1.02] lg:h-14 lg:w-14">
-                <Image src={logoSrc} alt="World Cup 2026" width={56} height={56} className="h-full w-full object-contain" priority />
+            <Link href="/" onClick={closeMenu} className="group flex shrink-0 items-center gap-2.5" aria-label="بورصة المونديال الرئيسية">
+              <span className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-[#0FF0FC]/25 bg-[#06111f] p-1.5 shadow-[0_0_22px_rgba(15,240,252,0.16)] transition group-hover:scale-[1.02] group-hover:border-[#FFD700]/35 lg:h-14 lg:w-14">
+                <Image src={logoSrc} alt="بورصة المونديال" width={56} height={56} className="h-full w-full object-contain" priority />
+              </span>
+              <span className="hidden min-w-0 flex-col leading-none md:flex">
+                <span className="whitespace-nowrap text-base font-black text-white lg:text-lg">بورصة المونديال</span>
+                <span className="mt-1 whitespace-nowrap text-[10px] font-black tracking-[0.18em] text-[#0FF0FC] lg:text-[11px]">MC PRIME SPORTS</span>
               </span>
             </Link>
 
