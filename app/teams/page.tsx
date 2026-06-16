@@ -14,6 +14,19 @@ type Props = {
   searchParams?: TeamsSearchParams;
 };
 
+type GoalLeader = {
+  team: {
+    id: string;
+    name: string;
+    code: string | null;
+    image: string | null;
+    group?: string | null;
+  } | null;
+  goalsFor: number;
+  goalsAgainst: number;
+  played: number;
+};
+
 function firstParam(value?: string | string[]) {
   return Array.isArray(value) ? value[0] : value;
 }
@@ -26,26 +39,99 @@ function toSearchable(value?: string | null) {
   return String(value || '').toLowerCase();
 }
 
+function formatCount(value?: number | null, fallback = '٠') {
+  return typeof value === 'number' && Number.isFinite(value) ? value.toLocaleString('ar-EG') : fallback;
+}
+
+function compactTeam(team: any) {
+  if (!team) return null;
+  return { id: team.id, name: team.name, code: team.code, image: team.image, group: team.group };
+}
+
+function flagNode(team: GoalLeader['team']) {
+  const flagUrl = getTeamFlagUrl(team, 80);
+  return flagUrl ? (
+    <img src={flagUrl} alt={`علم ${team?.name || 'منتخب'}`} className="h-full w-full object-cover" loading="lazy" />
+  ) : (
+    <span className="text-sm font-black text-[#FFD700]">{team?.code || '---'}</span>
+  );
+}
+
+function GoalLeaderCard({ title, leader, valueLabel, value }: { title: string; leader?: GoalLeader | null; valueLabel: string; value?: number | null }) {
+  return (
+    <div className="rounded-3xl border border-white/10 bg-black/25 p-4">
+      <p className="text-[11px] font-black uppercase tracking-[0.16em] text-[#FFD700]">{title}</p>
+      {leader?.team ? (
+        <Link href={`/teams/${leader.team.id}`} className="mt-3 flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.04] p-3 transition hover:border-[#0FF0FC]/40 hover:bg-white/[0.07]">
+          <span className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-black/40">
+            {flagNode(leader.team)}
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-base font-black text-white">{leader.team.name}</span>
+            <span className="mt-1 block text-xs font-bold text-gray-500">{leader.team.code || 'N/A'} · {leader.team.group || 'Group N/A'}</span>
+          </span>
+          <span className="text-left">
+            <span className="block text-2xl font-black text-[#0FF0FC]">{formatCount(value)}</span>
+            <span className="text-[10px] font-bold text-gray-500">{valueLabel}</span>
+          </span>
+        </Link>
+      ) : (
+        <div className="mt-3 rounded-2xl border border-dashed border-white/10 bg-white/[0.03] p-4 text-sm font-bold text-gray-500">غير متوفر حاليًا</div>
+      )}
+    </div>
+  );
+}
+
 export default async function TeamsPage({ searchParams }: Props) {
   const resolvedSearchParams = searchParams ? await searchParams : {};
   const query = cleanParam(firstParam(resolvedSearchParams.q));
   const selectedGroup = cleanParam(firstParam(resolvedSearchParams.group));
   const selectedContinent = cleanParam(firstParam(resolvedSearchParams.continent));
 
-  const allTeams = await prisma.asset.findMany({
-    where: { type: 'TEAM' },
-    orderBy: [{ group: 'asc' }, { name: 'asc' }],
-    select: {
-      id: true,
-      name: true,
-      code: true,
-      group: true,
-      continent: true,
-      image: true,
-      fifaRank: true,
-      coach: true,
-    },
+  const [allTeams, scoredMatches] = await Promise.all([
+    prisma.asset.findMany({
+      where: { type: 'TEAM' },
+      orderBy: [{ group: 'asc' }, { name: 'asc' }],
+      select: {
+        id: true,
+        name: true,
+        code: true,
+        group: true,
+        continent: true,
+        image: true,
+        fifaRank: true,
+        coach: true,
+      },
+    }),
+    prisma.match.findMany({
+      where: { status: { in: ['FINISHED', 'FT', 'AET', 'PEN', 'IN_PLAY', 'LIVE', 'HT'] } },
+      select: {
+        homeScore: true,
+        awayScore: true,
+        homeTeam: { select: { id: true, name: true, code: true, image: true, group: true } },
+        awayTeam: { select: { id: true, name: true, code: true, image: true, group: true } },
+      },
+    }),
+  ]);
+
+  const goalLeaders = new Map<string, GoalLeader>();
+  const addTeamScore = (team: any, goalsFor: number, goalsAgainst: number) => {
+    if (!team?.id) return;
+    const current = goalLeaders.get(team.id) || { team: compactTeam(team), goalsFor: 0, goalsAgainst: 0, played: 0 };
+    current.goalsFor += Number(goalsFor || 0);
+    current.goalsAgainst += Number(goalsAgainst || 0);
+    current.played += 1;
+    goalLeaders.set(team.id, current);
+  };
+
+  scoredMatches.forEach((match) => {
+    addTeamScore(match.homeTeam, match.homeScore, match.awayScore);
+    addTeamScore(match.awayTeam, match.awayScore, match.homeScore);
   });
+
+  const playedTeams = Array.from(goalLeaders.values()).filter((item) => item.played > 0);
+  const bestScoringTeam = [...playedTeams].sort((a, b) => b.goalsFor - a.goalsFor || a.goalsAgainst - b.goalsAgainst || a.team?.name.localeCompare(b.team?.name || '', 'ar') || 0)[0] || null;
+  const bestDefensiveTeam = [...playedTeams].sort((a, b) => a.goalsAgainst - b.goalsAgainst || b.goalsFor - a.goalsFor || a.team?.name.localeCompare(b.team?.name || '', 'ar') || 0)[0] || null;
 
   const groups = Array.from(
     new Set(allTeams.map((team) => team.group).filter((value): value is string => Boolean(value))),
@@ -77,15 +163,17 @@ export default async function TeamsPage({ searchParams }: Props) {
         <p className="text-sm font-black uppercase tracking-[0.28em] text-[#0FF0FC]">World Cup Teams</p>
         <div className="mt-3 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <h1 className="text-3xl font-black md:text-5xl">دليل المنتخبات</h1>
-            <p className="mt-4 max-w-3xl leading-8 text-gray-300">
-              تصفح منتخبات كأس العالم من مكان واحد، واستخدم الفلاتر للوصول السريع حسب المجموعة أو القارة أو اسم المنتخب.
-            </p>
+            <h1 className="text-2xl font-black md:text-3xl">دليل المنتخبات</h1>
           </div>
           <div className="rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm font-bold text-gray-300">
             <span className="text-2xl font-black text-white">{teams.length}</span> منتخب ظاهر
           </div>
         </div>
+      </section>
+
+      <section className="mt-6 grid gap-4 md:grid-cols-2">
+        <GoalLeaderCard title="أفضل منتخب تسجيلًا للأهداف" leader={bestScoringTeam} value={bestScoringTeam?.goalsFor} valueLabel="هدف" />
+        <GoalLeaderCard title="أقل منتخب استقبالًا للأهداف" leader={bestDefensiveTeam} value={bestDefensiveTeam?.goalsAgainst} valueLabel="هدف عليه" />
       </section>
 
       <section className="mt-6 rounded-3xl border border-white/10 bg-black/25 p-4">
