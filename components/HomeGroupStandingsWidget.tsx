@@ -37,7 +37,6 @@ export default function HomeGroupStandingsWidget() {
         const data = await res.json();
         if (data.ok && Array.isArray(data.groups)) {
           setGroups(data.groups);
-          // Set default selected group to the first group in the list if available
           if (data.groups.length > 0) {
             setSelectedGroupKey(data.groups[0].key);
           }
@@ -54,10 +53,15 @@ export default function HomeGroupStandingsWidget() {
   const selectedGroup = groups.find((g) => g.key === selectedGroupKey);
 
   return (
-    <section className="rounded-2xl border border-white/10 bg-white/[0.04] p-4 shadow-card backdrop-blur text-white flex flex-col h-full min-h-[30rem]">
-      <div className="mb-4">
-        <p className="text-xs font-black uppercase tracking-[0.16em] text-[#FFD700]">Tournament Tables</p>
-        <h2 className="mt-1 text-base font-black text-white md:text-lg">ترتيب المجموعات</h2>
+    <section className="flex h-full min-h-[30rem] flex-col rounded-3xl border border-white/10 bg-white/[0.04] p-3 text-white shadow-[0_14px_38px_rgba(0,0,0,0.2)] backdrop-blur">
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <div>
+          <p className="text-[11px] font-black uppercase tracking-[0.16em] text-[#FFD700]">Tournament Tables</p>
+          <h2 className="mt-1 text-lg font-black text-white md:text-xl">ترتيب المجموعات</h2>
+        </div>
+        <Link href="/groups" className="rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-[11px] font-black text-white transition hover:border-[#0FF0FC]/40 hover:bg-white/[0.14]">
+          كل المجموعات
+        </Link>
       </div>
 
       {loading ? (
@@ -69,14 +73,13 @@ export default function HomeGroupStandingsWidget() {
           جدول الترتيب غير متوفر حالياً.
         </div>
       ) : (
-        <div className="flex flex-col flex-1">
-          {/* Horizontal Groups Tab Selector */}
-          <div className="flex gap-1.5 overflow-x-auto pb-3 mb-3 scrollbar-none">
+        <div className="flex min-h-0 flex-1 flex-col">
+          <div className="mb-3 flex gap-1.5 overflow-x-auto pb-2 scrollbar-none">
             {groups.map((group) => (
               <button
                 key={group.key}
                 onClick={() => setSelectedGroupKey(group.key)}
-                className={`flex-shrink-0 px-3.5 py-1.5 rounded-xl text-xs font-black transition-all ${
+                className={`flex-shrink-0 rounded-xl px-3 py-1.5 text-[11px] font-black transition-all ${
                   selectedGroupKey === group.key
                     ? 'bg-[#FFD700] text-black shadow-md shadow-[#FFD700]/10'
                     : 'bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white'
@@ -87,11 +90,10 @@ export default function HomeGroupStandingsWidget() {
             ))}
           </div>
 
-          {/* Standings Table with Animation */}
-          <div className="flex-1 overflow-x-auto">
+          <div className="min-h-0 flex-1 overflow-x-auto rounded-2xl border border-white/10 bg-black/20 px-2">
             <AnimatePresence mode="wait">
               {selectedGroup && (
-                <motion.table 
+                <motion.table
                   key={selectedGroupKey}
                   initial={{ opacity: 0, y: 5 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -100,50 +102,42 @@ export default function HomeGroupStandingsWidget() {
                   className="w-full text-right text-xs"
                 >
                   <thead>
-                    <tr className="border-b border-white/10 text-gray-400 font-bold">
-                      <th className="py-2.5 px-2 text-center w-8">#</th>
-                      <th className="py-2.5 px-2">المنتخب</th>
-                      <th className="py-2.5 px-2 text-center w-8">لعب</th>
-                      <th className="py-2.5 px-2 text-center w-8">فارق</th>
-                      <th className="py-2.5 px-2 text-center w-10">النقاط</th>
+                    <tr className="border-b border-white/10 font-bold text-gray-400">
+                      <th className="w-8 px-2 py-2 text-center">#</th>
+                      <th className="px-2 py-2">المنتخب</th>
+                      <th className="w-8 px-2 py-2 text-center">لعب</th>
+                      <th className="w-8 px-2 py-2 text-center">فارق</th>
+                      <th className="w-10 px-2 py-2 text-center">النقاط</th>
                     </tr>
                   </thead>
                   <tbody>
                     {selectedGroup.standings.map((row, index) => {
                       const flagUrl = getTeamFlagUrl({ code: row.code, name: row.team }, 40);
                       const teamId = `team-${row.code.toLowerCase()}`;
-                      
-                      // Highlight top 2 positions (World Cup qualification)
                       const isQualifying = index < 2;
 
                       return (
-                        <tr 
-                          key={row.code} 
-                          className={`border-b border-white/5 transition hover:bg-white/[0.02]`}
-                        >
-                          <td className="py-3 px-2 text-center">
+                        <tr key={row.code} className="border-b border-white/5 transition hover:bg-white/[0.02]">
+                          <td className="px-2 py-2.5 text-center">
                             <span className={`inline-flex h-5 w-5 items-center justify-center rounded-md text-[10px] font-black ${
-                              isQualifying 
-                                ? 'bg-[#00FF88]/10 text-[#00FF88] border border-[#00FF88]/20' 
+                              isQualifying
+                                ? 'border border-[#00FF88]/20 bg-[#00FF88]/10 text-[#00FF88]'
                                 : 'bg-white/5 text-gray-400'
                             }`}>
                               {index + 1}
                             </span>
                           </td>
-                          <td className="py-3 px-2 font-bold text-white">
-                            <Link 
-                              href={`/teams/${teamId}`}
-                              className="inline-flex items-center gap-2 hover:text-[#0FF0FC] transition"
-                            >
+                          <td className="px-2 py-2.5 font-bold text-white">
+                            <Link href={`/teams/${teamId}`} className="inline-flex items-center gap-2 transition hover:text-[#0FF0FC]">
                               <img src={flagUrl || undefined} alt="" className="h-4 w-5 rounded-sm object-cover" />
-                              <span className="truncate max-w-[7rem] md:max-w-[10rem]">{row.team}</span>
+                              <span className="max-w-[7rem] truncate md:max-w-[10rem]">{row.team}</span>
                             </Link>
                           </td>
-                          <td className="py-3 px-2 text-center text-gray-300 font-medium">{row.played}</td>
-                          <td className="py-3 px-2 text-center text-gray-300 font-medium font-mono">
+                          <td className="px-2 py-2.5 text-center font-medium text-gray-300">{row.played}</td>
+                          <td className="px-2 py-2.5 text-center font-mono font-medium text-gray-300">
                             {row.goalDifference > 0 ? `+${row.goalDifference}` : row.goalDifference}
                           </td>
-                          <td className="py-3 px-2 text-center text-[#FFD700] font-black">{row.points}</td>
+                          <td className="px-2 py-2.5 text-center font-black text-[#FFD700]">{row.points}</td>
                         </tr>
                       );
                     })}
@@ -152,14 +146,14 @@ export default function HomeGroupStandingsWidget() {
               )}
             </AnimatePresence>
           </div>
-          
-          <div className="mt-4 pt-3 border-t border-white/5 flex items-center justify-between text-[10px] text-gray-500 font-bold">
+
+          <div className="mt-3 flex items-center justify-between border-t border-white/5 pt-2 text-[10px] font-bold text-gray-500">
             <div className="flex items-center gap-1">
               <span className="h-2 w-2 rounded-full bg-[#00FF88]" />
               <span>يتأهل المتصدر والوصيف</span>
             </div>
             <Link href="/groups" className="text-[#0FF0FC] hover:underline">
-              عرض التفاصيل الكاملة ←
+              التفاصيل ←
             </Link>
           </div>
         </div>
