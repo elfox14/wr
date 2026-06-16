@@ -1,0 +1,25 @@
+{
+  "dryRun": true,
+  "teams": [
+    {
+      "teamCode": "NED",
+      "sourceName": "Reuters World Cup 2026 squads",
+      "sourceUrl": "Reuters - World Cup 2026: list of 26-man squads at the finals",
+      "players": [
+        { "name": "Mark Flekken", "position": "Goalkeeper" },
+        { "name": "Robin Roefs", "position": "Goalkeeper" },
+        { "name": "Bart Verbruggen", "position": "Goalkeeper" }
+      ]
+    },
+    {
+      "teamCode": "NZL",
+      "sourceName": "Reuters World Cup 2026 squads",
+      "sourceUrl": "Reuters - World Cup 2026: list of 26-man squads at the finals",
+      "players": [
+        { "name": "Max Crocombe", "position": "Goalkeeper" },
+        { "name": "Alex Paulsen", "position": "Goalkeeper" },
+        { "name": "Michael Woud", "position": "Goalkeeper" }
+      ]
+    }
+  ]
+}
