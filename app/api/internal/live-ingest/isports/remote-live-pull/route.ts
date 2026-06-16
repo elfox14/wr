@@ -158,8 +158,32 @@ async function getMatch(input: { dbMatchId?: string | null; providerMatchId: num
   });
 }
 
-async function saveLiveSnapshot(match: any, providerMatchId: number, stats: NormalizedStats, rawData: any) {
-  if (!match?.id || !hasUsefulStats(stats)) return { inserted: 0, snapshotId: null, reason: 'no_useful_stats' };
+function hasUndefinedPlaceholder(text: string) {
+  const compact = String(text || '').replace(/\s+/g, ' ').toLowerCase();
+  return compact.includes('undefined attack undefined')
+    || compact.includes('undefined shots undefined')
+    || compact.includes('undefined% possession undefined%')
+    || compact.includes('no data');
+}
+
+function hasReliableLiveStats(stats: NormalizedStats, text: string) {
+  if (hasUndefinedPlaceholder(text)) return false;
+  return hasUsefulStats(stats);
+}
+
+async function cleanupLiveSnapshots(match: any) {
+  if (!match?.id) return { deleted: 0 };
+  await ensureStatsTable();
+  const result = await prisma.matchStatsSnapshot.deleteMany({ where: { matchId: match.id, provider: LIVE_SOURCE } });
+  return { deleted: result.count };
+}
+
+async function saveLiveSnapshot(match: any, providerMatchId: number, stats: NormalizedStats, rawData: any, reliable: boolean) {
+  if (!match?.id) return { inserted: 0, snapshotId: null, reason: 'no_match' };
+  if (!reliable) {
+    const cleanup = await cleanupLiveSnapshots(match);
+    return { inserted: 0, snapshotId: null, reason: 'unreliable_or_placeholder_stats', cleanup };
+  }
   await ensureStatsTable();
   const snapshot = await prisma.matchStatsSnapshot.create({
     data: {
@@ -224,7 +248,7 @@ async function handler(req: Request) {
     const rendered = await renderWithBrowserless(frameUrl, timeoutMs, waitMs);
     const text = htmlToText(rendered.html);
     const stats = parseISportsVisibleStats(text);
-    const hasStats = hasUsefulStats(stats);
+    const reliable = hasReliableLiveStats(stats, text);
     const match = (save || url.searchParams.get('includeMatch') === 'true') ? await getMatch({ dbMatchId, providerMatchId }) : null;
     const saveResult = save ? match ? await saveLiveSnapshot(match, providerMatchId, stats, {
       source: LIVE_SOURCE,
@@ -232,7 +256,8 @@ async function handler(req: Request) {
       frameUrl: maskUrl(frameUrl),
       textSample: text.slice(0, 2000),
       capturedBy: 'browserless_content',
-    }) : { inserted: 0, snapshotId: null, error: 'No local match found by dbMatchId or animationMatchId' } : null;
+      reliable,
+    }, reliable) : { inserted: 0, snapshotId: null, error: 'No local match found by dbMatchId or animationMatchId' } : null;
 
     return json({
       ok: true,
@@ -241,10 +266,15 @@ async function handler(req: Request) {
       wrapper: { sourceUrl: wrapperUrl, ok: wrapper.ok, status: wrapper.status, htmlLength: wrapper.html.length },
       frame: { sourceUrl: maskUrl(frameUrl), loader: 'browserless_content', rendered: Boolean(rendered.ok && rendered.html.trim()), htmlLength: rendered.html.length, textLength: text.length, textSample: text.slice(0, 1600) },
       match: match ? { id: match.id, status: match.status, homeTeam: match.homeTeam, awayTeam: match.awayTeam } : null,
-      hasStats,
+      hasStats: reliable,
       stats,
+      validation: {
+        hasUsefulStats: hasUsefulStats(stats),
+        reliable,
+        rejectedPlaceholder: hasUndefinedPlaceholder(text),
+      },
       save: saveResult,
-      note: save ? 'Rendered live iSports detail iframe through Browserless and saved a MatchStatsSnapshot when useful stats were found.' : 'Diagnostic only unless save=true.',
+      note: reliable ? 'Rendered live iSports detail iframe through Browserless and saved a MatchStatsSnapshot when useful stats were found.' : 'Rendered live iSports detail iframe, but rejected placeholder/undefined stats to avoid saving fake zeros.',
     });
   } catch (error: any) {
     return json({ ok: false, error: error?.message || 'Internal Server Error' }, 500);
