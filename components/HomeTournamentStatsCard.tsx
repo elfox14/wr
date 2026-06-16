@@ -9,7 +9,7 @@ type Props = {
   upcomingMatchesCount?: number;
 };
 
-type TileTone = 'default' | 'gold' | 'alert' | 'cyan';
+type TileTone = 'default' | 'gold' | 'alert' | 'cyan' | 'green';
 
 type Tile = {
   label: string;
@@ -18,6 +18,7 @@ type Tile = {
   href?: string;
   tone?: TileTone;
   loading?: boolean;
+  source?: string;
 };
 
 const STATS_REFRESH_MS = 60_000;
@@ -71,30 +72,84 @@ function shortTeamStat(team: any, statKey: string, suffix = '') {
 }
 
 function fallbackNote(base: string, isFbrefFallback: boolean) {
-  return isFbrefFallback ? `${base} · من لقطة FBref المحفوظة` : base;
+  return isFbrefFallback ? `${base} · FBref` : base;
 }
 
-function StatTile({ value, label, note, href, tone = 'default', loading = false }: Tile) {
-  const valueClass = loading
-    ? 'animate-pulse text-gray-400'
-    : tone === 'alert'
-      ? 'text-red-200'
-      : tone === 'gold'
-        ? 'text-[#FFD700]'
-        : tone === 'cyan'
-          ? 'text-[#0FF0FC]'
-          : 'text-white';
+function toneClasses(tone: TileTone) {
+  if (tone === 'alert') return { value: 'text-red-200', glow: 'from-red-400/40', border: 'hover:border-red-300/35' };
+  if (tone === 'gold') return { value: 'text-[#FFD700]', glow: 'from-[#FFD700]/45', border: 'hover:border-[#FFD700]/35' };
+  if (tone === 'cyan') return { value: 'text-[#0FF0FC]', glow: 'from-[#0FF0FC]/45', border: 'hover:border-[#0FF0FC]/35' };
+  if (tone === 'green') return { value: 'text-[#00FF88]', glow: 'from-[#00FF88]/40', border: 'hover:border-[#00FF88]/35' };
+  return { value: 'text-white', glow: 'from-white/25', border: 'hover:border-white/25' };
+}
+
+function SourceBadge({ source }: { source?: string }) {
+  if (!source) return null;
+  return <span className="rounded-full border border-white/10 bg-white/[0.055] px-2 py-0.5 text-[9px] font-black text-gray-300">{source}</span>;
+}
+
+function StatTile({ value, label, note, href, tone = 'default', loading = false, source }: Tile) {
+  const toneClass = toneClasses(tone);
+  const valueClass = loading ? 'animate-pulse text-gray-400' : toneClass.value;
 
   const content = (
-    <div className="group relative h-full overflow-hidden rounded-2xl border border-white/10 bg-black/25 p-3 transition hover:-translate-y-0.5 hover:border-[#FFD700]/35 hover:bg-white/[0.06]">
-      <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#FFD700]/45 to-transparent opacity-70" />
-      <div className={`text-xl font-black md:text-2xl ${valueClass}`}>{value}</div>
-      <div className="mt-1 text-[11px] font-black text-[#FFD700]">{label}</div>
-      <div className="mt-1 text-[10px] font-bold leading-4 text-gray-400">{note}</div>
+    <div className={`group relative h-full overflow-hidden rounded-2xl border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.055),rgba(0,0,0,0.24))] p-3.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] transition hover:-translate-y-0.5 ${toneClass.border}`}>
+      <div className={`absolute inset-x-0 top-0 h-px bg-gradient-to-r ${toneClass.glow} via-white/50 to-transparent opacity-80`} />
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <div className="text-[10px] font-black text-[#FFD700]">{label}</div>
+        <SourceBadge source={source} />
+      </div>
+      <div className={`text-2xl font-black leading-none md:text-3xl ${valueClass}`}>{value}</div>
+      <div className="mt-2 text-[10px] font-bold leading-5 text-gray-400">{note}</div>
     </div>
   );
 
   return href ? <Link href={href}>{content}</Link> : content;
+}
+
+function PenaltyStatsCard({ kickStats, loading, usingFbref }: { kickStats: any; loading: boolean; usingFbref: boolean }) {
+  const available = Boolean(kickStats?.available);
+  const total = available ? Number(kickStats?.total || 0) : null;
+  const scored = available ? Number(kickStats?.scored || 0) : null;
+  const missed = available ? Number(kickStats?.missed || 0) : null;
+  const unknown = available ? Number(kickStats?.unknown || 0) : null;
+
+  return (
+    <div className="relative overflow-hidden rounded-2xl border border-[#FFD700]/20 bg-[radial-gradient(circle_at_top_right,rgba(255,215,0,0.16),transparent_34%),linear-gradient(180deg,rgba(255,255,255,0.06),rgba(0,0,0,0.26))] p-3.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <div>
+          <div className="text-[10px] font-black text-[#FFD700]">ركلات الجزاء</div>
+          <div className="mt-1 text-[9px] font-bold text-gray-500">Penalty Tracker</div>
+        </div>
+        <SourceBadge source={usingFbref ? 'FBref' : available ? 'DB/Event' : 'No verified source'} />
+      </div>
+
+      {loading ? (
+        <div className="h-20 animate-pulse rounded-xl bg-white/[0.06]" />
+      ) : available ? (
+        <div className="grid grid-cols-3 gap-2">
+          <div className="rounded-xl border border-white/10 bg-black/25 p-2 text-center">
+            <div className="text-xl font-black text-white">{formatCount(total)}</div>
+            <div className="mt-1 text-[9px] font-bold text-gray-400">إجمالي</div>
+          </div>
+          <div className="rounded-xl border border-[#00FF88]/20 bg-[#00FF88]/10 p-2 text-center">
+            <div className="text-xl font-black text-[#00FF88]">{formatCount(scored)}</div>
+            <div className="mt-1 text-[9px] font-bold text-gray-300">مسجلة</div>
+          </div>
+          <div className="rounded-xl border border-red-300/20 bg-red-400/10 p-2 text-center">
+            <div className="text-xl font-black text-red-100">{formatCount(missed)}</div>
+            <div className="mt-1 text-[9px] font-bold text-gray-300">ضائعة</div>
+          </div>
+          {unknown ? <div className="col-span-3 text-center text-[10px] font-bold text-gray-400">غير مصنفة: {formatCount(unknown)}</div> : null}
+        </div>
+      ) : (
+        <div className="rounded-xl border border-dashed border-white/12 bg-black/20 p-3 text-center">
+          <div className="text-lg font-black text-gray-200">بانتظار توثيق</div>
+          <div className="mt-1 text-[10px] font-bold leading-5 text-gray-500">بحثنا في قاعدة البيانات ولقطة FBref المحفوظة؛ لا توجد حقول جزاءات مؤكدة حتى الآن.</div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default function HomeTournamentStatsCard({ playersCount: serverPlayersCount, teamsCount, upcomingMatchesCount }: Props) {
@@ -151,8 +206,10 @@ export default function HomeTournamentStatsCard({ playersCount: serverPlayersCou
   const scheduledMatches = pickNumber(stats?.scheduledMatches, fbrefStats?.scheduledMatches ?? upcomingMatchesCount);
   const cardTotalYellow = pickNumber(read(stats, 'yellow' + 'Cards'), read(fbrefStats, 'yellow' + 'Cards'));
   const cardTotalRed = pickNumber(read(stats, 'red' + 'Cards'), read(fbrefStats, 'red' + 'Cards'));
-  const kickStats = read(stats, 'penal' + 'ties') || read(fbrefStats, 'penal' + 'ties');
-  const kicksAvailable = Boolean(kickStats?.available);
+  const dbPenalties = read(stats, 'penal' + 'ties');
+  const fbrefPenalties = read(fbrefStats, 'penal' + 'ties');
+  const kickStats = dbPenalties?.available ? dbPenalties : fbrefPenalties?.available ? fbrefPenalties : dbPenalties || fbrefPenalties;
+  const usingFbrefPenalties = !dbPenalties?.available && Boolean(fbrefPenalties?.available);
   const biggestScore = stats?.biggestScore || fbrefStats?.biggestScore || null;
   const topScoringTeam = stats?.teamLeaders?.topScoringTeam || fbrefStats?.teamLeaders?.topScoringTeam || null;
   const bestCleanSheetTeam = stats?.teamLeaders?.bestCleanSheetTeam || fbrefStats?.teamLeaders?.bestCleanSheetTeam || null;
@@ -168,21 +225,14 @@ export default function HomeTournamentStatsCard({ playersCount: serverPlayersCou
   const usingFbrefGoals = !usefulNumber(stats?.totalGoals) && usefulNumber(fbrefStats?.totalGoals) !== null;
   const usingFbrefTeams = !stats?.teamLeaders?.topScoringTeam && Boolean(fbrefStats?.teamLeaders?.topScoringTeam);
 
-  const tiles = useMemo<Tile[]>(() => ([
-    {
-      label: 'عدد اللاعبين',
-      value: isInitialLoading ? LOADING_VALUE : formatCount(playerCount),
-      note: isInitialLoading ? loadingNote : fbrefStats?.playerCount && !stats?.playerCount ? 'من قوائم FBref المحفوظة' : 'من اللاعبين المرتبطين بالمنتخبات في قاعدة البيانات',
-      href: '/players',
-      tone: 'default',
-      loading: isInitialLoading,
-    },
+  const highlightTiles = useMemo<Tile[]>(() => ([
     {
       label: 'أهداف البطولة',
       value: isInitialLoading ? LOADING_VALUE : formatCount(totalGoals),
-      note: isInitialLoading ? loadingNote : fallbackNote(`من ${formatCount(finishedMatches)} مباراة منتهية${stats?.liveGoals ? ` · أهداف مباشرة غير نهائية: ${formatCount(stats.liveGoals)}` : ''}`, usingFbrefGoals),
+      note: isInitialLoading ? loadingNote : fallbackNote(`من ${formatCount(finishedMatches)} مباراة منتهية`, usingFbrefGoals),
       href: '/matches',
       tone: 'gold',
+      source: usingFbrefGoals ? 'FBref' : 'DB',
       loading: isInitialLoading,
     },
     {
@@ -191,54 +241,7 @@ export default function HomeTournamentStatsCard({ playersCount: serverPlayersCou
       note: isInitialLoading ? loadingNote : fallbackNote('هدف لكل مباراة منتهية فقط', usingFbrefGoals),
       href: '/matches',
       tone: 'cyan',
-      loading: isInitialLoading,
-    },
-    {
-      label: 'أكثر منتخب تسجيلًا',
-      value: isInitialLoading ? LOADING_VALUE : topScoringTeam ? formatCount(topScoringTeam.goalsFor) : 'غير متوفر',
-      note: isInitialLoading ? loadingNote : topScoringTeam ? fallbackNote(shortTeamStat(topScoringTeam, 'played', ' مباريات'), usingFbrefTeams) : 'يظهر بعد انتهاء مباريات كافية',
-      href: topScoringTeam?.id ? `/teams/${encodeURIComponent(topScoringTeam.id)}` : '/teams',
-      tone: 'gold',
-      loading: isInitialLoading,
-    },
-    {
-      label: 'شباك نظيفة',
-      value: isInitialLoading ? LOADING_VALUE : formatCount(cleanSheets),
-      note: isInitialLoading ? loadingNote : bestCleanSheetTeam ? fallbackNote(`الأبرز: ${shortTeamStat(bestCleanSheetTeam, 'cleanSheets')}`, usingFbrefTeams) : 'إجمالي الشباك النظيفة بعد المباريات',
-      href: '/matches',
-      tone: 'default',
-      loading: isInitialLoading,
-    },
-    {
-      label: 'تسديدات / على المرمى',
-      value: isInitialLoading ? LOADING_VALUE : totalShots ? `${formatCount(totalShots)} / ${formatCount(totalShotsOnTarget)}` : 'غير متوفر',
-      note: isInitialLoading ? loadingNote : matchesWithFinalSnapshots ? fallbackNote(`من ${formatCount(matchesWithFinalSnapshots)} مباراة بها إحصائيات`, usingFbrefShots) : 'تظهر بعد مزامنة إحصائيات المباراة',
-      href: '/matches',
-      tone: 'cyan',
-      loading: isInitialLoading,
-    },
-    {
-      label: 'كروت صفراء / حمراء',
-      value: isInitialLoading ? LOADING_VALUE : `${formatCount(cardTotalYellow)} / ${formatCount(cardTotalRed)}`,
-      note: isInitialLoading ? loadingNote : fallbackNote('من snapshots أو أحداث المباراة أو FBref عند عدم توفرها في قاعدة البيانات', usingFbrefCards),
-      href: '/matches',
-      tone: 'alert',
-      loading: isInitialLoading,
-    },
-    {
-      label: 'ركلات الجزاء',
-      value: isInitialLoading ? LOADING_VALUE : kicksAvailable ? formatCount(kickStats?.total) : 'غير متوفر',
-      note: isInitialLoading ? loadingNote : kicksAvailable ? `مسجلة: ${formatCount(kickStats?.scored)} · ضائعة: ${formatCount(kickStats?.missed)}` : 'غير متوفر في لقطة FBref الحالية ولا في أحداث قاعدة البيانات',
-      href: '/matches',
-      tone: 'default',
-      loading: isInitialLoading,
-    },
-    {
-      label: 'أكبر نتيجة',
-      value: isInitialLoading ? LOADING_VALUE : biggestScore ? `${formatCount(biggestScore.homeScore)}-${formatCount(biggestScore.awayScore)}` : 'غير متوفر',
-      note: isInitialLoading ? loadingNote : biggestScore ? `${teamName(biggestScore.homeTeam)} ضد ${teamName(biggestScore.awayTeam)}` : 'تظهر بعد تسجيل نتيجة بها أهداف',
-      href: biggestScore?.matchId ? `/matches/${encodeURIComponent(biggestScore.matchId)}` : '/matches',
-      tone: 'default',
+      source: usingFbrefGoals ? 'FBref' : 'DB',
       loading: isInitialLoading,
     },
     {
@@ -247,37 +250,102 @@ export default function HomeTournamentStatsCard({ playersCount: serverPlayersCou
       note: isInitialLoading ? loadingNote : `مباشر الآن: ${formatCount(liveMatches)} / متبقية: ${formatCount(scheduledMatches)}`,
       href: '/matches',
       tone: 'default',
+      source: stats?.finishedMatches ? 'DB' : 'FBref',
       loading: isInitialLoading,
     },
-  ]), [stats, fbrefStats, upcomingMatchesCount, kicksAvailable, biggestScore, isInitialLoading, cardTotalYellow, cardTotalRed, kickStats, playerCount, topScoringTeam, bestCleanSheetTeam, finalStats, fbrefFinalStats, totalGoals, averageGoals, finishedMatches, liveMatches, scheduledMatches, totalShots, totalShotsOnTarget, matchesWithFinalSnapshots, cleanSheets, usingFbrefShots, usingFbrefCards, usingFbrefGoals, usingFbrefTeams]);
+    {
+      label: 'عدد اللاعبين',
+      value: isInitialLoading ? LOADING_VALUE : formatCount(playerCount),
+      note: isInitialLoading ? loadingNote : fbrefStats?.playerCount && !stats?.playerCount ? 'من قوائم FBref المحفوظة' : 'من اللاعبين المرتبطين بالمنتخبات',
+      href: '/players',
+      tone: 'green',
+      source: fbrefStats?.playerCount && !stats?.playerCount ? 'FBref' : 'DB',
+      loading: isInitialLoading,
+    },
+  ]), [stats, fbrefStats, isInitialLoading, totalGoals, averageGoals, finishedMatches, liveMatches, scheduledMatches, playerCount, usingFbrefGoals]);
+
+  const detailTiles = useMemo<Tile[]>(() => ([
+    {
+      label: 'أكثر منتخب تسجيلًا',
+      value: isInitialLoading ? LOADING_VALUE : topScoringTeam ? formatCount(topScoringTeam.goalsFor) : 'غير متوفر',
+      note: isInitialLoading ? loadingNote : topScoringTeam ? fallbackNote(shortTeamStat(topScoringTeam, 'played', ' مباريات'), usingFbrefTeams) : 'يظهر بعد انتهاء مباريات كافية',
+      href: topScoringTeam?.id ? `/teams/${encodeURIComponent(topScoringTeam.id)}` : '/teams',
+      tone: 'gold',
+      source: usingFbrefTeams ? 'FBref' : 'DB',
+      loading: isInitialLoading,
+    },
+    {
+      label: 'شباك نظيفة',
+      value: isInitialLoading ? LOADING_VALUE : formatCount(cleanSheets),
+      note: isInitialLoading ? loadingNote : bestCleanSheetTeam ? fallbackNote(`الأبرز: ${shortTeamStat(bestCleanSheetTeam, 'cleanSheets')}`, usingFbrefTeams) : 'إجمالي الشباك النظيفة',
+      href: '/matches',
+      tone: 'default',
+      source: usingFbrefTeams ? 'FBref' : 'DB',
+      loading: isInitialLoading,
+    },
+    {
+      label: 'تسديدات / على المرمى',
+      value: isInitialLoading ? LOADING_VALUE : totalShots ? `${formatCount(totalShots)} / ${formatCount(totalShotsOnTarget)}` : 'غير متوفر',
+      note: isInitialLoading ? loadingNote : matchesWithFinalSnapshots ? fallbackNote(`من ${formatCount(matchesWithFinalSnapshots)} مباراة بها إحصائيات`, usingFbrefShots) : 'تظهر بعد مزامنة إحصائيات المباراة',
+      href: '/matches',
+      tone: 'cyan',
+      source: usingFbrefShots ? 'FBref' : 'DB',
+      loading: isInitialLoading,
+    },
+    {
+      label: 'كروت صفراء / حمراء',
+      value: isInitialLoading ? LOADING_VALUE : `${formatCount(cardTotalYellow)} / ${formatCount(cardTotalRed)}`,
+      note: isInitialLoading ? loadingNote : fallbackNote('من أحداث المباراة أو FBref عند غياب snapshots', usingFbrefCards),
+      href: '/matches',
+      tone: 'alert',
+      source: usingFbrefCards ? 'FBref' : 'DB',
+      loading: isInitialLoading,
+    },
+    {
+      label: 'أكبر نتيجة',
+      value: isInitialLoading ? LOADING_VALUE : biggestScore ? `${formatCount(biggestScore.homeScore)}-${formatCount(biggestScore.awayScore)}` : 'غير متوفر',
+      note: isInitialLoading ? loadingNote : biggestScore ? `${teamName(biggestScore.homeTeam)} ضد ${teamName(biggestScore.awayTeam)}` : 'تظهر بعد تسجيل نتيجة بها أهداف',
+      href: biggestScore?.matchId ? `/matches/${encodeURIComponent(biggestScore.matchId)}` : '/matches',
+      tone: 'default',
+      source: biggestScore ? 'DB' : undefined,
+      loading: isInitialLoading,
+    },
+  ]), [isInitialLoading, topScoringTeam, bestCleanSheetTeam, totalShots, totalShotsOnTarget, matchesWithFinalSnapshots, cardTotalYellow, cardTotalRed, biggestScore, cleanSheets, usingFbrefTeams, usingFbrefShots, usingFbrefCards]);
 
   return (
-    <section className="mx-auto mb-4 max-w-7xl overflow-hidden rounded-2xl border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(255,215,0,0.13),transparent_28%),linear-gradient(135deg,rgba(7,24,18,0.94),rgba(4,17,13,0.98))] p-3 text-white shadow-[0_18px_46px_rgba(0,0,0,0.32)] backdrop-blur sm:p-4" aria-label="إحصائيات البطولة">
-      <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+    <section className="mx-auto mb-5 max-w-7xl overflow-hidden rounded-[1.65rem] border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(255,215,0,0.16),transparent_26%),radial-gradient(circle_at_bottom_left,rgba(15,240,252,0.09),transparent_30%),linear-gradient(135deg,rgba(7,24,18,0.96),rgba(3,12,11,0.99))] p-4 text-white shadow-[0_22px_60px_rgba(0,0,0,0.38)] backdrop-blur sm:p-5" aria-label="إحصائيات البطولة">
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-4">
         <div>
           <div className="inline-flex items-center gap-2 rounded-full border border-[#FFD700]/25 bg-[#FFD700]/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-[#FFD700]">
             <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#FFD700]" />
-            TOURNAMENT STATS
+            TOURNAMENT DATA CENTER
           </div>
-          <h1 className="mt-3 text-xl font-black leading-snug tracking-tight text-white md:text-2xl lg:text-3xl">الإحصائيات</h1>
+          <h1 className="mt-3 text-2xl font-black leading-snug tracking-tight text-white md:text-3xl">الإحصائيات</h1>
           <p className="mt-2 max-w-4xl text-xs font-semibold leading-6 text-gray-300 md:text-sm md:leading-7">
-            ملخص البطولة من قاعدة البيانات مع استخدام لقطة FBref المحفوظة كبديل عند غياب snapshots أو أحداث المباراة.
+            ملخص احترافي للبطولة من قاعدة البيانات، مع استخدام لقطة FBref المحفوظة كبديل فقط عند غياب snapshots أو أحداث المباراة.
           </p>
         </div>
-        <div className="rounded-2xl border border-white/10 bg-black/25 px-3 py-2 text-left text-[10px] font-bold leading-5 text-gray-400">
-          <div className="font-black text-[#FFD700]">تحديث تلقائي كل 60 ثانية</div>
+        <div className="rounded-2xl border border-white/10 bg-black/30 px-3 py-2 text-left text-[10px] font-bold leading-5 text-gray-400 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
+          <div className="font-black text-[#FFD700]">Auto-refresh 60s</div>
           <div>آخر مصدر: {isInitialLoading ? 'جاري التحميل...' : formatUpdateTime(sourceUpdatedAt)}</div>
           <div>آخر جلب: {lastClientRefresh ? formatUpdateTime(lastClientRefresh.toISOString()) : isLoading ? 'جاري التحميل...' : 'غير متوفر'}</div>
         </div>
       </div>
 
-      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
-        {tiles.map((tile) => <StatTile key={tile.label} {...tile} />)}
+      <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {highlightTiles.map((tile) => <StatTile key={tile.label} {...tile} />)}
       </div>
 
-      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-[10px] font-bold text-gray-500">
+      <div className="grid gap-3 lg:grid-cols-[1.1fr_2fr]">
+        <PenaltyStatsCard kickStats={kickStats} loading={isInitialLoading} usingFbref={usingFbrefPenalties} />
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+          {detailTiles.map((tile) => <StatTile key={tile.label} {...tile} />)}
+        </div>
+      </div>
+
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-white/10 bg-black/20 px-3 py-2 text-[10px] font-bold text-gray-500">
         <span>الفرق المسجلة: {formatCount(stats?.teamCount ?? fbrefStats?.teamCount ?? teamsCount, isInitialLoading ? LOADING_VALUE : 'غير متوفر')} منتخب</span>
-        <span>الأولوية: قاعدة البيانات الحية والنهائية · البديل: FBref copied snapshot</span>
+        <span>الأولوية: قاعدة البيانات الحية والنهائية · البديل: FBref copied snapshot · الجزاءات لا تظهر إلا إذا كانت موثقة</span>
       </div>
     </section>
   );
