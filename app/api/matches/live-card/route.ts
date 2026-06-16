@@ -24,6 +24,9 @@ const LIVE_STATUSES = ['1H', '2H', 'ET', 'BT', 'P', 'LIVE', 'IN_PLAY', 'HT'];
 const FINISHED_STATUSES = ['FT', 'AET', 'PEN', 'FINISHED'];
 const GROUP_STAGE_MAX_LIVE_MINUTES = 115;
 const KNOCKOUT_MAX_LIVE_MINUTES = 150;
+const STALE_FINAL_SNAPSHOT_MS = 7 * 60 * 1000;
+const FINAL_MINUTE_FLOOR = 85;
+const FINAL_LOCAL_MINUTE_FALLBACK = 100;
 
 function dateKey(date = new Date()) {
   return date.toISOString().slice(0, 10);
@@ -90,6 +93,18 @@ function pickLiveScore(providerValue: unknown, snapshotValue: unknown, matchValu
   return nullableNumber(matchValue) ?? 0;
 }
 
+function snapshotAgeMs(snapshotState: any, now: Date) {
+  const capturedAt = snapshotState?.capturedAt ? new Date(snapshotState.capturedAt) : null;
+  if (!capturedAt || !Number.isFinite(capturedAt.getTime())) return null;
+  return now.getTime() - capturedAt.getTime();
+}
+
+function isFinalSnapshotStale(snapshotState: any, now: Date) {
+  const minute = nullableNumber(snapshotState?.minute);
+  const age = snapshotAgeMs(snapshotState, now);
+  return Boolean(minute !== null && minute >= FINAL_MINUTE_FLOOR && age !== null && age >= STALE_FINAL_SNAPSHOT_MS);
+}
+
 async function fetchLatestScoreSnapshots(matchIds: string[]) {
   if (!matchIds.length) return new Map<string, any>();
   try {
@@ -143,7 +158,9 @@ function decorateMatch(match: any, now: Date, providerState?: any, snapshotState
   const providerHasMinute = providerState?.minute != null;
   const snapshotMinute = nullableNumber(snapshotState?.minute);
   const staleByTime = isStaleByTime(match, localMinute);
-  const isFinished = staleByTime || isFinishedStatus(dbStatus) || isFinishedStatus(effectiveStatus);
+  const staleFinalSnapshot = !providerHasState && isFinalSnapshotStale(snapshotState, now);
+  const noProviderFinalFallback = !providerHasState && (dbStatus === 'IN_PLAY' || dbStatus === 'LIVE') && localMinute >= FINAL_LOCAL_MINUTE_FALLBACK;
+  const isFinished = staleByTime || staleFinalSnapshot || noProviderFinalFallback || isFinishedStatus(dbStatus) || isFinishedStatus(effectiveStatus);
   const isHalfTimeFromProvider = !isFinished && isHalftimeStatus(effectiveStatus);
   const isLocalHalftimeFallback = !isFinished && !providerHasState && dbStatus === 'SCHEDULED' && localMinute >= 46 && localMinute <= 65;
   const isHalfTime = isHalfTimeFromProvider || isLocalHalftimeFallback;
@@ -168,7 +185,7 @@ function decorateMatch(match: any, now: Date, providerState?: any, snapshotState
     isLiveNow,
     isHalfTime,
     isLikelyLiveByTime,
-    isStaleAutoFinished: isFinished && staleByTime,
+    isStaleAutoFinished: isFinished && (staleByTime || staleFinalSnapshot || noProviderFinalFallback),
     displayStatus: isFinished ? 'FINISHED' : isHalfTime ? 'HT' : (isLiveNow ? 'IN_PLAY' : match.status),
     minute: isFinished ? null : displayMinute,
     liveLabel: isFinished ? 'انتهت المباراة' : isHalfTime ? 'استراحة بين الشوطين' : (isLiveNow ? (displayMinute ? `الدقيقة ${displayMinute}` : (fallbackLabel || 'جارية الآن')) : null),
@@ -231,9 +248,10 @@ export async function GET() {
       upcomingCount: upcoming.length,
       recentlyFinishedCount: decoratedFinished.length,
       recentFinishedWindowHours: 6,
-      liveDetection: 'provider_or_snapshot_score_then_safe_time_window',
+      liveDetection: 'provider_or_fresh_snapshot_then_safe_time_window',
       groupStageMaxLiveMinutes: GROUP_STAGE_MAX_LIVE_MINUTES,
       knockoutMaxLiveMinutes: KNOCKOUT_MAX_LIVE_MINUTES,
+      staleFinalSnapshotMinutes: STALE_FINAL_SNAPSHOT_MS / 60_000,
       selectionMode: 'one_live_plus_one_next',
       updatedEverySeconds: 15,
     },
