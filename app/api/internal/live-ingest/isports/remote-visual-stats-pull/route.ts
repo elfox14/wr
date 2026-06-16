@@ -45,10 +45,22 @@ function functionEndpoint() {
   if (token && !url.searchParams.has('token')) url.searchParams.set('token', token);
   return url.toString();
 }
-function maskUrl(value: string) {
-  const url = new URL(value);
-  for (const key of ['accessKey', 'auth', 'ts', 'r', 'token']) if (url.searchParams.has(key)) url.searchParams.set(key, '***');
-  return url.toString();
+function maskUrl(value?: string | null) {
+  if (!value) return value || null;
+  try {
+    const url = new URL(value);
+    for (const key of ['accessKey', 'auth', 'ts', 'r', 'token']) if (url.searchParams.has(key)) url.searchParams.set(key, '***');
+    return url.toString();
+  } catch {
+    return value.replace(/(accessKey|auth|ts|r|token)=([^&\s]+)/gi, '$1=***');
+  }
+}
+function scrubSensitive(value: unknown) {
+  return String(value ?? '')
+    .replace(/(accessKey|auth|ts|r|token)=([^&\s]+)/gi, '$1=***')
+    .replace(/\b(ak|sk)\s*:\s*['"][^'"]+['"]/gi, "$1: '***'")
+    .replace(/USER_FEIJING88\.ak\s*=\s*['"][^'"]+['"]/gi, "USER_FEIJING88.ak = '***'")
+    .replace(/USER_FEIJING88\.sk\s*=\s*['"][^'"]+['"]/gi, "USER_FEIJING88.sk = '***'");
 }
 function emptyStats(): NormalizedStats {
   return {
@@ -93,8 +105,19 @@ function validRange(label: string, home: number | null, away: number | null) {
   if (home === null || away === null) return false;
   const name = label.toLowerCase();
   if (name.includes('possession') || name === 'poss') return home >= 0 && away >= 0 && home <= 100 && away <= 100 && Math.abs(home + away - 100) <= 5;
-  if (name.includes('attack') || name === 'att' || name.includes('shots') || name.includes('target')) return home >= 0 && away >= 0 && home <= 500 && away <= 500;
+  if (name.includes('attack') || name === 'att' || name === 'd-att' || name.includes('shots') || name.includes('target')) return home >= 0 && away >= 0 && home <= 500 && away <= 500;
   return home >= 0 && away >= 0 && home <= 1000 && away <= 1000;
+}
+function exactLinePair(lines: string[], aliases: string[]) {
+  for (const alias of aliases) {
+    const escaped = alias.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(`^(\\d+(?:\\.\\d+)?%?)\\s*${escaped}\\s*(\\d+(?:\\.\\d+)?%?)$`, 'i');
+    for (const line of lines) {
+      const match = line.match(regex);
+      if (match) return [numberFrom(match[1]), numberFrom(match[2])] as const;
+    }
+  }
+  return [null, null] as const;
 }
 function valueToken(value: string) {
   return /^\d+(?:\.\d+)?%?$/.test(String(value || '').trim());
@@ -102,43 +125,41 @@ function valueToken(value: string) {
 function parseByLines(lines: string[], aliases: string[]) {
   for (let i = 0; i < lines.length; i += 1) {
     if (!sameLabel(lines[i], aliases)) continue;
-    const prev = [...lines.slice(Math.max(0, i - 8), i)].reverse().find(valueToken);
-    const next = lines.slice(i + 1, i + 9).find(valueToken);
+    const prev = [...lines.slice(Math.max(0, i - 4), i)].reverse().find(valueToken);
+    const next = lines.slice(i + 1, i + 5).find(valueToken);
     if (prev && next) return [numberFrom(prev), numberFrom(next)] as const;
   }
   return [null, null] as const;
 }
-function parsePairFromText(text: string, aliases: string[]) {
+function visualPair(pairs: VisualPair[], aliases: string[], label: string) {
+  const visual = pairs.find((pair) => sameLabel(pair.label, aliases));
+  if (!visual) return [null, null] as const;
+  const pair = [numberFrom(visual.home), numberFrom(visual.away)] as const;
+  return validRange(label, pair[0], pair[1]) ? pair : [null, null] as const;
+}
+function choosePair(text: string, pairs: VisualPair[], aliases: string[], label: string) {
   const normalized = String(text || '').replace(/\r/g, '\n').replace(/[ \t]+/g, ' ').replace(/\n{2,}/g, '\n');
   const lines = normalized.split(/\n/).map((line) => line.trim()).filter(Boolean);
+  const exact = exactLinePair(lines, aliases);
+  if (validRange(label, exact[0], exact[1])) return exact;
   const byLines = parseByLines(lines, aliases);
-  if (byLines[0] !== null || byLines[1] !== null) return byLines;
-  for (const alias of aliases) {
-    const escaped = alias.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const line = lines.find((item) => new RegExp(`(^|\\b)${escaped}(\\b|$)`, 'i').test(item));
-    if (!line) continue;
-    const nums = line.match(/\d+(?:\.\d+)?%?/g) || [];
-    if (nums.length >= 2) return [numberFrom(nums[0]), numberFrom(nums[1])] as const;
-  }
+  if (validRange(label, byLines[0], byLines[1])) return byLines;
+  const visual = visualPair(pairs, aliases, label);
+  if (validRange(label, visual[0], visual[1])) return visual;
   return [null, null] as const;
 }
-function choosePair(pairs: VisualPair[], aliases: string[], fallbackText: string) {
-  const visual = pairs.find((pair) => sameLabel(pair.label, aliases));
-  if (visual) return [numberFrom(visual.home), numberFrom(visual.away)] as const;
-  return parsePairFromText(fallbackText, aliases);
-}
-function applyPair(stats: NormalizedStats, homeKey: keyof NormalizedStats, awayKey: keyof NormalizedStats, label: string, pair: readonly [number | null, number | null]) {
-  if (!validRange(label, pair[0], pair[1])) return;
-  (stats as any)[homeKey] = pair[0];
-  (stats as any)[awayKey] = pair[1];
+function applyPair(stats: NormalizedStats, homeKey: keyof NormalizedStats, awayKey: keyof NormalizedStats, pair: readonly [number | null, number | null]) {
+  if (pair[0] !== null) (stats as any)[homeKey] = pair[0];
+  if (pair[1] !== null) (stats as any)[awayKey] = pair[1];
 }
 function parseVisualStats(text: string, pairs: VisualPair[]) {
   const stats = emptyStats();
-  applyPair(stats, 'homeAttacks', 'awayAttacks', 'Attack', choosePair(pairs, ['Attack', 'ATT', 'Attacks'], text));
-  applyPair(stats, 'homeShots', 'awayShots', 'Shots', choosePair(pairs, ['Shots', 'Shot'], text));
-  applyPair(stats, 'homePossession', 'awayPossession', 'Possession', choosePair(pairs, ['Possession', 'Poss'], text));
-  applyPair(stats, 'homeShotsOnTarget', 'awayShotsOnTarget', 'On Target', choosePair(pairs, ['On Target', 'On-TGT', 'On TGT', 'On-TARGET'], text));
-  applyPair(stats, 'homeShotsOffTarget', 'awayShotsOffTarget', 'Off Target', choosePair(pairs, ['Off Target', 'Off-TGT', 'Off TGT', 'Off-TARGET'], text));
+  applyPair(stats, 'homePossession', 'awayPossession', choosePair(text, pairs, ['Possession', 'Poss'], 'Possession'));
+  applyPair(stats, 'homeAttacks', 'awayAttacks', choosePair(text, pairs, ['Attack', 'ATT', 'Attacks'], 'Attack'));
+  applyPair(stats, 'homeDangerousAttacks', 'awayDangerousAttacks', choosePair(text, pairs, ['D-ATT', 'D ATT', 'Dangerous Attack', 'Dangerous Attacks'], 'D-ATT'));
+  applyPair(stats, 'homeShotsOffTarget', 'awayShotsOffTarget', choosePair(text, pairs, ['Off Target', 'Off-TGT', 'Off TGT', 'Off-TARGET'], 'Off Target'));
+  applyPair(stats, 'homeShots', 'awayShots', choosePair(text, pairs, ['Shots', 'Shot'], 'Shots'));
+  applyPair(stats, 'homeShotsOnTarget', 'awayShotsOnTarget', choosePair(text, pairs, ['On Target', 'On-TGT', 'On TGT', 'On-TARGET'], 'On Target'));
   return stats;
 }
 function browserlessCode() {
@@ -173,11 +194,11 @@ function browserlessCode() {
               return { tag: el.tagName, text: clean(el.textContent), x: rect.left + rect.width / 2, y: rect.top + rect.height / 2, w: rect.width, h: rect.height, cls: el.getAttribute('class') || '' };
             })
             .filter((node) => node.text && node.text.length <= 40);
-          const labels = rawNodes.filter((node) => /^(Attack|ATT|Attacks|Shots|Shot|Possession|Poss|On Target|On-TGT|On TGT|Off Target|Off-TGT|Off TGT)$/i.test(node.text));
+          const labels = rawNodes.filter((node) => /^(Attack|ATT|Attacks|D-ATT|D ATT|Shots|Shot|Possession|Poss|On Target|On-TGT|On TGT|Off Target|Off-TGT|Off TGT)$/i.test(node.text));
           const values = rawNodes.filter((node) => /^\\d+(?:\\.\\d+)?%?$/.test(node.text));
           const pairs = labels.map((label) => {
             const rowValues = values.filter((value) => Math.abs(value.y - label.y) <= Math.max(12, label.h + 8));
-            const left = rowValues.filter((value) => value.x < label.x).sort((a, b) => Math.abs(b.x - label.x) - Math.abs(a.x - label.x)).pop();
+            const left = rowValues.filter((value) => value.x < label.x).sort((a, b) => Math.abs(a.x - label.x) - Math.abs(b.x - label.x))[0];
             const right = rowValues.filter((value) => value.x > label.x).sort((a, b) => Math.abs(a.x - label.x) - Math.abs(b.x - label.x))[0];
             return { label: label.text, home: left ? left.text : null, away: right ? right.text : null, sourceUrl: location.href };
           }).filter((pair) => pair.home || pair.away);
@@ -239,13 +260,22 @@ export async function GET(req: Request) {
     const waitMs = clamp(url.searchParams.get('waitMs'), 15000, 1000, 35000);
     const save = boolParam(url.searchParams.get('save'), false);
     const rendered = await callBrowserless(wrapperUrl, timeoutMs, waitMs);
-    const text = String(rendered.data?.text || '');
-    const pairs = Array.isArray(rendered.data?.pairs) ? rendered.data.pairs : [];
+    const text = scrubSensitive(rendered.data?.text || '');
+    const rawPairs = Array.isArray(rendered.data?.pairs) ? rendered.data.pairs : [];
+    const pairs = rawPairs.map((pair: VisualPair) => ({ ...pair, sourceUrl: maskUrl(pair.sourceUrl) }));
     const stats = parseVisualStats(text, pairs);
     const reliable = hasUsefulStats(stats) && !hasUndefinedPlaceholder(text);
     const match = (save || url.searchParams.get('includeMatch') === 'true') ? await getMatch({ dbMatchId: url.searchParams.get('dbMatchId'), providerMatchId }) : null;
-    const saveResult = save ? match ? await saveSnapshot(match, providerMatchId, stats, { source: VISUAL_SOURCE, wrapperUrl, visualPairs: pairs, textSample: text.slice(0, 4000), framesSample: rendered.data?.frames?.map?.((frame: any) => ({ url: frame.url, title: frame.title, pairs: frame.pairs || [], text: String(frame.text || '').slice(0, 900), nodes: frame.nodes?.slice?.(0, 30) || [] })) || [], capturedBy: 'browserless_function_visual_stats_frames' }, reliable) : { inserted: 0, snapshotId: null, error: 'No local match found' } : null;
-    return json({ ok: true, mode: 'isports_remote_visual_stats_pull', remoteBrowser: { ok: rendered.ok, status: rendered.status, rawLength: rendered.rawLength, error: rendered.rawSample || null }, wrapper: { sourceUrl: wrapperUrl }, hasStats: reliable, stats, validation: { hasUsefulStats: hasUsefulStats(stats), reliable, rejectedPlaceholder: hasUndefinedPlaceholder(text), frameCount: rendered.data?.frameCount || 0, pairs }, textSample: text.slice(0, 2200), framesPreview: rendered.data?.frames?.map?.((frame: any) => ({ url: frame.url, title: frame.title, pairs: frame.pairs || [], text: String(frame.text || '').slice(0, 500), nodes: frame.nodes?.slice?.(0, 10) || [], error: frame.error || null })) || [], match: match ? { id: match.id, status: match.status, homeTeam: match.homeTeam, awayTeam: match.awayTeam } : null, save: saveResult, note: 'Parses Statistics from all visible frame nodes in iSports pc.html. It uses element positions to avoid merged numbers like 99+11.' });
+    const framesSample = rendered.data?.frames?.map?.((frame: any) => ({
+      url: maskUrl(frame.url),
+      title: frame.title,
+      pairs: (frame.pairs || []).map((pair: VisualPair) => ({ ...pair, sourceUrl: maskUrl(pair.sourceUrl) })),
+      text: scrubSensitive(frame.text).slice(0, 900),
+      nodes: frame.nodes?.slice?.(0, 30) || [],
+      error: frame.error || null,
+    })) || [];
+    const saveResult = save ? match ? await saveSnapshot(match, providerMatchId, stats, { source: VISUAL_SOURCE, wrapperUrl, visualPairs: pairs, textSample: text.slice(0, 4000), framesSample, capturedBy: 'browserless_function_visual_stats_frames' }, reliable) : { inserted: 0, snapshotId: null, error: 'No local match found' } : null;
+    return json({ ok: true, mode: 'isports_remote_visual_stats_pull', remoteBrowser: { ok: rendered.ok, status: rendered.status, rawLength: rendered.rawLength, error: rendered.rawSample || null }, wrapper: { sourceUrl: wrapperUrl }, hasStats: reliable, stats, validation: { hasUsefulStats: hasUsefulStats(stats), reliable, rejectedPlaceholder: hasUndefinedPlaceholder(text), frameCount: rendered.data?.frameCount || 0, pairs }, textSample: text.slice(0, 2200), framesPreview: framesSample.map((frame: any) => ({ ...frame, text: String(frame.text || '').slice(0, 500), nodes: frame.nodes?.slice?.(0, 10) || [] })), match: match ? { id: match.id, status: match.status, homeTeam: match.homeTeam, awayTeam: match.awayTeam } : null, save: saveResult, note: 'Parses exact statistic lines like 54%Poss46%, 113ATT99, 32D-ATT27, 11Shots6 to avoid merged-number errors.' });
   } catch (error: any) {
     return json({ ok: false, error: error?.message || 'Internal Server Error' }, 500);
   }
