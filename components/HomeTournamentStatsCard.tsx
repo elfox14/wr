@@ -129,14 +129,37 @@ function LoadingBox({ label }: { label: string }) {
   return <GoalStatCard title={label} value={LOADING_VALUE} subtitle="جاري التحميل" />;
 }
 
-function PlayerLeaderCard({ title, leader, metricLabel, tone }: { title: string; leader: any; metricLabel: string; tone: Tone }) {
-  const value = leader?.name ? shortText(String(leader.name), 18) : 'غير متوفر';
-  const subtitle = leader?.value
-    ? `${formatCount(Number(leader.value))} ${metricLabel}${leader?.team ? ` • ${shortText(teamName(leader.team), 14)}` : ''}`
-    : 'بانتظار بيانات موثقة';
-  const href = leader?.teamId ? `/teams/${encodeURIComponent(String(leader.teamId))}?player=${encodeURIComponent(String(leader.id))}` : '/players';
+function PlayerImage({ leader }: { leader: any }) {
+  const initials = String(leader?.code || leader?.name || '—').slice(0, 2);
+  const image = typeof leader?.image === 'string' && leader.image.trim() ? leader.image : '';
 
-  return <GoalStatCard title={title} value={value} subtitle={subtitle} source={leader ? 'DB' : '—'} tone={tone} href={href} />;
+  return (
+    <span className="relative mx-auto flex h-16 w-16 items-center justify-center overflow-hidden rounded-2xl border border-[#FFD700]/25 bg-black/55 shadow-[0_0_24px_rgba(255,215,0,0.12)] transition group-hover:scale-105">
+      {image ? (
+        <img src={image} alt={leader?.name || 'الهداف'} className="h-full w-full object-cover" loading="lazy" />
+      ) : (
+        <span className="text-lg font-black text-[#FFD700]/75">{initials}</span>
+      )}
+    </span>
+  );
+}
+
+function TopScorerCard({ leader }: { leader: any }) {
+  const href = leader?.id ? `/players/${encodeURIComponent(String(leader.id))}` : '/players';
+  const playerName = leader?.name ? shortText(String(leader.name), 20) : 'غير متوفر';
+  const subtitle = leader?.value
+    ? `${formatCount(Number(leader.value))} هدف${leader?.team ? ` • ${shortText(teamName(leader.team), 14)}` : ''}`
+    : 'بانتظار بيانات موثقة';
+
+  return (
+    <StatShell title="الهداف" source={leader ? 'DB' : '—'} tone="gold" href={href} itemClassName="col-span-1 sm:col-span-2 lg:col-span-2 xl:col-span-2">
+      <div className="flex flex-1 flex-col items-center justify-center rounded-xl border border-[#FFD700]/15 bg-[#FFD700]/10 px-2 py-2 text-center">
+        <PlayerImage leader={leader} />
+        <div className="mt-2 w-full truncate text-sm font-black text-white">{playerName}</div>
+        <div className="mt-1 w-full truncate text-[9px] font-bold text-[#FFD700]/80">{subtitle}</div>
+      </div>
+    </StatShell>
+  );
 }
 
 function PlayersGroupCard({ playerCount, teamCount, source }: { playerCount: number | null; teamCount: number | null; source: SourceName }) {
@@ -271,7 +294,6 @@ export default function HomeTournamentStatsCard({ playersCount: serverPlayersCou
   const cleanSheets = pickNumber(stats?.cleanSheets, fbrefStats?.cleanSheets);
   const teamCountValue = pickNumber(stats?.teamCount, fbrefStats?.teamCount ?? teamsCount);
   const topScorer = playerLeaders?.leaders?.topScorer || null;
-  const topAssister = playerLeaders?.leaders?.topAssister || null;
   const usingFbrefShots = !usefulNumber(finalStats?.totalShots) && usefulNumber(fbrefFinalStats?.totalShots) !== null;
   const usingFbrefCards = (!usefulNumber(read(stats, 'yellow' + 'Cards')) && usefulNumber(read(fbrefStats, 'yellow' + 'Cards')) !== null) || (!usefulNumber(read(stats, 'red' + 'Cards')) && usefulNumber(read(fbrefStats, 'red' + 'Cards')) !== null);
   const usingFbrefGoals = !usefulNumber(stats?.totalGoals) && usefulNumber(fbrefStats?.totalGoals) !== null;
@@ -292,12 +314,11 @@ export default function HomeTournamentStatsCard({ playersCount: serverPlayersCou
 
       {isInitialLoading ? (
         <div className="grid auto-rows-[128px] grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-8 xl:grid-cols-12">
-          {['الهداف', 'صانع الأهداف', 'الأهداف', 'المتوسط', 'التسديدات', 'أكبر نتيجة', 'الشباك', 'اللاعبون', 'الكروت', 'الجزاءات'].map((label) => <LoadingBox key={label} label={label} />)}
+          {['الهداف', 'الأهداف', 'المتوسط', 'التسديدات', 'أكبر نتيجة', 'الشباك', 'اللاعبون', 'الكروت', 'الجزاءات'].map((label) => <LoadingBox key={label} label={label} />)}
         </div>
       ) : (
         <div className="grid auto-rows-[128px] grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-8 xl:grid-cols-12">
-          <PlayerLeaderCard title="الهداف" leader={topScorer} metricLabel="هدف" tone="gold" />
-          <PlayerLeaderCard title="أكثر صانع أهداف" leader={topAssister} metricLabel="أسيست" tone="cyan" />
+          <TopScorerCard leader={topScorer} />
           <GoalStatCard title="أهداف البطولة" value={formatCount(totalGoals)} subtitle={`${formatCount(finishedMatches)} مباراة منتهية`} source={sourceFrom(usingFbrefGoals, true)} tone="gold" href="/matches" />
           <GoalStatCard title="متوسط الأهداف" value={formatDecimal(averageGoals)} subtitle="هدف لكل مباراة" source={sourceFrom(usingFbrefGoals, true)} tone="cyan" href="/matches" />
           <GoalStatCard title="التسديدات" value={`${formatCount(totalShots)} / ${formatCount(totalShotsOnTarget)}`} subtitle="إجمالي / على المرمى" source={sourceFrom(usingFbrefShots, true)} tone="cyan" href="/matches" />
