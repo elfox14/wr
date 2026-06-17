@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { BookOpen, Clock, Filter, Newspaper, Sparkles, TrendingUp } from 'lucide-react';
+import { BookOpen, Clock, Filter, Newspaper, Sparkles } from 'lucide-react';
 import prisma from '@/lib/prisma';
 import AdSenseBanner from '@/components/ads/AdSenseBanner';
 import { ensureWorldCup2026OpeningNews, getPressNewsMeta } from '@/lib/press-news/world-cup-2026-opening-news';
@@ -14,10 +14,13 @@ export const metadata: Metadata = {
   keywords: ['أخبار كأس العالم', 'تحليل مباريات المونديال', 'كأس العالم 2026', 'ميسي', 'هالاند', 'مبابي', 'بورصة المونديال'],
 };
 
+export const MATCH_CENTER_ANALYSIS_CATEGORY = 'تحليل صفحة المباراة';
+
 const CATEGORIES = [
   { key: 'all', label: 'كل الأخبار' },
   { key: 'رصد صحفي', label: 'رصد صحفي' },
   { key: 'مباريات', label: 'مباريات' },
+  { key: MATCH_CENTER_ANALYSIS_CATEGORY, label: 'تحليل صفحة المباراة' },
   { key: 'إحصائيات', label: 'إحصائيات' },
   { key: 'لاعبون', label: 'لاعبون' },
   { key: 'إصابات', label: 'إصابات' },
@@ -96,6 +99,7 @@ export default async function NewsPage({ searchParams }: NewsPageProps) {
   const heroItem = newsItems[0];
   const heroMeta = heroItem ? getPressNewsMeta(heroItem.tags, heroItem.title) : null;
   const listItems = newsItems.slice(1);
+  const isMatchCenterCategory = currentCategory === MATCH_CENTER_ANALYSIS_CATEGORY;
 
   return (
     <main className="min-h-screen bg-[#050505] text-white px-4 py-8 sm:px-6 lg:px-8" dir="rtl">
@@ -110,7 +114,7 @@ export default async function NewsPage({ searchParams }: NewsPageProps) {
                 <Newspaper size={36} className="text-[#FFD700]" /> غرفة الأخبار والتحليلات
               </h1>
               <p className="mt-3 max-w-3xl text-sm font-bold leading-7 text-gray-400">
-                أخبار وتحليلات كأس العالم 2026 بصياغة عربية موثقة، مع صور تحريرية آمنة للسيو وروابط مصادر داخل كل مقال.
+                أخبار وتحليلات كأس العالم 2026 بصياغة عربية موثقة، مع تصنيف مؤقت لتحليلات صفحة المباراة المبنية على الإحصائيات والأحداث والزخم.
               </p>
             </div>
           </div>
@@ -129,7 +133,9 @@ export default async function NewsPage({ searchParams }: NewsPageProps) {
                 className={`rounded-2xl px-4 py-2 text-xs font-black transition-all ${
                   isActive
                     ? 'bg-[#0FF0FC] text-black shadow-[0_0_15px_rgba(15,240,252,0.3)]'
-                    : 'border border-white/10 bg-white/[0.03] text-gray-300 hover:bg-white/[0.08] hover:text-white'
+                    : cat.key === MATCH_CENTER_ANALYSIS_CATEGORY
+                      ? 'border border-[#FFD700]/25 bg-[#FFD700]/10 text-[#FFD700] hover:bg-[#FFD700]/15 hover:text-white'
+                      : 'border border-white/10 bg-white/[0.03] text-gray-300 hover:bg-white/[0.08] hover:text-white'
                 }`}
               >
                 {cat.label}
@@ -137,6 +143,12 @@ export default async function NewsPage({ searchParams }: NewsPageProps) {
             );
           })}
         </nav>
+
+        {isMatchCenterCategory && (
+          <section className="rounded-2xl border border-[#FFD700]/15 bg-[#FFD700]/5 p-5 text-sm font-bold leading-7 text-gray-300">
+            هذا تصنيف مؤقت للمقالات الحصرية المولّدة من صفحة المباراة. المقال هنا يجب أن يعتمد على النتيجة، الأحداث بالدقيقة، الإحصائيات، مؤشر الضغط، والزخم؛ وليس على نصوص عامة أو شرح طريقة كتابة المقال.
+          </section>
+        )}
 
         {heroItem ? (
           <article className="group relative overflow-hidden rounded-[2rem] border border-white/10 bg-gradient-to-br from-white/[0.06] to-white/[0.01] transition-all hover:border-[#0FF0FC]/30">
@@ -194,7 +206,11 @@ export default async function NewsPage({ searchParams }: NewsPageProps) {
           <div className="rounded-2xl border border-dashed border-white/10 bg-black/20 p-12 text-center">
             <Newspaper size={48} className="mx-auto text-gray-500 opacity-30 mb-3" />
             <h3 className="text-lg font-black text-white">لا توجد أخبار منشورة</h3>
-            <p className="mt-2 text-sm font-bold text-gray-500">اختر تصنيفًا آخر أو تصفح في وقت لاحق.</p>
+            <p className="mt-2 text-sm font-bold text-gray-500">
+              {isMatchCenterCategory
+                ? 'سيظهر هنا أي مقال يتم إنشاؤه من صفحة المباراة عند حفظه تحت تصنيف تحليل صفحة المباراة.'
+                : 'اختر تصنيفًا آخر أو تصفح في وقت لاحق.'}
+            </p>
           </div>
         )}
 
@@ -253,29 +269,6 @@ export default async function NewsPage({ searchParams }: NewsPageProps) {
             </div>
           </section>
         )}
-
-        {listItems.length > 4 && (
-          <AdSenseBanner slot="0987654321" format="auto" className="mt-6" />
-        )}
-
-        <section className="rounded-3xl border border-[#FFD700]/15 bg-[radial-gradient(circle_at_bottom_right,rgba(255,215,0,0.08),transparent_40%),rgba(255,215,0,0.02)] p-6 md:p-8">
-          <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
-            <div className="space-y-2">
-              <h3 className="text-lg font-black text-[#FFD700] flex items-center gap-2">
-                <TrendingUp size={20} /> هل تؤثر هذه الأخبار على أسعار الأصول؟
-              </h3>
-              <p className="max-w-3xl text-sm font-bold text-gray-400 leading-7">
-                اربط كل تحليل بالمباراة والمنتخب واللاعبين داخل موقعك لزيادة الوقت داخل الصفحة وتحسين الربط الداخلي أمام محركات البحث.
-              </p>
-            </div>
-            <Link
-              href="/market"
-              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#FFD700] px-5 py-3 text-sm font-black text-black transition hover:bg-[#0FF0FC]"
-            >
-              افتح لوحة التداول الرياضي
-            </Link>
-          </div>
-        </section>
       </div>
     </main>
   );
