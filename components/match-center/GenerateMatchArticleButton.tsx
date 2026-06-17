@@ -8,6 +8,8 @@ type ExistingArticle = {
   title: string;
   url: string;
   status?: string | null;
+  updatedAt?: Date | string | null;
+  count?: number | null;
 } | null;
 
 type Props = {
@@ -27,6 +29,18 @@ type PreviewItem = {
 
 function wordCount(text: string) {
   return String(text || '').split(/\s+/).filter(Boolean).length;
+}
+
+function formatArticleDate(value?: Date | string | null) {
+  if (!value) return '';
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return '';
+  return date.toLocaleString('ar-EG', {
+    day: '2-digit',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 }
 
 function qualityNotes(item: PreviewItem | null) {
@@ -52,6 +66,9 @@ export default function GenerateMatchArticleButton({ matchId, existingArticle = 
   const notes = useMemo(() => qualityNotes(previewItem), [previewItem]);
   const previewWords = previewItem ? wordCount(previewItem.body) : 0;
   const currentArticleUrl = newsUrl || existingArticle?.url || null;
+  const hasExistingArticle = Boolean(existingArticle?.url);
+  const articleCount = Math.max(0, Number(existingArticle?.count || 0));
+  const lastUpdated = formatArticleDate(existingArticle?.updatedAt || null);
 
   async function requestArticle(mode: 'preview' | 'upsert') {
     if (mode === 'preview') setPreviewLoading(true);
@@ -123,15 +140,26 @@ export default function GenerateMatchArticleButton({ matchId, existingArticle = 
             className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#FFD700] px-4 text-sm font-black text-black transition hover:bg-[#0FF0FC] disabled:cursor-not-allowed disabled:opacity-60"
           >
             {publishLoading ? <Loader2 size={16} className="animate-spin" /> : <FileText size={16} />}
-            {publishLoading ? 'جارٍ النشر...' : existingArticle ? 'تحديث المقال' : 'نشر المقال'}
+            {publishLoading ? 'جارٍ النشر...' : hasExistingArticle ? 'تحديث المقال' : 'نشر المقال'}
           </button>
         </div>
       </div>
 
-      {existingArticle && (
-        <div className="mt-3 rounded-xl border border-[#0FF0FC]/15 bg-[#0FF0FC]/5 p-3 text-xs font-bold leading-6 text-gray-300">
-          يوجد مقال مرتبط بهذه المباراة بالفعل: <Link href={existingArticle.url} className="text-[#0FF0FC] hover:underline">{existingArticle.title}</Link>
-          {existingArticle.status && <span className="mr-2 text-gray-500">الحالة: {existingArticle.status}</span>}
+      {hasExistingArticle && existingArticle && (
+        <div className="mt-3 grid gap-3 rounded-xl border border-[#0FF0FC]/15 bg-[#0FF0FC]/5 p-3 text-xs font-bold leading-6 text-gray-300 md:grid-cols-[1fr_auto] md:items-center">
+          <div>
+            <div>
+              يوجد مقال مرتبط بهذه المباراة بالفعل: <Link href={existingArticle.url} className="text-[#0FF0FC] hover:underline">{existingArticle.title}</Link>
+            </div>
+            <div className="mt-1 flex flex-wrap gap-2 text-[11px] text-gray-500">
+              {existingArticle.status && <span>الحالة: {existingArticle.status}</span>}
+              {articleCount > 0 && <span>عدد المقالات المرتبطة: {articleCount}</span>}
+              {lastUpdated && <span>آخر تحديث: {lastUpdated}</span>}
+            </div>
+          </div>
+          <Link href={existingArticle.url} className="inline-flex items-center justify-center gap-1 rounded-lg border border-[#0FF0FC]/20 bg-black/20 px-3 py-2 text-[#0FF0FC] hover:bg-[#0FF0FC] hover:text-black">
+            فتح المقال <ExternalLink size={12} />
+          </Link>
         </div>
       )}
 
