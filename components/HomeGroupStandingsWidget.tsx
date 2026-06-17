@@ -158,7 +158,7 @@ export default function HomeGroupStandingsWidget({ compact = false }: Props = {}
           <div className={`mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-white/5 pt-2 ${compact ? 'text-[9px]' : 'text-[10px]'} font-bold text-gray-500`}>
             <div className="flex items-center gap-1">
               <span className="h-2 w-2 rounded-full bg-[#00FF88]" />
-              <span>يتأهل المتصدر والوصيف</span>
+              <span>يتأهل المتصدر والوصيف + أفضل 8 فرق من المركز الثالث</span>
             </div>
             <Link href="/groups" className="text-[#0FF0FC] hover:underline">
               التفاصيل ←
