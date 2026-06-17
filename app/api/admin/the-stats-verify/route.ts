@@ -40,6 +40,18 @@ const FINISHED_STATUSES = new Set(['FINISHED', 'FT', 'FULL_TIME', 'AET', 'PEN', 
 const LIVE_STATUSES = new Set(['LIVE', 'IN_PLAY', '1H', '2H', 'HT', 'HALFTIME', 'ET']);
 const SCHEDULED_STATUSES = new Set(['SCHEDULED', 'TIMED', 'NS', 'NOT_STARTED', 'TBD']);
 const SAFE_APPLY_FIELDS = new Set(['status', 'homeScore', 'awayScore']);
+const TEAM_NAME_ALIASES = new Map([
+  ['usa', 'united states'],
+  ['us', 'united states'],
+  ['u s a', 'united states'],
+  ['united states of america', 'united states'],
+  ['czechia', 'czech republic'],
+  ['bosnia', 'bosnia and herzegovina'],
+  ['bosnia herzegovina', 'bosnia and herzegovina'],
+  ['d r congo', 'dr congo'],
+  ['democratic republic of congo', 'dr congo'],
+  ['congo dr', 'dr congo'],
+]);
 
 function configuredSecrets() {
   return [process.env.ADMIN_API_SECRET, process.env.CRON_SECRET]
@@ -98,6 +110,18 @@ function normalizeText(value?: string | null) {
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/[^a-z0-9\u0600-\u06ff]+/g, ' ')
     .trim();
+}
+
+function normalizeTeamName(value?: string | null) {
+  const normalized = normalizeText(value);
+  return TEAM_NAME_ALIASES.get(normalized) || normalized;
+}
+
+function normalizeGroupPhase(value?: string | null) {
+  const raw = asString(value);
+  if (!raw) return null;
+  const normalized = raw.toUpperCase().replace(/^GROUP[\s_-]*/, '').trim();
+  return normalized || raw.toUpperCase();
 }
 
 function normalizeProviderStatus(value?: string | null) {
@@ -186,10 +210,10 @@ function providerMatchesLocal(providerMatch: any, localMatch: any) {
   if (!providerMatch || !localMatch) return false;
   if (providerMatch.providerId && localMatch.externalId && String(providerMatch.providerId) === String(localMatch.externalId)) return true;
 
-  const providerHome = normalizeText(providerMatch.homeName);
-  const providerAway = normalizeText(providerMatch.awayName);
-  const localHome = normalizeText(localMatch.homeTeam?.name || localMatch.homeTeam?.code);
-  const localAway = normalizeText(localMatch.awayTeam?.name || localMatch.awayTeam?.code);
+  const providerHome = normalizeTeamName(providerMatch.homeName);
+  const providerAway = normalizeTeamName(providerMatch.awayName);
+  const localHome = normalizeTeamName(localMatch.homeTeam?.name || localMatch.homeTeam?.code);
+  const localAway = normalizeTeamName(localMatch.awayTeam?.name || localMatch.awayTeam?.code);
 
   if (!providerHome || !providerAway || !localHome || !localAway) return false;
   const homeMatches = providerHome === localHome || providerHome.includes(localHome) || localHome.includes(providerHome);
@@ -208,6 +232,21 @@ function diffField(field: string, localValue: any, providerValue: any) {
   };
 }
 
+function diffGroupPhase(localValue: any, providerValue: any) {
+  if (providerValue === undefined || providerValue === null || providerValue === '') return null;
+  const localNormalized = normalizeGroupPhase(localValue);
+  const providerNormalized = normalizeGroupPhase(providerValue);
+  const matched = !!localNormalized && !!providerNormalized && localNormalized === providerNormalized;
+  return {
+    field: 'groupPhase',
+    localValue: localValue ?? null,
+    providerValue,
+    status: matched ? 'matched' : localValue === null || localValue === undefined || localValue === '' ? 'missing_locally' : 'different',
+    normalizedLocalValue: localNormalized,
+    normalizedProviderValue: providerNormalized,
+  };
+}
+
 function buildDiffs(localMatch: any, providerMatch: any) {
   return [
     diffField('status', localMatch.status, providerMatch.status),
@@ -215,7 +254,7 @@ function buildDiffs(localMatch: any, providerMatch: any) {
     diffField('awayScore', localMatch.awayScore, providerMatch.awayScore),
     diffField('matchDate', localMatch.matchDate?.toISOString?.() || localMatch.matchDate, providerMatch.matchDate),
     diffField('stage', localMatch.stage, providerMatch.stage),
-    diffField('groupPhase', localMatch.groupPhase, providerMatch.groupPhase),
+    diffGroupPhase(localMatch.groupPhase, providerMatch.groupPhase),
   ].filter(Boolean) as any[];
 }
 
