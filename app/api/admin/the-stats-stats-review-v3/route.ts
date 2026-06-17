@@ -65,8 +65,9 @@ function toNumber(value: any): number | null {
 
 function pair(value: any, sourcePath: string): ProviderStat | null {
   if (!value || typeof value !== 'object') return null;
-  const home = toNumber(value.home);
-  const away = toNumber(value.away);
+  const source = value.all && typeof value.all === 'object' ? value.all : value;
+  const home = toNumber(source.home);
+  const away = toNumber(source.away);
   if (home === null && away === null) return null;
   return { home, away, sourcePath };
 }
@@ -352,6 +353,7 @@ export async function GET(req: Request) {
     safety: {
       reviewOnly: true,
       noDatabaseWrites: true,
+      parsedNestedAllValues: true,
       parsedKnownStatsShape: true,
       includesLineupSummaryOnly: includeLineups,
       maxMatchesPerRequest: 6,
