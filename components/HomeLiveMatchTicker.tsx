@@ -58,12 +58,12 @@ function matchStatus(match: TickerMatch) {
 }
 
 function isHalfTime(match: TickerMatch) {
-  return matchStatus(match) === 'HT' || Boolean(match.isHalfTime);
+  return ['HT', 'HALFTIME', 'HALF_TIME', 'HALF-TIME'].includes(matchStatus(match)) || Boolean(match.isHalfTime);
 }
 
 function isLive(match: TickerMatch) {
   const status = matchStatus(match);
-  return ['IN_PLAY', 'LIVE', 'HT'].includes(status) || Boolean(match.isLiveNow);
+  return ['1H', '2H', 'ET', 'BT', 'P', 'IN_PLAY', 'LIVE'].includes(status) || Boolean(match.isLiveNow) || isHalfTime(match);
 }
 
 function isFinished(match: TickerMatch) {
@@ -73,8 +73,8 @@ function isFinished(match: TickerMatch) {
 function liveStatusText(match: TickerMatch) {
   if (isHalfTime(match)) return 'استراحة';
   const label = String(match.liveLabel || '').trim();
-  if (label && !/^الدقيقة\s*\d+$/i.test(label) && label !== 'مباشر الآن') return label;
-  if (typeof match.minute === 'number' && Number.isFinite(match.minute) && match.minute > 0) return `${Math.floor(match.minute)}′`;
+  if (label && !label.includes('الشوط الثاني') && !/^الدقيقة\s*\d+$/i.test(label) && label !== 'مباشر الآن') return label;
+  if (typeof match.minute === 'number' && Number.isFinite(match.minute) && match.minute > 0) return `د${formatCount(Math.floor(match.minute))}`;
   return 'جارية';
 }
 
@@ -89,10 +89,7 @@ export default function HomeLiveMatchTicker({ matches = [] }: Props) {
       <div className="pointer-events-none absolute bottom-0 left-0 top-0 z-10 w-6 bg-gradient-to-r from-[#04110D] to-transparent sm:w-8" />
       <div className="pointer-events-none absolute bottom-0 right-0 top-0 z-10 w-6 bg-gradient-to-l from-[#04110D] to-transparent sm:w-8" />
 
-      <div
-        ref={scrollContainerRef}
-        className="scrollbar-none flex cursor-grab snap-x snap-mandatory gap-2.5 overflow-x-auto px-3 py-2 active:cursor-grabbing sm:gap-3 sm:px-4"
-      >
+      <div ref={scrollContainerRef} className="scrollbar-none flex cursor-grab snap-x snap-mandatory gap-2.5 overflow-x-auto px-3 py-2 active:cursor-grabbing sm:gap-3 sm:px-4">
         {safeMatches.map((match) => {
           const live = isLive(match);
           const halfTime = isHalfTime(match);
@@ -106,9 +103,7 @@ export default function HomeLiveMatchTicker({ matches = [] }: Props) {
               <motion.div
                 whileHover={{ y: -2 }}
                 className={`relative flex min-h-[104px] w-[min(17.25rem,calc(100vw-2rem))] items-center justify-between gap-3 rounded-2xl border bg-black/45 p-3 backdrop-blur-md transition-all duration-300 sm:w-64 ${
-                  live
-                    ? 'border-[#00FF88]/40 shadow-[0_0_12px_rgba(0,255,136,0.06)]'
-                    : 'border-white/10 hover:border-[#0FF0FC]/30'
+                  live ? 'border-[#00FF88]/40 shadow-[0_0_12px_rgba(0,255,136,0.06)]' : 'border-white/10 hover:border-[#0FF0FC]/30'
                 }`}
               >
                 <div className="flex min-w-[3.8rem] flex-col gap-1.5">
@@ -121,10 +116,7 @@ export default function HomeLiveMatchTicker({ matches = [] }: Props) {
                     <span className="text-[10px] font-bold text-gray-500">انتهت</span>
                   ) : (
                     <span className="text-[10px] font-bold text-[#0FF0FC]">
-                      {match.matchDate ? new Intl.DateTimeFormat('ar-EG', {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      }).format(new Date(match.matchDate)) : 'قريباً'}
+                      {match.matchDate ? new Intl.DateTimeFormat('ar-EG', { hour: '2-digit', minute: '2-digit' }).format(new Date(match.matchDate)) : 'قريباً'}
                     </span>
                   )}
                   <span className="max-w-[4.2rem] truncate text-[9px] font-bold text-gray-400">
@@ -138,18 +130,14 @@ export default function HomeLiveMatchTicker({ matches = [] }: Props) {
                       <img src={homeFlag || undefined} alt="" className="h-5 w-5 shrink-0 rounded-md object-cover" />
                       <span className="truncate text-[12px] font-bold text-white">{match.homeTeam?.name}</span>
                     </div>
-                    {(live || finished) && (
-                      <span className="text-sm font-black text-white">{match.homeScore}</span>
-                    )}
+                    {(live || finished) && <span className="text-sm font-black text-white">{match.homeScore}</span>}
                   </div>
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex min-w-0 items-center gap-1.5">
                       <img src={awayFlag || undefined} alt="" className="h-5 w-5 shrink-0 rounded-md object-cover" />
                       <span className="truncate text-[12px] font-bold text-white">{match.awayTeam?.name}</span>
                     </div>
-                    {(live || finished) && (
-                      <span className="text-sm font-black text-white">{match.awayScore}</span>
-                    )}
+                    {(live || finished) && <span className="text-sm font-black text-white">{match.awayScore}</span>}
                   </div>
                 </div>
               </motion.div>
