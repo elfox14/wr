@@ -113,7 +113,7 @@ function providerStatus(matchState: unknown, minute: number | null) {
   if (state === '-1' || state === 'FT' || state === 'FINISHED') return 'FINISHED';
   if (state === '2' || state === 'HT' || state.includes('HALF')) return 'HT';
   if (state === '3' || state === '2H' || state.includes('SECOND')) return '2H';
-  if (state === '1' || state === '1H' || state.includes('FIRST')) return minute && minute >= 46 ? '2H' : '1H';
+  if (state === '1' || state === '1H' || state.includes('FIRST')) return '1H';
   return null;
 }
 async function getMatch(input: { dbMatchId?: string | null; providerMatchId: number }) {
