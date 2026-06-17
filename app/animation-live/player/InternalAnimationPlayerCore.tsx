@@ -5,7 +5,7 @@ import type { EventFilterKey, LiveEventsResponse, LiveStatsResponse, MatchEvent,
 import { sortEventsByMinute } from './eventUtils';
 import { calculatePressureModel } from './livePressureUtils';
 import { calculateMomentumSegments, strongestMomentumSegment } from './momentumUtils';
-import { dataQuality, matchStoryLines, n, resolvedSnapshot } from './matchAnalysisUtils';
+import { dataQuality, matchAnalysisArticle, matchStoryLines, n, resolvedSnapshot } from './matchAnalysisUtils';
 import { isFinishedStatus, isHalfTimeStatus, normalizeStatus } from './statusUtils';
 import MatchHeaderPanel from './components/MatchHeaderPanel';
 import LivePitchTimelinePanel from './components/LivePitchTimelinePanel';
@@ -72,7 +72,7 @@ function matchClockMinute(snapshot: Snapshot, events: MatchEvent[], status?: str
   if (elapsedMinute !== null) return { minute: elapsedMinute, source: 'final_elapsed' };
 
   const finalEventMinute = latestEvent(events)?.minute ?? null;
-  return { minute: finalEventMinute, source: finalEventMinute !== null ? 'final_event' : 'unavailable' };
+  return { minute: finalEventMinute !== null ? finalEventMinute : null, source: finalEventMinute !== null ? 'final_event' : 'unavailable' };
 }
 
 export default function InternalAnimationPlayerCore({ matchId = '', dbMatchId = '' }: InternalAnimationPlayerCoreProps) {
@@ -174,6 +174,10 @@ export default function InternalAnimationPlayerCore({ matchId = '', dbMatchId = 
   const strongestSegment = useMemo(() => strongestMomentumSegment(momentumSegments), [momentumSegments]);
   const quality = useMemo(() => dataQuality(snapshot, events, updatedAt), [snapshot, events, updatedAt]);
   const storyLines = useMemo(() => matchStoryLines(match, snapshot, strongestSegment), [match, snapshot, strongestSegment]);
+  const articleLines = useMemo(
+    () => matchAnalysisArticle(match, snapshot, events, pressure, strongestSegment, currentMinute),
+    [match, snapshot, events, pressure, strongestSegment, currentMinute],
+  );
 
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-4 px-3 py-4 text-right md:px-6" dir="rtl">
@@ -206,6 +210,7 @@ export default function InternalAnimationPlayerCore({ matchId = '', dbMatchId = 
         pressure={pressure}
         quality={quality}
         storyLines={storyLines}
+        articleLines={articleLines}
         home={homeTeam}
         away={awayTeam}
       />
