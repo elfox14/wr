@@ -23,6 +23,15 @@ async function callRoute(handler: RouteHandler, url: URL, adminSecret: string) {
 function compactFlash(result: any) { return { ok: Boolean(result?.ok), hasStats: Boolean(result?.hasStats), stats: result?.stats || null, save: result?.save || null, flash: result?.flash || null, error: result?.error || null }; }
 function compactTimeline(result: any) { return { ok: Boolean(result?.ok), eventsCount: result?.timeline?.eventsCount || 0, save: result?.timeline?.save || null, statsSave: result?.timeline?.statsSave || null, eventsPreview: Array.isArray(result?.timeline?.events) ? result.timeline.events.slice(0, 4) : [], error: result?.error || null }; }
 function compactLive(result: any) { return { ok: Boolean(result?.ok), hasStats: Boolean(result?.hasStats), stats: result?.stats || null, validation: result?.validation || null, save: result?.save || null, textSample: result?.textSample || null, error: result?.error || null }; }
+function buildLiveUrl(origin: string, match: any, providerMatchId: number, save: boolean, timeoutMs: number, waitMs: number) {
+  const liveUrl = new URL('/api/internal/live-ingest/isports/remote-visual-stats-pull', origin);
+  liveUrl.searchParams.set('matchId', String(providerMatchId));
+  liveUrl.searchParams.set('dbMatchId', match.id);
+  liveUrl.searchParams.set('save', save ? 'true' : 'false');
+  liveUrl.searchParams.set('timeoutMs', String(timeoutMs));
+  liveUrl.searchParams.set('waitMs', String(waitMs));
+  return liveUrl;
+}
 
 export async function GET(req: Request) {
   const auth = await requireAdmin(req);
@@ -38,6 +47,7 @@ export async function GET(req: Request) {
     const includeFlash = boolParam(url.searchParams.get('includeFlash'), true);
     const includeTimeline = boolParam(url.searchParams.get('includeTimeline'), true);
     const includeLive = boolParam(url.searchParams.get('includeLive'), false);
+    const asyncLive = boolParam(url.searchParams.get('asyncLive'), false);
     const save = boolParam(url.searchParams.get('save'), true);
     const replace = boolParam(url.searchParams.get('replace'), true);
     const explicitDbMatchId = url.searchParams.get('dbMatchId') || url.searchParams.get('id');
@@ -73,20 +83,24 @@ export async function GET(req: Request) {
           const flash = await callRoute(remoteFlashPullGET, flashUrl, adminSecret);
           item.flashHttpStatus = flash.status; item.flash = compactFlash(flash.result);
         }
-        // Visual stats run last so possession/shots/visible attack numbers become the newest snapshot when available.
+        // Visual stats can run async for external cron services that cut requests at 30 seconds.
         if (includeLive) {
-          const liveUrl = new URL('/api/internal/live-ingest/isports/remote-visual-stats-pull', origin);
-          liveUrl.searchParams.set('matchId', String(providerMatchId)); liveUrl.searchParams.set('dbMatchId', match.id); liveUrl.searchParams.set('save', save ? 'true' : 'false'); liveUrl.searchParams.set('timeoutMs', String(timeoutMs)); liveUrl.searchParams.set('waitMs', String(waitMs));
-          const live = await callRoute(remoteVisualStatsPullGET, liveUrl, adminSecret);
-          item.liveHttpStatus = live.status; item.live = compactLive(live.result);
+          const liveUrl = buildLiveUrl(origin, match, providerMatchId, save, timeoutMs, waitMs);
+          if (asyncLive) {
+            item.live = { queued: true, async: true, save, timeoutMs, waitMs };
+            void callRoute(remoteVisualStatsPullGET, liveUrl, adminSecret).catch((error) => console.error('[isports-live-sync] async visual stats failed', { matchId: match.id, providerMatchId, error: error?.message || String(error) }));
+          } else {
+            const live = await callRoute(remoteVisualStatsPullGET, liveUrl, adminSecret);
+            item.liveHttpStatus = live.status; item.live = compactLive(live.result);
+          }
         }
-        item.ok = Boolean(item.flash?.ok || item.timeline?.ok || item.live?.ok);
-        item.dataMode = item.live?.hasStats ? 'visual_stats_flash_and_timeline' : item.flash?.hasStats ? 'flash_stats_and_timeline' : item.timeline?.eventsCount ? 'timeline_events_only' : 'no_reliable_data';
+        item.ok = Boolean(item.flash?.ok || item.timeline?.ok || item.live?.ok || item.live?.queued);
+        item.dataMode = item.live?.queued ? 'visual_stats_queued' : item.live?.hasStats ? 'visual_stats_flash_and_timeline' : item.flash?.hasStats ? 'flash_stats_and_timeline' : item.timeline?.eventsCount ? 'timeline_events_only' : 'no_reliable_data';
       } catch (error: any) { item.ok = false; item.error = error?.message || 'sync failed'; }
       results.push(item);
     }
 
-    return json({ ok: true, mode: 'cron_isports_live_sync', save, includeFlash, includeTimeline, includeLive, processed: results.length, durationMs: Date.now() - startedAt, window: { start: start.toISOString(), end: end.toISOString() }, results, note: 'Cron-safe route. Timeline saves events, flash saves event-derived details, and visual stats run last for possession/shots/visible attack totals.' });
+    return json({ ok: true, mode: 'cron_isports_live_sync', save, includeFlash, includeTimeline, includeLive, asyncLive, processed: results.length, durationMs: Date.now() - startedAt, window: { start: start.toISOString(), end: end.toISOString() }, results, note: asyncLive && includeLive ? 'Visual stats were queued in the background to avoid external cron timeout.' : 'Cron-safe route. Timeline saves events, flash saves event-derived details, and visual stats run last for possession/shots/visible attack totals.' });
   } catch (error: any) {
     return json({ ok: false, error: error?.message || 'Internal Server Error' }, 500);
   }
