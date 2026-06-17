@@ -48,6 +48,12 @@ function formatDate(value: Date | string) {
   });
 }
 
+function resolveImageUrl(baseUrl: string, image?: string) {
+  if (!image) return `${baseUrl}/og-image.jpg`;
+  if (/^https?:\/\//i.test(image)) return image;
+  return `${baseUrl}${image.startsWith('/') ? image : `/${image}`}`;
+}
+
 async function getNewsArticle(id: string) {
   try {
     await ensurePressNewsTable();
@@ -74,7 +80,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://worldcup.mcprim.com';
   const articleMeta = getPressNewsMeta(newsItem.tags, newsItem.title);
   const shortDescription = newsItem.body ? newsItem.body.slice(0, 160).trim() + '...' : '';
-  const imageUrl = articleMeta.image ? `${baseUrl}${articleMeta.image}` : `${baseUrl}/og-image.jpg`;
+  const imageUrl = resolveImageUrl(baseUrl, articleMeta.image);
 
   return {
     title: `${newsItem.title} | بورصة المونديال`,
@@ -127,7 +133,7 @@ export default async function NewsDetailPage({ params }: Props) {
     console.error('Error loading related news:', err);
   }
 
-  const imageUrl = articleMeta.image ? `${baseUrl}${articleMeta.image}` : `${baseUrl}/og-image.jpg`;
+  const imageUrl = resolveImageUrl(baseUrl, articleMeta.image);
   const jsonLd = {
     '@context': 'https://schema.org',
     '@type': 'NewsArticle',
