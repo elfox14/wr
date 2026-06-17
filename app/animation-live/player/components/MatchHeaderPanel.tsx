@@ -58,7 +58,9 @@ function clockInfo(status?: string | null, currentMinute?: number | null) {
   }
 
   if (isFinishedStatus(value)) {
-    return { label: 'انتهت', hint: minute ? `آخر دقيقة مسجلة د${ar(minute)}` : 'المباراة انتهت', active: false };
+    return minute
+      ? { label: minuteLabel(minute), hint: `انتهت عند د${ar(minute)}`, active: false }
+      : { label: 'انتهت', hint: 'المباراة انتهت', active: false };
   }
 
   if (value === 'ET') {
