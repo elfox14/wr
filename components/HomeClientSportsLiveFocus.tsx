@@ -50,6 +50,8 @@ const HALF_TIME_STATUSES = ['HT', 'HALFTIME', 'HALF_TIME', 'HALF-TIME'];
 const FINISHED_STATUSES = ['FINISHED', 'FT', 'AET', 'PEN'];
 const SCHEDULED_STATUSES = ['SCHEDULED', 'TIMED', 'NOT_STARTED', 'NS'];
 const GROUP_LETTERS = 'ABCDEFGHIJKL'.split('');
+const LIKELY_LIVE_AFTER_MINUTES = 5;
+const MAX_LIKELY_LIVE_MINUTES = 115;
 
 function formatCount(value?: number | null, fallback = 0) {
   return new Intl.NumberFormat('ar-EG').format(typeof value === 'number' && Number.isFinite(value) ? value : fallback);
@@ -92,9 +94,15 @@ function matchTime(match: HomeMatch) {
   return date && Number.isFinite(date.getTime()) ? date.getTime() : Number.MAX_SAFE_INTEGER;
 }
 
-function hasKickoffPassed(match: HomeMatch, now: Date) {
+function minutesSinceKickoff(match: HomeMatch, now: Date) {
   const date = match.matchDate ? new Date(match.matchDate) : null;
-  return Boolean(date && Number.isFinite(date.getTime()) && date.getTime() <= now.getTime());
+  if (!date || !Number.isFinite(date.getTime())) return null;
+  return Math.floor((now.getTime() - date.getTime()) / 60_000) + 1;
+}
+
+function hasKickoffPassed(match: HomeMatch, now: Date) {
+  const minutes = minutesSinceKickoff(match, now);
+  return minutes !== null && minutes >= 1;
 }
 
 function isFinished(match?: HomeMatch | null) {
@@ -105,17 +113,22 @@ function isHalfTime(match?: HomeMatch | null) {
   return HALF_TIME_STATUSES.includes(normalizeStatus(match)) || Boolean(match?.isHalfTime);
 }
 
-function isConfirmedLive(match?: HomeMatch | null) {
-  const status = normalizeStatus(match);
-  return !isFinished(match) && !isHalfTime(match) && (LIVE_STATUSES.includes(status) || Boolean(match?.isLiveNow));
-}
-
 function isScheduled(match?: HomeMatch | null) {
   return !isFinished(match) && SCHEDULED_STATUSES.includes(normalizeStatus(match));
 }
 
+function isLikelyLiveByElapsedTime(match: HomeMatch, now: Date) {
+  const minutes = minutesSinceKickoff(match, now);
+  return !isFinished(match) && !isHalfTime(match) && isScheduled(match) && minutes !== null && minutes >= LIKELY_LIVE_AFTER_MINUTES && minutes < MAX_LIKELY_LIVE_MINUTES;
+}
+
+function isConfirmedLive(match?: HomeMatch | null, now?: Date) {
+  const status = normalizeStatus(match);
+  return !isFinished(match) && !isHalfTime(match) && (LIVE_STATUSES.includes(status) || Boolean(match?.isLiveNow) || Boolean(match?.isLikelyLiveByTime) || Boolean(match && now && isLikelyLiveByElapsedTime(match, now)));
+}
+
 function isWaitingForStartConfirmation(match: HomeMatch, now: Date) {
-  return isScheduled(match) && hasKickoffPassed(match, now) && !isConfirmedLive(match) && !isHalfTime(match);
+  return isScheduled(match) && hasKickoffPassed(match, now) && !isLikelyLiveByElapsedTime(match, now) && !isConfirmedLive(match, now) && !isHalfTime(match);
 }
 
 function uniqueMatches(list: HomeMatch[]) {
@@ -206,8 +219,10 @@ function MatchStatePill({ match, now }: { match: HomeMatch; now: Date }) {
     return <span className="rounded-xl border border-[#FFD700]/20 bg-[#FFD700]/10 px-2.5 py-1.5 text-[11px] font-black text-[#FFD700]">استراحة</span>;
   }
 
-  if (isConfirmedLive(match)) {
-    return <span className="rounded-xl border border-[#00FF88]/25 bg-[#00FF88]/10 px-2.5 py-1.5 text-[11px] font-black text-[#00FF88]">جارية الآن</span>;
+  if (isConfirmedLive(match, now)) {
+    const minute = typeof match.minute === 'number' && Number.isFinite(match.minute) ? match.minute : minutesSinceKickoff(match, now);
+    const label = minute && minute > 0 ? `جارية الآن - د${formatCount(Math.min(150, minute))}` : 'جارية الآن';
+    return <span className="rounded-xl border border-[#00FF88]/25 bg-[#00FF88]/10 px-2.5 py-1.5 text-[11px] font-black text-[#00FF88]">{label}</span>;
   }
 
   if (isWaitingForStartConfirmation(match, now)) {
@@ -293,14 +308,14 @@ function MatchCenter({ fallbackMatches = [], nextMatch = null }: { fallbackMatch
 
   const mergedMatches = useMemo(() => uniqueMatches([...(matches.length ? matches : []), ...(nextMatch ? [nextMatch] : []), ...(matches.length ? [] : fallbackMatches)]), [matches, nextMatch, fallbackMatches]);
   const sortedMatches = useMemo(() => [...mergedMatches].sort((a, b) => matchTime(a) - matchTime(b)), [mergedMatches]);
-  const confirmedLiveMatch = sortedMatches.find((match) => isConfirmedLive(match) || isHalfTime(match)) || null;
+  const confirmedLiveMatch = sortedMatches.find((match) => isConfirmedLive(match, now) || isHalfTime(match)) || null;
   const waitingMatch = sortedMatches.find((match) => isWaitingForStartConfirmation(match, now)) || null;
-  const nextScheduledMatch = sortedMatches.find((match) => isScheduled(match) && !isWaitingForStartConfirmation(match, now)) || null;
+  const nextScheduledMatch = sortedMatches.find((match) => isScheduled(match) && !isWaitingForStartConfirmation(match, now) && !isConfirmedLive(match, now)) || null;
   const primaryMatch = confirmedLiveMatch || waitingMatch || nextScheduledMatch || sortedMatches.find((match) => !isFinished(match)) || sortedMatches[0] || null;
   const primaryKey = primaryMatch ? matchKey(primaryMatch) : null;
   const secondaryMatches = sortedMatches
     .filter((match) => matchKey(match) !== primaryKey)
-    .filter((match) => isScheduled(match) && !isWaitingForStartConfirmation(match, now) && matchTime(match) >= now.getTime())
+    .filter((match) => isScheduled(match) && !isWaitingForStartConfirmation(match, now) && !isConfirmedLive(match, now) && matchTime(match) >= now.getTime())
     .slice(0, 2);
 
   return (
@@ -308,7 +323,7 @@ function MatchCenter({ fallbackMatches = [], nextMatch = null }: { fallbackMatch
       <div className="flex flex-col gap-4">
         <div>
           {primaryMatch ? (
-            <MatchRow match={primaryMatch} now={now} variant={isConfirmedLive(primaryMatch) || isHalfTime(primaryMatch) ? 'live' : 'primary'} />
+            <MatchRow match={primaryMatch} now={now} variant={isConfirmedLive(primaryMatch, now) || isHalfTime(primaryMatch) ? 'live' : 'primary'} />
           ) : (
             <div className="rounded-2xl border border-dashed border-white/10 bg-black/20 p-4 text-sm font-bold text-gray-400">لا توجد مباراة رئيسية جاهزة للعرض الآن.</div>
           )}
@@ -394,21 +409,18 @@ export default function HomeClientSportsLiveFocus({
     <main dir="rtl" className="mx-auto max-w-7xl space-y-4 px-3 pb-8 pt-3 sm:space-y-6 sm:px-4 sm:py-5 lg:px-6">
       <HomeLiveMatchTicker matches={safeTickerMatches} />
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3 lg:items-start lg:gap-6">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3 lg:items-start lg:gap-5">
         <div className="lg:col-span-2">
-          <MatchCenter fallbackMatches={safeUpcomingMatches} nextMatch={safeNextMatch} />
+          <HomeTournamentStatsCard playersCount={playersCount} teamsCount={teamsCount} upcomingMatchesCount={upcomingMatchesCount} />
         </div>
         <div className="lg:col-span-1">
-          <HomeGroupStandingsWidget />
+          <MatchCenter fallbackMatches={safeUpcomingMatches} nextMatch={safeNextMatch} />
         </div>
       </div>
 
-      <HomeTournamentStatsCard playersCount={playersCount} teamsCount={teamsCount} upcomingMatchesCount={upcomingMatchesCount} />
-
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:gap-6">
-        <ContentHubCard />
-        <QuickLinksCard />
-      </div>
+      <HomeGroupStandingsWidget />
+      <ContentHubCard />
+      <QuickLinksCard />
     </main>
   );
 }
