@@ -1,7 +1,9 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { getServerSession } from 'next-auth';
 import { BookOpen, Clock, ExternalLink, Filter, Newspaper, Sparkles } from 'lucide-react';
 import prisma from '@/lib/prisma';
+import { authOptions } from '@/lib/auth';
 import AdSenseBanner from '@/components/ads/AdSenseBanner';
 import { ensureWorldCup2026OpeningNews, getPressNewsMeta } from '@/lib/press-news/world-cup-2026-opening-news';
 
@@ -27,6 +29,21 @@ const CATEGORIES = [
   { key: 'منتخبات', label: 'منتخبات' },
   { key: 'السوق', label: 'تحليل السوق' },
 ];
+
+const STATUS_FILTERS = [
+  { key: 'published', label: 'المنشور' },
+  { key: 'draft', label: 'المسودات' },
+  { key: 'all', label: 'الكل' },
+];
+
+type AdminSession = {
+  user?: { email?: string | null; role?: string | null };
+} | null;
+
+function isAdmin(session: AdminSession) {
+  const email = session?.user?.email || '';
+  return session?.user?.role === 'ADMIN' || email === 'worldcup@mcprim.com' || email === 'elfox14usa@gmail.com';
+}
 
 async function ensurePressNewsTable() {
   await prisma.$executeRawUnsafe(`
@@ -77,13 +94,33 @@ function matchCenterUrl(item: any) {
   return '';
 }
 
+function statusHref(category: string, status: string) {
+  const params = new URLSearchParams();
+  if (category !== 'all') params.set('category', category);
+  if (status !== 'published') params.set('status', status);
+  const query = params.toString();
+  return query ? `/news?${query}` : '/news';
+}
+
+function categoryHref(category: string, status: string, isAdminView: boolean) {
+  const params = new URLSearchParams();
+  if (category !== 'all') params.set('category', category);
+  if (isAdminView && status !== 'published') params.set('status', status);
+  const query = params.toString();
+  return query ? `/news?${query}` : '/news';
+}
+
 type NewsPageProps = {
-  searchParams: Promise<{ category?: string }>;
+  searchParams: Promise<{ category?: string; status?: string }>;
 };
 
 export default async function NewsPage({ searchParams }: NewsPageProps) {
   const resolvedSearchParams = await searchParams;
   const currentCategory = resolvedSearchParams.category || 'all';
+  const session = await getServerSession(authOptions as any) as AdminSession;
+  const canViewDrafts = isAdmin(session);
+  const requestedStatus = String(resolvedSearchParams.status || 'published');
+  const currentStatus = canViewDrafts && ['published', 'draft', 'all'].includes(requestedStatus) ? requestedStatus : 'published';
 
   await ensurePressNewsTable();
   try {
@@ -94,18 +131,29 @@ export default async function NewsPage({ searchParams }: NewsPageProps) {
 
   let newsItems: any[] = [];
   try {
-    if (currentCategory === 'all') {
+    if (currentCategory === 'all' && currentStatus === 'all') {
       newsItems = await prisma.$queryRawUnsafe<any[]>(`
         SELECT * FROM "PressNews"
-        WHERE "status" = 'published'
-        ORDER BY "publishedAt" DESC, "importance" DESC
+        ORDER BY "updatedAt" DESC, "publishedAt" DESC, "importance" DESC
       `);
+    } else if (currentCategory === 'all') {
+      newsItems = await prisma.$queryRawUnsafe<any[]>(`
+        SELECT * FROM "PressNews"
+        WHERE "status" = $1
+        ORDER BY "updatedAt" DESC, "publishedAt" DESC, "importance" DESC
+      `, currentStatus);
+    } else if (currentStatus === 'all') {
+      newsItems = await prisma.$queryRawUnsafe<any[]>(`
+        SELECT * FROM "PressNews"
+        WHERE "category" = $1
+        ORDER BY "updatedAt" DESC, "publishedAt" DESC, "importance" DESC
+      `, currentCategory);
     } else {
       newsItems = await prisma.$queryRawUnsafe<any[]>(`
         SELECT * FROM "PressNews"
-        WHERE "status" = 'published' AND "category" = $1
-        ORDER BY "publishedAt" DESC, "importance" DESC
-      `, currentCategory);
+        WHERE "status" = $1 AND "category" = $2
+        ORDER BY "updatedAt" DESC, "publishedAt" DESC, "importance" DESC
+      `, currentStatus, currentCategory);
     }
   } catch (err) {
     console.error('Error fetching news items:', err);
@@ -116,6 +164,8 @@ export default async function NewsPage({ searchParams }: NewsPageProps) {
   const heroMatchUrl = heroItem ? matchCenterUrl(heroItem) : '';
   const listItems = newsItems.slice(1);
   const isMatchCenterCategory = currentCategory === MATCH_CENTER_ANALYSIS_CATEGORY;
+  const isDraftView = canViewDrafts && currentStatus === 'draft';
+  const isAdminAllStatusView = canViewDrafts && currentStatus === 'all';
 
   return (
     <main className="min-h-screen bg-[#050505] text-white px-4 py-8 sm:px-6 lg:px-8" dir="rtl">
@@ -145,7 +195,7 @@ export default async function NewsPage({ searchParams }: NewsPageProps) {
             return (
               <Link
                 key={cat.key}
-                href={cat.key === 'all' ? '/news' : `/news?category=${encodeURIComponent(cat.key)}`}
+                href={categoryHref(cat.key, currentStatus, canViewDrafts)}
                 className={`rounded-2xl px-4 py-2 text-xs font-black transition-all ${
                   isActive
                     ? 'bg-[#0FF0FC] text-black shadow-[0_0_15px_rgba(15,240,252,0.3)]'
@@ -159,6 +209,35 @@ export default async function NewsPage({ searchParams }: NewsPageProps) {
             );
           })}
         </nav>
+
+        {canViewDrafts && (
+          <section className="rounded-2xl border border-[#FFD700]/15 bg-[#FFD700]/5 p-4">
+            <div className="mb-3 text-xs font-black text-[#FFD700]">فلتر إداري لحالة النشر</div>
+            <div className="flex flex-wrap gap-2">
+              {STATUS_FILTERS.map((status) => {
+                const isActive = currentStatus === status.key;
+                return (
+                  <Link
+                    key={status.key}
+                    href={statusHref(currentCategory, status.key)}
+                    className={`rounded-xl px-4 py-2 text-xs font-black transition ${
+                      isActive
+                        ? 'bg-[#FFD700] text-black'
+                        : 'border border-[#FFD700]/20 bg-black/20 text-[#FFD700] hover:bg-[#FFD700]/10'
+                    }`}
+                  >
+                    {status.label}
+                  </Link>
+                );
+              })}
+            </div>
+            {(isDraftView || isAdminAllStatusView) && (
+              <p className="mt-3 text-xs font-bold leading-6 text-gray-400">
+                هذا الفلتر يظهر للأدمن فقط. المسودات لا تظهر للزوار ولا لمحركات البحث حتى يتم نشرها.
+              </p>
+            )}
+          </section>
+        )}
 
         {isMatchCenterCategory && (
           <section className="rounded-2xl border border-[#FFD700]/15 bg-[#FFD700]/5 p-5 text-sm font-bold leading-7 text-gray-300">
@@ -175,6 +254,11 @@ export default async function NewsPage({ searchParams }: NewsPageProps) {
                     <span className="rounded-xl bg-[#FFD700]/10 border border-[#FFD700]/25 px-3 py-1 text-[11px] font-black text-[#FFD700]">
                       {heroItem.category}
                     </span>
+                    {canViewDrafts && heroItem.status !== 'published' && (
+                      <span className="rounded-xl border border-[#FFD700]/25 bg-[#FFD700]/10 px-3 py-1 text-[11px] font-black text-[#FFD700]">
+                        {heroItem.status}
+                      </span>
+                    )}
                     <span className="text-xs font-bold text-gray-500 flex items-center gap-1">
                       <Clock size={12} /> {formatDate(heroItem.publishedAt)}
                     </span>
@@ -238,14 +322,16 @@ export default async function NewsPage({ searchParams }: NewsPageProps) {
             <Newspaper size={48} className="mx-auto text-gray-500 opacity-30 mb-3" />
             <h3 className="text-lg font-black text-white">لا توجد أخبار منشورة</h3>
             <p className="mt-2 text-sm font-bold text-gray-500">
-              {isMatchCenterCategory
-                ? 'سيظهر هنا أي مقال يتم إنشاؤه من صفحة المباراة عند حفظه تحت تصنيف تحليل صفحة المباراة.'
-                : 'اختر تصنيفًا آخر أو تصفح في وقت لاحق.'}
+              {isDraftView
+                ? 'لا توجد مسودات مطابقة لهذا التصنيف حاليًا.'
+                : isMatchCenterCategory
+                  ? 'سيظهر هنا أي مقال يتم إنشاؤه من صفحة المباراة عند حفظه تحت تصنيف تحليل صفحة المباراة.'
+                  : 'اختر تصنيفًا آخر أو تصفح في وقت لاحق.'}
             </p>
           </div>
         )}
 
-        {heroItem && (
+        {heroItem && currentStatus === 'published' && (
           <AdSenseBanner slot="1234567890" format="horizontal" className="my-4" />
         )}
 
@@ -281,6 +367,11 @@ export default async function NewsPage({ searchParams }: NewsPageProps) {
                           </span>
                           <span>{formatDate(item.publishedAt)}</span>
                         </div>
+                        {canViewDrafts && item.status !== 'published' && (
+                          <span className="inline-flex rounded-lg border border-[#FFD700]/20 bg-[#FFD700]/10 px-2 py-1 text-[10px] font-black text-[#FFD700]">
+                            {item.status}
+                          </span>
+                        )}
                         {itemMatchUrl && (
                           <Link
                             href={itemMatchUrl}
