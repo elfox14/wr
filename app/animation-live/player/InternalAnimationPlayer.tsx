@@ -23,7 +23,7 @@ type LiveStatsResponse = {
 };
 type LiveEventsResponse = { ok: boolean; updatedAt?: string; events?: MatchEvent[]; error?: string };
 type PressureWindow = { available: boolean; home: number; away: number; homeEvents: number; awayEvents: number; leader: PressureSide };
-type PressureModel = { home: number; away: number; leader: PressureSide; rhythm: string; danger: string; window5: PressureWindow; window15: PressureWindow };
+type PressureModel = { home: number; away: number; leader: PressureSide; rhythm: string; danger: string; readout: string; window5: PressureWindow; window15: PressureWindow };
 type MomentumDefinition = { key: string; label: string; start: number; end: number };
 type MomentumSegment = MomentumDefinition & { available: boolean; home: number; away: number; homeEvents: number; awayEvents: number; homeDangerEvents: number; awayDangerEvents: number; leader: PressureSide; rating: string; topEvent: MatchEvent | null };
 
@@ -187,6 +187,20 @@ function pressureWindow(events: MatchEvent[], currentMinute: number | null, span
     return acc;
   }, initial);
 }
+function sideName(side: PressureSide, home?: Team, away?: Team) {
+  if (side === 'home') return home?.name || 'الفريق الأول';
+  if (side === 'away') return away?.name || 'الفريق الثاني';
+  if (side === 'balanced') return 'متوازن';
+  return 'غير متوفر';
+}
+function liveReadout(leader: PressureSide, rhythm: string, danger: string, window5: PressureWindow, window15: PressureWindow, homeTeam: Team, awayTeam: Team) {
+  const leaderName = sideName(leader, homeTeam, awayTeam);
+  if (leader === 'unknown') return 'لا توجد أحداث كافية لاستخراج قراءة مباشرة موثوقة.';
+  if (window5.available && (window5.home + window5.away) >= 12) return `${sideName(window5.leader, homeTeam, awayTeam)} يملك الزخم الأقرب في آخر ٥ دقائق، والرتم الحالي ${rhythm}.`;
+  if (window15.available && (window15.home + window15.away) >= 14) return `${sideName(window15.leader, homeTeam, awayTeam)} أكثر نشاطًا في آخر ١٥ دقيقة، والخطورة اللحظية ${danger}.`;
+  if (leader === 'balanced') return `المؤشر العام متوازن، والرتم اللحظي ${rhythm} بدون أفضلية ضغط واضحة.`;
+  return `${leaderName} يتفوق في مؤشر الضغط العام، لكن الرتم اللحظي ${rhythm} والخطورة ${danger}.`;
+}
 function calculatePressureModel(snapshot: Snapshot, events: MatchEvent[], currentMinute: number | null, homeTeam: Team, awayTeam: Team): PressureModel {
   const homeBase = (n(snapshot, 'homeAttacks') ?? 0) + ((n(snapshot, 'homeDangerousAttacks') ?? 0) * 3) + ((n(snapshot, 'homeShots') ?? 0) * 4) + ((n(snapshot, 'homeShotsOnTarget') ?? 0) * 6) + ((n(snapshot, 'homeCorners') ?? 0) * 2);
   const awayBase = (n(snapshot, 'awayAttacks') ?? 0) + ((n(snapshot, 'awayDangerousAttacks') ?? 0) * 3) + ((n(snapshot, 'awayShots') ?? 0) * 4) + ((n(snapshot, 'awayShotsOnTarget') ?? 0) * 6) + ((n(snapshot, 'awayCorners') ?? 0) * 2);
@@ -199,7 +213,8 @@ function calculatePressureModel(snapshot: Snapshot, events: MatchEvent[], curren
   const recentIntensity = hasRecentEvents ? ((window5.home + window5.away) * 2) + (window15.home + window15.away) : ((homeBase + awayBase) / Math.max(1, currentMinute ?? 90)) * 15;
   const rhythm = recentIntensity >= 35 ? 'عالي' : recentIntensity >= 14 ? 'متوسط' : 'هادئ';
   const danger = recentIntensity >= 35 ? 'مرتفعة' : recentIntensity >= 14 ? 'متوسطة' : 'منخفضة';
-  return { home: Math.round(homePressure), away: Math.round(awayPressure), leader, rhythm, danger, window5, window15 };
+  const readout = liveReadout(leader, rhythm, danger, window5, window15, homeTeam, awayTeam);
+  return { home: Math.round(homePressure), away: Math.round(awayPressure), leader, rhythm, danger, readout, window5, window15 };
 }
 function momentumRating(total: number) {
   if (total >= 18) return 'ضغط عالي';
@@ -226,12 +241,6 @@ function calculateMomentumSegments(events: MatchEvent[], homeTeam: Team, awayTea
     const total = result.home + result.away;
     return { ...segment, ...result, available: segmentEvents.length > 0, leader: pressureLeader(result.home, result.away), rating: momentumRating(total) };
   });
-}
-function sideName(side: PressureSide, home?: Team, away?: Team) {
-  if (side === 'home') return home?.name || 'الفريق الأول';
-  if (side === 'away') return away?.name || 'الفريق الثاني';
-  if (side === 'balanced') return 'متوازن';
-  return 'غير متوفر';
 }
 function windowLabel(window: PressureWindow) {
   if (!window.available) return 'غير متوفر';
@@ -366,6 +375,7 @@ export default function InternalAnimationPlayer({ matchId = '', dbMatchId = '' }
 
           <div className="order-4 rounded-3xl border border-[#0FF0FC]/20 bg-[#0FF0FC]/[0.045] p-4">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2"><div><div className="text-sm font-black text-white">Match Intelligence</div><div className="mt-1 text-[11px] font-bold text-gray-500">مؤشر تقديري من الهجمات، الهجمات الخطيرة، التسديدات، الركنيات، وآخر الأحداث المتاحة.</div></div><span className="rounded-full border border-white/10 bg-black/30 px-3 py-1 text-[10px] font-black text-gray-400">ليس رقمًا رسميًا</span></div>
+            <div className="mb-3 rounded-2xl border border-[#0FF0FC]/20 bg-black/25 p-3"><div className="text-[10px] font-black text-[#0FF0FC]">قراءة مباشرة</div><div className="mt-1 text-sm font-bold leading-6 text-white">{pressure.readout}</div></div>
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><IntelligenceTile label="الفريق الأخطر حاليًا" value={sideName(pressure.leader, match?.homeTeam, match?.awayTeam)} hint={`${ar(pressure.home)} - ${ar(pressure.away)} مؤشر ضغط`} accent /><IntelligenceTile label="رتم آخر ١٥ دقيقة" value={pressure.rhythm} hint="هادئ / متوسط / عالي" /><IntelligenceTile label="الخطورة اللحظية" value={pressure.danger} hint="منخفضة / متوسطة / مرتفعة" /><IntelligenceTile label="آخر ٥ دقائق" value={windowLabel(pressure.window5)} hint={pressure.window5.available ? `${ar(pressure.window5.homeEvents)} - ${ar(pressure.window5.awayEvents)} أحداث مرصودة` : 'غير متوفر من الأحداث'} /><IntelligenceTile label="آخر ١٥ دقيقة" value={windowLabel(pressure.window15)} hint={pressure.window15.available ? `${ar(pressure.window15.homeEvents)} - ${ar(pressure.window15.awayEvents)} أحداث مرصودة` : 'غير متوفر من الأحداث'} /><IntelligenceTile label="ضغط الفريق الأول" value={ar(pressure.home)} hint={match?.homeTeam?.name || 'الفريق الأول'} /><IntelligenceTile label="ضغط الفريق الثاني" value={ar(pressure.away)} hint={match?.awayTeam?.name || 'الفريق الثاني'} /><IntelligenceTile label="مصدر الذكاء" value="Live + Events" hint="بدون تخزين جديد في قاعدة البيانات" /></div>
           </div>
 
