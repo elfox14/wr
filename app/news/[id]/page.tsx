@@ -11,6 +11,8 @@ import { buildExpandedArticleParagraphs } from '@/lib/press-news/article-expansi
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
+const MATCH_CENTER_ANALYSIS_CATEGORY = 'تحليل صفحة المباراة';
+
 type Props = {
   params: Promise<{ id: string }>;
 };
@@ -29,13 +31,20 @@ async function ensurePressNewsTable() {
       "status" TEXT NOT NULL DEFAULT 'published',
       "importance" INTEGER NOT NULL DEFAULT 50,
       "tags" JSONB,
+      "relatedTeamId" TEXT,
+      "relatedPlayerId" TEXT,
+      "relatedMatchId" TEXT,
       "publishedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
       "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
       "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
     )
   `);
+  await prisma.$executeRawUnsafe('ALTER TABLE "PressNews" ADD COLUMN IF NOT EXISTS "relatedTeamId" TEXT');
+  await prisma.$executeRawUnsafe('ALTER TABLE "PressNews" ADD COLUMN IF NOT EXISTS "relatedPlayerId" TEXT');
+  await prisma.$executeRawUnsafe('ALTER TABLE "PressNews" ADD COLUMN IF NOT EXISTS "relatedMatchId" TEXT');
   await prisma.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS "PressNews_status_publishedAt_idx" ON "PressNews" ("status", "publishedAt")');
   await prisma.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS "PressNews_category_publishedAt_idx" ON "PressNews" ("category", "publishedAt")');
+  await prisma.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS "PressNews_relatedMatchId_idx" ON "PressNews" ("relatedMatchId")');
 }
 
 function formatDate(value: Date | string) {
@@ -53,6 +62,23 @@ function resolveImageUrl(baseUrl: string, image?: string) {
   if (!image) return `${baseUrl}/og-image.jpg`;
   if (/^https?:\/\//i.test(image)) return image;
   return `${baseUrl}${image.startsWith('/') ? image : `/${image}`}`;
+}
+
+function bodyParagraphs(newsItem: any) {
+  return newsItem.body
+    ? String(newsItem.body).split(/\r?\n/).filter((p: string) => p.trim().length > 0)
+    : [];
+}
+
+function isMatchCenterArticle(newsItem: any) {
+  return String(newsItem.category || '') === MATCH_CENTER_ANALYSIS_CATEGORY
+    || String(newsItem.sourceType || '') === 'match_center'
+    || String(newsItem.id || '').startsWith('match-center-');
+}
+
+function articleParagraphs(newsItem: any) {
+  if (isMatchCenterArticle(newsItem)) return bodyParagraphs(newsItem);
+  return buildExpandedArticleParagraphs(newsItem);
 }
 
 async function getNewsArticle(id: string) {
@@ -80,8 +106,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://worldcup.mcprim.com';
   const articleMeta = getPressNewsMeta(newsItem.tags, newsItem.title);
-  const expandedParagraphs = buildExpandedArticleParagraphs(newsItem);
-  const shortDescription = expandedParagraphs.join(' ').slice(0, 158).trim() + '...';
+  const paragraphs = articleParagraphs(newsItem);
+  const shortDescription = paragraphs.join(' ').slice(0, 158).trim() + '...';
   const imageUrl = resolveImageUrl(baseUrl, articleMeta.image);
 
   return {
@@ -118,7 +144,7 @@ export default async function NewsDetailPage({ params }: Props) {
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://worldcup.mcprim.com';
   const pageUrl = `${baseUrl}/news/${newsItem.id}`;
   const articleMeta = getPressNewsMeta(newsItem.tags, newsItem.title);
-  const paragraphs = buildExpandedArticleParagraphs(newsItem);
+  const paragraphs = articleParagraphs(newsItem);
   const words = paragraphs.join(' ').split(/\s+/).filter(Boolean).length;
   const readingTime = Math.max(1, Math.ceil(words / 180));
 
