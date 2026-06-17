@@ -33,6 +33,14 @@ type Props = {
   compact?: boolean;
 };
 
+function formatCount(value?: number | null, fallback = 0) {
+  return new Intl.NumberFormat('ar-EG').format(typeof value === 'number' && Number.isFinite(value) ? value : fallback);
+}
+
+function formatGoalDifference(value: number) {
+  return value > 0 ? `+${formatCount(value)}` : formatCount(value);
+}
+
 function rankThirdPlaced(groups: GroupData[]) {
   return groups
     .map<ThirdPlaceRow | null>((group, index) => {
@@ -53,7 +61,7 @@ function ThirdPlacedCard({ rows, compact }: { rows: ThirdPlaceRow[]; compact: bo
   return (
     <section className={`rounded-[1.2rem] border border-[#FFD700]/15 bg-black/25 ${compact ? 'p-2.5' : 'p-3'} shadow-[0_14px_38px_rgba(0,0,0,0.16)]`}>
       <div className="mb-2 flex items-center justify-between gap-2">
-        <h3 className="text-[11px] font-black text-white">أفضل 8 ثوالث</h3>
+        <h3 className="text-[11px] font-black text-white">أفضل ٨ ثوالث</h3>
         <span className="rounded-full border border-[#00FF88]/20 bg-[#00FF88]/10 px-2 py-0.5 text-[9px] font-black text-[#00FF88]">يتأهلون</span>
       </div>
 
@@ -62,20 +70,20 @@ function ThirdPlacedCard({ rows, compact }: { rows: ThirdPlaceRow[]; compact: bo
           {rows.map((row, index) => {
             const flagUrl = getTeamFlagUrl({ code: row.code, name: row.team }, 32);
             const teamId = `team-${row.code.toLowerCase()}`;
-            const gd = row.goalDifference > 0 ? `+${row.goalDifference}` : row.goalDifference;
+            const gd = formatGoalDifference(row.goalDifference);
 
             return (
               <Link
                 key={`${row.groupKey}-${row.code}`}
                 href={`/teams/${teamId}`}
                 className="mobile-tap flex min-w-0 items-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.04] px-1.5 py-1.5 transition hover:border-[#0FF0FC]/35 hover:bg-white/[0.07]"
-                title={`${row.team} - المجموعة ${row.groupNumber}`}
+                title={`${row.team} - المجموعة ${formatCount(row.groupNumber)}`}
               >
-                <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-md bg-[#FFD700] text-[9px] font-black text-black">{index + 1}</span>
+                <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-md bg-[#FFD700] text-[9px] font-black text-black">{formatCount(index + 1)}</span>
                 <img src={flagUrl || undefined} alt="" className="h-3.5 w-5 shrink-0 rounded-[3px] object-cover" />
                 <span className="min-w-0 flex-1 truncate text-[10px] font-black text-white">{row.team}</span>
-                <span className="shrink-0 text-[9px] font-black text-gray-500">م{row.groupNumber}</span>
-                <span className="shrink-0 rounded-md bg-[#FFD700]/10 px-1 text-[9px] font-black text-[#FFD700]">{row.points}ن</span>
+                <span className="shrink-0 text-[9px] font-black text-gray-500">م{formatCount(row.groupNumber)}</span>
+                <span className="shrink-0 rounded-md bg-[#FFD700]/10 px-1 text-[9px] font-black text-[#FFD700]">{formatCount(row.points)}ن</span>
                 <span className="hidden shrink-0 text-[9px] font-bold text-gray-500 sm:inline">{gd}</span>
               </Link>
             );
@@ -148,7 +156,7 @@ export default function HomeGroupStandingsWidget({ compact = false }: Props = {}
                   title={group.arName}
                   aria-label={group.arName}
                 >
-                  {index + 1}
+                  {formatCount(index + 1)}
                 </button>
               ))}
             </div>
@@ -189,7 +197,7 @@ export default function HomeGroupStandingsWidget({ compact = false }: Props = {}
                                     ? 'border border-[#FFD700]/20 bg-[#FFD700]/10 text-[#FFD700]'
                                     : 'bg-white/5 text-gray-400'
                               }`}>
-                                {index + 1}
+                                {formatCount(index + 1)}
                               </span>
                             </td>
                             <td className={`min-w-0 font-bold text-white ${cellPadding}`}>
@@ -198,11 +206,11 @@ export default function HomeGroupStandingsWidget({ compact = false }: Props = {}
                                 <span className={compact ? 'max-w-[5rem] truncate' : 'max-w-[6.5rem] truncate sm:max-w-[10rem]'}>{row.team}</span>
                               </Link>
                             </td>
-                            <td className={`${cellPadding} text-center font-medium text-gray-300`}>{row.played}</td>
+                            <td className={`${cellPadding} text-center font-medium text-gray-300`}>{formatCount(row.played)}</td>
                             <td className={`${cellPadding} text-center font-mono font-medium text-gray-300`}>
-                              {row.goalDifference > 0 ? `+${row.goalDifference}` : row.goalDifference}
+                              {formatGoalDifference(row.goalDifference)}
                             </td>
-                            <td className={`${cellPadding} text-center font-black text-[#FFD700]`}>{row.points}</td>
+                            <td className={`${cellPadding} text-center font-black text-[#FFD700]`}>{formatCount(row.points)}</td>
                           </tr>
                         );
                       })}
