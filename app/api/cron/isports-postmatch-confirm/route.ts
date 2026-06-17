@@ -153,7 +153,7 @@ export async function GET(req: Request) {
         homeTeam: { select: { id: true, name: true, code: true } },
         awayTeam: { select: { id: true, name: true, code: true } },
         _count: { select: { events: true, statsSnapshots: true } },
-        statsSnapshots: { orderBy: { createdAt: 'desc' }, take: 1, select: { provider: true, homeScore: true, awayScore: true, homeCorners: true, awayCorners: true, homePossession: true, awayPossession: true, homeShots: true, awayShots: true, createdAt: true } },
+        statsSnapshots: { orderBy: { capturedAt: 'desc' }, take: 1, select: { provider: true, homeScore: true, awayScore: true, homeCorners: true, awayCorners: true, homePossession: true, awayPossession: true, homeShots: true, awayShots: true, capturedAt: true } },
       },
     });
 
