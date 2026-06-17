@@ -1,124 +1,104 @@
-import { PageHeader } from '@/components/ui/PageHeader';
+import type { Metadata } from 'next';
 import { Mail, MessageSquare, MapPin, Send } from 'lucide-react';
-import { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'اتصل بنا',
-  description: 'تواصل مع فريق الدعم في MC PRIME Exchange',
+  title: 'اتصل بنا | بورصة المونديال',
+  description: 'تواصل مع فريق بورصة المونديال للاستفسارات العامة، التصحيحات التحريرية، حقوق الصور، الشراكات، أو الدعم الفني.',
+  alternates: { canonical: '/contact' },
 };
 
 export default function ContactPage() {
   return (
-    <div className="max-w-5xl mx-auto px-4 py-8">
-      <PageHeader 
-        title="اتصل بنا" 
-        description="نحن هنا للاستماع إليك ومساعدتك في أي وقت"
-        icon={<Mail size={32} />}
-        textColor="text-primary"
-      />
-      
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-        {/* Contact Info */}
-        <div className="space-y-8">
-          <div>
-            <h2 className="text-2xl font-bold text-white mb-6">طرق التواصل</h2>
-            <div className="space-y-6">
-              
-              <div className="flex items-start gap-4">
-                <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center text-primary shrink-0">
-                  <Mail size={24} />
-                </div>
-                <div>
-                  <h3 className="font-bold text-white text-lg">البريد الإلكتروني</h3>
-                  <p className="text-gray-400 text-sm mb-1">للاستفسارات العامة والدعم الفني</p>
-                  <a href="mailto:support@mcprime-exchange.com" className="text-primary hover:underline font-mono">support@mcprime-exchange.com</a>
-                </div>
-              </div>
+    <main className="min-h-screen bg-[#050505] px-4 py-10 text-white" dir="rtl">
+      <div className="mx-auto max-w-5xl space-y-8">
+        <header className="rounded-3xl border border-white/10 bg-white/[0.03] p-6 md:p-10">
+          <p className="text-sm font-black text-[#0FF0FC]">تواصل معنا</p>
+          <h1 className="mt-2 text-3xl font-black md:text-5xl">اتصل بنا</h1>
+          <p className="mt-4 max-w-3xl text-sm font-bold leading-7 text-gray-400">
+            نرحب بالاستفسارات، التصحيحات التحريرية، طلبات إزالة أو تعديل الصور، مقترحات التعاون، وملاحظات المستخدمين حول تجربة الموقع.
+          </p>
+        </header>
 
-              <div className="flex items-start gap-4">
-                <div className="w-12 h-12 rounded-xl bg-accent/10 flex items-center justify-center text-accent shrink-0">
-                  <MessageSquare size={24} />
-                </div>
-                <div>
-                  <h3 className="font-bold text-white text-lg">الشبكات الاجتماعية</h3>
-                  <p className="text-gray-400 text-sm mb-2">تابعنا وراسلنا على منصات التواصل</p>
-                  <div className="flex gap-3">
-                    <a href="#" className="text-gray-400 hover:text-white transition-colors">Twitter (X)</a>
-                    <span className="text-gray-600">•</span>
-                    <a href="#" className="text-gray-400 hover:text-white transition-colors">Instagram</a>
-                  </div>
-                </div>
-              </div>
+        <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
+          <section className="space-y-6 rounded-3xl border border-white/10 bg-white/[0.03] p-6 md:p-8">
+            <h2 className="text-2xl font-black text-[#FFD700]">طرق التواصل</h2>
 
-              <div className="flex items-start gap-4">
-                <div className="w-12 h-12 rounded-xl bg-emerald-400/10 flex items-center justify-center text-emerald-400 shrink-0">
-                  <MapPin size={24} />
-                </div>
-                <div>
-                  <h3 className="font-bold text-white text-lg">الاستفسارات التجارية</h3>
-                  <p className="text-gray-400 text-sm mb-1">للشراكات والإعلانات (Google AdSense وما شابه)</p>
-                  <a href="mailto:business@mcprime-exchange.com" className="text-emerald-400 hover:underline font-mono">business@mcprime-exchange.com</a>
-                </div>
+            <div className="flex items-start gap-4">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[#0FF0FC]/10 text-[#0FF0FC]">
+                <Mail size={24} />
               </div>
-
+              <div>
+                <h3 className="text-lg font-black text-white">البريد الإلكتروني</h3>
+                <p className="mb-1 text-sm font-bold text-gray-400">للاستفسارات العامة والدعم الفني والتصحيحات.</p>
+                <a href="mailto:elfox14usa@gmail.com" className="font-mono text-[#0FF0FC] hover:underline">elfox14usa@gmail.com</a>
+              </div>
             </div>
-          </div>
-        </div>
 
-        {/* Contact Form */}
-        <div className="bg-surface p-8 rounded-2xl border border-white/5 shadow-xl">
-          <h2 className="text-2xl font-bold text-white mb-6">أرسل رسالة</h2>
-          <form className="space-y-5">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <div className="flex items-start gap-4">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[#FFD700]/10 text-[#FFD700]">
+                <MessageSquare size={24} />
+              </div>
+              <div>
+                <h3 className="text-lg font-black text-white">التصحيحات التحريرية</h3>
+                <p className="text-sm font-bold leading-7 text-gray-400">
+                  عند الإبلاغ عن خطأ في نتيجة أو اسم لاعب أو صورة، يرجى إرسال رابط المقال، الجزء المراد تعديله، والمصدر الصحيح إن توفر.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-4">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-emerald-400/10 text-emerald-400">
+                <MapPin size={24} />
+              </div>
+              <div>
+                <h3 className="text-lg font-black text-white">الإدارة</h3>
+                <p className="text-sm font-bold leading-7 text-gray-400">
+                  MC PRIME — أسيوط، مصر. الموقع يعمل كمنصة محتوى رياضي رقمية موجهة للقراء العرب.
+                </p>
+              </div>
+            </div>
+          </section>
+
+          <section className="rounded-3xl border border-white/10 bg-white/[0.03] p-6 shadow-xl md:p-8">
+            <h2 className="mb-6 text-2xl font-black text-white">أرسل رسالة</h2>
+            <form className="space-y-5">
+              <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+                <div className="space-y-2">
+                  <label className="text-sm font-bold text-gray-300">الاسم بالكامل</label>
+                  <input type="text" className="w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-white outline-none transition-all focus:border-[#0FF0FC]" placeholder="اكتب اسمك" />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-bold text-gray-300">البريد الإلكتروني</label>
+                  <input type="email" className="w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-white outline-none transition-all focus:border-[#0FF0FC]" placeholder="name@example.com" />
+                </div>
+              </div>
+
               <div className="space-y-2">
-                <label className="text-sm font-bold text-gray-300">الاسم بالكامل</label>
-                <input 
-                  type="text" 
-                  className="w-full bg-background border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
-                  placeholder="محمد أحمد"
-                />
+                <label className="text-sm font-bold text-gray-300">نوع الرسالة</label>
+                <select className="w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-white outline-none transition-all focus:border-[#0FF0FC]">
+                  <option value="correction">تصحيح خبر أو نتيجة</option>
+                  <option value="image-rights">حقوق صورة أو طلب إزالة</option>
+                  <option value="general">استفسار عام</option>
+                  <option value="business">شراكة أو إعلان</option>
+                  <option value="technical">مشكلة فنية</option>
+                </select>
               </div>
+
               <div className="space-y-2">
-                <label className="text-sm font-bold text-gray-300">البريد الإلكتروني</label>
-                <input 
-                  type="email" 
-                  className="w-full bg-background border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
-                  placeholder="name@example.com"
-                />
+                <label className="text-sm font-bold text-gray-300">رسالتك</label>
+                <textarea rows={6} className="w-full resize-none rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-white outline-none transition-all focus:border-[#0FF0FC]" placeholder="اكتب تفاصيل رسالتك هنا..."></textarea>
               </div>
-            </div>
-            
-            <div className="space-y-2">
-              <label className="text-sm font-bold text-gray-300">نوع الاستفسار</label>
-              <select className="w-full bg-background border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all appearance-none">
-                <option value="support">مشكلة فنية في الحساب أو التداول</option>
-                <option value="general">استفسار عام</option>
-                <option value="business">شراكة تجارية أو إعلانات</option>
-                <option value="report">الإبلاغ عن إساءة أو خطأ</option>
-              </select>
-            </div>
 
-            <div className="space-y-2">
-              <label className="text-sm font-bold text-gray-300">رسالتك</label>
-              <textarea 
-                rows={5}
-                className="w-full bg-background border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all resize-none"
-                placeholder="اكتب تفاصيل رسالتك هنا..."
-              ></textarea>
-            </div>
-
-            <button 
-              type="button" 
-              className="w-full bg-primary hover:bg-primary-light text-white font-bold py-3.5 rounded-xl transition-colors flex items-center justify-center gap-2"
-            >
-              <Send size={18} /> إرسال الرسالة
-            </button>
-            <p className="text-xs text-gray-500 text-center mt-4">
-              بالنقر على إرسال، أنت توافق على سياسة الخصوصية الخاصة بنا.
-            </p>
-          </form>
+              <button type="button" className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#0FF0FC] py-3.5 font-black text-black transition hover:bg-[#FFD700]">
+                <Send size={18} /> إرسال الرسالة
+              </button>
+              <p className="text-center text-xs font-bold leading-6 text-gray-500">
+                النموذج الحالي للعرض فقط. للتواصل الفعلي، استخدم البريد الإلكتروني أعلاه.
+              </p>
+            </form>
+          </section>
         </div>
       </div>
-    </div>
+    </main>
   );
 }
