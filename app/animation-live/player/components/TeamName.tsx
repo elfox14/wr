@@ -1,6 +1,5 @@
 import { getTeamFlagUrl } from '@/lib/teamFlags';
-
-type Team = { id?: string; name?: string; code?: string; image?: string } | null;
+import type { Team } from '../types';
 
 type TeamNameProps = {
   team: Team;
