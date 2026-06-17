@@ -1,21 +1,53 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import Link from 'next/link';
-import { FileText, Loader2, Sparkles } from 'lucide-react';
+import { CheckCircle2, Eye, FileText, Loader2, Sparkles } from 'lucide-react';
 
 type Props = {
   matchId: string;
 };
 
+type PreviewItem = {
+  id: string;
+  title: string;
+  body: string;
+  category: string;
+  sourceName: string;
+  sourceUrl?: string | null;
+  tags?: { keywords?: string[] } | string[] | null;
+};
+
+function wordCount(text: string) {
+  return String(text || '').split(/\s+/).filter(Boolean).length;
+}
+
+function qualityNotes(item: PreviewItem | null) {
+  if (!item) return [];
+  const notes: string[] = [];
+  const words = wordCount(item.body);
+  if (words < 450) notes.push(`المقال قصير نسبيًا: ${words} كلمة تقريبًا. راجعه إذا كنت تستهدف مقالًا أطول.`);
+  if (item.body.includes('تعتمد هذه القراءة على أحداث الأهداف')) notes.push('تنبيه: النتيجة اعتمدت على أحداث الأهداف لأن نتيجة جدول المباراة قد تكون غير مكتملة.');
+  if (!item.body.includes('عن طريق ')) notes.push('تنبيه: أسماء اللاعبين غير متوفرة في الأحداث، لذلك استخدم القالب لقطة المباراة بدل نجم المباراة.');
+  if (item.body.includes('غير متوفرة') || item.body.includes('غير مكتملة')) notes.push('توجد إشارة إلى بيانات غير مكتملة داخل المقال؛ راجعها قبل النشر النهائي.');
+  if (!notes.length) notes.push('المقال يبدو جاهزًا للنشر من ناحية البنية الأساسية والبيانات المتاحة.');
+  return notes;
+}
+
 export default function GenerateMatchArticleButton({ matchId }: Props) {
-  const [loading, setLoading] = useState(false);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [publishLoading, setPublishLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [newsUrl, setNewsUrl] = useState<string | null>(null);
   const [categoryUrl, setCategoryUrl] = useState<string | null>(null);
+  const [previewItem, setPreviewItem] = useState<PreviewItem | null>(null);
 
-  async function generateArticle() {
-    setLoading(true);
+  const notes = useMemo(() => qualityNotes(previewItem), [previewItem]);
+  const previewWords = previewItem ? wordCount(previewItem.body) : 0;
+
+  async function requestArticle(mode: 'preview' | 'upsert') {
+    if (mode === 'preview') setPreviewLoading(true);
+    else setPublishLoading(true);
     setMessage(null);
     setNewsUrl(null);
     setCategoryUrl(null);
@@ -24,17 +56,25 @@ export default function GenerateMatchArticleButton({ matchId }: Props) {
       const response = await fetch('/api/admin/match-article', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ matchId, status: 'published', mode: 'upsert' }),
+        body: JSON.stringify({ matchId, status: 'published', mode }),
       });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok || !payload.ok) throw new Error(payload.error || 'تعذر إنشاء المقال من بيانات المباراة.');
-      setNewsUrl(payload.url || null);
-      setCategoryUrl(payload.categoryUrl || null);
-      setMessage('تم إنشاء/تحديث المقال بنجاح داخل تصنيف تحليل صفحة المباراة.');
+
+      if (mode === 'preview') {
+        setPreviewItem(payload.item || null);
+        setMessage('تم تجهيز معاينة المقال. راجع النص والملاحظات، ثم اضغط نشر/تحديث.');
+      } else {
+        setNewsUrl(payload.url || null);
+        setCategoryUrl(payload.categoryUrl || null);
+        setPreviewItem(payload.item || previewItem);
+        setMessage('تم نشر/تحديث المقال بنجاح داخل تصنيف تحليل صفحة المباراة.');
+      }
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'تعذر إنشاء المقال.');
     } finally {
-      setLoading(false);
+      if (mode === 'preview') setPreviewLoading(false);
+      else setPublishLoading(false);
     }
   }
 
@@ -46,18 +86,29 @@ export default function GenerateMatchArticleButton({ matchId }: Props) {
             <Sparkles size={16} /> أداة إدارية مؤقتة
           </div>
           <p className="mt-1 text-xs font-bold leading-6 text-gray-400">
-            أنشئ مقالًا حصريًا من نتيجة المباراة، الإحصائيات، الأحداث، والزخم، واحفظه في تصنيف تحليل صفحة المباراة.
+            أنشئ معاينة لمقال حصري من نتيجة المباراة، الإحصائيات، والأحداث، ثم انشره بعد المراجعة في تصنيف تحليل صفحة المباراة.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={generateArticle}
-          disabled={loading}
-          className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#FFD700] px-4 text-sm font-black text-black transition hover:bg-[#0FF0FC] disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {loading ? <Loader2 size={16} className="animate-spin" /> : <FileText size={16} />}
-          {loading ? 'جارٍ إنشاء المقال...' : 'إنشاء مقال من هذه المباراة'}
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => requestArticle('preview')}
+            disabled={previewLoading || publishLoading}
+            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[#0FF0FC]/25 bg-[#0FF0FC]/10 px-4 text-sm font-black text-[#EAFBFF] transition hover:bg-[#0FF0FC] hover:text-black disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {previewLoading ? <Loader2 size={16} className="animate-spin" /> : <Eye size={16} />}
+            {previewLoading ? 'جارٍ تجهيز المعاينة...' : 'معاينة المقال'}
+          </button>
+          <button
+            type="button"
+            onClick={() => requestArticle('upsert')}
+            disabled={previewLoading || publishLoading || !previewItem}
+            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#FFD700] px-4 text-sm font-black text-black transition hover:bg-[#0FF0FC] disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {publishLoading ? <Loader2 size={16} className="animate-spin" /> : <FileText size={16} />}
+            {publishLoading ? 'جارٍ النشر...' : 'نشر/تحديث المقال'}
+          </button>
+        </div>
       </div>
 
       {message && (
@@ -67,6 +118,34 @@ export default function GenerateMatchArticleButton({ matchId }: Props) {
             {newsUrl && <Link href={newsUrl} className="text-[#0FF0FC] hover:underline">فتح المقال</Link>}
             {categoryUrl && <Link href={categoryUrl} className="text-[#FFD700] hover:underline">فتح التصنيف</Link>}
           </div>
+        </div>
+      )}
+
+      {previewItem && (
+        <div className="mt-4 grid gap-3 lg:grid-cols-[1fr_280px]">
+          <article className="rounded-2xl border border-white/10 bg-black/30 p-4">
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+              <span className="rounded-full border border-[#FFD700]/20 bg-[#FFD700]/10 px-3 py-1 text-[11px] font-black text-[#FFD700]">
+                معاينة قبل النشر
+              </span>
+              <span className="text-[11px] font-bold text-gray-500">{previewWords} كلمة تقريبًا</span>
+            </div>
+            <h3 className="text-base font-black leading-7 text-white">{previewItem.title}</h3>
+            <div className="mt-3 max-h-96 overflow-auto whitespace-pre-line rounded-xl border border-white/5 bg-black/30 p-3 text-xs font-bold leading-7 text-gray-300">
+              {previewItem.body}
+            </div>
+          </article>
+
+          <aside className="rounded-2xl border border-white/10 bg-black/30 p-4">
+            <div className="flex items-center gap-2 text-sm font-black text-[#0FF0FC]">
+              <CheckCircle2 size={16} /> ملاحظات الجودة
+            </div>
+            <ul className="mt-3 space-y-2 text-xs font-bold leading-6 text-gray-300">
+              {notes.map((note) => (
+                <li key={note} className="rounded-xl border border-white/5 bg-white/[0.03] p-2">{note}</li>
+              ))}
+            </ul>
+          </aside>
         </div>
       )}
     </section>
