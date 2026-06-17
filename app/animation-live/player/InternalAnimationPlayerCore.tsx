@@ -162,6 +162,7 @@ export default function InternalAnimationPlayerCore({ matchId = '', dbMatchId = 
         away={awayTeam}
         activeEvent={activeEvent}
         selectedEventId={selectedEventId}
+        currentMinute={currentMinute}
         eventFilter={eventFilter}
         onFilterChange={setEventFilter}
         onSelectEvent={setSelectedEventId}
