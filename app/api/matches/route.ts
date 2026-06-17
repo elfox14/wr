@@ -4,11 +4,15 @@ import prisma from '@/lib/prisma';
 const LIVE_STATUSES = ['1H', '2H', 'ET', 'BT', 'P', 'IN_PLAY', 'LIVE', 'HT'];
 const SCHEDULED_STATUSES = ['SCHEDULED', 'TIMED', 'NOT_STARTED', 'NS'];
 const FINISHED_STATUSES = ['FINISHED', 'FT', 'AET', 'PEN'];
+const HALF_TIME_STATUSES = ['HT', 'HALFTIME', 'HALF_TIME', 'HALF-TIME'];
 const GROUP_STAGE_MAX_LIVE_MINUTES = 115;
 const KNOCKOUT_MAX_LIVE_MINUTES = 150;
 const STALE_FINAL_SNAPSHOT_MS = 7 * 60 * 1000;
 const FINAL_MINUTE_FLOOR = 85;
 const FINAL_LOCAL_MINUTE_FALLBACK = 100;
+const FIRST_HALF_FALLBACK_CAP = 50;
+
+type SnapshotState = { minute: number; capturedAt: Date };
 
 function dayHourKey(value: Date | string) {
   const date = new Date(value);
@@ -70,6 +74,28 @@ function isLiveStatus(status?: string | null) {
   return LIVE_STATUSES.includes(normalizeStatus(status));
 }
 
+function isHalfTimeStatus(status?: string | null) {
+  return HALF_TIME_STATUSES.includes(normalizeStatus(status));
+}
+
+function isSecondHalfStatus(status?: string | null) {
+  const value = normalizeStatus(status);
+  return value === '2H' || value === 'ET';
+}
+
+function halftimeDisplay(match: any) {
+  return {
+    ...match,
+    displayStatus: 'HT',
+    isLiveNow: true,
+    isHalfTime: true,
+    isLikelyLiveByTime: false,
+    minute: null,
+    liveLabel: 'استراحة',
+    minuteSource: 'provider_status',
+  };
+}
+
 function isStaleByTime(match: any, now = Date.now()) {
   const minute = minutesFromKickoff(match, now);
   if (minute === null) return false;
@@ -85,7 +111,7 @@ function isFinalSnapshotStale(match: any, now = Date.now()) {
 
 function isFinishedByNoProviderFallback(match: any, now = Date.now()) {
   const status = normalizeStatus(match.status);
-  if (status !== 'IN_PLAY' && status !== 'LIVE') return false;
+  if (status !== 'IN_PLAY' && status !== 'LIVE' && status !== '1H') return false;
   const minute = minutesFromKickoff(match, now);
   return minute !== null && minute >= FINAL_LOCAL_MINUTE_FALLBACK;
 }
@@ -98,59 +124,53 @@ function isLikelyLiveByTime(match: any, now = Date.now()) {
   return minute >= 1 && minute < maxLiveMinutes(match);
 }
 
-function normalizeMatchForDisplay(match: any, now = Date.now()) {
+function displayMinute(match: any, snapshot: SnapshotState | undefined, now = Date.now()) {
   const status = normalizeStatus(match.status);
-  const minute = minutesFromKickoff(match, now);
+  const kickoff = safeKickoffMinute(match, now);
+  const snapshotMinute = snapshot?.minute || Number(match.latestStatsMinute) || null;
+
+  if (isSecondHalfStatus(status)) {
+    if (snapshotMinute && snapshotMinute >= 46) return Math.min(snapshotMinute, maxLiveMinutes(match));
+    return kickoff ? Math.max(46, kickoff) : null;
+  }
+
+  if (status === '1H') {
+    if (snapshotMinute && snapshotMinute > 0 && snapshotMinute <= 60) return snapshotMinute;
+    return kickoff ? Math.min(kickoff, FIRST_HALF_FALLBACK_CAP) : null;
+  }
+
+  if (status === 'IN_PLAY' || status === 'LIVE') {
+    if (snapshotMinute && snapshotMinute >= 46) return Math.min(snapshotMinute, maxLiveMinutes(match));
+    if (kickoff && kickoff > FIRST_HALF_FALLBACK_CAP && kickoff < 70) return null;
+    return kickoff ? Math.min(kickoff, FIRST_HALF_FALLBACK_CAP) : snapshotMinute;
+  }
+
+  return kickoff;
+}
+
+function normalizeMatchForDisplay(match: any, now = Date.now(), snapshot?: SnapshotState) {
+  const status = normalizeStatus(match.status);
   const shouldAutoFinish = isStaleByTime(match, now) || isFinalSnapshotStale(match, now) || isFinishedByNoProviderFallback(match, now);
 
   if (isOfficialFinished(match)) {
-    return {
-      ...match,
-      displayStatus: 'FINISHED',
-      isLiveNow: false,
-      isLikelyLiveByTime: false,
-      minute: null,
-      liveLabel: null,
-    };
+    return { ...match, displayStatus: 'FINISHED', isLiveNow: false, isLikelyLiveByTime: false, minute: null, liveLabel: null };
   }
 
+  if (isHalfTimeStatus(status)) return halftimeDisplay(match);
+
   if ((isLiveStatus(status) || isScheduledStatus(status)) && shouldAutoFinish) {
-    return {
-      ...match,
-      status: 'FINISHED',
-      displayStatus: 'FINISHED',
-      isLiveNow: false,
-      isLikelyLiveByTime: false,
-      isStaleAutoFinished: true,
-      minute: null,
-      liveLabel: null,
-    };
+    return { ...match, status: 'FINISHED', displayStatus: 'FINISHED', isLiveNow: false, isLikelyLiveByTime: false, isStaleAutoFinished: true, minute: null, liveLabel: null };
   }
 
   if (isLikelyLiveByTime(match, now)) {
-    const safeMinute = minute ? Math.max(1, Math.min(maxLiveMinutes(match), minute)) : null;
-    return {
-      ...match,
-      displayStatus: 'IN_PLAY',
-      isLiveNow: true,
-      isLikelyLiveByTime: true,
-      minute: safeMinute,
-      liveLabel: safeMinute ? `الدقيقة ${safeMinute}` : 'مباشر الآن',
-      minuteSource: 'kickoff_time',
-    };
+    const safeMinute = displayMinute({ ...match, status: '1H' }, snapshot, now);
+    return { ...match, displayStatus: 'IN_PLAY', isLiveNow: true, isLikelyLiveByTime: true, minute: safeMinute, liveLabel: safeMinute ? `الدقيقة ${safeMinute}` : 'مباشر الآن', minuteSource: 'kickoff_time' };
   }
 
   if (isLiveStatus(status)) {
-    const safeMinute = safeKickoffMinute(match, now);
-    return {
-      ...match,
-      displayStatus: status,
-      isLiveNow: true,
-      isLikelyLiveByTime: false,
-      minute: safeMinute ?? match.minute ?? null,
-      liveLabel: safeMinute ? `الدقيقة ${safeMinute}` : match.liveLabel || 'مباشر الآن',
-      minuteSource: safeMinute ? 'kickoff_time' : 'snapshot',
-    };
+    const safeMinute = displayMinute(match, snapshot, now);
+    if (safeMinute === null && (status === 'IN_PLAY' || status === 'LIVE')) return halftimeDisplay(match);
+    return { ...match, displayStatus: status, isLiveNow: true, isLikelyLiveByTime: false, minute: safeMinute, liveLabel: safeMinute ? `الدقيقة ${safeMinute}` : 'مباشر الآن', minuteSource: isSecondHalfStatus(status) ? 'provider_second_half' : 'provider_or_kickoff' };
   }
 
   return match;
@@ -165,10 +185,8 @@ function rankMatch(match: any) {
 }
 
 function dedupeMatches(matches: any[]) {
-  const now = Date.now();
-  const normalizedMatches = matches.map((match) => normalizeMatchForDisplay(match, now));
   const byExact = new Map<string, any>();
-  for (const match of normalizedMatches) {
+  for (const match of matches) {
     const key = dedupeKey(match);
     const previous = byExact.get(key);
     if (!previous || rankMatch(match) > rankMatch(previous)) byExact.set(key, match);
@@ -190,21 +208,12 @@ function validMinute(value: unknown) {
   return Math.max(1, Math.min(130, Math.floor(minute)));
 }
 
-type SnapshotState = { minute: number; capturedAt: Date };
-
 async function latestDocumentedSnapshots(matchIds: string[]) {
   if (matchIds.length === 0) return new Map<string, SnapshotState>();
 
   const snapshots = await prisma.matchStatsSnapshot.findMany({
-    where: {
-      matchId: { in: matchIds },
-      minute: { not: null },
-    },
-    select: {
-      matchId: true,
-      minute: true,
-      capturedAt: true,
-    },
+    where: { matchId: { in: matchIds }, minute: { not: null } },
+    select: { matchId: true, minute: true, capturedAt: true },
     orderBy: { capturedAt: 'desc' },
   });
 
@@ -220,10 +229,7 @@ async function latestDocumentedSnapshots(matchIds: string[]) {
 export async function GET() {
   try {
     const matches = await prisma.match.findMany({
-      include: {
-        homeTeam: true,
-        awayTeam: true,
-      },
+      include: { homeTeam: true, awayTeam: true },
       orderBy: { matchDate: 'asc' },
     });
 
@@ -232,13 +238,7 @@ export async function GET() {
     const enrichedMatches = matches.map((match) => {
       const snapshot = documentedSnapshots.get(match.id);
       const matchWithSnapshot = snapshot ? { ...match, latestStatsMinute: snapshot.minute, latestStatsCapturedAt: snapshot.capturedAt } : match;
-      const kickoffMinute = safeKickoffMinute(matchWithSnapshot, now);
-      const liveByStatusOrTime = isLiveStatus(matchWithSnapshot.status) || isLikelyLiveByTime(matchWithSnapshot, now);
-      if (liveByStatusOrTime && kickoffMinute !== null && !isOfficialFinished(matchWithSnapshot) && !isStaleByTime(matchWithSnapshot, now)) {
-        return { ...matchWithSnapshot, minute: kickoffMinute, displayStatus: 'IN_PLAY', isLiveNow: true, liveLabel: `الدقيقة ${kickoffMinute}`, minuteSource: 'kickoff_time' };
-      }
-      const canUseLiveSnapshot = snapshot && !isOfficialFinished(matchWithSnapshot) && !isStaleByTime(matchWithSnapshot, now) && !isFinalSnapshotStale(matchWithSnapshot, now);
-      return canUseLiveSnapshot ? { ...matchWithSnapshot, minute: snapshot.minute, displayStatus: 'IN_PLAY', isLiveNow: true, liveLabel: `الدقيقة ${snapshot.minute}`, minuteSource: 'snapshot' } : matchWithSnapshot;
+      return normalizeMatchForDisplay(matchWithSnapshot, now, snapshot);
     });
 
     return NextResponse.json(dedupeMatches(enrichedMatches), { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } });
