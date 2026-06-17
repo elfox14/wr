@@ -248,6 +248,23 @@ function calculateMomentumSegments(events: MatchEvent[], homeTeam: Team, awayTea
 function strongestMomentumSegment(segments: MomentumSegment[]) {
   return segments.filter((segment) => segment.available).sort((a, b) => ((b.home + b.away) - (a.home + a.away)) || ((b.homeEvents + b.awayEvents) - (a.homeEvents + a.awayEvents)))[0] || null;
 }
+function statEdge(snapshot: Snapshot, homeKey: string, awayKey: string, label: string, homeName: string, awayName: string) {
+  const home = n(snapshot, homeKey);
+  const away = n(snapshot, awayKey);
+  if (home === null || away === null || home === away) return null;
+  const leader = home > away ? homeName : awayName;
+  return `${leader} يتفوق في ${label} بفارق ${ar(Math.abs(home - away))}.`;
+}
+function matchStoryLines(match: LiveStatsResponse['match'] | undefined, snapshot: Snapshot, strongestSegment: MomentumSegment | null) {
+  const homeName = match?.homeTeam?.name || 'الفريق الأول';
+  const awayName = match?.awayTeam?.name || 'الفريق الثاني';
+  const homeScore = n(snapshot, 'homeScore') ?? match?.homeScore ?? 0;
+  const awayScore = n(snapshot, 'awayScore') ?? match?.awayScore ?? 0;
+  const scoreLine = homeScore === awayScore ? `النتيجة متعادلة ${ar(homeScore)} - ${ar(awayScore)}.` : `${homeScore > awayScore ? homeName : awayName} متقدم ${ar(homeScore)} - ${ar(awayScore)}.`;
+  const statLine = statEdge(snapshot, 'homeDangerousAttacks', 'awayDangerousAttacks', 'الهجمات الخطيرة', homeName, awayName) || statEdge(snapshot, 'homeShotsOnTarget', 'awayShotsOnTarget', 'التسديدات على المرمى', homeName, awayName) || statEdge(snapshot, 'homeShots', 'awayShots', 'إجمالي التسديدات', homeName, awayName) || statEdge(snapshot, 'homePossession', 'awayPossession', 'الاستحواذ', homeName, awayName) || 'الأرقام المتاحة لا تظهر أفضلية إحصائية حاسمة.';
+  const momentumLine = strongestSegment ? `أقوى فترة كانت د ${strongestSegment.label} لصالح ${sideName(strongestSegment.leader, match?.homeTeam, match?.awayTeam)} بمؤشر ${ar(strongestSegment.home + strongestSegment.away)}.` : 'أقوى فترة غير متوفرة لأن الأحداث المحفوظة غير كافية.';
+  return [scoreLine, statLine, momentumLine];
+}
 function windowLabel(window: PressureWindow) {
   if (!window.available) return 'غير متوفر';
   return `${ar(window.home)} - ${ar(window.away)}`;
@@ -348,6 +365,7 @@ export default function InternalAnimationPlayer({ matchId = '', dbMatchId = '' }
   const momentumSegments = useMemo(() => calculateMomentumSegments(events, match?.homeTeam || null, match?.awayTeam || null), [events, match?.homeTeam, match?.awayTeam]);
   const strongestSegment = useMemo(() => strongestMomentumSegment(momentumSegments), [momentumSegments]);
   const maxMomentumScore = useMemo(() => Math.max(1, ...momentumSegments.map((segment) => segment.home + segment.away)), [momentumSegments]);
+  const storyLines = useMemo(() => matchStoryLines(match, latest, strongestSegment), [match, latest, strongestSegment]);
 
   useEffect(() => {
     if (!filteredEvents.length) { if (selectedEventId) setSelectedEventId(null); return; }
@@ -384,6 +402,7 @@ export default function InternalAnimationPlayer({ matchId = '', dbMatchId = '' }
           <div className="order-4 rounded-3xl border border-[#0FF0FC]/20 bg-[#0FF0FC]/[0.045] p-4">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2"><div><div className="text-sm font-black text-white">Match Intelligence</div><div className="mt-1 text-[11px] font-bold text-gray-500">مؤشر تقديري من الهجمات، الهجمات الخطيرة، التسديدات، الركنيات، وآخر الأحداث المتاحة.</div></div><span className="rounded-full border border-white/10 bg-black/30 px-3 py-1 text-[10px] font-black text-gray-400">ليس رقمًا رسميًا</span></div>
             <div className="mb-3 rounded-2xl border border-[#0FF0FC]/20 bg-black/25 p-3"><div className="text-[10px] font-black text-[#0FF0FC]">قراءة مباشرة</div><div className="mt-1 text-sm font-bold leading-6 text-white">{pressure.readout}</div></div>
+            <div className="mb-3 rounded-2xl border border-white/10 bg-black/25 p-3"><div className="text-[10px] font-black text-gray-400">قصة المباراة</div><div className="mt-2 grid gap-2 md:grid-cols-3">{storyLines.map((line, index) => <div key={`${index}-${line}`} className="rounded-xl border border-white/10 bg-black/25 p-2 text-[11px] font-bold leading-5 text-gray-200">{line}</div>)}</div></div>
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><IntelligenceTile label="الفريق الأخطر حاليًا" value={sideName(pressure.leader, match?.homeTeam, match?.awayTeam)} hint={`${ar(pressure.home)} - ${ar(pressure.away)} مؤشر ضغط`} accent /><IntelligenceTile label="رتم آخر ١٥ دقيقة" value={pressure.rhythm} hint="هادئ / متوسط / عالي" /><IntelligenceTile label="الخطورة اللحظية" value={pressure.danger} hint="منخفضة / متوسطة / مرتفعة" /><IntelligenceTile label="آخر ٥ دقائق" value={windowLabel(pressure.window5)} hint={pressure.window5.available ? `${ar(pressure.window5.homeEvents)} - ${ar(pressure.window5.awayEvents)} أحداث مرصودة` : 'غير متوفر من الأحداث'} /><IntelligenceTile label="آخر ١٥ دقيقة" value={windowLabel(pressure.window15)} hint={pressure.window15.available ? `${ar(pressure.window15.homeEvents)} - ${ar(pressure.window15.awayEvents)} أحداث مرصودة` : 'غير متوفر من الأحداث'} /><IntelligenceTile label="ضغط الفريق الأول" value={ar(pressure.home)} hint={match?.homeTeam?.name || 'الفريق الأول'} /><IntelligenceTile label="ضغط الفريق الثاني" value={ar(pressure.away)} hint={match?.awayTeam?.name || 'الفريق الثاني'} /><IntelligenceTile label="مصدر الذكاء" value="Live + Events" hint="بدون تخزين جديد في قاعدة البيانات" /></div>
           </div>
 
