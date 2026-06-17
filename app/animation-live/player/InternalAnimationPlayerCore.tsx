@@ -26,6 +26,7 @@ const EVENTS_POLL_MS = 30_000;
 const CLOCK_TICK_MS = 15_000;
 const GROUP_STAGE_MAX_LIVE_MINUTES = 115;
 const FIRST_HALF_FALLBACK_CAP = 50;
+const FALSE_SECOND_HALF_GUARD_MINUTE = 45;
 
 function buildQuery(matchId?: string, dbMatchId?: string) {
   const params = new URLSearchParams();
@@ -58,35 +59,46 @@ function kickoffMinute(matchDate?: string | null, nowMs = Date.now()) {
   return Math.max(1, Math.min(GROUP_STAGE_MAX_LIVE_MINUTES, minute));
 }
 
+function safeFirstHalfMinute(localMinute: number | null) {
+  if (localMinute === null) return null;
+  return Math.min(localMinute, FIRST_HALF_FALLBACK_CAP);
+}
+
 function matchClockMinute(snapshot: Snapshot, events: MatchEvent[], status?: string | null, matchDate?: string | null, nowMs = Date.now()): MatchClock {
   const value = normalizeStatus(status);
+  const localMinute = kickoffMinute(matchDate, nowMs);
+  const liveMinute = n(snapshot, 'minute');
 
   if (isHalfTimeStatus(value)) {
     return { minute: null, source: 'provider_status' };
   }
 
   if (isLiveLike(value) && !isFinishedStatus(value)) {
-    const liveMinute = n(snapshot, 'minute');
-
     if (isSecondHalfStatus(value)) {
+      if (localMinute !== null && localMinute < FALSE_SECOND_HALF_GUARD_MINUTE) {
+        return { minute: safeFirstHalfMinute(localMinute), source: 'kickoff_time' };
+      }
       if (liveMinute !== null && liveMinute >= 46) return { minute: liveMinute, source: 'live_stats' };
-      const localMinute = kickoffMinute(matchDate, nowMs);
       return { minute: localMinute !== null ? Math.max(46, localMinute) : 46, source: 'provider_status' };
     }
 
-    if (value === '1H' && liveMinute !== null && liveMinute <= 60) return { minute: liveMinute, source: 'live_stats' };
-
-    const localMinute = kickoffMinute(matchDate, nowMs);
-    if (localMinute !== null) {
-      if ((value === 'IN_PLAY' || value === 'LIVE') && localMinute > FIRST_HALF_FALLBACK_CAP && localMinute < 70) return { minute: null, source: 'provider_status' };
-      return { minute: Math.min(localMinute, FIRST_HALF_FALLBACK_CAP), source: 'kickoff_time' };
+    if (localMinute !== null && localMinute < FALSE_SECOND_HALF_GUARD_MINUTE) {
+      return { minute: safeFirstHalfMinute(localMinute), source: 'kickoff_time' };
     }
 
-    if (liveMinute !== null) return { minute: liveMinute, source: 'live_stats' };
+    if (value === '1H' && liveMinute !== null && liveMinute > 0 && liveMinute <= FIRST_HALF_FALLBACK_CAP) {
+      return { minute: liveMinute, source: 'live_stats' };
+    }
+
+    if (localMinute !== null) {
+      if ((value === 'IN_PLAY' || value === 'LIVE' || value === '1H') && localMinute > FIRST_HALF_FALLBACK_CAP && localMinute < 70) return { minute: null, source: 'provider_status' };
+      return { minute: safeFirstHalfMinute(localMinute), source: 'kickoff_time' };
+    }
+
+    if (liveMinute !== null && liveMinute > 0 && liveMinute <= FIRST_HALF_FALLBACK_CAP) return { minute: liveMinute, source: 'live_stats' };
     return { minute: null, source: 'unavailable' };
   }
 
-  const liveMinute = n(snapshot, 'minute');
   if (liveMinute !== null) return { minute: liveMinute, source: 'live_stats' };
 
   if (!isFinishedStatus(value)) return { minute: null, source: 'unavailable' };
