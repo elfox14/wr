@@ -20,12 +20,16 @@ type AdminSession = {
   user?: { email?: string | null; role?: string | null };
 } | null;
 
-type ExistingArticle = {
-  id: string;
-  title: string;
-  status?: string | null;
-  updatedAt?: Date | string | null;
-} | null;
+type MatchArticleSummary = {
+  latest: {
+    id: string;
+    title: string;
+    status?: string | null;
+    updatedAt?: Date | string | null;
+  } | null;
+  count: number;
+  latestUpdatedAt?: Date | string | null;
+};
 
 function isAdmin(session: AdminSession) {
   const email = session?.user?.email || '';
@@ -36,15 +40,23 @@ async function getMatch(id: string) {
   return prisma.match.findUnique({ where: { id }, include: { homeTeam: true, awayTeam: true } });
 }
 
-async function getExistingMatchArticle(matchId: string): Promise<ExistingArticle> {
+async function getMatchArticleSummary(matchId: string): Promise<MatchArticleSummary> {
   try {
     const rows = await prisma.$queryRawUnsafe<any[]>(
       'SELECT "id", "title", "status", "updatedAt" FROM "PressNews" WHERE "relatedMatchId" = $1 ORDER BY "updatedAt" DESC, "publishedAt" DESC LIMIT 1',
       matchId
     );
-    return rows[0] || null;
+    const counts = await prisma.$queryRawUnsafe<any[]>(
+      'SELECT COUNT(*)::int AS "count", MAX("updatedAt") AS "latestUpdatedAt" FROM "PressNews" WHERE "relatedMatchId" = $1',
+      matchId
+    );
+    return {
+      latest: rows[0] || null,
+      count: Number(counts[0]?.count || 0),
+      latestUpdatedAt: counts[0]?.latestUpdatedAt || rows[0]?.updatedAt || null,
+    };
   } catch (error) {
-    return null;
+    return { latest: null, count: 0, latestUpdatedAt: null };
   }
 }
 
@@ -55,7 +67,8 @@ export default async function MatchCenterPage({ params }: { params: Promise<{ id
 
   const session = await getServerSession(authOptions as any) as AdminSession;
   const canGenerateArticle = isAdmin(session);
-  const existingArticle = canGenerateArticle ? await getExistingMatchArticle(match.id) : null;
+  const articleSummary = canGenerateArticle ? await getMatchArticleSummary(match.id) : { latest: null, count: 0, latestUpdatedAt: null };
+  const existingArticle = articleSummary.latest;
   const animationMatchId = match.animationMatchId ? String(match.animationMatchId) : '';
 
   return (
@@ -68,7 +81,15 @@ export default async function MatchCenterPage({ params }: { params: Promise<{ id
               title: existingArticle.title,
               url: `/news/${existingArticle.id}`,
               status: existingArticle.status || 'published',
-            } : null}
+              updatedAt: existingArticle.updatedAt || articleSummary.latestUpdatedAt || null,
+              count: articleSummary.count,
+            } : {
+              title: '',
+              url: '',
+              status: null,
+              updatedAt: articleSummary.latestUpdatedAt || null,
+              count: articleSummary.count,
+            }}
           />
         )}
 
