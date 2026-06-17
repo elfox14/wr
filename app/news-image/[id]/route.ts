@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import prisma from '@/lib/prisma';
 import { WORLD_CUP_2026_OPENING_NEWS, getPressNewsMeta } from '@/lib/press-news/world-cup-2026-opening-news';
 
 export const dynamic = 'force-dynamic';
@@ -32,6 +33,47 @@ function splitTitle(title: string) {
   }
   if (current) lines.push(current);
   return lines.slice(0, 3);
+}
+
+async function findDynamicNewsImage(id: string) {
+  const staticItem = WORLD_CUP_2026_OPENING_NEWS.find((entry) => entry.id === id);
+  if (staticItem) {
+    return {
+      title: staticItem.title,
+      meta: getPressNewsMeta(staticItem.tags, staticItem.title),
+    };
+  }
+
+  try {
+    let rows: any[] = [];
+    if (id.startsWith('match-center-')) {
+      const matchId = id.replace(/^match-center-/, '').trim();
+      rows = await prisma.$queryRawUnsafe<any[]>(
+        'SELECT "title", "tags" FROM "PressNews" WHERE "relatedMatchId" = $1 ORDER BY "updatedAt" DESC, "publishedAt" DESC LIMIT 1',
+        matchId
+      );
+    }
+
+    if (!rows.length) {
+      rows = await prisma.$queryRawUnsafe<any[]>(
+        'SELECT "title", "tags" FROM "PressNews" WHERE "id" = $1 LIMIT 1',
+        id
+      );
+    }
+
+    const row = rows[0];
+    if (row?.title) {
+      return {
+        title: row.title,
+        meta: getPressNewsMeta(row.tags, row.title),
+      };
+    }
+  } catch (error) {
+    console.error('news-image dynamic lookup error:', error);
+  }
+
+  const title = 'كأس العالم 2026';
+  return { title, meta: getPressNewsMeta(null, title) };
 }
 
 function buildSvg(title: string, meta: ReturnType<typeof getPressNewsMeta>) {
@@ -81,9 +123,7 @@ function buildSvg(title: string, meta: ReturnType<typeof getPressNewsMeta>) {
 
 export async function GET(_req: Request, { params }: Props) {
   const { id } = await params;
-  const item = WORLD_CUP_2026_OPENING_NEWS.find((entry) => entry.id === id);
-  const title = item?.title || 'كأس العالم 2026';
-  const meta = getPressNewsMeta(item?.tags, title);
+  const { title, meta } = await findDynamicNewsImage(id);
   const svg = buildSvg(title, meta);
 
   return new NextResponse(svg, {
