@@ -20,6 +20,13 @@ type AdminSession = {
   user?: { email?: string | null; role?: string | null };
 } | null;
 
+type ExistingArticle = {
+  id: string;
+  title: string;
+  status?: string | null;
+  updatedAt?: Date | string | null;
+} | null;
+
 function isAdmin(session: AdminSession) {
   const email = session?.user?.email || '';
   return session?.user?.role === 'ADMIN' || email === 'worldcup@mcprim.com' || email === 'elfox14usa@gmail.com';
@@ -29,6 +36,18 @@ async function getMatch(id: string) {
   return prisma.match.findUnique({ where: { id }, include: { homeTeam: true, awayTeam: true } });
 }
 
+async function getExistingMatchArticle(matchId: string): Promise<ExistingArticle> {
+  try {
+    const rows = await prisma.$queryRawUnsafe<any[]>(
+      'SELECT "id", "title", "status", "updatedAt" FROM "PressNews" WHERE "relatedMatchId" = $1 ORDER BY "updatedAt" DESC, "publishedAt" DESC LIMIT 1',
+      matchId
+    );
+    return rows[0] || null;
+  } catch (error) {
+    return null;
+  }
+}
+
 export default async function MatchCenterPage({ params }: { params: Promise<{ id: string }> | { id: string } }) {
   const resolved = await params;
   const match = await getMatch(resolved.id);
@@ -36,12 +55,22 @@ export default async function MatchCenterPage({ params }: { params: Promise<{ id
 
   const session = await getServerSession(authOptions as any) as AdminSession;
   const canGenerateArticle = isAdmin(session);
+  const existingArticle = canGenerateArticle ? await getExistingMatchArticle(match.id) : null;
   const animationMatchId = match.animationMatchId ? String(match.animationMatchId) : '';
 
   return (
     <main className="min-h-screen bg-background px-3 py-4 text-white sm:px-6 sm:py-6 lg:px-8" dir="rtl">
       <section className="mx-auto max-w-7xl space-y-4 sm:space-y-5">
-        {canGenerateArticle && <GenerateMatchArticleButton matchId={match.id} />}
+        {canGenerateArticle && (
+          <GenerateMatchArticleButton
+            matchId={match.id}
+            existingArticle={existingArticle ? {
+              title: existingArticle.title,
+              url: `/news/${existingArticle.id}`,
+              status: existingArticle.status || 'published',
+            } : null}
+          />
+        )}
 
         <section id="live-broadcast" className="rounded-[1.45rem] border border-white/10 bg-white/[0.035] p-3 shadow-card sm:rounded-[1.5rem] sm:p-5">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
