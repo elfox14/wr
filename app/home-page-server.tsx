@@ -42,7 +42,21 @@ function minutesFromKickoff(match: MatchCandidate, now: Date) {
   return Math.floor((now.getTime() - matchTime) / 60_000) + 1;
 }
 
-async function findFreshLiveCandidate(candidates: MatchCandidate[], now: Date) {
+function decorateLiveCandidateWithSnapshot<T extends MatchCandidate>(match: T, snapshot?: { minute: number; capturedAt: Date }) {
+  if (!snapshot) return match;
+
+  return {
+    ...match,
+    status: 'IN_PLAY',
+    displayStatus: 'IN_PLAY',
+    isLiveNow: true,
+    isLikelyLiveByTime: false,
+    minute: snapshot.minute,
+    liveLabel: `الدقيقة ${snapshot.minute}`,
+  };
+}
+
+async function findFreshLiveCandidate<T extends MatchCandidate>(candidates: T[], now: Date) {
   if (!candidates.length) return null;
 
   const snapshots = await prisma.matchStatsSnapshot.findMany({
@@ -65,7 +79,7 @@ async function findFreshLiveCandidate(candidates: MatchCandidate[], now: Date) {
     if (minute !== null) latestByMatch.set(snapshot.matchId, { minute, capturedAt: snapshot.capturedAt });
   }
 
-  return candidates.find((match) => {
+  const candidate = candidates.find((match) => {
     const localMinute = minutesFromKickoff(match, now);
     if (localMinute !== null && localMinute >= maxLiveMinutes(match)) return false;
     if (localMinute !== null && localMinute >= FINAL_LOCAL_MINUTE_FALLBACK) return false;
@@ -77,7 +91,9 @@ async function findFreshLiveCandidate(candidates: MatchCandidate[], now: Date) {
     if (snapshot.minute >= FINAL_MINUTE_FLOOR && snapshotAge >= STALE_FINAL_SNAPSHOT_MS) return false;
 
     return true;
-  }) || null;
+  });
+
+  return candidate ? decorateLiveCandidateWithSnapshot(candidate, latestByMatch.get(candidate.id)) : null;
 }
 
 export default async function Home() {
@@ -148,7 +164,7 @@ export default async function Home() {
       }),
     ]);
 
-    const freshLiveMatch = await findFreshLiveCandidate(liveCandidatesRaw as MatchCandidate[], now);
+    const freshLiveMatch = await findFreshLiveCandidate(liveCandidatesRaw, now);
 
     playersCount = totalPlayers;
     teamsCount = totalTeams;
