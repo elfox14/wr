@@ -16,6 +16,7 @@ export type {
   DataQuality,
 } from './types';
 
+export { default as InternalAnimationPlayerV2 } from './InternalAnimationPlayerV2';
 export { default as TeamName } from './components/TeamName';
 export { MiniStat, StatRow } from './components/StatCards';
 export { default as MatchHeaderPanel } from './components/MatchHeaderPanel';
