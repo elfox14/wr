@@ -245,8 +245,9 @@ async function reviewOneMatch(match: any, options: { statsPathTemplate: string; 
     const comparisons = COMPARED_STATS.map((spec) => {
       const local = localPair(localSnapshot, spec.localHome, spec.localAway);
       const provider = providerStats[spec.key];
-      return { key: spec.key, label: spec.label, ...diffPair(local, provider, options.tolerance) };
-    }).filter((item) => item.status);
+      const comparison = diffPair(local, provider, options.tolerance);
+      return comparison ? { key: spec.key, label: spec.label, ...comparison } : null;
+    }).filter(Boolean);
 
     const providerOnly = [...COMPARED_STATS, ...EXTRA_STATS]
       .filter((spec) => providerStats[spec.key] && !COMPARED_STATS.some((known) => known.key === spec.key && localPair(localSnapshot, known.localHome, known.localAway)))
