@@ -18,13 +18,14 @@ type InternalAnimationPlayerCoreProps = {
   dbMatchId?: string;
 };
 
-type MatchClockSource = 'kickoff_time' | 'live_stats' | 'cached' | 'final_elapsed' | 'final_event' | 'unavailable';
+type MatchClockSource = 'kickoff_time' | 'provider_status' | 'live_stats' | 'cached' | 'final_elapsed' | 'final_event' | 'unavailable';
 type MatchClock = { minute: number | null; source: MatchClockSource };
 
 const STATS_POLL_MS = 60_000;
 const EVENTS_POLL_MS = 30_000;
 const CLOCK_TICK_MS = 15_000;
 const GROUP_STAGE_MAX_LIVE_MINUTES = 115;
+const FIRST_HALF_FALLBACK_CAP = 50;
 
 function buildQuery(matchId?: string, dbMatchId?: string) {
   const params = new URLSearchParams();
@@ -43,6 +44,11 @@ function isLiveLike(status?: string | null) {
   return ['IN_PLAY', 'LIVE', '1H', '2H', 'ET'].includes(value) || isHalfTimeStatus(value);
 }
 
+function isSecondHalfStatus(status?: string | null) {
+  const value = normalizeStatus(status);
+  return value === '2H' || value === 'ET';
+}
+
 function kickoffMinute(matchDate?: string | null, nowMs = Date.now()) {
   if (!matchDate) return null;
   const start = new Date(matchDate).getTime();
@@ -53,20 +59,37 @@ function kickoffMinute(matchDate?: string | null, nowMs = Date.now()) {
 }
 
 function matchClockMinute(snapshot: Snapshot, events: MatchEvent[], status?: string | null, matchDate?: string | null, nowMs = Date.now()): MatchClock {
-  if (isLiveLike(status) && !isFinishedStatus(status)) {
-    const localMinute = kickoffMinute(matchDate, nowMs);
-    if (localMinute !== null) return { minute: localMinute, source: 'kickoff_time' };
+  const value = normalizeStatus(status);
 
+  if (isHalfTimeStatus(value)) {
+    return { minute: null, source: 'provider_status' };
+  }
+
+  if (isLiveLike(value) && !isFinishedStatus(value)) {
     const liveMinute = n(snapshot, 'minute');
-    if (liveMinute !== null) return { minute: liveMinute, source: 'live_stats' };
 
+    if (isSecondHalfStatus(value)) {
+      if (liveMinute !== null && liveMinute >= 46) return { minute: liveMinute, source: 'live_stats' };
+      const localMinute = kickoffMinute(matchDate, nowMs);
+      return { minute: localMinute !== null ? Math.max(46, localMinute) : 46, source: 'provider_status' };
+    }
+
+    if (value === '1H' && liveMinute !== null && liveMinute <= 60) return { minute: liveMinute, source: 'live_stats' };
+
+    const localMinute = kickoffMinute(matchDate, nowMs);
+    if (localMinute !== null) {
+      if ((value === 'IN_PLAY' || value === 'LIVE') && localMinute > FIRST_HALF_FALLBACK_CAP && localMinute < 70) return { minute: null, source: 'provider_status' };
+      return { minute: Math.min(localMinute, FIRST_HALF_FALLBACK_CAP), source: 'kickoff_time' };
+    }
+
+    if (liveMinute !== null) return { minute: liveMinute, source: 'live_stats' };
     return { minute: null, source: 'unavailable' };
   }
 
   const liveMinute = n(snapshot, 'minute');
   if (liveMinute !== null) return { minute: liveMinute, source: 'live_stats' };
 
-  if (!isFinishedStatus(status)) return { minute: null, source: 'unavailable' };
+  if (!isFinishedStatus(value)) return { minute: null, source: 'unavailable' };
 
   const elapsedMinute = n(snapshot, 'elapsed');
   if (elapsedMinute !== null) return { minute: elapsedMinute, source: 'final_elapsed' };
@@ -153,8 +176,8 @@ export default function InternalAnimationPlayerCore({ matchId = '', dbMatchId = 
   const homeTeam = match?.homeTeam || null;
   const awayTeam = match?.awayTeam || null;
   const rawClock = matchClockMinute(snapshot, events, match?.status, match?.matchDate, clockNow);
-  const currentMinute = rawClock.minute ?? stableMatchClock.minute;
-  const clockSource = rawClock.minute !== null ? rawClock.source : stableMatchClock.minute !== null ? 'cached' : 'unavailable';
+  const currentMinute = rawClock.minute ?? (rawClock.source === 'provider_status' ? null : stableMatchClock.minute);
+  const clockSource = rawClock.source !== 'unavailable' ? rawClock.source : stableMatchClock.minute !== null ? 'cached' : 'unavailable';
   const provider = statsData?.sourceStatus?.statsProvider || statsData?.sourceStatus?.primary;
   const updatedAt = statsData?.updatedAt || eventsData?.updatedAt;
 
