@@ -26,6 +26,7 @@ type PressureWindow = { available: boolean; home: number; away: number; homeEven
 type PressureModel = { home: number; away: number; leader: PressureSide; rhythm: string; danger: string; readout: string; window5: PressureWindow; window15: PressureWindow };
 type MomentumDefinition = { key: string; label: string; start: number; end: number };
 type MomentumSegment = MomentumDefinition & { available: boolean; home: number; away: number; homeEvents: number; awayEvents: number; homeDangerEvents: number; awayDangerEvents: number; leader: PressureSide; rating: string; topEvent: MatchEvent | null };
+type MomentumAccum = { home: number; away: number; homeEvents: number; awayEvents: number; homeDangerEvents: number; awayDangerEvents: number; topEvent: MatchEvent | null };
 
 const STATS_POLL_MS = 60_000;
 const EVENTS_POLL_MS = 30_000;
@@ -63,7 +64,9 @@ function n(snapshot: Snapshot, key: string) {
   const value = Number(snapshot?.[key]);
   return Number.isFinite(value) ? value : null;
 }
-function ar(value: number | null | undefined, fallback = '٠') { return value === null || value === undefined ? fallback : value.toLocaleString('ar-EG'); }
+function ar(value: number | null | undefined, fallback = '٠') {
+  return value === null || value === undefined ? fallback : value.toLocaleString('ar-EG');
+}
 function formatDate(value?: string | null) {
   if (!value) return 'موعد غير متوفر';
   const date = new Date(value);
@@ -229,8 +232,8 @@ function calculateMomentumSegments(events: MatchEvent[], homeTeam: Team, awayTea
       if (minuteValue === null) return false;
       return minuteValue >= segment.start && minuteValue < segment.end;
     }).sort(sortEventsByMinute);
-    const initial = { home: 0, away: 0, homeEvents: 0, awayEvents: 0, homeDangerEvents: 0, awayDangerEvents: 0, topEvent: null as MatchEvent | null };
-    const result = segmentEvents.reduce<typeof initial>((acc, event) => {
+    const initial: MomentumAccum = { home: 0, away: 0, homeEvents: 0, awayEvents: 0, homeDangerEvents: 0, awayDangerEvents: 0, topEvent: null };
+    const result = segmentEvents.reduce<MomentumAccum>((acc, event) => {
       const side = eventSide(event, homeTeam, awayTeam);
       const weight = pressureEventWeight(event.type);
       if (side === 'home') { acc.home += weight; acc.homeEvents += 1; if (eventCategory(event.type) === 'danger') acc.homeDangerEvents += 1; }
@@ -241,6 +244,9 @@ function calculateMomentumSegments(events: MatchEvent[], homeTeam: Team, awayTea
     const total = result.home + result.away;
     return { ...segment, ...result, available: segmentEvents.length > 0, leader: pressureLeader(result.home, result.away), rating: momentumRating(total) };
   });
+}
+function strongestMomentumSegment(segments: MomentumSegment[]) {
+  return segments.filter((segment) => segment.available).sort((a, b) => ((b.home + b.away) - (a.home + a.away)) || ((b.homeEvents + b.awayEvents) - (a.homeEvents + a.awayEvents)))[0] || null;
 }
 function windowLabel(window: PressureWindow) {
   if (!window.available) return 'غير متوفر';
@@ -340,6 +346,7 @@ export default function InternalAnimationPlayer({ matchId = '', dbMatchId = '' }
   const provider = sourceLabel(latest?.provider || stats?.sourceStatus?.statsProvider);
   const pressure = useMemo(() => calculatePressureModel(latest, events, minute, match?.homeTeam || null, match?.awayTeam || null), [latest, events, minute, match?.homeTeam, match?.awayTeam]);
   const momentumSegments = useMemo(() => calculateMomentumSegments(events, match?.homeTeam || null, match?.awayTeam || null), [events, match?.homeTeam, match?.awayTeam]);
+  const strongestSegment = useMemo(() => strongestMomentumSegment(momentumSegments), [momentumSegments]);
 
   useEffect(() => {
     if (!filteredEvents.length) { if (selectedEventId) setSelectedEventId(null); return; }
@@ -381,6 +388,10 @@ export default function InternalAnimationPlayer({ matchId = '', dbMatchId = '' }
 
           <div className="order-5 rounded-3xl border border-[#FFD700]/20 bg-[#FFD700]/[0.04] p-4">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2"><div><div className="text-sm font-black text-white">Match Momentum</div><div className="mt-1 text-[11px] font-bold text-gray-500">فترات السيطرة محسوبة من الأحداث المحفوظة. أرقام الهجمات التفصيلية لكل فترة تظهر غير متوفر إن لم تصل من المصدر.</div></div><span className="rounded-full border border-white/10 bg-black/30 px-3 py-1 text-[10px] font-black text-gray-400">تقسيم 15 دقيقة</span></div>
+            <div className="mb-3 rounded-2xl border border-[#FFD700]/25 bg-[#FFD700]/10 p-3">
+              <div className="text-[10px] font-black text-[#FFD700]">أقوى فترة في المباراة</div>
+              {strongestSegment ? <div className="mt-1 flex flex-wrap items-center gap-2 text-sm font-bold text-white"><span>د {strongestSegment.label}</span><span className="text-gray-500">·</span><span>{sideName(strongestSegment.leader, match?.homeTeam, match?.awayTeam)}</span><span className="text-gray-500">·</span><span>{ar(strongestSegment.home + strongestSegment.away)} مؤشر</span><span className="text-gray-500">·</span><span>{ar(strongestSegment.homeEvents + strongestSegment.awayEvents)} أحداث</span>{strongestSegment.topEvent ? <button type="button" onClick={() => selectEvent(strongestSegment.topEvent!.id)} className="rounded-full border border-[#FFD700]/30 bg-black/25 px-3 py-1 text-[11px] font-black text-[#FFD700] hover:bg-[#FFD700]/10">عرض أهم حدث</button> : null}</div> : <div className="mt-1 text-sm font-bold text-gray-400">غير متوفر من الأحداث الحالية.</div>}
+            </div>
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{momentumSegments.map((segment) => <MomentumCard key={segment.key} segment={segment} home={match?.homeTeam || null} away={match?.awayTeam || null} onSelectEvent={selectEvent} />)}</div>
           </div>
 
