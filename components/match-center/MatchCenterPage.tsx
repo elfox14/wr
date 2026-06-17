@@ -37,6 +37,8 @@ export default async function MatchCenterPage({
   const animationMatchId = match.animationMatchId ? String(match.animationMatchId) : '';
   const playerMode = String(getSingleValue(query.player) || '').toLowerCase();
   const useV2 = playerMode === 'v2';
+  const stableHref = `/match-center/${encodeURIComponent(match.id)}#live-broadcast`;
+  const v2Href = `/match-center/${encodeURIComponent(match.id)}?player=v2#live-broadcast`;
 
   return (
     <main className="min-h-screen bg-background px-3 py-4 text-white sm:px-6 sm:py-6 lg:px-8" dir="rtl">
@@ -50,9 +52,15 @@ export default async function MatchCenterPage({
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <Link href={`/match-center/${encodeURIComponent(match.id)}?player=v2#live-broadcast`} className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#FFD700]/25 bg-[#FFD700]/10 px-3 text-sm font-black text-[#FFF7CC] transition hover:border-[#FFD700]/45 hover:bg-[#FFD700]/15 hover:text-white">
-                عرض V2 هنا
-              </Link>
+              {useV2 ? (
+                <Link href={stableHref} className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#0FF0FC]/25 bg-[#0FF0FC]/10 px-3 text-sm font-black text-[#EAFBFF] transition hover:border-[#0FF0FC]/45 hover:bg-[#0FF0FC]/15 hover:text-white">
+                  الرجوع للمستقرة
+                </Link>
+              ) : (
+                <Link href={v2Href} className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#FFD700]/25 bg-[#FFD700]/10 px-3 text-sm font-black text-[#FFF7CC] transition hover:border-[#FFD700]/45 hover:bg-[#FFD700]/15 hover:text-white">
+                  عرض V2 هنا
+                </Link>
+              )}
               <Link href={`/animation-live/player-v2?dbMatchId=${encodeURIComponent(match.id)}`} className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-white/10 bg-black/30 px-3 text-sm font-black text-white transition hover:border-[#FFD700]/45">
                 صفحة اختبار V2
               </Link>
