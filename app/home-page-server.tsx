@@ -4,7 +4,7 @@ import prisma from '@/lib/prisma';
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-const LIVE_STATUSES = ['LIVE', 'IN_PLAY', 'HT'];
+const LIVE_STATUSES = ['LIVE', 'IN_PLAY', '1H', '2H', 'ET', 'HT'];
 const SCHEDULED_STATUSES = ['SCHEDULED', 'TIMED', 'NOT_STARTED', 'NS'];
 const ACTIVE_HOME_STATUSES = [...SCHEDULED_STATUSES, ...LIVE_STATUSES];
 const GROUP_STAGE_MAX_LIVE_MINUTES = 115;
@@ -27,6 +27,19 @@ function validMinute(value: unknown) {
   return Math.max(1, Math.min(150, Math.floor(minute)));
 }
 
+function normalizeStatus(value?: string | null) {
+  return String(value || '').toUpperCase();
+}
+
+function isHalfTimeStatus(value?: string | null) {
+  return ['HT', 'HALFTIME', 'HALF_TIME', 'HALF-TIME'].includes(normalizeStatus(value));
+}
+
+function isSecondHalfStatus(value?: string | null) {
+  const status = normalizeStatus(value);
+  return status === '2H' || status === 'ET';
+}
+
 function isGroupStage(match: MatchCandidate) {
   const value = String(match.groupPhase || match.stage || '').toUpperCase();
   return value.includes('GROUP');
@@ -43,16 +56,35 @@ function minutesFromKickoff(match: MatchCandidate, now: Date) {
 }
 
 function decorateLiveCandidateWithSnapshot<T extends MatchCandidate>(match: T, snapshot?: { minute: number; capturedAt: Date }) {
-  if (!snapshot) return match;
+  const status = normalizeStatus(match.status);
+
+  if (isHalfTimeStatus(status)) {
+    return {
+      ...match,
+      status: 'HT',
+      displayStatus: 'HT',
+      isLiveNow: false,
+      isHalfTime: true,
+      isLikelyLiveByTime: false,
+      minute: null,
+      liveLabel: 'استراحة',
+    };
+  }
+
+  const snapshotMinute = validMinute(snapshot?.minute);
+  const minute = isSecondHalfStatus(status)
+    ? snapshotMinute && snapshotMinute >= 46 ? snapshotMinute : 46
+    : snapshotMinute;
 
   return {
     ...match,
-    status: 'IN_PLAY',
-    displayStatus: 'IN_PLAY',
+    status: isSecondHalfStatus(status) ? '2H' : 'IN_PLAY',
+    displayStatus: isSecondHalfStatus(status) ? '2H' : 'IN_PLAY',
     isLiveNow: true,
+    isHalfTime: false,
     isLikelyLiveByTime: false,
-    minute: snapshot.minute,
-    liveLabel: `الدقيقة ${snapshot.minute}`,
+    minute,
+    liveLabel: minute ? `الدقيقة ${minute}` : 'جارية الآن',
   };
 }
 
@@ -80,6 +112,8 @@ async function findFreshLiveCandidate<T extends MatchCandidate>(candidates: T[],
   }
 
   const candidate = candidates.find((match) => {
+    if (isHalfTimeStatus(match.status)) return true;
+
     const localMinute = minutesFromKickoff(match, now);
     if (localMinute !== null && localMinute >= maxLiveMinutes(match)) return false;
     if (localMinute !== null && localMinute >= FINAL_LOCAL_MINUTE_FALLBACK) return false;
