@@ -29,6 +29,9 @@ const LIVE_STATUSES = ['IN_PLAY', 'LIVE', 'HT'];
 const FINISHED_STATUSES = ['FINISHED', 'FT', 'AET', 'PEN'];
 const GROUP_STAGE_MAX_LIVE_MINUTES = 115;
 const KNOCKOUT_MAX_LIVE_MINUTES = 150;
+const selectStyle = { backgroundColor: '#020b08', color: '#ffffff', colorScheme: 'dark' as const };
+const optionStyle = { backgroundColor: '#020b08', color: '#ffffff' };
+const selectClassName = 'min-w-[132px] cursor-pointer bg-[#020b08] text-sm font-black text-white outline-none [color-scheme:dark] focus:outline-none';
 
 function normalizeGroupKey(value?: string | null) {
   if (!value) return 'غير محددة';
@@ -187,6 +190,15 @@ function uniqueRoundOptions(roundMap: Map<string, RoundOption>) {
   return Array.from(byKey.values()).sort((a, b) => a.order - b.order || a.label.localeCompare(b.label, 'ar'));
 }
 
+function updateMatchesUrl(tab: string, round: string, group: string) {
+  const params = new URLSearchParams();
+  if (tab !== 'all') params.set('filter', tab);
+  if (round !== 'all') params.set('round', round);
+  if (group !== 'all') params.set('group', group);
+  const query = params.toString();
+  window.history.replaceState(null, '', query ? `/matches?${query}` : '/matches');
+}
+
 export default function MatchesPage() {
   const [matches, setMatches] = useState<Match[]>([]);
   const [loading, setLoading] = useState(true);
@@ -198,8 +210,10 @@ export default function MatchesPage() {
     const params = new URLSearchParams(window.location.search);
     const filter = params.get('filter');
     const round = params.get('round');
+    const group = params.get('group');
     if (filter && validFilters.includes(filter)) setActiveTab(filter);
     if (round) setSelectedRound(round);
+    if (group) setSelectedGroup(group);
 
     fetch('/api/matches', { cache: 'no-store' })
       .then((res) => (res.ok ? res.json() : []))
@@ -234,8 +248,17 @@ export default function MatchesPage() {
     setActiveTab(tab);
     setSelectedGroup('all');
     setSelectedRound('all');
-    const url = tab === 'all' ? '/matches' : `/matches?filter=${encodeURIComponent(tab)}`;
-    window.history.replaceState(null, '', url);
+    updateMatchesUrl(tab, 'all', 'all');
+  };
+
+  const changeRound = (round: string) => {
+    setSelectedRound(round);
+    updateMatchesUrl(activeTab, round, selectedGroup);
+  };
+
+  const changeGroup = (group: string) => {
+    setSelectedGroup(group);
+    updateMatchesUrl(activeTab, selectedRound, group);
   };
 
   let filteredMatches = [...matches];
@@ -287,29 +310,29 @@ export default function MatchesPage() {
           </div>
 
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-            <label className="flex items-center gap-2 rounded-lg border border-white/10 bg-surface px-3 py-2">
+            <label className="flex items-center gap-2 rounded-lg border border-white/10 bg-[#020b08] px-3 py-2 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
               <Filter size={16} className="text-primary" />
-              <span className="text-xs font-bold text-gray-500">الجولة</span>
-              <select value={selectedRound} onChange={(event) => setSelectedRound(event.target.value)} className="bg-transparent text-sm font-bold text-white focus:outline-none">
-                <option value="all">كل الجولات</option>
-                {roundOptions.map((round) => (
-                  <option key={round.key} value={round.key}>
+              <span className="text-xs font-bold text-gray-400">الجولة</span>
+              <select value={selectedRound} onChange={(event) => changeRound(event.target.value)} className={selectClassName} style={selectStyle}>
+                <option value="all" style={optionStyle}>كل الجولات</option>
+                {roundOptions.length ? roundOptions.map((round) => (
+                  <option key={round.key} value={round.key} style={optionStyle}>
                     {round.label}
                   </option>
-                ))}
+                )) : <option value="all" disabled style={optionStyle}>لا توجد جولات</option>}
               </select>
             </label>
 
-            <label className="flex items-center gap-2 rounded-lg border border-white/10 bg-surface px-3 py-2">
+            <label className="flex items-center gap-2 rounded-lg border border-white/10 bg-[#020b08] px-3 py-2 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
               <Filter size={16} className="text-primary" />
-              <span className="text-xs font-bold text-gray-500">المجموعة</span>
-              <select value={selectedGroup} onChange={(event) => setSelectedGroup(event.target.value)} className="bg-transparent text-sm font-bold text-white focus:outline-none">
-                <option value="all">كل المجموعات</option>
-                {groupOptions.map((group) => (
-                  <option key={group} value={group}>
+              <span className="text-xs font-bold text-gray-400">المجموعة</span>
+              <select value={selectedGroup} onChange={(event) => changeGroup(event.target.value)} className={selectClassName} style={selectStyle}>
+                <option value="all" style={optionStyle}>كل المجموعات</option>
+                {groupOptions.length ? groupOptions.map((group) => (
+                  <option key={group} value={group} style={optionStyle}>
                     المجموعة {group}
                   </option>
-                ))}
+                )) : <option value="all" disabled style={optionStyle}>لا توجد مجموعات</option>}
               </select>
             </label>
           </div>
