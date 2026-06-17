@@ -34,8 +34,46 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: page.prio,
   }));
 
+  let newsUrls: any[] = [];
+  try {
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "PressNews" (
+        "id" TEXT PRIMARY KEY,
+        "title" TEXT NOT NULL,
+        "body" TEXT NOT NULL,
+        "category" TEXT NOT NULL DEFAULT 'رصد صحفي',
+        "sourceName" TEXT NOT NULL,
+        "sourceUrl" TEXT,
+        "sourceType" TEXT NOT NULL DEFAULT 'newsletter',
+        "language" TEXT NOT NULL DEFAULT 'ar',
+        "status" TEXT NOT NULL DEFAULT 'published',
+        "importance" INTEGER NOT NULL DEFAULT 50,
+        "tags" JSONB,
+        "publishedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    const newsItems = await prisma.$queryRawUnsafe<any[]>(`
+      SELECT "id", "publishedAt", "updatedAt" FROM "PressNews"
+      WHERE "status" = 'published'
+      ORDER BY "publishedAt" DESC
+    `);
+
+    newsUrls = newsItems.map((item) => ({
+      url: `${baseUrl}/news/${item.id}`,
+      lastModified: new Date(item.updatedAt || item.publishedAt || new Date()),
+      changeFrequency: 'daily' as const,
+      priority: 0.8,
+    }));
+  } catch (err) {
+    console.error('Sitemap news generation error:', err);
+  }
+
   return [
     ...staticPages,
     ...matchCenterUrls,
+    ...newsUrls,
   ];
 }

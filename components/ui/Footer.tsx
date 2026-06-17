@@ -41,8 +41,14 @@ export function Footer() {
           </nav>
         </div>
 
-        <div className="mt-6 border-t border-white/10 pt-5 text-xs font-bold text-gray-500">
-          © {new Date().getFullYear()} بورصة المونديال — MC PRIME. جميع الحقوق محفوظة.
+        <div className="mt-6 border-t border-white/10 pt-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 text-xs font-bold text-gray-500">
+          <div>
+            © {new Date().getFullYear()} بورصة المونديال — MC PRIME. جميع الحقوق محفوظة.
+          </div>
+          <div className="flex gap-4">
+            <Link href="/privacy" className="hover:text-gray-300 transition">سياسة الخصوصية</Link>
+            <Link href="/terms" className="hover:text-gray-300 transition">شروط الاستخدام</Link>
+          </div>
         </div>
       </div>
     </footer>
