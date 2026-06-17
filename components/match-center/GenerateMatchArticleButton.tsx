@@ -2,10 +2,17 @@
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
-import { CheckCircle2, Eye, FileText, Loader2, Sparkles } from 'lucide-react';
+import { CheckCircle2, ExternalLink, Eye, FileText, Loader2, Sparkles } from 'lucide-react';
+
+type ExistingArticle = {
+  title: string;
+  url: string;
+  status?: string | null;
+} | null;
 
 type Props = {
   matchId: string;
+  existingArticle?: ExistingArticle;
 };
 
 type PreviewItem = {
@@ -34,23 +41,25 @@ function qualityNotes(item: PreviewItem | null) {
   return notes;
 }
 
-export default function GenerateMatchArticleButton({ matchId }: Props) {
+export default function GenerateMatchArticleButton({ matchId, existingArticle = null }: Props) {
   const [previewLoading, setPreviewLoading] = useState(false);
   const [publishLoading, setPublishLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-  const [newsUrl, setNewsUrl] = useState<string | null>(null);
+  const [newsUrl, setNewsUrl] = useState<string | null>(existingArticle?.url || null);
   const [categoryUrl, setCategoryUrl] = useState<string | null>(null);
   const [previewItem, setPreviewItem] = useState<PreviewItem | null>(null);
 
   const notes = useMemo(() => qualityNotes(previewItem), [previewItem]);
   const previewWords = previewItem ? wordCount(previewItem.body) : 0;
+  const currentArticleUrl = newsUrl || existingArticle?.url || null;
 
   async function requestArticle(mode: 'preview' | 'upsert') {
     if (mode === 'preview') setPreviewLoading(true);
     else setPublishLoading(true);
     setMessage(null);
-    setNewsUrl(null);
-    setCategoryUrl(null);
+    if (mode === 'preview') {
+      setCategoryUrl(null);
+    }
 
     try {
       const response = await fetch('/api/admin/match-article', {
@@ -90,6 +99,14 @@ export default function GenerateMatchArticleButton({ matchId }: Props) {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          {currentArticleUrl && (
+            <Link
+              href={currentArticleUrl}
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 text-sm font-black text-white transition hover:border-[#FFD700]/40 hover:bg-white/10"
+            >
+              <ExternalLink size={16} /> فتح المقال الحالي
+            </Link>
+          )}
           <button
             type="button"
             onClick={() => requestArticle('preview')}
@@ -106,16 +123,23 @@ export default function GenerateMatchArticleButton({ matchId }: Props) {
             className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#FFD700] px-4 text-sm font-black text-black transition hover:bg-[#0FF0FC] disabled:cursor-not-allowed disabled:opacity-60"
           >
             {publishLoading ? <Loader2 size={16} className="animate-spin" /> : <FileText size={16} />}
-            {publishLoading ? 'جارٍ النشر...' : 'نشر/تحديث المقال'}
+            {publishLoading ? 'جارٍ النشر...' : existingArticle ? 'تحديث المقال' : 'نشر المقال'}
           </button>
         </div>
       </div>
+
+      {existingArticle && (
+        <div className="mt-3 rounded-xl border border-[#0FF0FC]/15 bg-[#0FF0FC]/5 p-3 text-xs font-bold leading-6 text-gray-300">
+          يوجد مقال مرتبط بهذه المباراة بالفعل: <Link href={existingArticle.url} className="text-[#0FF0FC] hover:underline">{existingArticle.title}</Link>
+          {existingArticle.status && <span className="mr-2 text-gray-500">الحالة: {existingArticle.status}</span>}
+        </div>
+      )}
 
       {message && (
         <div className="mt-3 rounded-xl border border-white/10 bg-black/25 p-3 text-xs font-bold leading-6 text-gray-300">
           {message}
           <div className="mt-2 flex flex-wrap gap-3">
-            {newsUrl && <Link href={newsUrl} className="text-[#0FF0FC] hover:underline">فتح المقال</Link>}
+            {currentArticleUrl && <Link href={currentArticleUrl} className="text-[#0FF0FC] hover:underline">فتح المقال</Link>}
             {categoryUrl && <Link href={categoryUrl} className="text-[#FFD700] hover:underline">فتح التصنيف</Link>}
           </div>
         </div>
