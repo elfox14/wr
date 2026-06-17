@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { EventFilterKey, LiveEventsResponse, LiveStatsResponse, MatchEvent } from './types';
+import type { EventFilterKey, LiveEventsResponse, LiveStatsResponse, MatchEvent, Snapshot } from './types';
 import { sortEventsByMinute } from './eventUtils';
 import { calculatePressureModel } from './livePressureUtils';
 import { calculateMomentumSegments, strongestMomentumSegment } from './momentumUtils';
@@ -31,6 +31,13 @@ function buildQuery(matchId?: string, dbMatchId?: string) {
 function latestEvent(events: MatchEvent[]) {
   const sortedEvents = [...events].sort(sortEventsByMinute);
   return sortedEvents.length ? sortedEvents[sortedEvents.length - 1] : null;
+}
+
+function matchClockMinute(snapshot: Snapshot, events: MatchEvent[], status?: string | null) {
+  const liveMinute = n(snapshot, 'minute');
+  if (!isFinishedStatus(status)) return liveMinute;
+
+  return liveMinute ?? n(snapshot, 'elapsed') ?? latestEvent(events)?.minute ?? null;
 }
 
 export default function InternalAnimationPlayerCore({ matchId = '', dbMatchId = '' }: InternalAnimationPlayerCoreProps) {
@@ -99,7 +106,7 @@ export default function InternalAnimationPlayerCore({ matchId = '', dbMatchId = 
   const events = useMemo(() => eventsData?.events || [], [eventsData]);
   const homeTeam = match?.homeTeam || null;
   const awayTeam = match?.awayTeam || null;
-  const currentMinute = n(snapshot, 'minute') ?? (isFinishedStatus(match?.status) ? 90 : null);
+  const currentMinute = matchClockMinute(snapshot, events, match?.status);
   const provider = statsData?.sourceStatus?.statsProvider || statsData?.sourceStatus?.primary;
   const updatedAt = statsData?.updatedAt || eventsData?.updatedAt;
 
