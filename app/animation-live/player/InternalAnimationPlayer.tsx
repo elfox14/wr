@@ -347,6 +347,7 @@ export default function InternalAnimationPlayer({ matchId = '', dbMatchId = '' }
   const pressure = useMemo(() => calculatePressureModel(latest, events, minute, match?.homeTeam || null, match?.awayTeam || null), [latest, events, minute, match?.homeTeam, match?.awayTeam]);
   const momentumSegments = useMemo(() => calculateMomentumSegments(events, match?.homeTeam || null, match?.awayTeam || null), [events, match?.homeTeam, match?.awayTeam]);
   const strongestSegment = useMemo(() => strongestMomentumSegment(momentumSegments), [momentumSegments]);
+  const maxMomentumScore = useMemo(() => Math.max(1, ...momentumSegments.map((segment) => segment.home + segment.away)), [momentumSegments]);
 
   useEffect(() => {
     if (!filteredEvents.length) { if (selectedEventId) setSelectedEventId(null); return; }
@@ -391,6 +392,14 @@ export default function InternalAnimationPlayer({ matchId = '', dbMatchId = '' }
             <div className="mb-3 rounded-2xl border border-[#FFD700]/25 bg-[#FFD700]/10 p-3">
               <div className="text-[10px] font-black text-[#FFD700]">أقوى فترة في المباراة</div>
               {strongestSegment ? <div className="mt-1 flex flex-wrap items-center gap-2 text-sm font-bold text-white"><span>د {strongestSegment.label}</span><span className="text-gray-500">·</span><span>{sideName(strongestSegment.leader, match?.homeTeam, match?.awayTeam)}</span><span className="text-gray-500">·</span><span>{ar(strongestSegment.home + strongestSegment.away)} مؤشر</span><span className="text-gray-500">·</span><span>{ar(strongestSegment.homeEvents + strongestSegment.awayEvents)} أحداث</span>{strongestSegment.topEvent ? <button type="button" onClick={() => selectEvent(strongestSegment.topEvent!.id)} className="rounded-full border border-[#FFD700]/30 bg-black/25 px-3 py-1 text-[11px] font-black text-[#FFD700] hover:bg-[#FFD700]/10">عرض أهم حدث</button> : null}</div> : <div className="mt-1 text-sm font-bold text-gray-400">غير متوفر من الأحداث الحالية.</div>}
+            </div>
+            <div className="mb-3 rounded-2xl border border-white/10 bg-black/25 p-3">
+              <div className="mb-3 flex items-center justify-between gap-2"><div className="text-[10px] font-black text-gray-400">منحنى الزخم حسب الفترات</div><div className="text-[10px] font-bold text-gray-500">اضغط على أي فترة بها حدث لعرض أهم لقطة</div></div>
+              <div className="space-y-2">{momentumSegments.map((segment) => {
+                const score = segment.home + segment.away;
+                const width = segment.available ? Math.max(5, Math.round((score / maxMomentumScore) * 100)) : 0;
+                return <button key={segment.key} type="button" disabled={!segment.topEvent} onClick={() => segment.topEvent ? selectEvent(segment.topEvent.id) : undefined} className="grid w-full grid-cols-[58px_1fr_54px] items-center gap-2 text-right text-[10px] font-black text-gray-400 disabled:cursor-not-allowed"><span>د {segment.label}</span><span className="h-3 overflow-hidden rounded-full bg-white/10"><span className={`block h-full rounded-full ${segment.available ? 'bg-[#FFD700]' : 'bg-white/10'}`} style={{ width: `${width}%` }} /></span><span className="text-white">{segment.available ? ar(score) : '—'}</span></button>;
+              })}</div>
             </div>
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{momentumSegments.map((segment) => <MomentumCard key={segment.key} segment={segment} home={match?.homeTeam || null} away={match?.awayTeam || null} onSelectEvent={selectEvent} />)}</div>
           </div>
