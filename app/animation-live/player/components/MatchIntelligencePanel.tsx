@@ -10,11 +10,12 @@ type MatchIntelligencePanelProps = {
   pressure: PressureModel;
   quality: DataQuality;
   storyLines: string[];
+  articleLines?: string[];
   home: Team;
   away: Team;
 };
 
-export default function MatchIntelligencePanel({ pressure, quality, storyLines, home, away }: MatchIntelligencePanelProps) {
+export default function MatchIntelligencePanel({ pressure, quality, storyLines, articleLines = [], home, away }: MatchIntelligencePanelProps) {
   const leaderName = sideName(pressure.leader, home, away);
   const totalPressure = pressure.home + pressure.away;
 
@@ -35,6 +36,21 @@ export default function MatchIntelligencePanel({ pressure, quality, storyLines, 
       </div>
 
       <MatchStoryCards lines={storyLines} />
+
+      {articleLines.length ? (
+        <article className="mb-3 rounded-3xl border border-[#FFD700]/15 bg-black/25 p-4">
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+            <h3 className="text-sm font-black text-[#FFD700]">مقالة تحليلية مباشرة</h3>
+            <span className="rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[10px] font-black text-gray-400">تتحدث مع كل حدث وإحصائية</span>
+          </div>
+          <div className="space-y-2 text-sm font-bold leading-7 text-gray-100">
+            {articleLines.map((line, index) => (
+              <p key={`${index}-${line.slice(0, 18)}`}>{line}</p>
+            ))}
+          </div>
+        </article>
+      ) : null}
+
       <DataQualityCard quality={quality} />
 
       <div className="grid gap-3 md:grid-cols-3">
