@@ -131,6 +131,13 @@ function isWaitingForStartConfirmation(match: HomeMatch, now: Date) {
   return isScheduled(match) && hasKickoffPassed(match, now) && !isLikelyLiveByElapsedTime(match, now) && !isConfirmedLive(match, now) && !isHalfTime(match);
 }
 
+function displayMinute(match: HomeMatch) {
+  if (isHalfTime(match)) return null;
+  const minute = Number(match.minute);
+  if (!Number.isFinite(minute) || minute <= 0) return null;
+  return Math.max(1, Math.min(150, Math.floor(minute)));
+}
+
 function uniqueMatches(list: HomeMatch[]) {
   const seen = new Set<string>();
   return list.filter((match) => {
@@ -181,10 +188,7 @@ function TeamBadge({ team, align }: { team?: Team | null; align: 'right' | 'left
   const src = team?.image?.startsWith('http') ? team.image : getTeamFlagUrl({ code: team?.code, name: team?.name, image: team?.image }, 80);
 
   return (
-    <Link
-      href={getTeamHref(team)}
-      className={`group/team flex min-w-0 items-center gap-2 rounded-2xl border border-white/10 bg-white/[0.04] px-2.5 py-2 transition hover:border-[#FFD700]/25 hover:bg-white/[0.07] sm:border-transparent sm:bg-transparent sm:p-1.5 ${align === 'left' ? 'flex-row-reverse text-left' : 'text-right'}`}
-    >
+    <Link href={getTeamHref(team)} className={`group/team flex min-w-0 items-center gap-2 rounded-2xl border border-white/10 bg-white/[0.04] px-2.5 py-2 transition hover:border-[#FFD700]/25 hover:bg-white/[0.07] sm:border-transparent sm:bg-transparent sm:p-1.5 ${align === 'left' ? 'flex-row-reverse text-left' : 'text-right'}`}>
       <span className="h-8 w-8 shrink-0 rounded-xl border border-white/10 bg-cover bg-center bg-no-repeat shadow-[0_8px_18px_rgba(0,0,0,0.22)] sm:h-9 sm:w-9" style={src ? { backgroundImage: `url(${src})` } : undefined}>
         {!src ? <span className="flex h-full w-full items-center justify-center text-[10px] font-black text-[#FFD700]">{teamCode(team)}</span> : null}
       </span>
@@ -211,23 +215,14 @@ function MatchScore({ match }: { match: HomeMatch }) {
 }
 
 function MatchStatePill({ match, now }: { match: HomeMatch; now: Date }) {
-  if (isFinished(match)) {
-    return <span className="rounded-xl border border-white/10 bg-white/[0.06] px-2.5 py-1.5 text-[11px] font-black text-gray-300">انتهت</span>;
-  }
-
-  if (isHalfTime(match)) {
-    return <span className="rounded-xl border border-[#FFD700]/20 bg-[#FFD700]/10 px-2.5 py-1.5 text-[11px] font-black text-[#FFD700]">استراحة</span>;
-  }
-
+  if (isFinished(match)) return <span className="rounded-xl border border-white/10 bg-white/[0.06] px-2.5 py-1.5 text-[11px] font-black text-gray-300">انتهت</span>;
+  if (isHalfTime(match)) return <span className="rounded-xl border border-[#FFD700]/20 bg-[#FFD700]/10 px-2.5 py-1.5 text-[11px] font-black text-[#FFD700]">استراحة</span>;
   if (isConfirmedLive(match, now)) {
-    const minute = typeof match.minute === 'number' && Number.isFinite(match.minute) ? match.minute : minutesSinceKickoff(match, now);
-    const label = minute && minute > 0 ? `جارية الآن - د${formatCount(Math.min(150, minute))}` : 'جارية الآن';
+    const minute = displayMinute(match);
+    const label = minute ? `جارية الآن - د${formatCount(minute)}` : 'جارية الآن';
     return <span className="rounded-xl border border-[#00FF88]/25 bg-[#00FF88]/10 px-2.5 py-1.5 text-[11px] font-black text-[#00FF88]">{label}</span>;
   }
-
-  if (isWaitingForStartConfirmation(match, now)) {
-    return <span className="rounded-xl border border-[#FFD700]/20 bg-[#FFD700]/10 px-2.5 py-1.5 text-[11px] font-black text-[#FFD700]">بانتظار تأكيد البداية</span>;
-  }
+  if (isWaitingForStartConfirmation(match, now)) return <span className="rounded-xl border border-[#FFD700]/20 bg-[#FFD700]/10 px-2.5 py-1.5 text-[11px] font-black text-[#FFD700]">بانتظار تأكيد البداية</span>;
 
   const parts = countdownParts(match, now);
   if (!parts.active) return <span className="rounded-xl border border-[#FFD700]/20 bg-[#FFD700]/10 px-2.5 py-1.5 text-[11px] font-black text-[#FFD700]">بانتظار المصدر</span>;
