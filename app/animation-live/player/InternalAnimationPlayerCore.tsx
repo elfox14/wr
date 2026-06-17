@@ -121,6 +121,7 @@ export default function InternalAnimationPlayerCore({ matchId = '', dbMatchId = 
         match={match}
         provider={provider}
         updatedAt={updatedAt}
+        currentMinute={currentMinute}
         loading={loading}
         error={error}
         onRefresh={refreshAll}
