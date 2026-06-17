@@ -6,7 +6,7 @@ import { sortEventsByMinute } from './eventUtils';
 import { calculatePressureModel } from './livePressureUtils';
 import { calculateMomentumSegments, strongestMomentumSegment } from './momentumUtils';
 import { dataQuality, matchStoryLines, n, resolvedSnapshot } from './matchAnalysisUtils';
-import { isFinishedStatus } from './statusUtils';
+import { isFinishedStatus, isHalfTimeStatus, normalizeStatus } from './statusUtils';
 import MatchHeaderPanel from './components/MatchHeaderPanel';
 import LivePitchTimelinePanel from './components/LivePitchTimelinePanel';
 import LiveStatsPanel from './components/LiveStatsPanel';
@@ -18,11 +18,13 @@ type InternalAnimationPlayerCoreProps = {
   dbMatchId?: string;
 };
 
-type MatchClockSource = 'live_stats' | 'cached' | 'final_elapsed' | 'final_event' | 'unavailable';
+type MatchClockSource = 'kickoff_time' | 'live_stats' | 'cached' | 'final_elapsed' | 'final_event' | 'unavailable';
 type MatchClock = { minute: number | null; source: MatchClockSource };
 
 const STATS_POLL_MS = 60_000;
 const EVENTS_POLL_MS = 30_000;
+const CLOCK_TICK_MS = 15_000;
+const GROUP_STAGE_MAX_LIVE_MINUTES = 115;
 
 function buildQuery(matchId?: string, dbMatchId?: string) {
   const params = new URLSearchParams();
@@ -36,7 +38,31 @@ function latestEvent(events: MatchEvent[]) {
   return sortedEvents.length ? sortedEvents[sortedEvents.length - 1] : null;
 }
 
-function matchClockMinute(snapshot: Snapshot, events: MatchEvent[], status?: string | null): MatchClock {
+function isLiveLike(status?: string | null) {
+  const value = normalizeStatus(status);
+  return ['IN_PLAY', 'LIVE', '1H', '2H', 'ET'].includes(value) || isHalfTimeStatus(value);
+}
+
+function kickoffMinute(matchDate?: string | null, nowMs = Date.now()) {
+  if (!matchDate) return null;
+  const start = new Date(matchDate).getTime();
+  if (!Number.isFinite(start)) return null;
+  const minute = Math.floor((nowMs - start) / 60_000) + 1;
+  if (minute < 1) return null;
+  return Math.max(1, Math.min(GROUP_STAGE_MAX_LIVE_MINUTES, minute));
+}
+
+function matchClockMinute(snapshot: Snapshot, events: MatchEvent[], status?: string | null, matchDate?: string | null, nowMs = Date.now()): MatchClock {
+  if (isLiveLike(status) && !isFinishedStatus(status)) {
+    const localMinute = kickoffMinute(matchDate, nowMs);
+    if (localMinute !== null) return { minute: localMinute, source: 'kickoff_time' };
+
+    const liveMinute = n(snapshot, 'minute');
+    if (liveMinute !== null) return { minute: liveMinute, source: 'live_stats' };
+
+    return { minute: null, source: 'unavailable' };
+  }
+
   const liveMinute = n(snapshot, 'minute');
   if (liveMinute !== null) return { minute: liveMinute, source: 'live_stats' };
 
@@ -57,6 +83,7 @@ export default function InternalAnimationPlayerCore({ matchId = '', dbMatchId = 
   const [eventFilter, setEventFilter] = useState<EventFilterKey>('all');
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [stableMatchClock, setStableMatchClock] = useState<MatchClock>({ minute: null, source: 'unavailable' });
+  const [clockNow, setClockNow] = useState(() => Date.now());
 
   const query = useMemo(() => buildQuery(matchId, dbMatchId), [matchId, dbMatchId]);
 
@@ -115,12 +142,17 @@ export default function InternalAnimationPlayerCore({ matchId = '', dbMatchId = 
     };
   }, [fetchStats, fetchEvents]);
 
+  useEffect(() => {
+    const clockTimer = window.setInterval(() => setClockNow(Date.now()), CLOCK_TICK_MS);
+    return () => window.clearInterval(clockTimer);
+  }, []);
+
   const match = statsData?.match;
   const snapshot = useMemo(() => resolvedSnapshot(statsData), [statsData]);
   const events = useMemo(() => eventsData?.events || [], [eventsData]);
   const homeTeam = match?.homeTeam || null;
   const awayTeam = match?.awayTeam || null;
-  const rawClock = matchClockMinute(snapshot, events, match?.status);
+  const rawClock = matchClockMinute(snapshot, events, match?.status, match?.matchDate, clockNow);
   const currentMinute = rawClock.minute ?? stableMatchClock.minute;
   const clockSource = rawClock.minute !== null ? rawClock.source : stableMatchClock.minute !== null ? 'cached' : 'unavailable';
   const provider = statsData?.sourceStatus?.statsProvider || statsData?.sourceStatus?.primary;
