@@ -5,7 +5,7 @@ import { ar, formatMatchDate, formatUpdatedAt, sourceLabel } from '../formatters
 import { displayMatchStatus, isFinishedStatus, isHalfTimeStatus, normalizeStatus } from '../statusUtils';
 import TeamName from './TeamName';
 
-type ClockSource = 'live_stats' | 'cached' | 'final_elapsed' | 'final_event' | 'unavailable';
+type ClockSource = 'kickoff_time' | 'live_stats' | 'cached' | 'final_elapsed' | 'final_event' | 'unavailable';
 
 type MatchHeaderPanelProps = {
   match?: LiveStatsResponse['match'];
@@ -37,12 +37,12 @@ function minuteLabel(minute: number | null) {
 
 function firstHalfHint(minute: number | null) {
   if (minute !== null && minute > 0 && minute <= 5) return 'بداية الشوط الأول';
-  return 'الشوط الأول بدأ';
+  return 'اللعب مستمر';
 }
 
 function secondHalfHint(minute: number | null) {
-  if (minute !== null && minute >= 46 && minute <= 50) return 'بداية الشوط الثاني';
-  return 'الشوط الثاني';
+  if (minute !== null && minute >= 46 && minute <= 50) return 'بداية اللعب بعد الاستراحة';
+  return 'اللعب مستمر';
 }
 
 function clockInfo(status?: string | null, currentMinute?: number | null) {
@@ -56,8 +56,7 @@ function clockInfo(status?: string | null, currentMinute?: number | null) {
   }
 
   if (isHalfTimeStatus(value)) {
-    const stoppedAt = minute ? `توقفت عند د${ar(Math.max(minute, 45))}` : 'استراحة بين الشوطين';
-    return { label: 'نهاية الشوط الأول', hint: stoppedAt, active: false };
+    return { label: 'استراحة', hint: 'استراحة بين الشوطين حسب حالة المصدر', active: false };
   }
 
   if (isFinishedStatus(value)) {
