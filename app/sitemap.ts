@@ -27,6 +27,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { route: '/teams', freq: 'daily', prio: 0.75 },
     { route: '/players', freq: 'daily', prio: 0.7 },
     { route: '/groups', freq: 'always', prio: 0.85 },
+    { route: '/about', freq: 'monthly', prio: 0.6 },
+    { route: '/privacy', freq: 'monthly', prio: 0.6 },
+    { route: '/privacy-policy', freq: 'monthly', prio: 0.5 },
+    { route: '/contact', freq: 'monthly', prio: 0.6 },
+    { route: '/terms', freq: 'monthly', prio: 0.5 },
   ].map((page) => ({
     url: `${baseUrl}${page.route}`,
     lastModified: new Date(),
