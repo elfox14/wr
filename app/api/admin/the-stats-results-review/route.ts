@@ -60,6 +60,12 @@ function asNumber(...values: any[]) {
   return Number.isFinite(number) ? number : null;
 }
 
+function clampInt(value: string | null, fallback: number, min: number, max: number) {
+  const parsed = Number(value || fallback);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.max(min, Math.min(max, Math.floor(parsed)));
+}
+
 function normalizeText(value?: string | null) {
   return String(value || '')
     .toLowerCase()
@@ -144,13 +150,32 @@ async function loadPastMatches(daysBack: number) {
   });
 }
 
+function isSuspiciousZeroScore(localMatch: any, providerMatch: ProviderRow | null) {
+  if (!providerMatch || providerMatch.status !== 'FINISHED') return false;
+  const localHome = asNumber(localMatch.homeScore) || 0;
+  const localAway = asNumber(localMatch.awayScore) || 0;
+  const providerHome = providerMatch.homeScore;
+  const providerAway = providerMatch.awayScore;
+  return String(localMatch.status || '').toUpperCase() === 'FINISHED'
+    && localHome + localAway > 0
+    && providerHome === 0
+    && providerAway === 0;
+}
+
+function reviewWarnings(localMatch: any, providerMatch: ProviderRow | null) {
+  const warnings: string[] = [];
+  if (isSuspiciousZeroScore(localMatch, providerMatch)) warnings.push('provider_zero_zero_conflicts_with_local_final_score');
+  return warnings;
+}
+
 function suggestedChanges(localMatch: any, providerMatch: ProviderRow | null) {
   const changes: Record<string, any> = {};
   if (!providerMatch || providerMatch.status !== 'FINISHED') return changes;
+  const suspiciousZeroScore = isSuspiciousZeroScore(localMatch, providerMatch);
   if (providerMatch.providerId && !localMatch.externalId) changes.externalId = providerMatch.providerId;
-  if (localMatch.status !== 'FINISHED') changes.status = 'FINISHED';
-  if (providerMatch.homeScore !== null && localMatch.homeScore !== providerMatch.homeScore) changes.homeScore = providerMatch.homeScore;
-  if (providerMatch.awayScore !== null && localMatch.awayScore !== providerMatch.awayScore) changes.awayScore = providerMatch.awayScore;
+  if (!suspiciousZeroScore && localMatch.status !== 'FINISHED') changes.status = 'FINISHED';
+  if (!suspiciousZeroScore && providerMatch.homeScore !== null && localMatch.homeScore !== providerMatch.homeScore) changes.homeScore = providerMatch.homeScore;
+  if (!suspiciousZeroScore && providerMatch.awayScore !== null && localMatch.awayScore !== providerMatch.awayScore) changes.awayScore = providerMatch.awayScore;
   return changes;
 }
 
@@ -160,12 +185,13 @@ export async function GET(req: Request) {
     return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401, headers: { 'Cache-Control': 'no-store' } });
   }
 
-  const daysBack = Math.max(1, Math.min(Number(url.searchParams.get('daysBack') || 3), 30));
+  const daysBack = clampInt(url.searchParams.get('daysBack'), 3, 1, 30);
+  const perPage = clampInt(url.searchParams.get('per_page'), 100, 1, 100);
   const providerPath = url.searchParams.get('providerPath') || '/api/football/matches';
   const providerQuery = {
     competition_id: url.searchParams.get('competition_id') || process.env.THE_STATS_API_WORLD_CUP_COMPETITION_ID || 'comp_6107',
     season_id: url.searchParams.get('season_id') || process.env.THE_STATS_API_WORLD_CUP_SEASON_ID || 'sn_118868',
-    per_page: Number(url.searchParams.get('per_page') || 100),
+    per_page: perPage,
   };
 
   try {
@@ -174,6 +200,7 @@ export async function GET(req: Request) {
     const finishedProviderRows = providerRows.filter((row) => row.status === 'FINISHED');
     const review = localMatches.map((localMatch) => {
       const providerMatch = providerRows.find((row) => providerMatchesLocal(row, localMatch));
+      const warnings = reviewWarnings(localMatch, providerMatch || null);
       return {
         localMatchId: localMatch.id,
         localTeams: `${localMatch.homeTeam?.name || 'Home'} vs ${localMatch.awayTeam?.name || 'Away'}`,
@@ -185,6 +212,7 @@ export async function GET(req: Request) {
         providerStatus: providerMatch?.status || null,
         providerScore: providerMatch ? `${providerMatch.homeScore}-${providerMatch.awayScore}` : null,
         providerIsFinished: providerMatch?.status === 'FINISHED',
+        warnings,
         suggestedChanges: suggestedChanges(localMatch, providerMatch || null),
       };
     });
@@ -199,11 +227,14 @@ export async function GET(req: Request) {
       matched: review.filter((item) => item.providerMatchId).length,
       matchedFinished: review.filter((item) => item.providerMatchId && item.providerIsFinished).length,
       changedCandidates: review.filter((item) => Object.keys(item.suggestedChanges).length).length,
+      warnings: review.filter((item) => item.warnings.length).length,
       review,
       safety: {
         reviewOnly: true,
         previousMatchesOnly: true,
         suggestionsFinishedOnly: true,
+        ignoresSuspiciousZeroZeroScoreConflicts: true,
+        providerPageSize: perPage,
         suggestedFields: ['externalId', 'status', 'homeScore', 'awayScore'],
       },
     }, { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } });
