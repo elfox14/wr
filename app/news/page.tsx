@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { BookOpen, Clock, Filter, Newspaper, Sparkles } from 'lucide-react';
+import { BookOpen, Clock, ExternalLink, Filter, Newspaper, Sparkles } from 'lucide-react';
 import prisma from '@/lib/prisma';
 import AdSenseBanner from '@/components/ads/AdSenseBanner';
 import { ensureWorldCup2026OpeningNews, getPressNewsMeta } from '@/lib/press-news/world-cup-2026-opening-news';
@@ -42,13 +42,20 @@ async function ensurePressNewsTable() {
       "status" TEXT NOT NULL DEFAULT 'published',
       "importance" INTEGER NOT NULL DEFAULT 50,
       "tags" JSONB,
+      "relatedTeamId" TEXT,
+      "relatedPlayerId" TEXT,
+      "relatedMatchId" TEXT,
       "publishedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
       "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
       "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
     )
   `);
+  await prisma.$executeRawUnsafe('ALTER TABLE "PressNews" ADD COLUMN IF NOT EXISTS "relatedTeamId" TEXT');
+  await prisma.$executeRawUnsafe('ALTER TABLE "PressNews" ADD COLUMN IF NOT EXISTS "relatedPlayerId" TEXT');
+  await prisma.$executeRawUnsafe('ALTER TABLE "PressNews" ADD COLUMN IF NOT EXISTS "relatedMatchId" TEXT');
   await prisma.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS "PressNews_status_publishedAt_idx" ON "PressNews" ("status", "publishedAt")');
   await prisma.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS "PressNews_category_publishedAt_idx" ON "PressNews" ("category", "publishedAt")');
+  await prisma.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS "PressNews_relatedMatchId_idx" ON "PressNews" ("relatedMatchId")');
 }
 
 function formatDate(value: Date | string) {
@@ -60,6 +67,14 @@ function formatDate(value: Date | string) {
     hour: '2-digit',
     minute: '2-digit',
   });
+}
+
+function matchCenterUrl(item: any) {
+  const relatedMatchId = String(item?.relatedMatchId || '').trim();
+  if (relatedMatchId) return `/match-center/${relatedMatchId}`;
+  const sourceUrl = String(item?.sourceUrl || '').trim();
+  if (sourceUrl.startsWith('/match-center/')) return sourceUrl;
+  return '';
 }
 
 type NewsPageProps = {
@@ -98,6 +113,7 @@ export default async function NewsPage({ searchParams }: NewsPageProps) {
 
   const heroItem = newsItems[0];
   const heroMeta = heroItem ? getPressNewsMeta(heroItem.tags, heroItem.title) : null;
+  const heroMatchUrl = heroItem ? matchCenterUrl(heroItem) : '';
   const listItems = newsItems.slice(1);
   const isMatchCenterCategory = currentCategory === MATCH_CENTER_ANALYSIS_CATEGORY;
 
@@ -162,6 +178,11 @@ export default async function NewsPage({ searchParams }: NewsPageProps) {
                     <span className="text-xs font-bold text-gray-500 flex items-center gap-1">
                       <Clock size={12} /> {formatDate(heroItem.publishedAt)}
                     </span>
+                    {heroMatchUrl && (
+                      <span className="rounded-xl border border-[#0FF0FC]/20 bg-[#0FF0FC]/10 px-3 py-1 text-[11px] font-black text-[#0FF0FC]">
+                        مرتبط بصفحة مباراة
+                      </span>
+                    )}
                   </div>
                   <h2 className="text-2xl font-black leading-tight text-white transition-colors group-hover:text-[#0FF0FC] md:text-4xl">
                     <Link href={`/news/${heroItem.id}`}>{heroItem.title}</Link>
@@ -170,16 +191,26 @@ export default async function NewsPage({ searchParams }: NewsPageProps) {
                     {heroItem.body}
                   </p>
                 </div>
-                <div className="flex items-center justify-between border-t border-white/5 pt-4">
+                <div className="flex flex-wrap items-center justify-between gap-3 border-t border-white/5 pt-4">
                   <span className="text-xs font-bold text-gray-500">
                     المصدر: <span className="text-gray-300">{heroItem.sourceName}</span>
                   </span>
-                  <Link
-                    href={`/news/${heroItem.id}`}
-                    className="inline-flex items-center gap-2 rounded-xl bg-white/10 px-4 py-2.5 text-xs font-black text-white transition-all hover:bg-[#0FF0FC] hover:text-black"
-                  >
-                    <BookOpen size={14} /> قراءة التحليل بالكامل
-                  </Link>
+                  <div className="flex flex-wrap gap-2">
+                    {heroMatchUrl && (
+                      <Link
+                        href={heroMatchUrl}
+                        className="inline-flex items-center gap-2 rounded-xl border border-[#FFD700]/25 bg-[#FFD700]/10 px-4 py-2.5 text-xs font-black text-[#FFD700] transition-all hover:bg-[#FFD700] hover:text-black"
+                      >
+                        <ExternalLink size={14} /> فتح المباراة
+                      </Link>
+                    )}
+                    <Link
+                      href={`/news/${heroItem.id}`}
+                      className="inline-flex items-center gap-2 rounded-xl bg-white/10 px-4 py-2.5 text-xs font-black text-white transition-all hover:bg-[#0FF0FC] hover:text-black"
+                    >
+                      <BookOpen size={14} /> قراءة التحليل بالكامل
+                    </Link>
+                  </div>
                 </div>
               </div>
 
@@ -226,6 +257,7 @@ export default async function NewsPage({ searchParams }: NewsPageProps) {
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
               {listItems.map((item) => {
                 const itemMeta = getPressNewsMeta(item.tags, item.title);
+                const itemMatchUrl = matchCenterUrl(item);
                 return (
                   <article
                     key={item.id}
@@ -249,6 +281,14 @@ export default async function NewsPage({ searchParams }: NewsPageProps) {
                           </span>
                           <span>{formatDate(item.publishedAt)}</span>
                         </div>
+                        {itemMatchUrl && (
+                          <Link
+                            href={itemMatchUrl}
+                            className="inline-flex items-center gap-1 rounded-lg border border-[#FFD700]/20 bg-[#FFD700]/10 px-2 py-1 text-[10px] font-black text-[#FFD700] hover:bg-[#FFD700] hover:text-black"
+                          >
+                            <ExternalLink size={12} /> فتح المباراة
+                          </Link>
+                        )}
                         <h3 className="line-clamp-2 font-black leading-7 text-white transition-colors hover:text-[#FFD700]">
                           <Link href={`/news/${item.id}`}>{item.title}</Link>
                         </h3>
