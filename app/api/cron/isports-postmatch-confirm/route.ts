@@ -120,6 +120,7 @@ export async function GET(req: Request) {
     const timeoutMs = clampInt(url.searchParams.get('timeoutMs'), 45000, 5000, 80000);
     const waitMs = clampInt(url.searchParams.get('waitMs'), 12000, 1000, 30000);
     const windowBeforeMinutes = clampInt(url.searchParams.get('windowBeforeMinutes'), 0, 0, 43200);
+    const minConfirmIntervalMinutes = clampInt(url.searchParams.get('minConfirmIntervalMinutes'), 180, 0, 10080);
     const includeTimeline = boolParam(url.searchParams.get('includeTimeline'), true);
     const includeFlash = boolParam(url.searchParams.get('includeFlash'), true);
     const includeLive = boolParam(url.searchParams.get('includeLive'), true);
@@ -135,8 +136,10 @@ export async function GET(req: Request) {
     const orderDirection: 'asc' | 'desc' = orderParam === 'asc' ? 'asc' : 'desc';
     const explicitDbMatchId = url.searchParams.get('dbMatchId') || url.searchParams.get('id');
     const explicitProviderMatchId = Number(url.searchParams.get('matchId') || url.searchParams.get('providerMatchId') || 0);
+    const hasExplicitTarget = Boolean(explicitDbMatchId || (Number.isFinite(explicitProviderMatchId) && explicitProviderMatchId > 0));
+    const recentConfirmCutoff = new Date(Date.now() - minConfirmIntervalMinutes * 60_000);
 
-    const baseWhere: any = explicitDbMatchId
+    let baseWhere: any = explicitDbMatchId
       ? { id: explicitDbMatchId, animationMatchId: { not: null } }
       : Number.isFinite(explicitProviderMatchId) && explicitProviderMatchId > 0
         ? { animationMatchId: Math.floor(explicitProviderMatchId) }
@@ -145,14 +148,33 @@ export async function GET(req: Request) {
             matchDate: { gte: after, lte: before },
             OR: [{ status: { in: FINISHED_STATUSES } }, { matchDate: { lte: before } }],
           };
+
+    if (!hasExplicitTarget && minConfirmIntervalMinutes > 0) {
+      baseWhere = {
+        AND: [
+          baseWhere,
+          {
+            NOT: {
+              statsSnapshots: {
+                some: {
+                  provider: 'ISPORTS_TIMELINE',
+                  capturedAt: { gte: recentConfirmCutoff },
+                },
+              },
+            },
+          },
+        ],
+      };
+    }
+
     const targetWhere = missingOnly
-      ? { ...baseWhere, OR: [{ events: { none: {} } }, { statsSnapshots: { none: finalStatsWhere() } }] }
+      ? { AND: [baseWhere, { OR: [{ events: { none: {} } }, { statsSnapshots: { none: finalStatsWhere() } }] }] }
       : baseWhere;
 
     const matches = await prisma.match.findMany({
       where: targetWhere,
       orderBy: { matchDate: orderDirection },
-      skip: explicitDbMatchId || explicitProviderMatchId || missingOnly ? 0 : skip,
+      skip: hasExplicitTarget || missingOnly ? 0 : skip,
       take,
       include: {
         homeTeam: { select: { id: true, name: true, code: true } },
@@ -174,7 +196,7 @@ export async function GET(req: Request) {
         includeLive,
         processed: 0,
         selected: matches.length,
-        query: { after: after.toISOString(), before: before.toISOString(), take, skip, missingOnly, order: orderDirection, windowBeforeMinutes: hasExplicitAfter ? null : windowBeforeMinutes },
+        query: { after: after.toISOString(), before: before.toISOString(), take, skip, missingOnly, order: orderDirection, windowBeforeMinutes: hasExplicitAfter ? null : windowBeforeMinutes, minConfirmIntervalMinutes, recentConfirmCutoff: minConfirmIntervalMinutes > 0 ? recentConfirmCutoff.toISOString() : null },
         targets: matches.map((match) => ({
           dbMatchId: match.id,
           providerMatchId: match.animationMatchId,
@@ -184,7 +206,7 @@ export async function GET(req: Request) {
           counts: match._count,
           latestSnapshot: match.statsSnapshots[0] || null,
         })),
-        note: 'Dry run only. This route confirms post-match data from iSports Timeline, FlashData, and Visual Stats. Timeline save uses replace=true by default, so if the source has extra events, the local timeline is refreshed with them.',
+        note: 'Dry run only. This route confirms post-match data from iSports Timeline, FlashData, and Visual Stats. Non-explicit cron runs skip matches already confirmed by ISPORTS_TIMELINE within minConfirmIntervalMinutes.',
       });
     }
 
@@ -278,9 +300,9 @@ export async function GET(req: Request) {
       includeLive,
       processed: results.length,
       durationMs: Date.now() - startedAt,
-      query: { after: after.toISOString(), before: before.toISOString(), take, skip, missingOnly, order: orderDirection, windowBeforeMinutes: hasExplicitAfter ? null : windowBeforeMinutes },
+      query: { after: after.toISOString(), before: before.toISOString(), take, skip, missingOnly, order: orderDirection, windowBeforeMinutes: hasExplicitAfter ? null : windowBeforeMinutes, minConfirmIntervalMinutes, recentConfirmCutoff: minConfirmIntervalMinutes > 0 ? recentConfirmCutoff.toISOString() : null },
       results,
-      note: 'Post-match confirmation uses iSports Timeline for final events, FlashData for score/corners/attacks, and Visual Stats for possession/shots. If Timeline has extra events, replace=true refreshes the saved timeline events.',
+      note: 'Post-match confirmation uses iSports Timeline for final events, FlashData for score/corners/attacks, and Visual Stats for possession/shots. Non-explicit cron runs skip matches already confirmed by ISPORTS_TIMELINE within minConfirmIntervalMinutes.',
     });
   } catch (error: any) {
     return json({ ok: false, error: error?.message || 'Internal Server Error' }, 500);
