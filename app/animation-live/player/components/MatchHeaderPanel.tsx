@@ -5,11 +5,14 @@ import { ar, formatMatchDate, formatUpdatedAt, sourceLabel } from '../formatters
 import { displayMatchStatus, isFinishedStatus, isHalfTimeStatus, normalizeStatus } from '../statusUtils';
 import TeamName from './TeamName';
 
+type ClockSource = 'live_stats' | 'cached' | 'final_elapsed' | 'final_event' | 'unavailable';
+
 type MatchHeaderPanelProps = {
   match?: LiveStatsResponse['match'];
   provider?: string | null;
   updatedAt?: string | null;
   currentMinute?: number | null;
+  clockSource?: ClockSource;
   loading?: boolean;
   error?: string | null;
   onRefresh?: () => void;
@@ -21,6 +24,20 @@ function statusClass(status?: string | null) {
   if (isHalfTimeStatus(value)) return 'border-[#FFD700]/25 bg-[#FFD700]/10 text-[#FFD700]';
   if (['IN_PLAY', 'LIVE', '1H', '2H', 'ET'].includes(value)) return 'border-emerald-400/25 bg-emerald-400/10 text-emerald-300';
   return 'border-white/10 bg-black/30 text-gray-400';
+}
+
+function clockSourceLabel(source?: ClockSource) {
+  if (source === 'live_stats') return 'إحصائيات مباشرة';
+  if (source === 'cached') return 'آخر زمن محفوظ';
+  if (source === 'final_elapsed' || source === 'final_event') return 'زمن النهاية';
+  return 'غير متوفر';
+}
+
+function clockSourceClass(source?: ClockSource) {
+  if (source === 'live_stats') return 'border-emerald-400/20 bg-emerald-400/10 text-emerald-300';
+  if (source === 'cached') return 'border-[#FFD700]/25 bg-[#FFD700]/10 text-[#FFD700]';
+  if (source === 'final_elapsed' || source === 'final_event') return 'border-white/10 bg-white/10 text-gray-300';
+  return 'border-white/10 bg-black/30 text-gray-500';
 }
 
 function safeMinute(currentMinute?: number | null) {
@@ -78,13 +95,14 @@ function clockInfo(status?: string | null, currentMinute?: number | null) {
   return { label: '—', hint: 'زمن المباراة غير متوفر بعد', active: false };
 }
 
-export default function MatchHeaderPanel({ match, provider, updatedAt, currentMinute, loading = false, error, onRefresh }: MatchHeaderPanelProps) {
+export default function MatchHeaderPanel({ match, provider, updatedAt, currentMinute, clockSource, loading = false, error, onRefresh }: MatchHeaderPanelProps) {
   const homeTeam = match?.homeTeam || null;
   const awayTeam = match?.awayTeam || null;
   const homeScore = match?.homeScore ?? 0;
   const awayScore = match?.awayScore ?? 0;
   const status = match?.status;
   const clock = clockInfo(status, currentMinute);
+  const sourceText = clockSourceLabel(clockSource);
 
   return (
     <section className="order-1 overflow-hidden rounded-[32px] border border-white/10 bg-white/[0.04] shadow-2xl shadow-black/40">
@@ -104,6 +122,9 @@ export default function MatchHeaderPanel({ match, provider, updatedAt, currentMi
             </span>
             <span className={`rounded-full border px-3 py-1 text-[10px] font-black ${clock.active ? 'border-[#FFD700]/30 bg-[#FFD700]/10 text-[#FFD700]' : 'border-white/10 bg-black/30 text-gray-400'}`} title={clock.hint}>
               زمن المباراة: {clock.label}
+            </span>
+            <span className={`rounded-full border px-3 py-1 text-[10px] font-black ${clockSourceClass(clockSource)}`} title={`مصدر الزمن: ${sourceText}`}>
+              مصدر الزمن: {sourceText}
             </span>
             {onRefresh ? (
               <button
@@ -131,6 +152,7 @@ export default function MatchHeaderPanel({ match, provider, updatedAt, currentMi
           </div>
           <div className="mt-2 text-[10px] font-bold text-gray-500">{formatMatchDate(match?.matchDate)}</div>
           <div className="mt-2 text-[10px] font-black text-[#FFD700]" title={clock.hint}>{clock.hint}</div>
+          <div className="mt-1 text-[9px] font-black text-gray-500">مصدر الزمن: {sourceText}</div>
         </div>
 
         <TeamName team={awayTeam} fallback="الفريق الثاني" align="left" />
