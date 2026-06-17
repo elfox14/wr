@@ -132,6 +132,12 @@ function normalizeProviderStatus(value?: string | null) {
   return status || null;
 }
 
+function normalizeComparableStatus(value?: string | null) {
+  const normalized = normalizeProviderStatus(value);
+  if (['1H', '2H', 'ET', 'LIVE', 'IN_PLAY'].includes(String(value || '').trim().toUpperCase())) return 'IN_PLAY';
+  return normalized;
+}
+
 function extractArray(payload: any): any[] {
   if (Array.isArray(payload)) return payload;
   for (const key of ['matches', 'fixtures', 'data', 'response', 'results', 'items']) {
@@ -232,6 +238,21 @@ function diffField(field: string, localValue: any, providerValue: any) {
   };
 }
 
+function diffStatus(localValue: any, providerValue: any) {
+  if (providerValue === undefined || providerValue === null || providerValue === '') return null;
+  const localComparable = normalizeComparableStatus(localValue);
+  const providerComparable = normalizeComparableStatus(providerValue);
+  const matched = !!localComparable && !!providerComparable && localComparable === providerComparable;
+  return {
+    field: 'status',
+    localValue: localValue ?? null,
+    providerValue,
+    status: matched ? 'matched' : localValue === null || localValue === undefined || localValue === '' ? 'missing_locally' : 'different',
+    normalizedLocalValue: localComparable,
+    normalizedProviderValue: providerComparable,
+  };
+}
+
 function diffGroupPhase(localValue: any, providerValue: any) {
   if (providerValue === undefined || providerValue === null || providerValue === '') return null;
   const localNormalized = normalizeGroupPhase(localValue);
@@ -249,7 +270,7 @@ function diffGroupPhase(localValue: any, providerValue: any) {
 
 function buildDiffs(localMatch: any, providerMatch: any) {
   return [
-    diffField('status', localMatch.status, providerMatch.status),
+    diffStatus(localMatch.status, providerMatch.status),
     diffField('homeScore', localMatch.homeScore, providerMatch.homeScore),
     diffField('awayScore', localMatch.awayScore, providerMatch.awayScore),
     diffField('matchDate', localMatch.matchDate?.toISOString?.() || localMatch.matchDate, providerMatch.matchDate),
