@@ -1,6 +1,4 @@
-function ar(value: number | null | undefined, fallback = '٠') {
-  return value === null || value === undefined ? fallback : value.toLocaleString('ar-EG');
-}
+import { ar } from '../formatters';
 
 type StatProps = {
   label: string;
