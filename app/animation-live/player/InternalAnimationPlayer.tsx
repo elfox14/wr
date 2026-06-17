@@ -199,7 +199,8 @@ function calculatePressureModel(snapshot: Snapshot, events: MatchEvent[], curren
   const maxPressure = Math.max(homePressure, awayPressure);
   const danger = maxPressure >= 220 ? 'مرتفعة' : maxPressure >= 110 ? 'متوسطة' : 'منخفضة';
   return { home: Math.round(homePressure), away: Math.round(awayPressure), leader, rhythm, danger, window5, window15 };
-}\nfunction momentumRating(total: number) {
+}
+function momentumRating(total: number) {
   if (total >= 18) return 'ضغط عالي';
   if (total >= 8) return 'ضغط متوسط';
   if (total > 0) return 'ضغط منخفض';
