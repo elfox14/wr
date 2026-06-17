@@ -1,6 +1,11 @@
 export type BrowserlessKind = 'content' | 'function';
 export type BrowserlessProvider = 'primary' | 'fallback';
 
+type BrowserlessCandidate = {
+  provider: BrowserlessProvider;
+  endpoint: string;
+};
+
 export type BrowserlessPostResult = {
   ok: boolean;
   status: number | null;
@@ -38,13 +43,13 @@ function fallbackRawEndpoint(kind: BrowserlessKind) {
   return process.env.BROWSERLESS_FALLBACK_ENDPOINT || null;
 }
 
-export function browserlessCandidates(kind: BrowserlessKind) {
+export function browserlessCandidates(kind: BrowserlessKind): BrowserlessCandidate[] {
   const primaryRaw = process.env.BROWSERLESS_ENDPOINT || 'https://production-sfo.browserless.io/content';
   const primaryToken = process.env.BROWSERLESS_TOKEN;
   const fallbackRaw = fallbackRawEndpoint(kind);
   const fallbackToken = process.env.BROWSERLESS_FALLBACK_TOKEN;
-  const candidates = [{ provider: 'primary' as const, endpoint: endpointFor(kind, primaryRaw, primaryToken) }];
-  if (fallbackRaw && fallbackToken) candidates.push({ provider: 'fallback' as const, endpoint: endpointFor(kind, fallbackRaw, fallbackToken) });
+  const candidates: BrowserlessCandidate[] = [{ provider: 'primary', endpoint: endpointFor(kind, primaryRaw, primaryToken) }];
+  if (fallbackRaw && fallbackToken) candidates.push({ provider: 'fallback', endpoint: endpointFor(kind, fallbackRaw, fallbackToken) });
   return candidates;
 }
 
