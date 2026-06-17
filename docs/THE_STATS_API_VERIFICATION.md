@@ -17,6 +17,8 @@ THE_STATS_API_BASE_URL="https://api.thestatsapi.com"
 THE_STATS_API_AUTH_HEADER="Authorization"
 THE_STATS_API_AUTH_SCHEME="Bearer"
 THE_STATS_API_TIMEOUT_MS="15000"
+THE_STATS_API_WORLD_CUP_COMPETITION_ID="comp_6107"
+THE_STATS_API_WORLD_CUP_SEASON_ID="sn_118868"
 ```
 
 Recommended first-run settings:
@@ -63,6 +65,34 @@ GET /api/admin/the-stats-verify?providerPath=/api/football/matches&competition_i
 
 The endpoint returns `providerSample` with normalized rows, including `utc_date` mapped to `matchDate`.
 
+## Admin dashboard
+
+```text
+/admin/data-verification?adminSecret=<secret>
+```
+
+This page shows the latest rows from `DataVerificationLog` in a readable table. It is an internal review page only and must not be linked from the public UI.
+
+## Safe cron endpoint
+
+```text
+/api/cron/the-stats-verify?cronSecret=<secret>
+```
+
+Default cron behavior:
+
+- Uses `/api/football/matches`.
+- Uses `competition_id=comp_6107` and `season_id=sn_118868` unless overridden by environment variables.
+- Forces `dryRun=true`.
+- Does not forward or allow `apply=true`.
+- Calls the admin verification endpoint server-side.
+
+Example Render cron URL:
+
+```text
+https://worldcup.mcprim.com/api/cron/the-stats-verify?cronSecret=<secret>
+```
+
 ## What the endpoint does
 
 1. Fetches a safe football endpoint from TheStatsAPI.
@@ -77,15 +107,20 @@ The endpoint returns `providerSample` with normalized rows, including `utc_date`
    - `away_team.name`
    - `score.home`
    - `score.away`
-5. Compares safe fields:
+5. Normalizes safe comparison values:
+   - `GROUP_J` equals `J`.
+   - `USA` equals `United States`.
+   - `Czechia` equals `Czech Republic`.
+   - `1H`, `2H`, `ET`, and `IN_PLAY` compare as live status.
+6. Compares safe fields:
    - `status`
    - `homeScore`
    - `awayScore`
    - `matchDate`
    - `stage`
    - `groupPhase`
-6. Writes results to `DataVerificationLog` only when a local/provider match is found.
-7. Returns a comparison report.
+7. Writes results to `DataVerificationLog` only when a local/provider match is found.
+8. Returns a comparison report.
 
 ## Apply mode
 
@@ -123,6 +158,8 @@ TheStatsAPI
 /api/admin/the-stats-verify
 ↓
 DataVerificationLog + optional safe match correction
+↓
+/admin/data-verification review page
 ↓
 Database-backed public UI
 ```
