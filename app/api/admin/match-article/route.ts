@@ -9,6 +9,52 @@ export const revalidate = 0;
 
 const MATCH_CENTER_ANALYSIS_CATEGORY = 'تحليل صفحة المباراة';
 
+const TEAM_AR_NAMES: Record<string, string> = {
+  mexico: 'المكسيك',
+  'south africa': 'جنوب أفريقيا',
+  canada: 'كندا',
+  bosnia: 'البوسنة',
+  'bosnia and herzegovina': 'البوسنة والهرسك',
+  usa: 'الولايات المتحدة',
+  'united states': 'الولايات المتحدة',
+  paraguay: 'باراغواي',
+  qatar: 'قطر',
+  switzerland: 'سويسرا',
+  brazil: 'البرازيل',
+  morocco: 'المغرب',
+  scotland: 'اسكتلندا',
+  haiti: 'هايتي',
+  australia: 'أستراليا',
+  turkiye: 'تركيا',
+  turkey: 'تركيا',
+  germany: 'ألمانيا',
+  curacao: 'كوراساو',
+  netherlands: 'هولندا',
+  japan: 'اليابان',
+  'cote divoire': 'كوت ديفوار',
+  'côte d’ivoire': 'كوت ديفوار',
+  ecuador: 'الإكوادور',
+  sweden: 'السويد',
+  tunisia: 'تونس',
+  spain: 'إسبانيا',
+  'cabo verde': 'الرأس الأخضر',
+  egypt: 'مصر',
+  belgium: 'بلجيكا',
+  saudi: 'السعودية',
+  'saudi arabia': 'السعودية',
+  uruguay: 'أوروغواي',
+  iran: 'إيران',
+  'new zealand': 'نيوزيلندا',
+  france: 'فرنسا',
+  senegal: 'السنغال',
+  norway: 'النرويج',
+  iraq: 'العراق',
+  argentina: 'الأرجنتين',
+  algeria: 'الجزائر',
+  austria: 'النمسا',
+  jordan: 'الأردن',
+};
+
 type AdminSession = {
   user?: { email?: string | null; role?: string | null };
 } | null;
@@ -82,6 +128,23 @@ function slugifyArabicSafe(value: string) {
     .slice(0, 90) || 'match-analysis';
 }
 
+function normalizeKey(value: unknown) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9\s]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function displayTeamName(value: unknown) {
+  const raw = String(value || '').trim();
+  if (!raw) return 'الفريق';
+  return TEAM_AR_NAMES[normalizeKey(raw)] || raw;
+}
+
 function n(snapshot: any, key: string) {
   const value = Number(snapshot?.[key]);
   return Number.isFinite(value) ? value : null;
@@ -113,8 +176,8 @@ function eventTypeLabel(type: string) {
 }
 
 function sideName(teamId: string | null | undefined, homeTeam: any, awayTeam: any) {
-  if (teamId && homeTeam?.id && teamId === homeTeam.id) return homeTeam.name;
-  if (teamId && awayTeam?.id && teamId === awayTeam.id) return awayTeam.name;
+  if (teamId && homeTeam?.id && teamId === homeTeam.id) return displayTeamName(homeTeam.name);
+  if (teamId && awayTeam?.id && teamId === awayTeam.id) return displayTeamName(awayTeam.name);
   return 'أحد الفريقين';
 }
 
@@ -142,20 +205,23 @@ function countEvents(events: EventRow[], match: any, includes: string[]) {
   return { home, away, total: home + away };
 }
 
-function statLine(snapshot: any, homeKey: string, awayKey: string, label: string, homeName: string, awayName: string) {
-  const home = n(snapshot, homeKey);
-  const away = n(snapshot, awayKey);
+function comparisonLine(home: number | null, away: number | null, label: string, homeName: string, awayName: string) {
   if (home === null || away === null) return null;
-  if (home === away) return `${label} متقاربة بين الطرفين عند ${ar(home)} - ${ar(away)}.`;
-  const leader = home > away ? homeName : awayName;
-  return `${leader} يتفوق في ${label} بواقع ${ar(home)} - ${ar(away)}.`;
+  if (home === 0 && away === 0) return null;
+  if (home === away) return `${label} متقاربة بين الطرفين عند ${ar(home)} لكل فريق.`;
+  const homeLeading = home > away;
+  const leader = homeLeading ? homeName : awayName;
+  const leaderValue = homeLeading ? home : away;
+  const otherValue = homeLeading ? away : home;
+  return `${leader} يتفوق في ${label} بواقع ${ar(leaderValue)} مقابل ${ar(otherValue)}.`;
+}
+
+function statLine(snapshot: any, homeKey: string, awayKey: string, label: string, homeName: string, awayName: string) {
+  return comparisonLine(n(snapshot, homeKey), n(snapshot, awayKey), label, homeName, awayName);
 }
 
 function pairLine(home: number, away: number, label: string, homeName: string, awayName: string) {
-  if (home === 0 && away === 0) return null;
-  if (home === away) return `${label} متقاربة بين الطرفين عند ${ar(home)} - ${ar(away)}.`;
-  const leader = home > away ? homeName : awayName;
-  return `${leader} يتفوق في ${label} بواقع ${ar(home)} - ${ar(away)}.`;
+  return comparisonLine(home, away, label, homeName, awayName);
 }
 
 function pickSnapshot(latest: any, history: any[]) {
@@ -214,12 +280,13 @@ function bestPlayer(events: EventRow[]) {
   return [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] || '';
 }
 
-function usefulDetail(event: EventRow, team: string) {
+function usefulDetail(event: EventRow, displayedTeam: string, rawTeam?: string | null) {
   const detail = cleanText(event.detail);
   if (!detail) return '';
   const label = eventTypeLabel(event.type);
   const reduced = detail
-    .replace(team, '')
+    .replace(displayedTeam, '')
+    .replace(String(rawTeam || ''), '')
     .replace(label, '')
     .replace(/د\s*\d+\s*'?/g, '')
     .replace(/[\-–—:|.]/g, ' ')
@@ -227,21 +294,40 @@ function usefulDetail(event: EventRow, team: string) {
     .trim();
 
   if (!reduced || reduced.length < 4) return '';
-  if (detail.includes(team) && detail.includes(label) && reduced.length < 12) return '';
+  if (detail.includes(label) && reduced.length < 12) return '';
   return detail;
 }
 
+function winnerPhrase(homeName: string, awayName: string, homeScore: number, awayScore: number, score: string) {
+  if (homeScore === awayScore) {
+    return {
+      title: `${homeName} و${awayName} يتعادلان ${score} في مباراة مثيرة بكأس العالم 2026`,
+      opening: `انتهت مباراة ${homeName} و${awayName} بالتعادل ${score}، في مواجهة حملت الكثير من التفاصيل بين النتيجة، الإحصائيات، وتسلسل الأحداث داخل صفحة المباراة.`,
+      winner: '',
+      loser: '',
+    };
+  }
+
+  const homeWon = homeScore > awayScore;
+  const winner = homeWon ? homeName : awayName;
+  const loser = homeWon ? awayName : homeName;
+  return {
+    title: `${winner} يهزم ${loser} بنتيجة ${score} في كأس العالم 2026`,
+    opening: `حقق ${winner} فوزًا مهمًا على ${loser} بنتيجة ${score}، في مباراة منحت الفائز دفعة قوية وفتحت باب التحليل حول طريقة الوصول إلى هذه النتيجة.`,
+    winner,
+    loser,
+  };
+}
+
 function buildMatchArticle(match: any, snapshot: any, events: EventRow[]) {
-  const homeName = match.homeTeam?.name || 'الفريق الأول';
-  const awayName = match.awayTeam?.name || 'الفريق الثاني';
+  const homeName = displayTeamName(match.homeTeam?.name || 'الفريق الأول');
+  const awayName = displayTeamName(match.awayTeam?.name || 'الفريق الثاني');
   const scoreReadout = resolveScore(match, snapshot, events);
   const homeScore = scoreReadout.home;
   const awayScore = scoreReadout.away;
   const score = `${ar(homeScore)}-${ar(awayScore)}`;
-  const winner = homeScore === awayScore ? '' : homeScore > awayScore ? homeName : awayName;
-  const title = homeScore === awayScore
-    ? `${homeName} و${awayName} يتعادلان ${score} في مباراة مثيرة بكأس العالم 2026`
-    : `${winner} يحسم مواجهة ${homeName} و${awayName} بنتيجة ${score} في كأس العالم 2026`;
+  const phrasing = winnerPhrase(homeName, awayName, homeScore, awayScore, score);
+  const title = phrasing.title;
 
   const sortedImportant = importantEvents(events);
   const goalEvents = goals(events);
@@ -273,8 +359,9 @@ function buildMatchArticle(match: any, snapshot: any, events: EventRow[]) {
   const eventLines = sortedImportant.length
     ? sortedImportant.map((event) => {
         const team = sideName(event.teamId, match.homeTeam, match.awayTeam);
+        const rawTeam = event.teamId === match.homeTeam?.id ? match.homeTeam?.name : event.teamId === match.awayTeam?.id ? match.awayTeam?.name : null;
         const playerText = event.playerName ? ` عن طريق ${event.playerName}` : '';
-        const detail = usefulDetail(event, team);
+        const detail = usefulDetail(event, team, rawTeam);
         return `د${ar(event.minute)}: ${eventTypeLabel(event.type)} لصالح ${team}${playerText}${detail ? ` — ${detail}` : ''}.`;
       })
     : ['الأحداث التفصيلية غير كافية حاليًا، لذلك يعتمد التحليل على النتيجة والإحصائيات المتاحة من صفحة المباراة.'];
@@ -283,9 +370,7 @@ function buildMatchArticle(match: any, snapshot: any, events: EventRow[]) {
     ? ' تم اعتماد النتيجة من أحداث الأهداف المحفوظة لأن النتيجة الرقمية في جدول المباراة لم تكن مكتملة.'
     : '';
 
-  const opening = homeScore === awayScore
-    ? `انتهت مباراة ${homeName} و${awayName} بالتعادل ${score}، في مواجهة حملت الكثير من التفاصيل بين النتيجة، الإحصائيات، وتسلسل الأحداث داخل صفحة المباراة.${scoreSourceNote}`
-    : `حسم ${winner} مواجهة ${homeName} و${awayName} بنتيجة ${score}، في مباراة منحت الفائز دفعة مهمة وفتحت باب التحليل حول طريقة الوصول إلى هذه النتيجة.${scoreSourceNote}`;
+  const opening = `${phrasing.opening}${scoreSourceNote}`;
 
   const turningPoint = firstGoal
     ? `نقطة التحول الأولى جاءت عند الدقيقة ${ar(firstGoal.minute)} مع ${eventTypeLabel(firstGoal.type)} لصالح ${sideName(firstGoal.teamId, match.homeTeam, match.awayTeam)}${firstGoal.playerName ? ` عن طريق ${firstGoal.playerName}` : ''}. هذه اللقطة غيّرت إحساس المباراة وفرضت على الطرف الآخر التعامل مع ضغط النتيجة.`
@@ -299,13 +384,13 @@ function buildMatchArticle(match: any, snapshot: any, events: EventRow[]) {
 
   const body = [
     opening,
-    `بدأت المباراة بين ${homeName} و${awayName} وسط أهمية واضحة في حسابات كأس العالم 2026. ومع مرور الدقائق، أصبحت النتيجة ${score} عنوانًا رئيسيًا، لكن التفاصيل داخل صفحة المباراة تكشف أن القصة لا تتوقف عند الرقم فقط.`,
+    `بدأت المواجهة بين ${homeName} و${awayName} وسط أهمية واضحة في حسابات كأس العالم 2026. ومع مرور الدقائق، أصبحت النتيجة ${score} عنوانًا رئيسيًا، لكن التفاصيل داخل صفحة المباراة تكشف أن القصة لا تتوقف عند الرقم فقط.`,
     turningPoint,
     `على مستوى الأحداث، جاءت أبرز اللقطات كالتالي:\n${eventLines.map((line) => `- ${line}`).join('\n')}`,
     statsLines.length
       ? `قراءة الإحصائيات تمنح المقال زاوية حصرية من بيانات المباراة نفسها. ${statsLines.join(' ')}`
       : 'الإحصائيات الرقمية التفصيلية غير مكتملة حاليًا، لذلك تظل القراءة معتمدة على النتيجة وتسلسل الأحداث المتاح.',
-    `فنيًا، المباراة أظهرت أن إدارة اللحظات الحاسمة كانت العامل الأهم. الفريق الذي تعامل بشكل أفضل مع التحولات والضغط بعد الأحداث المؤثرة استطاع أن يفرض إيقاعه أو يحافظ على توازنه حتى النهاية.`,
+    `فنيًا، أظهرت المباراة أن إدارة اللحظات الحاسمة كانت العامل الأهم. الفريق الذي تعامل بشكل أفضل مع التحولات والضغط بعد الأحداث المؤثرة استطاع أن يفرض إيقاعه أو يحافظ على توازنه حتى النهاية.`,
     starLine,
     `تأثير هذه النتيجة لا يقتصر على جدول المباراة فقط، بل يمتد إلى الحالة المعنوية قبل الجولة التالية. ${homeName} و${awayName} سيخرجان من هذه المواجهة بدروس واضحة تتعلق بطريقة الضغط، استغلال الفرص، والتعامل مع الدقائق الأخيرة.`,
     `سؤال تفاعلي: من وجهة نظرك، هل كانت النتيجة عادلة بناءً على أحداث المباراة وإحصائياتها؟`,
