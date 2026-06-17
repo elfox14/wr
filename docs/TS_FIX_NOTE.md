@@ -1,0 +1,1 @@
+Apply animation TypeScript fixes to main if the original pull request has already been merged.
