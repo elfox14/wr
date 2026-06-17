@@ -29,6 +29,7 @@ const FRESH_LIVE_SNAPSHOT_MS = 4 * 60 * 1000;
 const STALE_FINAL_SNAPSHOT_MS = 7 * 60 * 1000;
 const FINAL_MINUTE_FLOOR = 85;
 const FINAL_LOCAL_MINUTE_FALLBACK = 100;
+const SCHEDULED_LIVE_FALLBACK_AFTER_MINUTES = 5;
 
 function dateKey(date = new Date()) {
   return date.toISOString().slice(0, 10);
@@ -180,7 +181,8 @@ function decorateMatch(match: any, now: Date, providerState?: any, snapshotState
   const isProviderLive = !isFinished && isProviderLiveStatus(providerStatus);
   const isDbLive = !isFinished && !isHalfTime && (dbStatus === 'IN_PLAY' || dbStatus === 'LIVE') && (providerHasState || freshSnapshot || localMinute < FINAL_LOCAL_MINUTE_FALLBACK);
   const isLikelyLiveByFreshSnapshot = !isFinished && !isHalfTime && !providerHasState && isScheduledStatus(dbStatus) && freshSnapshot && localMinute >= 1 && localMinute < maxLiveMinutes(match);
-  const isLiveNow = !isFinished && !isHalfTime && (isDbLive || isProviderLive || isLikelyLiveByFreshSnapshot);
+  const isLikelyLiveByElapsedTime = !isFinished && !isHalfTime && !providerHasState && isScheduledStatus(dbStatus) && localMinute >= SCHEDULED_LIVE_FALLBACK_AFTER_MINUTES && localMinute < maxLiveMinutes(match);
+  const isLiveNow = !isFinished && !isHalfTime && (isDbLive || isProviderLive || isLikelyLiveByFreshSnapshot || isLikelyLiveByElapsedTime);
   const localSafeMinute = isLiveNow && localMinute >= 1 && localMinute < maxLiveMinutes(match) ? Math.max(1, Math.min(150, localMinute)) : null;
   const displayMinute = isHalfTime ? null : (providerHasMinute && !staleByTime ? providerState.minute : (freshSnapshot ? snapshotMinute : localSafeMinute));
   const fallbackLabel = isLiveNow && localSafeMinute && localSafeMinute > 65 ? 'الشوط الثاني جارٍ' : null;
@@ -191,13 +193,13 @@ function decorateMatch(match: any, now: Date, providerState?: any, snapshotState
 
   return {
     ...match,
-    status: isFinished ? 'FINISHED' : isHalfTime ? 'HT' : (isProviderLive || isLikelyLiveByFreshSnapshot ? 'IN_PLAY' : match.status),
+    status: isFinished ? 'FINISHED' : isHalfTime ? 'HT' : (isProviderLive || isLikelyLiveByFreshSnapshot || isLikelyLiveByElapsedTime ? 'IN_PLAY' : match.status),
     homeScore: pickLiveScore(providerState?.homeScore, useSnapshotScore ? snapshotState?.homeScore : null, match.homeScore),
     awayScore: pickLiveScore(providerState?.awayScore, useSnapshotScore ? snapshotState?.awayScore : null, match.awayScore),
     scoreSource,
     isLiveNow,
     isHalfTime,
-    isLikelyLiveByTime: isLikelyLiveByFreshSnapshot,
+    isLikelyLiveByTime: isLikelyLiveByFreshSnapshot || isLikelyLiveByElapsedTime,
     isStaleAutoFinished: isFinished && (staleByTime || staleFinalSnapshot || noProviderFinalFallback),
     displayStatus: isFinished ? 'FINISHED' : isHalfTime ? 'HT' : (isLiveNow ? 'IN_PLAY' : match.status),
     minute: isFinished || isHalfTime ? null : displayMinute,
@@ -255,26 +257,5 @@ export async function GET() {
   const filler = [...decoratedFinished, ...other].filter((match) => !primary || match.id !== primary.id).filter((match) => !nextTwo.some((next) => next.id === match.id));
   const matches = uniqueById([...(primary ? [primary] : []), ...nextTwo, ...filler]).slice(0, 3);
 
-  return NextResponse.json({
-    matches,
-    meta: {
-      liveCount: live.length,
-      waitingForStartCount: waitingForStart.length,
-      upcomingCount: upcoming.length,
-      recentlyFinishedCount: decoratedFinished.length,
-      recentFinishedWindowHours: 6,
-      liveDetection: 'provider_or_fresh_snapshot_no_time_only_start',
-      freshLiveSnapshotMinutes: FRESH_LIVE_SNAPSHOT_MS / 60_000,
-      staleFinalSnapshotMinutes: STALE_FINAL_SNAPSHOT_MS / 60_000,
-      groupStageMaxLiveMinutes: GROUP_STAGE_MAX_LIVE_MINUTES,
-      knockoutMaxLiveMinutes: KNOCKOUT_MAX_LIVE_MINUTES,
-      selectionMode: 'primary_focus_plus_next_two',
-      updatedEverySeconds: 15,
-    },
-    updatedAt: now.toISOString(),
-  }, {
-    headers: {
-      'Cache-Control': 'private, max-age=0, no-cache, must-revalidate',
-    },
-  });
+  return NextResponse.json({ ok: true, updatedAt: now.toISOString(), matches }, { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } });
 }
