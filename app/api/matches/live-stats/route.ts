@@ -17,6 +17,8 @@ const LIVE_STATUSES = ['IN_PLAY', 'LIVE', '1H', '2H', 'HT'];
 const FINISHED_STATUSES = ['FINISHED', 'FT', 'AET', 'PEN'];
 const GROUP_STAGE_MAX_LIVE_MINUTES = 115;
 const KNOCKOUT_MAX_LIVE_MINUTES = 150;
+const MERGE_HISTORY_LIMIT = 80;
+const PUBLIC_HISTORY_LIMIT = 25;
 const SNAPSHOT_FIELDS = [
   'minute', 'homePossession', 'awayPossession', 'homeAttacks', 'awayAttacks',
   'homeDangerousAttacks', 'awayDangerousAttacks', 'homeShots', 'awayShots',
@@ -97,6 +99,14 @@ function mergeSnapshots(rows: any[]) {
   for (const field of SNAPSHOT_FIELDS) merged[field] = firstWithValue(ordered, field);
   return merged;
 }
+function publicHistoryRows(match: any, rows: any[]) {
+  return rows
+    .filter(plausibleSnapshot)
+    .map((row) => cleanPublicSnapshot(match, publicSnapshot(row)))
+    .filter((row) => hasAnyStat(row))
+    .slice(0, PUBLIC_HISTORY_LIMIT)
+    .reverse();
+}
 
 export async function GET(request: Request) {
   const now = new Date();
@@ -132,7 +142,7 @@ export async function GET(request: Request) {
       catch (error: any) { syncResult = { status: 'failed', ...providerErrorDetails(error) }; }
     } else syncResult = { status: 'cached_recent_snapshot', autoSync: autoSyncCandidate, note: 'Latest snapshot is still fresh.' };
 
-    const historyRows = await getSnapshotHistory(match.id, 80);
+    const historyRows = await getSnapshotHistory(match.id, MERGE_HISTORY_LIMIT);
     const mergedSnapshot = mergeSnapshots([latest, ...historyRows]);
     const rawLatestPublic = publicSnapshot(mergedSnapshot || latest);
     const latestPublic = cleanPublicSnapshot(match, rawLatestPublic);
@@ -157,7 +167,8 @@ export async function GET(request: Request) {
       scorePolicy: { source: 'match', ignoredSnapshotScore, ignoredPrematureFinishedStatus: prematureFinishedMinute, ignoredMinuteZeroSnapshot: Boolean(latestPublic && snapshotHasScore(latestPublic) && snapshotMinute(latestPublic) === null) },
       match: { id: match.id, animationMatchId: match.animationMatchId, status: effectiveStatus, matchDate: toIso(match.matchDate), homeScore: match.homeScore ?? 0, awayScore: match.awayScore ?? 0, homeTeam: match.homeTeam, awayTeam: match.awayTeam },
       latest: latestPublic,
-      history: historyRows.filter(plausibleSnapshot).map((row) => cleanPublicSnapshot(match, publicSnapshot(row))).reverse(),
+      history: publicHistoryRows(match, historyRows),
+      historyMeta: { returned: Math.min(publicHistoryRows(match, historyRows).length, PUBLIC_HISTORY_LIMIT), limit: PUBLIC_HISTORY_LIMIT, filteredEmptyRows: true },
     }, { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } });
   } catch (error: any) {
     console.error('live-stats endpoint error:', error);
