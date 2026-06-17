@@ -27,16 +27,12 @@ export default async function MatchCenterPage({ params }: { params: Promise<{ id
   return (
     <main className="min-h-screen bg-background px-3 py-4 text-white sm:px-6 sm:py-6 lg:px-8" dir="rtl">
       <section className="mx-auto max-w-7xl space-y-4 sm:space-y-5">
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/[0.035] px-3 py-2.5 sm:px-4">
-          <Link href="/matches" className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-white/10 bg-black/20 px-3 text-sm font-black text-gray-300 transition hover:border-[#0FF0FC]/30 hover:text-white">
-            <ArrowLeft size={16} /> العودة إلى المباريات
-          </Link>
-          <span className="rounded-xl border border-[#FFD700]/20 bg-[#FFD700]/10 px-3 py-2 text-[11px] font-black text-[#FFD700]">البث التفاعلي</span>
-        </div>
-
         <section id="live-broadcast" className="rounded-[1.45rem] border border-white/10 bg-white/[0.035] p-3 shadow-card sm:rounded-[1.5rem] sm:p-5">
-          <div className="mb-4 flex items-center justify-between gap-4">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <h1 className="flex min-w-0 items-center gap-2 text-base font-black text-white sm:text-xl"><Radio className="text-[#FFD700]" /> البث التفاعلي</h1>
+            <Link href="/matches" className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#0FF0FC]/25 bg-[#0FF0FC]/10 px-3 text-sm font-black text-[#EAFBFF] transition hover:border-[#0FF0FC]/45 hover:bg-[#0FF0FC]/15 hover:text-white">
+              العودة إلى المباريات <ArrowLeft size={16} />
+            </Link>
           </div>
           <InternalAnimationPlayer matchId={animationMatchId} dbMatchId={match.id} />
         </section>
