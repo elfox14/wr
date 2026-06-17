@@ -1,8 +1,10 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
+import { getServerSession } from 'next-auth';
 import { ArrowRight, Calendar, Clock, ExternalLink, Link2, Newspaper, User } from 'lucide-react';
 import prisma from '@/lib/prisma';
+import { authOptions } from '@/lib/auth';
 import AdSenseBanner from '@/components/ads/AdSenseBanner';
 import ShareButtons from '@/components/news/ShareButtons';
 import { ensureWorldCup2026OpeningNews, getPressNewsMeta } from '@/lib/press-news/world-cup-2026-opening-news';
@@ -16,6 +18,24 @@ const MATCH_CENTER_ANALYSIS_CATEGORY = 'تحليل صفحة المباراة';
 type Props = {
   params: Promise<{ id: string }>;
 };
+
+type AdminSession = {
+  user?: { email?: string | null; role?: string | null };
+} | null;
+
+function isAdmin(session: AdminSession) {
+  const email = session?.user?.email || '';
+  return session?.user?.role === 'ADMIN' || email === 'worldcup@mcprim.com' || email === 'elfox14usa@gmail.com';
+}
+
+async function canViewUnpublished() {
+  const session = await getServerSession(authOptions as any) as AdminSession;
+  return isAdmin(session);
+}
+
+function isPublished(newsItem: any) {
+  return String(newsItem?.status || 'published') === 'published';
+}
 
 async function ensurePressNewsTable() {
   await prisma.$executeRawUnsafe(`
@@ -107,9 +127,13 @@ async function getNewsArticle(id: string) {
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
   const newsItem = await getNewsArticle(id);
+  const allowUnpublished = await canViewUnpublished();
 
-  if (!newsItem) {
-    return { title: 'مقال غير موجود | بورصة المونديال' };
+  if (!newsItem || (!isPublished(newsItem) && !allowUnpublished)) {
+    return {
+      title: 'مقال غير موجود | بورصة المونديال',
+      robots: { index: false, follow: false },
+    };
   }
 
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://worldcup.mcprim.com';
@@ -117,12 +141,14 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const paragraphs = articleParagraphs(newsItem);
   const shortDescription = paragraphs.join(' ').slice(0, 158).trim() + '...';
   const imageUrl = resolveImageUrl(baseUrl, articleMeta.image);
+  const draftRobots = isPublished(newsItem) ? undefined : { index: false, follow: false };
 
   return {
     title: `${newsItem.title} | بورصة المونديال`,
     description: shortDescription,
     keywords: [newsItem.category, 'أخبار كأس العالم', 'كأس العالم 2026', 'تحليل كروي', ...articleMeta.keywords],
     alternates: { canonical: `/news/${newsItem.id}` },
+    robots: draftRobots,
     openGraph: {
       title: newsItem.title,
       description: shortDescription,
@@ -146,9 +172,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function NewsDetailPage({ params }: Props) {
   const { id } = await params;
   const newsItem = await getNewsArticle(id);
+  const allowUnpublished = await canViewUnpublished();
 
-  if (!newsItem) notFound();
+  if (!newsItem || (!isPublished(newsItem) && !allowUnpublished)) notFound();
 
+  const isDraft = !isPublished(newsItem);
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://worldcup.mcprim.com';
   const pageUrl = `${baseUrl}/news/${newsItem.id}`;
   const articleMeta = getPressNewsMeta(newsItem.tags, newsItem.title);
@@ -226,11 +254,22 @@ export default async function NewsDetailPage({ params }: Props) {
 
         <div className="grid gap-8 lg:grid-cols-[1fr_350px]">
           <article className="space-y-6">
+            {isDraft && (
+              <div className="rounded-2xl border border-[#FFD700]/25 bg-[#FFD700]/10 p-4 text-sm font-black leading-7 text-[#FFD700]">
+                معاينة إدارية فقط: هذا المقال حالته {newsItem.status} ولن يظهر للزوار أو في صفحة الأخبار حتى يتم نشره.
+              </div>
+            )}
+
             <header className="rounded-3xl border border-white/10 bg-white/[0.03] p-6 md:p-8 space-y-4">
               <div className="flex flex-wrap items-center gap-3">
                 <span className="rounded-xl bg-[#0FF0FC]/10 border border-[#0FF0FC]/20 px-3.5 py-1 text-xs font-black text-[#0FF0FC]">
                   {newsItem.category}
                 </span>
+                {isDraft && (
+                  <span className="rounded-xl border border-[#FFD700]/25 bg-[#FFD700]/10 px-3.5 py-1 text-xs font-black text-[#FFD700]">
+                    غير منشور
+                  </span>
+                )}
                 <span className="text-xs font-bold text-gray-400 flex items-center gap-1.5">
                   <Calendar size={13} /> {formatDate(newsItem.publishedAt)}
                 </span>
