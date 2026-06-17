@@ -195,10 +195,10 @@ function calculatePressureModel(snapshot: Snapshot, events: MatchEvent[], curren
   const homePressure = homeBase + (window15.home * 2) + (window5.home * 2);
   const awayPressure = awayBase + (window15.away * 2) + (window5.away * 2);
   const leader = pressureLeader(homePressure, awayPressure);
-  const rhythmScore = window15.available ? window15.home + window15.away : ((homeBase + awayBase) / Math.max(1, currentMinute ?? 90)) * 15;
-  const rhythm = rhythmScore >= 35 ? 'عالي' : rhythmScore >= 18 ? 'متوسط' : 'هادئ';
-  const maxPressure = Math.max(homePressure, awayPressure);
-  const danger = maxPressure >= 220 ? 'مرتفعة' : maxPressure >= 110 ? 'متوسطة' : 'منخفضة';
+  const hasRecentEvents = window5.available || window15.available;
+  const recentIntensity = hasRecentEvents ? ((window5.home + window5.away) * 2) + (window15.home + window15.away) : ((homeBase + awayBase) / Math.max(1, currentMinute ?? 90)) * 15;
+  const rhythm = recentIntensity >= 35 ? 'عالي' : recentIntensity >= 14 ? 'متوسط' : 'هادئ';
+  const danger = recentIntensity >= 35 ? 'مرتفعة' : recentIntensity >= 14 ? 'متوسطة' : 'منخفضة';
   return { home: Math.round(homePressure), away: Math.round(awayPressure), leader, rhythm, danger, window5, window15 };
 }
 function momentumRating(total: number) {
@@ -366,7 +366,7 @@ export default function InternalAnimationPlayer({ matchId = '', dbMatchId = '' }
 
           <div className="order-4 rounded-3xl border border-[#0FF0FC]/20 bg-[#0FF0FC]/[0.045] p-4">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2"><div><div className="text-sm font-black text-white">Match Intelligence</div><div className="mt-1 text-[11px] font-bold text-gray-500">مؤشر تقديري من الهجمات، الهجمات الخطيرة، التسديدات، الركنيات، وآخر الأحداث المتاحة.</div></div><span className="rounded-full border border-white/10 bg-black/30 px-3 py-1 text-[10px] font-black text-gray-400">ليس رقمًا رسميًا</span></div>
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><IntelligenceTile label="الفريق الأخطر حاليًا" value={sideName(pressure.leader, match?.homeTeam, match?.awayTeam)} hint={`${ar(pressure.home)} - ${ar(pressure.away)} مؤشر ضغط`} accent /><IntelligenceTile label="رتم المباراة" value={pressure.rhythm} hint="هادئ / متوسط / عالي" /><IntelligenceTile label="الخطورة اللحظية" value={pressure.danger} hint="منخفضة / متوسطة / مرتفعة" /><IntelligenceTile label="آخر ٥ دقائق" value={windowLabel(pressure.window5)} hint={pressure.window5.available ? `${ar(pressure.window5.homeEvents)} - ${ar(pressure.window5.awayEvents)} أحداث مرصودة` : 'غير متوفر من الأحداث'} /><IntelligenceTile label="آخر ١٥ دقيقة" value={windowLabel(pressure.window15)} hint={pressure.window15.available ? `${ar(pressure.window15.homeEvents)} - ${ar(pressure.window15.awayEvents)} أحداث مرصودة` : 'غير متوفر من الأحداث'} /><IntelligenceTile label="ضغط الفريق الأول" value={ar(pressure.home)} hint={match?.homeTeam?.name || 'الفريق الأول'} /><IntelligenceTile label="ضغط الفريق الثاني" value={ar(pressure.away)} hint={match?.awayTeam?.name || 'الفريق الثاني'} /><IntelligenceTile label="مصدر الذكاء" value="Live + Events" hint="بدون تخزين جديد في قاعدة البيانات" /></div>
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><IntelligenceTile label="الفريق الأخطر حاليًا" value={sideName(pressure.leader, match?.homeTeam, match?.awayTeam)} hint={`${ar(pressure.home)} - ${ar(pressure.away)} مؤشر ضغط`} accent /><IntelligenceTile label="رتم آخر ١٥ دقيقة" value={pressure.rhythm} hint="هادئ / متوسط / عالي" /><IntelligenceTile label="الخطورة اللحظية" value={pressure.danger} hint="منخفضة / متوسطة / مرتفعة" /><IntelligenceTile label="آخر ٥ دقائق" value={windowLabel(pressure.window5)} hint={pressure.window5.available ? `${ar(pressure.window5.homeEvents)} - ${ar(pressure.window5.awayEvents)} أحداث مرصودة` : 'غير متوفر من الأحداث'} /><IntelligenceTile label="آخر ١٥ دقيقة" value={windowLabel(pressure.window15)} hint={pressure.window15.available ? `${ar(pressure.window15.homeEvents)} - ${ar(pressure.window15.awayEvents)} أحداث مرصودة` : 'غير متوفر من الأحداث'} /><IntelligenceTile label="ضغط الفريق الأول" value={ar(pressure.home)} hint={match?.homeTeam?.name || 'الفريق الأول'} /><IntelligenceTile label="ضغط الفريق الثاني" value={ar(pressure.away)} hint={match?.awayTeam?.name || 'الفريق الثاني'} /><IntelligenceTile label="مصدر الذكاء" value="Live + Events" hint="بدون تخزين جديد في قاعدة البيانات" /></div>
           </div>
 
           <div className="order-5 rounded-3xl border border-[#FFD700]/20 bg-[#FFD700]/[0.04] p-4">
