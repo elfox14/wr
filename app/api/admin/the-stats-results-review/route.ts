@@ -23,6 +23,8 @@ const TEAM_NAME_ALIASES = new Map([
   ['united states of america', 'united states'],
   ['czechia', 'czech republic'],
   ['bosnia herzegovina', 'bosnia and herzegovina'],
+  ['cote d ivoire', 'ivory coast'],
+  ['côte d ivoire', 'ivory coast'],
 ]);
 
 function configuredSecrets() {
@@ -142,10 +144,11 @@ async function loadPastMatches(daysBack: number) {
   });
 }
 
-function suggestedChanges(localMatch: any, providerMatch: ProviderRow) {
+function suggestedChanges(localMatch: any, providerMatch: ProviderRow | null) {
   const changes: Record<string, any> = {};
+  if (!providerMatch || providerMatch.status !== 'FINISHED') return changes;
   if (providerMatch.providerId && !localMatch.externalId) changes.externalId = providerMatch.providerId;
-  if (providerMatch.status === 'FINISHED' && localMatch.status !== 'FINISHED') changes.status = 'FINISHED';
+  if (localMatch.status !== 'FINISHED') changes.status = 'FINISHED';
   if (providerMatch.homeScore !== null && localMatch.homeScore !== providerMatch.homeScore) changes.homeScore = providerMatch.homeScore;
   if (providerMatch.awayScore !== null && localMatch.awayScore !== providerMatch.awayScore) changes.awayScore = providerMatch.awayScore;
   return changes;
@@ -167,7 +170,8 @@ export async function GET(req: Request) {
 
   try {
     const [payload, localMatches] = await Promise.all([theStatsApiFetch(providerPath, providerQuery), loadPastMatches(daysBack)]);
-    const providerRows = extractArray(payload).map(normalizeProviderMatch).filter((row) => row.status === 'FINISHED');
+    const providerRows = extractArray(payload).map(normalizeProviderMatch);
+    const finishedProviderRows = providerRows.filter((row) => row.status === 'FINISHED');
     const review = localMatches.map((localMatch) => {
       const providerMatch = providerRows.find((row) => providerMatchesLocal(row, localMatch));
       return {
@@ -180,7 +184,8 @@ export async function GET(req: Request) {
         providerTeams: providerMatch ? `${providerMatch.homeName} vs ${providerMatch.awayName}` : null,
         providerStatus: providerMatch?.status || null,
         providerScore: providerMatch ? `${providerMatch.homeScore}-${providerMatch.awayScore}` : null,
-        suggestedChanges: providerMatch ? suggestedChanges(localMatch, providerMatch) : {},
+        providerIsFinished: providerMatch?.status === 'FINISHED',
+        suggestedChanges: suggestedChanges(localMatch, providerMatch || null),
       };
     });
     return NextResponse.json({
@@ -189,14 +194,16 @@ export async function GET(req: Request) {
       mode: 'review_only',
       config: getTheStatsApiConfigStatus(),
       localMatches: localMatches.length,
-      finishedProviderRows: providerRows.length,
+      providerRows: providerRows.length,
+      finishedProviderRows: finishedProviderRows.length,
       matched: review.filter((item) => item.providerMatchId).length,
+      matchedFinished: review.filter((item) => item.providerMatchId && item.providerIsFinished).length,
       changedCandidates: review.filter((item) => Object.keys(item.suggestedChanges).length).length,
       review,
       safety: {
         reviewOnly: true,
         previousMatchesOnly: true,
-        finishedProviderRowsOnly: true,
+        suggestionsFinishedOnly: true,
         suggestedFields: ['externalId', 'status', 'homeScore', 'awayScore'],
       },
     }, { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } });
