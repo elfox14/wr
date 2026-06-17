@@ -27,11 +27,13 @@ type PressureModel = { home: number; away: number; leader: PressureSide; rhythm:
 type MomentumDefinition = { key: string; label: string; start: number; end: number };
 type MomentumSegment = MomentumDefinition & { available: boolean; home: number; away: number; homeEvents: number; awayEvents: number; homeDangerEvents: number; awayDangerEvents: number; leader: PressureSide; rating: string; topEvent: MatchEvent | null };
 type MomentumAccum = { home: number; away: number; homeEvents: number; awayEvents: number; homeDangerEvents: number; awayDangerEvents: number; topEvent: MatchEvent | null };
+type DataQuality = { score: number; label: string; hint: string; availableStats: number; totalStats: number; eventsCount: number; lastUpdated: string };
 
 const STATS_POLL_MS = 60_000;
 const EVENTS_POLL_MS = 30_000;
 const FINISHED_STATUSES = ['FINISHED', 'FT', 'AET', 'PEN'];
 const HALF_TIME_STATUSES = ['HT', 'HALFTIME', 'HALF_TIME', 'HALF-TIME'];
+const DATA_QUALITY_STAT_KEYS = ['homePossession', 'awayPossession', 'homeAttacks', 'awayAttacks', 'homeDangerousAttacks', 'awayDangerousAttacks', 'homeShots', 'awayShots', 'homeShotsOnTarget', 'awayShotsOnTarget', 'homeShotsOffTarget', 'awayShotsOffTarget', 'homeCorners', 'awayCorners', 'homeYellowCards', 'awayYellowCards', 'homeRedCards', 'awayRedCards'];
 const EVENT_FILTERS: { key: EventFilterKey; label: string }[] = [
   { key: 'all', label: 'الكل' },
   { key: 'goals', label: 'الأهداف' },
@@ -72,6 +74,12 @@ function formatDate(value?: string | null) {
   const date = new Date(value);
   if (!Number.isFinite(date.getTime())) return 'موعد غير متوفر';
   return date.toLocaleString('ar-EG', { weekday: 'long', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+}
+function formatUpdatedAt(value?: string | null) {
+  if (!value) return 'غير متوفر';
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return 'غير متوفر';
+  return date.toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
 }
 function sourceLabel(provider?: string | null) {
   const value = String(provider || '').toUpperCase();
@@ -265,6 +273,16 @@ function matchStoryLines(match: LiveStatsResponse['match'] | undefined, snapshot
   const momentumLine = strongestSegment ? `أقوى فترة كانت د ${strongestSegment.label} لصالح ${sideName(strongestSegment.leader, match?.homeTeam, match?.awayTeam)} بمؤشر ${ar(strongestSegment.home + strongestSegment.away)}.` : 'أقوى فترة غير متوفرة لأن الأحداث المحفوظة غير كافية.';
   return [scoreLine, statLine, momentumLine];
 }
+function dataQuality(snapshot: Snapshot, events: MatchEvent[], updatedAt?: string): DataQuality {
+  const availableStats = DATA_QUALITY_STAT_KEYS.filter((key) => n(snapshot, key) !== null).length;
+  const eventsScore = Math.min(events.length, 20) / 20;
+  const statsScore = availableStats / DATA_QUALITY_STAT_KEYS.length;
+  const freshnessScore = updatedAt ? 1 : 0;
+  const score = Math.round((statsScore * 65) + (eventsScore * 25) + (freshnessScore * 10));
+  const label = score >= 75 ? 'قوية' : score >= 45 ? 'متوسطة' : 'محدودة';
+  const hint = label === 'قوية' ? 'القراءة مدعومة بإحصائيات وأحداث كافية.' : label === 'متوسطة' ? 'القراءة جيدة لكنها قد تتحسن مع وصول أحداث أو إحصائيات أكثر.' : 'القراءة تقديرية جدًا بسبب نقص الإحصائيات أو الأحداث.';
+  return { score, label, hint, availableStats, totalStats: DATA_QUALITY_STAT_KEYS.length, eventsCount: events.length, lastUpdated: formatUpdatedAt(updatedAt) };
+}
 function windowLabel(window: PressureWindow) {
   if (!window.available) return 'غير متوفر';
   return `${ar(window.home)} - ${ar(window.away)}`;
@@ -366,6 +384,7 @@ export default function InternalAnimationPlayer({ matchId = '', dbMatchId = '' }
   const strongestSegment = useMemo(() => strongestMomentumSegment(momentumSegments), [momentumSegments]);
   const maxMomentumScore = useMemo(() => Math.max(1, ...momentumSegments.map((segment) => segment.home + segment.away)), [momentumSegments]);
   const storyLines = useMemo(() => matchStoryLines(match, latest, strongestSegment), [match, latest, strongestSegment]);
+  const quality = useMemo(() => dataQuality(latest, events, stats?.updatedAt), [latest, events, stats?.updatedAt]);
 
   useEffect(() => {
     if (!filteredEvents.length) { if (selectedEventId) setSelectedEventId(null); return; }
@@ -403,6 +422,12 @@ export default function InternalAnimationPlayer({ matchId = '', dbMatchId = '' }
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2"><div><div className="text-sm font-black text-white">Match Intelligence</div><div className="mt-1 text-[11px] font-bold text-gray-500">مؤشر تقديري من الهجمات، الهجمات الخطيرة، التسديدات، الركنيات، وآخر الأحداث المتاحة.</div></div><span className="rounded-full border border-white/10 bg-black/30 px-3 py-1 text-[10px] font-black text-gray-400">ليس رقمًا رسميًا</span></div>
             <div className="mb-3 rounded-2xl border border-[#0FF0FC]/20 bg-black/25 p-3"><div className="text-[10px] font-black text-[#0FF0FC]">قراءة مباشرة</div><div className="mt-1 text-sm font-bold leading-6 text-white">{pressure.readout}</div></div>
             <div className="mb-3 rounded-2xl border border-white/10 bg-black/25 p-3"><div className="text-[10px] font-black text-gray-400">قصة المباراة</div><div className="mt-2 grid gap-2 md:grid-cols-3">{storyLines.map((line, index) => <div key={`${index}-${line}`} className="rounded-xl border border-white/10 bg-black/25 p-2 text-[11px] font-bold leading-5 text-gray-200">{line}</div>)}</div></div>
+            <div className="mb-3 rounded-2xl border border-white/10 bg-black/25 p-3">
+              <div className="mb-2 flex items-center justify-between gap-2"><div className="text-[10px] font-black text-gray-400">جودة البيانات</div><span className="rounded-full border border-[#FFD700]/25 bg-[#FFD700]/10 px-3 py-1 text-[10px] font-black text-[#FFD700]">{quality.label}</span></div>
+              <div className="h-2 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-[#0FF0FC]" style={{ width: `${quality.score}%` }} /></div>
+              <div className="mt-2 grid gap-2 text-[10px] font-bold text-gray-400 sm:grid-cols-3"><div>إحصائيات: <span className="text-white">{ar(quality.availableStats)} / {ar(quality.totalStats)}</span></div><div>أحداث: <span className="text-white">{ar(quality.eventsCount)}</span></div><div>آخر تحديث: <span className="text-white">{quality.lastUpdated}</span></div></div>
+              <div className="mt-2 text-[10px] font-bold leading-5 text-gray-500">{quality.hint}</div>
+            </div>
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><IntelligenceTile label="الفريق الأخطر حاليًا" value={sideName(pressure.leader, match?.homeTeam, match?.awayTeam)} hint={`${ar(pressure.home)} - ${ar(pressure.away)} مؤشر ضغط`} accent /><IntelligenceTile label="رتم آخر ١٥ دقيقة" value={pressure.rhythm} hint="هادئ / متوسط / عالي" /><IntelligenceTile label="الخطورة اللحظية" value={pressure.danger} hint="منخفضة / متوسطة / مرتفعة" /><IntelligenceTile label="آخر ٥ دقائق" value={windowLabel(pressure.window5)} hint={pressure.window5.available ? `${ar(pressure.window5.homeEvents)} - ${ar(pressure.window5.awayEvents)} أحداث مرصودة` : 'غير متوفر من الأحداث'} /><IntelligenceTile label="آخر ١٥ دقيقة" value={windowLabel(pressure.window15)} hint={pressure.window15.available ? `${ar(pressure.window15.homeEvents)} - ${ar(pressure.window15.awayEvents)} أحداث مرصودة` : 'غير متوفر من الأحداث'} /><IntelligenceTile label="ضغط الفريق الأول" value={ar(pressure.home)} hint={match?.homeTeam?.name || 'الفريق الأول'} /><IntelligenceTile label="ضغط الفريق الثاني" value={ar(pressure.away)} hint={match?.awayTeam?.name || 'الفريق الثاني'} /><IntelligenceTile label="مصدر الذكاء" value="Live + Events" hint="بدون تخزين جديد في قاعدة البيانات" /></div>
           </div>
 
