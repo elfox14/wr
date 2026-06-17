@@ -65,11 +65,11 @@ function clockInfo(status?: string | null, currentMinute?: number | null) {
       : { label: 'انتهت', hint: 'المباراة انتهت', active: false };
   }
 
-  if (value === 'ET') {
+  if (value === 'ET' && minute !== null && minute >= 90) {
     return { label: minute ? `د${ar(minute)}` : 'وقت إضافي', hint: 'وقت إضافي', active: true };
   }
 
-  if (value === '2H' || (minute !== null && minute >= 46)) {
+  if (minute !== null && minute >= 46) {
     return { label: minuteLabel(minute), hint: secondHalfHint(minute), active: true };
   }
 
