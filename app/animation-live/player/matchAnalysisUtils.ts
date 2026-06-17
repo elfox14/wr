@@ -110,7 +110,8 @@ function scoreArticleLine(match: LiveStatsResponse['match'] | undefined, snapsho
 function latestEventLine(events: MatchEvent[], match: LiveStatsResponse['match'] | undefined) {
   const latest = [...events].sort(sortEventsByMinute).filter((event) => eventMinute(event) !== null).pop();
   if (!latest) return 'لم تصل أحداث كافية بعد لصياغة تسلسل تفصيلي للمباراة.';
-  const side = sideName(eventSide(latest, match?.homeTeam, match?.awayTeam), match?.homeTeam, match?.awayTeam);
+  const rawSide = eventSide(latest, match?.homeTeam, match?.awayTeam);
+  const side = rawSide === 'neutral' ? 'حدث محايد' : sideName(rawSide, match?.homeTeam, match?.awayTeam);
   const detail = cleanEventDetail(latest.detail);
   return `آخر حدث مؤثر وصل عند د${ar(eventMinute(latest) || 0)}: ${eventLabel(latest.type)} لصالح ${side}${detail ? ` — ${detail}` : ''}.`;
 }
