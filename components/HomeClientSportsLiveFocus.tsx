@@ -410,15 +410,15 @@ export default function HomeClientSportsLiveFocus({
       <HomeLiveMatchTicker matches={safeTickerMatches} />
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3 lg:items-start lg:gap-5">
-        <div className="lg:col-span-1 lg:order-1">
+        <div className="lg:col-span-2">
           <MatchCenter fallbackMatches={safeUpcomingMatches} nextMatch={safeNextMatch} />
         </div>
-        <div className="lg:col-span-2 lg:order-2">
-          <HomeTournamentStatsCard playersCount={playersCount} teamsCount={teamsCount} upcomingMatchesCount={upcomingMatchesCount} />
+        <div className="lg:col-span-1">
+          <HomeGroupStandingsWidget compact />
         </div>
       </div>
 
-      <HomeGroupStandingsWidget />
+      <HomeTournamentStatsCard playersCount={playersCount} teamsCount={teamsCount} upcomingMatchesCount={upcomingMatchesCount} />
       <ContentHubCard />
       <QuickLinksCard />
     </main>
