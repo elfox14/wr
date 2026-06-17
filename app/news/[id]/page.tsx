@@ -7,6 +7,7 @@ import prisma from '@/lib/prisma';
 import { authOptions } from '@/lib/auth';
 import AdSenseBanner from '@/components/ads/AdSenseBanner';
 import ShareButtons from '@/components/news/ShareButtons';
+import NewsStatusButton from '@/components/news/NewsStatusButton';
 import { ensureWorldCup2026OpeningNews, getPressNewsMeta } from '@/lib/press-news/world-cup-2026-opening-news';
 import { buildExpandedArticleParagraphs } from '@/lib/press-news/article-expansion';
 
@@ -257,6 +258,22 @@ export default async function NewsDetailPage({ params }: Props) {
             {isDraft && (
               <div className="rounded-2xl border border-[#FFD700]/25 bg-[#FFD700]/10 p-4 text-sm font-black leading-7 text-[#FFD700]">
                 معاينة إدارية فقط: هذا المقال حالته {newsItem.status} ولن يظهر للزوار أو في صفحة الأخبار حتى يتم نشره.
+              </div>
+            )}
+
+            {allowUnpublished && (
+              <div className="rounded-2xl border border-[#0FF0FC]/15 bg-[#0FF0FC]/5 p-4 text-sm font-bold leading-7 text-gray-300">
+                <div className="mb-3 text-xs font-black text-[#0FF0FC]">إدارة حالة المقال</div>
+                <div className="flex flex-wrap items-center gap-3">
+                  <span className="rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-xs font-black text-gray-300">
+                    الحالة الحالية: {newsItem.status || 'published'}
+                  </span>
+                  <NewsStatusButton
+                    id={newsItem.id}
+                    currentStatus={newsItem.status || 'published'}
+                    targetStatus={isDraft ? 'published' : 'draft'}
+                  />
+                </div>
               </div>
             )}
 
