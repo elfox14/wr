@@ -1,6 +1,6 @@
 export type Team = { id?: string; name?: string; code?: string; image?: string } | null;
 
-export type Snapshot = Record<string, any> | null;
+export type Snapshot = Record<string, unknown> | null;
 
 export type EventSide = 'home' | 'away' | 'neutral';
 export type PressureSide = 'home' | 'away' | 'balanced' | 'unknown';
