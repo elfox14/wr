@@ -76,6 +76,19 @@ type ScoreReadout = {
   source: 'match' | 'snapshot' | 'events';
 };
 
+type CountPair = {
+  home: number;
+  away: number;
+  total: number;
+};
+
+type MatchPhrasing = {
+  title: string;
+  opening: string;
+  winner: string;
+  loser: string;
+};
+
 function isAdmin(session: AdminSession) {
   const email = session?.user?.email || '';
   return session?.user?.role === 'ADMIN' || email === 'worldcup@mcprim.com' || email === 'elfox14usa@gmail.com';
@@ -204,7 +217,7 @@ function isArticleEvent(event: EventRow) {
   return eventMatches(event, ['goal', 'red', 'yellow', 'penalty', 'var', 'corner', 'shot_on_target', 'dangerous_attack']);
 }
 
-function countEvents(events: EventRow[], match: any, includes: string[]) {
+function countEvents(events: EventRow[], match: any, includes: string[]): CountPair {
   let home = 0;
   let away = 0;
   for (const event of events) {
@@ -319,7 +332,7 @@ function usefulDetail(event: EventRow, displayedTeam: string, rawTeam?: string |
   return detail;
 }
 
-function winnerPhrase(homeName: string, awayName: string, homeScore: number, awayScore: number, score: string) {
+function winnerPhrase(homeName: string, awayName: string, homeScore: number, awayScore: number, score: string): MatchPhrasing {
   if (homeScore === awayScore) {
     return {
       title: `${homeName} و${awayName} يتعادلان ${score} في مباراة مثيرة بكأس العالم 2026`,
@@ -338,6 +351,49 @@ function winnerPhrase(homeName: string, awayName: string, homeScore: number, awa
     winner,
     loser,
   };
+}
+
+function fallbackStarLine(player: string, firstGoal: EventRow | undefined, phrasing: MatchPhrasing, match: any) {
+  if (player) {
+    return `نجم المباراة بحسب الأحداث المحفوظة هو ${player}، لأن اسمه ظهر في اللقطات المؤثرة وكان حاضرًا في صناعة الفارق داخل سياق المباراة.`;
+  }
+
+  if (firstGoal) {
+    return `لقطة المباراة الأهم كانت هدف الدقيقة ${ar(firstGoal.minute)} لصالح ${sideName(firstGoal.teamId, match.homeTeam, match.awayTeam)}، لأنه منح المباراة اتجاهًا واضحًا مبكرًا وغيّر طريقة تعامل المنافس مع بقية اللقاء.`;
+  }
+
+  if (phrasing.winner) {
+    return `العامل الحاسم في المباراة كان قدرة ${phrasing.winner} على إدارة النتيجة واللحظات المؤثرة، بينما احتاج ${phrasing.loser} إلى فاعلية أكبر في الثلث الأخير.`;
+  }
+
+  return 'العامل الحاسم في المباراة كان توازن الطرفين وعدم قدرة أي منتخب على تحويل فترات الضغط إلى فارق واضح في النتيجة.';
+}
+
+function buildScoreContext(phrasing: MatchPhrasing, homeName: string, awayName: string, score: string, scoreReadout: ScoreReadout) {
+  const sourceNote = scoreReadout.source === 'events'
+    ? ' وتعتمد هذه القراءة على أحداث الأهداف المحفوظة في صفحة المباراة.'
+    : '';
+  if (phrasing.winner) {
+    return `${phrasing.opening}${sourceNote} الفوز لا يعكس النتيجة فقط، بل يعكس أيضًا قدرة الفائز على استثمار اللحظات الحاسمة وعدم ترك المباراة تنزلق إلى حالة من الفوضى رغم كثرة البطاقات والاحتكاكات.`;
+  }
+  return `${phrasing.opening}${sourceNote} التعادل هنا لا يعني غياب التفاصيل، بل يفتح الباب لقراءة أعمق لكيفية توزع السيطرة والضغط بين ${homeName} و${awayName}.`;
+}
+
+function buildFlowParagraph(firstGoal: EventRow | undefined, lastEvent: EventRow | undefined, match: any) {
+  if (firstGoal) {
+    return `نقطة التحول الأولى جاءت عند الدقيقة ${ar(firstGoal.minute)} مع ${eventTypeLabel(firstGoal.type)} لصالح ${sideName(firstGoal.teamId, match.homeTeam, match.awayTeam)}${firstGoal.playerName ? ` عن طريق ${firstGoal.playerName}` : ''}. هذه اللقطة غيّرت إحساس المباراة وفرضت على الطرف الآخر التعامل مع ضغط النتيجة بدل اللعب بأريحية.`;
+  }
+  if (lastEvent) {
+    return `أبرز نقطة تحول متاحة في بيانات المباراة جاءت عند الدقيقة ${ar(lastEvent.minute)} مع ${eventTypeLabel(lastEvent.type)} لصالح ${sideName(lastEvent.teamId, match.homeTeam, match.awayTeam)}، وهي لقطة تساعد في فهم اتجاه الزخم خلال اللقاء.`;
+  }
+  return 'لم تظهر في البيانات أحداث كافية لتحديد نقطة تحول دقيقة، لكن قراءة النتيجة والإحصائيات تمنح صورة مبدئية عن اتجاه المباراة.';
+}
+
+function buildTeamNeedsParagraph(phrasing: MatchPhrasing, homeName: string, awayName: string) {
+  if (phrasing.winner) {
+    return `${phrasing.winner} يستطيع البناء على هذه المباراة من زاويتين: الفاعلية أمام المرمى، والقدرة على الحفاظ على الأفضلية بعد التقدم. أما ${phrasing.loser}، فيحتاج إلى مراجعة الانضباط الدفاعي وتقليل الأخطاء التي تمنح المنافس فرصة التحكم في إيقاع اللقاء.`;
+  }
+  return `${homeName} و${awayName} سيخرجان من هذه المواجهة بدروس مختلفة. كل طرف يحتاج إلى تحويل فترات السيطرة إلى فرص أوضح، لأن مباريات كأس العالم غالبًا لا تمنح الكثير من الفرص للتعويض.`;
 }
 
 function buildMatchArticle(match: any, snapshot: any, events: EventRow[]) {
@@ -389,33 +445,23 @@ function buildMatchArticle(match: any, snapshot: any, events: EventRow[]) {
       })
     : ['الأحداث التفصيلية غير كافية حاليًا، لذلك يعتمد التحليل على النتيجة والإحصائيات المتاحة من صفحة المباراة.'];
 
-  const scoreSourceNote = scoreReadout.source === 'events'
-    ? ' وتعتمد هذه القراءة على أحداث الأهداف المحفوظة في صفحة المباراة.'
-    : '';
-
-  const opening = `${phrasing.opening}${scoreSourceNote}`;
-
-  const turningPoint = firstGoal
-    ? `نقطة التحول الأولى جاءت عند الدقيقة ${ar(firstGoal.minute)} مع ${eventTypeLabel(firstGoal.type)} لصالح ${sideName(firstGoal.teamId, match.homeTeam, match.awayTeam)}${firstGoal.playerName ? ` عن طريق ${firstGoal.playerName}` : ''}. هذه اللقطة غيّرت إحساس المباراة وفرضت على الطرف الآخر التعامل مع ضغط النتيجة.`
-    : lastEvent
-      ? `أبرز نقطة تحول متاحة في بيانات المباراة جاءت عند الدقيقة ${ar(lastEvent.minute)} مع ${eventTypeLabel(lastEvent.type)} لصالح ${sideName(lastEvent.teamId, match.homeTeam, match.awayTeam)}، وهي لقطة تساعد في فهم اتجاه الزخم خلال اللقاء.`
-      : 'لم تظهر في البيانات أحداث كافية لتحديد نقطة تحول دقيقة، لكن قراءة النتيجة والإحصائيات تمنح صورة مبدئية عن اتجاه المباراة.';
-
-  const starLine = player
-    ? `نجم المباراة بحسب الأحداث المحفوظة هو ${player}، لأن اسمه ظهر في اللقطات المؤثرة وكان حاضرًا في صناعة الفارق داخل سياق المباراة.`
-    : `نجم المباراة يحتاج إلى مراجعة يدوية بعد اكتمال بيانات اللاعبين، لأن الأحداث المحفوظة لا تمنح أفضلية فردية واضحة حتى الآن.`;
+  const opening = buildScoreContext(phrasing, homeName, awayName, score, scoreReadout);
+  const flowParagraph = buildFlowParagraph(firstGoal, lastEvent, match);
+  const starLine = fallbackStarLine(player, firstGoal, phrasing, match);
+  const teamNeeds = buildTeamNeedsParagraph(phrasing, homeName, awayName);
 
   const body = [
     opening,
     `بدأت المواجهة بين ${homeName} و${awayName} وسط أهمية واضحة في حسابات كأس العالم 2026. ومع مرور الدقائق، أصبحت النتيجة ${score} عنوانًا رئيسيًا، لكن التفاصيل داخل صفحة المباراة تكشف أن القصة لا تتوقف عند الرقم فقط.`,
-    turningPoint,
+    flowParagraph,
     `على مستوى الأحداث، جاءت أبرز اللقطات كالتالي:\n${eventLines.map((line) => `- ${line}`).join('\n')}`,
     statsLines.length
       ? `قراءة الإحصائيات تمنح المقال زاوية حصرية من بيانات المباراة نفسها. ${statsLines.join(' ')}`
       : 'الإحصائيات الرقمية التفصيلية غير مكتملة حاليًا، لذلك تظل القراءة معتمدة على النتيجة وتسلسل الأحداث المتاح.',
     `فنيًا، أظهرت المباراة أن إدارة اللحظات الحاسمة كانت العامل الأهم. الفريق الذي تعامل بشكل أفضل مع التحولات والضغط بعد الأحداث المؤثرة استطاع أن يفرض إيقاعه أو يحافظ على توازنه حتى النهاية.`,
     starLine,
-    `تأثير هذه النتيجة لا يقتصر على جدول المباراة فقط، بل يمتد إلى الحالة المعنوية قبل الجولة التالية. ${homeName} و${awayName} سيخرجان من هذه المواجهة بدروس واضحة تتعلق بطريقة الضغط، استغلال الفرص، والتعامل مع الدقائق الأخيرة.`,
+    teamNeeds,
+    `تأثير هذه النتيجة لا يقتصر على جدول المباراة فقط، بل يمتد إلى الحالة المعنوية قبل الجولة التالية. مثل هذه المباريات تمنح الجهاز الفني مادة واضحة للمراجعة، سواء في بناء الهجمة أو التعامل مع الكرات الثابتة أو ضبط الانضباط عند ارتفاع التوتر.`,
     `سؤال تفاعلي: من وجهة نظرك، هل كانت النتيجة عادلة بناءً على أحداث المباراة وإحصائياتها؟`,
   ].join('\n\n');
 
