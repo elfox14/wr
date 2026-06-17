@@ -5,6 +5,7 @@ import { BookOpen, Clock, ExternalLink, Filter, Newspaper, Sparkles } from 'luci
 import prisma from '@/lib/prisma';
 import { authOptions } from '@/lib/auth';
 import AdSenseBanner from '@/components/ads/AdSenseBanner';
+import NewsStatusButton from '@/components/news/NewsStatusButton';
 import { ensureWorldCup2026OpeningNews, getPressNewsMeta } from '@/lib/press-news/world-cup-2026-opening-news';
 
 export const dynamic = 'force-dynamic';
@@ -280,6 +281,9 @@ export default async function NewsPage({ searchParams }: NewsPageProps) {
                     المصدر: <span className="text-gray-300">{heroItem.sourceName}</span>
                   </span>
                   <div className="flex flex-wrap gap-2">
+                    {canViewDrafts && heroItem.status !== 'published' && (
+                      <NewsStatusButton id={heroItem.id} currentStatus={heroItem.status} targetStatus="published" />
+                    )}
                     {heroMatchUrl && (
                       <Link
                         href={heroMatchUrl}
@@ -387,11 +391,16 @@ export default async function NewsPage({ searchParams }: NewsPageProps) {
                           {item.body}
                         </p>
                       </div>
-                      <div className="mt-4 flex items-center justify-between border-t border-white/5 pt-3 text-xs font-bold text-gray-500">
+                      <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-white/5 pt-3 text-xs font-bold text-gray-500">
                         <span>{item.sourceName}</span>
-                        <Link href={`/news/${item.id}`} className="text-[#0FF0FC] hover:underline flex items-center gap-1">
-                          التفاصيل ←
-                        </Link>
+                        <div className="flex flex-wrap items-center gap-2">
+                          {canViewDrafts && item.status !== 'published' && (
+                            <NewsStatusButton id={item.id} currentStatus={item.status} targetStatus="published" compact />
+                          )}
+                          <Link href={`/news/${item.id}`} className="text-[#0FF0FC] hover:underline flex items-center gap-1">
+                            التفاصيل ←
+                          </Link>
+                        </div>
                       </div>
                     </div>
                   </article>
