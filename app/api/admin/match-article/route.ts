@@ -24,6 +24,12 @@ type EventRow = {
   createdAt?: Date | string | null;
 };
 
+type ScoreReadout = {
+  home: number;
+  away: number;
+  source: 'match' | 'snapshot' | 'events';
+};
+
 function isAdmin(session: AdminSession) {
   const email = session?.user?.email || '';
   return session?.user?.role === 'ADMIN' || email === 'worldcup@mcprim.com' || email === 'elfox14usa@gmail.com';
@@ -112,10 +118,41 @@ function sideName(teamId: string | null | undefined, homeTeam: any, awayTeam: an
   return 'أحد الفريقين';
 }
 
+function isHomeEvent(event: EventRow, match: any) {
+  return Boolean(event.teamId && match.homeTeam?.id && event.teamId === match.homeTeam.id);
+}
+
+function isAwayEvent(event: EventRow, match: any) {
+  return Boolean(event.teamId && match.awayTeam?.id && event.teamId === match.awayTeam.id);
+}
+
+function eventMatches(event: EventRow, includes: string[]) {
+  const value = String(event.type || '').toLowerCase();
+  return includes.some((item) => value.includes(item));
+}
+
+function countEvents(events: EventRow[], match: any, includes: string[]) {
+  let home = 0;
+  let away = 0;
+  for (const event of events) {
+    if (!eventMatches(event, includes)) continue;
+    if (isHomeEvent(event, match)) home += 1;
+    else if (isAwayEvent(event, match)) away += 1;
+  }
+  return { home, away, total: home + away };
+}
+
 function statLine(snapshot: any, homeKey: string, awayKey: string, label: string, homeName: string, awayName: string) {
   const home = n(snapshot, homeKey);
   const away = n(snapshot, awayKey);
   if (home === null || away === null) return null;
+  if (home === away) return `${label} متقاربة بين الطرفين عند ${ar(home)} - ${ar(away)}.`;
+  const leader = home > away ? homeName : awayName;
+  return `${leader} يتفوق في ${label} بواقع ${ar(home)} - ${ar(away)}.`;
+}
+
+function pairLine(home: number, away: number, label: string, homeName: string, awayName: string) {
+  if (home === 0 && away === 0) return null;
   if (home === away) return `${label} متقاربة بين الطرفين عند ${ar(home)} - ${ar(away)}.`;
   const leader = home > away ? homeName : awayName;
   return `${leader} يتفوق في ${label} بواقع ${ar(home)} - ${ar(away)}.`;
@@ -133,11 +170,36 @@ function importantEvents(events: EventRow[]) {
   return [...events]
     .filter((event) => event.minute !== null && event.minute !== undefined)
     .sort((a, b) => Number(a.minute || 0) - Number(b.minute || 0))
-    .slice(0, 12);
+    .slice(0, 14);
 }
 
 function goals(events: EventRow[]) {
-  return importantEvents(events).filter((event) => String(event.type || '').toLowerCase().includes('goal'));
+  return importantEvents(events).filter((event) => eventMatches(event, ['goal']));
+}
+
+function scoreFromEvents(events: EventRow[], match: any) {
+  return countEvents(events, match, ['goal']);
+}
+
+function resolveScore(match: any, snapshot: any, events: EventRow[]): ScoreReadout {
+  const eventScore = scoreFromEvents(events, match);
+  const snapshotHome = n(snapshot, 'homeScore');
+  const snapshotAway = n(snapshot, 'awayScore');
+  const matchHome = Number(match.homeScore ?? 0);
+  const matchAway = Number(match.awayScore ?? 0);
+
+  const snapshotTotal = (snapshotHome ?? 0) + (snapshotAway ?? 0);
+  const matchTotal = matchHome + matchAway;
+
+  if (eventScore.total > Math.max(snapshotTotal, matchTotal)) {
+    return { home: eventScore.home, away: eventScore.away, source: 'events' };
+  }
+
+  if (snapshotHome !== null && snapshotAway !== null && snapshotTotal >= matchTotal) {
+    return { home: snapshotHome, away: snapshotAway, source: 'snapshot' };
+  }
+
+  return { home: matchHome, away: matchAway, source: 'match' };
 }
 
 function bestPlayer(events: EventRow[]) {
@@ -152,11 +214,29 @@ function bestPlayer(events: EventRow[]) {
   return [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] || '';
 }
 
+function usefulDetail(event: EventRow, team: string) {
+  const detail = cleanText(event.detail);
+  if (!detail) return '';
+  const label = eventTypeLabel(event.type);
+  const reduced = detail
+    .replace(team, '')
+    .replace(label, '')
+    .replace(/د\s*\d+\s*'?/g, '')
+    .replace(/[\-–—:|.]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (!reduced || reduced.length < 4) return '';
+  if (detail.includes(team) && detail.includes(label) && reduced.length < 12) return '';
+  return detail;
+}
+
 function buildMatchArticle(match: any, snapshot: any, events: EventRow[]) {
   const homeName = match.homeTeam?.name || 'الفريق الأول';
   const awayName = match.awayTeam?.name || 'الفريق الثاني';
-  const homeScore = n(snapshot, 'homeScore') ?? match.homeScore ?? 0;
-  const awayScore = n(snapshot, 'awayScore') ?? match.awayScore ?? 0;
+  const scoreReadout = resolveScore(match, snapshot, events);
+  const homeScore = scoreReadout.home;
+  const awayScore = scoreReadout.away;
   const score = `${ar(homeScore)}-${ar(awayScore)}`;
   const winner = homeScore === awayScore ? '' : homeScore > awayScore ? homeName : awayName;
   const title = homeScore === awayScore
@@ -168,27 +248,44 @@ function buildMatchArticle(match: any, snapshot: any, events: EventRow[]) {
   const player = bestPlayer(events);
   const firstGoal = goalEvents[0];
   const lastEvent = sortedImportant[sortedImportant.length - 1];
+  const corners = countEvents(events, match, ['corner']);
+  const yellowCards = countEvents(events, match, ['yellow']);
+  const redCards = countEvents(events, match, ['red']);
+
+  const cornerLine = corners.total > 0
+    ? pairLine(corners.home, corners.away, 'الركنيات من الأحداث المحفوظة', homeName, awayName)
+    : statLine(snapshot, 'homeCorners', 'awayCorners', 'الركنيات', homeName, awayName);
+
+  const cardLines = [
+    yellowCards.total > 0 ? pairLine(yellowCards.home, yellowCards.away, 'البطاقات الصفراء', homeName, awayName) : null,
+    redCards.total > 0 ? pairLine(redCards.home, redCards.away, 'البطاقات الحمراء', homeName, awayName) : null,
+  ].filter(Boolean);
 
   const statsLines = [
     statLine(snapshot, 'homePossession', 'awayPossession', 'الاستحواذ', homeName, awayName),
     statLine(snapshot, 'homeAttacks', 'awayAttacks', 'الهجمات', homeName, awayName),
     statLine(snapshot, 'homeDangerousAttacks', 'awayDangerousAttacks', 'الهجمات الخطيرة', homeName, awayName),
     statLine(snapshot, 'homeShotsOnTarget', 'awayShotsOnTarget', 'التسديدات على المرمى', homeName, awayName) || statLine(snapshot, 'homeShots', 'awayShots', 'إجمالي التسديدات', homeName, awayName),
-    statLine(snapshot, 'homeCorners', 'awayCorners', 'الركنيات', homeName, awayName),
+    cornerLine,
+    ...cardLines,
   ].filter(Boolean);
 
   const eventLines = sortedImportant.length
     ? sortedImportant.map((event) => {
         const team = sideName(event.teamId, match.homeTeam, match.awayTeam);
         const playerText = event.playerName ? ` عن طريق ${event.playerName}` : '';
-        const detail = cleanText(event.detail);
+        const detail = usefulDetail(event, team);
         return `د${ar(event.minute)}: ${eventTypeLabel(event.type)} لصالح ${team}${playerText}${detail ? ` — ${detail}` : ''}.`;
       })
     : ['الأحداث التفصيلية غير كافية حاليًا، لذلك يعتمد التحليل على النتيجة والإحصائيات المتاحة من صفحة المباراة.'];
 
+  const scoreSourceNote = scoreReadout.source === 'events'
+    ? ' تم اعتماد النتيجة من أحداث الأهداف المحفوظة لأن النتيجة الرقمية في جدول المباراة لم تكن مكتملة.'
+    : '';
+
   const opening = homeScore === awayScore
-    ? `انتهت مباراة ${homeName} و${awayName} بالتعادل ${score}، في مواجهة حملت الكثير من التفاصيل بين النتيجة، الإحصائيات، وتسلسل الأحداث داخل صفحة المباراة.`
-    : `حسم ${winner} مواجهة ${homeName} و${awayName} بنتيجة ${score}، في مباراة منحت الفائز دفعة مهمة وفتحت باب التحليل حول طريقة الوصول إلى هذه النتيجة.`;
+    ? `انتهت مباراة ${homeName} و${awayName} بالتعادل ${score}، في مواجهة حملت الكثير من التفاصيل بين النتيجة، الإحصائيات، وتسلسل الأحداث داخل صفحة المباراة.${scoreSourceNote}`
+    : `حسم ${winner} مواجهة ${homeName} و${awayName} بنتيجة ${score}، في مباراة منحت الفائز دفعة مهمة وفتحت باب التحليل حول طريقة الوصول إلى هذه النتيجة.${scoreSourceNote}`;
 
   const turningPoint = firstGoal
     ? `نقطة التحول الأولى جاءت عند الدقيقة ${ar(firstGoal.minute)} مع ${eventTypeLabel(firstGoal.type)} لصالح ${sideName(firstGoal.teamId, match.homeTeam, match.awayTeam)}${firstGoal.playerName ? ` عن طريق ${firstGoal.playerName}` : ''}. هذه اللقطة غيّرت إحساس المباراة وفرضت على الطرف الآخر التعامل مع ضغط النتيجة.`
