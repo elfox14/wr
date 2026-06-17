@@ -108,24 +108,33 @@ function parseFlashStats(text: string) {
   if (maxMinute > 0) stats.minute = maxMinute;
   return { stats, records, meta: { scheduleID: schedule[0] || null, homeProviderTeamId, awayProviderTeamId, matchState: schedule[8] || null, scheduleMinute: numberFrom(schedule[9]), eventTypeCounts: counts } };
 }
+function providerStatus(matchState: unknown, minute: number | null) {
+  const state = String(matchState ?? '').trim().toUpperCase();
+  if (state === '-1' || state === 'FT' || state === 'FINISHED') return 'FINISHED';
+  if (state === '2' || state === 'HT' || state.includes('HALF')) return 'HT';
+  if (state === '3' || state === '2H' || state.includes('SECOND')) return '2H';
+  if (state === '1' || state === '1H' || state.includes('FIRST')) return minute && minute >= 46 ? '2H' : '1H';
+  return null;
+}
 async function getMatch(input: { dbMatchId?: string | null; providerMatchId: number }) {
   if (input.dbMatchId) return prisma.match.findUnique({ where: { id: input.dbMatchId }, include: { homeTeam: { select: { id: true, name: true, code: true } }, awayTeam: { select: { id: true, name: true, code: true } } } });
   return prisma.match.findFirst({ where: { animationMatchId: input.providerMatchId }, include: { homeTeam: { select: { id: true, name: true, code: true } }, awayTeam: { select: { id: true, name: true, code: true } } } });
 }
-async function updateMatchScore(match: any, stats: NormalizedStats) {
+async function updateMatchScore(match: any, stats: NormalizedStats, meta: any) {
   const data: any = {};
   if (typeof stats.homeScore === 'number' && Number.isFinite(stats.homeScore)) data.homeScore = stats.homeScore;
   if (typeof stats.awayScore === 'number' && Number.isFinite(stats.awayScore)) data.awayScore = stats.awayScore;
+  const nextStatus = providerStatus(meta?.matchState, stats.minute ?? meta?.scheduleMinute ?? null);
+  if (nextStatus) data.status = nextStatus;
   if (!Object.keys(data).length) return null;
-  const updated = await prisma.match.update({ where: { id: match.id }, data, select: { id: true, homeScore: true, awayScore: true, status: true } });
-  return updated;
+  return prisma.match.update({ where: { id: match.id }, data, select: { id: true, homeScore: true, awayScore: true, status: true } });
 }
 async function saveSnapshot(match: any, providerMatchId: number, stats: NormalizedStats, rawData: any, replace = true) {
   if (!match?.id || !hasUsefulStats(stats)) return { deleted: 0, inserted: 0, snapshotId: null, reason: 'no_useful_flash_stats' };
   await ensureStatsTable(); let deleted = 0;
   if (replace) { const result = await prisma.matchStatsSnapshot.deleteMany({ where: { matchId: match.id, provider: FLASH_SOURCE } }); deleted = result.count; }
   const snapshot = await prisma.matchStatsSnapshot.create({ data: { id: randomUUID(), matchId: match.id, provider: FLASH_SOURCE, providerMatchId, minute: stats.minute, homePossession: stats.homePossession, awayPossession: stats.awayPossession, homeAttacks: stats.homeAttacks, awayAttacks: stats.awayAttacks, homeDangerousAttacks: stats.homeDangerousAttacks, awayDangerousAttacks: stats.awayDangerousAttacks, homeShots: stats.homeShots, awayShots: stats.awayShots, homeShotsOnTarget: stats.homeShotsOnTarget, awayShotsOnTarget: stats.awayShotsOnTarget, homeShotsOffTarget: stats.homeShotsOffTarget, awayShotsOffTarget: stats.awayShotsOffTarget, homeCorners: stats.homeCorners, awayCorners: stats.awayCorners, homeYellowCards: stats.homeYellowCards, awayYellowCards: stats.awayYellowCards, homeRedCards: stats.homeRedCards, awayRedCards: stats.awayRedCards, homeScore: stats.homeScore, awayScore: stats.awayScore, rawData }, select: { id: true } });
-  const matchUpdate = await updateMatchScore(match, stats);
+  const matchUpdate = await updateMatchScore(match, stats, rawData?.flashMeta || {});
   return { deleted, inserted: 1, snapshotId: snapshot.id, matchUpdate };
 }
 
@@ -144,7 +153,7 @@ export async function GET(req: Request) {
     const rendered = await callBrowserless(frameUrl, timeoutMs, waitMs); const flashText = String(rendered.data?.flashFetch?.text || ''); const parsed = parseFlashStats(flashText);
     const match = (save || url.searchParams.get('includeMatch') === 'true') ? await getMatch({ dbMatchId: url.searchParams.get('dbMatchId'), providerMatchId }) : null;
     const saveResult = save ? match ? await saveSnapshot(match, providerMatchId, parsed.stats, { source: FLASH_SOURCE, wrapperUrl, frameUrl: maskUrl(frameUrl), flashMeta: parsed.meta, recordsSample: parsed.records.slice(0, 20) }, replace) : { deleted: 0, inserted: 0, snapshotId: null, error: 'No local match found' } : null;
-    return json({ ok: true, mode: 'isports_remote_flash_pull', frameMode: mode, remoteBrowser: { ok: rendered.ok, status: rendered.status, rawLength: rendered.rawLength, error: rendered.rawSample || null }, wrapper: { sourceUrl: wrapperUrl, ok: wrapper.ok, status: wrapper.status, htmlLength: wrapper.html.length }, frame: { sourceUrl: maskUrl(frameUrl) }, match: match ? { id: match.id, status: match.status, homeTeam: match.homeTeam, awayTeam: match.awayTeam } : null, hasStats: hasUsefulStats(parsed.stats), stats: parsed.stats, flash: { ok: rendered.data?.flashFetch?.ok ?? null, status: rendered.data?.flashFetch?.status ?? null, scheduleID: rendered.data?.scheduleID || parsed.meta.scheduleID, attackBarsLength: rendered.data?.attackBarsLength ?? null, recordsCount: parsed.records.length, meta: parsed.meta }, save: saveResult, note: 'Parses iSports flashdata. eventType 21 = attacks, 20 = dangerous attacks, dataType 2/eventType 1 = corners. Possession and shots remain null unless exposed by source.' });
+    return json({ ok: true, mode: 'isports_remote_flash_pull', frameMode: mode, remoteBrowser: { ok: rendered.ok, status: rendered.status, rawLength: rendered.rawLength, error: rendered.rawSample || null }, wrapper: { sourceUrl: wrapperUrl, ok: wrapper.ok, status: wrapper.status, htmlLength: wrapper.html.length }, frame: { sourceUrl: maskUrl(frameUrl) }, match: match ? { id: match.id, status: match.status, homeTeam: match.homeTeam, awayTeam: match.awayTeam } : null, hasStats: hasUsefulStats(parsed.stats), stats: parsed.stats, flash: { ok: rendered.data?.flashFetch?.ok ?? null, status: rendered.data?.flashFetch?.status ?? null, scheduleID: rendered.data?.scheduleID || parsed.meta.scheduleID, attackBarsLength: rendered.data?.attackBarsLength ?? null, recordsCount: parsed.records.length, meta: parsed.meta, providerStatus: providerStatus(parsed.meta.matchState, parsed.stats.minute) }, save: saveResult, note: 'Parses iSports flashdata and updates score plus match phase when provider exposes matchState.' });
   } catch (error: any) {
     return json({ ok: false, error: error?.message || 'Internal Server Error' }, 500);
   }
