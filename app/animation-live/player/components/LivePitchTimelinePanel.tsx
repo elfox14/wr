@@ -57,7 +57,7 @@ export default function LivePitchTimelinePanel({
     <section className="order-2 rounded-[28px] border border-white/10 bg-white/[0.03] p-4 shadow-2xl shadow-black/30 md:p-5">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <div className="text-xs font-black uppercase tracking-[0.3em] text-[#FFD700]">Live Animation</div>
+          <div className="text-xs font-black uppercase tracking-[0.3em] text-[#FFD700]">البث الحي</div>
           <h2 className="mt-1 text-xl font-black text-white">ملعب تفاعلي للأحداث</h2>
         </div>
         <div className="rounded-full border border-white/10 bg-black/30 px-3 py-1 text-[10px] font-black text-gray-400">
