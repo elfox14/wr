@@ -54,6 +54,8 @@ export default async function AnimationLivePlayerV2Page({ searchParams }: { sear
   const params = (await searchParams) || {};
   const dbMatchId = await resolveDbMatchId(params);
   const matchId = getSingleValue(params.matchId) || '';
+  const stableHref = dbMatchId ? `/match-center/${encodeURIComponent(dbMatchId)}#live-broadcast` : '/animation-live';
+  const matchCenterV2Href = dbMatchId ? `/match-center/${encodeURIComponent(dbMatchId)}?player=v2#live-broadcast` : '/animation-live/player-v2';
 
   return (
     <main className="min-h-screen bg-background px-3 py-4 text-white sm:px-6 sm:py-6 lg:px-8" dir="rtl">
@@ -64,12 +66,17 @@ export default async function AnimationLivePlayerV2Page({ searchParams }: { sear
               <div className="text-xs font-black uppercase tracking-[0.3em] text-[#FFD700]">V2 Test Route</div>
               <h1 className="mt-1 text-xl font-black text-white">اختبار مشغل البث التفاعلي V2</h1>
               <p className="mt-2 text-xs font-bold leading-6 text-gray-300">
-                هذه صفحة اختبار منفصلة ولا تغيّر صفحة المباراة الحالية.
+                هذه صفحة اختبار منفصلة للمراجعة الفنية فقط، ولا تغيّر صفحة المباراة الحالية.
               </p>
             </div>
-            <Link href={dbMatchId ? `/match-center/${encodeURIComponent(dbMatchId)}#live-broadcast` : '/animation-live'} className="rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm font-black text-white transition hover:border-[#0FF0FC]/40">
-              العودة للنسخة الحالية
-            </Link>
+            <div className="flex flex-wrap items-center gap-2">
+              <Link href={matchCenterV2Href} className="rounded-xl border border-[#FFD700]/25 bg-black/30 px-3 py-2 text-sm font-black text-[#FFF7CC] transition hover:border-[#FFD700]/45">
+                عرض داخل صفحة المباراة
+              </Link>
+              <Link href={stableHref} className="rounded-xl border border-[#0FF0FC]/25 bg-[#0FF0FC]/10 px-3 py-2 text-sm font-black text-[#EAFBFF] transition hover:border-[#0FF0FC]/45 hover:text-white">
+                العودة للنسخة المستقرة
+              </Link>
+            </div>
           </div>
         </div>
 
