@@ -47,6 +47,7 @@ export default function InternalAnimationPlayerCore({ matchId = '', dbMatchId = 
   const [error, setError] = useState<string | null>(null);
   const [eventFilter, setEventFilter] = useState<EventFilterKey>('all');
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
+  const [stableMatchMinute, setStableMatchMinute] = useState<number | null>(null);
 
   const query = useMemo(() => buildQuery(matchId, dbMatchId), [matchId, dbMatchId]);
 
@@ -89,6 +90,10 @@ export default function InternalAnimationPlayerCore({ matchId = '', dbMatchId = 
   }, [fetchStats, fetchEvents]);
 
   useEffect(() => {
+    setStableMatchMinute(null);
+  }, [query]);
+
+  useEffect(() => {
     refreshAll();
   }, [refreshAll]);
 
@@ -106,9 +111,14 @@ export default function InternalAnimationPlayerCore({ matchId = '', dbMatchId = 
   const events = useMemo(() => eventsData?.events || [], [eventsData]);
   const homeTeam = match?.homeTeam || null;
   const awayTeam = match?.awayTeam || null;
-  const currentMinute = matchClockMinute(snapshot, events, match?.status);
+  const rawClockMinute = matchClockMinute(snapshot, events, match?.status);
+  const currentMinute = rawClockMinute ?? stableMatchMinute;
   const provider = statsData?.sourceStatus?.statsProvider || statsData?.sourceStatus?.primary;
   const updatedAt = statsData?.updatedAt || eventsData?.updatedAt;
+
+  useEffect(() => {
+    if (rawClockMinute !== null) setStableMatchMinute(rawClockMinute);
+  }, [rawClockMinute]);
 
   const activeEvent = useMemo(() => latestEvent(events), [events]);
   const pressure = useMemo(
