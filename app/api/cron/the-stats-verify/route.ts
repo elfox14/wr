@@ -30,6 +30,11 @@ function isAuthorized(secret: string) {
   return !!secret && validSecrets.includes(secret);
 }
 
+function internalOrigin(fallback: string) {
+  const port = process.env.PORT;
+  return port ? `http://127.0.0.1:${port}` : fallback;
+}
+
 export async function GET(req: Request) {
   const incomingUrl = new URL(req.url);
   const suppliedSecret = getSuppliedSecret(req, incomingUrl.searchParams);
@@ -38,7 +43,7 @@ export async function GET(req: Request) {
     return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401, headers: { 'Cache-Control': 'no-store' } });
   }
 
-  const adminUrl = new URL('/api/admin/the-stats-verify', incomingUrl.origin);
+  const adminUrl = new URL('/api/admin/the-stats-verify', internalOrigin(incomingUrl.origin));
   adminUrl.searchParams.set('providerPath', incomingUrl.searchParams.get('providerPath') || '/api/football/matches');
   adminUrl.searchParams.set('competition_id', incomingUrl.searchParams.get('competition_id') || process.env.THE_STATS_API_WORLD_CUP_COMPETITION_ID || 'comp_6107');
   adminUrl.searchParams.set('season_id', incomingUrl.searchParams.get('season_id') || process.env.THE_STATS_API_WORLD_CUP_SEASON_ID || 'sn_118868');
@@ -64,6 +69,7 @@ export async function GET(req: Request) {
     mode: 'verify_only',
     forcedDryRun: true,
     upstreamStatus: response.status,
+    usedInternalOrigin: adminUrl.origin,
     result: payload,
     safety: {
       databaseIsSourceOfTruth: true,
