@@ -19,6 +19,13 @@ type VerificationRow = {
   createdAt: Date | string;
 };
 
+type DashboardFilters = {
+  scope: 'latest' | 'recent' | 'all';
+  status: 'all' | 'matched' | 'different' | 'missing_locally' | 'reported_only';
+  hours: number;
+  secret: string;
+};
+
 function getParam(params: Record<string, string | string[] | undefined>, key: string) {
   const value = params[key];
   return Array.isArray(value) ? value[0] : value;
@@ -30,6 +37,18 @@ function isAuthorized(params: Record<string, string | string[] | undefined>) {
     .filter(Boolean);
   const supplied = String(getParam(params, 'adminSecret') || getParam(params, 'key') || getParam(params, 'cronSecret') || '').trim();
   return !!supplied && secrets.includes(supplied);
+}
+
+function readFilters(params: Record<string, string | string[] | undefined>): DashboardFilters {
+  const scopeValue = String(getParam(params, 'scope') || 'latest');
+  const statusValue = String(getParam(params, 'status') || 'all');
+  const hoursValue = Number(getParam(params, 'hours') || 24);
+  return {
+    scope: ['latest', 'recent', 'all'].includes(scopeValue) ? (scopeValue as DashboardFilters['scope']) : 'latest',
+    status: ['all', 'matched', 'different', 'missing_locally', 'reported_only'].includes(statusValue) ? (statusValue as DashboardFilters['status']) : 'all',
+    hours: Number.isFinite(hoursValue) ? Math.max(1, Math.min(168, Math.floor(hoursValue))) : 24,
+    secret: String(getParam(params, 'adminSecret') || getParam(params, 'key') || getParam(params, 'cronSecret') || ''),
+  };
 }
 
 function formatDate(value: Date | string) {
@@ -45,13 +64,49 @@ function statusClass(notes: string | null) {
   return 'border-slate-200 bg-slate-50 text-slate-700';
 }
 
-async function loadRows() {
+function filterDescription(filters: DashboardFilters) {
+  const scopeLabel = filters.scope === 'latest' ? 'آخر تشغيل فقط' : filters.scope === 'recent' ? `آخر ${filters.hours} ساعة` : 'كل السجلات';
+  const statusLabel = filters.status === 'all' ? 'كل الحالات' : filters.status === 'reported_only' ? 'Reported only' : filters.status;
+  return `${scopeLabel} · ${statusLabel}`;
+}
+
+function dashboardHref(filters: DashboardFilters, overrides: Partial<DashboardFilters>) {
+  const next = { ...filters, ...overrides };
+  const params = new URLSearchParams();
+  params.set('adminSecret', next.secret);
+  params.set('scope', next.scope);
+  params.set('status', next.status);
+  params.set('hours', String(next.hours));
+  return `/admin/data-verification?${params.toString()}`;
+}
+
+function linkClass(active: boolean) {
+  return active
+    ? 'rounded-full bg-slate-950 px-4 py-2 text-sm font-bold text-white'
+    : 'rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50';
+}
+
+async function loadRows(filters: DashboardFilters) {
   try {
+    const where: string[] = ['"provider" = \'THE_STATS_API\''];
+    if (filters.scope === 'latest') {
+      where.push('"createdAt" >= COALESCE((SELECT MAX("createdAt") FROM "DataVerificationLog") - INTERVAL \'2 minutes\', NOW() - INTERVAL \'2 minutes\')');
+    }
+    if (filters.scope === 'recent') {
+      where.push(`"createdAt" >= NOW() - INTERVAL '${filters.hours} hours'`);
+    }
+    if (filters.status === 'reported_only') {
+      where.push('"action" = \'reported_only\'');
+    } else if (filters.status !== 'all') {
+      where.push(`"notes" = '${filters.status}'`);
+    }
+
     return await prisma.$queryRawUnsafe<VerificationRow[]>(`
       SELECT "id", "provider", "route", "localMatchId", "providerMatchId", "field", "localValue", "providerValue", "action", "confidence", "notes", "createdAt"
       FROM "DataVerificationLog"
+      WHERE ${where.join(' AND ')}
       ORDER BY "createdAt" DESC
-      LIMIT 200
+      LIMIT 300
     `);
   } catch (error) {
     return [];
@@ -73,7 +128,8 @@ export default async function DataVerificationPage({ searchParams }: { searchPar
     );
   }
 
-  const rows = await loadRows();
+  const filters = readFilters(params);
+  const rows = await loadRows(filters);
   const matched = rows.filter((row) => row.notes === 'matched').length;
   const different = rows.filter((row) => row.notes === 'different').length;
   const reportedOnly = rows.filter((row) => row.action === 'reported_only').length;
@@ -86,8 +142,18 @@ export default async function DataVerificationPage({ searchParams }: { searchPar
           <p className="text-sm font-semibold text-emerald-700">THE_STATS_API · VERIFY ONLY</p>
           <h1 className="mt-2 text-3xl font-black">لوحة تحقق بيانات المباريات</h1>
           <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600">
-            تعرض هذه الصفحة آخر سجلات المقارنة بين قاعدة بيانات الموقع وTheStatsAPI. لا توجد أي تعديلات تلقائية هنا؛ قاعدة البيانات تظل مصدر الحقيقة، والنتائج للمتابعة والمراجعة فقط.
+            تعرض هذه الصفحة سجلات المقارنة بين قاعدة بيانات الموقع وTheStatsAPI. لا توجد أي تعديلات تلقائية هنا؛ قاعدة البيانات تظل مصدر الحقيقة، والنتائج للمتابعة والمراجعة فقط.
           </p>
+        </section>
+
+        <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="flex flex-wrap items-center gap-3">
+            <a className={linkClass(filters.scope === 'latest' && filters.status === 'all')} href={dashboardHref(filters, { scope: 'latest', status: 'all' })}>آخر تشغيل فقط</a>
+            <a className={linkClass(filters.scope === 'recent' && filters.status === 'all')} href={dashboardHref(filters, { scope: 'recent', status: 'all', hours: 24 })}>آخر 24 ساعة</a>
+            <a className={linkClass(filters.status === 'different')} href={dashboardHref(filters, { status: 'different' })}>Different فقط</a>
+            <a className={linkClass(filters.scope === 'all' && filters.status === 'all')} href={dashboardHref(filters, { scope: 'all', status: 'all' })}>كل السجلات</a>
+          </div>
+          <p className="mt-3 text-sm text-slate-500">الفلتر الحالي: {filterDescription(filters)}</p>
         </section>
 
         <section className="grid gap-4 md:grid-cols-4">
@@ -104,7 +170,7 @@ export default async function DataVerificationPage({ searchParams }: { searchPar
             <p className="mt-2 text-3xl font-black text-amber-800">{different}</p>
           </div>
           <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <p className="text-sm text-slate-500">آخر تحقق</p>
+            <p className="text-sm text-slate-500">آخر تحقق في العرض</p>
             <p className="mt-2 text-lg font-bold">{latest}</p>
             <p className="mt-1 text-xs text-slate-500">reported_only: {reportedOnly}</p>
           </div>
@@ -112,8 +178,8 @@ export default async function DataVerificationPage({ searchParams }: { searchPar
 
         <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
           <div className="border-b border-slate-200 p-5">
-            <h2 className="text-xl font-black">آخر 200 سجل</h2>
-            <p className="mt-1 text-sm text-slate-500">استخدم هذه الصفحة للمراجعة فقط، ولا تعرضها للعامة.</p>
+            <h2 className="text-xl font-black">سجلات التحقق</h2>
+            <p className="mt-1 text-sm text-slate-500">استخدم الفلاتر بالأعلى للفصل بين آخر تشغيل والسجلات القديمة.</p>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full min-w-[1100px] text-left text-sm">
@@ -147,7 +213,7 @@ export default async function DataVerificationPage({ searchParams }: { searchPar
                 {!rows.length && (
                   <tr>
                     <td colSpan={8} className="px-4 py-10 text-center text-slate-500">
-                      لا توجد سجلات بعد. شغّل endpoint التحقق أولًا لإنشاء DataVerificationLog.
+                      لا توجد سجلات مطابقة لهذا الفلتر.
                     </td>
                   </tr>
                 )}
