@@ -134,11 +134,11 @@ function PlayerImage({ leader }: { leader: any }) {
   const image = typeof leader?.image === 'string' && leader.image.trim() ? leader.image : '';
 
   return (
-    <span className="relative mx-auto flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-[#FFD700]/25 bg-black/55 shadow-[0_0_24px_rgba(255,215,0,0.12)] transition group-hover:scale-105">
+    <span className="relative mx-auto flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-3xl border border-[#FFD700]/25 bg-black/55 shadow-[0_0_24px_rgba(255,215,0,0.12)] transition group-hover:scale-105">
       {image ? (
         <img src={image} alt={leader?.name || 'الهداف'} className="h-full w-full object-cover" loading="lazy" />
       ) : (
-        <span className="text-sm font-black text-[#FFD700]/75">{initials}</span>
+        <span className="text-xl font-black text-[#FFD700]/75">{initials}</span>
       )}
     </span>
   );
@@ -146,17 +146,17 @@ function PlayerImage({ leader }: { leader: any }) {
 
 function TopScorerCard({ leader }: { leader: any }) {
   const href = leader?.id ? `/players/${encodeURIComponent(String(leader.id))}` : '/players';
-  const playerName = leader?.name ? shortText(String(leader.name), 22) : 'غير متوفر';
+  const playerName = leader?.name ? shortText(String(leader.name), 26) : 'غير متوفر';
   const subtitle = leader?.value
-    ? `${formatCount(Number(leader.value))} هدف${leader?.team ? ` • ${shortText(teamName(leader.team), 14)}` : ''}`
+    ? `${formatCount(Number(leader.value))} هدف${leader?.team ? ` • ${shortText(teamName(leader.team), 18)}` : ''}`
     : 'بانتظار بيانات موثقة';
 
   return (
-    <StatShell title="الهداف" source={leader ? 'DB' : '—'} tone="gold" href={href} itemClassName="col-span-1 sm:col-span-2 lg:col-span-2 xl:col-span-2">
-      <div className="flex min-h-0 flex-1 flex-col items-center justify-center overflow-hidden rounded-xl border border-[#FFD700]/15 bg-[#FFD700]/10 px-2 py-1.5 text-center">
+    <StatShell title="الهداف" source={leader ? 'DB' : '—'} tone="gold" href={href} itemClassName="col-span-1 row-span-2 sm:col-span-2 lg:col-span-2 xl:col-span-2">
+      <div className="flex min-h-0 flex-1 flex-col items-center justify-center overflow-hidden rounded-xl border border-[#FFD700]/15 bg-[#FFD700]/10 px-3 py-3 text-center">
         <PlayerImage leader={leader} />
-        <div className="mt-1.5 w-full truncate text-xs font-black leading-tight text-white">{playerName}</div>
-        <div className="mt-0.5 w-full truncate text-[9px] font-bold leading-tight text-[#FFD700]/80">{subtitle}</div>
+        <div className="mt-3 w-full truncate text-base font-black leading-tight text-white">{playerName}</div>
+        <div className="mt-1 w-full truncate text-xs font-bold leading-tight text-[#FFD700]/80">{subtitle}</div>
       </div>
     </StatShell>
   );
