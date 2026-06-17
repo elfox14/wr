@@ -145,6 +145,12 @@ function displayTeamName(value: unknown) {
   return TEAM_AR_NAMES[normalizeKey(raw)] || raw;
 }
 
+function teamLabel(value: unknown) {
+  const name = displayTeamName(value);
+  if (name.startsWith('منتخب ')) return name;
+  return `منتخب ${name}`;
+}
+
 function n(snapshot: any, key: string) {
   const value = Number(snapshot?.[key]);
   return Number.isFinite(value) ? value : null;
@@ -176,8 +182,8 @@ function eventTypeLabel(type: string) {
 }
 
 function sideName(teamId: string | null | undefined, homeTeam: any, awayTeam: any) {
-  if (teamId && homeTeam?.id && teamId === homeTeam.id) return displayTeamName(homeTeam.name);
-  if (teamId && awayTeam?.id && teamId === awayTeam.id) return displayTeamName(awayTeam.name);
+  if (teamId && homeTeam?.id && teamId === homeTeam.id) return teamLabel(homeTeam.name);
+  if (teamId && awayTeam?.id && teamId === awayTeam.id) return teamLabel(awayTeam.name);
   return 'أحد الفريقين';
 }
 
@@ -192,6 +198,10 @@ function isAwayEvent(event: EventRow, match: any) {
 function eventMatches(event: EventRow, includes: string[]) {
   const value = String(event.type || '').toLowerCase();
   return includes.some((item) => value.includes(item));
+}
+
+function isArticleEvent(event: EventRow) {
+  return eventMatches(event, ['goal', 'red', 'yellow', 'penalty', 'var', 'corner', 'shot_on_target', 'dangerous_attack']);
 }
 
 function countEvents(events: EventRow[], match: any, includes: string[]) {
@@ -216,6 +226,16 @@ function comparisonLine(home: number | null, away: number | null, label: string,
   return `${leader} يتفوق في ${label} بواقع ${ar(leaderValue)} مقابل ${ar(otherValue)}.`;
 }
 
+function disciplineLine(home: number, away: number, label: string, homeName: string, awayName: string) {
+  if (home === 0 && away === 0) return null;
+  if (home === away) return `${label} متساوية بين الطرفين عند ${ar(home)} لكل فريق.`;
+  const homeMore = home > away;
+  const team = homeMore ? homeName : awayName;
+  const value = homeMore ? home : away;
+  const other = homeMore ? away : home;
+  return `${team} حصل على عدد أكبر من ${label} بواقع ${ar(value)} مقابل ${ar(other)}.`;
+}
+
 function statLine(snapshot: any, homeKey: string, awayKey: string, label: string, homeName: string, awayName: string) {
   return comparisonLine(n(snapshot, homeKey), n(snapshot, awayKey), label, homeName, awayName);
 }
@@ -233,10 +253,11 @@ function pickSnapshot(latest: any, history: any[]) {
 }
 
 function importantEvents(events: EventRow[]) {
-  return [...events]
+  const withMinute = [...events]
     .filter((event) => event.minute !== null && event.minute !== undefined)
-    .sort((a, b) => Number(a.minute || 0) - Number(b.minute || 0))
-    .slice(0, 14);
+    .sort((a, b) => Number(a.minute || 0) - Number(b.minute || 0));
+  const filtered = withMinute.filter(isArticleEvent);
+  return (filtered.length ? filtered : withMinute).slice(0, 12);
 }
 
 function goals(events: EventRow[]) {
@@ -320,8 +341,10 @@ function winnerPhrase(homeName: string, awayName: string, homeScore: number, awa
 }
 
 function buildMatchArticle(match: any, snapshot: any, events: EventRow[]) {
-  const homeName = displayTeamName(match.homeTeam?.name || 'الفريق الأول');
-  const awayName = displayTeamName(match.awayTeam?.name || 'الفريق الثاني');
+  const homeName = teamLabel(match.homeTeam?.name || 'الفريق الأول');
+  const awayName = teamLabel(match.awayTeam?.name || 'الفريق الثاني');
+  const homePlain = displayTeamName(match.homeTeam?.name || 'الفريق الأول');
+  const awayPlain = displayTeamName(match.awayTeam?.name || 'الفريق الثاني');
   const scoreReadout = resolveScore(match, snapshot, events);
   const homeScore = scoreReadout.home;
   const awayScore = scoreReadout.away;
@@ -339,12 +362,12 @@ function buildMatchArticle(match: any, snapshot: any, events: EventRow[]) {
   const redCards = countEvents(events, match, ['red']);
 
   const cornerLine = corners.total > 0
-    ? pairLine(corners.home, corners.away, 'الركنيات من الأحداث المحفوظة', homeName, awayName)
+    ? pairLine(corners.home, corners.away, 'الركنيات', homeName, awayName)
     : statLine(snapshot, 'homeCorners', 'awayCorners', 'الركنيات', homeName, awayName);
 
   const cardLines = [
-    yellowCards.total > 0 ? pairLine(yellowCards.home, yellowCards.away, 'البطاقات الصفراء', homeName, awayName) : null,
-    redCards.total > 0 ? pairLine(redCards.home, redCards.away, 'البطاقات الحمراء', homeName, awayName) : null,
+    yellowCards.total > 0 ? disciplineLine(yellowCards.home, yellowCards.away, 'البطاقات الصفراء', homeName, awayName) : null,
+    redCards.total > 0 ? disciplineLine(redCards.home, redCards.away, 'البطاقات الحمراء', homeName, awayName) : null,
   ].filter(Boolean);
 
   const statsLines = [
@@ -367,7 +390,7 @@ function buildMatchArticle(match: any, snapshot: any, events: EventRow[]) {
     : ['الأحداث التفصيلية غير كافية حاليًا، لذلك يعتمد التحليل على النتيجة والإحصائيات المتاحة من صفحة المباراة.'];
 
   const scoreSourceNote = scoreReadout.source === 'events'
-    ? ' تم اعتماد النتيجة من أحداث الأهداف المحفوظة لأن النتيجة الرقمية في جدول المباراة لم تكن مكتملة.'
+    ? ' وتعتمد هذه القراءة على أحداث الأهداف المحفوظة في صفحة المباراة.'
     : '';
 
   const opening = `${phrasing.opening}${scoreSourceNote}`;
@@ -397,9 +420,10 @@ function buildMatchArticle(match: any, snapshot: any, events: EventRow[]) {
   ].join('\n\n');
 
   const keywords = [
+    `${homePlain} ${awayPlain}`,
+    `${homePlain} ضد ${awayPlain}`,
+    `تحليل مباراة ${homePlain} و${awayPlain}`,
     `${homeName} ${awayName}`,
-    `${homeName} ضد ${awayName}`,
-    `تحليل مباراة ${homeName} و${awayName}`,
     'كأس العالم 2026',
     'تحليل صفحة المباراة',
     player,
