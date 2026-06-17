@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowRight, Calendar, Clock, Link2, Newspaper, User } from 'lucide-react';
+import { ArrowRight, Calendar, Clock, ExternalLink, Link2, Newspaper, User } from 'lucide-react';
 import prisma from '@/lib/prisma';
 import AdSenseBanner from '@/components/ads/AdSenseBanner';
 import ShareButtons from '@/components/news/ShareButtons';
@@ -81,6 +81,14 @@ function articleParagraphs(newsItem: any) {
   return buildExpandedArticleParagraphs(newsItem);
 }
 
+function resolveMatchCenterUrl(newsItem: any) {
+  const relatedMatchId = String(newsItem.relatedMatchId || '').trim();
+  if (relatedMatchId) return `/match-center/${relatedMatchId}`;
+  const sourceUrl = String(newsItem.sourceUrl || '').trim();
+  if (sourceUrl.startsWith('/match-center/')) return sourceUrl;
+  return '';
+}
+
 async function getNewsArticle(id: string) {
   try {
     await ensurePressNewsTable();
@@ -147,6 +155,7 @@ export default async function NewsDetailPage({ params }: Props) {
   const paragraphs = articleParagraphs(newsItem);
   const words = paragraphs.join(' ').split(/\s+/).filter(Boolean).length;
   const readingTime = Math.max(1, Math.ceil(words / 180));
+  const matchCenterUrl = resolveMatchCenterUrl(newsItem);
 
   let relatedArticles: any[] = [];
   try {
@@ -189,6 +198,7 @@ export default async function NewsDetailPage({ params }: Props) {
       organizer: { '@type': 'Organization', name: 'FIFA World Cup 2026' },
       image: [imageUrl],
       description: paragraphs[0] || newsItem.title,
+      ...(matchCenterUrl ? { url: `${baseUrl}${matchCenterUrl}` } : {}),
     },
     {
       '@context': 'https://schema.org',
@@ -261,6 +271,26 @@ export default async function NewsDetailPage({ params }: Props) {
             )}
 
             <AdSenseBanner slot="5678901234" format="horizontal" className="my-2" />
+
+            {matchCenterUrl && (
+              <section className="rounded-3xl border border-[#FFD700]/15 bg-[#FFD700]/5 p-5 md:p-6">
+                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                  <div>
+                    <div className="text-xs font-black uppercase tracking-[0.25em] text-[#FFD700]">مصدر المقال التفاعلي</div>
+                    <h2 className="mt-2 text-lg font-black text-white">هذا المقال مرتبط بصفحة مباراة مباشرة</h2>
+                    <p className="mt-1 text-sm font-bold leading-7 text-gray-400">
+                      راجع الإحصائيات، الأحداث، والزخم الذي بُني عليه هذا التحليل من صفحة المباراة الأصلية.
+                    </p>
+                  </div>
+                  <Link
+                    href={matchCenterUrl}
+                    className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#FFD700] px-4 text-sm font-black text-black transition hover:bg-[#0FF0FC]"
+                  >
+                    العودة إلى صفحة المباراة <ExternalLink size={15} />
+                  </Link>
+                </div>
+              </section>
+            )}
 
             <section className="rounded-3xl border border-white/5 bg-black/20 p-6 md:p-8 space-y-6">
               {paragraphs.map((p: string, idx: number) => (
