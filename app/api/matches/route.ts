@@ -50,6 +50,12 @@ function minutesFromKickoff(match: any, now = Date.now()) {
   return Math.floor((now - matchTime) / 60_000) + 1;
 }
 
+function safeKickoffMinute(match: any, now = Date.now()) {
+  const minute = minutesFromKickoff(match, now);
+  if (minute === null || minute < 1) return null;
+  return Math.max(1, Math.min(maxLiveMinutes(match), minute));
+}
+
 function isOfficialFinished(match: any) {
   const status = normalizeStatus(match.status);
   const displayStatus = normalizeStatus(match.displayStatus);
@@ -122,7 +128,7 @@ function normalizeMatchForDisplay(match: any, now = Date.now()) {
   }
 
   if (isLikelyLiveByTime(match, now)) {
-    const safeMinute = minute ? Math.max(1, Math.min(130, minute)) : null;
+    const safeMinute = minute ? Math.max(1, Math.min(maxLiveMinutes(match), minute)) : null;
     return {
       ...match,
       displayStatus: 'IN_PLAY',
@@ -130,15 +136,20 @@ function normalizeMatchForDisplay(match: any, now = Date.now()) {
       isLikelyLiveByTime: true,
       minute: safeMinute,
       liveLabel: safeMinute ? `الدقيقة ${safeMinute}` : 'مباشر الآن',
+      minuteSource: 'kickoff_time',
     };
   }
 
   if (isLiveStatus(status)) {
+    const safeMinute = safeKickoffMinute(match, now);
     return {
       ...match,
       displayStatus: status,
       isLiveNow: true,
       isLikelyLiveByTime: false,
+      minute: safeMinute ?? match.minute ?? null,
+      liveLabel: safeMinute ? `الدقيقة ${safeMinute}` : match.liveLabel || 'مباشر الآن',
+      minuteSource: safeMinute ? 'kickoff_time' : 'snapshot',
     };
   }
 
@@ -221,8 +232,13 @@ export async function GET() {
     const enrichedMatches = matches.map((match) => {
       const snapshot = documentedSnapshots.get(match.id);
       const matchWithSnapshot = snapshot ? { ...match, latestStatsMinute: snapshot.minute, latestStatsCapturedAt: snapshot.capturedAt } : match;
+      const kickoffMinute = safeKickoffMinute(matchWithSnapshot, now);
+      const liveByStatusOrTime = isLiveStatus(matchWithSnapshot.status) || isLikelyLiveByTime(matchWithSnapshot, now);
+      if (liveByStatusOrTime && kickoffMinute !== null && !isOfficialFinished(matchWithSnapshot) && !isStaleByTime(matchWithSnapshot, now)) {
+        return { ...matchWithSnapshot, minute: kickoffMinute, displayStatus: 'IN_PLAY', isLiveNow: true, liveLabel: `الدقيقة ${kickoffMinute}`, minuteSource: 'kickoff_time' };
+      }
       const canUseLiveSnapshot = snapshot && !isOfficialFinished(matchWithSnapshot) && !isStaleByTime(matchWithSnapshot, now) && !isFinalSnapshotStale(matchWithSnapshot, now);
-      return canUseLiveSnapshot ? { ...matchWithSnapshot, minute: snapshot.minute, displayStatus: 'IN_PLAY', isLiveNow: true, liveLabel: `الدقيقة ${snapshot.minute}` } : matchWithSnapshot;
+      return canUseLiveSnapshot ? { ...matchWithSnapshot, minute: snapshot.minute, displayStatus: 'IN_PLAY', isLiveNow: true, liveLabel: `الدقيقة ${snapshot.minute}`, minuteSource: 'snapshot' } : matchWithSnapshot;
     });
 
     return NextResponse.json(dedupeMatches(enrichedMatches), { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } });
