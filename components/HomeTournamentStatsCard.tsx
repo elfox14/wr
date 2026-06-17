@@ -9,7 +9,7 @@ type Props = {
   upcomingMatchesCount?: number;
 };
 
-type SourceName = 'DB' | 'FBref' | '—';
+type SourceName = 'DB' | 'FBref' | 'FBref PK/PKatt' | 'ثابت' | '—';
 type Tone = 'gold' | 'cyan' | 'green' | 'red' | 'neutral';
 
 const STATS_REFRESH_MS = 60_000;
@@ -87,7 +87,7 @@ function StatShell({
   const body = (
     <article className={`group relative h-full min-h-[128px] overflow-hidden rounded-2xl border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.052),rgba(0,0,0,0.25))] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_8px_22px_rgba(0,0,0,0.16)] transition hover:-translate-y-0.5 ${style.border}`}>
       <div className={`absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent ${style.line} to-transparent`} />
-      <div className="relative z-10 flex h-full flex-col gap-2">
+      <div className="relative z-10 flex h-full min-h-0 flex-col gap-2">
         <div className="flex items-start justify-between gap-1.5">
           <div className={`truncate text-[10px] font-black ${style.value}`}>{title}</div>
           <SourceBadge source={source} />
@@ -134,11 +134,11 @@ function PlayerImage({ leader }: { leader: any }) {
   const image = typeof leader?.image === 'string' && leader.image.trim() ? leader.image : '';
 
   return (
-    <span className="relative mx-auto flex h-16 w-16 items-center justify-center overflow-hidden rounded-2xl border border-[#FFD700]/25 bg-black/55 shadow-[0_0_24px_rgba(255,215,0,0.12)] transition group-hover:scale-105">
+    <span className="relative mx-auto flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-[#FFD700]/25 bg-black/55 shadow-[0_0_24px_rgba(255,215,0,0.12)] transition group-hover:scale-105">
       {image ? (
         <img src={image} alt={leader?.name || 'الهداف'} className="h-full w-full object-cover" loading="lazy" />
       ) : (
-        <span className="text-lg font-black text-[#FFD700]/75">{initials}</span>
+        <span className="text-sm font-black text-[#FFD700]/75">{initials}</span>
       )}
     </span>
   );
@@ -146,17 +146,17 @@ function PlayerImage({ leader }: { leader: any }) {
 
 function TopScorerCard({ leader }: { leader: any }) {
   const href = leader?.id ? `/players/${encodeURIComponent(String(leader.id))}` : '/players';
-  const playerName = leader?.name ? shortText(String(leader.name), 20) : 'غير متوفر';
+  const playerName = leader?.name ? shortText(String(leader.name), 22) : 'غير متوفر';
   const subtitle = leader?.value
     ? `${formatCount(Number(leader.value))} هدف${leader?.team ? ` • ${shortText(teamName(leader.team), 14)}` : ''}`
     : 'بانتظار بيانات موثقة';
 
   return (
     <StatShell title="الهداف" source={leader ? 'DB' : '—'} tone="gold" href={href} itemClassName="col-span-1 sm:col-span-2 lg:col-span-2 xl:col-span-2">
-      <div className="flex flex-1 flex-col items-center justify-center rounded-xl border border-[#FFD700]/15 bg-[#FFD700]/10 px-2 py-2 text-center">
+      <div className="flex min-h-0 flex-1 flex-col items-center justify-center overflow-hidden rounded-xl border border-[#FFD700]/15 bg-[#FFD700]/10 px-2 py-1.5 text-center">
         <PlayerImage leader={leader} />
-        <div className="mt-2 w-full truncate text-sm font-black text-white">{playerName}</div>
-        <div className="mt-1 w-full truncate text-[9px] font-bold text-[#FFD700]/80">{subtitle}</div>
+        <div className="mt-1.5 w-full truncate text-xs font-black leading-tight text-white">{playerName}</div>
+        <div className="mt-0.5 w-full truncate text-[9px] font-bold leading-tight text-[#FFD700]/80">{subtitle}</div>
       </div>
     </StatShell>
   );
@@ -209,8 +209,9 @@ function PenaltyMiniCard({ kickStats, usingFbref }: { kickStats: any; usingFbref
   const scored = available ? Number(kickStats?.scored || 0) : null;
   const missed = available ? Number(kickStats?.missed || 0) : null;
   const conversion = total && scored !== null ? Math.max(0, Math.min(100, (scored / total) * 100)) : null;
+  const source = usingFbref || String(kickStats?.source || '').toLowerCase().includes('fbref') ? 'FBref PK/PKatt' : available ? 'DB/Event' : 'FBref PK/PKatt';
   return (
-    <StatShell title="ركلات الجزاء" source={usingFbref ? 'FBref' : available ? 'DB/Event' : '—'} tone="gold" itemClassName="col-span-1 sm:col-span-2 lg:col-span-2 xl:col-span-2">
+    <StatShell title="ركلات الجزاء" source={source} tone="gold" itemClassName="col-span-1 sm:col-span-2 lg:col-span-2 xl:col-span-2">
       {available ? (
         <div className="flex flex-1 flex-col justify-center">
           <div className="grid grid-cols-3 gap-1.5">
@@ -223,8 +224,8 @@ function PenaltyMiniCard({ kickStats, usingFbref }: { kickStats: any; usingFbref
       ) : (
         <div className="flex flex-1 items-center justify-center rounded-xl border border-dashed border-[#FFD700]/18 bg-black/20 p-3 text-center">
           <div>
-            <div className="text-sm font-black text-gray-200">بانتظار توثيق</div>
-            <div className="mt-1 text-[8px] font-bold text-gray-500">لا يوجد رقم مؤكد</div>
+            <div className="text-xs font-black text-gray-200">غير متوفر في اللقطة الحالية</div>
+            <div className="mt-1 text-[8px] font-bold text-gray-500">المصدر المقترح: FBref PK/PKatt</div>
           </div>
         </div>
       )}
@@ -275,7 +276,7 @@ export default function HomeTournamentStatsCard({ playersCount: serverPlayersCou
   }, []);
 
   const isInitialLoading = isLoading && !stats && !fbrefStats && !playerLeaders;
-  const playerCount = pickNumber(stats?.playerCount, fbrefStats?.playerCount) ?? serverPlayersCount ?? DEFAULT_PLAYERS_COUNT;
+  const playerCount = DEFAULT_PLAYERS_COUNT;
   const totalGoals = pickNumber(stats?.totalGoals, fbrefStats?.totalGoals);
   const averageGoals = pickNumber(stats?.averageGoalsPerFinishedMatch, fbrefStats?.averageGoalsPerFinishedMatch);
   const finishedMatches = pickNumber(stats?.finishedMatches, fbrefStats?.finishedMatches);
@@ -298,7 +299,7 @@ export default function HomeTournamentStatsCard({ playersCount: serverPlayersCou
   const usingFbrefCards = (!usefulNumber(read(stats, 'yellow' + 'Cards')) && usefulNumber(read(fbrefStats, 'yellow' + 'Cards')) !== null) || (!usefulNumber(read(stats, 'red' + 'Cards')) && usefulNumber(read(fbrefStats, 'red' + 'Cards')) !== null);
   const usingFbrefGoals = !usefulNumber(stats?.totalGoals) && usefulNumber(fbrefStats?.totalGoals) !== null;
   const usingFbrefTeams = !stats?.teamLeaders?.bestCleanSheetTeam && Boolean(fbrefStats?.teamLeaders?.bestCleanSheetTeam);
-  const playerSource: SourceName = fbrefStats?.playerCount && !stats?.playerCount ? 'FBref' : 'DB';
+  const playerSource: SourceName = 'ثابت';
 
   return (
     <section className="mx-auto mb-4 max-w-7xl overflow-hidden rounded-3xl border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(255,215,0,0.11),transparent_23%),radial-gradient(circle_at_bottom_left,rgba(15,240,252,0.07),transparent_28%),linear-gradient(135deg,rgba(7,24,18,0.96),rgba(3,12,11,0.99))] p-3 text-white shadow-[0_16px_44px_rgba(0,0,0,0.32)] backdrop-blur" aria-label="إحصائيات البطولة">
