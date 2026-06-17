@@ -299,6 +299,7 @@ export async function GET(req: Request) {
   const dryRun = url.searchParams.get('dryRun') === 'true';
   const applyMarketEvents = url.searchParams.get('applyMarketEvents') === 'true';
   const force = url.searchParams.get('force') === 'true';
+  const strictStatus = url.searchParams.get('strictStatus') === 'true';
   const minIntervalMinutes = Math.max(0, Number(url.searchParams.get('minIntervalMinutes') || process.env.FOOTBALL_DATA_MIN_INTERVAL_MINUTES || 5));
   const processed: any[] = [];
   const errors: any[] = [];
@@ -353,9 +354,12 @@ export async function GET(req: Request) {
   } catch (error: any) {
     if (isProviderQuotaError(error)) {
       await blockProviderForHours('FOOTBALL_DATA', 24, error?.message || 'football-data quota or rate limit reached');
+    } else if (Number(error?.status) >= 500) {
+      await blockProviderUntil('FOOTBALL_DATA', new Date(Date.now() + 30 * 60 * 1000), error?.message || 'temporary football-data provider error');
     }
     errors.push({ message: error?.message || 'football-data sync failed', status: error?.status, provider: error?.provider || 'FOOTBALL_DATA', payload: error?.payload });
-    return NextResponse.json({ ok: false, mode: 'football_data_backup_match_sync', provider: 'FOOTBALL_DATA', competition, dateFrom, dateTo, externalRequestsUsed: error?.status === 429 ? 1 : 0, processed, errors, startedAt: startedAt.toISOString(), finishedAt: new Date().toISOString() }, { status: error?.status || 500, headers: { 'Cache-Control': 'no-store' } });
+    const responseStatus = strictStatus ? (error?.status || 500) : 200;
+    return NextResponse.json({ ok: false, cronSafe: !strictStatus, mode: 'football_data_backup_match_sync', provider: 'FOOTBALL_DATA', competition, dateFrom, dateTo, externalRequestsUsed: error?.status ? 1 : 0, processed, errors, startedAt: startedAt.toISOString(), finishedAt: new Date().toISOString(), note: strictStatus ? 'strictStatus=true returned the provider HTTP status.' : 'Cron-safe response: provider error was reported in JSON and the provider was cooled down when needed.' }, { status: responseStatus, headers: { 'Cache-Control': 'no-store' } });
   }
 }
 
