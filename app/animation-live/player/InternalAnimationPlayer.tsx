@@ -1,1 +1,1 @@
-export { default } from './InternalAnimationPlayerV2';
+export { default } from './InternalAnimationPlayerCore';
