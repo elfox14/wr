@@ -31,7 +31,7 @@ export default async function MatchCenterPage({ params }: { params: Promise<{ id
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <div>
               <h1 className="flex min-w-0 items-center gap-2 text-base font-black text-white sm:text-xl"><Radio className="text-[#FFD700]" /> البث التفاعلي</h1>
-              <div className="mt-1 text-[10px] font-black text-[#FFD700]">المشغل الأساسي الجديد V2</div>
+              <div className="mt-1 text-[10px] font-black text-[#FFD700]">المشغل التفاعلي المباشر</div>
             </div>
             <Link href="/matches" className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#0FF0FC]/25 bg-[#0FF0FC]/10 px-3 text-sm font-black text-[#EAFBFF] transition hover:border-[#0FF0FC]/45 hover:bg-[#0FF0FC]/15 hover:text-white">
               العودة إلى المباريات <ArrowLeft size={16} />
