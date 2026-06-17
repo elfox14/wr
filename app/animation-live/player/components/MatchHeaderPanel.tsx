@@ -5,7 +5,7 @@ import { ar, formatMatchDate, formatUpdatedAt, sourceLabel } from '../formatters
 import { displayMatchStatus, isFinishedStatus, isHalfTimeStatus, normalizeStatus } from '../statusUtils';
 import TeamName from './TeamName';
 
-type ClockSource = 'kickoff_time' | 'live_stats' | 'cached' | 'final_elapsed' | 'final_event' | 'unavailable';
+type ClockSource = 'kickoff_time' | 'provider_status' | 'live_stats' | 'cached' | 'final_elapsed' | 'final_event' | 'unavailable';
 
 type MatchHeaderPanelProps = {
   match?: LiveStatsResponse['match'];
