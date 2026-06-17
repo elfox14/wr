@@ -20,6 +20,8 @@ export { default as TeamName } from './components/TeamName';
 export { MiniStat, StatRow } from './components/StatCards';
 export { default as IntelligenceTile } from './components/IntelligenceTile';
 export { default as MomentumCard } from './components/MomentumCard';
+export { default as DataQualityCard } from './components/DataQualityCard';
+export { default as MatchStoryCards } from './components/MatchStoryCards';
 
 export { ar, formatMatchDate, formatUpdatedAt, sourceLabel } from './formatters';
 export { normalizeStatus, isFinishedStatus, isHalfTimeStatus, displayMatchStatus } from './statusUtils';
