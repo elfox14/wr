@@ -119,6 +119,7 @@ export async function GET(req: Request) {
     const skip = clampInt(url.searchParams.get('skip'), 0, 0, 10000);
     const timeoutMs = clampInt(url.searchParams.get('timeoutMs'), 45000, 5000, 80000);
     const waitMs = clampInt(url.searchParams.get('waitMs'), 12000, 1000, 30000);
+    const windowBeforeMinutes = clampInt(url.searchParams.get('windowBeforeMinutes'), 0, 0, 43200);
     const includeTimeline = boolParam(url.searchParams.get('includeTimeline'), true);
     const includeFlash = boolParam(url.searchParams.get('includeFlash'), true);
     const includeLive = boolParam(url.searchParams.get('includeLive'), true);
@@ -126,8 +127,12 @@ export async function GET(req: Request) {
     const replace = boolParam(url.searchParams.get('replace'), true);
     const dryRun = boolParam(url.searchParams.get('dryRun'), false);
     const missingOnly = boolParam(url.searchParams.get('missingOnly'), false);
-    const after = parseDate(url.searchParams.get('after') || url.searchParams.get('from'), new Date('2026-06-01T00:00:00.000Z'));
+    const hasExplicitAfter = Boolean(url.searchParams.get('after') || url.searchParams.get('from'));
     const before = parseDate(url.searchParams.get('before') || url.searchParams.get('to'), new Date(Date.now() - 10 * 60_000));
+    const afterFallback = windowBeforeMinutes > 0 ? new Date(Date.now() - windowBeforeMinutes * 60_000) : new Date('2026-06-01T00:00:00.000Z');
+    const after = parseDate(url.searchParams.get('after') || url.searchParams.get('from'), afterFallback);
+    const orderParam = String(url.searchParams.get('order') || '').toLowerCase();
+    const orderDirection: 'asc' | 'desc' = orderParam === 'asc' ? 'asc' : 'desc';
     const explicitDbMatchId = url.searchParams.get('dbMatchId') || url.searchParams.get('id');
     const explicitProviderMatchId = Number(url.searchParams.get('matchId') || url.searchParams.get('providerMatchId') || 0);
 
@@ -146,7 +151,7 @@ export async function GET(req: Request) {
 
     const matches = await prisma.match.findMany({
       where: targetWhere,
-      orderBy: { matchDate: 'asc' },
+      orderBy: { matchDate: orderDirection },
       skip: explicitDbMatchId || explicitProviderMatchId || missingOnly ? 0 : skip,
       take,
       include: {
@@ -169,7 +174,7 @@ export async function GET(req: Request) {
         includeLive,
         processed: 0,
         selected: matches.length,
-        query: { after: after.toISOString(), before: before.toISOString(), take, skip, missingOnly },
+        query: { after: after.toISOString(), before: before.toISOString(), take, skip, missingOnly, order: orderDirection, windowBeforeMinutes: hasExplicitAfter ? null : windowBeforeMinutes },
         targets: matches.map((match) => ({
           dbMatchId: match.id,
           providerMatchId: match.animationMatchId,
@@ -273,7 +278,7 @@ export async function GET(req: Request) {
       includeLive,
       processed: results.length,
       durationMs: Date.now() - startedAt,
-      query: { after: after.toISOString(), before: before.toISOString(), take, skip, missingOnly },
+      query: { after: after.toISOString(), before: before.toISOString(), take, skip, missingOnly, order: orderDirection, windowBeforeMinutes: hasExplicitAfter ? null : windowBeforeMinutes },
       results,
       note: 'Post-match confirmation uses iSports Timeline for final events, FlashData for score/corners/attacks, and Visual Stats for possession/shots. If Timeline has extra events, replace=true refreshes the saved timeline events.',
     });
