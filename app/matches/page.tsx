@@ -22,6 +22,8 @@ type Match = {
   isStaleAutoFinished?: boolean;
 };
 
+type RoundOption = { key: string; label: string; order: number };
+
 const validFilters = ['all', 'yesterday', 'today', 'tomorrow', 'animation'];
 const LIVE_STATUSES = ['IN_PLAY', 'LIVE', 'HT'];
 const FINISHED_STATUSES = ['FINISHED', 'FT', 'AET', 'PEN'];
@@ -30,7 +32,8 @@ const KNOCKOUT_MAX_LIVE_MINUTES = 150;
 
 function normalizeGroupKey(value?: string | null) {
   if (!value) return 'غير محددة';
-  return value.replace(/^group[_\s-]*/i, '').replace('Group', '').replace('المجموعة', '').trim().toUpperCase();
+  const cleaned = value.replace(/^group[_\s-]*/i, '').replace('Group', '').replace('المجموعة', '').trim().toUpperCase();
+  return cleaned || 'غير محددة';
 }
 
 function getMatchGroup(match: Match) {
@@ -126,15 +129,77 @@ function TeamNameWithFlag({ team, fallback }: { team?: Team | null; fallback: st
   );
 }
 
+function isGroupRoundCandidate(match: Match) {
+  const group = getMatchGroup(match);
+  if (!group || group === 'غير محددة') return false;
+  if (isGroupStage(match)) return true;
+  return /^[A-Z0-9]{1,3}$/.test(group);
+}
+
+function stageRoundLabel(stage?: string | null) {
+  const value = String(stage || '').trim();
+  const normalized = value.toUpperCase();
+  if (!value) return 'جولة غير محددة';
+  if (normalized.includes('ROUND') && normalized.includes('32')) return 'دور الـ32';
+  if (normalized.includes('ROUND') && normalized.includes('16')) return 'دور الـ16';
+  if (normalized.includes('QUARTER')) return 'ربع النهائي';
+  if (normalized.includes('SEMI')) return 'نصف النهائي';
+  if (normalized.includes('FINAL') && normalized.includes('THIRD')) return 'تحديد المركز الثالث';
+  if (normalized.includes('FINAL')) return 'النهائي';
+  return value.replace(/[_-]+/g, ' ');
+}
+
+function getTeamRoundKey(match: Match, side: 'home' | 'away') {
+  const team = side === 'home' ? match.homeTeam : match.awayTeam;
+  return team?.id || team?.code || team?.name || side;
+}
+
+function buildRoundMap(matches: Match[]) {
+  const sorted = [...matches].sort((a, b) => new Date(a.matchDate).getTime() - new Date(b.matchDate).getTime());
+  const teamAppearances = new Map<string, number>();
+  const roundMap = new Map<string, RoundOption>();
+
+  sorted.forEach((match) => {
+    if (isGroupRoundCandidate(match)) {
+      const group = getMatchGroup(match);
+      const homeKey = `${group}:${getTeamRoundKey(match, 'home')}`;
+      const awayKey = `${group}:${getTeamRoundKey(match, 'away')}`;
+      const roundNumber = Math.max(teamAppearances.get(homeKey) || 0, teamAppearances.get(awayKey) || 0) + 1;
+      teamAppearances.set(homeKey, (teamAppearances.get(homeKey) || 0) + 1);
+      teamAppearances.set(awayKey, (teamAppearances.get(awayKey) || 0) + 1);
+      roundMap.set(match.id, { key: `round-${roundNumber}`, label: `الجولة ${roundNumber.toLocaleString('ar-EG')}`, order: roundNumber });
+      return;
+    }
+
+    const label = stageRoundLabel(match.stage || match.groupPhase || match.group);
+    roundMap.set(match.id, { key: `stage-${label}`, label, order: 1000 + new Date(match.matchDate).getTime() });
+  });
+
+  return roundMap;
+}
+
+function uniqueRoundOptions(roundMap: Map<string, RoundOption>) {
+  const byKey = new Map<string, RoundOption>();
+  for (const option of roundMap.values()) {
+    const previous = byKey.get(option.key);
+    if (!previous || option.order < previous.order) byKey.set(option.key, option);
+  }
+  return Array.from(byKey.values()).sort((a, b) => a.order - b.order || a.label.localeCompare(b.label, 'ar'));
+}
+
 export default function MatchesPage() {
   const [matches, setMatches] = useState<Match[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('all');
   const [selectedGroup, setSelectedGroup] = useState('all');
+  const [selectedRound, setSelectedRound] = useState('all');
 
   useEffect(() => {
-    const filter = new URLSearchParams(window.location.search).get('filter');
+    const params = new URLSearchParams(window.location.search);
+    const filter = params.get('filter');
+    const round = params.get('round');
     if (filter && validFilters.includes(filter)) setActiveTab(filter);
+    if (round) setSelectedRound(round);
 
     fetch('/api/matches', { cache: 'no-store' })
       .then((res) => (res.ok ? res.json() : []))
@@ -161,11 +226,14 @@ export default function MatchesPage() {
   const liveMatchesCount = matches.filter((m) => isLiveStatus(m, now)).length;
   const upcomingMatchesCount = matches.filter((m) => String(m.status).toUpperCase() === 'SCHEDULED' && !isFinished(m, now)).length;
   const finishedMatchesCount = matches.filter((m) => isFinished(m, now)).length;
-  const groupOptions = Array.from(new Set(matches.map(getMatchGroup).filter(Boolean))).sort((a, b) => a.localeCompare(b));
+  const groupOptions = Array.from(new Set(matches.map(getMatchGroup).filter((group) => group && group !== 'غير محددة'))).sort((a, b) => a.localeCompare(b));
+  const roundMap = buildRoundMap(matches);
+  const roundOptions = uniqueRoundOptions(roundMap);
 
   const applySummaryFilter = (tab: string) => {
     setActiveTab(tab);
     setSelectedGroup('all');
+    setSelectedRound('all');
     const url = tab === 'all' ? '/matches' : `/matches?filter=${encodeURIComponent(tab)}`;
     window.history.replaceState(null, '', url);
   };
@@ -176,6 +244,7 @@ export default function MatchesPage() {
   if (activeTab === 'tomorrow') filteredMatches = filteredMatches.filter((m) => isSameDay(m.matchDate, tomorrow));
   if (activeTab === 'animation') filteredMatches = filteredMatches.filter((m) => hasAnimation(m) && !isFinished(m, now));
   if (selectedGroup !== 'all') filteredMatches = filteredMatches.filter((m) => getMatchGroup(m) === selectedGroup);
+  if (selectedRound !== 'all') filteredMatches = filteredMatches.filter((m) => roundMap.get(m.id)?.key === selectedRound);
   filteredMatches.sort((a, b) => new Date(a.matchDate).getTime() - new Date(b.matchDate).getTime());
 
   const tabs = [
@@ -217,18 +286,33 @@ export default function MatchesPage() {
             ))}
           </div>
 
-          <label className="flex items-center gap-2 rounded-lg border border-white/10 bg-surface px-3 py-2">
-            <Filter size={16} className="text-primary" />
-            <span className="text-xs font-bold text-gray-500">المجموعة</span>
-            <select value={selectedGroup} onChange={(event) => setSelectedGroup(event.target.value)} className="bg-transparent text-sm font-bold text-white focus:outline-none">
-              <option value="all">كل المجموعات</option>
-              {groupOptions.map((group) => (
-                <option key={group} value={group}>
-                  المجموعة {group}
-                </option>
-              ))}
-            </select>
-          </label>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <label className="flex items-center gap-2 rounded-lg border border-white/10 bg-surface px-3 py-2">
+              <Filter size={16} className="text-primary" />
+              <span className="text-xs font-bold text-gray-500">الجولة</span>
+              <select value={selectedRound} onChange={(event) => setSelectedRound(event.target.value)} className="bg-transparent text-sm font-bold text-white focus:outline-none">
+                <option value="all">كل الجولات</option>
+                {roundOptions.map((round) => (
+                  <option key={round.key} value={round.key}>
+                    {round.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="flex items-center gap-2 rounded-lg border border-white/10 bg-surface px-3 py-2">
+              <Filter size={16} className="text-primary" />
+              <span className="text-xs font-bold text-gray-500">المجموعة</span>
+              <select value={selectedGroup} onChange={(event) => setSelectedGroup(event.target.value)} className="bg-transparent text-sm font-bold text-white focus:outline-none">
+                <option value="all">كل المجموعات</option>
+                {groupOptions.map((group) => (
+                  <option key={group} value={group}>
+                    المجموعة {group}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
         </div>
 
         {filteredMatches.length === 0 ? (
