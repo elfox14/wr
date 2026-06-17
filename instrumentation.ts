@@ -48,6 +48,16 @@ export async function register() {
     return target.toString();
   }
 
+  function withFallbackHeaders(response: Response, headersToAdd: Record<string, string>) {
+    const headers = new Headers(response.headers);
+    for (const [key, value] of Object.entries(headersToAdd)) headers.set(key, value);
+    return new Response(response.body, {
+      status: response.status,
+      statusText: response.statusText,
+      headers,
+    });
+  }
+
   globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     const sourceUrl = urlFromInput(input);
     if (!sourceUrl || !isPrimaryBrowserlessUrl(sourceUrl)) return originalFetch(input, init);
@@ -58,15 +68,17 @@ export async function register() {
       const response = await originalFetch(input, init);
       if (!shouldRetry(response.status)) return response;
       const fallbackResponse = await originalFetch(fallbackUrl, init);
-      fallbackResponse.headers.set('x-browserless-provider', 'fallback');
-      fallbackResponse.headers.set('x-browserless-primary-status', String(response.status));
-      return fallbackResponse;
+      return withFallbackHeaders(fallbackResponse, {
+        'x-browserless-provider': 'fallback',
+        'x-browserless-primary-status': String(response.status),
+      });
     } catch (error) {
       try {
         const fallbackResponse = await originalFetch(fallbackUrl, init);
-        fallbackResponse.headers.set('x-browserless-provider', 'fallback');
-        fallbackResponse.headers.set('x-browserless-primary-error', String((error as Error)?.message || error).slice(0, 200));
-        return fallbackResponse;
+        return withFallbackHeaders(fallbackResponse, {
+          'x-browserless-provider': 'fallback',
+          'x-browserless-primary-error': String((error as Error)?.message || error).slice(0, 200),
+        });
       } catch {
         throw error;
       }
