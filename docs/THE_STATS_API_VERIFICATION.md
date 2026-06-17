@@ -39,29 +39,53 @@ The endpoint requires `ADMIN_API_SECRET` or `CRON_SECRET` using one of:
 - `x-admin-secret: <secret>`
 - `x-cron-secret: <secret>`
 - `?key=<secret>`
+- `?adminSecret=<secret>`
 
 ## Safe dry run example
 
+The first verified TheStatsAPI football path is:
+
 ```text
-GET /api/admin/the-stats-verify?providerPath=/football/matches&date=2026-06-17&dryRun=true
+/api/football/matches
 ```
 
-The exact `providerPath` must match the path shown in the TheStatsAPI dashboard documentation. Only football paths are allowed.
+Example:
+
+```text
+GET /api/admin/the-stats-verify?providerPath=/api/football/matches&status=scheduled&per_page=5&dryRun=true
+```
+
+World Cup 2026 lookup discovered from the provider response:
+
+```text
+GET /api/admin/the-stats-verify?providerPath=/api/football/matches&competition_id=comp_6107&season_id=sn_118868&per_page=100&dryRun=true
+```
+
+The endpoint returns `providerSample` with normalized rows, including `utc_date` mapped to `matchDate`.
 
 ## What the endpoint does
 
 1. Fetches a safe football endpoint from TheStatsAPI.
 2. Loads local matches by `matchId`, `externalId`, `date`, or the near live window.
 3. Attempts to match provider rows to local matches by external ID first, then team names and kickoff date.
-4. Compares safe fields:
+4. Supports TheStatsAPI fields such as:
+   - `id`
+   - `competition_id`
+   - `season_id`
+   - `utc_date`
+   - `home_team.name`
+   - `away_team.name`
+   - `score.home`
+   - `score.away`
+5. Compares safe fields:
    - `status`
    - `homeScore`
    - `awayScore`
    - `matchDate`
    - `stage`
    - `groupPhase`
-5. Writes results to `DataVerificationLog`.
-6. Returns a comparison report.
+6. Writes results to `DataVerificationLog` only when a local/provider match is found.
+7. Returns a comparison report.
 
 ## Apply mode
 
@@ -88,6 +112,8 @@ Everything else remains reported only until a dedicated schema and review workfl
 The code blocks paths and query parameters that appear to request prohibited commercial prediction or wagering data. Do not add public UI for that kind of data.
 
 The platform should use only sports data such as fixtures, results, lineups, player stats, match events, xG, shot maps, standings, venues, and referees when available.
+
+Provider fields such as availability flags should remain internal/debug only and should not be shown in the public UI.
 
 ## Data flow
 

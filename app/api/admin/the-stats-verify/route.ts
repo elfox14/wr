@@ -11,6 +11,7 @@ import {
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
+type QueryMap = Record<string, string | number | boolean | null | undefined>;
 type ControlInput = {
   providerPath?: string;
   matchId?: string;
@@ -18,7 +19,7 @@ type ControlInput = {
   dryRun?: boolean;
   apply?: boolean;
   includeRaw?: boolean;
-  query?: Record<string, string | number | boolean | null | undefined>;
+  query?: QueryMap;
 };
 
 const CONTROL_KEYS = new Set([
@@ -35,9 +36,9 @@ const CONTROL_KEYS = new Set([
   'key',
 ]);
 
-const FINISHED_PROVIDER_STATUSES = new Set(['FINISHED', 'FT', 'FULL_TIME', 'AET', 'PEN', 'ENDED', 'FINAL']);
-const LIVE_PROVIDER_STATUSES = new Set(['LIVE', 'IN_PLAY', '1H', '2H', 'HT', 'HALFTIME', 'ET']);
-const SCHEDULED_PROVIDER_STATUSES = new Set(['SCHEDULED', 'TIMED', 'NS', 'NOT_STARTED', 'TBD']);
+const FINISHED_STATUSES = new Set(['FINISHED', 'FT', 'FULL_TIME', 'AET', 'PEN', 'ENDED', 'FINAL']);
+const LIVE_STATUSES = new Set(['LIVE', 'IN_PLAY', '1H', '2H', 'HT', 'HALFTIME', 'ET']);
+const SCHEDULED_STATUSES = new Set(['SCHEDULED', 'TIMED', 'NS', 'NOT_STARTED', 'TBD']);
 const SAFE_APPLY_FIELDS = new Set(['status', 'homeScore', 'awayScore']);
 
 function configuredSecrets() {
@@ -48,7 +49,7 @@ function configuredSecrets() {
 
 function getAuth(req: Request, searchParams: URLSearchParams) {
   const validSecrets = configuredSecrets();
-  if (validSecrets.length === 0) return { valid: false, method: 'missing_server_secret' };
+  if (!validSecrets.length) return { valid: false, method: 'missing_server_secret' };
 
   const auth = req.headers.get('authorization') || '';
   const bearer = auth.startsWith('Bearer ') ? auth.slice(7).trim() : '';
@@ -101,15 +102,15 @@ function normalizeText(value?: string | null) {
 
 function normalizeProviderStatus(value?: string | null) {
   const status = String(value || '').trim().toUpperCase();
-  if (FINISHED_PROVIDER_STATUSES.has(status)) return 'FINISHED';
-  if (LIVE_PROVIDER_STATUSES.has(status)) return status === 'HALFTIME' ? 'HT' : 'IN_PLAY';
-  if (SCHEDULED_PROVIDER_STATUSES.has(status)) return 'SCHEDULED';
+  if (FINISHED_STATUSES.has(status)) return 'FINISHED';
+  if (LIVE_STATUSES.has(status)) return status === 'HALFTIME' ? 'HT' : 'IN_PLAY';
+  if (SCHEDULED_STATUSES.has(status)) return 'SCHEDULED';
   return status || null;
 }
 
 function extractArray(payload: any): any[] {
   if (Array.isArray(payload)) return payload;
-  for (const key of ['matches', 'fixtures', 'events', 'data', 'response', 'results', 'items']) {
+  for (const key of ['matches', 'fixtures', 'data', 'response', 'results', 'items']) {
     if (Array.isArray(payload?.[key])) return payload[key];
   }
   if (Array.isArray(payload?.data?.matches)) return payload.data.matches;
@@ -144,9 +145,23 @@ function normalizeProviderMatch(row: any) {
     status: normalizeProviderStatus(asString(statusObject?.short, statusObject?.long, row?.status, row?.matchStatus, row?.match_status)),
     homeScore: asNumber(fullTime?.home, fullTime?.homeTeam, score?.home, score?.homeScore, row?.homeScore, row?.home_score, row?.home_goals),
     awayScore: asNumber(fullTime?.away, fullTime?.awayTeam, score?.away, score?.awayScore, row?.awayScore, row?.away_score, row?.away_goals),
-    matchDate: asString(fixture?.date, fixture?.matchDate, fixture?.match_date, row?.date, row?.matchDate, row?.match_date, row?.kickoff, row?.startTime, row?.start_time),
-    stage: asString(row?.stage, row?.round, row?.league?.round, row?.competition_round),
-    groupPhase: asString(row?.group, row?.groupPhase, row?.group_phase, row?.league?.round),
+    matchDate: asString(
+      fixture?.utc_date,
+      fixture?.date,
+      fixture?.matchDate,
+      fixture?.match_date,
+      row?.utc_date,
+      row?.date,
+      row?.matchDate,
+      row?.match_date,
+      row?.kickoff,
+      row?.startTime,
+      row?.start_time,
+    ),
+    competitionId: asString(row?.competition_id, row?.competitionId, row?.competition?.id, row?.league?.id),
+    seasonId: asString(row?.season_id, row?.seasonId, row?.season?.id),
+    stage: asString(row?.stage_name, row?.stage, row?.round, row?.league?.round, row?.competition_round),
+    groupPhase: asString(row?.group_label, row?.group, row?.groupPhase, row?.group_phase, row?.league?.round),
     raw: row,
   };
 }
@@ -194,7 +209,7 @@ function diffField(field: string, localValue: any, providerValue: any) {
 }
 
 function buildDiffs(localMatch: any, providerMatch: any) {
-  const diffs = [
+  return [
     diffField('status', localMatch.status, providerMatch.status),
     diffField('homeScore', localMatch.homeScore, providerMatch.homeScore),
     diffField('awayScore', localMatch.awayScore, providerMatch.awayScore),
@@ -202,8 +217,6 @@ function buildDiffs(localMatch: any, providerMatch: any) {
     diffField('stage', localMatch.stage, providerMatch.stage),
     diffField('groupPhase', localMatch.groupPhase, providerMatch.groupPhase),
   ].filter(Boolean) as any[];
-
-  return diffs;
 }
 
 async function ensureVerificationLogTable() {
@@ -281,7 +294,7 @@ async function safeApply(localMatch: any, diffs: any[]) {
 }
 
 function readQueryParams(searchParams: URLSearchParams, body: ControlInput = {}) {
-  const query: Record<string, string | number | boolean | null | undefined> = { ...(body.query || {}) };
+  const query: QueryMap = { ...(body.query || {}) };
   for (const [key, value] of searchParams.entries()) {
     if (!CONTROL_KEYS.has(key)) query[key] = value;
   }
@@ -345,17 +358,14 @@ async function handle(req: Request) {
   if (!input.providerPath) {
     return NextResponse.json({
       ok: false,
-      error: 'providerPath is required. Example: /football/matches or /v1/football/matches depending on your TheStatsAPI dashboard docs.',
+      error: 'providerPath is required. Example: /api/football/matches',
       config,
-      safety: {
-        defaultMode: 'verify_only',
-        blocked: ['odds', 'betting', 'bookmakers', 'Bet365', 'Pinnacle', 'Betfair', 'Kambi', 'handicap'],
-      },
+      safety: { defaultMode: 'verify_only', databaseIsSourceOfTruth: true },
     }, { status: 400, headers: { 'Cache-Control': 'no-store' } });
   }
 
   const providerQuery = readQueryParams(url.searchParams, body);
-  if (input.date && !providerQuery.date) providerQuery.date = input.date;
+  if (input.date && !providerQuery.date && !providerQuery.from && !providerQuery.start_date) providerQuery.date = input.date;
 
   const hardVerifyOnly = isTheStatsApiVerifyOnly();
   const canApply = input.apply && !input.dryRun && !hardVerifyOnly;
@@ -367,7 +377,7 @@ async function handle(req: Request) {
     ]);
 
     const providerRows = extractArray(payload).map(normalizeProviderMatch);
-    const comparisons = [];
+    const comparisons: any[] = [];
     const logs: any[] = [];
     const applied: any[] = [];
 
@@ -384,7 +394,7 @@ async function handle(req: Request) {
 
       const diffs = buildDiffs(localMatch, providerMatch);
       const actionable = diffs.filter((diff) => diff.status !== 'matched');
-      const applyResult = canApply ? await safeApply(localMatch, actionable) : { patch: {}, safeApplied: [] };
+      const applyResult = canApply ? await safeApply(localMatch, actionable) : { patch: {}, safeApplied: [] as string[] };
 
       for (const diff of diffs) {
         const action = applyResult.safeApplied.includes(diff.field)
@@ -403,6 +413,9 @@ async function handle(req: Request) {
         providerMatchId: providerMatch.providerId,
         localTeams: `${localMatch.homeTeam?.name || 'Home'} vs ${localMatch.awayTeam?.name || 'Away'}`,
         providerTeams: `${providerMatch.homeName || 'Home'} vs ${providerMatch.awayName || 'Away'}`,
+        providerMatchDate: providerMatch.matchDate,
+        providerCompetitionId: providerMatch.competitionId,
+        providerSeasonId: providerMatch.seasonId,
         diffs,
         actionableCount: actionable.length,
         apply: canApply ? applyResult : { skipped: true, reason: hardVerifyOnly ? 'THE_STATS_API_VERIFY_ONLY=true' : input.dryRun ? 'dryRun=true' : 'apply=false' },
@@ -423,6 +436,14 @@ async function handle(req: Request) {
       comparisons,
       logsWritten: logs.length,
       applied,
+      providerSample: providerRows.slice(0, 5).map((row) => ({
+        providerId: row.providerId,
+        teams: `${row.homeName || 'Home'} vs ${row.awayName || 'Away'}`,
+        matchDate: row.matchDate,
+        status: row.status,
+        competitionId: row.competitionId,
+        seasonId: row.seasonId,
+      })),
       rawSample: input.includeRaw ? extractArray(payload).slice(0, 3) : undefined,
       safety: {
         databaseIsSourceOfTruth: true,
@@ -438,10 +459,7 @@ async function handle(req: Request) {
       providerPath: input.providerPath,
       config,
       error: safeTheStatsApiError(error),
-      safety: {
-        databaseIsSourceOfTruth: true,
-        prohibitedDataBlocked: true,
-      },
+      safety: { databaseIsSourceOfTruth: true, prohibitedDataBlocked: true },
     }, { status: Number(error?.status) && Number(error.status) < 500 ? Number(error.status) : 500, headers: { 'Cache-Control': 'no-store' } });
   }
 }
