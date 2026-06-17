@@ -170,6 +170,7 @@ function decorateMatch(match: any, now: Date, providerState?: any, snapshotState
   const providerHasState = Boolean(providerStatus);
   const providerHasMinute = providerState?.minute != null;
   const snapshotMinute = nullableNumber(snapshotState?.minute);
+  const hasSnapshotMinute = snapshotMinute !== null && !isFinalSnapshotStale(snapshotState, now);
   const freshSnapshot = isFreshLiveSnapshot(snapshotState, now);
   const staleByTime = isStaleByTime(match, localMinute);
   const staleFinalSnapshot = !providerHasState && isFinalSnapshotStale(snapshotState, now);
@@ -184,7 +185,7 @@ function decorateMatch(match: any, now: Date, providerState?: any, snapshotState
   const isLikelyLiveByElapsedTime = !isFinished && !isHalfTime && !providerHasState && isScheduledStatus(dbStatus) && localMinute >= SCHEDULED_LIVE_FALLBACK_AFTER_MINUTES && localMinute < maxLiveMinutes(match);
   const isLiveNow = !isFinished && !isHalfTime && (isDbLive || isProviderLive || isLikelyLiveByFreshSnapshot || isLikelyLiveByElapsedTime);
   const localSafeMinute = isLiveNow && localMinute >= 1 && localMinute < maxLiveMinutes(match) ? Math.max(1, Math.min(150, localMinute)) : null;
-  const displayMinute = isHalfTime ? null : (providerHasMinute && !staleByTime ? providerState.minute : (freshSnapshot ? snapshotMinute : localSafeMinute));
+  const displayMinute = isHalfTime ? null : (providerHasMinute && !staleByTime ? providerState.minute : (hasSnapshotMinute ? snapshotMinute : null));
   const fallbackLabel = isLiveNow && localSafeMinute && localSafeMinute > 65 ? 'الشوط الثاني جارٍ' : null;
   const providerHasScore = hasAnyNumber(providerState?.homeScore, providerState?.awayScore);
   const snapshotHasScore = hasAnyNumber(snapshotState?.homeScore, snapshotState?.awayScore);
