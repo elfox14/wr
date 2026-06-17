@@ -1,72 +1,80 @@
-import { PageHeader } from '@/components/ui/PageHeader';
-import { ShieldAlert } from 'lucide-react';
-import { Metadata } from 'next';
+import type { Metadata } from 'next';
+import Link from 'next/link';
 
 export const metadata: Metadata = {
-  title: 'سياسة الخصوصية',
-  description: 'سياسة الخصوصية لمنصة MC PRIME Exchange',
+  title: 'سياسة الخصوصية | بورصة المونديال',
+  description: 'سياسة الخصوصية وملفات تعريف الارتباط وإعلانات Google AdSense في موقع بورصة المونديال.',
+  alternates: { canonical: '/privacy' },
 };
 
 export default function PrivacyPage() {
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8">
-      <PageHeader 
-        title="سياسة الخصوصية" 
-        description="تعرف على كيفية جمعنا واستخدامنا لبياناتك"
-        icon={<ShieldAlert size={32} />}
-        textColor="text-accent"
-        glowColor="bg-accent/10"
-      />
-      
-      <div className="prose prose-invert prose-lg max-w-none">
-        <div className="bg-surface p-8 rounded-2xl border border-white/5 space-y-8 text-gray-300 leading-relaxed">
-          
-          <section>
-            <h2 className="text-2xl font-bold text-white mb-4">1. مقدمة</h2>
-            <p>
-              في MC PRIME Exchange، نولي أهمية قصوى لخصوصية زوارنا ومستخدمينا. توضح هذه السياسة ماهية المعلومات التي نجمعها، وكيفية استخدامها، وحماية بياناتك الشخصية عند استخدامك لمنصتنا.
-            </p>
-          </section>
+    <main className="min-h-screen bg-[#050505] px-4 py-10 text-white" dir="rtl">
+      <article className="mx-auto max-w-4xl space-y-8 rounded-3xl border border-white/10 bg-white/[0.03] p-6 leading-8 md:p-10">
+        <header className="space-y-3 border-b border-white/10 pb-6">
+          <p className="text-sm font-black text-[#0FF0FC]">آخر تحديث: 17 يونيو 2026</p>
+          <h1 className="text-3xl font-black md:text-5xl">سياسة الخصوصية</h1>
+          <p className="text-sm font-bold text-gray-400">
+            توضح هذه الصفحة كيفية تعامل موقع بورصة المونديال مع البيانات وملفات تعريف الارتباط والإعلانات، خصوصًا عند استخدام خدمات Google AdSense أو أدوات تحليل الزيارات.
+          </p>
+        </header>
 
-          <section>
-            <h2 className="text-2xl font-bold text-white mb-4">2. المعلومات التي نجمعها</h2>
-            <p>نحن نقوم بجمع نوعين من المعلومات:</p>
-            <ul className="list-disc list-inside mt-2 space-y-2 text-gray-400">
-              <li><strong>معلومات شخصية:</strong> مثل الاسم، البريد الإلكتروني، ومعلومات الحساب التي تقدمها عند التسجيل.</li>
-              <li><strong>معلومات غير شخصية:</strong> بيانات التصفح، نوع الجهاز، عنوان الـ IP، ومعلومات الاستخدام التي يتم جمعها تلقائياً.</li>
-            </ul>
-          </section>
+        <section className="space-y-4">
+          <h2 className="text-2xl font-black text-[#FFD700]">1. المعلومات التي قد نجمعها</h2>
+          <p className="text-gray-300">
+            قد يجمع الموقع معلومات غير شخصية مثل نوع الجهاز، المتصفح، الصفحات التي تمت زيارتها، مدة الجلسة، عنوان IP التقريبي، ومصدر الزيارة. إذا استخدمت نماذج التواصل أو سجلت حسابًا، فقد تقدم لنا معلومات مثل الاسم أو البريد الإلكتروني أو محتوى الرسالة.
+          </p>
+        </section>
 
-          <section>
-            <h2 className="text-2xl font-bold text-white mb-4">3. استخدام ملفات تعريف الارتباط (Cookies)</h2>
-            <p>
-              نستخدم ملفات تعريف الارتباط لتحسين تجربة المستخدم، تذكر تفضيلاتك، وتوفير محتوى وإعلانات مخصصة (بما في ذلك إعلانات Google AdSense). يمكنك التحكم في إعدادات الكوكيز من خلال متصفحك.
-            </p>
-          </section>
+        <section className="space-y-4">
+          <h2 className="text-2xl font-black text-[#FFD700]">2. ملفات تعريف الارتباط Cookies</h2>
+          <p className="text-gray-300">
+            يستخدم الموقع ملفات تعريف الارتباط لتحسين تجربة التصفح، حفظ بعض التفضيلات، قياس الأداء، وعرض الإعلانات. يمكنك تعطيل ملفات تعريف الارتباط من إعدادات المتصفح، لكن بعض وظائف الموقع قد لا تعمل بالشكل الأمثل.
+          </p>
+        </section>
 
-          <section>
-            <h2 className="text-2xl font-bold text-white mb-4">4. إعلانات جوجل (Google AdSense)</h2>
-            <p>
-              نستخدم خدمة Google AdSense لعرض الإعلانات. قد تستخدم Google ملفات تعريف الارتباط (مثل DART cookie) لعرض إعلانات تستند إلى زياراتك لموقعنا والمواقع الأخرى على الإنترنت. يمكنك التعطيل من خلال زيارة سياسة خصوصية شبكة إعلانات Google.
-            </p>
-          </section>
+        <section className="space-y-4">
+          <h2 className="text-2xl font-black text-[#FFD700]">3. Google AdSense والإعلانات المخصصة</h2>
+          <p className="text-gray-300">
+            قد يستخدم Google أو شركاؤه ملفات تعريف الارتباط لعرض إعلانات بناءً على زيارات المستخدم السابقة لهذا الموقع أو لمواقع أخرى. يمكن للمستخدمين تعطيل الإعلانات المخصصة من خلال إعدادات إعلانات Google. كما قد تستخدم شبكات إعلانية خارجية ملفات تعريف ارتباط خاصة بها وفق سياساتها.
+          </p>
+          <p className="text-gray-300">
+            نلتزم بإبلاغ الزوار بوجود ملفات تعريف ارتباط مرتبطة بالإعلانات والتحليلات، ونحرص على عدم جمع أو مشاركة معلومات شخصية حساسة لأغراض إعلانية دون أساس قانوني أو موافقة مناسبة عند الحاجة.
+          </p>
+        </section>
 
-          <section>
-            <h2 className="text-2xl font-bold text-white mb-4">5. حماية البيانات</h2>
-            <p>
-              نحن نتخذ كافة الإجراءات الأمنية والتشفير اللازم لحماية بياناتك من الوصول غير المصرح به، أو التعديل، أو الإفصاح، أو الإتلاف.
-            </p>
-          </section>
+        <section className="space-y-4">
+          <h2 className="text-2xl font-black text-[#FFD700]">4. استخدام البيانات</h2>
+          <ul className="list-disc space-y-2 pr-6 text-gray-300">
+            <li>تشغيل الموقع وتحسين تجربة الاستخدام.</li>
+            <li>قياس أداء المحتوى ومعرفة الصفحات الأكثر قراءة.</li>
+            <li>عرض إعلانات مناسبة وغير مضللة.</li>
+            <li>الرد على رسائل المستخدمين وطلبات التصحيح.</li>
+            <li>حماية الموقع من إساءة الاستخدام أو النشاط غير الطبيعي.</li>
+          </ul>
+        </section>
 
-          <section>
-            <h2 className="text-2xl font-bold text-white mb-4">6. اتصل بنا</h2>
-            <p>
-              إذا كان لديك أي أسئلة حول سياسة الخصوصية، يرجى التواصل معنا عبر صفحة <a href="/contact" className="text-primary hover:underline">اتصل بنا</a>.
-            </p>
-          </section>
+        <section className="space-y-4">
+          <h2 className="text-2xl font-black text-[#FFD700]">5. الروابط الخارجية</h2>
+          <p className="text-gray-300">
+            قد تحتوي المقالات على روابط لمصادر خارجية مثل مواقع رياضية أو وكالات أخبار أو مواقع رسمية. نحن غير مسؤولين عن ممارسات الخصوصية في تلك المواقع، وينبغي مراجعة سياساتها عند الانتقال إليها.
+          </p>
+        </section>
 
-        </div>
-      </div>
-    </div>
+        <section className="space-y-4">
+          <h2 className="text-2xl font-black text-[#FFD700]">6. حقوق المستخدم</h2>
+          <p className="text-gray-300">
+            يمكنك التواصل معنا لطلب تصحيح بياناتك، حذف رسالة أرسلتها، أو الاستفسار عن طريقة استخدام معلوماتك. سنحاول الرد خلال مدة معقولة وفق الإمكانات المتاحة وطبيعة الطلب.
+          </p>
+        </section>
+
+        <section className="space-y-4">
+          <h2 className="text-2xl font-black text-[#FFD700]">7. اتصل بنا</h2>
+          <p className="text-gray-300">
+            لأي استفسار متعلق بالخصوصية أو الإعلانات أو تصحيح المحتوى، يرجى زيارة صفحة <Link href="/contact" className="text-[#0FF0FC] hover:underline">اتصل بنا</Link>.
+          </p>
+        </section>
+      </article>
+    </main>
   );
 }
