@@ -6,6 +6,7 @@ import prisma from '@/lib/prisma';
 import AdSenseBanner from '@/components/ads/AdSenseBanner';
 import ShareButtons from '@/components/news/ShareButtons';
 import { ensureWorldCup2026OpeningNews, getPressNewsMeta } from '@/lib/press-news/world-cup-2026-opening-news';
+import { buildExpandedArticleParagraphs } from '@/lib/press-news/article-expansion';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -79,7 +80,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://worldcup.mcprim.com';
   const articleMeta = getPressNewsMeta(newsItem.tags, newsItem.title);
-  const shortDescription = newsItem.body ? newsItem.body.slice(0, 160).trim() + '...' : '';
+  const expandedParagraphs = buildExpandedArticleParagraphs(newsItem);
+  const shortDescription = expandedParagraphs.join(' ').slice(0, 158).trim() + '...';
   const imageUrl = resolveImageUrl(baseUrl, articleMeta.image);
 
   return {
@@ -116,11 +118,9 @@ export default async function NewsDetailPage({ params }: Props) {
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://worldcup.mcprim.com';
   const pageUrl = `${baseUrl}/news/${newsItem.id}`;
   const articleMeta = getPressNewsMeta(newsItem.tags, newsItem.title);
-  const words = newsItem.body ? newsItem.body.split(/\s+/).length : 0;
+  const paragraphs = buildExpandedArticleParagraphs(newsItem);
+  const words = paragraphs.join(' ').split(/\s+/).filter(Boolean).length;
   const readingTime = Math.max(1, Math.ceil(words / 180));
-  const paragraphs = newsItem.body
-    ? newsItem.body.split(/\r?\n/).filter((p: string) => p.trim().length > 0)
-    : [];
 
   let relatedArticles: any[] = [];
   try {
@@ -134,22 +134,46 @@ export default async function NewsDetailPage({ params }: Props) {
   }
 
   const imageUrl = resolveImageUrl(baseUrl, articleMeta.image);
-  const jsonLd = {
-    '@context': 'https://schema.org',
-    '@type': 'NewsArticle',
-    headline: newsItem.title,
-    description: newsItem.body ? newsItem.body.slice(0, 160).trim() + '...' : '',
-    datePublished: newsItem.publishedAt,
-    dateModified: newsItem.updatedAt || newsItem.publishedAt,
-    mainEntityOfPage: pageUrl,
-    image: [imageUrl],
-    author: { '@type': 'Organization', name: 'بورصة المونديال', url: baseUrl },
-    publisher: {
-      '@type': 'Organization',
-      name: 'MC PRIME Sports Exchange',
-      logo: { '@type': 'ImageObject', url: `${baseUrl}/brand/borsa-mondial-sport-logo-icon.svg` },
+  const jsonLd = [
+    {
+      '@context': 'https://schema.org',
+      '@type': 'NewsArticle',
+      headline: newsItem.title,
+      description: paragraphs.join(' ').slice(0, 160).trim() + '...',
+      datePublished: newsItem.publishedAt,
+      dateModified: newsItem.updatedAt || newsItem.publishedAt,
+      mainEntityOfPage: pageUrl,
+      image: [imageUrl],
+      articleSection: newsItem.category,
+      keywords: articleMeta.keywords.join(', '),
+      author: { '@type': 'Organization', name: 'بورصة المونديال', url: baseUrl },
+      publisher: {
+        '@type': 'Organization',
+        name: 'MC PRIME Sports Exchange',
+        logo: { '@type': 'ImageObject', url: `${baseUrl}/brand/borsa-mondial-sport-logo-icon.svg` },
+      },
     },
-  };
+    {
+      '@context': 'https://schema.org',
+      '@type': 'SportsEvent',
+      name: newsItem.title,
+      sport: 'Football',
+      eventAttendanceMode: 'https://schema.org/OfflineEventAttendanceMode',
+      eventStatus: 'https://schema.org/EventCompleted',
+      organizer: { '@type': 'Organization', name: 'FIFA World Cup 2026' },
+      image: [imageUrl],
+      description: paragraphs[0] || newsItem.title,
+    },
+    {
+      '@context': 'https://schema.org',
+      '@type': 'BreadcrumbList',
+      itemListElement: [
+        { '@type': 'ListItem', position: 1, name: 'الرئيسية', item: baseUrl },
+        { '@type': 'ListItem', position: 2, name: 'الأخبار والتحليلات', item: `${baseUrl}/news` },
+        { '@type': 'ListItem', position: 3, name: newsItem.title, item: pageUrl },
+      ],
+    },
+  ];
 
   return (
     <main className="min-h-screen bg-[#050505] text-white px-4 py-8 sm:px-6 lg:px-8" dir="rtl">
@@ -218,6 +242,16 @@ export default async function NewsDetailPage({ params }: Props) {
                   {p}
                 </p>
               ))}
+
+              <div className="rounded-2xl border border-[#0FF0FC]/15 bg-[#0FF0FC]/5 p-4 text-sm font-bold leading-7 text-gray-300">
+                اقرأ أيضًا: <Link href="/news" className="text-[#0FF0FC] hover:underline">آخر أخبار كأس العالم</Link>
+                <span className="px-2 text-gray-600">|</span>
+                <Link href="/matches" className="text-[#0FF0FC] hover:underline">جدول المباريات</Link>
+                <span className="px-2 text-gray-600">|</span>
+                <Link href="/teams" className="text-[#0FF0FC] hover:underline">صفحات المنتخبات</Link>
+                <span className="px-2 text-gray-600">|</span>
+                <Link href="/players" className="text-[#0FF0FC] hover:underline">اللاعبون</Link>
+              </div>
 
               {articleMeta.keywords.length > 0 && (
                 <div className="flex flex-wrap gap-2 border-t border-white/5 pt-4">
