@@ -18,6 +18,7 @@ export type {
 
 export { default as TeamName } from './components/TeamName';
 export { MiniStat, StatRow } from './components/StatCards';
+export { default as MatchHeaderPanel } from './components/MatchHeaderPanel';
 export { default as LiveStatsPanel } from './components/LiveStatsPanel';
 export { default as IntelligenceTile } from './components/IntelligenceTile';
 export { default as MomentumCard } from './components/MomentumCard';
