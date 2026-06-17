@@ -145,7 +145,7 @@ function aggregateFbrefPenalties(teams: any[]): PenaltyAggregate {
     missed,
     unknown,
     teamsWithPenaltyFields,
-    source: teamsWithPenaltyFields > 0 ? 'FBref penalty fields fallback' : 'not_available_in_current_fbref_snapshot',
+    source: teamsWithPenaltyFields > 0 ? 'FBref Standard/Shooting PK and PKatt fields' : 'not_available_in_current_fbref_snapshot',
   };
 }
 
