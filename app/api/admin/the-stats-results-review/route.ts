@@ -60,6 +60,12 @@ function asNumber(...values: any[]) {
   return Number.isFinite(number) ? number : null;
 }
 
+function clampInt(value: string | null, fallback: number, min: number, max: number) {
+  const parsed = Number(value || fallback);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.max(min, Math.min(max, Math.floor(parsed)));
+}
+
 function normalizeText(value?: string | null) {
   return String(value || '')
     .toLowerCase()
@@ -160,12 +166,13 @@ export async function GET(req: Request) {
     return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401, headers: { 'Cache-Control': 'no-store' } });
   }
 
-  const daysBack = Math.max(1, Math.min(Number(url.searchParams.get('daysBack') || 3), 30));
+  const daysBack = clampInt(url.searchParams.get('daysBack'), 3, 1, 30);
+  const perPage = clampInt(url.searchParams.get('per_page'), 100, 1, 100);
   const providerPath = url.searchParams.get('providerPath') || '/api/football/matches';
   const providerQuery = {
     competition_id: url.searchParams.get('competition_id') || process.env.THE_STATS_API_WORLD_CUP_COMPETITION_ID || 'comp_6107',
     season_id: url.searchParams.get('season_id') || process.env.THE_STATS_API_WORLD_CUP_SEASON_ID || 'sn_118868',
-    per_page: Number(url.searchParams.get('per_page') || 100),
+    per_page: perPage,
   };
 
   try {
@@ -204,6 +211,7 @@ export async function GET(req: Request) {
         reviewOnly: true,
         previousMatchesOnly: true,
         suggestionsFinishedOnly: true,
+        providerPageSize: perPage,
         suggestedFields: ['externalId', 'status', 'homeScore', 'awayScore'],
       },
     }, { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } });
