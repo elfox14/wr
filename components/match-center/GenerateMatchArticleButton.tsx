@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
-import { CheckCircle2, ExternalLink, Eye, FileText, Loader2, Sparkles } from 'lucide-react';
+import { CheckCircle2, ExternalLink, Eye, FileText, Loader2, Save, Sparkles } from 'lucide-react';
 
 type ExistingArticle = {
   title: string;
@@ -57,21 +57,25 @@ function qualityNotes(item: PreviewItem | null) {
 
 export default function GenerateMatchArticleButton({ matchId, existingArticle = null }: Props) {
   const [previewLoading, setPreviewLoading] = useState(false);
+  const [draftLoading, setDraftLoading] = useState(false);
   const [publishLoading, setPublishLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [newsUrl, setNewsUrl] = useState<string | null>(existingArticle?.url || null);
   const [categoryUrl, setCategoryUrl] = useState<string | null>(null);
   const [previewItem, setPreviewItem] = useState<PreviewItem | null>(null);
+  const [currentStatus, setCurrentStatus] = useState<string | null>(existingArticle?.status || null);
 
   const notes = useMemo(() => qualityNotes(previewItem), [previewItem]);
   const previewWords = previewItem ? wordCount(previewItem.body) : 0;
   const currentArticleUrl = newsUrl || existingArticle?.url || null;
-  const hasExistingArticle = Boolean(existingArticle?.url);
+  const hasExistingArticle = Boolean(currentArticleUrl);
   const articleCount = Math.max(0, Number(existingArticle?.count || 0));
   const lastUpdated = formatArticleDate(existingArticle?.updatedAt || null);
+  const busy = previewLoading || draftLoading || publishLoading;
 
-  async function requestArticle(mode: 'preview' | 'upsert') {
+  async function requestArticle(mode: 'preview' | 'upsert', status: 'draft' | 'published' = 'published') {
     if (mode === 'preview') setPreviewLoading(true);
+    else if (status === 'draft') setDraftLoading(true);
     else setPublishLoading(true);
     setMessage(null);
     if (mode === 'preview') {
@@ -82,24 +86,28 @@ export default function GenerateMatchArticleButton({ matchId, existingArticle = 
       const response = await fetch('/api/admin/match-article', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ matchId, status: 'published', mode }),
+        body: JSON.stringify({ matchId, status, mode }),
       });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok || !payload.ok) throw new Error(payload.error || 'تعذر إنشاء المقال من بيانات المباراة.');
 
       if (mode === 'preview') {
         setPreviewItem(payload.item || null);
-        setMessage('تم تجهيز معاينة المقال. راجع النص والملاحظات، ثم اضغط نشر/تحديث.');
+        setMessage('تم تجهيز معاينة المقال. راجع النص والملاحظات، ثم احفظه كمسودة أو انشره.');
       } else {
         setNewsUrl(payload.url || null);
         setCategoryUrl(payload.categoryUrl || null);
         setPreviewItem(payload.item || previewItem);
-        setMessage('تم نشر/تحديث المقال بنجاح داخل تصنيف تحليل صفحة المباراة.');
+        setCurrentStatus(status);
+        setMessage(status === 'draft'
+          ? 'تم حفظ المقال كمسودة. سيظهر للأدمن فقط ولن يظهر في صفحة الأخبار العامة.'
+          : 'تم نشر/تحديث المقال بنجاح داخل تصنيف تحليل صفحة المباراة.');
       }
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'تعذر إنشاء المقال.');
     } finally {
       if (mode === 'preview') setPreviewLoading(false);
+      else if (status === 'draft') setDraftLoading(false);
       else setPublishLoading(false);
     }
   }
@@ -112,7 +120,7 @@ export default function GenerateMatchArticleButton({ matchId, existingArticle = 
             <Sparkles size={16} /> أداة إدارية مؤقتة
           </div>
           <p className="mt-1 text-xs font-bold leading-6 text-gray-400">
-            أنشئ معاينة لمقال حصري من نتيجة المباراة، الإحصائيات، والأحداث، ثم انشره بعد المراجعة في تصنيف تحليل صفحة المباراة.
+            أنشئ معاينة لمقال حصري من نتيجة المباراة، الإحصائيات، والأحداث، ثم احفظه كمسودة أو انشره بعد المراجعة.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -127,7 +135,7 @@ export default function GenerateMatchArticleButton({ matchId, existingArticle = 
           <button
             type="button"
             onClick={() => requestArticle('preview')}
-            disabled={previewLoading || publishLoading}
+            disabled={busy}
             className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[#0FF0FC]/25 bg-[#0FF0FC]/10 px-4 text-sm font-black text-[#EAFBFF] transition hover:bg-[#0FF0FC] hover:text-black disabled:cursor-not-allowed disabled:opacity-60"
           >
             {previewLoading ? <Loader2 size={16} className="animate-spin" /> : <Eye size={16} />}
@@ -135,12 +143,21 @@ export default function GenerateMatchArticleButton({ matchId, existingArticle = 
           </button>
           <button
             type="button"
-            onClick={() => requestArticle('upsert')}
-            disabled={previewLoading || publishLoading || !previewItem}
+            onClick={() => requestArticle('upsert', 'draft')}
+            disabled={busy || !previewItem}
+            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[#FFD700]/25 bg-[#FFD700]/10 px-4 text-sm font-black text-[#FFD700] transition hover:bg-[#FFD700] hover:text-black disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {draftLoading ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+            {draftLoading ? 'جارٍ حفظ المسودة...' : 'حفظ كمسودة'}
+          </button>
+          <button
+            type="button"
+            onClick={() => requestArticle('upsert', 'published')}
+            disabled={busy || !previewItem}
             className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#FFD700] px-4 text-sm font-black text-black transition hover:bg-[#0FF0FC] disabled:cursor-not-allowed disabled:opacity-60"
           >
             {publishLoading ? <Loader2 size={16} className="animate-spin" /> : <FileText size={16} />}
-            {publishLoading ? 'جارٍ النشر...' : hasExistingArticle ? 'تحديث المقال' : 'نشر المقال'}
+            {publishLoading ? 'جارٍ النشر...' : hasExistingArticle ? 'نشر/تحديث' : 'نشر المقال'}
           </button>
         </div>
       </div>
@@ -149,17 +166,19 @@ export default function GenerateMatchArticleButton({ matchId, existingArticle = 
         <div className="mt-3 grid gap-3 rounded-xl border border-[#0FF0FC]/15 bg-[#0FF0FC]/5 p-3 text-xs font-bold leading-6 text-gray-300 md:grid-cols-[1fr_auto] md:items-center">
           <div>
             <div>
-              يوجد مقال مرتبط بهذه المباراة بالفعل: <Link href={existingArticle.url} className="text-[#0FF0FC] hover:underline">{existingArticle.title}</Link>
+              يوجد مقال مرتبط بهذه المباراة بالفعل: {existingArticle.url ? <Link href={existingArticle.url} className="text-[#0FF0FC] hover:underline">{existingArticle.title || 'فتح المقال'}</Link> : <span>{existingArticle.title || 'بدون عنوان'}</span>}
             </div>
             <div className="mt-1 flex flex-wrap gap-2 text-[11px] text-gray-500">
-              {existingArticle.status && <span>الحالة: {existingArticle.status}</span>}
+              {(currentStatus || existingArticle.status) && <span>الحالة: {currentStatus || existingArticle.status}</span>}
               {articleCount > 0 && <span>عدد المقالات المرتبطة: {articleCount}</span>}
               {lastUpdated && <span>آخر تحديث: {lastUpdated}</span>}
             </div>
           </div>
-          <Link href={existingArticle.url} className="inline-flex items-center justify-center gap-1 rounded-lg border border-[#0FF0FC]/20 bg-black/20 px-3 py-2 text-[#0FF0FC] hover:bg-[#0FF0FC] hover:text-black">
-            فتح المقال <ExternalLink size={12} />
-          </Link>
+          {existingArticle.url && (
+            <Link href={existingArticle.url} className="inline-flex items-center justify-center gap-1 rounded-lg border border-[#0FF0FC]/20 bg-black/20 px-3 py-2 text-[#0FF0FC] hover:bg-[#0FF0FC] hover:text-black">
+              فتح المقال <ExternalLink size={12} />
+            </Link>
+          )}
         </div>
       )}
 
@@ -178,7 +197,7 @@ export default function GenerateMatchArticleButton({ matchId, existingArticle = 
           <article className="rounded-2xl border border-white/10 bg-black/30 p-4">
             <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
               <span className="rounded-full border border-[#FFD700]/20 bg-[#FFD700]/10 px-3 py-1 text-[11px] font-black text-[#FFD700]">
-                معاينة قبل النشر
+                معاينة قبل الحفظ أو النشر
               </span>
               <span className="text-[11px] font-bold text-gray-500">{previewWords} كلمة تقريبًا</span>
             </div>
