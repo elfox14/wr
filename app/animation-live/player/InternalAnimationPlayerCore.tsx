@@ -6,6 +6,7 @@ import { sortEventsByMinute } from './eventUtils';
 import { calculatePressureModel } from './livePressureUtils';
 import { calculateMomentumSegments, strongestMomentumSegment } from './momentumUtils';
 import { dataQuality, matchStoryLines, n, resolvedSnapshot } from './matchAnalysisUtils';
+import { isFinishedStatus } from './statusUtils';
 import MatchHeaderPanel from './components/MatchHeaderPanel';
 import LivePitchTimelinePanel from './components/LivePitchTimelinePanel';
 import LiveStatsPanel from './components/LiveStatsPanel';
@@ -98,7 +99,7 @@ export default function InternalAnimationPlayerCore({ matchId = '', dbMatchId = 
   const events = useMemo(() => eventsData?.events || [], [eventsData]);
   const homeTeam = match?.homeTeam || null;
   const awayTeam = match?.awayTeam || null;
-  const currentMinute = n(snapshot, 'minute') ?? n(snapshot, 'elapsed') ?? latestEvent(events)?.minute ?? null;
+  const currentMinute = n(snapshot, 'minute') ?? (isFinishedStatus(match?.status) ? 90 : null);
   const provider = statsData?.sourceStatus?.statsProvider || statsData?.sourceStatus?.primary;
   const updatedAt = statsData?.updatedAt || eventsData?.updatedAt;
 
