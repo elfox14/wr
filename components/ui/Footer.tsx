@@ -14,6 +14,14 @@ const links = [
   ['/animation-live', 'البث التفاعلي'],
 ] as const;
 
+const trustLinks = [
+  ['/about', 'عن الموقع'],
+  ['/privacy', 'سياسة الخصوصية'],
+  ['/privacy-policy', 'Privacy Policy'],
+  ['/contact', 'اتصل بنا'],
+  ['/terms', 'شروط الاستخدام'],
+] as const;
+
 export function Footer() {
   return (
     <footer className="mt-10 w-full border-t border-white/5 bg-background">
@@ -32,7 +40,7 @@ export function Footer() {
             </span>
           </Link>
 
-          <nav className="flex flex-wrap gap-3 text-sm font-bold text-gray-400">
+          <nav className="flex flex-wrap gap-3 text-sm font-bold text-gray-400" aria-label="روابط الموقع الرئيسية">
             {links.map(([href, label]) => (
               <Link key={href} href={href} className="transition hover:text-white">
                 {label}
@@ -41,14 +49,17 @@ export function Footer() {
           </nav>
         </div>
 
-        <div className="mt-6 border-t border-white/10 pt-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 text-xs font-bold text-gray-500">
+        <div className="mt-6 border-t border-white/10 pt-5 flex flex-col gap-4 text-xs font-bold text-gray-500 sm:flex-row sm:items-center sm:justify-between">
           <div>
             © {new Date().getFullYear()} بورصة المونديال — MC PRIME. جميع الحقوق محفوظة.
           </div>
-          <div className="flex gap-4">
-            <Link href="/privacy" className="hover:text-gray-300 transition">سياسة الخصوصية</Link>
-            <Link href="/terms" className="hover:text-gray-300 transition">شروط الاستخدام</Link>
-          </div>
+          <nav className="flex flex-wrap gap-4" aria-label="روابط الثقة والسياسات">
+            {trustLinks.map(([href, label]) => (
+              <Link key={href} href={href} className="transition hover:text-gray-300">
+                {label}
+              </Link>
+            ))}
+          </nav>
         </div>
       </div>
     </footer>
