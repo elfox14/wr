@@ -28,12 +28,27 @@ function safeMinute(currentMinute?: number | null) {
   return Math.max(0, Math.floor(currentMinute));
 }
 
+function minuteLabel(minute: number | null) {
+  return minute !== null && minute > 0 ? `د${ar(minute)}` : '—';
+}
+
+function firstHalfHint(minute: number | null) {
+  if (minute !== null && minute > 0 && minute <= 5) return 'بداية الشوط الأول';
+  return 'الشوط الأول بدأ';
+}
+
+function secondHalfHint(minute: number | null) {
+  if (minute !== null && minute >= 46 && minute <= 50) return 'بداية الشوط الثاني';
+  return 'الشوط الثاني';
+}
+
 function clockInfo(status?: string | null, currentMinute?: number | null) {
   const value = normalizeStatus(status);
   const minute = safeMinute(currentMinute);
+  const scheduledStatus = ['SCHEDULED', 'TIMED', 'NOT_STARTED', 'NS'].includes(value);
   const liveStatus = ['IN_PLAY', 'LIVE', '1H', '2H', 'ET'].includes(value);
 
-  if (['SCHEDULED', 'TIMED', 'NOT_STARTED', 'NS'].includes(value)) {
+  if (scheduledStatus) {
     return { label: 'لم تبدأ', hint: 'بانتظار صافرة البداية', active: false };
   }
 
@@ -50,15 +65,15 @@ function clockInfo(status?: string | null, currentMinute?: number | null) {
     return { label: minute ? `د${ar(minute)}` : 'وقت إضافي', hint: 'وقت إضافي', active: true };
   }
 
-  if (value === '2H' || (liveStatus && minute !== null && minute >= 46)) {
-    return { label: minute ? `د${ar(minute)}` : 'الشوط الثاني', hint: 'الشوط الثاني بدأ', active: true };
+  if (value === '2H' || (minute !== null && minute >= 46)) {
+    return { label: minuteLabel(minute), hint: secondHalfHint(minute), active: true };
   }
 
-  if (value === '1H' || liveStatus) {
-    return { label: minute ? `د${ar(minute)}` : 'الشوط الأول', hint: 'الشوط الأول بدأ', active: true };
+  if (value === '1H' || liveStatus || (minute !== null && minute >= 1)) {
+    return { label: minuteLabel(minute), hint: firstHalfHint(minute), active: true };
   }
 
-  return { label: minute ? `د${ar(minute)}` : '—', hint: 'زمن المباراة', active: Boolean(minute) };
+  return { label: '—', hint: 'زمن المباراة غير متوفر بعد', active: false };
 }
 
 export default function MatchHeaderPanel({ match, provider, updatedAt, currentMinute, loading = false, error, onRefresh }: MatchHeaderPanelProps) {
