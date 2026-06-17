@@ -28,7 +28,8 @@ function buildQuery(matchId?: string, dbMatchId?: string) {
 }
 
 function latestEvent(events: MatchEvent[]) {
-  return [...events].sort(sortEventsByMinute).at(-1) || null;
+  const sortedEvents = [...events].sort(sortEventsByMinute);
+  return sortedEvents.length ? sortedEvents[sortedEvents.length - 1] : null;
 }
 
 export default function InternalAnimationPlayerCore({ matchId = '', dbMatchId = '' }: InternalAnimationPlayerCoreProps) {
