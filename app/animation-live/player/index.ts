@@ -23,6 +23,7 @@ export { default as MomentumCard } from './components/MomentumCard';
 export { default as DataQualityCard } from './components/DataQualityCard';
 export { default as MatchStoryCards } from './components/MatchStoryCards';
 export { default as MatchIntelligencePanel } from './components/MatchIntelligencePanel';
+export { default as MatchMomentumPanel } from './components/MatchMomentumPanel';
 
 export { ar, formatMatchDate, formatUpdatedAt, sourceLabel } from './formatters';
 export { normalizeStatus, isFinishedStatus, isHalfTimeStatus, displayMatchStatus } from './statusUtils';
