@@ -18,6 +18,9 @@ type InternalAnimationPlayerCoreProps = {
   dbMatchId?: string;
 };
 
+type MatchClockSource = 'live_stats' | 'cached' | 'final_elapsed' | 'final_event' | 'unavailable';
+type MatchClock = { minute: number | null; source: MatchClockSource };
+
 const STATS_POLL_MS = 60_000;
 const EVENTS_POLL_MS = 30_000;
 
@@ -33,11 +36,17 @@ function latestEvent(events: MatchEvent[]) {
   return sortedEvents.length ? sortedEvents[sortedEvents.length - 1] : null;
 }
 
-function matchClockMinute(snapshot: Snapshot, events: MatchEvent[], status?: string | null) {
+function matchClockMinute(snapshot: Snapshot, events: MatchEvent[], status?: string | null): MatchClock {
   const liveMinute = n(snapshot, 'minute');
-  if (!isFinishedStatus(status)) return liveMinute;
+  if (liveMinute !== null) return { minute: liveMinute, source: 'live_stats' };
 
-  return liveMinute ?? n(snapshot, 'elapsed') ?? latestEvent(events)?.minute ?? null;
+  if (!isFinishedStatus(status)) return { minute: null, source: 'unavailable' };
+
+  const elapsedMinute = n(snapshot, 'elapsed');
+  if (elapsedMinute !== null) return { minute: elapsedMinute, source: 'final_elapsed' };
+
+  const finalEventMinute = latestEvent(events)?.minute ?? null;
+  return { minute: finalEventMinute, source: finalEventMinute !== null ? 'final_event' : 'unavailable' };
 }
 
 export default function InternalAnimationPlayerCore({ matchId = '', dbMatchId = '' }: InternalAnimationPlayerCoreProps) {
@@ -47,7 +56,7 @@ export default function InternalAnimationPlayerCore({ matchId = '', dbMatchId = 
   const [error, setError] = useState<string | null>(null);
   const [eventFilter, setEventFilter] = useState<EventFilterKey>('all');
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
-  const [stableMatchMinute, setStableMatchMinute] = useState<number | null>(null);
+  const [stableMatchClock, setStableMatchClock] = useState<MatchClock>({ minute: null, source: 'unavailable' });
 
   const query = useMemo(() => buildQuery(matchId, dbMatchId), [matchId, dbMatchId]);
 
@@ -90,7 +99,7 @@ export default function InternalAnimationPlayerCore({ matchId = '', dbMatchId = 
   }, [fetchStats, fetchEvents]);
 
   useEffect(() => {
-    setStableMatchMinute(null);
+    setStableMatchClock({ minute: null, source: 'unavailable' });
   }, [query]);
 
   useEffect(() => {
@@ -111,14 +120,15 @@ export default function InternalAnimationPlayerCore({ matchId = '', dbMatchId = 
   const events = useMemo(() => eventsData?.events || [], [eventsData]);
   const homeTeam = match?.homeTeam || null;
   const awayTeam = match?.awayTeam || null;
-  const rawClockMinute = matchClockMinute(snapshot, events, match?.status);
-  const currentMinute = rawClockMinute ?? stableMatchMinute;
+  const rawClock = matchClockMinute(snapshot, events, match?.status);
+  const currentMinute = rawClock.minute ?? stableMatchClock.minute;
+  const clockSource = rawClock.minute !== null ? rawClock.source : stableMatchClock.minute !== null ? 'cached' : 'unavailable';
   const provider = statsData?.sourceStatus?.statsProvider || statsData?.sourceStatus?.primary;
   const updatedAt = statsData?.updatedAt || eventsData?.updatedAt;
 
   useEffect(() => {
-    if (rawClockMinute !== null) setStableMatchMinute(rawClockMinute);
-  }, [rawClockMinute]);
+    if (rawClock.minute !== null) setStableMatchClock(rawClock);
+  }, [rawClock.minute, rawClock.source]);
 
   const activeEvent = useMemo(() => latestEvent(events), [events]);
   const pressure = useMemo(
@@ -140,6 +150,7 @@ export default function InternalAnimationPlayerCore({ matchId = '', dbMatchId = 
         provider={provider}
         updatedAt={updatedAt}
         currentMinute={currentMinute}
+        clockSource={clockSource}
         loading={loading}
         error={error}
         onRefresh={refreshAll}
