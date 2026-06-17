@@ -34,7 +34,7 @@ export function Footer() {
             <span>
               <span className="block text-xl font-black text-white">بورصة المونديال</span>
               <span className="mt-2 block max-w-xl text-sm font-bold leading-7 text-gray-400">
-                منصة رياضية مباشرة لمتابعة مباريات وأخبار ومجموعات كأس العالم، مع تحليل كروي وبورصة افتراضية ترفيهية.
+                منصة رياضية مباشرة لمتابعة مباريات وأخبار ومجموعات كأس العالم، مع تحليل كروي ومؤشرات افتراضية ترفيهية مبنية على بيانات رياضية فقط.
               </span>
               <span className="mt-2 block text-[11px] font-black tracking-[0.18em] text-[#0FF0FC]">MC PRIME SPORTS EXCHANGE</span>
             </span>
@@ -47,6 +47,10 @@ export function Footer() {
               </Link>
             ))}
           </nav>
+        </div>
+
+        <div className="mt-5 rounded-2xl border border-white/10 bg-white/[0.035] px-4 py-3 text-xs font-bold leading-6 text-gray-400">
+          تنويه: جميع الأسعار والمؤشرات داخل المنصة افتراضية وترفيهية فقط، ولا تمثل قيمة مالية أو توصية مالية.
         </div>
 
         <div className="mt-6 border-t border-white/10 pt-5 flex flex-col gap-4 text-xs font-bold text-gray-500 sm:flex-row sm:items-center sm:justify-between">
