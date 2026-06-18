@@ -10,7 +10,7 @@ const KNOCKOUT_MAX_LIVE_MINUTES = 150;
 const FIRST_HALF_FALLBACK_CAP = 50;
 const DEFAULT_PROVIDER_SNAPSHOT_TTL_SECONDS = 5 * 60;
 
-type SnapshotState = { minute: number; capturedAt: Date; providerStatus?: string | null };
+type SnapshotState = { minute: number | null; capturedAt: Date; providerStatus?: string | null };
 
 function providerSnapshotTtlMs() {
   const seconds = Number(process.env.MATCH_PROVIDER_SNAPSHOT_TTL_SECONDS || DEFAULT_PROVIDER_SNAPSHOT_TTL_SECONDS);
@@ -215,7 +215,7 @@ async function latestDocumentedSnapshots(matchIds: string[]) {
   if (matchIds.length === 0) return new Map<string, SnapshotState>();
 
   const snapshots = await prisma.matchStatsSnapshot.findMany({
-    where: { matchId: { in: matchIds }, minute: { not: null } },
+    where: { matchId: { in: matchIds } },
     select: { matchId: true, minute: true, capturedAt: true, rawData: true },
     orderBy: { capturedAt: 'desc' },
   });
@@ -223,8 +223,7 @@ async function latestDocumentedSnapshots(matchIds: string[]) {
   const latestByMatch = new Map<string, SnapshotState>();
   for (const snapshot of snapshots) {
     if (latestByMatch.has(snapshot.matchId)) continue;
-    const minute = validMinute(snapshot.minute);
-    if (minute !== null) latestByMatch.set(snapshot.matchId, { minute, capturedAt: snapshot.capturedAt, providerStatus: snapshotProviderStatus(snapshot.rawData) });
+    latestByMatch.set(snapshot.matchId, { minute: validMinute(snapshot.minute), capturedAt: snapshot.capturedAt, providerStatus: snapshotProviderStatus(snapshot.rawData) });
   }
   return latestByMatch;
 }
