@@ -34,9 +34,9 @@ function boolFromEnv(value?: string | null) {
 }
 
 function clamp(value: string | null, fallback: number, min: number, max: number) {
-  const n = Number(value);
-  if (!Number.isFinite(n)) return fallback;
-  return Math.max(min, Math.min(max, Math.floor(n)));
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.max(min, Math.min(max, Math.floor(parsed)));
 }
 
 function safeUrl(value: string) {
@@ -51,17 +51,13 @@ function md5(value: string) {
 
 function lastRegexValue(text: string, regex: RegExp) {
   let found: string | null = null;
-  for (const match of text.matchAll(regex)) {
-    if (match?.[1]) found = match[1];
-  }
+  for (const match of text.matchAll(regex)) if (match?.[1]) found = match[1];
   return found;
 }
 
 function extractFrameCredentials(html: string) {
-  const ak = lastRegexValue(html, /USER_FEIJING88\.ak\s*=\s*["']([^"']+)["']/g)
-    || lastRegexValue(html, /\bak\s*:\s*["']([^"']+)["']/g);
-  const sk = lastRegexValue(html, /USER_FEIJING88\.sk\s*=\s*["']([^"']+)["']/g)
-    || lastRegexValue(html, /\bsk\s*:\s*["']([^"']+)["']/g);
+  const ak = lastRegexValue(html, /USER_FEIJING88\.ak\s*=\s*["']([^"']+)["']/g) || lastRegexValue(html, /\bak\s*:\s*["']([^"']+)["']/g);
+  const sk = lastRegexValue(html, /USER_FEIJING88\.sk\s*=\s*["']([^"']+)["']/g) || lastRegexValue(html, /\bsk\s*:\s*["']([^"']+)["']/g);
   if (!ak || !sk) return null;
   return { ak, sk };
 }
@@ -134,6 +130,7 @@ function timelineType(title: string, cssClass?: string | null) {
   if (lower.includes('goal') || /(^|\s)b(\s|$)/.test(lower)) return 'goal';
   if (lower.includes('corner') || /(^|\s)f(\s|$)/.test(lower)) return 'corner';
   if (lower.includes('substitution') || /(^|\s)c(\s|$)/.test(lower)) return 'substitution';
+  if (lower.includes('dangerous')) return 'dangerous_attack';
   return 'timeline_event';
 }
 
@@ -152,10 +149,7 @@ function parseMinute(title: string) {
   if (injury) {
     const base = Number(injury[1]);
     const extra = Number(injury[2]);
-    return {
-      minute: Number.isFinite(base) && Number.isFinite(extra) ? base + extra : null,
-      displayMinute: `${injury[1]}+${injury[2]}'`,
-    };
+    return { minute: Number.isFinite(base) && Number.isFinite(extra) ? base + extra : null, displayMinute: `${injury[1]}+${injury[2]}'` };
   }
   const normal = title.match(/(?:^|\s)(\d{1,3})\s*['`′]/);
   if (normal) {
@@ -212,7 +206,6 @@ function timelineStatCounts(events: TimelineEvent[]) {
     homeRedCards: 0,
     awayRedCards: 0,
   };
-
   for (const event of events) {
     const prefix = event.side === 'home' ? 'home' : event.side === 'away' ? 'away' : null;
     if (!prefix) continue;
@@ -221,7 +214,6 @@ function timelineStatCounts(events: TimelineEvent[]) {
     if (event.type === 'yellow_card') counts[`${prefix}YellowCards` as 'homeYellowCards' | 'awayYellowCards'] += 1;
     if (event.type === 'red_card') counts[`${prefix}RedCards` as 'homeRedCards' | 'awayRedCards'] += 1;
   }
-
   return counts;
 }
 
@@ -310,11 +302,33 @@ async function fetchWrapper(url: string) {
     cache: 'no-store',
     headers: {
       accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-      'user-agent': 'Mozilla/5.0 (compatible; MCPrimeRemoteFramePull/1.0; +https://worldcup.mcprim.com)',
+      'user-agent': 'Mozilla/5.0 (compatible; MCPrimeISportsPull/1.0; +https://worldcup.mcprim.com)',
     },
   });
   const html = await response.text();
   return { ok: response.ok, status: response.status, html };
+}
+
+async function fetchFrameDirect(targetUrl: string, timeoutMs: number) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), Math.max(timeoutMs, 5000));
+  try {
+    const response = await fetch(targetUrl, {
+      cache: 'no-store',
+      signal: controller.signal,
+      headers: {
+        accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        referer: 'https://www.isportslive8.com/',
+        'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome Safari/537.36',
+      },
+    });
+    const html = await response.text();
+    return { ok: response.ok, status: response.status, html, rawLength: html.length, contentType: response.headers.get('content-type'), error: response.ok ? null : html.slice(0, 1000) };
+  } catch (error: any) {
+    return { ok: false, status: null, html: '', rawLength: 0, contentType: null, error: String(error?.message || error).slice(0, 1000) };
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 function browserlessEndpoint() {
@@ -346,17 +360,11 @@ async function renderWithBrowserless(targetUrl: string, timeoutMs: number, waitM
       method: 'POST',
       cache: 'no-store',
       signal: controller.signal,
-      headers: {
-        'content-type': 'application/json',
-        accept: 'text/html,application/json,*/*',
-      },
+      headers: { 'content-type': 'application/json', accept: 'text/html,application/json,*/*' },
       body: JSON.stringify({
         url: targetUrl,
         bestAttempt: true,
-        gotoOptions: {
-          waitUntil: 'networkidle2',
-          timeout: timeoutMs,
-        },
+        gotoOptions: { waitUntil: 'networkidle2', timeout: timeoutMs },
         waitForTimeout: waitMs,
       }),
     });
@@ -368,6 +376,24 @@ async function renderWithBrowserless(targetUrl: string, timeoutMs: number, waitM
   } finally {
     clearTimeout(timer);
   }
+}
+
+async function getCachedTimeline(matchId?: string | null) {
+  if (!matchId) return { events: [], snapshot: null };
+  const [events, snapshot] = await Promise.all([
+    prisma.matchEvent.findMany({ where: { matchId, sourceName: TIMELINE_SOURCE }, orderBy: [{ minute: 'asc' }, { createdAt: 'asc' }], take: 200 }),
+    prisma.matchStatsSnapshot.findFirst({ where: { matchId, provider: TIMELINE_SOURCE }, orderBy: { capturedAt: 'desc' } }),
+  ]);
+  return { events, snapshot };
+}
+
+async function autoMapAnimationId(match: any, providerMatchId: number, enabled: boolean) {
+  if (!enabled || !match?.id) return { updated: false, reason: 'disabled_or_no_match' };
+  const current = Number(match.animationMatchId || 0);
+  if (current === providerMatchId) return { updated: false, reason: 'already_mapped' };
+  if (current && current !== providerMatchId) return { updated: false, reason: 'different_animation_match_id_exists', current };
+  await prisma.match.update({ where: { id: match.id }, data: { animationMatchId: providerMatchId } });
+  return { updated: true, animationMatchId: providerMatchId };
 }
 
 async function handler(req: Request) {
@@ -383,12 +409,9 @@ async function handler(req: Request) {
     const matchId = Math.floor(rawMatchId);
     const wrapperUrl = explicitSourceUrl ? safeUrl(explicitSourceUrl).toString() : defaultWrapperUrl(matchId, mode, url.searchParams.get('lang') || 'en', url.searchParams.get('v') || '1');
 
-    const configured = String(process.env.LIVE_STATS_REMOTE_BROWSER || '').toLowerCase() === 'browserless'
+    const browserlessConfigured = String(process.env.LIVE_STATS_REMOTE_BROWSER || '').toLowerCase() === 'browserless'
       && Boolean(process.env.BROWSERLESS_TOKEN)
       && Boolean(process.env.BROWSERLESS_ENDPOINT);
-    if (!configured) {
-      return json({ ok: false, mode: 'isports_remote_frame_pull', error: 'Browserless is not configured. Set LIVE_STATS_REMOTE_BROWSER=browserless, BROWSERLESS_ENDPOINT, and BROWSERLESS_TOKEN.' }, 400);
-    }
 
     const wrapper = await fetchWrapper(wrapperUrl);
     const credentials = extractFrameCredentials(wrapper.html);
@@ -400,49 +423,67 @@ async function handler(req: Request) {
     const save = boolFromEnv(url.searchParams.get('save'));
     const replace = url.searchParams.get('replace') === null ? true : boolFromEnv(url.searchParams.get('replace'));
     const dbMatchId = url.searchParams.get('dbMatchId');
-    const rendered = await renderWithBrowserless(frameUrl, timeoutMs, waitMs);
-    const text = htmlToText(rendered.html);
-    const stats = parseISportsVisibleStats(text);
-    const match = mode === 'timeline' && (save || url.searchParams.get('includeMatch') === 'true')
+    const autoMap = url.searchParams.get('autoMap') === null ? true : boolFromEnv(url.searchParams.get('autoMap'));
+
+    const match = mode === 'timeline' && (save || url.searchParams.get('includeMatch') === 'true' || dbMatchId)
       ? await getMatchForTimeline({ dbMatchId, providerMatchId: matchId })
       : null;
-    const timelineEvents = mode === 'timeline' ? extractTimelineEvents(rendered.html, match) : [];
+    const mapping = mode === 'timeline' ? await autoMapAnimationId(match, matchId, autoMap) : null;
+
+    const directFirst = mode === 'timeline' && url.searchParams.get('loader') !== 'browserless';
+    const direct = directFirst ? await fetchFrameDirect(frameUrl, clamp(url.searchParams.get('directTimeoutMs'), 12000, 3000, 30000)) : null;
+    const directHasUsableHtml = Boolean(direct?.ok && direct.html && direct.html.trim().length > 100);
+    const shouldUseBrowserless = !directHasUsableHtml && browserlessConfigured;
+    const browserless = shouldUseBrowserless ? await renderWithBrowserless(frameUrl, timeoutMs, waitMs) : null;
+    const renderedHtml = directHasUsableHtml ? direct!.html : browserless?.html || direct?.html || '';
+    const loader = directHasUsableHtml ? 'direct_signed_iframe_fetch' : browserless ? 'browserless_content' : 'direct_signed_iframe_fetch_failed';
+
+    const text = htmlToText(renderedHtml);
+    const stats = parseISportsVisibleStats(text);
+    const timelineEvents = mode === 'timeline' ? extractTimelineEvents(renderedHtml, match) : [];
     const saveResult = save && mode === 'timeline'
       ? match ? await saveTimelineEvents(match, timelineEvents, wrapperUrl, replace) : { error: 'No local match found by dbMatchId or animationMatchId', deleted: 0, inserted: 0 }
       : null;
     const statsSaveResult = save && mode === 'timeline'
       ? match ? await saveTimelineStatsSnapshot(match, matchId, timelineEvents, replace) : { error: 'No local match found by dbMatchId or animationMatchId', deleted: 0, inserted: 0, snapshotId: null }
       : null;
+    const cache = await getCachedTimeline(match?.id || dbMatchId);
 
     return json({
       ok: true,
       mode: 'isports_remote_frame_pull',
       frameMode: mode,
+      loader,
+      directFrame: direct ? {
+        attempted: true,
+        ok: direct.ok,
+        status: direct.status,
+        contentType: direct.contentType,
+        rawLength: direct.rawLength,
+        error: direct.error,
+      } : { attempted: false },
       remoteBrowser: {
         provider: 'browserless',
-        configured: true,
-        endpoint: rendered.endpoint,
-        ok: rendered.ok,
-        status: rendered.status,
-        contentType: rendered.contentType,
-        rawLength: rendered.rawLength,
-        error: rendered.error,
+        configured: browserlessConfigured,
+        used: Boolean(browserless),
+        endpoint: browserless?.endpoint || (browserlessConfigured ? maskUrl(browserlessEndpoint()) : null),
+        ok: browserless?.ok ?? null,
+        status: browserless?.status ?? null,
+        contentType: browserless?.contentType ?? null,
+        rawLength: browserless?.rawLength ?? 0,
+        error: browserless?.error ?? null,
       },
       wrapper: { sourceUrl: wrapperUrl, ok: wrapper.ok, status: wrapper.status, htmlLength: wrapper.html.length },
       frame: {
         sourceUrl: maskUrl(frameUrl),
-        loader: 'browserless_content',
-        rendered: Boolean(rendered.ok && rendered.html.trim()),
-        htmlLength: rendered.html.length,
+        loader,
+        rendered: Boolean(renderedHtml.trim()),
+        htmlLength: renderedHtml.length,
         textLength: text.length,
         textSample: text.slice(0, 1600),
       },
-      match: match ? {
-        id: match.id,
-        status: match.status,
-        homeTeam: match.homeTeam,
-        awayTeam: match.awayTeam,
-      } : null,
+      match: match ? { id: match.id, status: match.status, animationMatchId: match.animationMatchId, homeTeam: match.homeTeam, awayTeam: match.awayTeam } : null,
+      mapping,
       hasStats: Object.entries(stats).some(([key, value]) => !['homeScore', 'awayScore', 'minute'].includes(key) && value !== null),
       stats,
       timeline: {
@@ -451,7 +492,20 @@ async function handler(req: Request) {
         save: saveResult,
         statsSave: statsSaveResult,
       },
-      note: save ? 'Rendered with Browserless, parsed timeline icons, saved MatchEvent rows, and saved derived timeline stats when a local match was found.' : 'Diagnostic only unless save=true. This renders the signed iframe through Browserless /content without requiring Chromium on Render.',
+      cachedTimeline: {
+        eventsCount: cache.events.length,
+        events: cache.events.slice(-20),
+        hasSnapshot: Boolean(cache.snapshot),
+        snapshot: cache.snapshot,
+        usedWhenCurrentPullEmpty: timelineEvents.length === 0 && cache.events.length > 0,
+      },
+      resilience: {
+        directFrameFirstForTimeline: true,
+        browserlessOnlyFallback: true,
+        doesNotDeleteOldEventsWhenCurrentPullEmpty: true,
+        canContinueWithCachedTimeline: true,
+      },
+      note: save ? 'Timeline pull is resilient: it tries direct signed iframe fetch first, uses Browserless only when direct fetch fails, never deletes old iSport events on empty pulls, and returns cached timeline data when the current pull is blocked or empty.' : 'Diagnostic only unless save=true.',
     });
   } catch (error: any) {
     return json({ ok: false, error: error?.message || 'Internal Server Error' }, 500);
