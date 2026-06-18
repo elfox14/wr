@@ -9,6 +9,7 @@ type Snapshot = Record<string, any> | null;
 type MatchEvent = {
   id: string;
   minute?: number | null;
+  minuteLabel?: string | null;
   type: string;
   detail: string;
   teamId?: string | null;
@@ -135,6 +136,19 @@ function cleanEventDetail(detail?: string | null) {
     .replace(/ISPORTS/g, '')
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+function formatEventMinuteLabel(event: MatchEvent) {
+  if (event.minuteLabel) return `د${event.minuteLabel}`;
+  const minute = validMinute(Number(event.minute || 0));
+  if (!minute) return 'حدث';
+  const detail = `${event.detail || ''} ${event.sourceName || ''}`.toLowerCase();
+  const explicitFirstHalf = /الشوط\s*الأول|first\s*half|1h/.test(detail);
+  const secondHalfHint = /الشوط\s*الثاني|second\s*half|2h/.test(detail);
+  const explicitStoppage = detail.match(/45\s*\+\s*(\d{1,2})/);
+  if (explicitStoppage) return `د45+${Number(explicitStoppage[1])}`;
+  if (minute > 45 && minute < 60 && explicitFirstHalf && !secondHalfHint) return `د45+${minute - 45}`;
+  return `د${minute}`;
 }
 
 function buildQueryString(matchId?: string | number | null, dbMatchId?: string | number | null) {
@@ -329,7 +343,7 @@ export default function LiveMatchStatsPanel({ matchId, dbMatchId }: Props) {
                   <div className="flex items-start gap-3">
                     <EventAvatar event={event} data={data} />
                     <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2 text-xs font-black text-[#FFD700]"><span>{eventIcon(event.type)}</span>{event.minute ? `د${event.minute}` : 'حدث'}</div>
+                      <div className="flex flex-wrap items-center gap-2 text-xs font-black text-[#FFD700]"><span>{eventIcon(event.type)}</span>{formatEventMinuteLabel(event)}</div>
                       {event.playerName ? <p className="mt-1 text-xs font-black text-white">{event.playerName}</p> : null}
                       <p className="mt-1 text-sm leading-6 text-gray-200">{cleanEventDetail(event.detail)}</p>
                     </div>
