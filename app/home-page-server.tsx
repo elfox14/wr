@@ -1,4 +1,5 @@
 import HomeClientSportsLiveFocus from '@/components/HomeClientSportsLiveFocus';
+import HomeProviderStatsCards from '@/components/HomeProviderStatsCards';
 import prisma from '@/lib/prisma';
 
 export const dynamic = 'force-dynamic';
@@ -28,7 +29,7 @@ function validMinute(value: unknown) {
 }
 
 function normalizeStatus(value?: string | null) {
-  return String(value || '').toUpperCase();
+  return String(value || []).toUpperCase();
 }
 
 function isHalfTimeStatus(value?: string | null) {
@@ -41,7 +42,7 @@ function isSecondHalfStatus(value?: string | null) {
 }
 
 function isGroupStage(match: MatchCandidate) {
-  const value = String(match.groupPhase || match.stage || '').toUpperCase();
+  const value = String(match.groupPhase || match.stage || []).toUpperCase();
   return value.includes('GROUP');
 }
 
@@ -113,17 +114,13 @@ async function findFreshLiveCandidate<T extends MatchCandidate>(candidates: T[],
 
   const candidate = candidates.find((match) => {
     if (isHalfTimeStatus(match.status)) return true;
-
     const localMinute = minutesFromKickoff(match, now);
     if (localMinute !== null && localMinute >= maxLiveMinutes(match)) return false;
     if (localMinute !== null && localMinute >= FINAL_LOCAL_MINUTE_FALLBACK) return false;
-
     const snapshot = latestByMatch.get(match.id);
     if (!snapshot) return true;
-
     const snapshotAge = now.getTime() - new Date(snapshot.capturedAt).getTime();
     if (snapshot.minute >= FINAL_MINUTE_FLOOR && snapshotAge >= STALE_FINAL_SNAPSHOT_MS) return false;
-
     return true;
   });
 
@@ -152,7 +149,7 @@ export default async function Home() {
       upcomingMatchesRaw,
       tickerMatchesRaw,
       liveCandidatesRaw,
-      nextMatchRaw
+      nextMatchRaw,
     ] = await Promise.all([
       prisma.asset.count({ where: { type: 'PLAYER' } }),
       prisma.asset.count({ where: { type: 'TEAM' } }),
@@ -172,9 +169,7 @@ export default async function Home() {
         include: { homeTeam: true, awayTeam: true },
       }),
       prisma.match.findMany({
-        where: {
-          matchDate: { gte: tickerStart, lte: tickerEnd },
-        },
+        where: { matchDate: { gte: tickerStart, lte: tickerEnd } },
         orderBy: { matchDate: 'asc' },
         take: 15,
         include: { homeTeam: true, awayTeam: true },
@@ -199,7 +194,6 @@ export default async function Home() {
     ]);
 
     const freshLiveMatch = await findFreshLiveCandidate(liveCandidatesRaw, now);
-
     playersCount = totalPlayers;
     teamsCount = totalTeams;
     upcomingMatchesCount = totalUpcomingMatches;
@@ -213,13 +207,17 @@ export default async function Home() {
   }
 
   return (
-    <HomeClientSportsLiveFocus
-      upcomingMatches={upcomingMatches}
-      tickerMatches={tickerMatches}
-      nextMarqueeMatch={nextMarqueeMatch}
-      playersCount={playersCount}
-      teamsCount={teamsCount}
-      upcomingMatchesCount={upcomingMatchesCount}
-    />
+    <>
+      <style>{`main > section[aria-label="إحصائيات البطولة"]{display:none}`}</style>
+      <HomeClientSportsLiveFocus
+        upcomingMatches={upcomingMatches}
+        tickerMatches={tickerMatches}
+        nextMarqueeMatch={nextMarqueeMatch}
+        playersCount={playersCount}
+        teamsCount={teamsCount}
+        upcomingMatchesCount={upcomingMatchesCount}
+      />
+      <HomeProviderStatsCards playersCount={playersCount} teamsCount={teamsCount} />
+    </>
   );
 }
