@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import Image from 'next/image';
-import Link from 'next/link';
 import { Menu, X } from 'lucide-react';
 
 const logoSrc = '/brand/borsa-mondial-sport-logo-icon.svg?v=20260616sport';
@@ -25,11 +24,7 @@ const primaryMobileLinks = [
 ] as const;
 
 function NavItem({ href, label, className, onClick }: { href: string; label: string; className: string; onClick?: () => void }) {
-  if (href === '/players') {
-    return <a href={href} onClick={onClick} className={className}>{label}</a>;
-  }
-
-  return <Link href={href} onClick={onClick} className={className}>{label}</Link>;
+  return <a href={href} onClick={onClick} className={className}>{label}</a>;
 }
 
 export function Navbar() {
@@ -42,7 +37,7 @@ export function Navbar() {
       <nav className="fixed inset-x-0 top-0 z-50 w-full border-b border-white/10 bg-[#030907]/92 shadow-[0_14px_34px_rgba(0,0,0,0.28)] backdrop-blur-2xl supports-[backdrop-filter]:bg-[#030907]/78">
         <div className="mx-auto max-w-[1400px] px-3 sm:px-6 lg:px-8">
           <div className="flex min-h-[64px] items-center justify-between gap-2.5 lg:min-h-[84px]">
-            <Link href="/" onClick={closeMenu} className="group flex shrink-0 items-center gap-2" aria-label="بورصة المونديال الرئيسية">
+            <a href="/" onClick={closeMenu} className="group flex shrink-0 items-center gap-2" aria-label="بورصة المونديال الرئيسية">
               <span className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-[1.05rem] border border-[#0FF0FC]/25 bg-[#06111f] p-1.5 shadow-[0_0_22px_rgba(15,240,252,0.16)] transition group-hover:scale-[1.02] group-hover:border-[#FFD700]/35 sm:h-12 sm:w-12 lg:h-14 lg:w-14">
                 <Image src={logoSrc} alt="بورصة المونديال" width={56} height={56} className="h-full w-full object-contain" priority />
               </span>
@@ -50,7 +45,7 @@ export function Navbar() {
                 <span className="whitespace-nowrap text-base font-black text-white lg:text-lg">بورصة المونديال</span>
                 <span className="mt-1 whitespace-nowrap text-[10px] font-black tracking-[0.18em] text-[#0FF0FC] lg:text-[11px]">MC PRIME SPORTS</span>
               </span>
-            </Link>
+            </a>
 
             <div className="hidden items-center justify-center gap-1 rounded-2xl border border-white/10 bg-white/[0.035] p-1 text-sm font-black text-gray-300 lg:flex">
               {links.map(([href, label]) => (
