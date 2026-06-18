@@ -131,6 +131,12 @@ function resolvedIdsFromTheStats(body: any) {
   return map;
 }
 
+function providerIdFromCatchupBody(body: any, matchId: string) {
+  const results = Array.isArray(body?.results) ? body.results : [];
+  const found = results.find((item: any) => String(item?.matchId || '') === matchId);
+  return String(found?.resolvedProviderMatchId || '').trim() || null;
+}
+
 export async function GET(req: Request) {
   const auth = await requireAdmin(req);
   if (!auth.authorized) return auth.error;
@@ -195,12 +201,24 @@ export async function GET(req: Request) {
       previousStatus: match.status,
       externalId: match.externalId,
       animationMatchId: match.animationMatchId,
+      theStatsResolveCatchup: null,
       theStatsStatus: null,
       isportsTimeline: null,
       dedupe: null,
     };
 
-    const providerMatchId = providerIds.get(match.id) || (String(match.externalId || '').startsWith('mt_') ? String(match.externalId) : null);
+    let providerMatchId = providerIds.get(match.id) || (String(match.externalId || '').startsWith('mt_') ? String(match.externalId) : null);
+    if (runTheStats && !providerMatchId) {
+      const oneCatchup = new URL('/api/admin/the-stats-live-catchup', origin);
+      oneCatchup.searchParams.set('matchId', match.id);
+      oneCatchup.searchParams.set('dryRun', String(dryRun));
+      oneCatchup.searchParams.set('skipSimilarExisting', 'true');
+      oneCatchup.searchParams.set('key', key);
+      item.theStatsResolveCatchup = await callJson(oneCatchup, 65000);
+      providerMatchId = providerIdFromCatchupBody((item.theStatsResolveCatchup as any)?.body, match.id);
+      if (providerMatchId) providerIds.set(match.id, providerMatchId);
+    }
+
     if (updateStatusFromStats && providerMatchId) {
       const statsOnly = new URL('/api/admin/the-stats-live-stats-only', origin);
       statsOnly.searchParams.set('matchId', match.id);
