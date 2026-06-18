@@ -14,6 +14,7 @@ type Tone = 'gold' | 'cyan' | 'green' | 'red' | 'neutral';
 const STATS_REFRESH_MS = 60_000;
 const LOADING_VALUE = '...';
 const unavailableSource = '—';
+const CARD_SPAN = 'col-span-1 sm:col-span-2 lg:col-span-2 xl:col-span-2';
 
 function read(obj: any, key: string) {
   return obj?.[key];
@@ -49,6 +50,11 @@ function formatCount(value?: number | null, unavailable = 'غير متوفر') {
 function formatDecimal(value?: number | null, unavailable = 'غير متوفر') {
   if (typeof value !== 'number' || !Number.isFinite(value)) return unavailable;
   return new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 2 }).format(value);
+}
+
+function formatPercent(value?: number | null, unavailable = 'غير متوفر') {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return unavailable;
+  return `${formatDecimal(value)}%`;
 }
 
 function teamName(team?: { name?: string; code?: string | null } | null) {
@@ -96,7 +102,7 @@ function StatShell({
   source,
   tone = 'neutral',
   href,
-  itemClassName = '',
+  itemClassName = CARD_SPAN,
   children,
 }: {
   title: string;
@@ -108,7 +114,7 @@ function StatShell({
 }) {
   const style = toneStyles(tone);
   const body = (
-    <article className={`group relative h-full min-h-[128px] overflow-hidden rounded-2xl border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.052),rgba(0,0,0,0.25))] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_8px_22px_rgba(0,0,0,0.16)] transition hover:-translate-y-0.5 ${style.border}`}>
+    <article className={`group relative h-full min-h-[124px] overflow-hidden rounded-2xl border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.052),rgba(0,0,0,0.25))] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_8px_22px_rgba(0,0,0,0.16)] transition hover:-translate-y-0.5 ${style.border}`}>
       <div className={`absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent ${style.line} to-transparent`} />
       <div className="relative z-10 flex h-full min-h-0 flex-col gap-2">
         <div className="flex items-start justify-between gap-1.5">
@@ -126,8 +132,8 @@ function StatShell({
 function GoalFrame({ children, tone = 'gold' }: { children: ReactNode; tone?: Tone }) {
   const style = toneStyles(tone);
   return (
-    <div className="relative flex min-h-[82px] flex-1 items-center justify-center overflow-hidden rounded-xl border border-white/10 bg-black/20 px-2 py-2 text-center">
-      <div className={`pointer-events-none absolute inset-x-3 top-2 h-[62px] rounded-t-2xl border-2 border-b-0 ${tone === 'green' ? 'border-[#00FF88]/35' : tone === 'cyan' ? 'border-[#0FF0FC]/35' : 'border-[#FFD700]/35'}`} />
+    <div className="relative flex min-h-[78px] flex-1 items-center justify-center overflow-hidden rounded-xl border border-white/10 bg-black/20 px-2 py-2 text-center">
+      <div className={`pointer-events-none absolute inset-x-3 top-2 h-[58px] rounded-t-2xl border-2 border-b-0 ${tone === 'green' ? 'border-[#00FF88]/35' : tone === 'cyan' ? 'border-[#0FF0FC]/35' : 'border-[#FFD700]/35'}`} />
       <div className="pointer-events-none absolute inset-x-5 top-[50%] h-px bg-white/10" />
       <div className="relative z-10 w-full">{children}</div>
       <div className={`pointer-events-none absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent ${style.line} to-transparent`} />
@@ -138,7 +144,7 @@ function GoalFrame({ children, tone = 'gold' }: { children: ReactNode; tone?: To
 function GoalStatCard({ title, value, subtitle, source, tone = 'gold', href }: { title: string; value: string; subtitle?: string; source?: string; tone?: Tone; href?: string }) {
   const style = toneStyles(tone);
   return (
-    <StatShell title={title} source={source} tone={tone} href={href} itemClassName="col-span-1 sm:col-span-2 lg:col-span-2 xl:col-span-2">
+    <StatShell title={title} source={source} tone={tone} href={href} itemClassName={CARD_SPAN}>
       <GoalFrame tone={tone}>
         <div className={`truncate text-3xl font-black leading-none ${style.value}`}>{value}</div>
         {subtitle ? <div className="mt-1 truncate text-[9px] font-bold text-gray-400">{subtitle}</div> : null}
@@ -177,7 +183,7 @@ function TopScorerCard({ leader }: { leader: any }) {
   const source = leader?.sourceName || leader?.source || (leader ? 'DB' : unavailableSource);
 
   return (
-    <StatShell title="الهداف" source={source} tone="gold" href={href} itemClassName="col-span-1 sm:col-span-2 lg:col-span-2 xl:col-span-2">
+    <StatShell title="الهداف" source={source} tone="gold" href={href} itemClassName={CARD_SPAN}>
       <div className="flex min-h-0 flex-1 items-center gap-3 overflow-hidden rounded-xl border border-[#FFD700]/15 bg-[#FFD700]/10 px-2.5 py-2 text-right">
         <PlayerImage leader={leader} />
         <div className="min-w-0 flex-1">
@@ -191,9 +197,9 @@ function TopScorerCard({ leader }: { leader: any }) {
 
 function PlayersGroupCard({ playerCount, teamCount, source }: { playerCount: number | null; teamCount: number | null; source: string }) {
   return (
-    <StatShell title="اللاعبون" source={source} tone="green" href="/players" itemClassName="col-span-1 sm:col-span-2 lg:col-span-2 xl:col-span-2">
+    <StatShell title="اللاعبون" source={source} tone="green" href="/players" itemClassName={CARD_SPAN}>
       <div className="flex flex-1 flex-col items-center justify-center rounded-xl border border-[#00FF88]/15 bg-[#00FF88]/10 px-2 py-2">
-        <div className="relative h-12 w-24">
+        <div className="relative h-10 w-24">
           {[0, 1, 2, 3, 4].map((item) => (
             <span key={item} className="absolute top-1 flex h-8 w-8 items-center justify-center rounded-full border border-[#00FF88]/25 bg-black/55 text-[10px] font-black text-[#00FF88] shadow-[0_4px_12px_rgba(0,255,136,0.08)]" style={{ right: `${item * 16}px`, zIndex: 10 - item }}>
               <span className="h-2.5 w-2.5 rounded-full bg-[#00FF88]/70" />
@@ -209,14 +215,14 @@ function PlayersGroupCard({ playerCount, teamCount, source }: { playerCount: num
 
 function CardsMiniCard({ yellow, red, source }: { yellow: number | null; red: number | null; source: string }) {
   return (
-    <StatShell title="الكروت" source={source} tone="red" href="/matches" itemClassName="col-span-1 sm:col-span-2 lg:col-span-2 xl:col-span-2">
+    <StatShell title="الكروت" source={source} tone="red" href="/matches" itemClassName={CARD_SPAN}>
       <div className="grid flex-1 grid-cols-2 items-center gap-2">
-        <div className="flex h-[82px] flex-col justify-between rounded-xl border border-[#FFD700]/35 bg-[#FFD700] p-2 text-black shadow-[0_5px_14px_rgba(255,215,0,0.12)] transition group-hover:-rotate-1">
+        <div className="flex h-[78px] flex-col justify-between rounded-xl border border-[#FFD700]/35 bg-[#FFD700] p-2 text-black shadow-[0_5px_14px_rgba(255,215,0,0.12)] transition group-hover:-rotate-1">
           <div className="text-[8px] font-black uppercase tracking-[0.12em] text-black/55">Yellow</div>
           <div className="text-4xl font-black leading-none">{formatCount(yellow)}</div>
           <div className="text-[9px] font-black text-black/65">صفراء</div>
         </div>
-        <div className="flex h-[82px] flex-col justify-between rounded-xl border border-red-300/35 bg-red-600 p-2 text-white shadow-[0_5px_14px_rgba(248,113,113,0.13)] transition group-hover:rotate-1">
+        <div className="flex h-[78px] flex-col justify-between rounded-xl border border-red-300/35 bg-red-600 p-2 text-white shadow-[0_5px_14px_rgba(248,113,113,0.13)] transition group-hover:rotate-1">
           <div className="text-[8px] font-black uppercase tracking-[0.12em] text-white/65">Red</div>
           <div className="text-4xl font-black leading-none">{formatCount(red)}</div>
           <div className="text-[9px] font-black text-white/75">حمراء</div>
@@ -234,7 +240,7 @@ function PenaltyMiniCard({ kickStats, source }: { kickStats: any; source: string
   const conversion = total && scored !== null ? Math.max(0, Math.min(100, (scored / total) * 100)) : null;
 
   return (
-    <StatShell title="ركلات الجزاء" source={available ? source : unavailableSource} tone="gold" itemClassName="col-span-1 sm:col-span-2 lg:col-span-2 xl:col-span-2">
+    <StatShell title="ركلات الجزاء" source={available ? source : unavailableSource} tone="gold" itemClassName={CARD_SPAN}>
       {available ? (
         <div className="flex flex-1 flex-col justify-center">
           <div className="grid grid-cols-3 gap-1.5">
@@ -259,24 +265,22 @@ function PowerStatsCard({ powerStats, source }: { powerStats: any; source: strin
   const passAccuracy = pickNumber(powerStats?.passAccuracyPercent);
   const saves = pickNumber(powerStats?.saves);
   const tackles = pickNumber(powerStats?.tackles);
-  const items = [
-    { label: 'xG', value: formatDecimal(xg) },
-    { label: 'فرص كبيرة', value: formatCount(bigChances) },
-    { label: 'دقة التمرير', value: passAccuracy !== null ? `${formatDecimal(passAccuracy)}%` : 'غير متوفر' },
-    { label: saves !== null ? 'تصديات' : 'تدخلات', value: saves !== null ? formatCount(saves) : formatCount(tackles) },
+  const corners = pickNumber(powerStats?.corners, powerStats?.totalCorners);
+
+  const cards = [
+    { title: 'xG', value: formatDecimal(xg), subtitle: 'الأهداف المتوقعة' },
+    { title: 'فرص كبيرة', value: formatCount(bigChances), subtitle: 'إجمالي الفرص' },
+    { title: 'دقة التمرير', value: formatPercent(passAccuracy), subtitle: 'نسبة النجاح' },
+    { title: saves !== null ? 'تصديات' : 'تدخلات', value: saves !== null ? formatCount(saves) : formatCount(tackles), subtitle: saves !== null ? 'إجمالي التصديات' : 'إجمالي التدخلات' },
+    ...(corners !== null ? [{ title: 'ركنيات', value: formatCount(corners), subtitle: 'إجمالي الركنيات' }] : []),
   ];
 
   return (
-    <StatShell title="مؤشرات متقدمة" source={source} tone="cyan" href="/matches" itemClassName="col-span-2 sm:col-span-4 lg:col-span-4 xl:col-span-4">
-      <div className="grid flex-1 grid-cols-2 gap-1.5">
-        {items.map((item) => (
-          <div key={item.label} className="rounded-xl border border-[#0FF0FC]/12 bg-[#0FF0FC]/8 px-2 py-2 text-center">
-            <div className="truncate text-[8px] font-black text-[#0FF0FC]/70">{item.label}</div>
-            <div className="mt-1 truncate text-base font-black leading-none text-white">{item.value}</div>
-          </div>
-        ))}
-      </div>
-    </StatShell>
+    <>
+      {cards.map((card) => (
+        <GoalStatCard key={`${card.title}-${card.subtitle}`} title={card.title} value={card.value} subtitle={card.subtitle} source={source} tone="cyan" href="/matches" />
+      ))}
+    </>
   );
 }
 
@@ -348,7 +352,7 @@ export default function HomeTournamentStatsCard({ playersCount: serverPlayersCou
   const topScorer = playerLeaders?.leaders?.topScorer || null;
   const penalties = penaltiesSummary?.penalties?.available ? penaltiesSummary.penalties : read(databaseSummary, 'penal' + 'ties')?.available ? read(databaseSummary, 'penal' + 'ties') : read(summary, 'penal' + 'ties');
   const penaltySource = penaltiesSummary?.penalties?.available ? (penaltiesSummary?.provider || penaltiesSummary?.source || 'FOOTBALL_DATA_FULL') : penalties?.available ? summarySource : unavailableSource;
-  const powerSource = hasProviderStat(summary, 'xg') || pickNumber(powerStats?.totalXg) !== null ? summarySource : unavailableSource;
+  const powerSource = hasProviderStat(summary, 'xg') || pickNumber(powerStats?.totalXg, powerStats?.xg) !== null ? summarySource : unavailableSource;
   const cardsSource = cardTotalYellow !== null || cardTotalRed !== null ? summarySource : unavailableSource;
 
   return (
@@ -364,11 +368,11 @@ export default function HomeTournamentStatsCard({ playersCount: serverPlayersCou
       </div>
 
       {isInitialLoading ? (
-        <div className="grid auto-rows-[128px] grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-8 xl:grid-cols-12">
-          {['الهداف', 'الأهداف', 'المتوسط', 'التسديدات', 'أكبر نتيجة', 'الشباك', 'اللاعبون', 'الكروت', 'الجزاءات', 'متقدم'].map((label) => <LoadingBox key={label} label={label} />)}
+        <div className="grid auto-rows-[124px] grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-8 xl:grid-cols-12">
+          {['الهداف', 'الأهداف', 'المتوسط', 'التسديدات', 'أكبر نتيجة', 'الشباك', 'اللاعبون', 'الكروت', 'الجزاءات', 'xG', 'فرص كبيرة', 'دقة التمرير', 'تصديات'].map((label) => <LoadingBox key={label} label={label} />)}
         </div>
       ) : (
-        <div className="grid auto-rows-[128px] grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-8 xl:grid-cols-12">
+        <div className="grid auto-rows-[124px] grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-8 xl:grid-cols-12">
           <TopScorerCard leader={topScorer} />
           <GoalStatCard title="أهداف البطولة" value={formatCount(totalGoals)} subtitle={`${formatCount(finishedMatches)} مباراة منتهية`} source={totalGoals !== null ? summarySource : unavailableSource} tone="gold" href="/matches" />
           <GoalStatCard title="متوسط الأهداف" value={formatDecimal(averageGoals)} subtitle="هدف لكل مباراة" source={averageGoals !== null ? summarySource : unavailableSource} tone="cyan" href="/matches" />
