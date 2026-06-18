@@ -169,7 +169,7 @@ function PlayerImage({ leader }: { leader: any }) {
   return (
     <span className="relative flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-[#FFD700]/25 bg-black/55 shadow-[0_0_24px_rgba(255,215,0,0.12)] transition group-hover:scale-105">
       {image ? (
-        <img src={image} alt={leader?.name || 'الهداف'} className="h-full w-full object-cover" loading="lazy" />
+        <img src={image} alt={leader?.name || 'لاعب'} className="h-full w-full object-cover" loading="lazy" />
       ) : (
         <span className="text-sm font-black text-[#FFD700]/75">{initials}</span>
       )}
@@ -177,18 +177,18 @@ function PlayerImage({ leader }: { leader: any }) {
   );
 }
 
-function TopScorerCard({ leader }: { leader: any }) {
+function PlayerLeaderCard({ title, leader, metricLabel, tone = 'gold' }: { title: string; leader: any; metricLabel: string; tone?: Tone }) {
   const rawId = String(leader?.id || '');
   const href = rawId && !rawId.startsWith('provider-scorer:') ? `/players/${encodeURIComponent(rawId)}` : '/players';
   const playerName = leader?.name ? shortText(String(leader.name), 22) : 'غير متوفر';
   const team = leader?.team?.name || leader?.team?.code || '';
   const subtitle = leader?.value
-    ? `${formatCount(Number(leader.value))} هدف${team ? ` • ${shortText(String(team), 14)}` : ''}`
+    ? `${formatCount(Number(leader.value))} ${metricLabel}${team ? ` • ${shortText(String(team), 14)}` : ''}`
     : 'بانتظار بيانات موثقة';
   const source = leader?.sourceName || leader?.source || (leader ? 'DB' : unavailableSource);
 
   return (
-    <StatShell title="الهداف" source={source} tone="gold" href={href} itemClassName={CARD_SPAN}>
+    <StatShell title={title} source={source} tone={tone} href={href} itemClassName={CARD_SPAN}>
       <div className="flex min-h-0 flex-1 items-center gap-3 overflow-hidden rounded-xl border border-[#FFD700]/15 bg-[#FFD700]/10 px-2.5 py-2 text-right">
         <PlayerImage leader={leader} />
         <div className="min-w-0 flex-1">
@@ -275,6 +275,8 @@ function PowerStatsCard({ powerStats, source }: { powerStats: any; source: strin
   const dangerousAttacks = pickNumber(powerStats?.dangerousAttacks, powerStats?.totalDangerousAttacks);
   const fouls = pickNumber(powerStats?.fouls, powerStats?.totalFouls);
   const offsides = pickNumber(powerStats?.offsides, powerStats?.totalOffsides);
+  const averageShots = pickNumber(powerStats?.averageShotsPerFinishedMatch);
+  const averagePossession = pickNumber(powerStats?.averagePossessionSample);
   const totalShots = pickNumber(powerStats?.totalShots, powerStats?.shots);
   const totalShotsOnTarget = pickNumber(powerStats?.totalShotsOnTarget, powerStats?.shotsOnTarget);
   const shotAccuracy = percent(totalShotsOnTarget, totalShots);
@@ -284,6 +286,8 @@ function PowerStatsCard({ powerStats, source }: { powerStats: any; source: strin
     { title: 'فرص كبيرة', value: formatCount(bigChances), subtitle: 'إجمالي الفرص', show: bigChances !== null },
     { title: 'دقة التمرير', value: formatPercent(passAccuracy), subtitle: 'نسبة النجاح', show: passAccuracy !== null },
     { title: 'دقة التسديد', value: formatPercent(shotAccuracy), subtitle: 'على المرمى / إجمالي', show: shotAccuracy !== null },
+    { title: 'متوسط التسديدات', value: formatDecimal(averageShots), subtitle: 'لكل مباراة منتهية', show: averageShots !== null },
+    { title: 'متوسط الاستحواذ', value: formatPercent(averagePossession), subtitle: 'عينات اللقطات', show: averagePossession !== null },
     { title: saves !== null ? 'تصديات' : 'تدخلات', value: saves !== null ? formatCount(saves) : formatCount(tackles), subtitle: saves !== null ? 'إجمالي التصديات' : 'إجمالي التدخلات', show: saves !== null || tackles !== null },
     { title: 'ركنيات', value: formatCount(corners), subtitle: 'إجمالي الركنيات', show: corners !== null },
     { title: 'هجمات', value: formatCount(attacks), subtitle: 'إجمالي الهجمات', show: attacks !== null },
@@ -295,7 +299,7 @@ function PowerStatsCard({ powerStats, source }: { powerStats: any; source: strin
   return (
     <>
       {cards.map((card) => (
-        <GoalStatCard key={`${card.title}-${card.subtitle}`} title={card.title} value={card.value} subtitle={card.subtitle} source={source} tone="cyan" href="/matches" />
+        <GoalStatCard key={`${card.title}-${card.subtitle}`} title={card.title} value={card.value} subtitle={card.subtitle} source={source} tone="cyan" href="/statistics" />
       ))}
     </>
   );
@@ -365,11 +369,16 @@ export default function HomeTournamentStatsCard({ playersCount: serverPlayersCou
   const cardTotalYellow = pickNumber(read(summary, 'yellow' + 'Cards'), read(databaseSummary, 'yellow' + 'Cards'));
   const cardTotalRed = pickNumber(read(summary, 'red' + 'Cards'), read(databaseSummary, 'red' + 'Cards'));
   const biggestScore = summary?.biggestScore || databaseSummary?.biggestScore || null;
-  const bestCleanSheetTeam = summary?.teamLeaders?.bestCleanSheetTeam || databaseSummary?.teamLeaders?.bestCleanSheetTeam || null;
+  const teamLeaders = summary?.teamLeaders || databaseSummary?.teamLeaders || {};
+  const topScoringTeam = teamLeaders?.topScoringTeam || null;
+  const mostConcedingTeam = teamLeaders?.mostConcedingTeam || null;
+  const bestCleanSheetTeam = teamLeaders?.bestCleanSheetTeam || null;
   const cleanSheets = pickNumber(summary?.cleanSheets, databaseSummary?.cleanSheets);
+  const cleanSheetRate = finishedMatches ? percent(cleanSheets, finishedMatches * 2) : null;
   const teamCountValue = pickNumber(summary?.teamCount, databaseSummary?.teamCount, teamsCount);
   const playerCountValue = pickNumber(databaseSummary?.playerCount, serverPlayersCount);
   const topScorer = playerLeaders?.leaders?.topScorer || null;
+  const topAssister = playerLeaders?.leaders?.topAssister || null;
   const penalties = penaltiesSummary?.penalties?.available ? penaltiesSummary.penalties : read(databaseSummary, 'penal' + 'ties')?.available ? read(databaseSummary, 'penal' + 'ties') : read(summary, 'penal' + 'ties');
   const penaltySource = penaltiesSummary?.penalties?.available ? (penaltiesSummary?.provider || penaltiesSummary?.source || 'FOOTBALL_DATA_FULL') : penalties?.available ? summarySource : unavailableSource;
   const advancedSourceValue = pickNumber(
@@ -377,7 +386,7 @@ export default function HomeTournamentStatsCard({ playersCount: serverPlayersCou
     powerStats?.saves, powerStats?.tackles, powerStats?.corners, powerStats?.totalCorners,
     powerStats?.attacks, powerStats?.totalAttacks, powerStats?.dangerousAttacks, powerStats?.totalDangerousAttacks,
     powerStats?.fouls, powerStats?.totalFouls, powerStats?.offsides, powerStats?.totalOffsides,
-    powerStats?.totalShots, powerStats?.totalShotsOnTarget,
+    powerStats?.totalShots, powerStats?.totalShotsOnTarget, powerStats?.averageShotsPerFinishedMatch, powerStats?.averagePossessionSample,
   );
   const powerSource = advancedSourceValue !== null ? summarySource : unavailableSource;
   const cardsSource = cardTotalYellow !== null || cardTotalRed !== null ? summarySource : unavailableSource;
@@ -392,21 +401,27 @@ export default function HomeTournamentStatsCard({ playersCount: serverPlayersCou
           </div>
           <h1 className="mt-1.5 text-lg font-black leading-tight text-white md:text-xl">الإحصائيات</h1>
         </div>
+        <Link href="/statistics" className="rounded-full border border-[#0FF0FC]/20 bg-[#0FF0FC]/10 px-3 py-1.5 text-[10px] font-black text-[#0FF0FC] transition hover:bg-[#0FF0FC]/15">
+          كل الإحصائيات
+        </Link>
       </div>
 
       {isInitialLoading ? (
         <div className="grid auto-rows-[124px] grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-8 xl:grid-cols-12">
-          {['الهداف', 'المباريات', 'الأهداف', 'المتوسط', 'التسديدات', 'أكبر نتيجة', 'الشباك', 'اللاعبون', 'الكروت', 'الجزاءات', 'xG', 'دقة التسديد', 'ركنيات', 'هجمات'].map((label) => <LoadingBox key={label} label={label} />)}
+          {['الهداف', 'صانع الأهداف', 'المباريات', 'الأهداف', 'المتوسط', 'أفضل هجوم', 'أضعف دفاع', 'الشباك', 'دقة التسديد', 'ركنيات', 'هجمات', 'استحواذ'].map((label) => <LoadingBox key={label} label={label} />)}
         </div>
       ) : (
         <div className="grid auto-rows-[124px] grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-8 xl:grid-cols-12">
-          <TopScorerCard leader={topScorer} />
-          <GoalStatCard title="المباريات" value={totalMatches !== null && finishedMatches !== null ? `${formatCount(finishedMatches)} / ${formatCount(totalMatches)}` : formatCount(totalMatches)} subtitle={`${formatCount(liveMatches)} مباشرة • ${formatCount(scheduledMatches)} قادمة`} source={totalMatches !== null || finishedMatches !== null ? summarySource : unavailableSource} tone="neutral" href="/matches" />
-          <GoalStatCard title="أهداف البطولة" value={formatCount(totalGoals)} subtitle={`${formatCount(finishedMatches)} مباراة منتهية`} source={totalGoals !== null ? summarySource : unavailableSource} tone="gold" href="/matches" />
-          <GoalStatCard title="متوسط الأهداف" value={formatDecimal(averageGoals)} subtitle="هدف لكل مباراة" source={averageGoals !== null ? summarySource : unavailableSource} tone="cyan" href="/matches" />
-          <GoalStatCard title="التسديدات" value={`${formatCount(totalShots)} / ${formatCount(totalShotsOnTarget)}`} subtitle="إجمالي / على المرمى" source={totalShots !== null || totalShotsOnTarget !== null ? summarySource : unavailableSource} tone="cyan" href="/matches" />
-          <GoalStatCard title="أكبر نتيجة" value={biggestScore ? `${formatCount(biggestScore.homeScore)}-${formatCount(biggestScore.awayScore)}` : '—'} subtitle={biggestScore ? shortText(`${teamName(biggestScore.homeTeam)} ضد ${teamName(biggestScore.awayTeam)}`, 22) : 'تظهر بعد التسجيل'} source={biggestScore ? summarySource : unavailableSource} href={biggestScore?.matchId ? `/matches/${encodeURIComponent(biggestScore.matchId)}` : '/matches'} />
-          <GoalStatCard title="الشباك النظيفة" value={formatCount(cleanSheets)} subtitle={bestCleanSheetTeam ? shortText(teamName(bestCleanSheetTeam), 18) : 'غير متوفر'} source={cleanSheets !== null ? summarySource : unavailableSource} tone="green" href="/matches" />
+          <PlayerLeaderCard title="الهداف" leader={topScorer} metricLabel="هدف" tone="gold" />
+          <PlayerLeaderCard title="صانع الأهداف" leader={topAssister} metricLabel="أسيست" tone="cyan" />
+          <GoalStatCard title="المباريات" value={totalMatches !== null && finishedMatches !== null ? `${formatCount(finishedMatches)} / ${formatCount(totalMatches)}` : formatCount(totalMatches)} subtitle={`${formatCount(liveMatches)} مباشرة • ${formatCount(scheduledMatches)} قادمة`} source={totalMatches !== null || finishedMatches !== null ? summarySource : unavailableSource} tone="neutral" href="/statistics" />
+          <GoalStatCard title="أهداف البطولة" value={formatCount(totalGoals)} subtitle={`${formatCount(finishedMatches)} مباراة منتهية`} source={totalGoals !== null ? summarySource : unavailableSource} tone="gold" href="/statistics" />
+          <GoalStatCard title="متوسط الأهداف" value={formatDecimal(averageGoals)} subtitle="هدف لكل مباراة" source={averageGoals !== null ? summarySource : unavailableSource} tone="cyan" href="/statistics" />
+          <GoalStatCard title="التسديدات" value={`${formatCount(totalShots)} / ${formatCount(totalShotsOnTarget)}`} subtitle="إجمالي / على المرمى" source={totalShots !== null || totalShotsOnTarget !== null ? summarySource : unavailableSource} tone="cyan" href="/statistics" />
+          <GoalStatCard title="أفضل هجوم" value={formatCount(pickNumber(topScoringTeam?.goalsFor))} subtitle={topScoringTeam ? shortText(teamName(topScoringTeam), 18) : 'غير متوفر'} source={topScoringTeam ? summarySource : unavailableSource} tone="green" href="/statistics" />
+          <GoalStatCard title="الأكثر استقبالًا" value={formatCount(pickNumber(mostConcedingTeam?.goalsAgainst))} subtitle={mostConcedingTeam ? shortText(teamName(mostConcedingTeam), 18) : 'غير متوفر'} source={mostConcedingTeam ? summarySource : unavailableSource} tone="red" href="/statistics" />
+          <GoalStatCard title="أكبر نتيجة" value={biggestScore ? `${formatCount(biggestScore.homeScore)}-${formatCount(biggestScore.awayScore)}` : '—'} subtitle={biggestScore ? shortText(`${teamName(biggestScore.homeTeam)} ضد ${teamName(biggestScore.awayTeam)}`, 22) : 'تظهر بعد التسجيل'} source={biggestScore ? summarySource : unavailableSource} href={biggestScore?.matchId ? `/matches/${encodeURIComponent(biggestScore.matchId)}` : '/statistics'} />
+          <GoalStatCard title="الشباك النظيفة" value={formatCount(cleanSheets)} subtitle={cleanSheetRate !== null ? `نسبة ${formatPercent(cleanSheetRate)}` : bestCleanSheetTeam ? shortText(teamName(bestCleanSheetTeam), 18) : 'غير متوفر'} source={cleanSheets !== null ? summarySource : unavailableSource} tone="green" href="/statistics" />
           <PlayersGroupCard playerCount={playerCountValue} teamCount={teamCountValue} source={playerCountValue !== null || teamCountValue !== null ? 'DB/Snapshots' : unavailableSource} />
           <CardsMiniCard yellow={cardTotalYellow} red={cardTotalRed} source={cardsSource} />
           <PenaltyMiniCard kickStats={penalties} source={penaltySource} />
