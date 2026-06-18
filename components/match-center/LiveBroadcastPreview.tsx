@@ -69,7 +69,7 @@ function toNumberText(value: unknown) {
 }
 
 function cleanText(value: unknown) {
-  return String(value || '').toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9\u0600-\u06ff]+/g, ' ').replace(/\s+/g, ' ').trim();
+  return String(value || '').toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/[_-]+/g, ' ').replace(/[^a-z0-9\u0600-\u06ff]+/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
 function initials(name: string) {
@@ -82,51 +82,67 @@ function shortName(name: string) {
   return `${parts[0]} ${parts[parts.length - 1]}`;
 }
 
-function eventText(event: MatchEventLike) {
-  return `${event.type || ''} ${event.detail || ''}`.toLowerCase();
+function eventType(event: MatchEventLike | null) {
+  return cleanText(event?.type || '');
 }
 
-function has(event: MatchEventLike, english: string, arabic: string) {
+function eventText(event: MatchEventLike | null) {
+  return cleanText(`${event?.type || ''} ${event?.detail || ''}`);
+}
+
+function isStrictGoalType(value: string) {
+  if (!value) return false;
+  if (/(goal kick|goal attempt|shot on goal|saved goal|goalkeeper|goalkeeper save|disallowed goal|no goal|goal line)/.test(value)) return false;
+  return value === 'goal' || value === 'penalty goal' || value === 'own goal' || value === 'penalty scored' || value === 'goal scored';
+}
+
+function has(event: MatchEventLike | null, english: string, arabic: string) {
   const text = eventText(event);
   return text.includes(english) || text.includes(arabic);
 }
 
-function isGoal(event: MatchEventLike) {
-  return has(event, 'goal', 'هدف');
+function isGoal(event: MatchEventLike | null) {
+  const type = eventType(event);
+  if (isStrictGoalType(type)) return true;
+  // Arabic details from trusted imports can still say "هدف" while type is exact goal-like.
+  if (/(goal kick|goal attempt|shot on goal|saved goal|goalkeeper|disallowed goal|no goal|goal line)/.test(eventText(event))) return false;
+  return type === 'goal' || type === 'penalty goal' || type === 'own goal';
 }
 
-function isCorner(event: MatchEventLike) {
+function isCorner(event: MatchEventLike | null) {
   return has(event, 'corner', 'ركنية');
 }
 
-function isCard(event: MatchEventLike) {
+function isCard(event: MatchEventLike | null) {
   return has(event, 'card', 'بطاقة') || has(event, 'yellow', 'صفراء') || has(event, 'red', 'حمراء');
 }
 
-function isShot(event: MatchEventLike) {
-  return has(event, 'shot', 'تسديدة') || has(event, 'attempt', 'محاولة');
+function isShot(event: MatchEventLike | null) {
+  const text = eventText(event);
+  if (isGoal(event)) return false;
+  return text.includes('shot') || text.includes('تسديدة') || text.includes('attempt') || text.includes('محاولة');
 }
 
 function isSubstitution(event: MatchEventLike | null) {
   return !!event && (has(event, 'sub', 'تبديل') || has(event, 'substitution', 'تغيير'));
 }
 
-function isVar(event: MatchEventLike) {
+function isVar(event: MatchEventLike | null) {
   return has(event, 'var', 'فار') || has(event, 'var', 'حكم الفيديو');
 }
 
-function isInjury(event: MatchEventLike) {
+function isInjury(event: MatchEventLike | null) {
   return has(event, 'injury', 'إصابة') || has(event, 'injury', 'اصابة');
 }
 
-function isDanger(event: MatchEventLike) {
+function isDanger(event: MatchEventLike | null) {
   return has(event, 'danger', 'خطورة') || has(event, 'attack', 'هجمة') || isGoal(event) || isShot(event) || isVar(event);
 }
 
 function isImportantEvent(event: MatchEventLike) {
   if (isGoal(event) || isSubstitution(event) || isCard(event) || isCorner(event) || isShot(event) || isVar(event) || isInjury(event)) return true;
-  const type = cleanText(event.type);
-  return type.includes('penalty') || type.includes('own goal') || type.includes('offside');
+  const type = eventType(event);
+  return type.includes('penalty') || type.includes('offside');
 }
 
 function eventMatchesFilter(event: MatchEventLike, filter: FilterKey) {
@@ -142,10 +158,10 @@ function eventMatchesFilter(event: MatchEventLike, filter: FilterKey) {
   return true;
 }
 
-function eventIcon(event: MatchEventLike) {
+function eventIcon(event: MatchEventLike | null) {
   if (isGoal(event)) return '⚽';
   if (isCorner(event)) return '🚩';
-  if (isCard(event)) return '🟨';
+  if (isCard(event)) return eventType(event).includes('red') ? '🟥' : '🟨';
   if (isSubstitution(event)) return '🔁';
   if (isVar(event)) return '📺';
   if (isShot(event)) return '🎯';
@@ -153,15 +169,15 @@ function eventIcon(event: MatchEventLike) {
   return '•';
 }
 
-function eventLabel(event: MatchEventLike) {
-  if (isGoal(event)) return 'هدف';
+function eventLabel(event: MatchEventLike | null) {
+  if (isGoal(event)) return eventType(event).includes('penalty') ? 'هدف من ركلة جزاء' : 'هدف';
   if (isCorner(event)) return 'ركنية';
   if (isCard(event)) return 'بطاقة';
   if (isSubstitution(event)) return 'تبديل';
   if (isVar(event)) return 'VAR';
   if (isShot(event)) return 'تسديدة';
   if (isDanger(event)) return 'خطورة';
-  return event.type || 'حدث';
+  return event?.type || 'حدث';
 }
 
 function eventMinuteLabel(event: MatchEventLike | null) {
