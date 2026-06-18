@@ -26,7 +26,7 @@ type PlayerLike = {
   teamId?: string | null;
 };
 
-type FilterKey = 'all' | 'goals' | 'danger' | 'shots' | 'corners' | 'cards';
+type FilterKey = 'important' | 'all' | 'goals' | 'danger' | 'shots' | 'corners' | 'cards' | 'subs' | 'var';
 
 type Props = {
   matchId: string;
@@ -38,12 +38,15 @@ type Props = {
 };
 
 const FILTERS: { key: FilterKey; label: string }[] = [
+  { key: 'important', label: 'المهمة' },
   { key: 'all', label: 'الكل' },
   { key: 'goals', label: 'الأهداف' },
   { key: 'danger', label: 'الخطورة' },
   { key: 'shots', label: 'التسديدات' },
   { key: 'corners', label: 'الركنيات' },
   { key: 'cards', label: 'البطاقات' },
+  { key: 'subs', label: 'التبديلات' },
+  { key: 'var', label: 'VAR' },
 ];
 
 const REPLAY_MS = 950;
@@ -108,17 +111,34 @@ function isSubstitution(event: MatchEventLike | null) {
   return !!event && (has(event, 'sub', 'تبديل') || has(event, 'substitution', 'تغيير'));
 }
 
+function isVar(event: MatchEventLike) {
+  return has(event, 'var', 'فار') || has(event, 'var', 'حكم الفيديو');
+}
+
+function isInjury(event: MatchEventLike) {
+  return has(event, 'injury', 'إصابة') || has(event, 'injury', 'اصابة');
+}
+
 function isDanger(event: MatchEventLike) {
-  return has(event, 'danger', 'خطورة') || has(event, 'attack', 'هجمة') || isGoal(event) || isShot(event);
+  return has(event, 'danger', 'خطورة') || has(event, 'attack', 'هجمة') || isGoal(event) || isShot(event) || isVar(event);
+}
+
+function isImportantEvent(event: MatchEventLike) {
+  if (isGoal(event) || isSubstitution(event) || isCard(event) || isCorner(event) || isShot(event) || isVar(event) || isInjury(event)) return true;
+  const type = cleanText(event.type);
+  return type.includes('penalty') || type.includes('own goal') || type.includes('offside');
 }
 
 function eventMatchesFilter(event: MatchEventLike, filter: FilterKey) {
+  if (filter === 'important') return isImportantEvent(event);
   if (filter === 'all') return true;
   if (filter === 'goals') return isGoal(event);
   if (filter === 'danger') return isDanger(event);
   if (filter === 'shots') return isShot(event);
   if (filter === 'corners') return isCorner(event);
   if (filter === 'cards') return isCard(event);
+  if (filter === 'subs') return isSubstitution(event);
+  if (filter === 'var') return isVar(event);
   return true;
 }
 
@@ -127,6 +147,7 @@ function eventIcon(event: MatchEventLike) {
   if (isCorner(event)) return '🚩';
   if (isCard(event)) return '🟨';
   if (isSubstitution(event)) return '🔁';
+  if (isVar(event)) return '📺';
   if (isShot(event)) return '🎯';
   if (isDanger(event)) return '🔥';
   return '•';
@@ -137,6 +158,7 @@ function eventLabel(event: MatchEventLike) {
   if (isCorner(event)) return 'ركنية';
   if (isCard(event)) return 'بطاقة';
   if (isSubstitution(event)) return 'تبديل';
+  if (isVar(event)) return 'VAR';
   if (isShot(event)) return 'تسديدة';
   if (isDanger(event)) return 'خطورة';
   return event.type || 'حدث';
@@ -216,7 +238,7 @@ function TeamHalfLineup({ team, players, currentEvent, side }: { team: TeamLike;
 }
 
 export default function LiveBroadcastPreview({ matchId, events, homeTeam, awayTeam, homePlayers, awayPlayers }: Props) {
-  const [filter, setFilter] = useState<FilterKey>('all');
+  const [filter, setFilter] = useState<FilterKey>('important');
   const sorted = useMemo(() => [...events].sort((a, b) => Number(a.minute ?? 0) - Number(b.minute ?? 0)), [events]);
   const visible = useMemo(() => sorted.filter((event) => eventMatchesFilter(event, filter)), [sorted, filter]);
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
