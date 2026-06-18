@@ -1,8 +1,9 @@
 import type { Metadata } from 'next';
+import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getServerSession } from 'next-auth';
-import { Activity, ArrowLeft, BarChart3, Radio, ShieldCheck, Target, TrendingUp, Users } from 'lucide-react';
+import { Activity, ArrowLeft, BarChart3, Radio, ShieldCheck, Sparkles, Target, TrendingUp, Users } from 'lucide-react';
 import prisma from '@/lib/prisma';
 import { authOptions } from '@/lib/auth';
 import InternalAnimationPlayer from '@/app/animation-live/player/InternalAnimationPlayer';
@@ -32,6 +33,12 @@ type MatchArticleSummary = {
 };
 
 type PairLike = { home?: number | null; away?: number | null; sourcePath?: string | null } | null;
+
+type Insight = {
+  title: string;
+  value: string;
+  body: string;
+};
 
 function isAdmin(session: AdminSession) {
   const email = session?.user?.email || '';
@@ -78,6 +85,11 @@ function formatNumber(value?: number | null, suffix = '') {
 function formatDecimal(value?: number | null, digits = 2) {
   if (value === null || value === undefined || Number.isNaN(Number(value))) return '—';
   return Number(value).toLocaleString('ar-EG', { maximumFractionDigits: digits, minimumFractionDigits: digits });
+}
+
+function numberValue(value?: number | null) {
+  if (value === null || value === undefined || Number.isNaN(Number(value))) return null;
+  return Number(value);
 }
 
 function formatDate(value?: Date | string | null) {
@@ -127,7 +139,7 @@ function providerStatPair(stats: Record<string, any>, key: string): PairLike {
 }
 
 function hasPair(pair: PairLike) {
-  return pair && (pair.home !== null && pair.home !== undefined || pair.away !== null && pair.away !== undefined);
+  return Boolean(pair && (pair.home !== null && pair.home !== undefined || pair.away !== null && pair.away !== undefined));
 }
 
 function pairShare(pair: PairLike) {
@@ -143,7 +155,85 @@ function teamName(team: any, fallback: string) {
   return team?.name || team?.code || fallback;
 }
 
-function QualityCard({ title, pair, icon, decimals = 0, suffix = '', accent = 'cyan' }: { title: string; pair: PairLike; icon: React.ReactNode; decimals?: number; suffix?: string; accent?: 'cyan' | 'gold' | 'green' }) {
+function leaderName(pair: PairLike, homeName: string, awayName: string) {
+  const home = numberValue(pair?.home);
+  const away = numberValue(pair?.away);
+  if (home === null || away === null) return null;
+  if (home === away) return 'تعادل';
+  return home > away ? homeName : awayName;
+}
+
+function pairDiff(pair: PairLike) {
+  const home = numberValue(pair?.home);
+  const away = numberValue(pair?.away);
+  if (home === null || away === null) return null;
+  return Math.abs(home - away);
+}
+
+function buildInsights({ homeName, awayName, xg, possession, shots, shotsOnTarget, saves }: { homeName: string; awayName: string; xg: PairLike; possession: PairLike; shots: PairLike; shotsOnTarget: PairLike; saves: PairLike }) {
+  const insights: Insight[] = [];
+  const xgLeader = leaderName(xg, homeName, awayName);
+  const xgDiff = pairDiff(xg);
+  if (xgLeader && xgDiff !== null) {
+    insights.push({
+      title: 'جودة الفرص',
+      value: xgLeader === 'تعادل' ? 'متقاربة' : xgLeader,
+      body: xgLeader === 'تعادل'
+        ? `xG متقارب بين الفريقين (${formatDecimal(xg?.home, 2)} - ${formatDecimal(xg?.away, 2)}).`
+        : `${xgLeader} صنع فرصًا أعلى جودة بفارق xG ${formatDecimal(xgDiff, 2)}.`,
+    });
+  }
+
+  const possessionLeader = leaderName(possession, homeName, awayName);
+  const possessionDiff = pairDiff(possession);
+  if (possessionLeader && possessionDiff !== null) {
+    insights.push({
+      title: 'إيقاع اللعب',
+      value: possessionLeader === 'تعادل' ? 'متوازن' : possessionLeader,
+      body: possessionLeader === 'تعادل'
+        ? 'الاستحواذ متوازن تقريبًا بين الفريقين.'
+        : `${possessionLeader} امتلك الكرة أكثر بفارق ${formatNumber(possessionDiff, '%')}.`,
+    });
+  }
+
+  const onTargetLeader = leaderName(shotsOnTarget, homeName, awayName);
+  const onTargetDiff = pairDiff(shotsOnTarget);
+  if (onTargetLeader && onTargetDiff !== null) {
+    insights.push({
+      title: 'الفاعلية على المرمى',
+      value: onTargetLeader === 'تعادل' ? 'متعادلة' : onTargetLeader,
+      body: onTargetLeader === 'تعادل'
+        ? `الفريقان سجلا نفس عدد التسديدات على المرمى (${formatNumber(shotsOnTarget?.home)} - ${formatNumber(shotsOnTarget?.away)}).`
+        : `${onTargetLeader} وصل للمرمى أكثر بفارق ${formatNumber(onTargetDiff)} تسديدات على المرمى.`,
+    });
+  }
+
+  const shotsLeader = leaderName(shots, homeName, awayName);
+  const shotsDiff = pairDiff(shots);
+  if (shotsLeader && shotsDiff !== null) {
+    insights.push({
+      title: 'حجم المحاولات',
+      value: shotsLeader === 'تعادل' ? 'متقارب' : shotsLeader,
+      body: shotsLeader === 'تعادل'
+        ? 'عدد المحاولات متقارب بين الفريقين.'
+        : `${shotsLeader} أنهى المباراة بمحاولات أكثر بفارق ${formatNumber(shotsDiff)} تسديدة.`,
+    });
+  }
+
+  const savesLeader = leaderName(saves, homeName, awayName);
+  const savesDiff = pairDiff(saves);
+  if (savesLeader && savesDiff !== null && savesDiff > 0) {
+    insights.push({
+      title: 'ضغط على الحارس',
+      value: savesLeader,
+      body: `حارس ${savesLeader} احتاج لتدخلات أكثر بفارق ${formatNumber(savesDiff)} تصديات، ما يعكس ضغطًا مباشرًا على مرماه.`,
+    });
+  }
+
+  return insights.slice(0, 4);
+}
+
+function QualityCard({ title, pair, icon, decimals = 0, suffix = '', accent = 'cyan' }: { title: string; pair: PairLike; icon: ReactNode; decimals?: number; suffix?: string; accent?: 'cyan' | 'gold' | 'green' }) {
   const border = accent === 'gold' ? 'border-[#FFD700]/25 bg-[#FFD700]/[0.06]' : accent === 'green' ? 'border-emerald-400/20 bg-emerald-400/[0.06]' : 'border-[#0FF0FC]/20 bg-[#0FF0FC]/[0.05]';
   const text = accent === 'gold' ? 'text-[#FFD700]' : accent === 'green' ? 'text-emerald-300' : 'text-[#0FF0FC]';
   return (
@@ -163,6 +253,19 @@ function QualityCard({ title, pair, icon, decimals = 0, suffix = '', accent = 'c
           <p className="mt-1 text-[10px] font-bold text-gray-500">الضيف</p>
         </div>
       </div>
+    </div>
+  );
+}
+
+function InsightCard({ insight }: { insight: Insight }) {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-black/25 p-4">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-[10px] font-black uppercase tracking-[0.24em] text-gray-500">{insight.title}</p>
+        <Sparkles size={15} className="text-[#FFD700]" />
+      </div>
+      <p className="mt-2 text-lg font-black text-white">{insight.value}</p>
+      <p className="mt-2 text-xs font-bold leading-6 text-gray-400">{insight.body}</p>
     </div>
   );
 }
@@ -213,7 +316,7 @@ function FormationCard({ side, lineup, fallbackName }: { side: 'home' | 'away'; 
 function ProfessionalStatsPanel({ match, iSportsSnapshot, theStatsSnapshot }: { match: any; iSportsSnapshot: any; theStatsSnapshot: any }) {
   const homeName = teamName(match.homeTeam, 'Home');
   const awayName = teamName(match.awayTeam, 'Away');
-  const { raw, stats, derived, lineup } = getProviderEnrichment(theStatsSnapshot);
+  const { stats, derived, lineup } = getProviderEnrichment(theStatsSnapshot);
   const lineupHome = rawObject(lineup.home);
   const lineupAway = rawObject(lineup.away);
 
@@ -235,6 +338,7 @@ function ProfessionalStatsPanel({ match, iSportsSnapshot, theStatsSnapshot }: { 
   const ballRecoveries = providerStatPair(stats, 'ballRecoveries');
   const yellowCards = pair('yellowCards', 'homeYellowCards', 'awayYellowCards');
   const redCards = pair('redCards', 'homeRedCards', 'awayRedCards');
+  const insights = buildInsights({ homeName, awayName, xg, possession, shots, shotsOnTarget, saves });
   const statsSource = theStatsSnapshot ? `${providerLabel(theStatsSnapshot.provider)} + ${iSportsSnapshot ? providerLabel(iSportsSnapshot.provider) : 'المصدر المحلي'}` : iSportsSnapshot ? providerLabel(iSportsSnapshot.provider) : 'غير متوفر';
 
   return (
@@ -253,6 +357,12 @@ function ProfessionalStatsPanel({ match, iSportsSnapshot, theStatsSnapshot }: { 
           {theStatsSnapshot?.capturedAt ? <p className="mt-1 text-[10px] font-bold text-gray-500">آخر إثراء: {formatDate(theStatsSnapshot.capturedAt)}</p> : null}
         </div>
       </div>
+
+      {insights.length ? (
+        <div className="mb-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          {insights.map((insight) => <InsightCard key={insight.title} insight={insight} />)}
+        </div>
+      ) : null}
 
       <div className="mb-5 grid gap-3 lg:grid-cols-3">
         <QualityCard title="xG" pair={xg} decimals={2} icon={<TrendingUp size={20} />} accent="gold" />
