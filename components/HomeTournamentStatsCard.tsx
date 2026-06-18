@@ -42,6 +42,11 @@ function pickNumber(...values: unknown[]) {
   return null;
 }
 
+function percent(numerator?: number | null, denominator?: number | null) {
+  if (typeof numerator !== 'number' || typeof denominator !== 'number' || !Number.isFinite(numerator) || !Number.isFinite(denominator) || denominator <= 0) return null;
+  return Math.max(0, Math.min(100, (numerator / denominator) * 100));
+}
+
 function formatCount(value?: number | null, unavailable = 'غير متوفر') {
   if (typeof value !== 'number' || !Number.isFinite(value)) return unavailable;
   return new Intl.NumberFormat('ar-EG').format(value);
@@ -265,15 +270,27 @@ function PowerStatsCard({ powerStats, source }: { powerStats: any; source: strin
   const passAccuracy = pickNumber(powerStats?.passAccuracyPercent);
   const saves = pickNumber(powerStats?.saves);
   const tackles = pickNumber(powerStats?.tackles);
-  const corners = pickNumber(powerStats?.corners, powerStats?.totalCorners);
+  const corners = pickNumber(powerStats?.corners, powerStats?.totalCorners, powerStats?.cornerKicks);
+  const attacks = pickNumber(powerStats?.attacks, powerStats?.totalAttacks);
+  const dangerousAttacks = pickNumber(powerStats?.dangerousAttacks, powerStats?.totalDangerousAttacks);
+  const fouls = pickNumber(powerStats?.fouls, powerStats?.totalFouls);
+  const offsides = pickNumber(powerStats?.offsides, powerStats?.totalOffsides);
+  const totalShots = pickNumber(powerStats?.totalShots, powerStats?.shots);
+  const totalShotsOnTarget = pickNumber(powerStats?.totalShotsOnTarget, powerStats?.shotsOnTarget);
+  const shotAccuracy = percent(totalShotsOnTarget, totalShots);
 
   const cards = [
-    { title: 'xG', value: formatDecimal(xg), subtitle: 'الأهداف المتوقعة' },
-    { title: 'فرص كبيرة', value: formatCount(bigChances), subtitle: 'إجمالي الفرص' },
-    { title: 'دقة التمرير', value: formatPercent(passAccuracy), subtitle: 'نسبة النجاح' },
-    { title: saves !== null ? 'تصديات' : 'تدخلات', value: saves !== null ? formatCount(saves) : formatCount(tackles), subtitle: saves !== null ? 'إجمالي التصديات' : 'إجمالي التدخلات' },
-    ...(corners !== null ? [{ title: 'ركنيات', value: formatCount(corners), subtitle: 'إجمالي الركنيات' }] : []),
-  ];
+    { title: 'xG', value: formatDecimal(xg), subtitle: 'الأهداف المتوقعة', show: xg !== null },
+    { title: 'فرص كبيرة', value: formatCount(bigChances), subtitle: 'إجمالي الفرص', show: bigChances !== null },
+    { title: 'دقة التمرير', value: formatPercent(passAccuracy), subtitle: 'نسبة النجاح', show: passAccuracy !== null },
+    { title: 'دقة التسديد', value: formatPercent(shotAccuracy), subtitle: 'على المرمى / إجمالي', show: shotAccuracy !== null },
+    { title: saves !== null ? 'تصديات' : 'تدخلات', value: saves !== null ? formatCount(saves) : formatCount(tackles), subtitle: saves !== null ? 'إجمالي التصديات' : 'إجمالي التدخلات', show: saves !== null || tackles !== null },
+    { title: 'ركنيات', value: formatCount(corners), subtitle: 'إجمالي الركنيات', show: corners !== null },
+    { title: 'هجمات', value: formatCount(attacks), subtitle: 'إجمالي الهجمات', show: attacks !== null },
+    { title: 'هجمات خطيرة', value: formatCount(dangerousAttacks), subtitle: 'إجمالي الخطورة', show: dangerousAttacks !== null },
+    { title: 'أخطاء', value: formatCount(fouls), subtitle: 'إجمالي الأخطاء', show: fouls !== null },
+    { title: 'تسللات', value: formatCount(offsides), subtitle: 'إجمالي التسللات', show: offsides !== null },
+  ].filter((card) => card.show);
 
   return (
     <>
@@ -337,9 +354,12 @@ export default function HomeTournamentStatsCard({ playersCount: serverPlayersCou
   const summarySource = sourceNameForSummary(summary, databaseSummary);
   const finalStats = summary?.finalStats || {};
   const powerStats = summary?.powerStats || finalStats || {};
+  const totalMatches = pickNumber(summary?.totalMatches, databaseSummary?.totalMatches);
   const totalGoals = pickNumber(summary?.totalGoals, databaseSummary?.totalGoals);
   const averageGoals = pickNumber(summary?.averageGoalsPerFinishedMatch, databaseSummary?.averageGoalsPerFinishedMatch);
   const finishedMatches = pickNumber(summary?.finishedMatches, databaseSummary?.finishedMatches);
+  const liveMatches = pickNumber(summary?.liveMatches, databaseSummary?.liveMatches);
+  const scheduledMatches = pickNumber(summary?.scheduledMatches, databaseSummary?.scheduledMatches);
   const totalShots = hasProviderStat(summary, 'shots') || hasSnapshotValue(summary, finalStats?.totalShots) ? pickNumber(finalStats?.totalShots, finalStats?.shots) : null;
   const totalShotsOnTarget = hasProviderStat(summary, 'shotsOnTarget') || hasSnapshotValue(summary, finalStats?.totalShotsOnTarget) ? pickNumber(finalStats?.totalShotsOnTarget) : null;
   const cardTotalYellow = pickNumber(read(summary, 'yellow' + 'Cards'), read(databaseSummary, 'yellow' + 'Cards'));
@@ -352,7 +372,14 @@ export default function HomeTournamentStatsCard({ playersCount: serverPlayersCou
   const topScorer = playerLeaders?.leaders?.topScorer || null;
   const penalties = penaltiesSummary?.penalties?.available ? penaltiesSummary.penalties : read(databaseSummary, 'penal' + 'ties')?.available ? read(databaseSummary, 'penal' + 'ties') : read(summary, 'penal' + 'ties');
   const penaltySource = penaltiesSummary?.penalties?.available ? (penaltiesSummary?.provider || penaltiesSummary?.source || 'FOOTBALL_DATA_FULL') : penalties?.available ? summarySource : unavailableSource;
-  const powerSource = hasProviderStat(summary, 'xg') || pickNumber(powerStats?.totalXg, powerStats?.xg) !== null ? summarySource : unavailableSource;
+  const advancedSourceValue = pickNumber(
+    powerStats?.totalXg, powerStats?.xg, powerStats?.bigChances, powerStats?.passAccuracyPercent,
+    powerStats?.saves, powerStats?.tackles, powerStats?.corners, powerStats?.totalCorners,
+    powerStats?.attacks, powerStats?.totalAttacks, powerStats?.dangerousAttacks, powerStats?.totalDangerousAttacks,
+    powerStats?.fouls, powerStats?.totalFouls, powerStats?.offsides, powerStats?.totalOffsides,
+    powerStats?.totalShots, powerStats?.totalShotsOnTarget,
+  );
+  const powerSource = advancedSourceValue !== null ? summarySource : unavailableSource;
   const cardsSource = cardTotalYellow !== null || cardTotalRed !== null ? summarySource : unavailableSource;
 
   return (
@@ -369,11 +396,12 @@ export default function HomeTournamentStatsCard({ playersCount: serverPlayersCou
 
       {isInitialLoading ? (
         <div className="grid auto-rows-[124px] grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-8 xl:grid-cols-12">
-          {['الهداف', 'الأهداف', 'المتوسط', 'التسديدات', 'أكبر نتيجة', 'الشباك', 'اللاعبون', 'الكروت', 'الجزاءات', 'xG', 'فرص كبيرة', 'دقة التمرير', 'تصديات'].map((label) => <LoadingBox key={label} label={label} />)}
+          {['الهداف', 'المباريات', 'الأهداف', 'المتوسط', 'التسديدات', 'أكبر نتيجة', 'الشباك', 'اللاعبون', 'الكروت', 'الجزاءات', 'xG', 'دقة التسديد', 'ركنيات', 'هجمات'].map((label) => <LoadingBox key={label} label={label} />)}
         </div>
       ) : (
         <div className="grid auto-rows-[124px] grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-8 xl:grid-cols-12">
           <TopScorerCard leader={topScorer} />
+          <GoalStatCard title="المباريات" value={totalMatches !== null && finishedMatches !== null ? `${formatCount(finishedMatches)} / ${formatCount(totalMatches)}` : formatCount(totalMatches)} subtitle={`${formatCount(liveMatches)} مباشرة • ${formatCount(scheduledMatches)} قادمة`} source={totalMatches !== null || finishedMatches !== null ? summarySource : unavailableSource} tone="neutral" href="/matches" />
           <GoalStatCard title="أهداف البطولة" value={formatCount(totalGoals)} subtitle={`${formatCount(finishedMatches)} مباراة منتهية`} source={totalGoals !== null ? summarySource : unavailableSource} tone="gold" href="/matches" />
           <GoalStatCard title="متوسط الأهداف" value={formatDecimal(averageGoals)} subtitle="هدف لكل مباراة" source={averageGoals !== null ? summarySource : unavailableSource} tone="cyan" href="/matches" />
           <GoalStatCard title="التسديدات" value={`${formatCount(totalShots)} / ${formatCount(totalShotsOnTarget)}`} subtitle="إجمالي / على المرمى" source={totalShots !== null || totalShotsOnTarget !== null ? summarySource : unavailableSource} tone="cyan" href="/matches" />
