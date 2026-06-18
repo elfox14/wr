@@ -6,6 +6,10 @@ import { getTheStatsApiConfigStatus, safeTheStatsApiError, theStatsApiFetch } fr
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
+const FINISHED = new Set(['FINISHED', 'FT', 'FULL_TIME', 'FULLTIME', 'COMPLETED', 'ENDED', 'CLOSED', 'AET', 'PEN']);
+const HALF_TIME = new Set(['HT', 'HALFTIME', 'HALF_TIME', 'HALF-TIME', 'BREAK']);
+const LIVE = new Set(['LIVE', 'IN_PLAY', 'INPLAY', '1H', '2H', 'FIRST_HALF', 'SECOND_HALF', 'ET', 'EXTRA_TIME']);
+
 function configuredSecrets() {
   return [process.env.ADMIN_API_SECRET, process.env.CRON_SECRET]
     .map((value) => String(value || '').trim())
@@ -93,31 +97,43 @@ function minuteFromMeta(match: any, meta: any) {
   return Number.isFinite(elapsed) ? Math.max(1, Math.min(130, elapsed)) : null;
 }
 
-async function createScoreUpdateEvent(match: any, score: { home: number; away: number }, minute: number | null, sourcePath: string) {
-  if (score.home + score.away <= 0) return false;
-  const detail = `تحديث النتيجة المباشرة من TheStatsAPI: ${match.homeTeam?.name || 'Home'} ${score.home} - ${score.away} ${match.awayTeam?.name || 'Away'} — توقيت واسم مسجل الهدف غير متوفرين من timeline`;
-  const existing = await prisma.matchEvent.findFirst({
+function normalizeStatus(value: any) {
+  return String(value || '').trim().toUpperCase().replace(/[\s-]+/g, '_');
+}
+
+function statusFromMeta(match: any, meta: any, params: URLSearchParams) {
+  if (boolParam(params.get('forceFinished'), false)) return 'FINISHED';
+  const explicitStatus = params.get('status');
+  if (explicitStatus) return normalizeStatus(explicitStatus) === 'FINISHED' ? 'FINISHED' : explicitStatus.toUpperCase();
+
+  const providerStatus = normalizeStatus(first(
+    meta.match_status,
+    meta.matchStatus,
+    meta.status,
+    meta.period,
+    meta.state,
+    meta.match_state,
+    meta.matchState,
+  ));
+
+  if (FINISHED.has(providerStatus)) return 'FINISHED';
+  if (HALF_TIME.has(providerStatus)) return 'HT';
+  if (LIVE.has(providerStatus)) return 'IN_PLAY';
+
+  // Never downgrade a match already marked as finished when the provider omits status in live-stats.
+  if (FINISHED.has(normalizeStatus(match?.status))) return 'FINISHED';
+
+  return 'IN_PLAY';
+}
+
+async function cleanupSyntheticScoreEvents(matchId: string) {
+  const result = await prisma.matchEvent.deleteMany({
     where: {
-      matchId: match.id,
-      type: 'score_update',
+      matchId,
       sourceName: 'THE_STATS_API_LIVE_SCORE',
-      detail: { contains: `${score.home} - ${score.away}` },
-    },
-    select: { id: true },
-  });
-  if (existing) return false;
-  await prisma.matchEvent.create({
-    data: {
-      matchId: match.id,
-      minute,
-      type: 'score_update',
-      teamId: score.home > score.away ? match.homeTeamId : score.away > score.home ? match.awayTeamId : null,
-      detail,
-      sourceName: 'THE_STATS_API_LIVE_SCORE',
-      sourceUrl: sourcePath,
     },
   });
-  return true;
+  return result.count;
 }
 
 export async function GET(req: Request) {
@@ -129,6 +145,7 @@ export async function GET(req: Request) {
   const matchId = url.searchParams.get('matchId') || '';
   const providerMatchId = url.searchParams.get('providerMatchId') || '';
   const dryRun = boolParam(url.searchParams.get('dryRun'), true);
+  const cleanupSyntheticEvents = boolParam(url.searchParams.get('cleanupSyntheticEvents'), true);
   if (!matchId || !providerMatchId) {
     return NextResponse.json({ ok: false, error: 'matchId and providerMatchId are required to avoid extra provider lookup calls' }, { status: 400, headers: { 'Cache-Control': 'no-store' } });
   }
@@ -142,9 +159,10 @@ export async function GET(req: Request) {
     const { meta, stats } = compactStats(liveStatsPayload);
     const score = scoreFromMeta(match, meta);
     const minute = minuteFromMeta(match, meta);
+    const nextStatus = statusFromMeta(match, meta, url.searchParams);
     let snapshotSaved = false;
     let matchUpdated = false;
-    let scoreEventCreated = false;
+    let syntheticScoreEventsDeleted = 0;
 
     if (!dryRun) {
       await prisma.matchStatsSnapshot.create({ data: {
@@ -169,16 +187,17 @@ export async function GET(req: Request) {
         awayRedCards: statInt(stats, 'redCards', 'away'),
         homeScore: score.home,
         awayScore: score.away,
-        rawData: { status: 'IN_PLAY', minute, stats, meta, liveStats: liveStatsPayload, source: { provider: 'THE_STATS_API', liveStatsPath }, importedAt: new Date().toISOString() },
+        rawData: { status: nextStatus, minute, stats, meta, liveStats: liveStatsPayload, source: { provider: 'THE_STATS_API', liveStatsPath }, importedAt: new Date().toISOString() },
       } });
       snapshotSaved = true;
 
-      const updateData: Record<string, any> = { status: 'IN_PLAY' };
+      const updateData: Record<string, any> = { status: nextStatus };
       if (score.home !== match.homeScore) updateData.homeScore = score.home;
       if (score.away !== match.awayScore) updateData.awayScore = score.away;
       await prisma.match.update({ where: { id: match.id }, data: updateData });
       matchUpdated = true;
-      scoreEventCreated = await createScoreUpdateEvent(match, score, minute, liveStatsPath);
+
+      if (cleanupSyntheticEvents) syntheticScoreEventsDeleted = await cleanupSyntheticScoreEvents(match.id);
     }
 
     return NextResponse.json({
@@ -194,13 +213,20 @@ export async function GET(req: Request) {
       liveStatsKeys: Object.keys(stats),
       minute,
       score,
+      previousStatus: match.status,
+      nextStatus,
       snapshotSaved,
       matchUpdated,
-      scoreEventCreated,
+      syntheticScoreEventsDeleted,
       sourcePath: liveStatsPath,
+      sourcePolicy: {
+        statsAndStatus: 'THE_STATS_API_LIVE',
+        events: 'THE_STATS_API_TIMELINE when available; ISPORTS_TIMELINE fallback only; synthetic score events are cleaned by default',
+        duplicatePrevention: 'No THE_STATS_API_LIVE_SCORE fallback events are created here.',
+      },
       displayNotes: {
         timelineEventsAvailable: false,
-        scoreUpdateEventIsFallback: true,
+        scoreUpdateEventIsFallback: false,
         unavailableFromLiveStats: ['attacks', 'dangerousAttacks', 'exactGoalMinute', 'goalScorer'],
       },
       safety: {
