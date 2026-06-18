@@ -156,7 +156,7 @@ function providerMatchesLocal(provider: ProviderMatch, localMatch: any) {
   const localHome = normalizeTeamName(localMatch.homeTeam?.name || localMatch.homeTeam?.code);
   const localAway = normalizeTeamName(localMatch.awayTeam?.name || localMatch.awayTeam?.code);
   const homeMatches = providerHome && localHome && (providerHome === localHome || providerHome.includes(localHome) || localHome.includes(providerHome));
-  const awayMatches = providerAway && localAway && (providerAway === localAway || providerAway.includes(awayMatches) || localAway.includes(providerAway));
+  const awayMatches = providerAway && localAway && (providerAway === localAway || providerAway.includes(localAway) || localAway.includes(providerAway));
   return Boolean(homeMatches && awayMatches && (sameDay(provider.matchDate, localMatch.matchDate) || hoursApart(provider.matchDate, localMatch.matchDate) <= 4));
 }
 
