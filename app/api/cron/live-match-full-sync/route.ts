@@ -143,18 +143,36 @@ function providerIdFromCatchupBody(body: any, matchId: string) {
   return String(found?.resolvedProviderMatchId || '').trim() || null;
 }
 
+function hasOfficialTheStatsTimeline(result: any, minEvents: number) {
+  return Boolean(result?.timelineOk !== false && Number(result?.providerEventsFound || 0) >= minEvents);
+}
+
 function isNotLiveConflict(result: any) {
   const error = result?.liveStatsError || result?.error;
   const status = Number(error?.status || error?.payload?.error?.status_code || 0);
-  const message = String(error?.message || error?.payload?.error?.message || '').toLowerCase();
-  return status === 409 && message.includes('not live');
+  const message = [
+    error?.message,
+    error?.code,
+    error?.payload?.error?.message,
+    error?.payload?.error?.code,
+  ].map((value) => String(value || '').toLowerCase()).join(' ');
+  return status === 409 && (message.includes('not live') || message.includes('conflict'));
 }
 
 async function autoFinishFromOfficialTimeline(match: any, result: any, dryRun: boolean) {
   const latestMinute = Number(result?.latestMinute || 0);
   const providerEventsFound = Number(result?.providerEventsFound || 0);
   const shouldFinish = isNotLiveConflict(result) && providerEventsFound > 0 && latestMinute >= 90;
-  if (!shouldFinish) return { checked: true, shouldFinish: false, reason: 'official_timeline_does_not_confirm_finished' };
+  if (!shouldFinish) {
+    return {
+      checked: true,
+      shouldFinish: false,
+      reason: 'official_timeline_does_not_confirm_finished',
+      isNotLiveConflict: isNotLiveConflict(result),
+      latestMinute,
+      providerEventsFound,
+    };
+  }
   if (!dryRun && String(match.status || '').toUpperCase() !== 'FINISHED') {
     await prisma.match.update({ where: { id: match.id }, data: { status: 'FINISHED' } });
   }
@@ -185,6 +203,8 @@ export async function GET(req: Request) {
   const updateStatusFromStats = bool(url.searchParams.get('updateStatusFromStats'), false);
   const forceStatsOnly = bool(url.searchParams.get('forceStatsOnly'), false);
   const autoFinish = bool(url.searchParams.get('autoFinish'), true);
+  const isportFallbackOnly = bool(url.searchParams.get('isportFallbackOnly'), true);
+  const officialTimelineMinEvents = int(url.searchParams.get('officialTimelineMinEvents'), 5, 1, 500);
   const limit = int(url.searchParams.get('limit'), 8, 1, 20);
   const minutesBack = int(url.searchParams.get('minutesBack'), 210, 15, 480);
   const minutesForward = int(url.searchParams.get('minutesForward'), 45, 0, 240);
@@ -200,10 +220,11 @@ export async function GET(req: Request) {
     matchesFound: matches.length,
     policy: {
       theStats: 'primary source for score, status, and live stats',
-      iSport: 'fallback source for animation timeline events when animationMatchId exists',
+      iSport: isportFallbackOnly ? 'fallback only when official TheStats timeline is not available' : 'fallback animation timeline events when animationMatchId exists',
       database: 'last successful snapshot/events remain visible if a provider fails',
       dedupe: 'removes duplicates after provider pulls; official TheStats timeline replaces iSport fallback when available',
       rateLimitProtection: 'stats-only is disabled by default because live-catchup already calls live-stats',
+      officialTimelineMinEvents,
     },
     wakeFallback: null,
     theStatsCatchup: null,
@@ -236,6 +257,7 @@ export async function GET(req: Request) {
       previousStatus: match.status,
       externalId: match.externalId,
       animationMatchId: match.animationMatchId,
+      officialTheStatsTimelineAvailable: false,
       theStatsResolveCatchup: null,
       theStatsAutoFinish: null,
       theStatsStatus: null,
@@ -256,6 +278,8 @@ export async function GET(req: Request) {
       if (providerMatchId) providerIds.set(match.id, providerMatchId);
     }
 
+    item.officialTheStatsTimelineAvailable = hasOfficialTheStatsTimeline(theStatsMatchResult, officialTimelineMinEvents);
+
     if (autoFinish && theStatsMatchResult) {
       item.theStatsAutoFinish = await autoFinishFromOfficialTimeline(match, theStatsMatchResult, dryRun);
     }
@@ -275,14 +299,22 @@ export async function GET(req: Request) {
     }
 
     if (runISports && match.animationMatchId) {
-      const isports = new URL('/api/internal/live-ingest/isports/remote-frame-pull-v4', origin);
-      isports.searchParams.set('mode', 'timeline');
-      isports.searchParams.set('matchId', String(match.animationMatchId));
-      isports.searchParams.set('dbMatchId', match.id);
-      isports.searchParams.set('save', String(!dryRun));
-      isports.searchParams.set('replace', 'true');
-      isports.searchParams.set('key', key);
-      item.isportsTimeline = await callJson(isports, 70000);
+      if (isportFallbackOnly && item.officialTheStatsTimelineAvailable) {
+        item.isportsTimeline = {
+          skipped: true,
+          reason: 'Official TheStats timeline is available; iSport fallback not needed for this run',
+          providerEventsFound: Number(theStatsMatchResult?.providerEventsFound || 0),
+        };
+      } else {
+        const isports = new URL('/api/internal/live-ingest/isports/remote-frame-pull-v4', origin);
+        isports.searchParams.set('mode', 'timeline');
+        isports.searchParams.set('matchId', String(match.animationMatchId));
+        isports.searchParams.set('dbMatchId', match.id);
+        isports.searchParams.set('save', String(!dryRun));
+        isports.searchParams.set('replace', 'true');
+        isports.searchParams.set('key', key);
+        item.isportsTimeline = await callJson(isports, 70000);
+      }
     } else if (runISports) {
       item.isportsTimeline = { skipped: true, reason: 'No animationMatchId mapped for this match' };
     }
@@ -292,6 +324,7 @@ export async function GET(req: Request) {
       dedupe.searchParams.set('matchId', match.id);
       dedupe.searchParams.set('dryRun', String(dryRun));
       dedupe.searchParams.set('preferTheStats', 'true');
+      dedupe.searchParams.set('preferTheStatsMinEvents', String(officialTimelineMinEvents));
       dedupe.searchParams.set('key', key);
       item.dedupe = await callJson(dedupe, 30000);
     }
