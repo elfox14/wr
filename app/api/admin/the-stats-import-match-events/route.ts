@@ -73,9 +73,13 @@ function boolParam(value: string | null, fallback = true) {
 }
 
 function clampInt(value: string | null, fallback: number, min: number, max: number) {
-  const parsed = Number(value || fallback);
+  const parsed = Number(value ?? fallback);
   if (!Number.isFinite(parsed)) return fallback;
   return Math.max(min, Math.min(max, Math.floor(parsed)));
+}
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function toNumber(value: any): number | null {
@@ -413,7 +417,9 @@ export async function GET(req: Request) {
   const skipSimilarExisting = boolParam(url.searchParams.get('skipSimilarExisting'), true);
   const replaceAllSources = boolParam(url.searchParams.get('replaceAllSources'), false);
   const explicitProviderMatchId = url.searchParams.get('providerMatchId');
-  const limit = clampInt(url.searchParams.get('limit'), 20, 1, 80);
+  const limit = clampInt(url.searchParams.get('limit'), 5, 1, 80);
+  const offset = clampInt(url.searchParams.get('offset'), 0, 0, 10000);
+  const delayMs = clampInt(url.searchParams.get('delayMs'), 0, 0, 10000);
   const providerMatchesPerPage = clampInt(url.searchParams.get('providerMatchesPerPage'), 100, 1, 100);
   const providerMatchesQuery = {
     competition_id: url.searchParams.get('competition_id') || process.env.THE_STATS_API_WORLD_CUP_COMPETITION_ID || 'comp_6107',
@@ -441,11 +447,13 @@ export async function GET(req: Request) {
         },
         include: { homeTeam: true, awayTeam: true },
         orderBy: { matchDate: 'asc' },
+        skip: offset,
         take: limit,
       });
 
       const results = [];
-      for (const match of matches) {
+      for (const [index, match] of matches.entries()) {
+        if (index > 0 && delayMs > 0) await sleep(delayMs);
         try {
           results.push(await importMatchEvents(match, options));
         } catch (error: any) {
@@ -468,6 +476,9 @@ export async function GET(req: Request) {
         saved: !dryRun,
         allPrevious: true,
         limit,
+        offset,
+        nextOffset: offset + matches.length,
+        delayMs,
         matchesFound: matches.length,
         successful: successful.length,
         failed: failed.length,
@@ -485,6 +496,7 @@ export async function GET(req: Request) {
           replacesPreviousTheStatsApiEventsOnly: !replaceAllSources,
           canReplaceAllSourcesWhenExplicitlyRequested: true,
           skipsSimilarExistingEventsByDefault: true,
+          useOffsetForNextBatch: true,
           prohibitedOddsStillBlocked: true,
         },
       }, { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } });
