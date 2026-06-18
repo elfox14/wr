@@ -62,6 +62,7 @@ function extractTimeline(payload: any) {
   if (Array.isArray(payload)) return payload;
   const data = payload?.data || payload?.response || payload?.result || payload;
   for (const field of ['timeline', 'events', 'incidents', 'commentary', 'data', 'items', 'results']) if (Array.isArray(data?.[field])) return data[field];
+  if (Array.isArray(data?.events)) return data.events;
   return [];
 }
 
@@ -179,23 +180,29 @@ function pair(value: any, sourcePath: string) {
 
 function parseLiveStats(payload: any) {
   const data = payload?.data || payload;
+  const meta = data?.meta || {};
+  const providerStats = data?.stats || {};
   const overview = data?.overview || {};
   const shots = data?.shots || {};
   const attack = data?.attack || {};
   const stats: Record<string, any> = {};
   const entries: Array<[string, any]> = [
-    ['possession', pair(overview.ball_possession || data?.ball_possession, 'live-stats.ball_possession')],
-    ['shots', pair(overview.total_shots || shots.total_shots || data?.total_shots, 'live-stats.total_shots')],
-    ['shotsOnTarget', pair(overview.shots_on_target || shots.shots_on_target || data?.shots_on_target, 'live-stats.shots_on_target')],
-    ['shotsOffTarget', pair(shots.shots_off_target || data?.shots_off_target, 'live-stats.shots_off_target')],
-    ['corners', pair(overview.corner_kicks || data?.corner_kicks || data?.corners, 'live-stats.corner_kicks')],
-    ['yellowCards', pair(overview.yellow_cards || data?.yellow_cards, 'live-stats.yellow_cards')],
-    ['redCards', pair(overview.red_cards || data?.red_cards, 'live-stats.red_cards')],
-    ['attacks', pair(attack.attacks || data?.attacks, 'live-stats.attacks')],
-    ['dangerousAttacks', pair(attack.dangerous_attacks || data?.dangerous_attacks, 'live-stats.dangerous_attacks')],
+    ['possession', pair(providerStats.ball_possession || overview.ball_possession || data?.ball_possession, 'live-stats.stats.ball_possession')],
+    ['shots', pair(providerStats.total_shots || overview.total_shots || shots.total_shots || data?.total_shots, 'live-stats.stats.total_shots')],
+    ['shotsOnTarget', pair(providerStats.shots_on_target || overview.shots_on_target || shots.shots_on_target || data?.shots_on_target, 'live-stats.stats.shots_on_target')],
+    ['shotsOffTarget', pair(providerStats.shots_off_target || shots.shots_off_target || data?.shots_off_target, 'live-stats.stats.shots_off_target')],
+    ['corners', pair(providerStats.corner_kicks || overview.corner_kicks || data?.corner_kicks || data?.corners, 'live-stats.stats.corner_kicks')],
+    ['yellowCards', pair(providerStats.yellow_cards || overview.yellow_cards || data?.yellow_cards, 'live-stats.stats.yellow_cards')],
+    ['redCards', pair(providerStats.red_cards || overview.red_cards || data?.red_cards, 'live-stats.stats.red_cards')],
+    ['attacks', pair(providerStats.attacks || attack.attacks || data?.attacks, 'live-stats.stats.attacks')],
+    ['dangerousAttacks', pair(providerStats.dangerous_attacks || attack.dangerous_attacks || data?.dangerous_attacks, 'live-stats.stats.dangerous_attacks')],
+    ['xg', pair(providerStats.expected_goals || providerStats.xg || data?.expected_goals || data?.xg, 'live-stats.stats.expected_goals')],
+    ['bigChances', pair(providerStats.big_chances || data?.big_chances, 'live-stats.stats.big_chances')],
+    ['fouls', pair(providerStats.fouls || data?.fouls, 'live-stats.stats.fouls')],
+    ['offsides', pair(providerStats.offsides || data?.offsides, 'live-stats.stats.offsides')],
   ];
   for (const [name, value] of entries) if (value) stats[name] = value;
-  return stats;
+  return { stats, meta };
 }
 
 function statInt(stats: Record<string, any>, keyName: string, side: 'home' | 'away') {
@@ -203,13 +210,27 @@ function statInt(stats: Record<string, any>, keyName: string, side: 'home' | 'aw
   return value === null ? null : Math.round(value);
 }
 
+function statFloat(stats: Record<string, any>, keyName: string, side: 'home' | 'away') {
+  const value = n(stats[keyName]?.[side]);
+  return value === null ? null : value;
+}
+
 function snapshotMinute(match: any, livePayload: any, timelineMinute: number | null) {
   const raw = livePayload?.data || livePayload || {};
-  const direct = n(first(raw.minute, raw.elapsed, raw.matchMinute, raw.currentMinute, raw?.time?.minute, raw?.fixture?.status?.elapsed));
+  const meta = raw.meta || {};
+  const direct = n(first(meta.elapsed_minutes, raw.minute, raw.elapsed, raw.matchMinute, raw.currentMinute, raw?.time?.minute, raw?.fixture?.status?.elapsed));
   if (direct !== null) return Math.round(direct);
   if (timelineMinute) return timelineMinute;
   const elapsed = Math.floor((Date.now() - new Date(match.matchDate).getTime()) / 60_000) + 1;
   return Number.isFinite(elapsed) ? Math.max(1, Math.min(130, elapsed)) : null;
+}
+
+function liveScore(match: any, livePayload: any) {
+  const meta = (livePayload?.data || livePayload || {}).meta || {};
+  return {
+    home: statInt({ score: { home: first(meta.home_goals, meta.homeGoals, meta.home_score) } }, 'score', 'home') ?? match.homeScore,
+    away: statInt({ score: { away: first(meta.away_goals, meta.awayGoals, meta.away_score) } }, 'score', 'away') ?? match.awayScore,
+  };
 }
 
 async function syncMatch(match: any, dryRun: boolean, skipSimilarExisting: boolean, query: Record<string, string | number>) {
@@ -239,12 +260,15 @@ async function syncMatch(match: any, dryRun: boolean, skipSimilarExisting: boole
 
   const latestTimelineMinute = providerEvents.reduce((max, event) => Math.max(max, Number(event.minute || 0)), 0) || null;
   const liveStatsPayload = liveStatsResult.ok ? (liveStatsResult as any).payload : null;
-  const stats = liveStatsPayload ? parseLiveStats(liveStatsPayload) : {};
+  const parsedLive = liveStatsPayload ? parseLiveStats(liveStatsPayload) : { stats: {}, meta: {} };
+  const stats = parsedLive.stats;
+  const score = liveScore(match, liveStatsPayload);
   const minute = snapshotMinute(match, liveStatsPayload, latestTimelineMinute);
   const shouldMarkLive = Boolean((providerEvents.length || liveStatsResult.ok) && !FINISHED.includes(String(match.status || '').toUpperCase()) && !LIVE.includes(String(match.status || '').toUpperCase()));
   let importedMatchEvents = 0;
   let createdSnapshot = null;
   let statusUpdated = false;
+  let scoreUpdated = false;
 
   if (!dryRun) {
     if (Object.keys(stats).length || liveStatsResult.ok) {
@@ -272,9 +296,9 @@ async function syncMatch(match: any, dryRun: boolean, skipSimilarExisting: boole
         awayYellowCards: statInt(stats, 'yellowCards', 'away'),
         homeRedCards: statInt(stats, 'redCards', 'home'),
         awayRedCards: statInt(stats, 'redCards', 'away'),
-        homeScore: match.homeScore,
-        awayScore: match.awayScore,
-        rawData: { status: 'IN_PLAY', minute, liveStats: liveStatsPayload, stats, source: { provider: 'THE_STATS_API', liveStatsPath, timelinePath }, importedAt: new Date().toISOString() },
+        homeScore: score.home,
+        awayScore: score.away,
+        rawData: { status: 'IN_PLAY', minute, liveStats: liveStatsPayload, stats, meta: parsedLive.meta, source: { provider: 'THE_STATS_API', liveStatsPath, timelinePath }, importedAt: new Date().toISOString() },
       } });
     }
     await prisma.matchEvent.deleteMany({ where: { matchId: match.id, sourceName: 'THE_STATS_API' } });
@@ -282,13 +306,18 @@ async function syncMatch(match: any, dryRun: boolean, skipSimilarExisting: boole
       const result = await prisma.matchEvent.createMany({ data: eventsToImport.map((event) => ({ matchId: match.id, minute: event.minute, type: event.type, teamId: eventTeamId(event, match), playerName: event.playerName || null, detail: event.detail, sourceName: 'THE_STATS_API', sourceUrl: event.sourcePath })) });
       importedMatchEvents = result.count;
     }
-    if (shouldMarkLive) {
-      await prisma.match.update({ where: { id: match.id }, data: { status: 'IN_PLAY' } });
-      statusUpdated = true;
+    const matchUpdate: Record<string, any> = {};
+    if (shouldMarkLive) matchUpdate.status = 'IN_PLAY';
+    if (score.home !== match.homeScore) matchUpdate.homeScore = score.home;
+    if (score.away !== match.awayScore) matchUpdate.awayScore = score.away;
+    if (Object.keys(matchUpdate).length) {
+      await prisma.match.update({ where: { id: match.id }, data: matchUpdate });
+      statusUpdated = matchUpdate.status === 'IN_PLAY';
+      scoreUpdated = matchUpdate.homeScore !== undefined || matchUpdate.awayScore !== undefined;
     }
   }
 
-  return { ok: true, matchId: match.id, localTeams: `${match.homeTeam?.name} vs ${match.awayTeam?.name}`, previousStatus: match.status, statusAfterSync: statusUpdated ? 'IN_PLAY' : match.status, statusUpdated, resolvedProviderMatchId: resolved.id, resolvedBy: resolved.by, timelineOk: timelineResult.ok, liveStatsOk: liveStatsResult.ok, liveStatsError: liveStatsResult.ok ? null : (liveStatsResult as any).error, providerEventsFound: providerEvents.length, eventsToImport: eventsToImport.length, skippedSimilarExisting, liveStatsFound: Object.keys(stats).length, latestMinute: minute, snapshotSaved: Boolean(createdSnapshot), importedMatchEvents, preview: providerEvents.slice(-8) };
+  return { ok: true, matchId: match.id, localTeams: `${match.homeTeam?.name} vs ${match.awayTeam?.name}`, previousStatus: match.status, statusAfterSync: statusUpdated ? 'IN_PLAY' : match.status, statusUpdated, scoreUpdated, score, resolvedProviderMatchId: resolved.id, resolvedBy: resolved.by, timelineOk: timelineResult.ok, liveStatsOk: liveStatsResult.ok, liveStatsError: liveStatsResult.ok ? null : (liveStatsResult as any).error, providerEventsFound: providerEvents.length, eventsToImport: eventsToImport.length, skippedSimilarExisting, liveStatsFound: Object.keys(stats).length, liveStatsKeys: Object.keys(stats), latestMinute: minute, snapshotSaved: Boolean(createdSnapshot), importedMatchEvents, preview: providerEvents.slice(-8) };
 }
 
 export async function GET(req: Request) {
@@ -315,7 +344,7 @@ export async function GET(req: Request) {
       catch (error: any) { results.push({ ok: false, matchId: match.id, localTeams: `${match.homeTeam?.name} vs ${match.awayTeam?.name}`, error: safeTheStatsApiError(error) }); }
     }
     const successful = results.filter((result: any) => result.ok);
-    return NextResponse.json({ ok: true, provider: 'THE_STATS_API', mode: 'the_stats_live_catchup', dryRun, saved: !dryRun, matchesFound: matches.length, successful: successful.length, failed: results.length - successful.length, skipSimilarExisting, totalProviderEventsFound: successful.reduce((sum: number, item: any) => sum + Number(item.providerEventsFound || 0), 0), totalEventsToImport: successful.reduce((sum: number, item: any) => sum + Number(item.eventsToImport || 0), 0), totalLiveStatsFound: successful.reduce((sum: number, item: any) => sum + Number(item.liveStatsFound || 0), 0), totalImportedMatchEvents: successful.reduce((sum: number, item: any) => sum + Number(item.importedMatchEvents || 0), 0), snapshotsSaved: successful.filter((item: any) => item.snapshotSaved).length, statusUpdated: successful.filter((item: any) => item.statusUpdated).length, results, config: getTheStatsApiConfigStatus() }, { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } });
+    return NextResponse.json({ ok: true, provider: 'THE_STATS_API', mode: 'the_stats_live_catchup', dryRun, saved: !dryRun, matchesFound: matches.length, successful: successful.length, failed: results.length - successful.length, skipSimilarExisting, totalProviderEventsFound: successful.reduce((sum: number, item: any) => sum + Number(item.providerEventsFound || 0), 0), totalEventsToImport: successful.reduce((sum: number, item: any) => sum + Number(item.eventsToImport || 0), 0), totalLiveStatsFound: successful.reduce((sum: number, item: any) => sum + Number(item.liveStatsFound || 0), 0), totalImportedMatchEvents: successful.reduce((sum: number, item: any) => sum + Number(item.importedMatchEvents || 0), 0), snapshotsSaved: successful.filter((item: any) => item.snapshotSaved).length, statusUpdated: successful.filter((item: any) => item.statusUpdated).length, scoreUpdated: successful.filter((item: any) => item.scoreUpdated).length, results, config: getTheStatsApiConfigStatus() }, { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } });
   } catch (error: any) {
     return NextResponse.json({ ok: false, provider: 'THE_STATS_API', mode: 'the_stats_live_catchup', error: safeTheStatsApiError(error), config: getTheStatsApiConfigStatus() }, { status: Number(error?.status) || 500, headers: { 'Cache-Control': 'no-store' } });
   }
