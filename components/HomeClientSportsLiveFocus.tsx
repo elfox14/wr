@@ -46,12 +46,11 @@ type Props = {
 
 const MATCH_REFRESH_MS = 15_000;
 const LIVE_STATUSES = ['1H', '2H', 'ET', 'BT', 'P', 'IN_PLAY', 'LIVE'];
+const SECOND_HALF_STATUSES = ['2H'];
 const HALF_TIME_STATUSES = ['HT', 'HALFTIME', 'HALF_TIME', 'HALF-TIME'];
-const FINISHED_STATUSES = ['FINISHED', 'FT', 'AET', 'PEN'];
+const FINISHED_STATUSES = ['FINISHED', 'FT', 'AET', 'PEN', 'FULL_TIME', 'ENDED'];
 const SCHEDULED_STATUSES = ['SCHEDULED', 'TIMED', 'NOT_STARTED', 'NS'];
 const GROUP_LETTERS = 'ABCDEFGHIJKL'.split('');
-const LIKELY_LIVE_AFTER_MINUTES = 5;
-const MAX_LIKELY_LIVE_MINUTES = 115;
 
 function formatCount(value?: number | null, fallback = 0) {
   return new Intl.NumberFormat('ar-EG').format(typeof value === 'number' && Number.isFinite(value) ? value : fallback);
@@ -117,23 +116,20 @@ function isScheduled(match?: HomeMatch | null) {
   return !isFinished(match) && SCHEDULED_STATUSES.includes(normalizeStatus(match));
 }
 
-function isLikelyLiveByElapsedTime(match: HomeMatch, now: Date) {
-  const minutes = minutesSinceKickoff(match, now);
-  return !isFinished(match) && !isHalfTime(match) && isScheduled(match) && minutes !== null && minutes >= LIKELY_LIVE_AFTER_MINUTES && minutes < MAX_LIKELY_LIVE_MINUTES;
-}
-
-function isConfirmedLive(match?: HomeMatch | null, now?: Date) {
+function isConfirmedLive(match?: HomeMatch | null) {
   const status = normalizeStatus(match);
-  return !isFinished(match) && !isHalfTime(match) && (LIVE_STATUSES.includes(status) || Boolean(match?.isLiveNow) || Boolean(match?.isLikelyLiveByTime) || Boolean(match && now && isLikelyLiveByElapsedTime(match, now)));
+  return !isFinished(match) && !isHalfTime(match) && (LIVE_STATUSES.includes(status) || Boolean(match?.isLiveNow) || Boolean(match?.isLikelyLiveByTime));
 }
 
 function isWaitingForStartConfirmation(match: HomeMatch, now: Date) {
-  return isScheduled(match) && hasKickoffPassed(match, now) && !isLikelyLiveByElapsedTime(match, now) && !isConfirmedLive(match, now) && !isHalfTime(match);
+  return isScheduled(match) && hasKickoffPassed(match, now) && !isConfirmedLive(match) && !isHalfTime(match);
 }
 
 function displayMinute(match: HomeMatch) {
-  if (isHalfTime(match)) return null;
+  if (isHalfTime(match) || isFinished(match)) return null;
   const minute = Number(match.minute);
+  const status = normalizeStatus(match);
+  if (SECOND_HALF_STATUSES.includes(status) && (!Number.isFinite(minute) || minute < 45)) return 45;
   if (!Number.isFinite(minute) || minute <= 0) return null;
   return Math.max(1, Math.min(150, Math.floor(minute)));
 }
@@ -217,7 +213,8 @@ function MatchScore({ match }: { match: HomeMatch }) {
 function MatchStatePill({ match, now }: { match: HomeMatch; now: Date }) {
   if (isFinished(match)) return <span className="rounded-xl border border-white/10 bg-white/[0.06] px-2.5 py-1.5 text-[11px] font-black text-gray-300">انتهت</span>;
   if (isHalfTime(match)) return <span className="rounded-xl border border-[#FFD700]/20 bg-[#FFD700]/10 px-2.5 py-1.5 text-[11px] font-black text-[#FFD700]">استراحة</span>;
-  if (isConfirmedLive(match, now)) {
+  if (isConfirmedLive(match)) {
+    if (match.liveLabel) return <span className="rounded-xl border border-[#00FF88]/25 bg-[#00FF88]/10 px-2.5 py-1.5 text-[11px] font-black text-[#00FF88]">{match.liveLabel}</span>;
     const minute = displayMinute(match);
     const label = minute ? `جارية الآن - د${formatCount(minute)}` : 'جارية الآن';
     return <span className="rounded-xl border border-[#00FF88]/25 bg-[#00FF88]/10 px-2.5 py-1.5 text-[11px] font-black text-[#00FF88]">{label}</span>;
@@ -303,14 +300,14 @@ function MatchCenter({ fallbackMatches = [], nextMatch = null }: { fallbackMatch
 
   const mergedMatches = useMemo(() => uniqueMatches([...(matches.length ? matches : []), ...(nextMatch ? [nextMatch] : []), ...(matches.length ? [] : fallbackMatches)]), [matches, nextMatch, fallbackMatches]);
   const sortedMatches = useMemo(() => [...mergedMatches].sort((a, b) => matchTime(a) - matchTime(b)), [mergedMatches]);
-  const confirmedLiveMatch = sortedMatches.find((match) => isConfirmedLive(match, now) || isHalfTime(match)) || null;
+  const confirmedLiveMatch = sortedMatches.find((match) => isConfirmedLive(match) || isHalfTime(match)) || null;
   const waitingMatch = sortedMatches.find((match) => isWaitingForStartConfirmation(match, now)) || null;
-  const nextScheduledMatch = sortedMatches.find((match) => isScheduled(match) && !isWaitingForStartConfirmation(match, now) && !isConfirmedLive(match, now)) || null;
+  const nextScheduledMatch = sortedMatches.find((match) => isScheduled(match) && !isWaitingForStartConfirmation(match, now) && !isConfirmedLive(match)) || null;
   const primaryMatch = confirmedLiveMatch || waitingMatch || nextScheduledMatch || sortedMatches.find((match) => !isFinished(match)) || sortedMatches[0] || null;
   const primaryKey = primaryMatch ? matchKey(primaryMatch) : null;
   const secondaryMatches = sortedMatches
     .filter((match) => matchKey(match) !== primaryKey)
-    .filter((match) => isScheduled(match) && !isWaitingForStartConfirmation(match, now) && !isConfirmedLive(match, now) && matchTime(match) >= now.getTime())
+    .filter((match) => isScheduled(match) && !isWaitingForStartConfirmation(match, now) && !isConfirmedLive(match) && matchTime(match) >= now.getTime())
     .slice(0, 2);
 
   return (
@@ -318,7 +315,7 @@ function MatchCenter({ fallbackMatches = [], nextMatch = null }: { fallbackMatch
       <div className="flex flex-col gap-4">
         <div>
           {primaryMatch ? (
-            <MatchRow match={primaryMatch} now={now} variant={isConfirmedLive(primaryMatch, now) || isHalfTime(primaryMatch) ? 'live' : 'primary'} />
+            <MatchRow match={primaryMatch} now={now} variant={isConfirmedLive(primaryMatch) || isHalfTime(primaryMatch) ? 'live' : 'primary'} />
           ) : (
             <div className="rounded-2xl border border-dashed border-white/10 bg-black/20 p-4 text-sm font-bold text-gray-400">لا توجد مباراة رئيسية جاهزة للعرض الآن.</div>
           )}
