@@ -1,5 +1,6 @@
 import prisma from '@/lib/prisma';
 import LiveBroadcastPreview from '@/components/match-center/LiveBroadcastPreview';
+import LiveBroadcastPreviewSlot from '@/components/match-center/LiveBroadcastPreviewSlot';
 
 function isLiveStatus(status?: string) {
   const value = String(status || '').toUpperCase();
@@ -53,11 +54,13 @@ export default async function MatchCenterLayout({ children, params }: { children
       {sportsEventJsonLd ? <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(sportsEventJsonLd) }} /> : null}
       {children}
       {match ? (
-        <div className="bg-[#02060d] px-3 pb-5 text-white sm:px-6" dir="rtl">
-          <div className="mx-auto max-w-7xl">
-            <LiveBroadcastPreview matchId={match.id} events={match.events || []} />
+        <LiveBroadcastPreviewSlot>
+          <div className="bg-[#02060d] px-3 pb-5 text-white sm:px-6" dir="rtl">
+            <div className="mx-auto max-w-7xl">
+              <LiveBroadcastPreview matchId={match.id} events={match.events || []} />
+            </div>
           </div>
-        </div>
+        </LiveBroadcastPreviewSlot>
       ) : null}
     </>
   );
