@@ -24,6 +24,15 @@ type ProviderEvent = {
   sourcePath: string;
 };
 
+type ImportOptions = {
+  dryRun: boolean;
+  importantOnly: boolean;
+  skipSimilarExisting: boolean;
+  replaceAllSources: boolean;
+  explicitProviderMatchId?: string | null;
+  providerMatchesQuery: Record<string, string | number>;
+};
+
 const TEAM_NAME_ALIASES = new Map([
   ['usa', 'united states'],
   ['us', 'united states'],
@@ -34,6 +43,8 @@ const TEAM_NAME_ALIASES = new Map([
   ['cote d ivoire', 'ivory coast'],
   ['côte d ivoire', 'ivory coast'],
 ]);
+
+const FINISHED_STATUSES = ['FINISHED', 'FT', 'AET', 'PEN', 'COMPLETED'];
 
 function configuredSecrets() {
   return [process.env.ADMIN_API_SECRET, process.env.CRON_SECRET]
@@ -252,6 +263,20 @@ function compactProviderEvent(row: any, sourcePath: string): (ProviderEvent & { 
   };
 }
 
+function eventTypeFamily(type: any) {
+  const value = text(type);
+  if (value.includes('goal') || value.includes('هدف')) return 'goal';
+  if (value.includes('penalty')) return 'penalty';
+  if (value.includes('sub')) return 'substitution';
+  if (value.includes('corner')) return 'corner';
+  if (value.includes('shot')) return 'shot';
+  if (value.includes('card') || value.includes('yellow') || value.includes('red')) return 'card';
+  if (value.includes('var')) return 'var';
+  if (value.includes('offside')) return 'offside';
+  if (value.includes('foul')) return 'foul';
+  return value || 'note';
+}
+
 function teamIdForEvent(event: ProviderEvent, match: any) {
   const team = normalizeTeamName(event.teamName);
   const home = normalizeTeamName(match.homeTeam?.name || match.homeTeam?.code);
@@ -262,6 +287,31 @@ function teamIdForEvent(event: ProviderEvent, match: any) {
   if (home && detail.includes(home)) return match.homeTeamId;
   if (away && detail.includes(away)) return match.awayTeamId;
   return null;
+}
+
+function eventsLookSimilar(providerEvent: ProviderEvent, localEvent: any, match: any) {
+  const providerMinute = providerEvent.minute ?? null;
+  const localMinute = localEvent.minute ?? null;
+  if (providerMinute !== localMinute) return false;
+
+  const providerType = eventTypeFamily(providerEvent.type);
+  const localType = eventTypeFamily(localEvent.type);
+  if (providerType !== localType) return false;
+
+  const providerTeamId = teamIdForEvent(providerEvent, match);
+  if (providerTeamId && localEvent.teamId && providerTeamId !== localEvent.teamId) return false;
+
+  const providerPlayer = text(providerEvent.playerName);
+  const localPlayer = text(localEvent.playerName);
+  if (providerPlayer && localPlayer) {
+    return providerPlayer === localPlayer || providerPlayer.includes(localPlayer) || localPlayer.includes(providerPlayer);
+  }
+
+  const providerDetail = text(providerEvent.detail);
+  const localDetail = text(localEvent.detail);
+  if (!providerDetail || !localDetail) return true;
+  const providerWords = providerDetail.split(' ').filter((word) => word.length > 3);
+  return providerWords.some((word) => localDetail.includes(word));
 }
 
 function parseProviderEvents(payload: any, sourcePath: string, importantOnly: boolean) {
@@ -279,6 +329,77 @@ function parseProviderEvents(payload: any, sourcePath: string, importantOnly: bo
     .sort((a: any, b: any) => (a.minute ?? 999) - (b.minute ?? 999));
 }
 
+async function importMatchEvents(match: any, options: ImportOptions) {
+  const resolved = await resolveProviderMatchId(match, options.providerMatchesQuery, options.explicitProviderMatchId);
+  if (!resolved.resolvedProviderMatchId) {
+    return {
+      ok: false,
+      matchId: match.id,
+      localTeams: `${match.homeTeam?.name || 'Home'} vs ${match.awayTeam?.name || 'Away'}`,
+      error: 'Could not resolve TheStatsAPI match id',
+      resolved,
+    };
+  }
+
+  const timelinePath = `/api/football/matches/${encodeURIComponent(resolved.resolvedProviderMatchId)}/timeline`;
+  const timelinePayload = await theStatsApiFetch(timelinePath, {}, { timeoutMs: 15000 });
+  const providerEvents = parseProviderEvents(timelinePayload, timelinePath, options.importantOnly);
+  let eventsToImport = providerEvents;
+  let skippedSimilarExisting = 0;
+
+  if (options.skipSimilarExisting && !options.replaceAllSources) {
+    const existingOtherEvents = await prisma.matchEvent.findMany({
+      where: {
+        matchId: match.id,
+        OR: [{ sourceName: null }, { sourceName: { not: 'THE_STATS_API' } }],
+      },
+      select: { id: true, minute: true, type: true, teamId: true, playerName: true, detail: true, sourceName: true },
+    });
+    eventsToImport = providerEvents.filter((event) => {
+      const duplicated = existingOtherEvents.some((existing) => eventsLookSimilar(event, existing, match));
+      if (duplicated) skippedSimilarExisting += 1;
+      return !duplicated;
+    });
+  }
+
+  let importedMatchEvents = 0;
+  if (!options.dryRun) {
+    if (options.replaceAllSources) {
+      await prisma.matchEvent.deleteMany({ where: { matchId: match.id } });
+    } else {
+      await prisma.matchEvent.deleteMany({ where: { matchId: match.id, sourceName: 'THE_STATS_API' } });
+    }
+    if (eventsToImport.length) {
+      const result = await prisma.matchEvent.createMany({
+        data: eventsToImport.map((event: ProviderEvent) => ({
+          matchId: match.id,
+          minute: event.minute,
+          type: event.type,
+          teamId: teamIdForEvent(event, match),
+          playerName: event.playerName || null,
+          detail: event.detail,
+          sourceName: 'THE_STATS_API',
+          sourceUrl: event.sourcePath,
+        })),
+      });
+      importedMatchEvents = result.count;
+    }
+  }
+
+  return {
+    ok: true,
+    matchId: match.id,
+    localTeams: `${match.homeTeam?.name || 'Home'} vs ${match.awayTeam?.name || 'Away'}`,
+    resolvedProviderMatchId: resolved.resolvedProviderMatchId,
+    resolvedBy: resolved.resolvedBy,
+    providerEventsFound: providerEvents.length,
+    eventsToImport: eventsToImport.length,
+    skippedSimilarExisting,
+    importedMatchEvents,
+    preview: providerEvents.slice(0, 20),
+  };
+}
+
 export async function GET(req: Request) {
   const url = new URL(req.url);
   if (!isAuthorized(req, url.searchParams)) {
@@ -288,7 +409,11 @@ export async function GET(req: Request) {
   const matchId = url.searchParams.get('matchId') || '';
   const dryRun = boolParam(url.searchParams.get('dryRun'), true);
   const importantOnly = boolParam(url.searchParams.get('importantOnly'), false);
+  const allPrevious = boolParam(url.searchParams.get('allPrevious'), false) || boolParam(url.searchParams.get('bulk'), false);
+  const skipSimilarExisting = boolParam(url.searchParams.get('skipSimilarExisting'), true);
+  const replaceAllSources = boolParam(url.searchParams.get('replaceAllSources'), false);
   const explicitProviderMatchId = url.searchParams.get('providerMatchId');
+  const limit = clampInt(url.searchParams.get('limit'), 20, 1, 80);
   const providerMatchesPerPage = clampInt(url.searchParams.get('providerMatchesPerPage'), 100, 1, 100);
   const providerMatchesQuery = {
     competition_id: url.searchParams.get('competition_id') || process.env.THE_STATS_API_WORLD_CUP_COMPETITION_ID || 'comp_6107',
@@ -296,49 +421,91 @@ export async function GET(req: Request) {
     per_page: providerMatchesPerPage,
   };
 
-  if (!matchId) {
-    return NextResponse.json({ ok: false, error: 'matchId is required' }, { status: 400, headers: { 'Cache-Control': 'no-store' } });
-  }
+  const options: ImportOptions = {
+    dryRun,
+    importantOnly,
+    skipSimilarExisting,
+    replaceAllSources,
+    explicitProviderMatchId,
+    providerMatchesQuery,
+  };
 
   try {
+    if (allPrevious) {
+      const matches = await prisma.match.findMany({
+        where: {
+          OR: [
+            { matchDate: { lt: new Date() } },
+            { status: { in: FINISHED_STATUSES } },
+          ],
+        },
+        include: { homeTeam: true, awayTeam: true },
+        orderBy: { matchDate: 'asc' },
+        take: limit,
+      });
+
+      const results = [];
+      for (const match of matches) {
+        try {
+          results.push(await importMatchEvents(match, options));
+        } catch (error: any) {
+          results.push({
+            ok: false,
+            matchId: match.id,
+            localTeams: `${match.homeTeam?.name || 'Home'} vs ${match.awayTeam?.name || 'Away'}`,
+            error: safeTheStatsApiError(error),
+          });
+        }
+      }
+
+      const successful = results.filter((result: any) => result.ok);
+      const failed = results.filter((result: any) => !result.ok);
+      return NextResponse.json({
+        ok: true,
+        provider: 'THE_STATS_API',
+        mode: 'the_stats_import_previous_match_events',
+        dryRun,
+        saved: !dryRun,
+        allPrevious: true,
+        limit,
+        matchesFound: matches.length,
+        successful: successful.length,
+        failed: failed.length,
+        importantOnly,
+        skipSimilarExisting,
+        replaceAllSources,
+        totalProviderEventsFound: successful.reduce((sum: number, item: any) => sum + Number(item.providerEventsFound || 0), 0),
+        totalEventsToImport: successful.reduce((sum: number, item: any) => sum + Number(item.eventsToImport || 0), 0),
+        totalSkippedSimilarExisting: successful.reduce((sum: number, item: any) => sum + Number(item.skippedSimilarExisting || 0), 0),
+        totalImportedMatchEvents: successful.reduce((sum: number, item: any) => sum + Number(item.importedMatchEvents || 0), 0),
+        results,
+        safety: {
+          dryRunDefault: true,
+          importsEventsFromTheStatsApiOnly: true,
+          replacesPreviousTheStatsApiEventsOnly: !replaceAllSources,
+          canReplaceAllSourcesWhenExplicitlyRequested: true,
+          skipsSimilarExistingEventsByDefault: true,
+          prohibitedOddsStillBlocked: true,
+        },
+      }, { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } });
+    }
+
+    if (!matchId) {
+      return NextResponse.json({ ok: false, error: 'matchId is required unless allPrevious=true' }, { status: 400, headers: { 'Cache-Control': 'no-store' } });
+    }
+
     const match = await prisma.match.findUnique({ where: { id: matchId }, include: { homeTeam: true, awayTeam: true } });
     if (!match) return NextResponse.json({ ok: false, error: 'Match not found' }, { status: 404, headers: { 'Cache-Control': 'no-store' } });
 
-    const resolved = await resolveProviderMatchId(match, providerMatchesQuery, explicitProviderMatchId);
-    if (!resolved.resolvedProviderMatchId) {
+    const result = await importMatchEvents(match, options);
+    if (!result.ok) {
       return NextResponse.json({
         ok: false,
+        provider: 'THE_STATS_API',
         mode: 'the_stats_import_match_events',
-        error: 'Could not resolve TheStatsAPI match id',
-        matchId,
-        localTeams: `${match.homeTeam?.name || 'Home'} vs ${match.awayTeam?.name || 'Away'}`,
-        resolved,
+        ...result,
         config: getTheStatsApiConfigStatus(),
       }, { status: 404, headers: { 'Cache-Control': 'no-store' } });
-    }
-
-    const timelinePath = `/api/football/matches/${encodeURIComponent(resolved.resolvedProviderMatchId)}/timeline`;
-    const timelinePayload = await theStatsApiFetch(timelinePath, {}, { timeoutMs: 15000 });
-    const providerEvents = parseProviderEvents(timelinePayload, timelinePath, importantOnly);
-
-    let importedMatchEvents = 0;
-    if (!dryRun) {
-      await prisma.matchEvent.deleteMany({ where: { matchId: match.id, sourceName: 'THE_STATS_API' } });
-      if (providerEvents.length) {
-        const result = await prisma.matchEvent.createMany({
-          data: providerEvents.map((event: ProviderEvent) => ({
-            matchId: match.id,
-            minute: event.minute,
-            type: event.type,
-            teamId: teamIdForEvent(event, match),
-            playerName: event.playerName || null,
-            detail: event.detail,
-            sourceName: 'THE_STATS_API',
-            sourceUrl: event.sourcePath,
-          })),
-        });
-        importedMatchEvents = result.count;
-      }
     }
 
     return NextResponse.json({
@@ -347,18 +514,16 @@ export async function GET(req: Request) {
       mode: 'the_stats_import_match_events',
       dryRun,
       saved: !dryRun,
-      matchId: match.id,
-      localTeams: `${match.homeTeam?.name || 'Home'} vs ${match.awayTeam?.name || 'Away'}`,
-      resolvedProviderMatchId: resolved.resolvedProviderMatchId,
-      resolvedBy: resolved.resolvedBy,
       importantOnly,
-      providerEventsFound: providerEvents.length,
-      importedMatchEvents,
-      preview: providerEvents.slice(0, 20),
+      skipSimilarExisting,
+      replaceAllSources,
+      ...result,
       safety: {
         dryRunDefault: true,
         importsEventsFromTheStatsApiOnly: true,
-        replacesPreviousTheStatsApiEventsOnly: true,
+        replacesPreviousTheStatsApiEventsOnly: !replaceAllSources,
+        canReplaceAllSourcesWhenExplicitlyRequested: true,
+        skipsSimilarExistingEventsByDefault: true,
         prohibitedOddsStillBlocked: true,
       },
     }, { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } });
@@ -366,7 +531,7 @@ export async function GET(req: Request) {
     return NextResponse.json({
       ok: false,
       provider: 'THE_STATS_API',
-      mode: 'the_stats_import_match_events',
+      mode: allPrevious ? 'the_stats_import_previous_match_events' : 'the_stats_import_match_events',
       error: safeTheStatsApiError(error),
       config: getTheStatsApiConfigStatus(),
     }, { status: Number(error?.status) || 500, headers: { 'Cache-Control': 'no-store' } });
