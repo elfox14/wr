@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 type MatchEventLike = {
   id?: string | null;
@@ -26,13 +26,11 @@ const FILTERS: { key: FilterKey; label: string }[] = [
   { key: 'cards', label: 'البطاقات' },
 ];
 
+const REPLAY_MS = 950;
+
 function toNumberText(value: unknown) {
   const number = Number(value);
   return Number.isFinite(number) ? number.toLocaleString('ar-EG') : '—';
-}
-
-function eventKey(event: MatchEventLike, index: number) {
-  return String(event.id || `${event.minute ?? 'na'}-${event.type || 'event'}-${index}`);
 }
 
 function eventText(event: MatchEventLike) {
@@ -114,9 +112,9 @@ export default function LiveBroadcastPreview({ matchId, events }: Props) {
   const [filter, setFilter] = useState<FilterKey>('all');
   const sorted = useMemo(() => [...events].sort((a, b) => Number(a.minute ?? 0) - Number(b.minute ?? 0)), [events]);
   const visible = useMemo(() => sorted.filter((event) => eventMatchesFilter(event, filter)), [sorted, filter]);
-  const [selectedKey, setSelectedKey] = useState<string | null>(null);
-  const matchedIndex = visible.findIndex((event, index) => eventKey(event, index) === selectedKey);
-  const currentIndex = visible.length ? (matchedIndex >= 0 ? matchedIndex : visible.length - 1) : -1;
+  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const currentIndex = visible.length ? Math.max(0, Math.min(visible.length - 1, selectedIndex ?? visible.length - 1)) : -1;
   const currentEvent = currentIndex >= 0 ? visible[currentIndex] : sorted[sorted.length - 1] || null;
   const ball = ballPosition(currentEvent);
   const goals = events.filter(isGoal).length;
@@ -124,10 +122,37 @@ export default function LiveBroadcastPreview({ matchId, events }: Props) {
   const cards = events.filter(isCard).length;
   const canNavigate = visible.length > 0;
 
+  useEffect(() => {
+    setSelectedIndex(null);
+    setIsPlaying(false);
+  }, [filter, events.length]);
+
+  useEffect(() => {
+    if (!isPlaying || !visible.length) return undefined;
+    const timer = window.setTimeout(() => {
+      setSelectedIndex((index) => {
+        const current = index ?? 0;
+        const next = current + 1;
+        if (next >= visible.length) {
+          setIsPlaying(false);
+          return current;
+        }
+        return next;
+      });
+    }, REPLAY_MS);
+    return () => window.clearTimeout(timer);
+  }, [isPlaying, selectedIndex, visible.length]);
+
   function selectIndex(index: number) {
     if (!visible.length) return;
-    const safeIndex = Math.max(0, Math.min(visible.length - 1, index));
-    setSelectedKey(eventKey(visible[safeIndex], safeIndex));
+    setIsPlaying(false);
+    setSelectedIndex(Math.max(0, Math.min(visible.length - 1, index)));
+  }
+
+  function playEvents() {
+    if (!visible.length) return;
+    setSelectedIndex(0);
+    setIsPlaying(true);
   }
 
   return (
@@ -152,20 +177,20 @@ export default function LiveBroadcastPreview({ matchId, events }: Props) {
       <div className="mt-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex flex-wrap gap-2">
           {FILTERS.map((item) => (
-            <button key={item.key} type="button" onClick={() => { setFilter(item.key); setSelectedKey(null); }} className={`rounded-full border px-3 py-1 text-[10px] font-black transition ${filter === item.key ? 'border-[#FFD700]/40 bg-[#FFD700]/15 text-[#FFD700]' : 'border-white/10 bg-black/25 text-gray-400 hover:text-white'}`}>
+            <button key={item.key} type="button" onClick={() => setFilter(item.key)} className={`rounded-full border px-3 py-1 text-[10px] font-black transition ${filter === item.key ? 'border-[#FFD700]/40 bg-[#FFD700]/15 text-[#FFD700]' : 'border-white/10 bg-black/25 text-gray-400 hover:text-white'}`}>
               {item.label}
             </button>
           ))}
         </div>
         <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-white/10 bg-black/20 p-2">
           <button type="button" disabled={!canNavigate} onClick={() => selectIndex(currentIndex - 1)} className="rounded-full border border-white/10 bg-black/30 px-3 py-1 text-[10px] font-black text-gray-300 transition hover:border-[#0FF0FC]/40 hover:text-white disabled:cursor-not-allowed disabled:opacity-40">السابق</button>
-          <button type="button" disabled={!canNavigate} onClick={() => selectIndex(0)} className="rounded-full border border-[#FFD700]/30 bg-[#FFD700]/10 px-3 py-1 text-[10px] font-black text-[#FFD700] transition hover:bg-[#FFD700]/20 disabled:cursor-not-allowed disabled:opacity-40">إعادة الأحداث</button>
+          <button type="button" disabled={!canNavigate} onClick={playEvents} className="rounded-full border border-[#FFD700]/30 bg-[#FFD700]/10 px-3 py-1 text-[10px] font-black text-[#FFD700] transition hover:bg-[#FFD700]/20 disabled:cursor-not-allowed disabled:opacity-40">تشغيل الأحداث</button>
           <button type="button" disabled={!canNavigate} onClick={() => selectIndex(currentIndex + 1)} className="rounded-full border border-white/10 bg-black/30 px-3 py-1 text-[10px] font-black text-gray-300 transition hover:border-[#0FF0FC]/40 hover:text-white disabled:cursor-not-allowed disabled:opacity-40">التالي</button>
           <span className="px-2 text-[10px] font-black text-gray-500">{canNavigate ? `${toNumberText(currentIndex + 1)} / ${toNumberText(visible.length)}` : 'لا توجد أحداث'}</span>
         </div>
       </div>
 
-      <div className="mt-4 grid items-stretch gap-4 lg:grid-cols-[minmax(0,1fr)_260px]">
+      <div className="mt-4 grid items-stretch gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div>
           <div className="relative aspect-[16/8] min-h-[260px] overflow-hidden rounded-[28px] border border-emerald-400/20 bg-emerald-950/60 shadow-inner shadow-black">
             <div className="absolute inset-4 rounded-[22px] border border-white/20" />
@@ -173,7 +198,7 @@ export default function LiveBroadcastPreview({ matchId, events }: Props) {
             <div className="absolute left-1/2 top-1/2 h-24 w-24 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/20" />
             <div className="absolute left-4 top-1/2 h-36 w-20 -translate-y-1/2 rounded-r-2xl border border-l-0 border-white/20" />
             <div className="absolute right-4 top-1/2 h-36 w-20 -translate-y-1/2 rounded-l-2xl border border-r-0 border-white/20" />
-            <div className="absolute flex h-10 w-10 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-white/40 bg-white text-lg shadow-xl shadow-black transition-all duration-500" style={{ left: `${ball.left}%`, top: `${ball.top}%` }}>⚽</div>
+            <div className={`absolute flex h-10 w-10 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-white/40 bg-white text-lg shadow-xl shadow-black transition-all duration-500 ${isPlaying ? 'scale-110 ring-4 ring-[#FFD700]/30' : ''}`} style={{ left: `${ball.left}%`, top: `${ball.top}%` }}>⚽</div>
             <div className="absolute bottom-3 left-3 right-3 rounded-2xl border border-white/10 bg-black/50 p-3 backdrop-blur">
               <div className="text-[10px] font-black text-[#FFD700]">{currentEvent ? `د${toNumberText(currentEvent.minute)} · ${eventLabel(currentEvent)}` : 'لا توجد أحداث'}</div>
               <div className="mt-1 text-sm font-bold leading-6 text-white">{currentEvent?.detail || 'عند وصول الأحداث ستظهر حركة الكرة هنا.'}</div>
@@ -188,11 +213,11 @@ export default function LiveBroadcastPreview({ matchId, events }: Props) {
                 <span className="text-[9px] font-black text-gray-500">{minute}</span>
               </div>
             ))}
-            {visible.slice(-22).map((event, index) => {
-              const key = eventKey(event, index);
+            {visible.slice(-22).map((event) => {
+              const index = visible.indexOf(event);
               const active = event === currentEvent;
               return (
-                <button key={key} type="button" onClick={() => setSelectedKey(key)} className={`absolute top-1/2 flex h-7 w-7 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border text-xs transition ${active ? 'border-[#FFD700] bg-[#FFD700] text-black' : 'border-white/20 bg-black text-white hover:border-[#0FF0FC]'}`} style={{ left: `${minuteLeft(event.minute)}%` }} title={`د${toNumberText(event.minute)} · ${eventLabel(event)}`}>
+                <button key={`${event.id || index}-${event.minute || 0}`} type="button" onClick={() => selectIndex(index)} className={`absolute top-1/2 flex h-7 w-7 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border text-xs transition ${active ? 'border-[#FFD700] bg-[#FFD700] text-black' : 'border-white/20 bg-black text-white hover:border-[#0FF0FC]'}`} style={{ left: `${minuteLeft(event.minute)}%` }} title={`د${toNumberText(event.minute)} · ${eventLabel(event)}`}>
                   {eventIcon(event)}
                 </button>
               );
@@ -200,15 +225,33 @@ export default function LiveBroadcastPreview({ matchId, events }: Props) {
           </div>
         </div>
 
-        <div className="flex h-full max-h-full min-h-0 flex-col justify-center overflow-hidden rounded-[1.25rem] border border-white/10 bg-black/25 p-4 text-center">
-          <p className="text-xs font-black text-[#0FF0FC]">أحداث المباراة</p>
-          <p className="mt-1 text-2xl font-black text-white">{toNumberText(events.length)} حدث</p>
-          <div className="my-4 h-px bg-white/10" />
-          <p className="text-xs font-bold text-gray-400">الحدث المختار</p>
-          <p className="mt-2 text-4xl">{currentEvent ? eventIcon(currentEvent) : '•'}</p>
-          <p className="mt-2 text-lg font-black text-white">{currentEvent ? eventLabel(currentEvent) : 'لا توجد أحداث'}</p>
-          <p className="mt-2 max-h-24 overflow-hidden text-sm font-bold leading-6 text-gray-400">{currentEvent?.detail || 'اختر حدثًا من شريط الملعب لمتابعة موضعه.'}</p>
-        </div>
+        <aside className="flex h-full max-h-[364px] min-h-0 flex-col overflow-hidden rounded-[1.25rem] border border-white/10 bg-black/25 p-3">
+          <div className="mb-3 flex items-center justify-between gap-2 border-b border-white/10 pb-3">
+            <div>
+              <p className="text-xs font-black text-[#0FF0FC]">أحداث المباراة</p>
+              <p className="mt-1 text-xl font-black text-white">{toNumberText(events.length)} حدث</p>
+            </div>
+            <div className="text-center">
+              <p className="text-2xl">{currentEvent ? eventIcon(currentEvent) : '•'}</p>
+              <p className="text-[10px] font-black text-[#FFD700]">{canNavigate ? `${toNumberText(currentIndex + 1)} / ${toNumberText(visible.length)}` : '—'}</p>
+            </div>
+          </div>
+          <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
+            {visible.length ? visible.slice().reverse().map((event) => {
+              const index = visible.indexOf(event);
+              const active = event === currentEvent;
+              return (
+                <button key={`${event.id || index}-${event.minute || 0}`} type="button" onClick={() => selectIndex(index)} className={`w-full rounded-2xl border p-3 text-right transition ${active ? 'border-[#FFD700]/40 bg-[#FFD700]/10' : 'border-white/10 bg-black/25 hover:border-[#0FF0FC]/40'}`}>
+                  <div className="flex items-center justify-between gap-2 text-[10px] font-black">
+                    <span className="text-[#FFD700]">د{toNumberText(event.minute)}</span>
+                    <span className="text-gray-500">{eventIcon(event)} {eventLabel(event)}</span>
+                  </div>
+                  <div className="mt-1 line-clamp-2 text-[11px] font-bold leading-5 text-gray-200">{event.detail || eventLabel(event)}</div>
+                </button>
+              );
+            }) : <div className="rounded-2xl border border-white/10 bg-black/25 p-3 text-center text-xs font-bold text-gray-500">لا توجد أحداث مطابقة لهذا الفلتر.</div>}
+          </div>
+        </aside>
       </div>
     </section>
   );
