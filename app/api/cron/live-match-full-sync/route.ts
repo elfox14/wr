@@ -122,19 +122,50 @@ async function selectActiveMatches(minutesBack: number, minutesForward: number, 
   });
 }
 
+function resultsFromCatchupBody(body: any): any[] {
+  return Array.isArray(body?.results) ? body.results : [];
+}
+
 function resolvedIdsFromTheStats(body: any) {
-  const results = Array.isArray(body?.results) ? body.results : [];
   const map = new Map<string, string>();
-  for (const item of results) {
+  for (const item of resultsFromCatchupBody(body)) {
     if (item?.matchId && item?.resolvedProviderMatchId) map.set(String(item.matchId), String(item.resolvedProviderMatchId));
   }
   return map;
 }
 
+function catchupResultFromBody(body: any, matchId: string) {
+  return resultsFromCatchupBody(body).find((item: any) => String(item?.matchId || '') === matchId) || null;
+}
+
 function providerIdFromCatchupBody(body: any, matchId: string) {
-  const results = Array.isArray(body?.results) ? body.results : [];
-  const found = results.find((item: any) => String(item?.matchId || '') === matchId);
+  const found = catchupResultFromBody(body, matchId);
   return String(found?.resolvedProviderMatchId || '').trim() || null;
+}
+
+function isNotLiveConflict(result: any) {
+  const error = result?.liveStatsError || result?.error;
+  const status = Number(error?.status || error?.payload?.error?.status_code || 0);
+  const message = String(error?.message || error?.payload?.error?.message || '').toLowerCase();
+  return status === 409 && message.includes('not live');
+}
+
+async function autoFinishFromOfficialTimeline(match: any, result: any, dryRun: boolean) {
+  const latestMinute = Number(result?.latestMinute || 0);
+  const providerEventsFound = Number(result?.providerEventsFound || 0);
+  const shouldFinish = isNotLiveConflict(result) && providerEventsFound > 0 && latestMinute >= 90;
+  if (!shouldFinish) return { checked: true, shouldFinish: false, reason: 'official_timeline_does_not_confirm_finished' };
+  if (!dryRun && String(match.status || '').toUpperCase() !== 'FINISHED') {
+    await prisma.match.update({ where: { id: match.id }, data: { status: 'FINISHED' } });
+  }
+  return {
+    checked: true,
+    shouldFinish: true,
+    updated: !dryRun,
+    reason: 'TheStats timeline exists, latestMinute >= 90, and live-stats says match is not live',
+    latestMinute,
+    providerEventsFound,
+  };
 }
 
 export async function GET(req: Request) {
@@ -151,7 +182,9 @@ export async function GET(req: Request) {
   const runISports = bool(url.searchParams.get('isports'), true);
   const runDedupe = bool(url.searchParams.get('dedupe'), true);
   const wakeFallback = bool(url.searchParams.get('wakeFallback'), true);
-  const updateStatusFromStats = bool(url.searchParams.get('updateStatusFromStats'), true);
+  const updateStatusFromStats = bool(url.searchParams.get('updateStatusFromStats'), false);
+  const forceStatsOnly = bool(url.searchParams.get('forceStatsOnly'), false);
+  const autoFinish = bool(url.searchParams.get('autoFinish'), true);
   const limit = int(url.searchParams.get('limit'), 8, 1, 20);
   const minutesBack = int(url.searchParams.get('minutesBack'), 210, 15, 480);
   const minutesForward = int(url.searchParams.get('minutesForward'), 45, 0, 240);
@@ -169,7 +202,8 @@ export async function GET(req: Request) {
       theStats: 'primary source for score, status, and live stats',
       iSport: 'fallback source for animation timeline events when animationMatchId exists',
       database: 'last successful snapshot/events remain visible if a provider fails',
-      dedupe: 'removes duplicates after provider pulls',
+      dedupe: 'removes duplicates after provider pulls; official TheStats timeline replaces iSport fallback when available',
+      rateLimitProtection: 'stats-only is disabled by default because live-catchup already calls live-stats',
     },
     wakeFallback: null,
     theStatsCatchup: null,
@@ -195,6 +229,7 @@ export async function GET(req: Request) {
 
   for (const [index, match] of matches.entries()) {
     if (index > 0 && delayMs > 0) await new Promise((resolve) => setTimeout(resolve, delayMs));
+    let theStatsMatchResult = runTheStats ? catchupResultFromBody((out.theStatsCatchup as any)?.body, match.id) : null;
     const item: any = {
       matchId: match.id,
       teams: `${match.homeTeam?.name || 'Home'} vs ${match.awayTeam?.name || 'Away'}`,
@@ -202,6 +237,7 @@ export async function GET(req: Request) {
       externalId: match.externalId,
       animationMatchId: match.animationMatchId,
       theStatsResolveCatchup: null,
+      theStatsAutoFinish: null,
       theStatsStatus: null,
       isportsTimeline: null,
       dedupe: null,
@@ -215,11 +251,16 @@ export async function GET(req: Request) {
       oneCatchup.searchParams.set('skipSimilarExisting', 'true');
       oneCatchup.searchParams.set('key', key);
       item.theStatsResolveCatchup = await callJson(oneCatchup, 65000);
+      theStatsMatchResult = catchupResultFromBody((item.theStatsResolveCatchup as any)?.body, match.id);
       providerMatchId = providerIdFromCatchupBody((item.theStatsResolveCatchup as any)?.body, match.id);
       if (providerMatchId) providerIds.set(match.id, providerMatchId);
     }
 
-    if (updateStatusFromStats && providerMatchId) {
+    if (autoFinish && theStatsMatchResult) {
+      item.theStatsAutoFinish = await autoFinishFromOfficialTimeline(match, theStatsMatchResult, dryRun);
+    }
+
+    if (updateStatusFromStats && providerMatchId && (forceStatsOnly || (!theStatsMatchResult?.liveStatsOk && !isNotLiveConflict(theStatsMatchResult)))) {
       const statsOnly = new URL('/api/admin/the-stats-live-stats-only', origin);
       statsOnly.searchParams.set('matchId', match.id);
       statsOnly.searchParams.set('providerMatchId', providerMatchId);
@@ -228,7 +269,9 @@ export async function GET(req: Request) {
       statsOnly.searchParams.set('key', key);
       item.theStatsStatus = await callJson(statsOnly, 30000);
     } else if (updateStatusFromStats) {
-      item.theStatsStatus = { skipped: true, reason: 'No resolved TheStats providerMatchId yet' };
+      item.theStatsStatus = { skipped: true, providerMatchId, reason: 'Handled by live-catchup or skipped to avoid duplicate TheStatsAPI live-stats request' };
+    } else {
+      item.theStatsStatus = { skipped: true, providerMatchId, reason: 'stats-only disabled by default; live-catchup is the primary TheStats sync path' };
     }
 
     if (runISports && match.animationMatchId) {
@@ -248,6 +291,7 @@ export async function GET(req: Request) {
       const dedupe = new URL('/api/admin/match-events-dedupe', origin);
       dedupe.searchParams.set('matchId', match.id);
       dedupe.searchParams.set('dryRun', String(dryRun));
+      dedupe.searchParams.set('preferTheStats', 'true');
       dedupe.searchParams.set('key', key);
       item.dedupe = await callJson(dedupe, 30000);
     }
