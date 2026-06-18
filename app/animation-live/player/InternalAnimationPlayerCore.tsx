@@ -3,15 +3,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { EventFilterKey, LiveEventsResponse, LiveStatsResponse, MatchEvent, Snapshot } from './types';
 import { sortEventsByMinute } from './eventUtils';
-import { calculatePressureModel } from './livePressureUtils';
-import { calculateMomentumSegments, strongestMomentumSegment } from './momentumUtils';
-import { dataQuality, matchAnalysisArticle, matchStoryLines, n, resolvedSnapshot } from './matchAnalysisUtils';
+import { resolvedSnapshot, n } from './matchAnalysisUtils';
 import { isFinishedStatus, isHalfTimeStatus, normalizeStatus } from './statusUtils';
 import MatchHeaderPanel from './components/MatchHeaderPanel';
 import LivePitchTimelinePanel from './components/LivePitchTimelinePanel';
 import LiveStatsPanel from './components/LiveStatsPanel';
-import MatchIntelligencePanel from './components/MatchIntelligencePanel';
-import MatchMomentumPanel from './components/MatchMomentumPanel';
 
 type InternalAnimationPlayerCoreProps = {
   matchId?: string;
@@ -198,21 +194,6 @@ export default function InternalAnimationPlayerCore({ matchId = '', dbMatchId = 
   }, [rawClock.minute, rawClock.source]);
 
   const activeEvent = useMemo(() => latestEvent(events), [events]);
-  const pressure = useMemo(
-    () => calculatePressureModel(snapshot, events, currentMinute, homeTeam, awayTeam),
-    [snapshot, events, currentMinute, homeTeam, awayTeam],
-  );
-  const momentumSegments = useMemo(
-    () => calculateMomentumSegments(events, homeTeam, awayTeam),
-    [events, homeTeam, awayTeam],
-  );
-  const strongestSegment = useMemo(() => strongestMomentumSegment(momentumSegments), [momentumSegments]);
-  const quality = useMemo(() => dataQuality(snapshot, events, updatedAt), [snapshot, events, updatedAt]);
-  const storyLines = useMemo(() => matchStoryLines(match, snapshot, strongestSegment), [match, snapshot, strongestSegment]);
-  const articleLines = useMemo(
-    () => matchAnalysisArticle(match, snapshot, events, pressure, strongestSegment, currentMinute),
-    [match, snapshot, events, pressure, strongestSegment, currentMinute],
-  );
 
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-4 px-3 py-4 text-right md:px-6" dir="rtl">
@@ -240,23 +221,6 @@ export default function InternalAnimationPlayerCore({ matchId = '', dbMatchId = 
       />
 
       <LiveStatsPanel snapshot={snapshot} provider={provider} updatedAt={updatedAt} />
-
-      <MatchIntelligencePanel
-        pressure={pressure}
-        quality={quality}
-        storyLines={storyLines}
-        articleLines={articleLines}
-        home={homeTeam}
-        away={awayTeam}
-      />
-
-      <MatchMomentumPanel
-        segments={momentumSegments}
-        strongestSegment={strongestSegment}
-        home={homeTeam}
-        away={awayTeam}
-        onSelectEvent={setSelectedEventId}
-      />
     </div>
   );
 }
