@@ -6,6 +6,9 @@ import { authOptions } from '@/lib/auth';
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
+const ALLOWED_STATUSES = ['draft', 'published', 'archived'] as const;
+type NewsStatus = typeof ALLOWED_STATUSES[number];
+
 type AdminSession = {
   user?: { email?: string | null; role?: string | null };
 } | null;
@@ -50,6 +53,11 @@ async function ensurePressNewsTable() {
   await prisma.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS "PressNews_status_publishedAt_idx" ON "PressNews" ("status", "publishedAt")');
 }
 
+function normalizeStatus(value: unknown): NewsStatus | null {
+  const status = String(value || '').trim() as NewsStatus;
+  return ALLOWED_STATUSES.includes(status) ? status : null;
+}
+
 export async function POST(req: Request) {
   const guard = await requireAdmin();
   if (guard.error) return guard.error;
@@ -57,11 +65,11 @@ export async function POST(req: Request) {
   await ensurePressNewsTable();
   const body = await req.json().catch(() => ({}));
   const id = String(body.id || '').trim();
-  const status = String(body.status || '').trim();
+  const status = normalizeStatus(body.status);
 
   if (!id) return NextResponse.json({ ok: false, error: 'id is required' }, { status: 400 });
-  if (!['draft', 'published'].includes(status)) {
-    return NextResponse.json({ ok: false, error: 'status must be draft or published' }, { status: 400 });
+  if (!status) {
+    return NextResponse.json({ ok: false, error: 'status must be draft, published, or archived' }, { status: 400 });
   }
 
   const rows = await prisma.$queryRawUnsafe<any[]>(
