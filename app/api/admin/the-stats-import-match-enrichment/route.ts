@@ -10,6 +10,20 @@ type Pair = { home: number | null; away: number | null };
 type ProviderStat = Pair & { sourcePath: string };
 type ProviderStats = Record<string, ProviderStat>;
 type ProviderMatch = { providerId: string | null; homeName: string | null; awayName: string | null; matchDate: string | null };
+type ProviderEvent = {
+  minute: number | null;
+  displayMinute: string | null;
+  type: string;
+  label: string;
+  teamName: string | null;
+  playerName: string | null;
+  assistName: string | null;
+  playerInName: string | null;
+  playerOutName: string | null;
+  detail: string;
+  raw: any;
+  sourcePath: string;
+};
 
 const TEAM_NAME_ALIASES = new Map([
   ['usa', 'united states'],
@@ -21,6 +35,9 @@ const TEAM_NAME_ALIASES = new Map([
   ['cote d ivoire', 'ivory coast'],
   ['côte d ivoire', 'ivory coast'],
 ]);
+
+const EVENT_ENDPOINTS = ['events', 'incidents', 'timeline', 'commentary'];
+const PLAYER_DETAIL_ENDPOINTS = ['players', 'player-stats', 'ratings'];
 
 function configuredSecrets() {
   return [process.env.ADMIN_API_SECRET, process.env.CRON_SECRET]
@@ -114,6 +131,16 @@ function extractArray(payload: any): any[] {
   return [];
 }
 
+function extractEventRows(payload: any): any[] {
+  if (Array.isArray(payload)) return payload;
+  const data = payload?.data || payload?.response || payload?.result || payload;
+  for (const key of ['events', 'incidents', 'timeline', 'commentary', 'data', 'items', 'results']) {
+    if (Array.isArray(data?.[key])) return data[key];
+  }
+  if (Array.isArray(data)) return data;
+  return [];
+}
+
 function normalizeProviderMatch(row: any): ProviderMatch {
   const fixture = row?.fixture || row?.match || row;
   const teams = row?.teams || row?.participants || {};
@@ -191,6 +218,24 @@ function parseProviderStats(payload: any): ProviderStats {
   return stats;
 }
 
+function compactPlayer(row: any) {
+  const player = row?.player || row?.athlete || row?.person || row;
+  const name = str(player?.name, player?.full_name, row?.name, row?.playerName, row?.display_name);
+  if (!name) return null;
+  return {
+    id: str(player?.id, player?.player_id, row?.id, row?.player_id),
+    name,
+    number: first(player?.shirt_number, player?.jersey_number, player?.number, row?.shirt_number, row?.jersey_number, row?.number),
+    image: str(player?.image, player?.photo, player?.image_url, row?.image, row?.photo, row?.image_url),
+    position: str(player?.position, row?.position),
+    rating: toNumber(first(player?.rating, row?.rating, row?.statistics?.rating, row?.stats?.rating)),
+  };
+}
+
+function compactPlayers(rows: any[]) {
+  return rows.map(compactPlayer).filter(Boolean);
+}
+
 function summarizeLineup(payload: any) {
   const data = payload?.data || payload;
   if (!data || typeof data !== 'object') return null;
@@ -201,6 +246,8 @@ function summarizeLineup(payload: any) {
       id: data.home.id || null,
       name: data.home.name || null,
       formation: data.home.formation || null,
+      startingXi: compactPlayers(data.home.starting_xi || data.home.startingXi || data.home.lineup || []),
+      substitutes: compactPlayers(data.home.substitutes || data.home.bench || []),
       startingXiCount: Array.isArray(data.home.starting_xi) ? data.home.starting_xi.length : null,
       substitutesCount: Array.isArray(data.home.substitutes) ? data.home.substitutes.length : null,
     } : null,
@@ -208,6 +255,8 @@ function summarizeLineup(payload: any) {
       id: data.away.id || null,
       name: data.away.name || null,
       formation: data.away.formation || null,
+      startingXi: compactPlayers(data.away.starting_xi || data.away.startingXi || data.away.lineup || []),
+      substitutes: compactPlayers(data.away.substitutes || data.away.bench || []),
       startingXiCount: Array.isArray(data.away.starting_xi) ? data.away.starting_xi.length : null,
       substitutesCount: Array.isArray(data.away.substitutes) ? data.away.substitutes.length : null,
     } : null,
@@ -233,7 +282,142 @@ function buildDerived(stats: ProviderStats) {
   };
 }
 
-function snapshotPreview(match: any, numericProviderMatchId: number, theStatsApiMatchId: string, stats: ProviderStats, derived: any, lineup: any) {
+async function fetchOptionalMatchPayloads(providerMatchId: string, endpoints: string[]) {
+  return Promise.all(endpoints.map(async (endpoint) => {
+    const path = `/api/football/matches/${encodeURIComponent(providerMatchId)}/${endpoint}`;
+    try {
+      const payload = await theStatsApiFetch(path, {}, { timeoutMs: 15000 });
+      return { endpoint, path, ok: true, payload };
+    } catch (error: any) {
+      return { endpoint, path, ok: false, error: safeTheStatsApiError(error) };
+    }
+  }));
+}
+
+function eventMinute(row: any) {
+  const rawMinute = first(row?.minute, row?.time?.minute, row?.elapsed, row?.match_minute, row?.matchMinute, row?.event_minute, row?.period_elapsed, row?.time);
+  if (typeof rawMinute === 'string') {
+    const stoppage = rawMinute.match(/(45|90|105)\s*\+\s*(\d+)/);
+    if (stoppage) return { minute: Number(stoppage[1]) + Number(stoppage[2]), displayMinute: `${stoppage[1]}+${stoppage[2]}` };
+  }
+  const base = toInteger(rawMinute);
+  const extra = toInteger(first(row?.extra_minute, row?.stoppage_time, row?.added_time, row?.minute_extra, row?.time?.extra, row?.extra));
+  if (base !== null && extra !== null && extra > 0) return { minute: base + extra, displayMinute: `${base}+${extra}` };
+  return { minute: base, displayMinute: base === null ? null : String(base) };
+}
+
+function eventTeamName(row: any) {
+  return str(row?.team?.name, row?.team_name, row?.teamName, row?.club?.name, row?.side?.name, row?.participant?.name);
+}
+
+function eventPlayerName(row: any) {
+  return str(row?.player?.name, row?.player_name, row?.playerName, row?.scorer?.name, row?.goal_scorer?.name, row?.athlete?.name, row?.person?.name);
+}
+
+function eventAssistName(row: any) {
+  return str(row?.assist?.name, row?.assister?.name, row?.assist_player?.name, row?.assistPlayer?.name, row?.assist_name, row?.assistName);
+}
+
+function eventPlayerInName(row: any) {
+  return str(row?.player_in?.name, row?.playerIn?.name, row?.player_on?.name, row?.substitution?.player_in?.name, row?.incoming_player?.name, row?.player_in_name, row?.playerInName);
+}
+
+function eventPlayerOutName(row: any) {
+  return str(row?.player_out?.name, row?.playerOut?.name, row?.player_off?.name, row?.substitution?.player_out?.name, row?.outgoing_player?.name, row?.player_out_name, row?.playerOutName);
+}
+
+function normalizeEventType(row: any) {
+  const raw = text(first(row?.type, row?.event_type, row?.incident_type, row?.name, row?.detail));
+  if (raw.includes('own') || raw.includes('عكسي')) return { type: 'own_goal', label: 'هدف عكسي' };
+  if (raw.includes('penalty missed') || raw.includes('missed penalty') || raw.includes('ركلة جزاء مهدرة')) return { type: 'penalty_missed', label: 'ركلة جزاء مهدرة' };
+  if (raw.includes('penalty') || raw.includes('ركلة جزاء')) return { type: 'penalty_goal', label: 'هدف من ركلة جزاء' };
+  if (raw.includes('goal') || raw.includes('هدف')) return { type: 'goal', label: 'هدف' };
+  if (raw.includes('sub') || raw.includes('تبديل') || raw.includes('تغيير')) return { type: 'substitution', label: 'تبديل' };
+  if (raw.includes('red') || raw.includes('حمراء')) return { type: 'red_card', label: 'بطاقة حمراء' };
+  if (raw.includes('yellow') || raw.includes('card') || raw.includes('صفراء') || raw.includes('بطاقة')) return { type: 'yellow_card', label: 'بطاقة صفراء' };
+  if (raw.includes('corner') || raw.includes('ركنية')) return { type: 'corner', label: 'ركنية' };
+  if (raw.includes('var')) return { type: 'var', label: 'VAR' };
+  if (raw.includes('injury') || raw.includes('إصابة') || raw.includes('اصابة')) return { type: 'injury', label: 'إصابة' };
+  if (raw.includes('shot') || raw.includes('attempt') || raw.includes('تسديدة')) return { type: 'shot', label: 'تسديدة' };
+  return { type: str(row?.type, row?.event_type, row?.incident_type) || 'note', label: str(row?.type, row?.event_type, row?.incident_type) || 'حدث' };
+}
+
+function compactProviderEvent(row: any, sourcePath: string): ProviderEvent | null {
+  const minute = eventMinute(row);
+  const normalized = normalizeEventType(row);
+  const teamName = eventTeamName(row);
+  const playerName = eventPlayerName(row);
+  const assistName = eventAssistName(row);
+  const playerInName = eventPlayerInName(row);
+  const playerOutName = eventPlayerOutName(row);
+  const existingDetail = str(row?.detail, row?.description, row?.comment, row?.text, row?.message);
+  const parts = [
+    teamName,
+    minute.displayMinute ? `د${minute.displayMinute}'` : null,
+    normalized.label,
+    playerName,
+    assistName ? `صناعة ${assistName}` : null,
+    playerInName || playerOutName ? `دخول ${playerInName || 'غير متوفر'} / خروج ${playerOutName || 'غير متوفر'}` : null,
+  ].filter(Boolean);
+  const detail = existingDetail || parts.join(' - ');
+  if (!detail && !normalized.label) return null;
+  return {
+    minute: minute.minute,
+    displayMinute: minute.displayMinute,
+    type: normalized.type,
+    label: normalized.label,
+    teamName,
+    playerName,
+    assistName,
+    playerInName,
+    playerOutName,
+    detail: detail || normalized.label,
+    raw: row,
+    sourcePath,
+  };
+}
+
+function teamIdForEvent(event: ProviderEvent, match: any) {
+  const team = normalizeTeamName(event.teamName);
+  const home = normalizeTeamName(match.homeTeam?.name || match.homeTeam?.code);
+  const away = normalizeTeamName(match.awayTeam?.name || match.awayTeam?.code);
+  if (team && home && (team === home || team.includes(home) || home.includes(team))) return match.homeTeamId;
+  if (team && away && (team === away || team.includes(away) || away.includes(team))) return match.awayTeamId;
+  const detail = normalizeTeamName(event.detail);
+  if (home && detail.includes(home)) return match.homeTeamId;
+  if (away && detail.includes(away)) return match.awayTeamId;
+  return null;
+}
+
+function parseProviderEvents(payloads: any[]) {
+  const events: ProviderEvent[] = [];
+  for (const source of payloads.filter((item) => item.ok)) {
+    for (const row of extractEventRows(source.payload)) {
+      const event = compactProviderEvent(row, source.path);
+      if (event) events.push(event);
+    }
+  }
+  const seen = new Set<string>();
+  return events.filter((event) => {
+    const key = [event.minute, event.type, event.teamName, event.playerName, event.detail].map((value) => text(value)).join('|');
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  }).sort((a, b) => (a.minute ?? 999) - (b.minute ?? 999));
+}
+
+function parsePlayerRatings(payloads: any[]) {
+  const rows = payloads.filter((item) => item.ok).flatMap((item) => extractEventRows(item.payload).map((row) => ({ row, sourcePath: item.path })));
+  const ratings = rows.map(({ row, sourcePath }) => {
+    const player = compactPlayer(row);
+    const rating = toNumber(first(player?.rating, row?.rating, row?.stats?.rating, row?.statistics?.rating, row?.performance?.rating));
+    if (!player?.name || rating === null) return null;
+    return { ...player, rating, sourcePath };
+  }).filter(Boolean).sort((a: any, b: any) => (b.rating || 0) - (a.rating || 0));
+  return { ratings, manOfMatch: ratings[0] || null };
+}
+
+function snapshotPreview(match: any, numericProviderMatchId: number, theStatsApiMatchId: string, stats: ProviderStats, derived: any, lineup: any, providerEvents: ProviderEvent[], playerRatings: any, optionalSources: any[]) {
   const offTargetForLocal = derived.shotsOffTargetForLocalCompare;
   return {
     id: randomUUID(),
@@ -262,11 +446,15 @@ function snapshotPreview(match: any, numericProviderMatchId: number, theStatsApi
       stats,
       derived,
       lineup,
+      events: providerEvents,
+      playerRatings,
+      manOfMatch: playerRatings?.manOfMatch || null,
       importedAt: new Date().toISOString(),
       source: {
         provider: 'THE_STATS_API',
         statsPath: `/api/football/matches/${theStatsApiMatchId}/stats`,
         lineupsPath: `/api/football/matches/${theStatsApiMatchId}/lineups`,
+        optionalSources: optionalSources.map((item) => ({ endpoint: item.endpoint, path: item.path, ok: item.ok, error: item.error || null })),
       },
       safety: {
         noOdds: true,
@@ -285,6 +473,7 @@ export async function GET(req: Request) {
 
   const matchId = url.searchParams.get('matchId') || '';
   const dryRun = boolParam(url.searchParams.get('dryRun'), true);
+  const importEvents = boolParam(url.searchParams.get('importEvents'), true);
   const providerMatchesPerPage = clampInt(url.searchParams.get('providerMatchesPerPage'), 100, 1, 100);
   const providerMatchesQuery = {
     competition_id: url.searchParams.get('competition_id') || process.env.THE_STATS_API_WORLD_CUP_COMPETITION_ID || 'comp_6107',
@@ -313,20 +502,59 @@ export async function GET(req: Request) {
       }, { status: 404, headers: { 'Cache-Control': 'no-store' } });
     }
 
-    const [statsPayload, lineupPayload] = await Promise.all([
+    const [statsPayload, lineupPayload, eventPayloads, playerPayloads] = await Promise.all([
       theStatsApiFetch(`/api/football/matches/${encodeURIComponent(resolved.resolvedProviderMatchId)}/stats`, {}, { timeoutMs: 15000 }),
       theStatsApiFetch(`/api/football/matches/${encodeURIComponent(resolved.resolvedProviderMatchId)}/lineups`, {}, { timeoutMs: 15000 }).catch((error) => ({ error: safeTheStatsApiError(error) })),
+      fetchOptionalMatchPayloads(resolved.resolvedProviderMatchId, EVENT_ENDPOINTS),
+      fetchOptionalMatchPayloads(resolved.resolvedProviderMatchId, PLAYER_DETAIL_ENDPOINTS),
     ]);
 
     const stats = parseProviderStats(statsPayload);
     const derived = buildDerived(stats);
     const lineup = (lineupPayload as any)?.error ? { error: (lineupPayload as any).error } : summarizeLineup(lineupPayload);
+    const providerEvents = parseProviderEvents(eventPayloads);
+    const playerRatings = parsePlayerRatings(playerPayloads);
+    const optionalSources = [...eventPayloads, ...playerPayloads];
+    if (playerRatings.manOfMatch) {
+      providerEvents.push({
+        minute: null,
+        displayMinute: null,
+        type: 'man_of_match',
+        label: 'رجل المباراة',
+        teamName: null,
+        playerName: playerRatings.manOfMatch.name,
+        assistName: null,
+        playerInName: null,
+        playerOutName: null,
+        detail: `رجل المباراة حسب تقييم TheStatsAPI - ${playerRatings.manOfMatch.name} (${playerRatings.manOfMatch.rating})`,
+        raw: playerRatings.manOfMatch,
+        sourcePath: playerRatings.manOfMatch.sourcePath,
+      });
+    }
+
     const numericProviderMatchId = Number.parseInt(String(resolved.sourceProviderMatchId || match.externalId || match.animationMatchId || 0), 10) || 0;
-    const data = snapshotPreview(match, numericProviderMatchId, resolved.resolvedProviderMatchId, stats, derived, lineup);
+    const data = snapshotPreview(match, numericProviderMatchId, resolved.resolvedProviderMatchId, stats, derived, lineup, providerEvents, playerRatings, optionalSources);
 
     let created = null;
+    let importedMatchEvents = 0;
     if (!dryRun) {
       created = await prisma.matchStatsSnapshot.create({ data });
+      if (importEvents && providerEvents.length) {
+        await prisma.matchEvent.deleteMany({ where: { matchId: match.id, sourceName: 'THE_STATS_API' } });
+        const result = await prisma.matchEvent.createMany({
+          data: providerEvents.map((event) => ({
+            matchId: match.id,
+            minute: event.minute,
+            type: event.type,
+            teamId: teamIdForEvent(event, match),
+            playerName: event.playerName || event.playerInName || event.playerOutName || null,
+            detail: event.detail,
+            sourceName: 'THE_STATS_API',
+            sourceUrl: event.sourcePath,
+          })),
+        });
+        importedMatchEvents = result.count;
+      }
     }
 
     return NextResponse.json({
@@ -342,6 +570,10 @@ export async function GET(req: Request) {
       resolvedBy: resolved.resolvedBy,
       providerStatsFound: Object.keys(stats).length,
       lineupAvailable: Boolean(lineup && !(lineup as any).error),
+      providerEventsFound: providerEvents.length,
+      importedMatchEvents,
+      manOfMatch: playerRatings.manOfMatch || null,
+      optionalSources: optionalSources.map((item) => ({ endpoint: item.endpoint, ok: item.ok, error: item.error?.code || item.error?.status || null })),
       derived,
       snapshot: dryRun ? data : created,
       safety: {
@@ -349,6 +581,7 @@ export async function GET(req: Request) {
         noMatchScoreUpdate: true,
         noISportsOverwrite: true,
         savesSeparateSnapshotOnly: true,
+        importsEventsFromTheStatsApiOnly: true,
         prohibitedOddsStillBlocked: true,
       },
     }, { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } });
