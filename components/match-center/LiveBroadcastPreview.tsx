@@ -144,7 +144,7 @@ export default function LiveBroadcastPreview({ matchId, events }: Props) {
         ))}
       </div>
 
-      <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_260px]">
+      <div className="mt-4 grid items-stretch gap-4 lg:grid-cols-[minmax(0,1fr)_260px]">
         <div>
           <div className="relative aspect-[16/8] min-h-[260px] overflow-hidden rounded-[28px] border border-emerald-400/20 bg-emerald-950/60 shadow-inner shadow-black">
             <div className="absolute inset-4 rounded-[22px] border border-white/20" />
@@ -175,11 +175,14 @@ export default function LiveBroadcastPreview({ matchId, events }: Props) {
           </div>
         </div>
 
-        <div className="flex flex-col justify-center rounded-[1.25rem] border border-white/10 bg-black/25 p-4 text-center">
+        <div className="flex h-full max-h-full min-h-0 flex-col justify-center overflow-hidden rounded-[1.25rem] border border-white/10 bg-black/25 p-4 text-center">
+          <p className="text-xs font-black text-[#0FF0FC]">أحداث المباراة</p>
+          <p className="mt-1 text-2xl font-black text-white">{toNumberText(events.length)} حدث</p>
+          <div className="my-4 h-px bg-white/10" />
           <p className="text-xs font-bold text-gray-400">الحدث المختار</p>
           <p className="mt-2 text-4xl">{currentEvent ? eventIcon(currentEvent) : '•'}</p>
           <p className="mt-2 text-lg font-black text-white">{currentEvent ? eventLabel(currentEvent) : 'لا توجد أحداث'}</p>
-          <p className="mt-2 text-sm font-bold leading-6 text-gray-400">{currentEvent?.detail || 'اختر حدثًا من شريط الملعب لمتابعة موضعه.'}</p>
+          <p className="mt-2 max-h-24 overflow-hidden text-sm font-bold leading-6 text-gray-400">{currentEvent?.detail || 'اختر حدثًا من شريط الملعب لمتابعة موضعه.'}</p>
         </div>
       </div>
     </section>
