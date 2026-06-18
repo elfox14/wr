@@ -199,6 +199,7 @@ export async function GET(req: Request) {
   const runTheStats = bool(url.searchParams.get('theStats'), true);
   const runISports = bool(url.searchParams.get('isports'), true);
   const runISportStats = bool(url.searchParams.get('isportStats'), true);
+  const runISportVisualStats = bool(url.searchParams.get('isportVisualStats'), false);
   const runDedupe = bool(url.searchParams.get('dedupe'), true);
   const wakeFallback = bool(url.searchParams.get('wakeFallback'), true);
   const mapISports = bool(url.searchParams.get('mapISports'), true);
@@ -224,7 +225,8 @@ export async function GET(req: Request) {
     policy: {
       theStats: 'primary source for score, status, and live stats',
       iSport: isportFallbackOnly ? 'fallback only when official TheStats timeline is not available' : 'fallback animation timeline events when animationMatchId exists',
-      iSportStats: 'visual iSport stats are saved as ISPORTS_REMOTE_LIVE to fill attacks, dangerous attacks, shots, and other live-only fields',
+      iSportStats: 'iSport flashdata stats are saved as ISPORTS_FLASH to fill attacks, dangerous attacks, score, phase, and corners without requiring Browserless /function',
+      iSportVisualStats: runISportVisualStats ? 'optional visual stats are enabled for possession/shots from the rendered page' : 'optional visual stats are disabled by default because /function is not available on the backup browser',
       iSportMapping: 'live-market-sync runs first to map missing animationMatchId values from the iSport live feed',
       database: 'last successful snapshot/events remain visible if a provider fails',
       dedupe: 'removes duplicates after provider pulls; official TheStats timeline replaces iSport fallback when available',
@@ -279,6 +281,7 @@ export async function GET(req: Request) {
       theStatsStatus: null,
       isportsTimeline: null,
       isportsStats: null,
+      isportsVisualStats: null,
       dedupe: null,
     };
 
@@ -337,16 +340,31 @@ export async function GET(req: Request) {
     }
 
     if (runISports && runISportStats && match.animationMatchId) {
-      const stats = new URL('/api/internal/live-ingest/isports/remote-visual-stats-pull', origin);
+      const stats = new URL('/api/internal/live-ingest/isports/remote-flash-pull', origin);
+      stats.searchParams.set('mode', 'live');
       stats.searchParams.set('matchId', String(match.animationMatchId));
       stats.searchParams.set('dbMatchId', match.id);
       stats.searchParams.set('save', String(!dryRun));
+      stats.searchParams.set('replace', 'true');
       stats.searchParams.set('timeoutMs', String(isportStatsTimeoutMs));
       stats.searchParams.set('waitMs', String(isportStatsWaitMs));
       stats.searchParams.set('key', key);
       item.isportsStats = await callJson(stats, Math.min(85000, isportStatsTimeoutMs + isportStatsWaitMs + 20000));
     } else if (runISports && runISportStats) {
-      item.isportsStats = { skipped: true, reason: 'No animationMatchId mapped for iSport visual stats' };
+      item.isportsStats = { skipped: true, reason: 'No animationMatchId mapped for iSport flash stats' };
+    }
+
+    if (runISports && runISportVisualStats && match.animationMatchId) {
+      const visual = new URL('/api/internal/live-ingest/isports/remote-visual-stats-pull', origin);
+      visual.searchParams.set('matchId', String(match.animationMatchId));
+      visual.searchParams.set('dbMatchId', match.id);
+      visual.searchParams.set('save', String(!dryRun));
+      visual.searchParams.set('timeoutMs', String(isportStatsTimeoutMs));
+      visual.searchParams.set('waitMs', String(isportStatsWaitMs));
+      visual.searchParams.set('key', key);
+      item.isportsVisualStats = await callJson(visual, Math.min(85000, isportStatsTimeoutMs + isportStatsWaitMs + 20000));
+    } else if (runISports && runISportVisualStats) {
+      item.isportsVisualStats = { skipped: true, reason: 'No animationMatchId mapped for iSport visual stats' };
     }
 
     if (runDedupe) {
