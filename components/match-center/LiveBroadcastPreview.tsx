@@ -31,6 +31,10 @@ function toNumberText(value: unknown) {
   return Number.isFinite(number) ? number.toLocaleString('ar-EG') : '—';
 }
 
+function eventKey(event: MatchEventLike, index: number) {
+  return String(event.id || `${event.minute ?? 'na'}-${event.type || 'event'}-${index}`);
+}
+
 function eventText(event: MatchEventLike) {
   return `${event.type || ''} ${event.detail || ''}`.toLowerCase();
 }
@@ -110,12 +114,21 @@ export default function LiveBroadcastPreview({ matchId, events }: Props) {
   const [filter, setFilter] = useState<FilterKey>('all');
   const sorted = useMemo(() => [...events].sort((a, b) => Number(a.minute ?? 0) - Number(b.minute ?? 0)), [events]);
   const visible = useMemo(() => sorted.filter((event) => eventMatchesFilter(event, filter)), [sorted, filter]);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const currentEvent = visible.find((event) => event.id === selectedId) || visible[visible.length - 1] || sorted[sorted.length - 1] || null;
+  const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  const matchedIndex = visible.findIndex((event, index) => eventKey(event, index) === selectedKey);
+  const currentIndex = visible.length ? (matchedIndex >= 0 ? matchedIndex : visible.length - 1) : -1;
+  const currentEvent = currentIndex >= 0 ? visible[currentIndex] : sorted[sorted.length - 1] || null;
   const ball = ballPosition(currentEvent);
   const goals = events.filter(isGoal).length;
   const corners = events.filter(isCorner).length;
   const cards = events.filter(isCard).length;
+  const canNavigate = visible.length > 0;
+
+  function selectIndex(index: number) {
+    if (!visible.length) return;
+    const safeIndex = Math.max(0, Math.min(visible.length - 1, index));
+    setSelectedKey(eventKey(visible[safeIndex], safeIndex));
+  }
 
   return (
     <section className="rounded-[1.6rem] border border-[#0FF0FC]/20 bg-[#0FF0FC]/[0.055] p-4 shadow-card" dir="rtl">
@@ -136,12 +149,20 @@ export default function LiveBroadcastPreview({ matchId, events }: Props) {
         <div className="rounded-2xl border border-white/10 bg-black/30 p-3 text-center"><p className="text-xs font-bold text-gray-400">البطاقات</p><p className="mt-1 text-2xl font-black text-[#ff6b7a]">{toNumberText(cards)}</p></div>
       </div>
 
-      <div className="mt-4 flex flex-wrap gap-2">
-        {FILTERS.map((item) => (
-          <button key={item.key} type="button" onClick={() => setFilter(item.key)} className={`rounded-full border px-3 py-1 text-[10px] font-black transition ${filter === item.key ? 'border-[#FFD700]/40 bg-[#FFD700]/15 text-[#FFD700]' : 'border-white/10 bg-black/25 text-gray-400 hover:text-white'}`}>
-            {item.label}
-          </button>
-        ))}
+      <div className="mt-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex flex-wrap gap-2">
+          {FILTERS.map((item) => (
+            <button key={item.key} type="button" onClick={() => { setFilter(item.key); setSelectedKey(null); }} className={`rounded-full border px-3 py-1 text-[10px] font-black transition ${filter === item.key ? 'border-[#FFD700]/40 bg-[#FFD700]/15 text-[#FFD700]' : 'border-white/10 bg-black/25 text-gray-400 hover:text-white'}`}>
+              {item.label}
+            </button>
+          ))}
+        </div>
+        <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-white/10 bg-black/20 p-2">
+          <button type="button" disabled={!canNavigate} onClick={() => selectIndex(currentIndex - 1)} className="rounded-full border border-white/10 bg-black/30 px-3 py-1 text-[10px] font-black text-gray-300 transition hover:border-[#0FF0FC]/40 hover:text-white disabled:cursor-not-allowed disabled:opacity-40">السابق</button>
+          <button type="button" disabled={!canNavigate} onClick={() => selectIndex(0)} className="rounded-full border border-[#FFD700]/30 bg-[#FFD700]/10 px-3 py-1 text-[10px] font-black text-[#FFD700] transition hover:bg-[#FFD700]/20 disabled:cursor-not-allowed disabled:opacity-40">إعادة الأحداث</button>
+          <button type="button" disabled={!canNavigate} onClick={() => selectIndex(currentIndex + 1)} className="rounded-full border border-white/10 bg-black/30 px-3 py-1 text-[10px] font-black text-gray-300 transition hover:border-[#0FF0FC]/40 hover:text-white disabled:cursor-not-allowed disabled:opacity-40">التالي</button>
+          <span className="px-2 text-[10px] font-black text-gray-500">{canNavigate ? `${toNumberText(currentIndex + 1)} / ${toNumberText(visible.length)}` : 'لا توجد أحداث'}</span>
+        </div>
       </div>
 
       <div className="mt-4 grid items-stretch gap-4 lg:grid-cols-[minmax(0,1fr)_260px]">
@@ -167,11 +188,15 @@ export default function LiveBroadcastPreview({ matchId, events }: Props) {
                 <span className="text-[9px] font-black text-gray-500">{minute}</span>
               </div>
             ))}
-            {visible.slice(-22).map((event, index) => (
-              <button key={event.id || `${event.minute}-${index}`} type="button" onClick={() => setSelectedId(event.id || `${event.minute}-${index}`)} className={`absolute top-1/2 flex h-7 w-7 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border text-xs transition ${event.id === currentEvent?.id ? 'border-[#FFD700] bg-[#FFD700] text-black' : 'border-white/20 bg-black text-white hover:border-[#0FF0FC]'}`} style={{ left: `${minuteLeft(event.minute)}%` }} title={`د${toNumberText(event.minute)} · ${eventLabel(event)}`}>
-                {eventIcon(event)}
-              </button>
-            ))}
+            {visible.slice(-22).map((event, index) => {
+              const key = eventKey(event, index);
+              const active = event === currentEvent;
+              return (
+                <button key={key} type="button" onClick={() => setSelectedKey(key)} className={`absolute top-1/2 flex h-7 w-7 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border text-xs transition ${active ? 'border-[#FFD700] bg-[#FFD700] text-black' : 'border-white/20 bg-black text-white hover:border-[#0FF0FC]'}`} style={{ left: `${minuteLeft(event.minute)}%` }} title={`د${toNumberText(event.minute)} · ${eventLabel(event)}`}>
+                  {eventIcon(event)}
+                </button>
+              );
+            })}
           </div>
         </div>
 
