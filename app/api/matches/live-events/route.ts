@@ -34,7 +34,15 @@ function validMinute(value: unknown) {
   return Number.isFinite(minute) && minute > 0 ? Math.floor(minute) : null;
 }
 
-function eventMinuteLabel(event: any) {
+function wasEventSavedDuringFirstHalf(event: any, matchDate?: Date | string | null) {
+  const kickoff = matchDate ? new Date(matchDate).getTime() : NaN;
+  const created = event?.createdAt ? new Date(event.createdAt).getTime() : NaN;
+  if (!Number.isFinite(kickoff) || !Number.isFinite(created)) return false;
+  const diff = created - kickoff;
+  return diff >= 0 && diff <= 65 * 60 * 1000;
+}
+
+function eventMinuteLabel(event: any, matchDate?: Date | string | null) {
   const minute = validMinute(event?.minute);
   if (!minute) return null;
   const detail = String(event?.detail || '').toLowerCase();
@@ -42,7 +50,8 @@ function eventMinuteLabel(event: any) {
   if (explicitStoppage) return `45+${Number(explicitStoppage[1])}`;
   const firstHalfHint = /الشوط\s*الأول|first\s*half|1h/.test(detail);
   const secondHalfHint = /الشوط\s*الثاني|second\s*half|2h/.test(detail);
-  if (minute > 45 && minute < 60 && firstHalfHint && !secondHalfHint) return `45+${minute - 45}`;
+  const firstHalfByTime = wasEventSavedDuringFirstHalf(event, matchDate);
+  if (minute > 45 && minute < 60 && !secondHalfHint && (firstHalfHint || firstHalfByTime)) return `45+${minute - 45}`;
   return String(minute);
 }
 
@@ -85,6 +94,7 @@ export async function GET(request: Request) {
         id: true,
         animationMatchId: true,
         status: true,
+        matchDate: true,
         homeTeamId: true,
         awayTeamId: true,
         homeTeam: { select: { id: true, name: true, code: true, image: true } },
@@ -122,6 +132,7 @@ export async function GET(request: Request) {
         id: match.id,
         animationMatchId: match.animationMatchId,
         status: match.status,
+        matchDate: toIso(match.matchDate),
         homeTeam: match.homeTeam,
         awayTeam: match.awayTeam,
       },
@@ -134,7 +145,7 @@ export async function GET(request: Request) {
         return {
           id: event.id,
           minute: event.minute,
-          minuteLabel: eventMinuteLabel(event),
+          minuteLabel: eventMinuteLabel(event, match.matchDate),
           type: event.type,
           teamId: event.teamId,
           playerId: event.playerId,
