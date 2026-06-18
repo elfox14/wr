@@ -261,7 +261,6 @@ export default async function Home() {
 
   return (
     <>
-      <style>{`main > section[aria-label="إحصائيات البطولة"],main > section[aria-label="إحصائيات البطولة"] ~ section{display:none}`}</style>
       <HomeClientSportsLiveFocus
         upcomingMatches={upcomingMatches}
         tickerMatches={tickerMatches}
