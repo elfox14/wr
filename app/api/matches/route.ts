@@ -111,16 +111,10 @@ function displayMinute(match: any, snapshot: SnapshotState | undefined) {
   return Math.min(snapshotMinute, maxLiveMinutes(match));
 }
 
-function livePhaseLabel(status: string, minute?: number | null) {
+function livePhaseLabel(status: string) {
   const value = normalizeStatus(status);
   if (isHalfTimeStatus(value)) return 'استراحة';
-  if (value === 'ET') return 'أشواط إضافية';
-  if (value === 'P') return 'ركلات الترجيح';
-  if (value === '2H') return 'الشوط الثاني';
-  if (value === '1H') return 'الشوط الأول';
-  if (typeof minute === 'number' && minute >= 46) return 'الشوط الثاني';
-  if (typeof minute === 'number' && minute > 0) return 'الشوط الأول';
-  return 'مباشر الآن';
+  return 'جارية الآن';
 }
 
 function effectiveProviderStatus(matchStatus: string, snapshot?: SnapshotState) {
@@ -146,16 +140,15 @@ function normalizeMatchForDisplay(match: any, now = Date.now(), snapshot?: Snaps
     const effectiveStatus = isScheduledStatus(status) && snapshotConfirmsLive
       ? snapshotMinute && snapshotMinute >= 46 ? '2H' : '1H'
       : providerStatus;
-    const safeMinute = displayMinute({ ...match, status: effectiveStatus }, freshSnapshot);
     return {
       ...match,
       displayStatus: effectiveStatus,
       isLiveNow: true,
       isLikelyLiveByTime: false,
       isHalfTime: false,
-      minute: safeMinute,
-      liveLabel: livePhaseLabel(effectiveStatus, safeMinute),
-      minuteSource: freshSnapshot ? 'provider_snapshot' : 'provider_status',
+      minute: null,
+      liveLabel: livePhaseLabel(effectiveStatus),
+      minuteSource: freshSnapshot ? 'provider_snapshot_hidden' : 'provider_status_hidden',
     };
   }
 
