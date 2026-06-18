@@ -73,7 +73,17 @@ function hoursApart(a: any, b: any) {
   return Number.isFinite(aa) && Number.isFinite(bb) ? Math.abs(aa - bb) / 36e5 : 999;
 }
 function normalizeTeam(value: any) {
-  return clean(value).replace('czechia', 'czech republic').replace('usa', 'united states').replace('bosnia h', 'bosnia and herzegovina');
+  return clean(value)
+    .replace('czechia', 'czech republic')
+    .replace('usa', 'united states')
+    .replace('u s a', 'united states')
+    .replace('turkiye', 'turkey')
+    .replace('turkiye national team', 'turkey')
+    .replace('bosnia h', 'bosnia and herzegovina')
+    .replace('bosnia herzegovina', 'bosnia and herzegovina')
+    .replace('bosnia and h', 'bosnia and herzegovina')
+    .replace('cote d ivoire', 'ivory coast')
+    .replace('curacao', 'curaçao');
 }
 function teamMatch(providerName: any, localTeam: any) {
   const p = normalizeTeam(providerName);
