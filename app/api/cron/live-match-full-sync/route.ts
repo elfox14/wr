@@ -200,6 +200,7 @@ export async function GET(req: Request) {
   const runISports = bool(url.searchParams.get('isports'), true);
   const runDedupe = bool(url.searchParams.get('dedupe'), true);
   const wakeFallback = bool(url.searchParams.get('wakeFallback'), true);
+  const mapISports = bool(url.searchParams.get('mapISports'), true);
   const updateStatusFromStats = bool(url.searchParams.get('updateStatusFromStats'), false);
   const forceStatsOnly = bool(url.searchParams.get('forceStatsOnly'), false);
   const autoFinish = bool(url.searchParams.get('autoFinish'), true);
@@ -210,23 +211,24 @@ export async function GET(req: Request) {
   const minutesForward = int(url.searchParams.get('minutesForward'), 45, 0, 240);
   const delayMs = int(url.searchParams.get('delayMs'), 750, 0, 5000);
 
-  const matches = await selectActiveMatches(minutesBack, minutesForward, limit);
   const out: any = {
     ok: true,
     mode: 'live_match_full_sync',
     dryRun,
     publicOrigin: origin,
     internalRequestOrigin: url.origin,
-    matchesFound: matches.length,
+    matchesFound: 0,
     policy: {
       theStats: 'primary source for score, status, and live stats',
       iSport: isportFallbackOnly ? 'fallback only when official TheStats timeline is not available' : 'fallback animation timeline events when animationMatchId exists',
+      iSportMapping: 'live-market-sync runs first to map missing animationMatchId values from the iSport live feed',
       database: 'last successful snapshot/events remain visible if a provider fails',
       dedupe: 'removes duplicates after provider pulls; official TheStats timeline replaces iSport fallback when available',
       rateLimitProtection: 'stats-only is disabled by default because live-catchup already calls live-stats',
       officialTimelineMinEvents,
     },
     wakeFallback: null,
+    iSportLiveMap: null,
     theStatsCatchup: null,
     perMatch: [] as any[],
   };
@@ -234,6 +236,16 @@ export async function GET(req: Request) {
   if (wakeFallback) {
     out.wakeFallback = await postBrowserlessWake(process.env.BROWSERLESS_FALLBACK_ENDPOINT || process.env.BROWSERLESS_BACKUP_ENDPOINT || 'https://browserless-backup-5k6y.onrender.com');
   }
+
+  if (mapISports) {
+    const liveMap = new URL('/api/cron/live-market-sync', origin);
+    liveMap.searchParams.set('forceLive', 'true');
+    liveMap.searchParams.set('key', key);
+    out.iSportLiveMap = await callJson(liveMap, 45000);
+  }
+
+  const matches = await selectActiveMatches(minutesBack, minutesForward, limit);
+  out.matchesFound = matches.length;
 
   let providerIds = new Map<string, string>();
   if (runTheStats) {
@@ -316,7 +328,7 @@ export async function GET(req: Request) {
         item.isportsTimeline = await callJson(isports, 70000);
       }
     } else if (runISports) {
-      item.isportsTimeline = { skipped: true, reason: 'No animationMatchId mapped for this match' };
+      item.isportsTimeline = { skipped: true, reason: 'No animationMatchId mapped for this match after iSport live map step' };
     }
 
     if (runDedupe) {
