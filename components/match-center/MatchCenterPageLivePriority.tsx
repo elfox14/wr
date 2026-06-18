@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation';
 import prisma from '@/lib/prisma';
 import { getTeamFlagUrl } from '@/lib/teamFlags';
 import MatchAutoRefresh from './MatchAutoRefresh';
+import MatchIntelligenceAndMomentum from './MatchIntelligenceAndMomentum';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -85,12 +86,9 @@ function scoreForDisplay(match: any, snapshots: any[]): ScorePair {
   const matchAway = n(match.awayScore);
   const matchScore: ScorePair = { home: matchHome, away: matchAway, source: 'قاعدة المباراة' };
   const matchTotal = Number(matchHome || 0) + Number(matchAway || 0);
-
   const snapshotScore = snapshots.map(scoreFromSnapshot).find(Boolean) as ScorePair | null;
   const snapshotTotal = Number(snapshotScore?.home || 0) + Number(snapshotScore?.away || 0);
 
-  // Score in Match row is the source of truth because live-market-sync and iSport flash update it.
-  // If it is still 0-0 while a newer provider snapshot has goals, use the provider snapshot as fallback.
   if (snapshotScore && snapshotTotal > matchTotal) return snapshotScore;
   if (matchHome !== null || matchAway !== null) return matchScore;
   return snapshotScore || { home: null, away: null, source: 'غير متوفر' };
@@ -130,6 +128,7 @@ function minuteFrom(match: any, sources: any[]) {
     const minute = n(snapshot?.minute ?? data.minute ?? data.elapsed ?? data.currentMinute ?? meta.elapsed_minutes ?? meta.minute);
     if (minute !== null) return minute;
   }
+
   const startMs = new Date(match.matchDate || '').getTime();
   if (LIVE.includes(String(match.status || '').toUpperCase()) && Number.isFinite(startMs)) return Math.max(1, Math.min(130, Math.floor((Date.now() - startMs) / 60000) + 1));
   return null;
@@ -143,6 +142,7 @@ function clockLabel(match: any, sources: any[]) {
     const minute = minuteFrom(match, sources);
     return minute === null ? 'مباشرة الآن' : `د${fmt(Math.floor(minute))}`;
   }
+
   const startMs = new Date(match.matchDate || '').getTime();
   if (Number.isFinite(startMs) && Date.now() > startMs + 5 * 60000) return 'تأخر البدء';
   return 'لم تبدأ';
@@ -217,5 +217,47 @@ export default async function MatchCenterPageLivePriority({ params }: { params: 
     ['الفرص الكبيرة Big Chances', metric(sources, 'bigChances', 'homeBigChances', 'awayBigChances'), ''],
   ] as const;
 
-  return <main className="min-h-screen bg-[#02060d] px-3 py-4 text-white sm:px-6" dir="rtl"><MatchAutoRefresh intervalMs={25000} /><section className="mx-auto max-w-7xl space-y-5"><section className="relative overflow-hidden rounded-[1.8rem] border border-white/10 bg-[#030912] px-4 py-6 text-center shadow-[0_0_70px_rgba(0,0,0,.55)] sm:px-6"><div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_16%,rgba(15,240,252,.20),transparent_34%),radial-gradient(circle_at_82%_14%,rgba(255,48,69,.18),transparent_34%),linear-gradient(180deg,rgba(255,215,0,.08),transparent_36%)]" /><div className="relative"><h1 className="text-3xl font-black text-[#FFD700] sm:text-5xl">إحصائيات المباراة</h1><p className="mt-2 text-sm font-bold text-gray-300">عرض موحّد للأرقام والأحداث في مكان واحد</p></div><div className="relative mt-8 grid items-center gap-5 lg:grid-cols-[1fr_auto_1fr]" dir="ltr"><TeamBlock team={match.homeTeam} side="home" /><div><div className="inline-flex items-center justify-center gap-5 rounded-[1.3rem] border border-white/10 bg-black/45 px-6 py-3"><span className="text-5xl font-black text-[#FFD700] sm:text-7xl">{fmt(displayScore.home)}</span><span className="text-4xl font-black text-white/80 sm:text-6xl">-</span><span className="text-5xl font-black text-white sm:text-7xl">{fmt(displayScore.away)}</span></div><div className="mx-auto mt-3 inline-flex min-h-9 items-center rounded-xl border border-[#FFD700]/30 bg-[#FFD700]/10 px-5 text-sm font-black text-[#FFD700]">{clockLabel(match, sources)}</div></div><TeamBlock team={match.awayTeam} side="away" /></div><div className="relative mt-4 rounded-2xl border border-white/10 bg-black/25 p-3 text-xs font-bold leading-6 text-gray-300"><b className="text-[#FFD700]">ترتيب مصادر العرض:</b> النتيجة من صف المباراة المحدث عبر TheStats/iSport، ثم أحدث Snapshot عند الحاجة. الأرقام: TheStatsAPI Live ثم TheStatsAPI ثم iSport Flash/Animation ثم آخر Snapshot. <span className="text-[#69d7ff]">المصدر الأساسي الحالي: {sourceName(primary)}</span>{displayScore.source ? <span> — مصدر النتيجة: {displayScore.source}</span> : null}</div></section><section className="rounded-[1.6rem] border border-white/10 bg-white/[.035] p-4" dir="ltr"><div className="mb-3 grid grid-cols-[1fr_auto_1fr] items-center gap-3"><h2 className="text-left text-lg font-black text-[#69d7ff]">{match.homeTeam?.name}</h2><div className="rounded-full border border-white/10 bg-black/35 px-4 py-1 text-[10px] font-black uppercase tracking-[.24em] text-gray-400">Stats Board</div><h2 className="text-right text-lg font-black text-[#ff6b7a]">{match.awayTeam?.name}</h2></div><div className="rounded-[1.2rem] border border-white/10 bg-black/30 px-2 sm:px-4">{rows.map(([label, value, suffix]) => <StatRow key={label} label={label} value={value} suffix={suffix} />)}</div></section><EventsPanel events={match.events || []} /></section></main>;
+  return (
+    <main className="min-h-screen bg-[#02060d] px-3 py-4 text-white sm:px-6" dir="rtl">
+      <MatchAutoRefresh intervalMs={25000} />
+      <section className="mx-auto max-w-7xl space-y-5">
+        <section className="relative overflow-hidden rounded-[1.8rem] border border-white/10 bg-[#030912] px-4 py-6 text-center shadow-[0_0_70px_rgba(0,0,0,.55)] sm:px-6">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_16%,rgba(15,240,252,.20),transparent_34%),radial-gradient(circle_at_82%_14%,rgba(255,48,69,.18),transparent_34%),linear-gradient(180deg,rgba(255,215,0,.08),transparent_36%)]" />
+          <div className="relative">
+            <h1 className="text-3xl font-black text-[#FFD700] sm:text-5xl">إحصائيات المباراة</h1>
+            <p className="mt-2 text-sm font-bold text-gray-300">عرض موحّد للأرقام والأحداث في مكان واحد</p>
+          </div>
+          <div className="relative mt-8 grid items-center gap-5 lg:grid-cols-[1fr_auto_1fr]" dir="ltr">
+            <TeamBlock team={match.homeTeam} side="home" />
+            <div>
+              <div className="inline-flex items-center justify-center gap-5 rounded-[1.3rem] border border-white/10 bg-black/45 px-6 py-3">
+                <span className="text-5xl font-black text-[#FFD700] sm:text-7xl">{fmt(displayScore.home)}</span>
+                <span className="text-4xl font-black text-white/80 sm:text-6xl">-</span>
+                <span className="text-5xl font-black text-white sm:text-7xl">{fmt(displayScore.away)}</span>
+              </div>
+              <div className="mx-auto mt-3 inline-flex min-h-9 items-center rounded-xl border border-[#FFD700]/30 bg-[#FFD700]/10 px-5 text-sm font-black text-[#FFD700]">{clockLabel(match, sources)}</div>
+            </div>
+            <TeamBlock team={match.awayTeam} side="away" />
+          </div>
+          <div className="relative mt-4 rounded-2xl border border-white/10 bg-black/25 p-3 text-xs font-bold leading-6 text-gray-300">
+            <b className="text-[#FFD700]">ترتيب مصادر العرض:</b> النتيجة من صف المباراة المحدث عبر TheStats/iSport، ثم أحدث Snapshot عند الحاجة. الأرقام: TheStatsAPI Live ثم TheStatsAPI ثم iSport Flash/Animation ثم آخر Snapshot. <span className="text-[#69d7ff]">المصدر الأساسي الحالي: {sourceName(primary)}</span>{displayScore.source ? <span> — مصدر النتيجة: {displayScore.source}</span> : null}
+          </div>
+        </section>
+
+        <section className="rounded-[1.6rem] border border-white/10 bg-white/[.035] p-4" dir="ltr">
+          <div className="mb-3 grid grid-cols-[1fr_auto_1fr] items-center gap-3">
+            <h2 className="text-left text-lg font-black text-[#69d7ff]">{match.homeTeam?.name}</h2>
+            <div className="rounded-full border border-white/10 bg-black/35 px-4 py-1 text-[10px] font-black uppercase tracking-[.24em] text-gray-400">Stats Board</div>
+            <h2 className="text-right text-lg font-black text-[#ff6b7a]">{match.awayTeam?.name}</h2>
+          </div>
+          <div className="rounded-[1.2rem] border border-white/10 bg-black/30 px-2 sm:px-4">
+            {rows.map(([label, value, suffix]) => <StatRow key={label} label={label} value={value} suffix={suffix} />)}
+          </div>
+        </section>
+
+        <EventsPanel events={match.events || []} />
+        <MatchIntelligenceAndMomentum match={match} />
+      </section>
+    </main>
+  );
 }
