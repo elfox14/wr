@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { getTeamFlagUrl } from '@/lib/teamFlags';
@@ -14,6 +14,7 @@ type Team = {
 
 type TickerMatch = {
   id?: string | number | null;
+  animationMatchId?: string | number | null;
   matchDate?: string | Date | null;
   status?: string | null;
   displayStatus?: string | null;
@@ -23,6 +24,8 @@ type TickerMatch = {
   awayTeam?: Team | null;
   isLiveNow?: boolean;
   isHalfTime?: boolean;
+  isLikelyLiveByTime?: boolean;
+  isStaleAutoFinished?: boolean;
   minute?: number | null;
   liveLabel?: string | null;
   groupPhase?: string | null;
@@ -35,6 +38,9 @@ type Props = {
 };
 
 const GROUP_LETTERS = 'ABCDEFGHIJKL'.split('');
+const TICKER_REFRESH_MS = 15_000;
+const GROUP_STAGE_MAX_LIVE_MINUTES = 115;
+const KNOCKOUT_MAX_LIVE_MINUTES = 150;
 
 function normalizeStatus(status?: string | null) {
   return String(status || '').toUpperCase();
@@ -57,32 +63,106 @@ function matchStatus(match: TickerMatch) {
   return normalizeStatus(match.displayStatus || match.status);
 }
 
+function isGroupStage(match: TickerMatch) {
+  const value = String(match.groupPhase || match.group || match.stage || '').toUpperCase();
+  return value.includes('GROUP');
+}
+
+function maxLiveMinutes(match: TickerMatch) {
+  return isGroupStage(match) ? GROUP_STAGE_MAX_LIVE_MINUTES : KNOCKOUT_MAX_LIVE_MINUTES;
+}
+
+function minutesFromKickoff(match: TickerMatch, now: Date) {
+  const date = match.matchDate ? new Date(match.matchDate) : null;
+  if (!date || !Number.isFinite(date.getTime())) return null;
+  return Math.floor((now.getTime() - date.getTime()) / 60_000) + 1;
+}
+
 function isHalfTime(match: TickerMatch) {
   return ['HT', 'HALFTIME', 'HALF_TIME', 'HALF-TIME'].includes(matchStatus(match)) || Boolean(match.isHalfTime);
 }
 
-function isLive(match: TickerMatch) {
+function isFinished(match: TickerMatch, now = new Date()) {
   const status = matchStatus(match);
-  return ['1H', '2H', 'ET', 'BT', 'P', 'IN_PLAY', 'LIVE'].includes(status) || Boolean(match.isLiveNow) || isHalfTime(match);
+  if (['FINISHED', 'FT', 'AET', 'PEN', 'FULL_TIME', 'ENDED'].includes(status) || Boolean(match.isStaleAutoFinished)) return true;
+  const minute = minutesFromKickoff(match, now);
+  const staleLive = ['1H', '2H', 'ET', 'BT', 'P', 'IN_PLAY', 'LIVE'].includes(status) || Boolean(match.isLiveNow);
+  return Boolean(staleLive && minute !== null && minute >= maxLiveMinutes(match));
 }
 
-function isFinished(match: TickerMatch) {
-  return ['FINISHED', 'FT', 'AET', 'PEN'].includes(matchStatus(match));
+function isLive(match: TickerMatch, now = new Date()) {
+  if (isFinished(match, now)) return false;
+  const status = matchStatus(match);
+  return ['1H', '2H', 'ET', 'BT', 'P', 'IN_PLAY', 'LIVE'].includes(status) || Boolean(match.isLiveNow) || isHalfTime(match);
 }
 
 function liveStatusText(match: TickerMatch) {
   if (isHalfTime(match)) return 'استراحة';
   const label = String(match.liveLabel || '').trim();
-  if (label && !label.includes('الشوط الثاني') && !/^الدقيقة\s*\d+$/i.test(label) && label !== 'مباشر الآن') return label;
+  if (label) return label.replace('انتهت المباراة', 'انتهت');
   if (typeof match.minute === 'number' && Number.isFinite(match.minute) && match.minute > 0) return `د${formatCount(Math.floor(match.minute))}`;
   return 'جارية';
+}
+
+function matchKey(match?: TickerMatch | null) {
+  return String(match?.id || match?.animationMatchId || `${match?.homeTeam?.name || ''}-${match?.awayTeam?.name || ''}-${match?.matchDate || ''}`);
+}
+
+function mergeById(baseMatches: TickerMatch[], updates: TickerMatch[]) {
+  const updateMap = new Map<string, TickerMatch>();
+  for (const update of updates) {
+    if (update.id) updateMap.set(`id:${update.id}`, update);
+    if (update.animationMatchId) updateMap.set(`animation:${update.animationMatchId}`, update);
+  }
+
+  const merged = baseMatches.map((match) => {
+    const update = (match.id && updateMap.get(`id:${match.id}`)) || (match.animationMatchId && updateMap.get(`animation:${match.animationMatchId}`));
+    return update ? { ...match, ...update } : match;
+  });
+
+  for (const update of updates) {
+    if (!merged.some((match) => matchKey(match) === matchKey(update))) merged.unshift(update);
+  }
+
+  return merged;
 }
 
 export default function HomeLiveMatchTicker({ matches = [] }: Props) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const safeMatches = Array.isArray(matches) ? (matches as TickerMatch[]) : [];
+  const [apiMatches, setApiMatches] = useState<TickerMatch[]>([]);
+  const [now, setNow] = useState(() => new Date());
 
-  if (safeMatches.length === 0) return null;
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(new Date()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function refreshTickerState() {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+      try {
+        const response = await fetch('/api/matches/live-card', { cache: 'no-store' });
+        if (!response.ok) return;
+        const data = await response.json();
+        const list = Array.isArray(data?.matches) ? data.matches : Array.isArray(data) ? data : [];
+        if (!cancelled) setApiMatches(list);
+      } catch {
+        // Keep server-rendered ticker matches visible if live-card is temporarily unavailable.
+      }
+    }
+    refreshTickerState();
+    const timer = window.setInterval(refreshTickerState, TICKER_REFRESH_MS);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, []);
+
+  const displayMatches = useMemo(() => mergeById(safeMatches, apiMatches).slice(0, 15), [safeMatches, apiMatches]);
+
+  if (displayMatches.length === 0) return null;
 
   return (
     <div className="relative -mx-3 w-[calc(100%+1.5rem)] overflow-hidden py-1 sm:mx-0 sm:w-full">
@@ -90,16 +170,16 @@ export default function HomeLiveMatchTicker({ matches = [] }: Props) {
       <div className="pointer-events-none absolute bottom-0 right-0 top-0 z-10 w-6 bg-gradient-to-l from-[#04110D] to-transparent sm:w-8" />
 
       <div ref={scrollContainerRef} className="scrollbar-none flex cursor-grab snap-x snap-mandatory gap-2.5 overflow-x-auto px-3 py-2 active:cursor-grabbing sm:gap-3 sm:px-4">
-        {safeMatches.map((match) => {
-          const live = isLive(match);
-          const halfTime = isHalfTime(match);
-          const finished = isFinished(match);
+        {displayMatches.map((match) => {
+          const finished = isFinished(match, now);
+          const live = isLive(match, now);
+          const halfTime = isHalfTime(match) && !finished;
           const homeFlag = match.homeTeam?.image || getTeamFlagUrl({ code: match.homeTeam?.code, name: match.homeTeam?.name }, 40);
           const awayFlag = match.awayTeam?.image || getTeamFlagUrl({ code: match.awayTeam?.code, name: match.awayTeam?.name }, 40);
           const matchHref = match.id ? `/matches/${match.id}` : '/matches';
 
           return (
-            <Link key={match.id} href={matchHref} className="shrink-0 snap-center">
+            <Link key={matchKey(match)} href={matchHref} className="shrink-0 snap-center">
               <motion.div
                 whileHover={{ y: -2 }}
                 className={`relative flex min-h-[104px] w-[min(17.25rem,calc(100vw-2rem))] items-center justify-between gap-3 rounded-2xl border bg-black/45 p-3 backdrop-blur-md transition-all duration-300 sm:w-64 ${
