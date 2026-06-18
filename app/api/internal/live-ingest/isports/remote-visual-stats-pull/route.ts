@@ -38,12 +38,25 @@ function defaultWrapperUrl(matchId: number, lang = 'en', version = '1') {
   url.searchParams.set('v', version);
   return url.toString();
 }
-function functionEndpoint() {
-  const raw = process.env.BROWSERLESS_ENDPOINT || 'https://production-sfo.browserless.io/content';
-  const url = new URL(raw.replace(/\/content\/?$/, '/function'));
-  const token = process.env.BROWSERLESS_TOKEN;
+function endpointToFunction(raw: string, token?: string | null) {
+  const url = new URL(raw);
+  if (url.pathname === '/' || url.pathname === '') url.pathname = '/function';
+  else if (/\/content\/?$/i.test(url.pathname)) url.pathname = url.pathname.replace(/\/content\/?$/i, '/function');
+  else if (!/\/function\/?$/i.test(url.pathname)) url.pathname = `${url.pathname.replace(/\/$/, '')}/function`;
   if (token && !url.searchParams.has('token')) url.searchParams.set('token', token);
   return url.toString();
+}
+function functionEndpoints() {
+  const candidates: string[] = [];
+  const primaryRaw = process.env.BROWSERLESS_ENDPOINT || 'https://production-sfo.browserless.io/content';
+  const primaryToken = process.env.BROWSERLESS_TOKEN;
+  if (primaryRaw && primaryToken) candidates.push(endpointToFunction(primaryRaw, primaryToken));
+
+  const fallbackRaw = process.env.BROWSERLESS_FALLBACK_ENDPOINT || process.env.BROWSERLESS_BACKUP_ENDPOINT || 'https://browserless-backup-5k6y.onrender.com/content';
+  const fallbackToken = process.env.BROWSERLESS_FALLBACK_TOKEN || process.env.BROWSERLESS_BACKUP_TOKEN || process.env.BROWSERLESS_TOKEN;
+  if (fallbackRaw) candidates.push(endpointToFunction(fallbackRaw, fallbackToken));
+
+  return [...new Set(candidates)];
 }
 function maskUrl(value?: string | null) {
   if (!value) return value || null;
@@ -186,7 +199,7 @@ function browserlessCode() {
             const style = window.getComputedStyle(el);
             return rect.width > 0 && rect.height > 0 && style.visibility !== 'hidden' && style.display !== 'none' && Number(style.opacity || 1) !== 0;
           };
-          const clean = (value) => String(value || '').replace(/\\s+/g, ' ').trim();
+          const clean = (value) => String(value || '').replace(/\s+/g, ' ').trim();
           const rawNodes = Array.from(document.querySelectorAll('body *'))
             .filter(visible)
             .map((el) => {
@@ -195,15 +208,15 @@ function browserlessCode() {
             })
             .filter((node) => node.text && node.text.length <= 40);
           const labels = rawNodes.filter((node) => /^(Attack|ATT|Attacks|D-ATT|D ATT|Shots|Shot|Possession|Poss|On Target|On-TGT|On TGT|Off Target|Off-TGT|Off TGT)$/i.test(node.text));
-          const values = rawNodes.filter((node) => /^\\d+(?:\\.\\d+)?%?$/.test(node.text));
+          const values = rawNodes.filter((node) => /^\d+(?:\.\d+)?%?$/.test(node.text));
           const pairs = labels.map((label) => {
             const rowValues = values.filter((value) => Math.abs(value.y - label.y) <= Math.max(12, label.h + 8));
             const left = rowValues.filter((value) => value.x < label.x).sort((a, b) => Math.abs(a.x - label.x) - Math.abs(b.x - label.x))[0];
             const right = rowValues.filter((value) => value.x > label.x).sort((a, b) => Math.abs(a.x - label.x) - Math.abs(b.x - label.x))[0];
             return { label: label.text, home: left ? left.text : null, away: right ? right.text : null, sourceUrl: location.href };
           }).filter((pair) => pair.home || pair.away);
-          const text = rawNodes.map((node) => node.text).join('\\n');
-          const nodes = rawNodes.filter((x) => /statistics|stats|attack|shots|possession|target|\\d+%?/i.test(x.text)).slice(0, 160);
+          const text = rawNodes.map((node) => node.text).join('\n');
+          const nodes = rawNodes.filter((x) => /statistics|stats|attack|shots|possession|target|\d+%?/i.test(x.text)).slice(0, 160);
           return { index: idx, url: location.href, title: document.title, text, nodes, pairs };
         }, index);
       } catch (error) {
@@ -221,17 +234,26 @@ function browserlessCode() {
     let idx = 0;
     for (const frame of page.frames()) frames.push(await readFrame(frame, idx++));
     const pairs = frames.flatMap((frame) => frame.pairs || []);
-    const text = frames.map((frame) => ['FRAME ' + frame.index, frame.url, frame.title, frame.text].filter(Boolean).join('\\n')).join('\\n---FRAME---\\n');
+    const text = frames.map((frame) => ['FRAME ' + frame.index, frame.url, frame.title, frame.text].filter(Boolean).join('\n')).join('\n---FRAME---\n');
     return { data: { title: await page.title(), href: page.url(), frameCount: frames.length, text, frames, pairs }, type: 'application/json' };
   }`;
 }
 async function callBrowserless(url: string, timeoutMs: number, waitMs: number) {
-  const endpoint = functionEndpoint();
-  const response = await fetch(endpoint, { method: 'POST', cache: 'no-store', headers: { 'content-type': 'application/json', accept: 'application/json,*/*' }, body: JSON.stringify({ code: browserlessCode(), context: { url, timeoutMs, waitMs } }) });
-  const text = await response.text();
-  let parsed: any = null;
-  try { parsed = JSON.parse(text); } catch {}
-  return { ok: response.ok, status: response.status, endpoint: maskUrl(endpoint), rawLength: text.length, contentType: response.headers.get('content-type'), data: parsed?.data || parsed || null, rawSample: parsed ? null : text.slice(0, 1200) };
+  const attempts: any[] = [];
+  for (const endpoint of functionEndpoints()) {
+    try {
+      const response = await fetch(endpoint, { method: 'POST', cache: 'no-store', headers: { 'content-type': 'application/json', accept: 'application/json,*/*' }, body: JSON.stringify({ code: browserlessCode(), context: { url, timeoutMs, waitMs } }) });
+      const text = await response.text();
+      let parsed: any = null;
+      try { parsed = JSON.parse(text); } catch {}
+      const attempt = { ok: response.ok, status: response.status, endpoint: maskUrl(endpoint), rawLength: text.length, contentType: response.headers.get('content-type'), data: parsed?.data || parsed || null, rawSample: parsed ? null : text.slice(0, 1200) };
+      attempts.push({ ...attempt, data: undefined });
+      if (response.ok) return { ...attempt, attempts };
+    } catch (error: any) {
+      attempts.push({ ok: false, status: null, endpoint: maskUrl(endpoint), error: String(error?.message || error).slice(0, 1000) });
+    }
+  }
+  return { ok: false, status: null, endpoint: null, rawLength: 0, contentType: null, data: null, rawSample: 'No Browserless function endpoint succeeded', attempts };
 }
 async function getMatch(input: { dbMatchId?: string | null; providerMatchId: number }) {
   if (input.dbMatchId) return prisma.match.findUnique({ where: { id: input.dbMatchId }, include: { homeTeam: { select: { id: true, name: true, code: true } }, awayTeam: { select: { id: true, name: true, code: true } } } });
@@ -253,7 +275,7 @@ export async function GET(req: Request) {
     const explicitSourceUrl = url.searchParams.get('sourceUrl');
     const rawMatchId = Number(url.searchParams.get('matchId') || url.searchParams.get('providerMatchId') || extractISportsMatchId(explicitSourceUrl));
     if (!Number.isFinite(rawMatchId) || rawMatchId <= 0) return json({ ok: false, error: 'matchId or sourceUrl is required' }, 400);
-    if (String(process.env.LIVE_STATS_REMOTE_BROWSER || '').toLowerCase() !== 'browserless' || !process.env.BROWSERLESS_TOKEN) return json({ ok: false, error: 'Browserless is not configured' }, 400);
+    if (!functionEndpoints().length) return json({ ok: false, error: 'Browserless function endpoint is not configured' }, 400);
     const providerMatchId = Math.floor(rawMatchId);
     const wrapperUrl = explicitSourceUrl ? safeUrl(explicitSourceUrl) : defaultWrapperUrl(providerMatchId, url.searchParams.get('lang') || 'en', url.searchParams.get('v') || '1');
     const timeoutMs = clamp(url.searchParams.get('timeoutMs'), 45000, 5000, 80000);
@@ -275,7 +297,7 @@ export async function GET(req: Request) {
       error: frame.error || null,
     })) || [];
     const saveResult = save ? match ? await saveSnapshot(match, providerMatchId, stats, { source: VISUAL_SOURCE, wrapperUrl, visualPairs: pairs, textSample: text.slice(0, 4000), framesSample, capturedBy: 'browserless_function_visual_stats_frames' }, reliable) : { inserted: 0, snapshotId: null, error: 'No local match found' } : null;
-    return json({ ok: true, mode: 'isports_remote_visual_stats_pull', remoteBrowser: { ok: rendered.ok, status: rendered.status, rawLength: rendered.rawLength, error: rendered.rawSample || null }, wrapper: { sourceUrl: wrapperUrl }, hasStats: reliable, stats, validation: { hasUsefulStats: hasUsefulStats(stats), reliable, rejectedPlaceholder: hasUndefinedPlaceholder(text), frameCount: rendered.data?.frameCount || 0, pairs }, textSample: text.slice(0, 2200), framesPreview: framesSample.map((frame: any) => ({ ...frame, text: String(frame.text || '').slice(0, 500), nodes: frame.nodes?.slice?.(0, 10) || [] })), match: match ? { id: match.id, status: match.status, homeTeam: match.homeTeam, awayTeam: match.awayTeam } : null, save: saveResult, note: 'Parses exact statistic lines like 54%Poss46%, 113ATT99, 32D-ATT27, 11Shots6 to avoid merged-number errors.' });
+    return json({ ok: true, mode: 'isports_remote_visual_stats_pull', remoteBrowser: { ok: rendered.ok, status: rendered.status, endpoint: maskUrl(rendered.endpoint), attempts: rendered.attempts, rawLength: rendered.rawLength, error: rendered.rawSample || null }, wrapper: { sourceUrl: wrapperUrl }, hasStats: reliable, stats, validation: { hasUsefulStats: hasUsefulStats(stats), reliable, rejectedPlaceholder: hasUndefinedPlaceholder(text), frameCount: rendered.data?.frameCount || 0, pairs }, textSample: text.slice(0, 2200), framesPreview: framesSample.map((frame: any) => ({ ...frame, text: String(frame.text || '').slice(0, 500), nodes: frame.nodes?.slice?.(0, 10) || [] })), match: match ? { id: match.id, status: match.status, homeTeam: match.homeTeam, awayTeam: match.awayTeam } : null, save: saveResult, note: 'Parses exact statistic lines like 54%Poss46%, 113ATT99, 32D-ATT27, 11Shots6 to avoid merged-number errors.' });
   } catch (error: any) {
     return json({ ok: false, error: error?.message || 'Internal Server Error' }, 500);
   }
