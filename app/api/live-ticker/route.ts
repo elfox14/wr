@@ -16,16 +16,31 @@ type TickerItem = {
   priority: number;
 };
 
+const LIVE_STATUSES = ['IN_PLAY', 'LIVE', 'HT', '1H', '2H', 'ET'];
+const FINISHED_STATUSES = ['FINISHED', 'FT', 'AET', 'PEN', 'COMPLETED'];
+
 function nullableNumber(value: unknown) {
   if (value === null || value === undefined || value === '') return null;
   const n = Number(value);
   return Number.isFinite(n) ? n : null;
 }
 
-function matchStatusLabel(status?: string | null) {
+function normalizeStatus(status?: string | null) {
   const value = String(status || '').toUpperCase();
-  if (value === 'IN_PLAY' || value === 'LIVE' || value === 'HT') return 'مباشر الآن';
+  if (value === '1H' || value === '2H' || value === 'ET' || value === 'IN_PLAY' || value === 'LIVE') return 'IN_PLAY';
+  if (value === 'HT' || value === 'HALFTIME' || value === 'HALF_TIME' || value === 'HALF-TIME') return 'HT';
+  if (FINISHED_STATUSES.includes(value)) return 'FINISHED';
+  return value || 'SCHEDULED';
+}
+
+function matchStatusLabel(status?: string | null, scoreSnapshot?: any) {
+  const value = normalizeStatus(status);
+  if (value === 'HT') return 'استراحة';
+  if (value === 'IN_PLAY') return 'مباشر الآن';
   if (value === 'FINISHED') return 'انتهت';
+  const snapshotMinute = nullableNumber(scoreSnapshot?.minute);
+  const snapshotScore = (nullableNumber(scoreSnapshot?.homeScore) || 0) + (nullableNumber(scoreSnapshot?.awayScore) || 0);
+  if (snapshotMinute !== null || snapshotScore > 0) return 'مباشر الآن';
   return 'قادمة';
 }
 
@@ -72,7 +87,7 @@ async function fetchLatestScoreSnapshots(matchIds: string[]) {
     const idList = matchIds.map(quoteSql).join(',');
     const rows = await prisma.$queryRawUnsafe<any[]>(`
       SELECT DISTINCT ON ("matchId")
-        "matchId", "homeScore", "awayScore", "capturedAt"
+        "matchId", "homeScore", "awayScore", "minute", "capturedAt"
       FROM "MatchStatsSnapshot"
       WHERE "matchId" IN (${idList})
       ORDER BY "matchId", "capturedAt" DESC
@@ -125,30 +140,43 @@ function fallbackMatchItems(now: Date): TickerItem[] {
   ];
 }
 
+function hasLiveEvidence(match: any, scoreSnapshot: any, now: Date) {
+  const status = normalizeStatus(match.status);
+  if (status === 'IN_PLAY' || status === 'HT') return true;
+  if (status === 'FINISHED') return false;
+  const snapshotMinute = nullableNumber(scoreSnapshot?.minute);
+  const snapshotScore = (nullableNumber(scoreSnapshot?.homeScore) || 0) + (nullableNumber(scoreSnapshot?.awayScore) || 0);
+  if (snapshotMinute !== null || snapshotScore > 0) return true;
+  const start = new Date(match.matchDate || '').getTime();
+  return Number.isFinite(start) && now.getTime() >= start && now.getTime() <= start + 150 * 60_000;
+}
+
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const limit = Math.min(Math.max(parseInt(searchParams.get('limit') || '24', 10), 6), 60);
     const now = new Date();
     const liveWindowStart = new Date(now.getTime() - 5 * 60 * 60 * 1000);
-    const liveWindowEnd = new Date(now.getTime() + 3 * 60 * 60 * 1000);
+    const liveWindowEnd = new Date(now.getTime() + 15 * 60 * 1000);
     const finishedWindowStart = new Date(now.getTime() - 8 * 60 * 60 * 1000);
     const eventsWindowStart = new Date(now.getTime() - 12 * 60 * 60 * 1000);
     const upcomingWindow = new Date(now.getTime() + 6 * 60 * 60 * 1000);
 
-    const [liveMatches, finishedMatches, upcomingMatches, recentEvents] = await Promise.all([
+    const [liveMatchCandidates, finishedMatches, upcomingMatches, recentEvents] = await Promise.all([
       prisma.match.findMany({
         where: {
-          status: { in: ['IN_PLAY', 'LIVE', 'HT'] },
-          matchDate: { gte: liveWindowStart, lte: liveWindowEnd },
+          OR: [
+            { status: { in: LIVE_STATUSES } },
+            { status: { notIn: FINISHED_STATUSES }, matchDate: { gte: liveWindowStart, lte: liveWindowEnd } },
+          ],
         },
         orderBy: { matchDate: 'asc' },
-        take: 8,
+        take: 12,
         include: { homeTeam: true, awayTeam: true },
       }),
       prisma.match.findMany({
         where: {
-          status: 'FINISHED',
+          status: { in: FINISHED_STATUSES },
           matchDate: { gte: finishedWindowStart, lte: now },
         },
         orderBy: { matchDate: 'desc' },
@@ -173,18 +201,21 @@ export async function GET(request: Request) {
     ]);
 
     const relatedMatchIds = [
-      ...liveMatches,
+      ...liveMatchCandidates,
       ...finishedMatches,
       ...recentEvents.map((event) => event.match).filter(Boolean),
     ].map((match: any) => match.id);
     const scoreSnapshots = await fetchLatestScoreSnapshots(Array.from(new Set(relatedMatchIds)));
+    const liveMatches = liveMatchCandidates.filter((match) => hasLiveEvidence(match, scoreSnapshots.get(match.id), now));
+    const liveMatchIdSet = new Set(liveMatches.map((match) => match.id));
     const items: TickerItem[] = [];
 
     for (const match of liveMatches) {
+      const scoreSnapshot = scoreSnapshots.get(match.id);
       items.push({
         id: `match-live-${match.id}`,
         type: 'MATCH_EVENT',
-        title: `${matchStatusLabel(match.status)}: ${matchTitle(match, scoreSnapshots.get(match.id))}`,
+        title: `${matchStatusLabel(match.status, scoreSnapshot)}: ${matchTitle(match, scoreSnapshot)}`,
         matchId: match.id,
         href: animationHref(match),
         timestamp: now.toISOString(),
@@ -209,10 +240,11 @@ export async function GET(request: Request) {
     }
 
     for (const match of finishedMatches) {
+      if (liveMatchIdSet.has(match.id)) continue;
       items.push({
         id: `match-finished-${match.id}`,
         type: 'MATCH_EVENT',
-        title: `${matchStatusLabel(match.status)}: ${matchTitle(match, scoreSnapshots.get(match.id))}`,
+        title: `${matchStatusLabel(match.status, scoreSnapshots.get(match.id))}: ${matchTitle(match, scoreSnapshots.get(match.id))}`,
         matchId: match.id,
         href: animationHref(match),
         timestamp: now.toISOString(),
@@ -222,6 +254,7 @@ export async function GET(request: Request) {
     }
 
     for (const match of upcomingMatches) {
+      if (liveMatchIdSet.has(match.id)) continue;
       items.push({
         id: `match-upcoming-${match.id}`,
         type: 'MATCH_EVENT',
@@ -238,23 +271,16 @@ export async function GET(request: Request) {
     return NextResponse.json({
       success: true,
       updatedAt: now.toISOString(),
-      responseMode: 'matches_only',
-      scoreSource: 'latest_snapshot_then_match',
-      counts: {
-        live: liveMatches.length,
-        events: recentEvents.length,
-        finished: finishedMatches.length,
-        upcoming: upcomingMatches.length,
-      },
+      count: sortedItems.length,
       items: (sortedItems.length ? sortedItems : fallbackMatchItems(now)).slice(0, limit).map(stripInternalFields),
     }, { headers: noStoreHeaders });
   } catch (error: any) {
-    console.error('Live ticker error:', error);
+    console.error('live ticker failed:', error);
     const now = new Date();
     return NextResponse.json({
       success: false,
-      error: error.message || 'Failed to fetch live ticker',
-      responseMode: 'matches_only',
+      error: error?.message || 'live ticker unavailable',
+      updatedAt: now.toISOString(),
       items: fallbackMatchItems(now).map(stripInternalFields),
     }, { status: 200, headers: noStoreHeaders });
   }
