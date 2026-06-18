@@ -93,6 +93,33 @@ function minuteFromMeta(match: any, meta: any) {
   return Number.isFinite(elapsed) ? Math.max(1, Math.min(130, elapsed)) : null;
 }
 
+async function createScoreUpdateEvent(match: any, score: { home: number; away: number }, minute: number | null, sourcePath: string) {
+  if (score.home + score.away <= 0) return false;
+  const detail = `تحديث النتيجة المباشرة من TheStatsAPI: ${match.homeTeam?.name || 'Home'} ${score.home} - ${score.away} ${match.awayTeam?.name || 'Away'} — توقيت واسم مسجل الهدف غير متوفرين من timeline`;
+  const existing = await prisma.matchEvent.findFirst({
+    where: {
+      matchId: match.id,
+      type: 'score_update',
+      sourceName: 'THE_STATS_API_LIVE_SCORE',
+      detail: { contains: `${score.home} - ${score.away}` },
+    },
+    select: { id: true },
+  });
+  if (existing) return false;
+  await prisma.matchEvent.create({
+    data: {
+      matchId: match.id,
+      minute,
+      type: 'score_update',
+      teamId: score.home > score.away ? match.homeTeamId : score.away > score.home ? match.awayTeamId : null,
+      detail,
+      sourceName: 'THE_STATS_API_LIVE_SCORE',
+      sourceUrl: sourcePath,
+    },
+  });
+  return true;
+}
+
 export async function GET(req: Request) {
   const url = new URL(req.url);
   if (!isAuthorized(req, url.searchParams)) {
@@ -117,6 +144,7 @@ export async function GET(req: Request) {
     const minute = minuteFromMeta(match, meta);
     let snapshotSaved = false;
     let matchUpdated = false;
+    let scoreEventCreated = false;
 
     if (!dryRun) {
       await prisma.matchStatsSnapshot.create({ data: {
@@ -150,6 +178,7 @@ export async function GET(req: Request) {
       if (score.away !== match.awayScore) updateData.awayScore = score.away;
       await prisma.match.update({ where: { id: match.id }, data: updateData });
       matchUpdated = true;
+      scoreEventCreated = await createScoreUpdateEvent(match, score, minute, liveStatsPath);
     }
 
     return NextResponse.json({
@@ -167,7 +196,13 @@ export async function GET(req: Request) {
       score,
       snapshotSaved,
       matchUpdated,
+      scoreEventCreated,
       sourcePath: liveStatsPath,
+      displayNotes: {
+        timelineEventsAvailable: false,
+        scoreUpdateEventIsFallback: true,
+        unavailableFromLiveStats: ['attacks', 'dangerousAttacks', 'exactGoalMinute', 'goalScorer'],
+      },
       safety: {
         singleProviderRequest: true,
         noTimelineRequest: true,
