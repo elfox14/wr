@@ -1,7 +1,5 @@
 import HomeClientSportsLiveFocus from '@/components/HomeClientSportsLiveFocus';
-import HomeProviderStatsCards from '@/components/HomeProviderStatsCards';
 import prisma from '@/lib/prisma';
-import Link from 'next/link';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -128,58 +126,6 @@ async function findFreshLiveCandidate<T extends MatchCandidate>(candidates: T[],
   return candidate ? decorateLiveCandidateWithSnapshot(candidate, latestByMatch.get(candidate.id)) : null;
 }
 
-function ContentHubCard() {
-  const items = [
-    ['الأخبار والتحليل', 'تقارير وتحليلات رياضية منفصلة عن الجانب الترفيهي.', '/news'],
-    ['الإحصائيات', 'ملخصات مباشرة للأهداف والبطاقات وحالة المباريات.', '/matches'],
-    ['المنتخبات', 'بطاقات المنتخبات، اللاعبين، والمعلومات الأساسية.', '/teams'],
-  ] as const;
-
-  return (
-    <section dir="rtl" className="mx-auto max-w-7xl rounded-[1.45rem] border border-white/10 bg-white/[0.04] p-4 text-white shadow-card backdrop-blur sm:rounded-3xl">
-      <div className="mb-4">
-        <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#FFD700] sm:text-xs">Content Hub</p>
-        <h2 className="mt-1 text-xl font-black text-white sm:text-2xl">مركز المحتوى</h2>
-        <p className="mt-1 text-sm font-semibold leading-6 text-gray-400">كل ما يخص البطولة من مباريات، منتخبات، وتحليل.</p>
-      </div>
-      <div className="grid gap-3 md:grid-cols-3">
-        {items.map(([title, body, href]) => (
-          <Link key={title} href={href} className="mobile-tap rounded-2xl border border-white/10 bg-black/25 p-4 transition hover:-translate-y-0.5 hover:border-[#0FF0FC]/30 hover:bg-white/[0.07]">
-            <h3 className="font-black text-white">{title}</h3>
-            <p className="mt-2 text-xs font-bold leading-6 text-gray-400">{body}</p>
-          </Link>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function QuickLinksCard() {
-  const links = [
-    ['المجموعات', 'ترتيب المنتخبات داخل كل مجموعة.', '/groups'],
-    ['المدن والملاعب', 'تعريف بالملاعب والمدن المستضيفة.', '/stadiums'],
-    ['البورصة الافتراضية', 'تجربة ترفيهية منفصلة عن التحليل الرياضي.', '/market'],
-  ] as const;
-
-  return (
-    <section dir="rtl" className="mx-auto max-w-7xl rounded-[1.45rem] border border-white/10 bg-white/[0.04] p-4 text-white shadow-card backdrop-blur sm:rounded-3xl">
-      <div className="mb-4">
-        <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#FFD700] sm:text-xs">World Cup Hub</p>
-        <h2 className="mt-1 text-xl font-black text-white sm:text-2xl">دليل المنصة</h2>
-        <p className="mt-1 text-sm font-semibold leading-6 text-gray-400">روابط سريعة لأهم أقسام كأس العالم.</p>
-      </div>
-      <div className="grid gap-3 md:grid-cols-3">
-        {links.map(([title, body, href]) => (
-          <Link key={title} href={href} className="mobile-tap rounded-2xl border border-white/10 bg-black/25 p-4 transition hover:-translate-y-0.5 hover:border-[#FFD700]/30 hover:bg-white/[0.07]">
-            <h3 className="font-black text-white">{title}</h3>
-            <p className="mt-2 text-xs font-bold leading-6 text-gray-400">{body}</p>
-          </Link>
-        ))}
-      </div>
-    </section>
-  );
-}
-
 export default async function Home() {
   const now = new Date();
   const tickerStart = new Date(now.getTime() - 24 * 60 * 60 * 1000);
@@ -260,20 +206,13 @@ export default async function Home() {
   }
 
   return (
-    <>
-      <HomeClientSportsLiveFocus
-        upcomingMatches={upcomingMatches}
-        tickerMatches={tickerMatches}
-        nextMarqueeMatch={nextMarqueeMatch}
-        playersCount={playersCount}
-        teamsCount={teamsCount}
-        upcomingMatchesCount={upcomingMatchesCount}
-      />
-      <div className="space-y-4 px-3 pb-8 sm:space-y-6 sm:px-4 lg:px-6">
-        <HomeProviderStatsCards playersCount={playersCount} teamsCount={teamsCount} />
-        <ContentHubCard />
-        <QuickLinksCard />
-      </div>
-    </>
+    <HomeClientSportsLiveFocus
+      upcomingMatches={upcomingMatches}
+      tickerMatches={tickerMatches}
+      nextMarqueeMatch={nextMarqueeMatch}
+      playersCount={playersCount}
+      teamsCount={teamsCount}
+      upcomingMatchesCount={upcomingMatchesCount}
+    />
   );
 }

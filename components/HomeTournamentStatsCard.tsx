@@ -9,12 +9,11 @@ type Props = {
   upcomingMatchesCount?: number;
 };
 
-type SourceName = 'TheStatsAPI' | 'DB' | 'FBref' | 'FBref PK/PKatt' | 'DB/Event' | 'ثابت' | '—';
 type Tone = 'gold' | 'cyan' | 'green' | 'red' | 'neutral';
 
 const STATS_REFRESH_MS = 60_000;
 const LOADING_VALUE = '...';
-const DEFAULT_PLAYERS_COUNT = 1248;
+const unavailableSource = '—';
 
 function read(obj: any, key: string) {
   return obj?.[key];
@@ -60,11 +59,21 @@ function shortText(value: string, max = 24) {
   return value.length > max ? `${value.slice(0, max - 1)}…` : value;
 }
 
-function sourceFrom(useFallback: boolean, hasDbValue = true, useTheStatsApi = false): SourceName {
-  if (useTheStatsApi) return 'TheStatsAPI';
-  if (useFallback) return 'FBref';
-  if (hasDbValue) return 'DB';
-  return '—';
+function sourceNameForSummary(summary: any, databaseSummary: any) {
+  if (summary?.provider === 'THE_STATS_API' || summary?.source === 'thestatsapi_server_side_summary') return 'TheStatsAPI';
+  if (summary?.provider === 'DATABASE_SUMMARY') return 'DB/Snapshots';
+  if (databaseSummary?.ok) return 'DB/Snapshots';
+  return unavailableSource;
+}
+
+function hasProviderStat(summary: any, key: string) {
+  const availability = finiteNumber(summary?.statAvailability?.[key]);
+  return availability !== null && availability > 0;
+}
+
+function hasSnapshotValue(summary: any, ...values: unknown[]) {
+  const matches = pickNumber(summary?.finalStats?.matchesWithFinalSnapshots);
+  return matches !== null && pickNumber(...values) !== null;
 }
 
 function toneStyles(tone: Tone) {
@@ -77,8 +86,8 @@ function toneStyles(tone: Tone) {
   }[tone];
 }
 
-function SourceBadge({ source }: { source?: SourceName | string }) {
-  if (!source || source === '—') return null;
+function SourceBadge({ source }: { source?: string }) {
+  if (!source || source === unavailableSource) return null;
   return <span className="rounded-full border border-white/10 bg-white/[0.06] px-1.5 py-0.5 text-[8px] font-black text-gray-300">{source}</span>;
 }
 
@@ -91,7 +100,7 @@ function StatShell({
   children,
 }: {
   title: string;
-  source?: SourceName | string;
+  source?: string;
   tone?: Tone;
   href?: string;
   itemClassName?: string;
@@ -119,7 +128,6 @@ function GoalFrame({ children, tone = 'gold' }: { children: ReactNode; tone?: To
   return (
     <div className="relative flex min-h-[82px] flex-1 items-center justify-center overflow-hidden rounded-xl border border-white/10 bg-black/20 px-2 py-2 text-center">
       <div className={`pointer-events-none absolute inset-x-3 top-2 h-[62px] rounded-t-2xl border-2 border-b-0 ${tone === 'green' ? 'border-[#00FF88]/35' : tone === 'cyan' ? 'border-[#0FF0FC]/35' : 'border-[#FFD700]/35'}`} />
-      <div className={`pointer-events-none absolute bottom-2 left-1/2 h-7 w-px -translate-x-1/2 ${tone === 'green' ? 'bg-[#00FF88]/18' : tone === 'cyan' ? 'bg-[#0FF0FC]/18' : 'bg-[#FFD700]/18'}`} />
       <div className="pointer-events-none absolute inset-x-5 top-[50%] h-px bg-white/10" />
       <div className="relative z-10 w-full">{children}</div>
       <div className={`pointer-events-none absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent ${style.line} to-transparent`} />
@@ -127,7 +135,7 @@ function GoalFrame({ children, tone = 'gold' }: { children: ReactNode; tone?: To
   );
 }
 
-function GoalStatCard({ title, value, subtitle, source, tone = 'gold', href }: { title: string; value: string; subtitle?: string; source?: SourceName | string; tone?: Tone; href?: string }) {
+function GoalStatCard({ title, value, subtitle, source, tone = 'gold', href }: { title: string; value: string; subtitle?: string; source?: string; tone?: Tone; href?: string }) {
   const style = toneStyles(tone);
   return (
     <StatShell title={title} source={source} tone={tone} href={href} itemClassName="col-span-1 sm:col-span-2 lg:col-span-2 xl:col-span-2">
@@ -159,14 +167,17 @@ function PlayerImage({ leader }: { leader: any }) {
 }
 
 function TopScorerCard({ leader }: { leader: any }) {
-  const href = leader?.id ? `/players/${encodeURIComponent(String(leader.id))}` : '/players';
+  const rawId = String(leader?.id || '');
+  const href = rawId && !rawId.startsWith('provider-scorer:') ? `/players/${encodeURIComponent(rawId)}` : '/players';
   const playerName = leader?.name ? shortText(String(leader.name), 22) : 'غير متوفر';
+  const team = leader?.team?.name || leader?.team?.code || '';
   const subtitle = leader?.value
-    ? `${formatCount(Number(leader.value))} هدف${leader?.team ? ` • ${shortText(teamName(leader.team), 14)}` : ''}`
+    ? `${formatCount(Number(leader.value))} هدف${team ? ` • ${shortText(String(team), 14)}` : ''}`
     : 'بانتظار بيانات موثقة';
+  const source = leader?.sourceName || leader?.source || (leader ? 'DB' : unavailableSource);
 
   return (
-    <StatShell title="الهداف" source={leader ? 'DB' : '—'} tone="gold" href={href} itemClassName="col-span-1 sm:col-span-2 lg:col-span-2 xl:col-span-2">
+    <StatShell title="الهداف" source={source} tone="gold" href={href} itemClassName="col-span-1 sm:col-span-2 lg:col-span-2 xl:col-span-2">
       <div className="flex min-h-0 flex-1 items-center gap-3 overflow-hidden rounded-xl border border-[#FFD700]/15 bg-[#FFD700]/10 px-2.5 py-2 text-right">
         <PlayerImage leader={leader} />
         <div className="min-w-0 flex-1">
@@ -178,29 +189,25 @@ function TopScorerCard({ leader }: { leader: any }) {
   );
 }
 
-function PlayersGroupCard({ playerCount, teamCount, source }: { playerCount: number | null; teamCount: number | null; source: SourceName }) {
+function PlayersGroupCard({ playerCount, teamCount, source }: { playerCount: number | null; teamCount: number | null; source: string }) {
   return (
     <StatShell title="اللاعبون" source={source} tone="green" href="/players" itemClassName="col-span-1 sm:col-span-2 lg:col-span-2 xl:col-span-2">
       <div className="flex flex-1 flex-col items-center justify-center rounded-xl border border-[#00FF88]/15 bg-[#00FF88]/10 px-2 py-2">
         <div className="relative h-12 w-24">
           {[0, 1, 2, 3, 4].map((item) => (
-            <span
-              key={item}
-              className="absolute top-1 flex h-8 w-8 items-center justify-center rounded-full border border-[#00FF88]/25 bg-black/55 text-[10px] font-black text-[#00FF88] shadow-[0_4px_12px_rgba(0,255,136,0.08)]"
-              style={{ right: `${item * 16}px`, zIndex: 10 - item }}
-            >
+            <span key={item} className="absolute top-1 flex h-8 w-8 items-center justify-center rounded-full border border-[#00FF88]/25 bg-black/55 text-[10px] font-black text-[#00FF88] shadow-[0_4px_12px_rgba(0,255,136,0.08)]" style={{ right: `${item * 16}px`, zIndex: 10 - item }}>
               <span className="h-2.5 w-2.5 rounded-full bg-[#00FF88]/70" />
             </span>
           ))}
         </div>
-        <div className="text-3xl font-black leading-none text-[#00FF88]">{formatCount(playerCount ?? DEFAULT_PLAYERS_COUNT)}</div>
+        <div className="text-3xl font-black leading-none text-[#00FF88]">{formatCount(playerCount)}</div>
         <div className="mt-1 text-[9px] font-bold text-gray-400">{formatCount(teamCount)} منتخب</div>
       </div>
     </StatShell>
   );
 }
 
-function CardsMiniCard({ yellow, red, source }: { yellow: number | null; red: number | null; source: SourceName | string }) {
+function CardsMiniCard({ yellow, red, source }: { yellow: number | null; red: number | null; source: string }) {
   return (
     <StatShell title="الكروت" source={source} tone="red" href="/matches" itemClassName="col-span-1 sm:col-span-2 lg:col-span-2 xl:col-span-2">
       <div className="grid flex-1 grid-cols-2 items-center gap-2">
@@ -219,16 +226,15 @@ function CardsMiniCard({ yellow, red, source }: { yellow: number | null; red: nu
   );
 }
 
-function PenaltyMiniCard({ kickStats, usingFbref }: { kickStats: any; usingFbref: boolean }) {
+function PenaltyMiniCard({ kickStats, source }: { kickStats: any; source: string }) {
   const available = Boolean(kickStats?.available);
   const total = available ? Number(kickStats?.total || 0) : null;
   const scored = available ? Number(kickStats?.scored || 0) : null;
   const missed = available ? Number(kickStats?.missed || 0) : null;
   const conversion = total && scored !== null ? Math.max(0, Math.min(100, (scored / total) * 100)) : null;
-  const sourceText = String(kickStats?.source || kickStats?.provider || '').toLowerCase();
-  const source = sourceText.includes('the_stats_api') || sourceText.includes('thestatsapi') ? 'TheStatsAPI' : usingFbref || sourceText.includes('fbref') ? 'FBref PK/PKatt' : available ? 'DB/Event' : 'FBref PK/PKatt';
+
   return (
-    <StatShell title="ركلات الجزاء" source={source} tone="gold" itemClassName="col-span-1 sm:col-span-2 lg:col-span-2 xl:col-span-2">
+    <StatShell title="ركلات الجزاء" source={available ? source : unavailableSource} tone="gold" itemClassName="col-span-1 sm:col-span-2 lg:col-span-2 xl:col-span-2">
       {available ? (
         <div className="flex flex-1 flex-col justify-center">
           <div className="grid grid-cols-3 gap-1.5">
@@ -240,23 +246,19 @@ function PenaltyMiniCard({ kickStats, usingFbref }: { kickStats: any; usingFbref
         </div>
       ) : (
         <div className="flex flex-1 items-center justify-center rounded-xl border border-dashed border-[#FFD700]/18 bg-black/20 p-3 text-center">
-          <div>
-            <div className="text-xs font-black text-gray-200">غير متوفر في اللقطة الحالية</div>
-            <div className="mt-1 text-[8px] font-bold text-gray-500">المصدر المقترح: FBref PK/PKatt</div>
-          </div>
+          <div className="text-xs font-black text-gray-200">غير متوفر من مصدر ركلات الجزاء</div>
         </div>
       )}
     </StatShell>
   );
 }
 
-function PowerStatsCard({ powerStats, source }: { powerStats: any; source: SourceName | string }) {
+function PowerStatsCard({ powerStats, source }: { powerStats: any; source: string }) {
   const xg = pickNumber(powerStats?.totalXg, powerStats?.xg);
   const bigChances = pickNumber(powerStats?.bigChances);
   const passAccuracy = pickNumber(powerStats?.passAccuracyPercent);
   const saves = pickNumber(powerStats?.saves);
   const tackles = pickNumber(powerStats?.tackles);
-  const corners = pickNumber(powerStats?.corners);
   const items = [
     { label: 'xG', value: formatDecimal(xg) },
     { label: 'فرص كبيرة', value: formatCount(bigChances) },
@@ -274,16 +276,15 @@ function PowerStatsCard({ powerStats, source }: { powerStats: any; source: Sourc
           </div>
         ))}
       </div>
-      {corners !== null ? <div className="mt-1 truncate text-[8px] font-bold text-gray-500">يشمل الركنيات: {formatCount(corners)}</div> : null}
     </StatShell>
   );
 }
 
 export default function HomeTournamentStatsCard({ playersCount: serverPlayersCount, teamsCount }: Props) {
-  const [theStatsApiStats, setTheStatsApiStats] = useState<any>(null);
-  const [stats, setStats] = useState<any>(null);
-  const [fbrefStats, setFbrefStats] = useState<any>(null);
+  const [providerSummary, setProviderSummary] = useState<any>(null);
+  const [databaseSummary, setDatabaseSummary] = useState<any>(null);
   const [playerLeaders, setPlayerLeaders] = useState<any>(null);
+  const [penaltiesSummary, setPenaltiesSummary] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -291,27 +292,27 @@ export default function HomeTournamentStatsCard({ playersCount: serverPlayersCou
     async function loadStats() {
       if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
       try {
-        const [theStatsApiResponse, databaseResponse, fbrefResponse, playerLeadersResponse] = await Promise.all([
-          fetch('/api/matches/the-stats-summary-stats', { cache: 'no-store' }),
+        const [providerResponse, databaseResponse, playerLeadersResponse, penaltiesResponse] = await Promise.all([
+          fetch('/api/matches/cached-the-stats-summary', { cache: 'no-store' }),
           fetch('/api/matches/summary-stats', { cache: 'no-store' }),
-          fetch('/api/matches/fbref-summary-stats', { cache: 'no-store' }),
           fetch('/api/players/leaders', { cache: 'no-store' }),
+          fetch('/api/matches/penalties-summary', { cache: 'no-store' }),
         ]);
-        if (theStatsApiResponse.ok) {
-          const data = await theStatsApiResponse.json();
-          if (!cancelled && data?.ok) setTheStatsApiStats(data);
+        if (providerResponse.ok) {
+          const data = await providerResponse.json();
+          if (!cancelled && data?.ok) setProviderSummary(data);
         }
         if (databaseResponse.ok) {
           const data = await databaseResponse.json();
-          if (!cancelled && data?.ok) setStats(data);
-        }
-        if (fbrefResponse.ok) {
-          const data = await fbrefResponse.json();
-          if (!cancelled && data?.ok) setFbrefStats(data);
+          if (!cancelled && data?.ok) setDatabaseSummary(data);
         }
         if (playerLeadersResponse.ok) {
           const data = await playerLeadersResponse.json();
           if (!cancelled && data?.ok) setPlayerLeaders(data);
+        }
+        if (penaltiesResponse.ok) {
+          const data = await penaltiesResponse.json();
+          if (!cancelled && data?.ok) setPenaltiesSummary(data);
         }
       } catch {
         // Keep the card readable if the endpoints are temporarily unavailable.
@@ -327,39 +328,28 @@ export default function HomeTournamentStatsCard({ playersCount: serverPlayersCou
     };
   }, []);
 
-  const isInitialLoading = isLoading && !theStatsApiStats && !stats && !fbrefStats && !playerLeaders;
-  const playerCount = DEFAULT_PLAYERS_COUNT;
-  const apiFinalStats = theStatsApiStats?.finalStats || {};
-  const finalStats = stats?.finalStats || {};
-  const fbrefFinalStats = fbrefStats?.finalStats || {};
-  const totalGoals = pickNumber(theStatsApiStats?.totalGoals, stats?.totalGoals, fbrefStats?.totalGoals);
-  const averageGoals = pickNumber(theStatsApiStats?.averageGoalsPerFinishedMatch, stats?.averageGoalsPerFinishedMatch, fbrefStats?.averageGoalsPerFinishedMatch);
-  const finishedMatches = pickNumber(theStatsApiStats?.finishedMatches, stats?.finishedMatches, fbrefStats?.finishedMatches);
-  const cardTotalYellow = pickNumber(read(theStatsApiStats, 'yellow' + 'Cards'), read(stats, 'yellow' + 'Cards'), read(fbrefStats, 'yellow' + 'Cards'));
-  const cardTotalRed = pickNumber(read(theStatsApiStats, 'red' + 'Cards'), read(stats, 'red' + 'Cards'), read(fbrefStats, 'red' + 'Cards'));
-  const apiPenalties = read(theStatsApiStats, 'penal' + 'ties');
-  const dbPenalties = read(stats, 'penal' + 'ties');
-  const fbrefPenalties = read(fbrefStats, 'penal' + 'ties');
-  const kickStats = apiPenalties?.available ? apiPenalties : dbPenalties?.available ? dbPenalties : fbrefPenalties?.available ? fbrefPenalties : apiPenalties || dbPenalties || fbrefPenalties;
-  const usingFbrefPenalties = !apiPenalties?.available && !dbPenalties?.available && Boolean(fbrefPenalties?.available);
-  const biggestScore = theStatsApiStats?.biggestScore || stats?.biggestScore || fbrefStats?.biggestScore || null;
-  const bestCleanSheetTeam = theStatsApiStats?.teamLeaders?.bestCleanSheetTeam || stats?.teamLeaders?.bestCleanSheetTeam || fbrefStats?.teamLeaders?.bestCleanSheetTeam || null;
-  const totalShots = pickNumber(apiFinalStats?.totalShots, finalStats?.totalShots, fbrefFinalStats?.totalShots);
-  const totalShotsOnTarget = pickNumber(apiFinalStats?.totalShotsOnTarget, finalStats?.totalShotsOnTarget, fbrefFinalStats?.totalShotsOnTarget);
-  const cleanSheets = pickNumber(theStatsApiStats?.cleanSheets, stats?.cleanSheets, fbrefStats?.cleanSheets);
-  const teamCountValue = pickNumber(theStatsApiStats?.teamCount, stats?.teamCount, fbrefStats?.teamCount, teamsCount);
+  const isInitialLoading = isLoading && !providerSummary && !databaseSummary && !playerLeaders && !penaltiesSummary;
+  const summary = providerSummary || databaseSummary;
+  const summarySource = sourceNameForSummary(summary, databaseSummary);
+  const finalStats = summary?.finalStats || {};
+  const powerStats = summary?.powerStats || finalStats || {};
+  const totalGoals = pickNumber(summary?.totalGoals, databaseSummary?.totalGoals);
+  const averageGoals = pickNumber(summary?.averageGoalsPerFinishedMatch, databaseSummary?.averageGoalsPerFinishedMatch);
+  const finishedMatches = pickNumber(summary?.finishedMatches, databaseSummary?.finishedMatches);
+  const totalShots = hasProviderStat(summary, 'shots') || hasSnapshotValue(summary, finalStats?.totalShots) ? pickNumber(finalStats?.totalShots, finalStats?.shots) : null;
+  const totalShotsOnTarget = hasProviderStat(summary, 'shotsOnTarget') || hasSnapshotValue(summary, finalStats?.totalShotsOnTarget) ? pickNumber(finalStats?.totalShotsOnTarget) : null;
+  const cardTotalYellow = pickNumber(read(summary, 'yellow' + 'Cards'), read(databaseSummary, 'yellow' + 'Cards'));
+  const cardTotalRed = pickNumber(read(summary, 'red' + 'Cards'), read(databaseSummary, 'red' + 'Cards'));
+  const biggestScore = summary?.biggestScore || databaseSummary?.biggestScore || null;
+  const bestCleanSheetTeam = summary?.teamLeaders?.bestCleanSheetTeam || databaseSummary?.teamLeaders?.bestCleanSheetTeam || null;
+  const cleanSheets = pickNumber(summary?.cleanSheets, databaseSummary?.cleanSheets);
+  const teamCountValue = pickNumber(summary?.teamCount, databaseSummary?.teamCount, teamsCount);
+  const playerCountValue = pickNumber(databaseSummary?.playerCount, serverPlayersCount);
   const topScorer = playerLeaders?.leaders?.topScorer || null;
-  const usingTheStatsGoals = usefulNumber(theStatsApiStats?.totalGoals) !== null;
-  const usingTheStatsShots = usefulNumber(apiFinalStats?.totalShots) !== null;
-  const usingTheStatsCards = finiteNumber(read(theStatsApiStats, 'yellow' + 'Cards')) !== null || finiteNumber(read(theStatsApiStats, 'red' + 'Cards')) !== null;
-  const usingTheStatsTeams = Boolean(theStatsApiStats?.teamLeaders?.bestCleanSheetTeam);
-  const usingFbrefShots = !usingTheStatsShots && !usefulNumber(finalStats?.totalShots) && usefulNumber(fbrefFinalStats?.totalShots) !== null;
-  const usingFbrefCards = !usingTheStatsCards && ((!usefulNumber(read(stats, 'yellow' + 'Cards')) && usefulNumber(read(fbrefStats, 'yellow' + 'Cards')) !== null) || (!usefulNumber(read(stats, 'red' + 'Cards')) && usefulNumber(read(fbrefStats, 'red' + 'Cards')) !== null));
-  const usingFbrefGoals = !usingTheStatsGoals && !usefulNumber(stats?.totalGoals) && usefulNumber(fbrefStats?.totalGoals) !== null;
-  const usingFbrefTeams = !usingTheStatsTeams && !stats?.teamLeaders?.bestCleanSheetTeam && Boolean(fbrefStats?.teamLeaders?.bestCleanSheetTeam);
-  const playerSource: SourceName = 'ثابت';
-  const powerStats = theStatsApiStats?.powerStats || apiFinalStats || finalStats || fbrefFinalStats;
-  const powerSource: SourceName = theStatsApiStats?.powerStats || usefulNumber(apiFinalStats?.totalXg) !== null ? 'TheStatsAPI' : 'DB';
+  const penalties = penaltiesSummary?.penalties?.available ? penaltiesSummary.penalties : read(databaseSummary, 'penal' + 'ties')?.available ? read(databaseSummary, 'penal' + 'ties') : read(summary, 'penal' + 'ties');
+  const penaltySource = penaltiesSummary?.penalties?.available ? (penaltiesSummary?.provider || penaltiesSummary?.source || 'FOOTBALL_DATA_FULL') : penalties?.available ? summarySource : unavailableSource;
+  const powerSource = hasProviderStat(summary, 'xg') || pickNumber(powerStats?.totalXg) !== null ? summarySource : unavailableSource;
+  const cardsSource = cardTotalYellow !== null || cardTotalRed !== null ? summarySource : unavailableSource;
 
   return (
     <section className="mx-auto mb-4 max-w-7xl overflow-hidden rounded-3xl border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(255,215,0,0.11),transparent_23%),radial-gradient(circle_at_bottom_left,rgba(15,240,252,0.07),transparent_28%),linear-gradient(135deg,rgba(7,24,18,0.96),rgba(3,12,11,0.99))] p-3 text-white shadow-[0_16px_44px_rgba(0,0,0,0.32)] backdrop-blur" aria-label="إحصائيات البطولة">
@@ -380,14 +370,14 @@ export default function HomeTournamentStatsCard({ playersCount: serverPlayersCou
       ) : (
         <div className="grid auto-rows-[128px] grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-8 xl:grid-cols-12">
           <TopScorerCard leader={topScorer} />
-          <GoalStatCard title="أهداف البطولة" value={formatCount(totalGoals)} subtitle={`${formatCount(finishedMatches)} مباراة منتهية`} source={sourceFrom(usingFbrefGoals, true, usingTheStatsGoals)} tone="gold" href="/matches" />
-          <GoalStatCard title="متوسط الأهداف" value={formatDecimal(averageGoals)} subtitle="هدف لكل مباراة" source={sourceFrom(usingFbrefGoals, true, usingTheStatsGoals)} tone="cyan" href="/matches" />
-          <GoalStatCard title="التسديدات" value={`${formatCount(totalShots)} / ${formatCount(totalShotsOnTarget)}`} subtitle="إجمالي / على المرمى" source={sourceFrom(usingFbrefShots, true, usingTheStatsShots)} tone="cyan" href="/matches" />
-          <GoalStatCard title="أكبر نتيجة" value={biggestScore ? `${formatCount(biggestScore.homeScore)}-${formatCount(biggestScore.awayScore)}` : '—'} subtitle={biggestScore ? shortText(`${teamName(biggestScore.homeTeam)} ضد ${teamName(biggestScore.awayTeam)}`, 22) : 'تظهر بعد التسجيل'} source={biggestScore?.providerMatchId ? 'TheStatsAPI' : undefined} href={biggestScore?.matchId ? `/matches/${encodeURIComponent(biggestScore.matchId)}` : '/matches'} />
-          <GoalStatCard title="الشباك النظيفة" value={formatCount(cleanSheets)} subtitle={bestCleanSheetTeam ? shortText(teamName(bestCleanSheetTeam), 18) : 'غير متوفر'} source={sourceFrom(usingFbrefTeams, true, usingTheStatsTeams)} tone="green" href="/matches" />
-          <PlayersGroupCard playerCount={playerCount} teamCount={teamCountValue} source={playerSource} />
-          <CardsMiniCard yellow={cardTotalYellow} red={cardTotalRed} source={sourceFrom(usingFbrefCards, true, usingTheStatsCards)} />
-          <PenaltyMiniCard kickStats={kickStats} usingFbref={usingFbrefPenalties} />
+          <GoalStatCard title="أهداف البطولة" value={formatCount(totalGoals)} subtitle={`${formatCount(finishedMatches)} مباراة منتهية`} source={totalGoals !== null ? summarySource : unavailableSource} tone="gold" href="/matches" />
+          <GoalStatCard title="متوسط الأهداف" value={formatDecimal(averageGoals)} subtitle="هدف لكل مباراة" source={averageGoals !== null ? summarySource : unavailableSource} tone="cyan" href="/matches" />
+          <GoalStatCard title="التسديدات" value={`${formatCount(totalShots)} / ${formatCount(totalShotsOnTarget)}`} subtitle="إجمالي / على المرمى" source={totalShots !== null || totalShotsOnTarget !== null ? summarySource : unavailableSource} tone="cyan" href="/matches" />
+          <GoalStatCard title="أكبر نتيجة" value={biggestScore ? `${formatCount(biggestScore.homeScore)}-${formatCount(biggestScore.awayScore)}` : '—'} subtitle={biggestScore ? shortText(`${teamName(biggestScore.homeTeam)} ضد ${teamName(biggestScore.awayTeam)}`, 22) : 'تظهر بعد التسجيل'} source={biggestScore ? summarySource : unavailableSource} href={biggestScore?.matchId ? `/matches/${encodeURIComponent(biggestScore.matchId)}` : '/matches'} />
+          <GoalStatCard title="الشباك النظيفة" value={formatCount(cleanSheets)} subtitle={bestCleanSheetTeam ? shortText(teamName(bestCleanSheetTeam), 18) : 'غير متوفر'} source={cleanSheets !== null ? summarySource : unavailableSource} tone="green" href="/matches" />
+          <PlayersGroupCard playerCount={playerCountValue} teamCount={teamCountValue} source={playerCountValue !== null || teamCountValue !== null ? 'DB/Snapshots' : unavailableSource} />
+          <CardsMiniCard yellow={cardTotalYellow} red={cardTotalRed} source={cardsSource} />
+          <PenaltyMiniCard kickStats={penalties} source={penaltySource} />
           <PowerStatsCard powerStats={powerStats} source={powerSource} />
         </div>
       )}
