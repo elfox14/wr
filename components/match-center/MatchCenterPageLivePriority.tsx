@@ -69,6 +69,16 @@ function firstPair(...pairs: Pair[]): Pair {
   return pairs.find((pair) => pair && (pair.home !== null || pair.away !== null)) || null;
 }
 
+function sourceName(snapshot: any) {
+  const p = provider(snapshot);
+  if (p.includes('THE_STATS') && p.includes('LIVE')) return 'TheStatsAPI Live';
+  if (p.includes('THE_STATS')) return 'TheStatsAPI';
+  if (p.includes('ISPORTS_FLASH')) return 'iSport Flash Stats';
+  if (p.includes('ISPORT')) return 'iSport Animation';
+  if (snapshot) return 'قاعدة البيانات';
+  return 'غير متوفر';
+}
+
 function scoreFromSnapshot(snapshot: any): ScorePair | null {
   if (!snapshot) return null;
   const data = raw(snapshot);
@@ -93,6 +103,28 @@ function scoreForDisplay(match: any, snapshots: any[]): ScorePair {
   return snapshotScore || { home: null, away: null, source: 'غير متوفر' };
 }
 
+function statusFromProviderValue(value: unknown) {
+  const status = String(value ?? '').trim().toUpperCase();
+  if (!status) return null;
+  if (['-1', 'FT', 'FINISHED', 'ENDED', 'COMPLETED'].includes(status)) return 'FINISHED';
+  if (['2', 'HT', 'HALFTIME', 'HALF_TIME', 'HALF-TIME'].includes(status) || status.includes('HALF')) return 'HT';
+  if (['1', '1H', 'FIRST_HALF', 'FIRST HALF'].includes(status) || status.includes('FIRST')) return '1H';
+  if (['3', '2H', 'SECOND_HALF', 'SECOND HALF'].includes(status) || status.includes('SECOND')) return '2H';
+  if (['LIVE', 'IN_PLAY', 'ET'].includes(status)) return status;
+  return null;
+}
+
+function statusFromSources(sources: any[]) {
+  for (const snapshot of sources) {
+    const data = raw(snapshot);
+    const flashMeta = obj(data.flashMeta);
+    const meta = obj(data.meta);
+    const status = statusFromProviderValue(data.status ?? data.providerStatus ?? data.matchState ?? flashMeta.matchState ?? meta.status ?? meta.matchState);
+    if (status) return status;
+  }
+  return null;
+}
+
 function share(value: Pair) {
   const home = Math.max(0, Number(value?.home ?? 0));
   const away = Math.max(0, Number(value?.away ?? 0));
@@ -100,16 +132,6 @@ function share(value: Pair) {
   if (!total) return { home: 0, away: 0 };
   const homeWidth = Math.max(4, Math.min(96, (home / total) * 100));
   return { home: homeWidth, away: 100 - homeWidth };
-}
-
-function sourceName(snapshot: any) {
-  const p = provider(snapshot);
-  if (p.includes('THE_STATS') && p.includes('LIVE')) return 'TheStatsAPI Live';
-  if (p.includes('THE_STATS')) return 'TheStatsAPI';
-  if (p.includes('ISPORTS_FLASH')) return 'iSport Flash Stats';
-  if (p.includes('ISPORT')) return 'iSport Animation';
-  if (snapshot) return 'قاعدة البيانات';
-  return 'غير متوفر';
 }
 
 function latest(match: any, predicate: (p: string) => boolean) {
@@ -124,7 +146,8 @@ function minuteFrom(match: any, sources: any[]) {
   for (const snapshot of sources) {
     const data = raw(snapshot);
     const meta = obj(data.meta);
-    const minute = n(snapshot?.minute ?? data.minute ?? data.elapsed ?? data.currentMinute ?? meta.elapsed_minutes ?? meta.minute);
+    const flashMeta = obj(data.flashMeta);
+    const minute = n(snapshot?.minute ?? data.minute ?? data.elapsed ?? data.currentMinute ?? meta.elapsed_minutes ?? meta.minute ?? flashMeta.scheduleMinute);
     if (minute !== null) return minute;
   }
 
@@ -134,13 +157,20 @@ function minuteFrom(match: any, sources: any[]) {
 }
 
 function clockLabel(match: any, sources: any[]) {
-  const status = String(match.status || raw(sources[0]).status || '').toUpperCase();
+  const providerStatus = statusFromSources(sources);
+  const dbStatus = String(match.status || '').toUpperCase();
+  const minute = minuteFrom(match, sources);
+  const status = providerStatus || dbStatus;
+
   if (FINISHED.includes(status)) return 'انتهت';
   if (HALF_TIME.includes(status)) return 'استراحة';
-  if (LIVE.includes(status)) {
-    const minute = minuteFrom(match, sources);
-    return minute === null ? 'مباشرة الآن' : `د${fmt(Math.floor(minute))}`;
-  }
+  if (LIVE.includes(status)) return minute === null ? 'مباشرة الآن' : `د${fmt(Math.floor(minute))}`;
+
+  // If the DB status is still SCHEDULED but a live provider snapshot already has a minute/score,
+  // treat the match as live instead of showing "delayed start".
+  if (minute !== null) return `د${fmt(Math.floor(minute))}`;
+  const snapshotScore = sources.map(scoreFromSnapshot).find(Boolean) as ScorePair | null;
+  if (snapshotScore && (Number(snapshotScore.home || 0) + Number(snapshotScore.away || 0) > 0)) return 'مباشرة الآن';
 
   const startMs = new Date(match.matchDate || '').getTime();
   if (Number.isFinite(startMs) && Date.now() > startMs + 5 * 60000) return 'تأخر البدء';
