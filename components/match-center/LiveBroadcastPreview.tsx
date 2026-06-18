@@ -124,6 +124,14 @@ function eventLabel(event: MatchEventLike) {
   return event.type || 'حدث';
 }
 
+function eventMinuteLabel(event: MatchEventLike | null) {
+  if (!event) return '—';
+  const detail = String(event.detail || '');
+  const stoppage = detail.match(/(?:د|minute|min)?\s*(45|90|105)\s*\+\s*(\d+)/i);
+  if (stoppage) return `د${toNumberText(stoppage[1])}+${toNumberText(stoppage[2])}`;
+  return event.minute !== null && event.minute !== undefined ? `د${toNumberText(event.minute)}` : '—';
+}
+
 function minuteLeft(minute?: number | null) {
   const safe = Math.max(0, Math.min(105, Number(minute ?? 0)));
   return Math.min(96, Math.max(4, (safe / 105) * 100));
@@ -290,7 +298,7 @@ export default function LiveBroadcastPreview({ matchId, events, homeTeam, awayTe
 
             <div className={`absolute z-20 flex h-10 w-10 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-white/40 bg-white text-lg shadow-xl shadow-black transition-all duration-500 ${isPlaying ? 'scale-110 ring-4 ring-[#FFD700]/30' : ''}`} style={{ left: `${ball.left}%`, top: `${ball.top}%` }}>⚽</div>
             <div className="absolute bottom-3 left-3 right-3 z-20 rounded-2xl border border-white/10 bg-black/50 p-3 backdrop-blur">
-              <div className="text-[10px] font-black text-[#FFD700]">{currentEvent ? `د${toNumberText(currentEvent.minute)} · ${eventLabel(currentEvent)}` : 'لا توجد أحداث'}</div>
+              <div className="text-[10px] font-black text-[#FFD700]">{currentEvent ? `${eventMinuteLabel(currentEvent)} · ${eventLabel(currentEvent)}` : 'لا توجد أحداث'}</div>
               <div className="mt-1 text-sm font-bold leading-6 text-white">{currentEvent?.detail || 'عند وصول الأحداث ستظهر حركة الكرة هنا.'}</div>
             </div>
           </div>
@@ -312,7 +320,7 @@ export default function LiveBroadcastPreview({ matchId, events, homeTeam, awayTe
               const index = visible.indexOf(event);
               const active = event === currentEvent;
               return (
-                <button key={`${event.id || index}-${event.minute || 0}`} type="button" onClick={() => selectIndex(index)} className={`absolute top-1/2 flex h-7 w-7 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border text-xs transition ${active ? 'border-[#FFD700] bg-[#FFD700] text-black' : 'border-white/20 bg-black text-white hover:border-[#0FF0FC]'}`} style={{ left: `${minuteLeft(event.minute)}%` }} title={`د${toNumberText(event.minute)} · ${eventLabel(event)}`}>
+                <button key={`${event.id || index}-${event.minute || 0}`} type="button" onClick={() => selectIndex(index)} className={`absolute top-1/2 flex h-7 w-7 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border text-xs transition ${active ? 'border-[#FFD700] bg-[#FFD700] text-black' : 'border-white/20 bg-black text-white hover:border-[#0FF0FC]'}`} style={{ left: `${minuteLeft(event.minute)}%` }} title={`${eventMinuteLabel(event)} · ${eventLabel(event)}`}>
                   {eventIcon(event)}
                 </button>
               );
@@ -338,7 +346,7 @@ export default function LiveBroadcastPreview({ matchId, events, homeTeam, awayTe
               return (
                 <button key={`${event.id || index}-${event.minute || 0}`} type="button" onClick={() => selectIndex(index)} className={`w-full rounded-2xl border p-3 text-right transition ${active ? 'border-[#FFD700]/40 bg-[#FFD700]/10' : 'border-white/10 bg-black/25 hover:border-[#0FF0FC]/40'}`}>
                   <div className="flex items-center justify-between gap-2 text-[10px] font-black">
-                    <span className="text-[#FFD700]">د{toNumberText(event.minute)}</span>
+                    <span className="text-[#FFD700]">{eventMinuteLabel(event)}</span>
                     <span className="text-gray-500">{eventIcon(event)} {eventLabel(event)}</span>
                   </div>
                   <div className="mt-1 line-clamp-2 text-[11px] font-bold leading-5 text-gray-200">{event.detail || eventLabel(event)}</div>
