@@ -47,6 +47,18 @@ const FILTERS: { key: FilterKey; label: string }[] = [
 ];
 
 const REPLAY_MS = 950;
+const HOME_POSITIONS = [
+  [8, 50],
+  [18, 18], [18, 38], [18, 62], [18, 82],
+  [31, 28], [31, 50], [31, 72],
+  [43, 22], [45, 50], [43, 78],
+] as const;
+const AWAY_POSITIONS = [
+  [92, 50],
+  [82, 18], [82, 38], [82, 62], [82, 82],
+  [69, 28], [69, 50], [69, 72],
+  [57, 22], [55, 50], [57, 78],
+] as const;
 
 function toNumberText(value: unknown) {
   const number = Number(value);
@@ -59,6 +71,12 @@ function cleanText(value: unknown) {
 
 function initials(name: string) {
   return name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join('');
+}
+
+function shortName(name: string) {
+  const parts = name.split(/\s+/).filter(Boolean);
+  if (parts.length <= 1) return name;
+  return `${parts[0]} ${parts[parts.length - 1]}`;
 }
 
 function eventText(event: MatchEventLike) {
@@ -156,39 +174,44 @@ function playerMentioned(player: PlayerLike, event: MatchEventLike | null) {
   return eventKey.includes(playerKey) || playerKey.split(' ').some((part) => part.length > 3 && eventKey.includes(part));
 }
 
-function TeamLineupCard({ team, players, currentEvent, side }: { team: TeamLike; players: PlayerLike[]; currentEvent: MatchEventLike | null; side: 'home' | 'away' }) {
+function TeamFlag({ team, side }: { team: TeamLike; side: 'home' | 'away' }) {
   const flagUrl = getTeamFlagUrl({ code: team.code, name: team.name, image: team.image }, 80);
-  const visiblePlayers = players.slice(0, 11);
-  const emptyRows = Math.max(0, 11 - visiblePlayers.length);
-  const tone = side === 'home' ? 'border-[#0FF0FC]/25 bg-[#0FF0FC]/10' : 'border-[#FFD700]/25 bg-[#FFD700]/10';
-
   return (
-    <div className={`flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border p-2 backdrop-blur-md ${tone}`}>
-      <div className="mb-2 flex items-center gap-2 border-b border-white/10 pb-2">
-        <div className="flex h-7 w-10 shrink-0 items-center justify-center overflow-hidden rounded-md border border-white/10 bg-black/40">
-          {flagUrl ? <img src={flagUrl} alt={team.name || 'علم المنتخب'} className="h-full w-full object-cover" loading="lazy" /> : <span className="text-[10px] font-black text-[#FFD700]">{team.code || '---'}</span>}
-        </div>
-        <p className="truncate text-xs font-black text-white">{team.name || team.code || 'منتخب'}</p>
+    <div className={`absolute top-3 z-20 flex max-w-[42%] items-center gap-2 rounded-2xl border border-white/10 bg-black/55 px-3 py-2 backdrop-blur ${side === 'home' ? 'left-[25%] -translate-x-1/2' : 'right-[25%] translate-x-1/2'}`}>
+      <div className="flex h-7 w-10 shrink-0 items-center justify-center overflow-hidden rounded-md border border-white/10 bg-black/40">
+        {flagUrl ? <img src={flagUrl} alt={team.name || 'علم المنتخب'} className="h-full w-full object-cover" loading="lazy" /> : <span className="text-[10px] font-black text-[#FFD700]">{team.code || '---'}</span>}
       </div>
-      <div className="min-h-0 flex-1 space-y-1 overflow-hidden">
-        {visiblePlayers.map((player, index) => {
-          const active = playerMentioned(player, currentEvent);
-          const name = player.name || 'غير متوفر';
-          return (
-            <div key={player.id || `${name}-${index}`} className={`flex items-center gap-2 rounded-xl border px-1.5 py-1 transition ${active ? 'border-[#FFD700]/70 bg-[#FFD700]/20' : 'border-white/10 bg-black/25'}`}>
-              <div className="flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-full border border-white/15 bg-black/50">
-                {player.image ? <img src={player.image} alt={name} className="h-full w-full object-cover" loading="lazy" /> : <span className="text-[8px] font-black text-white">{initials(name)}</span>}
-              </div>
-              <span className="truncate text-[10px] font-black leading-4 text-white">{name}</span>
-              {active ? <span className="mr-auto text-[10px]">🔁</span> : null}
-            </div>
-          );
-        })}
-        {Array.from({ length: emptyRows }).map((_, index) => (
-          <div key={`empty-${index}`} className="rounded-xl border border-dashed border-white/10 bg-black/10 px-2 py-1 text-[10px] font-bold text-gray-600">غير متوفر</div>
-        ))}
-      </div>
+      <p className="truncate text-xs font-black text-white">{team.name || team.code || 'منتخب'}</p>
     </div>
+  );
+}
+
+function PitchPlayer({ player, currentEvent, x, y, side }: { player: PlayerLike; currentEvent: MatchEventLike | null; x: number; y: number; side: 'home' | 'away' }) {
+  const name = player.name || 'غير متوفر';
+  const active = playerMentioned(player, currentEvent);
+  const border = side === 'home' ? 'border-[#0FF0FC]/80' : 'border-[#FFD700]/80';
+  return (
+    <div className="absolute z-10 flex w-[74px] -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-1 text-center" style={{ left: `${x}%`, top: `${y}%` }}>
+      <div className={`relative flex h-11 w-11 items-center justify-center overflow-hidden rounded-full border-2 bg-black/65 shadow-[0_0_18px_rgba(0,0,0,.55)] ${active ? 'border-[#ff3b57] ring-4 ring-[#FFD700]/25' : border}`}>
+        {player.image ? <img src={player.image} alt={name} className="h-full w-full object-cover" loading="lazy" /> : <span className="text-[10px] font-black text-white">{initials(name)}</span>}
+        {player.code ? <span className="absolute -bottom-1 -left-1 rounded-full bg-[#FFD700] px-1.5 text-[8px] font-black text-black">{player.code}</span> : null}
+      </div>
+      <p className="max-w-[82px] truncate rounded-md bg-black/60 px-1.5 py-0.5 text-[10px] font-black leading-4 text-white shadow-black [text-shadow:0_1px_2px_black]">{shortName(name)}</p>
+    </div>
+  );
+}
+
+function TeamHalfLineup({ team, players, currentEvent, side }: { team: TeamLike; players: PlayerLike[]; currentEvent: MatchEventLike | null; side: 'home' | 'away' }) {
+  const positions = side === 'home' ? HOME_POSITIONS : AWAY_POSITIONS;
+  const visiblePlayers = players.slice(0, 11);
+  return (
+    <>
+      <TeamFlag team={team} side={side} />
+      {visiblePlayers.map((player, index) => {
+        const [x, y] = positions[index] || positions[positions.length - 1];
+        return <PitchPlayer key={player.id || `${player.name}-${index}`} player={player} currentEvent={currentEvent} x={x} y={y} side={side} />;
+      })}
+    </>
   );
 }
 
@@ -244,7 +267,7 @@ export default function LiveBroadcastPreview({ matchId, events, homeTeam, awayTe
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
           <h2 className="text-2xl font-black text-white">البث الحي</h2>
-          <p className="mt-1 text-sm font-bold text-gray-400">ملعب تفاعلي للأحداث مع تشكيلتي المنتخبين وصور اللاعبين.</p>
+          <p className="mt-1 text-sm font-bold text-gray-400">ملعب تفاعلي للأحداث مع تمركز لاعبي كل منتخب داخل نصف ملعبه.</p>
         </div>
         <Link href={`/match-live/${encodeURIComponent(matchId)}`} className="inline-flex min-h-11 items-center justify-center rounded-xl border border-[#FFD700]/25 bg-[#FFD700]/10 px-4 text-sm font-black text-[#FFD700] transition hover:bg-[#FFD700] hover:text-black">
           فتح الصفحة الكاملة
@@ -276,36 +299,27 @@ export default function LiveBroadcastPreview({ matchId, events, homeTeam, awayTe
 
       <div className="mt-4 grid items-stretch gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div>
-          <div className="relative aspect-[16/8] min-h-[430px] overflow-hidden rounded-[28px] border border-emerald-400/20 bg-emerald-950/60 shadow-inner shadow-black">
+          <div className="relative min-h-[500px] overflow-hidden rounded-[28px] border border-emerald-400/20 bg-emerald-950/60 shadow-inner shadow-black">
             <div className="absolute inset-4 rounded-[22px] border border-white/20" />
             <div className="absolute left-1/2 top-4 h-[calc(100%-2rem)] w-px bg-white/20" />
             <div className="absolute left-1/2 top-1/2 h-24 w-24 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/20" />
             <div className="absolute left-4 top-1/2 h-36 w-20 -translate-y-1/2 rounded-r-2xl border border-l-0 border-white/20" />
             <div className="absolute right-4 top-1/2 h-36 w-20 -translate-y-1/2 rounded-l-2xl border border-r-0 border-white/20" />
 
-            <div className="absolute bottom-28 left-3 top-3 z-10 hidden w-[174px] xl:block">
-              <TeamLineupCard team={homeTeam} players={homePlayers} currentEvent={currentEvent} side="home" />
-            </div>
-            <div className="absolute bottom-28 right-3 top-3 z-10 hidden w-[174px] xl:block">
-              <TeamLineupCard team={awayTeam} players={awayPlayers} currentEvent={currentEvent} side="away" />
-            </div>
+            <TeamHalfLineup team={homeTeam} players={homePlayers} currentEvent={currentEvent} side="home" />
+            <TeamHalfLineup team={awayTeam} players={awayPlayers} currentEvent={currentEvent} side="away" />
 
             {isSubstitution(currentEvent) ? (
-              <div className="absolute left-1/2 top-4 z-20 max-w-[360px] -translate-x-1/2 rounded-2xl border border-[#FFD700]/30 bg-black/70 px-4 py-2 text-center text-xs font-black text-[#FFD700] backdrop-blur">
+              <div className="absolute left-1/2 top-14 z-30 max-w-[360px] -translate-x-1/2 rounded-2xl border border-[#FFD700]/30 bg-black/75 px-4 py-2 text-center text-xs font-black text-[#FFD700] backdrop-blur">
                 🔁 تبديل: {currentEvent?.detail || 'غير متوفر أسماء اللاعبين'}
               </div>
             ) : null}
 
-            <div className={`absolute z-20 flex h-10 w-10 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-white/40 bg-white text-lg shadow-xl shadow-black transition-all duration-500 ${isPlaying ? 'scale-110 ring-4 ring-[#FFD700]/30' : ''}`} style={{ left: `${ball.left}%`, top: `${ball.top}%` }}>⚽</div>
-            <div className="absolute bottom-3 left-3 right-3 z-20 rounded-2xl border border-white/10 bg-black/50 p-3 backdrop-blur">
+            <div className={`absolute z-30 flex h-10 w-10 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-white/40 bg-white text-lg shadow-xl shadow-black transition-all duration-500 ${isPlaying ? 'scale-110 ring-4 ring-[#FFD700]/30' : ''}`} style={{ left: `${ball.left}%`, top: `${ball.top}%` }}>⚽</div>
+            <div className="absolute bottom-3 left-3 right-3 z-30 rounded-2xl border border-white/10 bg-black/55 p-3 backdrop-blur">
               <div className="text-[10px] font-black text-[#FFD700]">{currentEvent ? `${eventMinuteLabel(currentEvent)} · ${eventLabel(currentEvent)}` : 'لا توجد أحداث'}</div>
               <div className="mt-1 text-sm font-bold leading-6 text-white">{currentEvent?.detail || 'عند وصول الأحداث ستظهر حركة الكرة هنا.'}</div>
             </div>
-          </div>
-
-          <div className="mt-3 grid gap-2 xl:hidden md:grid-cols-2">
-            <TeamLineupCard team={homeTeam} players={homePlayers} currentEvent={currentEvent} side="home" />
-            <TeamLineupCard team={awayTeam} players={awayPlayers} currentEvent={currentEvent} side="away" />
           </div>
 
           <div className="relative mt-4 h-20 rounded-2xl border border-white/10 bg-black/25 px-3">
@@ -328,7 +342,7 @@ export default function LiveBroadcastPreview({ matchId, events, homeTeam, awayTe
           </div>
         </div>
 
-        <aside className="flex h-full max-h-[532px] min-h-0 flex-col overflow-hidden rounded-[1.25rem] border border-white/10 bg-black/25 p-3">
+        <aside className="flex h-full max-h-[592px] min-h-0 flex-col overflow-hidden rounded-[1.25rem] border border-white/10 bg-black/25 p-3">
           <div className="mb-3 flex items-center justify-between gap-2 border-b border-white/10 pb-3">
             <div>
               <p className="text-xs font-black text-[#0FF0FC]">أحداث المباراة</p>
