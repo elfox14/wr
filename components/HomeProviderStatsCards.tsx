@@ -163,10 +163,11 @@ function hasCardSource(summary: any) {
 
 export default async function HomeProviderStatsCards({ playersCount, teamsCount }: Props) {
   const base = await getOrigin();
-  const [providerSummary, databaseSummary, leaders] = await Promise.all([
+  const [providerSummary, databaseSummary, leaders, penaltiesSummary] = await Promise.all([
     readJson(base, `${servicePrefix}/matches/cached-the-stats-summary`),
     readJson(base, `${servicePrefix}/matches/summary-stats`),
     readJson(base, `${servicePrefix}/players/leaders`),
+    readJson(base, `${servicePrefix}/matches/penalties-summary`),
   ]);
 
   const summary = providerSummary || databaseSummary;
@@ -179,9 +180,12 @@ export default async function HomeProviderStatsCards({ playersCount, teamsCount 
   const topSource = top?.sourceName || leaders?.sources?.topScorer?.provider || top?.source || (top ? 'DB' : unavailableSource);
   const topTeam = top?.team?.name || top?.team?.code || top?.teamName || '';
   const topSubtitle = top?.value ? `${fmt(Number(top.value))} هدف${topTeam ? ` • ${trim(String(topTeam), 18)}` : ''}` : 'غير متوفر من مصدر الهدافين';
-  const penalties = nested(summary, 'penal' + 'ties');
-  const hasPenaltySource = Boolean(penalties && (penalties.available || hasStat(summary, 'penalties') || hasStat(summary, 'penaltiesScored') || hasStat(summary, 'penaltiesMissed')));
-  const penaltyText = hasPenaltySource ? `${fmt(pick(penalties?.scored))} مسجلة • ${fmt(pick(penalties?.missed))} ضائعة` : 'غير متوفر من المصدر';
+  const summaryPenalties = nested(summary, 'penal' + 'ties');
+  const sourcedPenalties = penaltiesSummary?.penalties?.available ? penaltiesSummary.penalties : null;
+  const penalties = sourcedPenalties || summaryPenalties;
+  const hasPenaltySource = Boolean(sourcedPenalties || (penalties && (penalties.available || hasStat(summary, 'penalties') || hasStat(summary, 'penaltiesScored') || hasStat(summary, 'penaltiesMissed'))));
+  const penaltySource = sourcedPenalties ? (penaltiesSummary?.provider || sourcedPenalties?.source || 'FOOTBALL_DATA_FULL') : hasPenaltySource ? sourceName : unavailableSource;
+  const penaltyText = hasPenaltySource ? `${fmt(pick(penalties?.scored))} مسجلة • ${fmt(pick(penalties?.missed))} ضائعة` : 'غير متوفر من مصدر ركلات الجزاء';
   const hasCards = hasCardSource(summary);
   const teamValue = pick(summary?.teamCount, teamsCount);
   const playerValue = pick(playersCount, summary?.playerCount);
@@ -193,7 +197,7 @@ export default async function HomeProviderStatsCards({ playersCount, teamsCount 
     { title: 'أكبر نتيجة', value: biggest ? `${fmt(biggest.homeScore)}-${fmt(biggest.awayScore)}` : 'غير متوفر', subtitle: biggest ? trim(`${teamLabel(biggest.homeTeam)} ضد ${teamLabel(biggest.awayTeam)}`) : 'تظهر بعد بيانات المصدر', tone: 'gold', source: biggest ? sourceName : unavailableSource },
     { title: 'الشباك النظيفة', value: fmt(summary ? pick(summary?.cleanSheets) : null), subtitle: bestClean ? trim(teamLabel(bestClean), 24) : 'غير متوفر من المصدر', tone: 'green', source: summary ? sourceName : unavailableSource },
     { title: 'المنتخبات', value: fmt(teamValue), subtitle: playerValue !== null ? `${fmt(playerValue)} لاعب` : 'اللاعبون غير متوفرين من قاعدة البيانات', tone: 'green', source: teamValue !== null || playerValue !== null ? 'DB' : unavailableSource },
-    { title: 'ركلات الجزاء', value: hasPenaltySource ? fmt(pick(penalties?.total)) : 'غير متوفر', subtitle: penaltyText, tone: 'gold', source: hasPenaltySource ? sourceName : unavailableSource },
+    { title: 'ركلات الجزاء', value: hasPenaltySource ? fmt(pick(penalties?.total)) : 'غير متوفر', subtitle: penaltyText, tone: 'gold', source: hasPenaltySource ? penaltySource : unavailableSource },
   ];
 
   const advancedCards: CardItem[] = [
