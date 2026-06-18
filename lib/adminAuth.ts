@@ -12,16 +12,24 @@ type AdminSession = {
 } | null;
 
 export function hasValidAdminSecret(req: Request) {
-  const expectedSecret = process.env.ADMIN_API_SECRET;
-  if (!expectedSecret) return false;
+  const expectedSecrets = [process.env.ADMIN_API_SECRET, process.env.CRON_SECRET]
+    .map((value) => String(value || '').trim())
+    .filter(Boolean);
+  if (!expectedSecrets.length) return false;
 
   const auth = req.headers.get('authorization') || '';
   const bearer = auth.startsWith('Bearer ') ? auth.slice(7).trim() : '';
-  const headerSecret = req.headers.get('x-admin-secret') || '';
   const { searchParams } = new URL(req.url);
-  const querySecret = searchParams.get('adminSecret') || '';
+  const candidates = [
+    bearer,
+    req.headers.get('x-admin-secret') || '',
+    req.headers.get('x-cron-secret') || '',
+    searchParams.get('adminSecret') || '',
+    searchParams.get('cronSecret') || '',
+    searchParams.get('key') || '',
+  ].map((value) => String(value || '').trim()).filter(Boolean);
 
-  return [bearer, headerSecret, querySecret].some((value) => value && value === expectedSecret);
+  return candidates.some((value) => expectedSecrets.includes(value));
 }
 
 export async function requireAdmin(req: Request) {
