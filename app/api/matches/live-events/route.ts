@@ -29,6 +29,23 @@ function normalizeName(value?: string | null) {
     .replace(/\s+/g, ' ');
 }
 
+function validMinute(value: unknown) {
+  const minute = Number(value);
+  return Number.isFinite(minute) && minute > 0 ? Math.floor(minute) : null;
+}
+
+function eventMinuteLabel(event: any) {
+  const minute = validMinute(event?.minute);
+  if (!minute) return null;
+  const detail = String(event?.detail || '').toLowerCase();
+  const explicitStoppage = detail.match(/45\s*\+\s*(\d{1,2})/);
+  if (explicitStoppage) return `45+${Number(explicitStoppage[1])}`;
+  const firstHalfHint = /الشوط\s*الأول|first\s*half|1h/.test(detail);
+  const secondHalfHint = /الشوط\s*الثاني|second\s*half|2h/.test(detail);
+  if (minute > 45 && minute < 60 && firstHalfHint && !secondHalfHint) return `45+${minute - 45}`;
+  return String(minute);
+}
+
 async function getPlayerAssetsForEvents(events: any[]) {
   const playerIds = [...new Set(events.map((event) => String(event.playerId || '').trim()).filter(Boolean))];
   const playerNames = [...new Set(events.map((event) => String(event.playerName || '').trim()).filter(Boolean))];
@@ -117,6 +134,7 @@ export async function GET(request: Request) {
         return {
           id: event.id,
           minute: event.minute,
+          minuteLabel: eventMinuteLabel(event),
           type: event.type,
           teamId: event.teamId,
           playerId: event.playerId,
