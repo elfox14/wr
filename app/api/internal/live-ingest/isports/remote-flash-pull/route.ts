@@ -40,8 +40,26 @@ function buildFrameUrl(wrapperUrl: string, matchId: number, mode: FrameMode, ak:
   return frame.toString();
 }
 function maskUrl(value: string) { const url = new URL(value); for (const key of ['accessKey', 'auth', 'ts', 'r', 'token']) if (url.searchParams.has(key)) url.searchParams.set(key, '***'); return url.toString(); }
+function maskMaybe(value?: string | null) { if (!value) return value || null; try { return maskUrl(value); } catch { return value.replace(/([?&](?:accessKey|auth|ts|r|token)=)[^&\s]+/gi, '$1***'); } }
 async function fetchWrapper(url: string) { const response = await fetch(url, { cache: 'no-store', headers: { accept: 'text/html,*/*', 'user-agent': 'Mozilla/5.0 MCPrimeFlashPull/1.0' } }); return { ok: response.ok, status: response.status, html: await response.text() }; }
-function functionEndpoint() { const url = new URL((process.env.BROWSERLESS_ENDPOINT || 'https://production-sfo.browserless.io/content').replace(/\/content\/?$/, '/function')); const token = process.env.BROWSERLESS_TOKEN; if (token && !url.searchParams.has('token')) url.searchParams.set('token', token); return url.toString(); }
+function endpointTo(raw: string, path: 'content' | 'function', token?: string | null) {
+  const url = new URL(raw);
+  if (url.pathname === '/' || url.pathname === '') url.pathname = `/${path}`;
+  else if (/\/(content|function)\/?$/i.test(url.pathname)) url.pathname = url.pathname.replace(/\/(content|function)\/?$/i, `/${path}`);
+  else url.pathname = `${url.pathname.replace(/\/$/, '')}/${path}`;
+  if (token && !url.searchParams.has('token')) url.searchParams.set('token', token);
+  return url.toString();
+}
+function browserlessEndpoints(path: 'content' | 'function') {
+  const candidates: string[] = [];
+  const primaryRaw = process.env.BROWSERLESS_ENDPOINT || 'https://production-sfo.browserless.io/content';
+  const primaryToken = process.env.BROWSERLESS_TOKEN;
+  if (primaryRaw && primaryToken) candidates.push(endpointTo(primaryRaw, path, primaryToken));
+  const fallbackRaw = process.env.BROWSERLESS_FALLBACK_ENDPOINT || process.env.BROWSERLESS_BACKUP_ENDPOINT || 'https://browserless-backup-5k6y.onrender.com/content';
+  const fallbackToken = process.env.BROWSERLESS_FALLBACK_TOKEN || process.env.BROWSERLESS_BACKUP_TOKEN || process.env.BROWSERLESS_TOKEN;
+  if (fallbackRaw) candidates.push(endpointTo(fallbackRaw, path, fallbackToken));
+  return [...new Set(candidates)];
+}
 function browserlessCode() {
   return `export default async function ({ page, context }) {
     const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -64,11 +82,73 @@ function browserlessCode() {
     return { data: payload, type: 'application/json' };
   }`;
 }
+async function callBrowserlessFunction(targetUrl: string, timeoutMs: number, waitMs: number) {
+  const attempts: any[] = [];
+  for (const endpoint of browserlessEndpoints('function')) {
+    try {
+      const response = await fetch(endpoint, { method: 'POST', cache: 'no-store', headers: { 'content-type': 'application/json', accept: 'application/json,*/*' }, body: JSON.stringify({ code: browserlessCode(), context: { url: targetUrl, timeoutMs, waitMs } }) });
+      const text = await response.text(); let parsed: any = null; try { parsed = JSON.parse(text); } catch {}
+      const result = { ok: response.ok, status: response.status, endpoint: maskMaybe(endpoint), rawLength: text.length, contentType: response.headers.get('content-type'), data: parsed?.data || parsed || null, rawSample: parsed ? null : text.slice(0, 1200) };
+      attempts.push({ ...result, data: undefined });
+      if (response.ok && result.data?.flashFetch?.text) return { ...result, attempts, loader: 'browserless_function' };
+    } catch (error: any) {
+      attempts.push({ ok: false, status: null, endpoint: maskMaybe(endpoint), error: String(error?.message || error).slice(0, 1000) });
+    }
+  }
+  return { ok: false, status: null, endpoint: null, rawLength: 0, contentType: null, data: null, rawSample: 'No Browserless function endpoint succeeded', attempts, loader: 'browserless_function_failed' };
+}
+async function callBrowserlessContent(targetUrl: string, timeoutMs: number, waitMs: number) {
+  const attempts: any[] = [];
+  for (const endpoint of browserlessEndpoints('content')) {
+    try {
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        cache: 'no-store',
+        headers: { 'content-type': 'application/json', accept: 'text/html,application/json,*/*' },
+        body: JSON.stringify({ url: targetUrl, bestAttempt: true, gotoOptions: { waitUntil: 'domcontentloaded', timeout: timeoutMs }, waitForTimeout: waitMs }),
+      });
+      const text = await response.text();
+      const result = { ok: response.ok, status: response.status, endpoint: maskMaybe(endpoint), rawLength: text.length, contentType: response.headers.get('content-type'), html: text, rawSample: text.slice(0, 600) };
+      attempts.push({ ...result, html: undefined });
+      if (response.ok && text && !/^\s*Loading\.?\s*$/i.test(text)) return { ...result, attempts, loader: 'browserless_content' };
+    } catch (error: any) {
+      attempts.push({ ok: false, status: null, endpoint: maskMaybe(endpoint), error: String(error?.message || error).slice(0, 1000) });
+    }
+  }
+  return { ok: false, status: null, endpoint: null, rawLength: 0, contentType: null, html: '', rawSample: 'No Browserless content endpoint succeeded', attempts, loader: 'browserless_content_failed' };
+}
+function extractScheduleID(text: string) {
+  return lastRegexValue(text, /\bscheduleID\s*=\s*["']?([A-Za-z0-9_-]+)["']?/gi)
+    || lastRegexValue(text, /\bscheduleId\s*=\s*["']?([A-Za-z0-9_-]+)["']?/gi)
+    || lastRegexValue(text, /\bscheduleid\s*[:=]\s*["']?([A-Za-z0-9_-]+)["']?/gi)
+    || lastRegexValue(text, /flashdata\/get\?id=([A-Za-z0-9_-]+)/gi);
+}
+async function fetchFlashBySchedule(frameUrl: string, scheduleID: string) {
+  const frame = new URL(frameUrl);
+  const url = new URL('/flashdata/get', frame.origin);
+  url.searchParams.set('id', scheduleID);
+  url.searchParams.set('t', String(Date.now()));
+  const response = await fetch(url.toString(), { cache: 'no-store', headers: { accept: 'text/plain,*/*', referer: frameUrl, 'user-agent': 'Mozilla/5.0 MCPrimeFlashPull/1.0' } });
+  return { ok: response.ok, status: response.status, contentType: response.headers.get('content-type'), url: maskMaybe(url.toString()), text: await response.text() };
+}
 async function callBrowserless(targetUrl: string, timeoutMs: number, waitMs: number) {
-  const endpoint = functionEndpoint();
-  const response = await fetch(endpoint, { method: 'POST', cache: 'no-store', headers: { 'content-type': 'application/json', accept: 'application/json,*/*' }, body: JSON.stringify({ code: browserlessCode(), context: { url: targetUrl, timeoutMs, waitMs } }) });
-  const text = await response.text(); let parsed: any = null; try { parsed = JSON.parse(text); } catch {}
-  return { ok: response.ok, status: response.status, endpoint: maskUrl(endpoint), rawLength: text.length, contentType: response.headers.get('content-type'), data: parsed?.data || parsed || null, rawSample: parsed ? null : text.slice(0, 1200) };
+  const fn = await callBrowserlessFunction(targetUrl, timeoutMs, waitMs);
+  if (fn.data?.flashFetch?.text) return fn;
+  const content = await callBrowserlessContent(targetUrl, timeoutMs, waitMs);
+  const scheduleID = extractScheduleID(content.html || '');
+  let flashFetch: any = null;
+  if (scheduleID) flashFetch = await fetchFlashBySchedule(targetUrl, scheduleID);
+  return {
+    ok: Boolean(flashFetch?.text) || content.ok,
+    status: flashFetch?.status ?? content.status,
+    endpoint: content.endpoint,
+    rawLength: content.rawLength,
+    contentType: content.contentType,
+    data: { scheduleID, bodyText: String(content.html || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').slice(0, 1500), flashFetch },
+    rawSample: flashFetch?.text ? null : content.rawSample,
+    attempts: [...(fn.attempts || []), ...(content.attempts || [])],
+    loader: flashFetch?.text ? 'browserless_content_plus_direct_flashdata' : 'browserless_content_no_schedule',
+  };
 }
 function emptyStats(): NormalizedStats { return { minute: null, homePossession: null, awayPossession: null, homeAttacks: null, awayAttacks: null, homeDangerousAttacks: null, awayDangerousAttacks: null, homeShots: null, awayShots: null, homeShotsOnTarget: null, awayShotsOnTarget: null, homeShotsOffTarget: null, awayShotsOffTarget: null, homeCorners: null, awayCorners: null, homeYellowCards: null, awayYellowCards: null, homeRedCards: null, awayRedCards: null, homeScore: null, awayScore: null }; }
 function parseFlashRecords(text: string) {
@@ -144,7 +224,6 @@ export async function GET(req: Request) {
     const url = new URL(req.url); const mode = parseMode(url.searchParams.get('mode')); const explicitSourceUrl = url.searchParams.get('sourceUrl');
     const rawMatchId = Number(url.searchParams.get('matchId') || url.searchParams.get('providerMatchId') || extractISportsMatchId(explicitSourceUrl));
     if (!Number.isFinite(rawMatchId) || rawMatchId <= 0) return json({ ok: false, error: 'matchId or sourceUrl is required' }, 400);
-    if (String(process.env.LIVE_STATS_REMOTE_BROWSER || '').toLowerCase() !== 'browserless' || !process.env.BROWSERLESS_TOKEN) return json({ ok: false, error: 'Browserless is not configured' }, 400);
     const providerMatchId = Math.floor(rawMatchId); const wrapperUrl = explicitSourceUrl ? safeUrl(explicitSourceUrl).toString() : defaultWrapperUrl(providerMatchId, mode, url.searchParams.get('lang') || 'en', url.searchParams.get('v') || '1');
     const wrapper = await fetchWrapper(wrapperUrl); const credentials = extractFrameCredentials(wrapper.html);
     if (!credentials) return json({ ok: false, error: 'Could not extract iframe credentials', wrapper: { ok: wrapper.ok, status: wrapper.status, htmlLength: wrapper.html.length } }, 502);
@@ -152,8 +231,8 @@ export async function GET(req: Request) {
     const timeoutMs = clamp(url.searchParams.get('timeoutMs'), 30000, 5000, 60000); const waitMs = clamp(url.searchParams.get('waitMs'), 10000, 1000, 30000); const save = boolParam(url.searchParams.get('save'), false); const replace = boolParam(url.searchParams.get('replace'), true);
     const rendered = await callBrowserless(frameUrl, timeoutMs, waitMs); const flashText = String(rendered.data?.flashFetch?.text || ''); const parsed = parseFlashStats(flashText);
     const match = (save || url.searchParams.get('includeMatch') === 'true') ? await getMatch({ dbMatchId: url.searchParams.get('dbMatchId'), providerMatchId }) : null;
-    const saveResult = save ? match ? await saveSnapshot(match, providerMatchId, parsed.stats, { source: FLASH_SOURCE, wrapperUrl, frameUrl: maskUrl(frameUrl), flashMeta: parsed.meta, recordsSample: parsed.records.slice(0, 20) }, replace) : { deleted: 0, inserted: 0, snapshotId: null, error: 'No local match found' } : null;
-    return json({ ok: true, mode: 'isports_remote_flash_pull', frameMode: mode, remoteBrowser: { ok: rendered.ok, status: rendered.status, rawLength: rendered.rawLength, error: rendered.rawSample || null }, wrapper: { sourceUrl: wrapperUrl, ok: wrapper.ok, status: wrapper.status, htmlLength: wrapper.html.length }, frame: { sourceUrl: maskUrl(frameUrl) }, match: match ? { id: match.id, status: match.status, homeTeam: match.homeTeam, awayTeam: match.awayTeam } : null, hasStats: hasUsefulStats(parsed.stats), stats: parsed.stats, flash: { ok: rendered.data?.flashFetch?.ok ?? null, status: rendered.data?.flashFetch?.status ?? null, scheduleID: rendered.data?.scheduleID || parsed.meta.scheduleID, attackBarsLength: rendered.data?.attackBarsLength ?? null, recordsCount: parsed.records.length, meta: parsed.meta, providerStatus: providerStatus(parsed.meta.matchState, parsed.stats.minute) }, save: saveResult, note: 'Parses iSports flashdata and updates score plus match phase when provider exposes matchState.' });
+    const saveResult = save ? match ? await saveSnapshot(match, providerMatchId, parsed.stats, { source: FLASH_SOURCE, wrapperUrl, frameUrl: maskUrl(frameUrl), loader: rendered.loader, flashMeta: parsed.meta, recordsSample: parsed.records.slice(0, 20) }, replace) : { deleted: 0, inserted: 0, snapshotId: null, error: 'No local match found' } : null;
+    return json({ ok: true, mode: 'isports_remote_flash_pull', frameMode: mode, loader: rendered.loader, remoteBrowser: { ok: rendered.ok, status: rendered.status, endpoint: maskMaybe(rendered.endpoint), attempts: rendered.attempts, rawLength: rendered.rawLength, error: rendered.rawSample || null }, wrapper: { sourceUrl: wrapperUrl, ok: wrapper.ok, status: wrapper.status, htmlLength: wrapper.html.length }, frame: { sourceUrl: maskUrl(frameUrl) }, match: match ? { id: match.id, status: match.status, homeTeam: match.homeTeam, awayTeam: match.awayTeam } : null, hasStats: hasUsefulStats(parsed.stats), stats: parsed.stats, flash: { ok: rendered.data?.flashFetch?.ok ?? null, status: rendered.data?.flashFetch?.status ?? null, scheduleID: rendered.data?.scheduleID || parsed.meta.scheduleID, attackBarsLength: rendered.data?.attackBarsLength ?? null, recordsCount: parsed.records.length, meta: parsed.meta, providerStatus: providerStatus(parsed.meta.matchState, parsed.stats.minute) }, save: saveResult, note: 'Parses iSports flashdata and updates score plus match phase when provider exposes matchState. Falls back from Browserless /function to /content + direct flashdata when /function is unavailable.' });
   } catch (error: any) {
     return json({ ok: false, error: error?.message || 'Internal Server Error' }, 500);
   }
