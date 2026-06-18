@@ -10,7 +10,7 @@ const KNOCKOUT_MAX_LIVE_MINUTES = 150;
 const FIRST_HALF_FALLBACK_CAP = 50;
 const DEFAULT_PROVIDER_SNAPSHOT_TTL_SECONDS = 5 * 60;
 
-type SnapshotState = { minute: number; capturedAt: Date };
+type SnapshotState = { minute: number; capturedAt: Date; providerStatus?: string | null };
 
 function providerSnapshotTtlMs() {
   const seconds = Number(process.env.MATCH_PROVIDER_SNAPSHOT_TTL_SECONDS || DEFAULT_PROVIDER_SNAPSHOT_TTL_SECONDS);
@@ -123,22 +123,29 @@ function livePhaseLabel(status: string, minute?: number | null) {
   return 'مباشر الآن';
 }
 
+function effectiveProviderStatus(matchStatus: string, snapshot?: SnapshotState) {
+  const snapshotStatus = normalizeStatus(snapshot?.providerStatus);
+  if (snapshotStatus) return snapshotStatus === 'PAUSED' ? 'HT' : snapshotStatus;
+  return matchStatus;
+}
+
 function normalizeMatchForDisplay(match: any, now = Date.now(), snapshot?: SnapshotState) {
   const status = normalizeStatus(match.status);
   const freshSnapshot = isFreshProviderSnapshot(snapshot, now) ? snapshot : undefined;
+  const providerStatus = effectiveProviderStatus(status, freshSnapshot);
   const snapshotMinute = freshSnapshot?.minute || null;
   const snapshotConfirmsLive = Boolean(snapshotMinute && snapshotMinute > 0 && snapshotMinute < maxLiveMinutes(match));
 
-  if (isOfficialFinished(match)) {
+  if (isOfficialFinished(match) || FINISHED_STATUSES.includes(providerStatus)) {
     return { ...match, displayStatus: 'FINISHED', isLiveNow: false, isLikelyLiveByTime: false, minute: null, liveLabel: null, minuteSource: 'provider_status' };
   }
 
-  if (isHalfTimeStatus(status)) return halftimeDisplay(match);
+  if (isHalfTimeStatus(providerStatus)) return halftimeDisplay(match);
 
-  if (isLiveStatus(status) || snapshotConfirmsLive) {
+  if (isLiveStatus(providerStatus) || snapshotConfirmsLive) {
     const effectiveStatus = isScheduledStatus(status) && snapshotConfirmsLive
       ? snapshotMinute && snapshotMinute >= 46 ? '2H' : '1H'
-      : status;
+      : providerStatus;
     const safeMinute = displayMinute({ ...match, status: effectiveStatus }, freshSnapshot);
     return {
       ...match,
@@ -199,12 +206,17 @@ function validMinute(value: unknown) {
   return Math.max(1, Math.min(130, Math.floor(minute)));
 }
 
+function snapshotProviderStatus(rawData: unknown) {
+  const raw = rawData as any;
+  return raw?.providerStatus || raw?.status || raw?.fixture?.status?.short || raw?.fixture?.status?.long || null;
+}
+
 async function latestDocumentedSnapshots(matchIds: string[]) {
   if (matchIds.length === 0) return new Map<string, SnapshotState>();
 
   const snapshots = await prisma.matchStatsSnapshot.findMany({
     where: { matchId: { in: matchIds }, minute: { not: null } },
-    select: { matchId: true, minute: true, capturedAt: true },
+    select: { matchId: true, minute: true, capturedAt: true, rawData: true },
     orderBy: { capturedAt: 'desc' },
   });
 
@@ -212,7 +224,7 @@ async function latestDocumentedSnapshots(matchIds: string[]) {
   for (const snapshot of snapshots) {
     if (latestByMatch.has(snapshot.matchId)) continue;
     const minute = validMinute(snapshot.minute);
-    if (minute !== null) latestByMatch.set(snapshot.matchId, { minute, capturedAt: snapshot.capturedAt });
+    if (minute !== null) latestByMatch.set(snapshot.matchId, { minute, capturedAt: snapshot.capturedAt, providerStatus: snapshotProviderStatus(snapshot.rawData) });
   }
   return latestByMatch;
 }
