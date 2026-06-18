@@ -20,6 +20,14 @@ export default function LiveBroadcastPreviewSlot({ children }: Props) {
     if (statsSection?.parentElement && statsSection.previousElementSibling !== root) {
       statsSection.parentElement.insertBefore(root, statsSection);
     }
+
+    const oldEventsTitle = Array.from(document.querySelectorAll('h2')).find((element) => element.textContent?.trim() === 'أحداث المباراة' && !root.contains(element));
+    const oldEventsSection = oldEventsTitle?.closest('section') as HTMLElement | null;
+    if (oldEventsSection) {
+      oldEventsSection.style.display = 'none';
+      const parent = oldEventsSection.parentElement as HTMLElement | null;
+      if (parent) parent.style.gridTemplateColumns = '1fr';
+    }
   }, []);
 
   return <div ref={ref}>{children}</div>;
