@@ -164,7 +164,7 @@ function hasCardSource(summary: any) {
 export default async function HomeProviderStatsCards({ playersCount, teamsCount }: Props) {
   const base = await getOrigin();
   const [providerSummary, databaseSummary, leaders] = await Promise.all([
-    readJson(base, `${servicePrefix}/matches/the-stats-summary-stats`),
+    readJson(base, `${servicePrefix}/matches/cached-the-stats-summary`),
     readJson(base, `${servicePrefix}/matches/summary-stats`),
     readJson(base, `${servicePrefix}/players/leaders`),
   ]);
