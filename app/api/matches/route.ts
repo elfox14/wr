@@ -1,18 +1,21 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 
-const LIVE_STATUSES = ['1H', '2H', 'ET', 'BT', 'P', 'IN_PLAY', 'LIVE', 'HT'];
+const LIVE_STATUSES = ['1H', '2H', 'ET', 'BT', 'P', 'IN_PLAY', 'LIVE'];
 const SCHEDULED_STATUSES = ['SCHEDULED', 'TIMED', 'NOT_STARTED', 'NS'];
 const FINISHED_STATUSES = ['FINISHED', 'FT', 'AET', 'PEN'];
-const HALF_TIME_STATUSES = ['HT', 'HALFTIME', 'HALF_TIME', 'HALF-TIME'];
+const HALF_TIME_STATUSES = ['HT', 'HALFTIME', 'HALF_TIME', 'HALF-TIME', 'PAUSED'];
 const GROUP_STAGE_MAX_LIVE_MINUTES = 115;
 const KNOCKOUT_MAX_LIVE_MINUTES = 150;
-const STALE_FINAL_SNAPSHOT_MS = 7 * 60 * 1000;
-const FINAL_MINUTE_FLOOR = 85;
-const FINAL_LOCAL_MINUTE_FALLBACK = 100;
 const FIRST_HALF_FALLBACK_CAP = 50;
+const DEFAULT_PROVIDER_SNAPSHOT_TTL_SECONDS = 5 * 60;
 
 type SnapshotState = { minute: number; capturedAt: Date };
+
+function providerSnapshotTtlMs() {
+  const seconds = Number(process.env.MATCH_PROVIDER_SNAPSHOT_TTL_SECONDS || DEFAULT_PROVIDER_SNAPSHOT_TTL_SECONDS);
+  return Math.max(60, Number.isFinite(seconds) ? Math.floor(seconds) : DEFAULT_PROVIDER_SNAPSHOT_TTL_SECONDS) * 1000;
+}
 
 function dayHourKey(value: Date | string) {
   const date = new Date(value);
@@ -54,12 +57,6 @@ function minutesFromKickoff(match: any, now = Date.now()) {
   return Math.floor((now - matchTime) / 60_000) + 1;
 }
 
-function safeKickoffMinute(match: any, now = Date.now()) {
-  const minute = minutesFromKickoff(match, now);
-  if (minute === null || minute < 1) return null;
-  return Math.max(1, Math.min(maxLiveMinutes(match), minute));
-}
-
 function isOfficialFinished(match: any) {
   const status = normalizeStatus(match.status);
   const displayStatus = normalizeStatus(match.displayStatus);
@@ -83,6 +80,13 @@ function isSecondHalfStatus(status?: string | null) {
   return value === '2H' || value === 'ET';
 }
 
+function isFreshProviderSnapshot(snapshot: SnapshotState | undefined, now = Date.now()) {
+  if (!snapshot?.capturedAt) return false;
+  const capturedAt = new Date(snapshot.capturedAt).getTime();
+  if (!Number.isFinite(capturedAt)) return false;
+  return now - capturedAt <= providerSnapshotTtlMs();
+}
+
 function halftimeDisplay(match: any) {
   return {
     ...match,
@@ -96,84 +100,71 @@ function halftimeDisplay(match: any) {
   };
 }
 
-function isStaleByTime(match: any, now = Date.now()) {
-  const minute = minutesFromKickoff(match, now);
-  if (minute === null) return false;
-  return minute >= maxLiveMinutes(match);
-}
-
-function isFinalSnapshotStale(match: any, now = Date.now()) {
-  const minute = Number(match.latestStatsMinute);
-  const capturedAt = match.latestStatsCapturedAt ? new Date(match.latestStatsCapturedAt).getTime() : NaN;
-  if (!Number.isFinite(minute) || minute < FINAL_MINUTE_FLOOR || !Number.isFinite(capturedAt)) return false;
-  return now - capturedAt >= STALE_FINAL_SNAPSHOT_MS;
-}
-
-function isFinishedByNoProviderFallback(match: any, now = Date.now()) {
+function displayMinute(match: any, snapshot: SnapshotState | undefined) {
   const status = normalizeStatus(match.status);
-  if (status !== 'IN_PLAY' && status !== 'LIVE' && status !== '1H') return false;
-  const minute = minutesFromKickoff(match, now);
-  return minute !== null && minute >= FINAL_LOCAL_MINUTE_FALLBACK;
-}
-
-function isLikelyLiveByTime(match: any, now = Date.now()) {
-  if (isOfficialFinished(match) || isFinalSnapshotStale(match, now) || isFinishedByNoProviderFallback(match, now)) return false;
-  if (!isScheduledStatus(match.status)) return false;
-  const minute = minutesFromKickoff(match, now);
-  if (minute === null) return false;
-  return minute >= 1 && minute < maxLiveMinutes(match);
-}
-
-function displayMinute(match: any, snapshot: SnapshotState | undefined, now = Date.now()) {
-  const status = normalizeStatus(match.status);
-  const kickoff = safeKickoffMinute(match, now);
   const snapshotMinute = snapshot?.minute || Number(match.latestStatsMinute) || null;
+  if (!snapshotMinute || !Number.isFinite(snapshotMinute)) return null;
 
-  if (isSecondHalfStatus(status)) {
-    if (snapshotMinute && snapshotMinute >= 46) return Math.min(snapshotMinute, maxLiveMinutes(match));
-    return kickoff ? Math.max(46, kickoff) : null;
-  }
+  if (isSecondHalfStatus(status)) return Math.min(Math.max(46, snapshotMinute), maxLiveMinutes(match));
+  if (status === '1H') return Math.min(snapshotMinute, FIRST_HALF_FALLBACK_CAP);
+  if (status === 'IN_PLAY' || status === 'LIVE') return Math.min(snapshotMinute, maxLiveMinutes(match));
+  return Math.min(snapshotMinute, maxLiveMinutes(match));
+}
 
-  if (status === '1H') {
-    if (snapshotMinute && snapshotMinute > 0 && snapshotMinute <= 60) return snapshotMinute;
-    return kickoff ? Math.min(kickoff, FIRST_HALF_FALLBACK_CAP) : null;
-  }
-
-  if (status === 'IN_PLAY' || status === 'LIVE') {
-    if (snapshotMinute && snapshotMinute >= 46) return Math.min(snapshotMinute, maxLiveMinutes(match));
-    if (kickoff && kickoff > FIRST_HALF_FALLBACK_CAP && kickoff < 70) return null;
-    return kickoff ? Math.min(kickoff, FIRST_HALF_FALLBACK_CAP) : snapshotMinute;
-  }
-
-  return kickoff;
+function livePhaseLabel(status: string, minute?: number | null) {
+  const value = normalizeStatus(status);
+  if (isHalfTimeStatus(value)) return 'استراحة';
+  if (value === 'ET') return 'أشواط إضافية';
+  if (value === 'P') return 'ركلات الترجيح';
+  if (value === '2H') return 'الشوط الثاني';
+  if (value === '1H') return 'الشوط الأول';
+  if (typeof minute === 'number' && minute >= 46) return 'الشوط الثاني';
+  if (typeof minute === 'number' && minute > 0) return 'الشوط الأول';
+  return 'مباشر الآن';
 }
 
 function normalizeMatchForDisplay(match: any, now = Date.now(), snapshot?: SnapshotState) {
   const status = normalizeStatus(match.status);
-  const shouldAutoFinish = isStaleByTime(match, now) || isFinalSnapshotStale(match, now) || isFinishedByNoProviderFallback(match, now);
+  const freshSnapshot = isFreshProviderSnapshot(snapshot, now) ? snapshot : undefined;
+  const snapshotMinute = freshSnapshot?.minute || null;
+  const snapshotConfirmsLive = Boolean(snapshotMinute && snapshotMinute > 0 && snapshotMinute < maxLiveMinutes(match));
 
   if (isOfficialFinished(match)) {
-    return { ...match, displayStatus: 'FINISHED', isLiveNow: false, isLikelyLiveByTime: false, minute: null, liveLabel: null };
+    return { ...match, displayStatus: 'FINISHED', isLiveNow: false, isLikelyLiveByTime: false, minute: null, liveLabel: null, minuteSource: 'provider_status' };
   }
 
   if (isHalfTimeStatus(status)) return halftimeDisplay(match);
 
-  if ((isLiveStatus(status) || isScheduledStatus(status)) && shouldAutoFinish) {
-    return { ...match, status: 'FINISHED', displayStatus: 'FINISHED', isLiveNow: false, isLikelyLiveByTime: false, isStaleAutoFinished: true, minute: null, liveLabel: null };
+  if (isLiveStatus(status) || snapshotConfirmsLive) {
+    const effectiveStatus = isScheduledStatus(status) && snapshotConfirmsLive
+      ? snapshotMinute && snapshotMinute >= 46 ? '2H' : '1H'
+      : status;
+    const safeMinute = displayMinute({ ...match, status: effectiveStatus }, freshSnapshot);
+    return {
+      ...match,
+      displayStatus: effectiveStatus,
+      isLiveNow: true,
+      isLikelyLiveByTime: false,
+      isHalfTime: false,
+      minute: safeMinute,
+      liveLabel: livePhaseLabel(effectiveStatus, safeMinute),
+      minuteSource: freshSnapshot ? 'provider_snapshot' : 'provider_status',
+    };
   }
 
-  if (isLikelyLiveByTime(match, now)) {
-    const safeMinute = displayMinute({ ...match, status: '1H' }, snapshot, now);
-    return { ...match, displayStatus: 'IN_PLAY', isLiveNow: true, isLikelyLiveByTime: true, minute: safeMinute, liveLabel: safeMinute ? `الدقيقة ${safeMinute}` : 'مباشر الآن', minuteSource: 'kickoff_time' };
+  if (isScheduledStatus(status) && minutesFromKickoff(match, now) !== null && (minutesFromKickoff(match, now) || 0) >= 1) {
+    return {
+      ...match,
+      displayStatus: 'SCHEDULED',
+      isLiveNow: false,
+      isLikelyLiveByTime: false,
+      minute: null,
+      liveLabel: 'بانتظار تأكيد البداية',
+      minuteSource: null,
+    };
   }
 
-  if (isLiveStatus(status)) {
-    const safeMinute = displayMinute(match, snapshot, now);
-    if (safeMinute === null && (status === 'IN_PLAY' || status === 'LIVE')) return halftimeDisplay(match);
-    return { ...match, displayStatus: status, isLiveNow: true, isLikelyLiveByTime: false, minute: safeMinute, liveLabel: safeMinute ? `الدقيقة ${safeMinute}` : 'مباشر الآن', minuteSource: isSecondHalfStatus(status) ? 'provider_second_half' : 'provider_or_kickoff' };
-  }
-
-  return match;
+  return { ...match, isLiveNow: false, isLikelyLiveByTime: false, minute: null, liveLabel: null, minuteSource: null };
 }
 
 function rankMatch(match: any) {
@@ -237,8 +228,9 @@ export async function GET() {
     const now = Date.now();
     const enrichedMatches = matches.map((match) => {
       const snapshot = documentedSnapshots.get(match.id);
-      const matchWithSnapshot = snapshot ? { ...match, latestStatsMinute: snapshot.minute, latestStatsCapturedAt: snapshot.capturedAt } : match;
-      return normalizeMatchForDisplay(matchWithSnapshot, now, snapshot);
+      const freshSnapshot = isFreshProviderSnapshot(snapshot, now) ? snapshot : undefined;
+      const matchWithSnapshot = freshSnapshot ? { ...match, latestStatsMinute: freshSnapshot.minute, latestStatsCapturedAt: freshSnapshot.capturedAt } : match;
+      return normalizeMatchForDisplay(matchWithSnapshot, now, freshSnapshot);
     });
 
     return NextResponse.json(dedupeMatches(enrichedMatches), { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } });
