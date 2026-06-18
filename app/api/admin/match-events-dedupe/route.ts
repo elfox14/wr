@@ -16,6 +16,11 @@ function bool(value: string | null, fallback = true) {
   return !['false', '0', 'no', 'off'].includes(value.toLowerCase());
 }
 
+function int(value: string | null, fallback: number, min: number, max: number) {
+  const parsed = Number(value ?? fallback);
+  return Number.isFinite(parsed) ? Math.max(min, Math.min(max, Math.floor(parsed))) : fallback;
+}
+
 function normalizeText(value: any) {
   return String(value || '')
     .toLowerCase()
@@ -72,6 +77,8 @@ export async function GET(req: Request) {
   const dryRun = bool(url.searchParams.get('dryRun'), true);
   const includeManual = bool(url.searchParams.get('includeManual'), false);
   const cleanupSynthetic = bool(url.searchParams.get('cleanupSynthetic'), true);
+  const preferTheStats = bool(url.searchParams.get('preferTheStats'), true);
+  const preferTheStatsMinEvents = int(url.searchParams.get('preferTheStatsMinEvents'), 5, 1, 500);
 
   if (!matchId) return json({ ok: false, error: 'matchId is required' }, 400);
 
@@ -80,6 +87,9 @@ export async function GET(req: Request) {
     orderBy: [{ minute: 'asc' }, { createdAt: 'asc' }],
     select: { id: true, minute: true, type: true, teamId: true, playerName: true, detail: true, sourceName: true, createdAt: true },
   });
+
+  const officialTheStats = events.filter((event) => String(event.sourceName || '').toUpperCase() === 'THE_STATS_API');
+  const hasOfficialTheStatsTimeline = officialTheStats.length >= preferTheStatsMinEvents;
 
   const byKey = new Map<string, any[]>();
   for (const event of events) {
@@ -90,6 +100,19 @@ export async function GET(req: Request) {
   }
 
   const toDelete = new Map<string, any>();
+
+  if (preferTheStats && hasOfficialTheStatsTimeline) {
+    for (const event of events) {
+      const source = String(event.sourceName || '').toUpperCase();
+      if (source === 'ISPORTS_TIMELINE') {
+        toDelete.set(event.id, { ...event, reason: 'official_the_stats_timeline_available', officialTheStatsEvents: officialTheStats.length });
+      }
+      if (source === 'THE_STATS_API_LIVE_SCORE') {
+        toDelete.set(event.id, { ...event, reason: 'synthetic_score_event_replaced_by_official_the_stats_timeline', officialTheStatsEvents: officialTheStats.length });
+      }
+    }
+  }
+
   for (const group of byKey.values()) {
     if (group.length < 2) continue;
     const sorted = [...group].sort((a, b) => sourceRank(b.sourceName) - sourceRank(a.sourceName));
@@ -120,10 +143,15 @@ export async function GET(req: Request) {
     dryRun,
     matchId,
     eventsChecked: events.length,
+    officialTheStatsEvents: officialTheStats.length,
+    preferTheStats,
+    preferTheStatsMinEvents,
+    officialTheStatsTimelineTakesPriority: preferTheStats && hasOfficialTheStatsTimeline,
     duplicatesFound: toDelete.size,
     deleted,
     policy: {
       priority: ['THE_STATS_API', 'ISPORTS_TIMELINE', 'manual/null', 'other', 'THE_STATS_API_LIVE_SCORE'],
+      officialTheStatsTimelineReplacesISportsWhenAvailable: preferTheStats,
       manualEventsProtectedByDefault: !includeManual,
       syntheticScoreEventsRemovedWhenRealGoalsExist: cleanupSynthetic,
     },
