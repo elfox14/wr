@@ -4,7 +4,6 @@ import { notFound } from 'next/navigation';
 import prisma from '@/lib/prisma';
 import { getTeamFlagUrl } from '@/lib/teamFlags';
 import MatchAutoRefresh from './MatchAutoRefresh';
-import MatchIntelligenceAndMomentum from './MatchIntelligenceAndMomentum';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -256,7 +255,6 @@ export default async function MatchCenterPageLivePriority({ params }: { params: 
         </section>
 
         <EventsPanel events={match.events || []} />
-        <MatchIntelligenceAndMomentum match={match} />
       </section>
     </main>
   );
