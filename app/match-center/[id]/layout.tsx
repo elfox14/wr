@@ -18,7 +18,7 @@ function schemaEventStatus(status?: string) {
 }
 
 async function getMatch(id: string) {
-  return prisma.match.findUnique({
+  const match = await prisma.match.findUnique({
     where: { id },
     include: {
       homeTeam: true,
@@ -26,6 +26,15 @@ async function getMatch(id: string) {
       events: { orderBy: [{ minute: 'asc' }, { createdAt: 'asc' }] },
     },
   });
+  if (!match) return null;
+
+  const players = await prisma.asset.findMany({
+    where: { type: 'PLAYER', teamId: { in: [match.homeTeamId, match.awayTeamId] } },
+    select: { id: true, name: true, code: true, image: true, teamId: true },
+    take: 80,
+  });
+
+  return { ...match, squadPlayers: players };
 }
 
 export default async function MatchCenterLayout({ children, params }: { children: React.ReactNode; params: Promise<{ id: string }> | { id: string } }) {
@@ -49,6 +58,9 @@ export default async function MatchCenterLayout({ children, params }: { children
       }
     : null;
 
+  const homePlayers = match?.squadPlayers?.filter((player) => player.teamId === match.homeTeamId) || [];
+  const awayPlayers = match?.squadPlayers?.filter((player) => player.teamId === match.awayTeamId) || [];
+
   return (
     <>
       {sportsEventJsonLd ? <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(sportsEventJsonLd) }} /> : null}
@@ -57,7 +69,7 @@ export default async function MatchCenterLayout({ children, params }: { children
         <LiveBroadcastPreviewSlot>
           <div className="bg-[#02060d] px-3 pb-5 text-white sm:px-6" dir="rtl">
             <div className="mx-auto max-w-7xl">
-              <LiveBroadcastPreview matchId={match.id} events={match.events || []} />
+              <LiveBroadcastPreview matchId={match.id} events={match.events || []} homeTeam={match.homeTeam} awayTeam={match.awayTeam} homePlayers={homePlayers} awayPlayers={awayPlayers} />
             </div>
           </div>
         </LiveBroadcastPreviewSlot>
