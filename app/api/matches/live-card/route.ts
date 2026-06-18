@@ -21,9 +21,11 @@ const MATCH_SELECT = {
 };
 
 const LIVE_STATUSES = ['1H', '2H', 'ET', 'BT', 'P', 'LIVE', 'IN_PLAY'];
+const SECOND_HALF_STATUSES = ['2H'];
+const FIRST_HALF_STATUSES = ['1H'];
 const HALF_TIME_STATUSES = ['HT', 'HALFTIME', 'HALF_TIME', 'HALF-TIME', 'PAUSED'];
 const SCHEDULED_STATUSES = ['SCHEDULED', 'TIMED', 'NOT_STARTED', 'NS'];
-const FINISHED_STATUSES = ['FT', 'AET', 'PEN', 'FINISHED'];
+const FINISHED_STATUSES = ['FT', 'AET', 'PEN', 'FINISHED', 'FULL_TIME', 'ENDED'];
 const GROUP_STAGE_MAX_LIVE_MINUTES = 115;
 const KNOCKOUT_MAX_LIVE_MINUTES = 150;
 const FRESH_LIVE_SNAPSHOT_MS = 4 * 60 * 1000;
@@ -63,6 +65,14 @@ function isScheduledStatus(status: string) {
 
 function isFinishedStatus(status: string) {
   return FINISHED_STATUSES.includes(normalizeStatus(status));
+}
+
+function isSecondHalfStatus(status: string) {
+  return SECOND_HALF_STATUSES.includes(normalizeStatus(status));
+}
+
+function isFirstHalfStatus(status: string) {
+  return FIRST_HALF_STATUSES.includes(normalizeStatus(status));
 }
 
 function isGroupStage(match: any) {
@@ -116,6 +126,25 @@ function isFreshLiveSnapshot(snapshotState: any, now: Date) {
   return Boolean(minute !== null && age !== null && age <= FRESH_LIVE_SNAPSHOT_MS && !isFinalSnapshotStale(snapshotState, now));
 }
 
+function liveMinuteForStatus(status: string, providerState: any, snapshotState: any, freshSnapshot: boolean) {
+  const normalized = normalizeStatus(status);
+  const provider = nullableNumber(providerState?.minute);
+  const snapshot = freshSnapshot ? nullableNumber(snapshotState?.minute) : null;
+  const rawMinute = provider ?? snapshot;
+  if (isHalftimeStatus(normalized) || isFinishedStatus(normalized)) return null;
+  if (isSecondHalfStatus(normalized)) return rawMinute === null || rawMinute < 45 ? 45 : rawMinute;
+  return rawMinute;
+}
+
+function liveMinuteLabel(minute: number | null, status: string) {
+  if (minute === null) return null;
+  const normalized = normalizeStatus(status);
+  if (isFirstHalfStatus(normalized) && minute > 45 && minute < 60) return `45+${minute - 45}`;
+  if (isSecondHalfStatus(normalized) && minute < 45) return '45';
+  if (minute > 90 && minute < 120) return `90+${minute - 90}`;
+  return String(minute);
+}
+
 async function fetchLatestScoreSnapshots(matchIds: string[]) {
   if (!matchIds.length) return new Map<string, any>();
   try {
@@ -167,25 +196,28 @@ function decorateMatch(match: any, now: Date, providerState?: any, snapshotState
   const providerStatus = normalizeStatus(providerState?.status || rawStatus(snapshotState?.rawData));
   const effectiveStatus = providerStatus || dbStatus;
   const providerHasState = Boolean(providerStatus);
-  const snapshotMinute = nullableNumber(snapshotState?.minute);
   const freshSnapshot = isFreshLiveSnapshot(snapshotState, now);
-  const staleByTime = localMinute >= maxLiveMinutes(match);
+  const dbLiveStatus = dbStatus === 'IN_PLAY' || dbStatus === 'LIVE';
+  const canAutoFinishByElapsedTime = providerHasState || dbLiveStatus || freshSnapshot;
+  const staleByTime = canAutoFinishByElapsedTime && localMinute >= maxLiveMinutes(match);
   const staleFinalSnapshot = !providerHasState && isFinalSnapshotStale(snapshotState, now);
-  const noProviderFinalFallback = !providerHasState && (dbStatus === 'IN_PLAY' || dbStatus === 'LIVE') && localMinute >= FINAL_LOCAL_MINUTE_FALLBACK;
+  const noProviderFinalFallback = !providerHasState && dbLiveStatus && localMinute >= FINAL_LOCAL_MINUTE_FALLBACK;
   const isFinished = staleByTime || staleFinalSnapshot || noProviderFinalFallback || isFinishedStatus(dbStatus) || isFinishedStatus(effectiveStatus);
   const isHalfTime = !isFinished && isHalftimeStatus(effectiveStatus);
   const isProviderLive = !isFinished && isProviderLiveStatus(providerStatus);
-  const isDbLive = !isFinished && !isHalfTime && (dbStatus === 'IN_PLAY' || dbStatus === 'LIVE') && (providerHasState || freshSnapshot || localMinute < FINAL_LOCAL_MINUTE_FALLBACK);
+  const isDbLive = !isFinished && !isHalfTime && dbLiveStatus && (providerHasState || freshSnapshot || localMinute < FINAL_LOCAL_MINUTE_FALLBACK);
   const isLikelyLiveByFreshSnapshot = !isFinished && !isHalfTime && !providerHasState && isScheduledStatus(dbStatus) && freshSnapshot && localMinute >= 1 && localMinute < maxLiveMinutes(match);
   const isLiveNow = !isFinished && !isHalfTime && (isDbLive || isProviderLive || isLikelyLiveByFreshSnapshot);
   const providerHasScore = hasAnyNumber(providerState?.homeScore, providerState?.awayScore);
   const snapshotHasScore = hasAnyNumber(snapshotState?.homeScore, snapshotState?.awayScore);
   const useSnapshotScore = !providerHasScore && snapshotHasScore && (isLiveNow || isHalfTime || isFinished);
   const scoreSource = providerHasScore ? 'provider' : useSnapshotScore ? 'snapshot' : 'match';
+  const minute = isLiveNow ? liveMinuteForStatus(effectiveStatus, providerState, snapshotState, freshSnapshot) : null;
+  const minuteLabel = liveMinuteLabel(minute, effectiveStatus);
 
   return {
     ...match,
-    status: isFinished ? 'FINISHED' : isHalfTime ? 'HT' : (isLiveNow ? 'IN_PLAY' : match.status),
+    status: isFinished ? 'FINISHED' : isHalfTime ? 'HT' : (isLiveNow ? (isSecondHalfStatus(effectiveStatus) ? '2H' : 'IN_PLAY') : match.status),
     homeScore: pickLiveScore(providerState?.homeScore, useSnapshotScore ? snapshotState?.homeScore : null, match.homeScore),
     awayScore: pickLiveScore(providerState?.awayScore, useSnapshotScore ? snapshotState?.awayScore : null, match.awayScore),
     scoreSource,
@@ -193,9 +225,9 @@ function decorateMatch(match: any, now: Date, providerState?: any, snapshotState
     isHalfTime,
     isLikelyLiveByTime: isLikelyLiveByFreshSnapshot,
     isStaleAutoFinished: isFinished && (staleByTime || staleFinalSnapshot || noProviderFinalFallback),
-    displayStatus: isFinished ? 'FINISHED' : isHalfTime ? 'HT' : (isLiveNow ? 'IN_PLAY' : match.status),
-    minute: null,
-    liveLabel: isFinished ? 'انتهت المباراة' : isHalfTime ? 'استراحة بين الشوطين' : (isLiveNow ? 'جارية الآن' : null),
+    displayStatus: isFinished ? 'FINISHED' : isHalfTime ? 'HT' : (isLiveNow ? (isSecondHalfStatus(effectiveStatus) ? '2H' : 'IN_PLAY') : match.status),
+    minute,
+    liveLabel: isFinished ? 'انتهت' : isHalfTime ? 'استراحة' : (isLiveNow ? (minuteLabel ? `الدقيقة ${minuteLabel}` : 'جارية الآن') : null),
   };
 }
 
