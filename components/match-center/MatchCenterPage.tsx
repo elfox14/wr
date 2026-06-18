@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getServerSession } from 'next-auth';
-import { ArrowLeft, Radio } from 'lucide-react';
+import { Activity, ArrowLeft, BarChart3, Radio, ShieldCheck, Target, TrendingUp, Users } from 'lucide-react';
 import prisma from '@/lib/prisma';
 import { authOptions } from '@/lib/auth';
 import InternalAnimationPlayer from '@/app/animation-live/player/InternalAnimationPlayer';
@@ -31,6 +31,8 @@ type MatchArticleSummary = {
   latestUpdatedAt?: Date | string | null;
 };
 
+type PairLike = { home?: number | null; away?: number | null; sourcePath?: string | null } | null;
+
 function isAdmin(session: AdminSession) {
   const email = session?.user?.email || '';
   return session?.user?.role === 'ADMIN' || email === 'worldcup@mcprim.com' || email === 'elfox14usa@gmail.com';
@@ -43,7 +45,7 @@ async function getMatch(id: string) {
       homeTeam: true,
       awayTeam: true,
       events: { orderBy: [{ minute: 'asc' }, { createdAt: 'asc' }] },
-      statsSnapshots: { orderBy: { capturedAt: 'desc' }, take: 6 },
+      statsSnapshots: { orderBy: { capturedAt: 'desc' }, take: 8 },
     },
   });
 }
@@ -69,8 +71,13 @@ async function getMatchArticleSummary(matchId: string): Promise<MatchArticleSumm
 }
 
 function formatNumber(value?: number | null, suffix = '') {
-  if (value === null || value === undefined) return '—';
+  if (value === null || value === undefined || Number.isNaN(Number(value))) return '—';
   return `${Number(value).toLocaleString('ar-EG')}${suffix}`;
+}
+
+function formatDecimal(value?: number | null, digits = 2) {
+  if (value === null || value === undefined || Number.isNaN(Number(value))) return '—';
+  return Number(value).toLocaleString('ar-EG', { maximumFractionDigits: digits, minimumFractionDigits: digits });
 }
 
 function formatDate(value?: Date | string | null) {
@@ -95,7 +102,7 @@ function getProviderEnrichment(snapshot: any) {
   const stats = rawObject(raw.stats || raw.providerStats || direct.stats || direct.providerStats);
   const derived = rawObject(raw.derived || direct.derived);
   const lineup = rawObject(raw.lineup || raw.lineups || direct.lineup || direct.lineups);
-  return { stats, derived, lineup };
+  return { raw, stats, derived, lineup };
 }
 
 function pickLatestSnapshot(match: any, providerHint: string) {
@@ -103,7 +110,7 @@ function pickLatestSnapshot(match: any, providerHint: string) {
   return snapshots.find((snapshot: any) => String(snapshot.provider || '').toUpperCase().includes(providerHint));
 }
 
-function statPairFromSnapshot(snapshot: any, homeKey: string, awayKey: string) {
+function statPairFromSnapshot(snapshot: any, homeKey: string, awayKey: string): PairLike {
   if (!snapshot) return null;
   const home = snapshot[homeKey];
   const away = snapshot[awayKey];
@@ -111,7 +118,7 @@ function statPairFromSnapshot(snapshot: any, homeKey: string, awayKey: string) {
   return { home, away };
 }
 
-function providerStatPair(stats: Record<string, any>, key: string) {
+function providerStatPair(stats: Record<string, any>, key: string): PairLike {
   const stat = rawObject(stats[key]);
   const home = stat.home;
   const away = stat.away;
@@ -119,152 +126,234 @@ function providerStatPair(stats: Record<string, any>, key: string) {
   return { home, away, sourcePath: stat.sourcePath || null };
 }
 
-function StatRow({ label, home, away, suffix = '' }: { label: string; home?: number | null; away?: number | null; suffix?: string }) {
-  return (
-    <div className="grid grid-cols-[64px_1fr_64px] items-center gap-3 rounded-xl border border-white/5 bg-black/20 px-3 py-2 text-sm">
-      <div className="text-left font-black text-white tabular-nums">{formatNumber(home, suffix)}</div>
-      <div className="text-center text-xs font-black text-gray-300">{label}</div>
-      <div className="text-right font-black text-white tabular-nums">{formatNumber(away, suffix)}</div>
-    </div>
-  );
+function hasPair(pair: PairLike) {
+  return pair && (pair.home !== null && pair.home !== undefined || pair.away !== null && pair.away !== undefined);
 }
 
-function ProviderStatsBlock({ title, snapshot, rows }: { title: string; snapshot: any; rows: Array<{ label: string; home: string; away: string; suffix?: string }> }) {
-  const availableRows = rows
-    .map((row) => ({ ...row, pair: statPairFromSnapshot(snapshot, row.home, row.away) }))
-    .filter((row) => row.pair);
+function pairShare(pair: PairLike) {
+  const home = Math.max(0, Number(pair?.home || 0));
+  const away = Math.max(0, Number(pair?.away || 0));
+  const total = home + away;
+  if (!total) return { home: 50, away: 50 };
+  const homeShare = Math.max(4, Math.min(96, (home / total) * 100));
+  return { home: homeShare, away: 100 - homeShare };
+}
 
+function teamName(team: any, fallback: string) {
+  return team?.name || team?.code || fallback;
+}
+
+function QualityCard({ title, pair, icon, decimals = 0, suffix = '', accent = 'cyan' }: { title: string; pair: PairLike; icon: React.ReactNode; decimals?: number; suffix?: string; accent?: 'cyan' | 'gold' | 'green' }) {
+  const border = accent === 'gold' ? 'border-[#FFD700]/25 bg-[#FFD700]/[0.06]' : accent === 'green' ? 'border-emerald-400/20 bg-emerald-400/[0.06]' : 'border-[#0FF0FC]/20 bg-[#0FF0FC]/[0.05]';
+  const text = accent === 'gold' ? 'text-[#FFD700]' : accent === 'green' ? 'text-emerald-300' : 'text-[#0FF0FC]';
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/[0.035] p-4">
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <h3 className="text-sm font-black text-white">{title}</h3>
-        {snapshot ? <span className="rounded-full border border-[#0FF0FC]/20 bg-[#0FF0FC]/10 px-2.5 py-1 text-[10px] font-black text-[#0FF0FC]">{providerLabel(snapshot.provider)}</span> : null}
+    <div className={`rounded-2xl border ${border} p-4 shadow-[0_20px_60px_rgba(0,0,0,0.18)]`}>
+      <div className="flex items-center justify-between gap-3">
+        <div className={`flex h-10 w-10 items-center justify-center rounded-xl bg-white/10 ${text}`}>{icon}</div>
+        <p className="text-[10px] font-black uppercase tracking-[0.24em] text-gray-500">{title}</p>
       </div>
-      {availableRows.length ? (
-        <div className="space-y-2">
-          {availableRows.map((row) => <StatRow key={row.label} label={row.label} home={row.pair?.home} away={row.pair?.away} suffix={row.suffix} />)}
+      <div className="mt-4 grid grid-cols-[1fr_auto_1fr] items-end gap-3 text-center">
+        <div className="text-left">
+          <p className="text-2xl font-black text-white">{decimals ? formatDecimal(pair?.home, decimals) : formatNumber(pair?.home, suffix)}</p>
+          <p className="mt-1 text-[10px] font-bold text-gray-500">صاحب الأرض</p>
         </div>
-      ) : (
-        <p className="rounded-xl border border-white/5 bg-black/20 p-3 text-center text-xs font-bold text-gray-400">لا توجد إحصائيات محفوظة لهذا المصدر بعد.</p>
-      )}
-      {snapshot?.capturedAt ? <p className="mt-3 text-[10px] font-bold text-gray-500">آخر تحديث: {formatDate(snapshot.capturedAt)}</p> : null}
+        <span className="pb-1 text-xs font-black text-gray-500">VS</span>
+        <div className="text-right">
+          <p className="text-2xl font-black text-white">{decimals ? formatDecimal(pair?.away, decimals) : formatNumber(pair?.away, suffix)}</p>
+          <p className="mt-1 text-[10px] font-bold text-gray-500">الضيف</p>
+        </div>
+      </div>
     </div>
   );
 }
 
-function TheStatsApiEnrichmentBlock({ snapshot }: { snapshot: any }) {
-  if (!snapshot) return null;
-  const { stats, derived, lineup } = getProviderEnrichment(snapshot);
+function CompareBarRow({ label, pair, suffix = '', decimals = 0, note }: { label: string; pair: PairLike; suffix?: string; decimals?: number; note?: string }) {
+  if (!hasPair(pair)) return null;
+  const share = pairShare(pair);
+  const homeValue = decimals ? formatDecimal(pair?.home, decimals) : formatNumber(pair?.home, suffix);
+  const awayValue = decimals ? formatDecimal(pair?.away, decimals) : formatNumber(pair?.away, suffix);
+  return (
+    <div className="rounded-2xl border border-white/8 bg-black/25 p-3">
+      <div className="mb-2 grid grid-cols-[64px_1fr_64px] items-center gap-3 text-sm">
+        <div className="text-left font-black text-white tabular-nums">{homeValue}</div>
+        <div className="text-center">
+          <p className="text-xs font-black text-gray-200">{label}</p>
+          {note ? <p className="mt-0.5 text-[10px] font-bold text-gray-500">{note}</p> : null}
+        </div>
+        <div className="text-right font-black text-white tabular-nums">{awayValue}</div>
+      </div>
+      <div className="flex h-2 overflow-hidden rounded-full bg-white/10">
+        <div className="h-full rounded-r-full bg-[#0FF0FC]" style={{ width: `${share.home}%` }} />
+        <div className="h-full rounded-l-full bg-[#FFD700]" style={{ width: `${share.away}%` }} />
+      </div>
+    </div>
+  );
+}
+
+function FormationCard({ side, lineup, fallbackName }: { side: 'home' | 'away'; lineup: Record<string, any>; fallbackName: string }) {
+  return (
+    <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-black/30 p-4">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(15,240,252,0.12),transparent_45%)]" />
+      <div className="relative">
+        <p className="text-[10px] font-black uppercase tracking-[0.28em] text-gray-500">{side === 'home' ? 'الفريق الأول' : 'الفريق الثاني'}</p>
+        <div className="mt-3 flex items-end justify-between gap-3">
+          <div>
+            <h4 className="text-lg font-black text-white">{lineup.name || fallbackName}</h4>
+            <p className="mt-1 text-xs font-bold text-gray-400">أساسي: {formatNumber(lineup.startingXiCount)} · بدلاء: {formatNumber(lineup.substitutesCount)}</p>
+          </div>
+          <div className="rounded-2xl border border-[#FFD700]/25 bg-[#FFD700]/10 px-4 py-2 text-2xl font-black text-[#FFD700]">
+            {lineup.formation || '—'}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ProfessionalStatsPanel({ match, iSportsSnapshot, theStatsSnapshot }: { match: any; iSportsSnapshot: any; theStatsSnapshot: any }) {
+  const homeName = teamName(match.homeTeam, 'Home');
+  const awayName = teamName(match.awayTeam, 'Away');
+  const { raw, stats, derived, lineup } = getProviderEnrichment(theStatsSnapshot);
   const lineupHome = rawObject(lineup.home);
   const lineupAway = rawObject(lineup.away);
-  const richStats = [
-    { key: 'xg', label: 'xG' },
-    { key: 'npxg', label: 'npxG' },
-    { key: 'bigChances', label: 'فرص كبيرة' },
-    { key: 'passes', label: 'تمريرات' },
-    { key: 'accuratePasses', label: 'تمريرات صحيحة' },
-    { key: 'fouls', label: 'أخطاء' },
-    { key: 'tackles', label: 'تدخلات' },
-    { key: 'interceptions', label: 'اعتراضات' },
-    { key: 'clearances', label: 'تشتيت' },
-    { key: 'ballRecoveries', label: 'استخلاصات' },
-    { key: 'saves', label: 'تصديات' },
-  ]
-    .map((row) => ({ ...row, pair: providerStatPair(stats, row.key) }))
-    .filter((row) => row.pair);
 
-  const derivedShots = rawObject(derived.shotsOffTargetForLocalCompare || derived.shotsOffTargetWithBlocked);
+  const pair = (key: string, homeKey: string, awayKey: string): PairLike => statPairFromSnapshot(iSportsSnapshot, homeKey, awayKey) || providerStatPair(stats, key);
+  const xg = providerStatPair(stats, 'xg');
+  const npxg = providerStatPair(stats, 'npxg');
+  const bigChances = providerStatPair(stats, 'bigChances');
+  const possession = pair('possession', 'homePossession', 'awayPossession');
+  const shots = pair('shots', 'homeShots', 'awayShots');
+  const shotsOnTarget = pair('shotsOnTarget', 'homeShotsOnTarget', 'awayShotsOnTarget');
+  const shotsOffTarget = statPairFromSnapshot(iSportsSnapshot, 'homeShotsOffTarget', 'awayShotsOffTarget') || rawObject(derived.shotsOffTargetForLocalCompare || derived.shotsOffTargetWithBlocked) as PairLike;
+  const corners = pair('corners', 'homeCorners', 'awayCorners');
+  const passes = providerStatPair(stats, 'passes');
+  const accuratePasses = providerStatPair(stats, 'accuratePasses');
+  const fouls = providerStatPair(stats, 'fouls');
+  const tackles = providerStatPair(stats, 'tackles');
+  const saves = providerStatPair(stats, 'saves');
+  const clearances = providerStatPair(stats, 'clearances');
+  const ballRecoveries = providerStatPair(stats, 'ballRecoveries');
+  const yellowCards = pair('yellowCards', 'homeYellowCards', 'awayYellowCards');
+  const redCards = pair('redCards', 'homeRedCards', 'awayRedCards');
+  const statsSource = theStatsSnapshot ? `${providerLabel(theStatsSnapshot.provider)} + ${iSportsSnapshot ? providerLabel(iSportsSnapshot.provider) : 'المصدر المحلي'}` : iSportsSnapshot ? providerLabel(iSportsSnapshot.provider) : 'غير متوفر';
 
   return (
-    <div className="rounded-2xl border border-[#FFD700]/15 bg-[#FFD700]/[0.04] p-4">
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+    <section className="overflow-hidden rounded-[1.6rem] border border-white/10 bg-gradient-to-b from-white/[0.07] to-white/[0.025] p-4 shadow-card sm:p-5">
+      <div className="mb-5 flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h3 className="text-sm font-black text-white">إثراء TheStatsAPI</h3>
-          <p className="mt-1 text-[10px] font-bold text-gray-400">إحصائيات متقدمة وتشكيلات مؤكدة — بدون Odds أو مراهنات.</p>
+          <div className="inline-flex items-center gap-2 rounded-full border border-[#0FF0FC]/20 bg-[#0FF0FC]/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.24em] text-[#0FF0FC]">
+            <BarChart3 size={14} /> Match Intelligence
+          </div>
+          <h2 className="mt-3 text-2xl font-black text-white">لوحة أرقام المباراة</h2>
+          <p className="mt-2 max-w-3xl text-sm leading-7 text-gray-400">مقارنة مرئية بين {homeName} و{awayName} باستخدام البيانات الرياضية المحفوظة فقط. لا يتم عرض أي Odds أو بيانات مراهنات.</p>
         </div>
-        <span className="rounded-full border border-[#FFD700]/25 bg-[#FFD700]/10 px-2.5 py-1 text-[10px] font-black text-[#FFD700]">بيانات إضافية</span>
+        <div className="rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-left">
+          <p className="text-[10px] font-black uppercase tracking-[0.24em] text-gray-500">Data source</p>
+          <p className="mt-1 text-sm font-black text-white">{statsSource}</p>
+          {theStatsSnapshot?.capturedAt ? <p className="mt-1 text-[10px] font-bold text-gray-500">آخر إثراء: {formatDate(theStatsSnapshot.capturedAt)}</p> : null}
+        </div>
       </div>
 
-      {richStats.length ? (
-        <div className="grid gap-2 md:grid-cols-2">
-          {richStats.map((row) => <StatRow key={row.key} label={row.label} home={row.pair?.home} away={row.pair?.away} />)}
-          {derivedShots.home !== undefined || derivedShots.away !== undefined ? <StatRow label="خارج المرمى + المحجوبة" home={derivedShots.home} away={derivedShots.away} /> : null}
-        </div>
-      ) : (
-        <p className="rounded-xl border border-white/5 bg-black/20 p-3 text-center text-xs font-bold text-gray-400">لم يتم حفظ إحصائيات TheStatsAPI لهذه المباراة بعد.</p>
-      )}
+      <div className="mb-5 grid gap-3 lg:grid-cols-3">
+        <QualityCard title="xG" pair={xg} decimals={2} icon={<TrendingUp size={20} />} accent="gold" />
+        <QualityCard title="npxG" pair={npxg} decimals={2} icon={<Activity size={20} />} accent="cyan" />
+        <QualityCard title="فرص كبيرة" pair={bigChances} icon={<Target size={20} />} accent="green" />
+      </div>
 
-      {(lineupHome.formation || lineupAway.formation) ? (
-        <div className="mt-4 grid gap-3 md:grid-cols-2">
-          <div className="rounded-xl border border-white/5 bg-black/25 p-3">
-            <p className="text-[10px] font-black uppercase tracking-wider text-gray-500">خطة الفريق الأول</p>
-            <p className="mt-1 text-lg font-black text-white">{lineupHome.name || 'الفريق الأول'}: {lineupHome.formation || 'غير متوفر'}</p>
-            <p className="mt-1 text-xs font-bold text-gray-400">أساسي: {formatNumber(lineupHome.startingXiCount)} · بدلاء: {formatNumber(lineupHome.substitutesCount)}</p>
+      <div className="grid gap-4 lg:grid-cols-[1.25fr_0.75fr]">
+        <div className="rounded-2xl border border-white/10 bg-white/[0.035] p-4">
+          <div className="mb-4 flex items-center justify-between gap-2">
+            <h3 className="text-sm font-black text-white">مقارنة الفريقين</h3>
+            <div className="flex items-center gap-2 text-[10px] font-black text-gray-500"><span className="h-2 w-2 rounded-full bg-[#0FF0FC]" /> {homeName}<span className="h-2 w-2 rounded-full bg-[#FFD700]" /> {awayName}</div>
           </div>
-          <div className="rounded-xl border border-white/5 bg-black/25 p-3">
-            <p className="text-[10px] font-black uppercase tracking-wider text-gray-500">خطة الفريق الثاني</p>
-            <p className="mt-1 text-lg font-black text-white">{lineupAway.name || 'الفريق الثاني'}: {lineupAway.formation || 'غير متوفر'}</p>
-            <p className="mt-1 text-xs font-bold text-gray-400">أساسي: {formatNumber(lineupAway.startingXiCount)} · بدلاء: {formatNumber(lineupAway.substitutesCount)}</p>
+          <div className="space-y-2">
+            <CompareBarRow label="الاستحواذ" pair={possession} suffix="%" />
+            <CompareBarRow label="التسديدات" pair={shots} />
+            <CompareBarRow label="على المرمى" pair={shotsOnTarget} />
+            <CompareBarRow label="خارج المرمى + المحجوبة" pair={shotsOffTarget} note="تعريف موحد للمقارنة مع iSports" />
+            <CompareBarRow label="الركنيات" pair={corners} />
+            <CompareBarRow label="التمريرات" pair={passes} />
+            <CompareBarRow label="تمريرات صحيحة" pair={accuratePasses} />
+            <CompareBarRow label="الأخطاء" pair={fouls} />
+            <CompareBarRow label="التدخلات" pair={tackles} />
+            <CompareBarRow label="التصديات" pair={saves} />
+            <CompareBarRow label="التشتيت" pair={clearances} />
+            <CompareBarRow label="استخلاصات الكرة" pair={ballRecoveries} />
+            <CompareBarRow label="بطاقات صفراء" pair={yellowCards} />
+            <CompareBarRow label="بطاقات حمراء" pair={redCards} />
           </div>
         </div>
-      ) : null}
-    </div>
+
+        <div className="space-y-4">
+          <div className="rounded-2xl border border-[#FFD700]/20 bg-[#FFD700]/[0.05] p-4">
+            <div className="mb-3 flex items-center gap-2 text-[#FFD700]"><ShieldCheck size={18} /><h3 className="text-sm font-black text-white">ملاحظات القراءة</h3></div>
+            <ul className="space-y-2 text-xs font-bold leading-6 text-gray-400">
+              <li>• xG وnpxG أرقام جودة فرص، وليست توقعًا تجاريًا.</li>
+              <li>• خارج المرمى هنا = خارج المرمى + التسديدات المحجوبة لضبط المقارنة.</li>
+              <li>• البيانات رياضية فقط، ولا تشمل أي Odds أو مراهنات.</li>
+            </ul>
+          </div>
+
+          {(lineupHome.formation || lineupAway.formation) ? (
+            <div className="rounded-2xl border border-white/10 bg-white/[0.035] p-4">
+              <div className="mb-3 flex items-center gap-2 text-[#0FF0FC]"><Users size={18} /><h3 className="text-sm font-black text-white">التشكيلات المؤكدة</h3></div>
+              <div className="space-y-3">
+                <FormationCard side="home" lineup={lineupHome} fallbackName={homeName} />
+                <FormationCard side="away" lineup={lineupAway} fallbackName={awayName} />
+              </div>
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-white/10 bg-white/[0.035] p-4 text-center text-sm font-bold text-gray-400">التشكيلات غير متوفرة في snapshot الحالية.</div>
+          )}
+        </div>
+      </div>
+    </section>
   );
 }
 
 function MatchEventsBlock({ events }: { events: any[] }) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/[0.035] p-4">
-      <div className="mb-3 flex items-center justify-between gap-2">
-        <h3 className="text-sm font-black text-white">أحداث المباراة</h3>
+    <div className="rounded-[1.6rem] border border-white/10 bg-white/[0.035] p-4 shadow-card">
+      <div className="mb-4 flex items-center justify-between gap-2">
+        <div>
+          <h3 className="text-sm font-black text-white">أحداث المباراة</h3>
+          <p className="mt-1 text-[10px] font-bold text-gray-500">اللقطات المسجلة في قاعدة البيانات</p>
+        </div>
         <span className="rounded-full border border-white/10 bg-black/20 px-2.5 py-1 text-[10px] font-black text-gray-400">{formatNumber(events.length)} حدث</span>
       </div>
       {events.length ? (
-        <div className="space-y-2">
+        <div className="relative space-y-3 before:absolute before:right-[17px] before:top-2 before:h-[calc(100%-16px)] before:w-px before:bg-white/10">
           {events.map((event) => (
-            <div key={event.id} className="rounded-xl border border-white/5 bg-black/20 p-3">
-              <div className="mb-1 flex items-center justify-between gap-2 text-xs font-black">
-                <span className="text-[#FFD700]">{event.minute !== null && event.minute !== undefined ? `${formatNumber(event.minute)}'` : 'بدون دقيقة'}</span>
-                <span className="rounded-full bg-white/5 px-2 py-0.5 text-[10px] text-gray-400">{event.type || 'note'}</span>
+            <div key={event.id} className="relative pr-10">
+              <div className="absolute right-0 top-1 flex h-9 w-9 items-center justify-center rounded-full border border-[#FFD700]/25 bg-[#FFD700]/10 text-xs font-black text-[#FFD700]">
+                {event.minute !== null && event.minute !== undefined ? `${formatNumber(event.minute)}'` : '—'}
               </div>
-              <p className="text-sm font-bold text-white">{event.detail}</p>
-              {event.playerName ? <p className="mt-1 text-xs text-gray-400">اللاعب: {event.playerName}</p> : null}
-              {event.sourceName ? <p className="mt-1 text-[10px] font-bold text-gray-500">المصدر: {event.sourceName}</p> : null}
+              <div className="rounded-2xl border border-white/5 bg-black/25 p-3">
+                <div className="mb-1 flex items-center justify-between gap-2 text-xs font-black">
+                  <span className="text-gray-400">{event.type || 'note'}</span>
+                  {event.sourceName ? <span className="rounded-full bg-white/5 px-2 py-0.5 text-[10px] text-gray-500">{event.sourceName}</span> : null}
+                </div>
+                <p className="text-sm font-bold text-white">{event.detail}</p>
+                {event.playerName ? <p className="mt-1 text-xs text-gray-400">اللاعب: {event.playerName}</p> : null}
+              </div>
             </div>
           ))}
         </div>
       ) : (
-        <p className="rounded-xl border border-white/5 bg-black/20 p-3 text-center text-xs font-bold text-gray-400">لم يتم تسجيل أحداث محفوظة لهذه المباراة بعد.</p>
+        <p className="rounded-xl border border-white/5 bg-black/20 p-4 text-center text-xs font-bold text-gray-400">لم يتم تسجيل أحداث محفوظة لهذه المباراة بعد.</p>
       )}
     </div>
   );
 }
 
 function MatchDataPanel({ match }: { match: any }) {
-  const iSportsSnapshot = pickLatestSnapshot(match, 'ISPORTS') || match.statsSnapshots?.[0] || null;
+  const iSportsSnapshot = pickLatestSnapshot(match, 'ISPORTS') || match.statsSnapshots?.find((snapshot: any) => !String(snapshot.provider || '').toUpperCase().includes('THE_STATS')) || null;
   const theStatsSnapshot = pickLatestSnapshot(match, 'THE_STATS') || null;
   const events = Array.isArray(match.events) ? match.events : [];
 
   return (
-    <section className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
-      <div className="space-y-4">
-        <ProviderStatsBlock
-          title="إحصائيات المباراة الأساسية"
-          snapshot={iSportsSnapshot}
-          rows={[
-            { label: 'الاستحواذ', home: 'homePossession', away: 'awayPossession', suffix: '%' },
-            { label: 'الهجمات', home: 'homeAttacks', away: 'awayAttacks' },
-            { label: 'هجمات خطيرة', home: 'homeDangerousAttacks', away: 'awayDangerousAttacks' },
-            { label: 'التسديدات', home: 'homeShots', away: 'awayShots' },
-            { label: 'على المرمى', home: 'homeShotsOnTarget', away: 'awayShotsOnTarget' },
-            { label: 'خارج المرمى', home: 'homeShotsOffTarget', away: 'awayShotsOffTarget' },
-            { label: 'ركنيات', home: 'homeCorners', away: 'awayCorners' },
-            { label: 'بطاقات صفراء', home: 'homeYellowCards', away: 'awayYellowCards' },
-            { label: 'بطاقات حمراء', home: 'homeRedCards', away: 'awayRedCards' },
-          ]}
-        />
-        <TheStatsApiEnrichmentBlock snapshot={theStatsSnapshot} />
-      </div>
+    <section className="grid gap-5 xl:grid-cols-[1fr_0.38fr]">
+      <ProfessionalStatsPanel match={match} iSportsSnapshot={iSportsSnapshot} theStatsSnapshot={theStatsSnapshot} />
       <MatchEventsBlock events={events} />
     </section>
   );
