@@ -8,6 +8,7 @@ export const runtime = 'nodejs';
 
 const FINISHED = ['FINISHED', 'FT', 'AET', 'PEN', 'COMPLETED'];
 const LIVE = ['IN_PLAY', 'LIVE', '1H', '2H', 'HT', 'ET'];
+const DEFAULT_PUBLIC_ORIGIN = 'https://worldcup.mcprim.com';
 
 function bool(value: string | null, fallback = true) {
   if (value === null) return fallback;
@@ -29,6 +30,36 @@ function maskUrl(value: string) {
 
 function json(value: unknown, status = 200) {
   return NextResponse.json(value, { status, headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } });
+}
+
+function cleanOrigin(value: string | null | undefined) {
+  const raw = String(value || '').trim();
+  if (!raw) return null;
+  try {
+    const withProtocol = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
+    return new URL(withProtocol).origin;
+  } catch {
+    return null;
+  }
+}
+
+function publicOrigin(req: Request, currentUrl: URL) {
+  const explicit = cleanOrigin(
+    process.env.LIVE_SYNC_PUBLIC_ORIGIN
+      || process.env.NEXT_PUBLIC_SITE_URL
+      || process.env.NEXTAUTH_URL
+      || process.env.APP_URL
+  );
+  if (explicit) return explicit;
+
+  const forwardedHost = String(req.headers.get('x-forwarded-host') || '').split(',')[0].trim();
+  const host = forwardedHost || String(req.headers.get('host') || '').split(',')[0].trim();
+  const forwardedProto = String(req.headers.get('x-forwarded-proto') || '').split(',')[0].trim() || 'https';
+  const headerOrigin = cleanOrigin(host ? `${forwardedProto}://${host}` : null);
+  if (headerOrigin && !headerOrigin.includes('localhost') && !headerOrigin.includes('127.0.0.1')) return headerOrigin;
+
+  if (!currentUrl.origin.includes('localhost') && !currentUrl.origin.includes('127.0.0.1')) return currentUrl.origin;
+  return DEFAULT_PUBLIC_ORIGIN;
 }
 
 async function callJson(url: URL, timeoutMs = 45000) {
@@ -108,7 +139,7 @@ export async function GET(req: Request) {
   if (!key) return json({ ok: false, error: 'CRON_SECRET or ADMIN_API_SECRET is required' }, 500);
 
   const url = new URL(req.url);
-  const origin = url.origin;
+  const origin = publicOrigin(req, url);
   const dryRun = bool(url.searchParams.get('dryRun'), false);
   const runTheStats = bool(url.searchParams.get('theStats'), true);
   const runISports = bool(url.searchParams.get('isports'), true);
@@ -125,6 +156,8 @@ export async function GET(req: Request) {
     ok: true,
     mode: 'live_match_full_sync',
     dryRun,
+    publicOrigin: origin,
+    internalRequestOrigin: url.origin,
     matchesFound: matches.length,
     policy: {
       theStats: 'primary source for score, status, and live stats',
