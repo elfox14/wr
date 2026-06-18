@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getTheStatsApiConfigStatus, safeTheStatsApiError, theStatsApiFetch } from '@/lib/theStatsApi';
@@ -167,12 +168,63 @@ function similar(event: any, existing: any, match: any) {
   return !p || !e || p === e || p.includes(e) || e.includes(p);
 }
 
+function pair(value: any, sourcePath: string) {
+  if (!value || typeof value !== 'object') return null;
+  const source = value.all && typeof value.all === 'object' ? value.all : value;
+  const home = n(source.home);
+  const away = n(source.away);
+  if (home === null && away === null) return null;
+  return { home, away, sourcePath };
+}
+
+function parseLiveStats(payload: any) {
+  const data = payload?.data || payload;
+  const overview = data?.overview || {};
+  const shots = data?.shots || {};
+  const attack = data?.attack || {};
+  const stats: Record<string, any> = {};
+  const entries: Array<[string, any]> = [
+    ['possession', pair(overview.ball_possession || data?.ball_possession, 'live-stats.ball_possession')],
+    ['shots', pair(overview.total_shots || shots.total_shots || data?.total_shots, 'live-stats.total_shots')],
+    ['shotsOnTarget', pair(overview.shots_on_target || shots.shots_on_target || data?.shots_on_target, 'live-stats.shots_on_target')],
+    ['shotsOffTarget', pair(shots.shots_off_target || data?.shots_off_target, 'live-stats.shots_off_target')],
+    ['corners', pair(overview.corner_kicks || data?.corner_kicks || data?.corners, 'live-stats.corner_kicks')],
+    ['yellowCards', pair(overview.yellow_cards || data?.yellow_cards, 'live-stats.yellow_cards')],
+    ['redCards', pair(overview.red_cards || data?.red_cards, 'live-stats.red_cards')],
+    ['attacks', pair(attack.attacks || data?.attacks, 'live-stats.attacks')],
+    ['dangerousAttacks', pair(attack.dangerous_attacks || data?.dangerous_attacks, 'live-stats.dangerous_attacks')],
+  ];
+  for (const [name, value] of entries) if (value) stats[name] = value;
+  return stats;
+}
+
+function statInt(stats: Record<string, any>, keyName: string, side: 'home' | 'away') {
+  const value = n(stats[keyName]?.[side]);
+  return value === null ? null : Math.round(value);
+}
+
+function snapshotMinute(match: any, livePayload: any, timelineMinute: number | null) {
+  const raw = livePayload?.data || livePayload || {};
+  const direct = n(first(raw.minute, raw.elapsed, raw.matchMinute, raw.currentMinute, raw?.time?.minute, raw?.fixture?.status?.elapsed));
+  if (direct !== null) return Math.round(direct);
+  if (timelineMinute) return timelineMinute;
+  const elapsed = Math.floor((Date.now() - new Date(match.matchDate).getTime()) / 60_000) + 1;
+  return Number.isFinite(elapsed) ? Math.max(1, Math.min(130, elapsed)) : null;
+}
+
 async function syncMatch(match: any, dryRun: boolean, skipSimilarExisting: boolean, query: Record<string, string | number>) {
   const resolved = await resolveProviderId(match, query);
   if (!resolved.id) return { ok: false, matchId: match.id, localTeams: `${match.homeTeam?.name} vs ${match.awayTeam?.name}`, error: 'Could not resolve provider match id', resolved };
-  const path = `/api/football/matches/${encodeURIComponent(resolved.id)}/timeline`;
-  const rows = extractTimeline(await theStatsApiFetch(path, {}, { timeoutMs: 15000 }));
-  const providerEvents = rows.map((row) => compactEvent(row, path)).filter((event) => event.detail);
+
+  const timelinePath = `/api/football/matches/${encodeURIComponent(resolved.id)}/timeline`;
+  const liveStatsPath = `/api/football/matches/${encodeURIComponent(resolved.id)}/live-stats`;
+  const [timelineResult, liveStatsResult] = await Promise.all([
+    theStatsApiFetch(timelinePath, {}, { timeoutMs: 15000 }).then((payload) => ({ ok: true, payload })).catch((error) => ({ ok: false, error: safeTheStatsApiError(error) })),
+    theStatsApiFetch(liveStatsPath, {}, { timeoutMs: 15000 }).then((payload) => ({ ok: true, payload })).catch((error) => ({ ok: false, error: safeTheStatsApiError(error) })),
+  ]);
+
+  const rows = timelineResult.ok ? extractTimeline((timelineResult as any).payload) : [];
+  const providerEvents = rows.map((row) => compactEvent(row, timelinePath)).filter((event) => event.detail);
   let eventsToImport = providerEvents;
   let skippedSimilarExisting = 0;
 
@@ -185,12 +237,46 @@ async function syncMatch(match: any, dryRun: boolean, skipSimilarExisting: boole
     });
   }
 
-  const latestMinute = providerEvents.reduce((max, event) => Math.max(max, Number(event.minute || 0)), 0) || null;
-  const shouldMarkLive = Boolean(providerEvents.length && !FINISHED.includes(String(match.status || '').toUpperCase()) && !LIVE.includes(String(match.status || '').toUpperCase()));
+  const latestTimelineMinute = providerEvents.reduce((max, event) => Math.max(max, Number(event.minute || 0)), 0) || null;
+  const liveStatsPayload = liveStatsResult.ok ? (liveStatsResult as any).payload : null;
+  const stats = liveStatsPayload ? parseLiveStats(liveStatsPayload) : {};
+  const minute = snapshotMinute(match, liveStatsPayload, latestTimelineMinute);
+  const shouldMarkLive = Boolean((providerEvents.length || liveStatsResult.ok) && !FINISHED.includes(String(match.status || '').toUpperCase()) && !LIVE.includes(String(match.status || '').toUpperCase()));
   let importedMatchEvents = 0;
+  let createdSnapshot = null;
   let statusUpdated = false;
 
   if (!dryRun) {
+    if (Object.keys(stats).length || liveStatsResult.ok) {
+      createdSnapshot = await prisma.matchStatsSnapshot.create({ data: {
+        id: randomUUID(),
+        matchId: match.id,
+        provider: 'THE_STATS_API_LIVE',
+        providerMatchId: Number(String(resolved.id).replace(/\D/g, '')) || 0,
+        minute,
+        homePossession: statInt(stats, 'possession', 'home'),
+        awayPossession: statInt(stats, 'possession', 'away'),
+        homeAttacks: statInt(stats, 'attacks', 'home'),
+        awayAttacks: statInt(stats, 'attacks', 'away'),
+        homeDangerousAttacks: statInt(stats, 'dangerousAttacks', 'home'),
+        awayDangerousAttacks: statInt(stats, 'dangerousAttacks', 'away'),
+        homeShots: statInt(stats, 'shots', 'home'),
+        awayShots: statInt(stats, 'shots', 'away'),
+        homeShotsOnTarget: statInt(stats, 'shotsOnTarget', 'home'),
+        awayShotsOnTarget: statInt(stats, 'shotsOnTarget', 'away'),
+        homeShotsOffTarget: statInt(stats, 'shotsOffTarget', 'home'),
+        awayShotsOffTarget: statInt(stats, 'shotsOffTarget', 'away'),
+        homeCorners: statInt(stats, 'corners', 'home'),
+        awayCorners: statInt(stats, 'corners', 'away'),
+        homeYellowCards: statInt(stats, 'yellowCards', 'home'),
+        awayYellowCards: statInt(stats, 'yellowCards', 'away'),
+        homeRedCards: statInt(stats, 'redCards', 'home'),
+        awayRedCards: statInt(stats, 'redCards', 'away'),
+        homeScore: match.homeScore,
+        awayScore: match.awayScore,
+        rawData: { status: 'IN_PLAY', minute, liveStats: liveStatsPayload, stats, source: { provider: 'THE_STATS_API', liveStatsPath, timelinePath }, importedAt: new Date().toISOString() },
+      } });
+    }
     await prisma.matchEvent.deleteMany({ where: { matchId: match.id, sourceName: 'THE_STATS_API' } });
     if (eventsToImport.length) {
       const result = await prisma.matchEvent.createMany({ data: eventsToImport.map((event) => ({ matchId: match.id, minute: event.minute, type: event.type, teamId: eventTeamId(event, match), playerName: event.playerName || null, detail: event.detail, sourceName: 'THE_STATS_API', sourceUrl: event.sourcePath })) });
@@ -202,7 +288,7 @@ async function syncMatch(match: any, dryRun: boolean, skipSimilarExisting: boole
     }
   }
 
-  return { ok: true, matchId: match.id, localTeams: `${match.homeTeam?.name} vs ${match.awayTeam?.name}`, previousStatus: match.status, statusAfterSync: statusUpdated ? 'IN_PLAY' : match.status, statusUpdated, resolvedProviderMatchId: resolved.id, resolvedBy: resolved.by, providerEventsFound: providerEvents.length, eventsToImport: eventsToImport.length, skippedSimilarExisting, latestMinute, importedMatchEvents, preview: providerEvents.slice(-8) };
+  return { ok: true, matchId: match.id, localTeams: `${match.homeTeam?.name} vs ${match.awayTeam?.name}`, previousStatus: match.status, statusAfterSync: statusUpdated ? 'IN_PLAY' : match.status, statusUpdated, resolvedProviderMatchId: resolved.id, resolvedBy: resolved.by, timelineOk: timelineResult.ok, liveStatsOk: liveStatsResult.ok, liveStatsError: liveStatsResult.ok ? null : (liveStatsResult as any).error, providerEventsFound: providerEvents.length, eventsToImport: eventsToImport.length, skippedSimilarExisting, liveStatsFound: Object.keys(stats).length, latestMinute: minute, snapshotSaved: Boolean(createdSnapshot), importedMatchEvents, preview: providerEvents.slice(-8) };
 }
 
 export async function GET(req: Request) {
@@ -229,7 +315,7 @@ export async function GET(req: Request) {
       catch (error: any) { results.push({ ok: false, matchId: match.id, localTeams: `${match.homeTeam?.name} vs ${match.awayTeam?.name}`, error: safeTheStatsApiError(error) }); }
     }
     const successful = results.filter((result: any) => result.ok);
-    return NextResponse.json({ ok: true, provider: 'THE_STATS_API', mode: 'the_stats_live_catchup', dryRun, saved: !dryRun, matchesFound: matches.length, successful: successful.length, failed: results.length - successful.length, skipSimilarExisting, totalProviderEventsFound: successful.reduce((sum: number, item: any) => sum + Number(item.providerEventsFound || 0), 0), totalEventsToImport: successful.reduce((sum: number, item: any) => sum + Number(item.eventsToImport || 0), 0), totalImportedMatchEvents: successful.reduce((sum: number, item: any) => sum + Number(item.importedMatchEvents || 0), 0), statusUpdated: successful.filter((item: any) => item.statusUpdated).length, results, config: getTheStatsApiConfigStatus() }, { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } });
+    return NextResponse.json({ ok: true, provider: 'THE_STATS_API', mode: 'the_stats_live_catchup', dryRun, saved: !dryRun, matchesFound: matches.length, successful: successful.length, failed: results.length - successful.length, skipSimilarExisting, totalProviderEventsFound: successful.reduce((sum: number, item: any) => sum + Number(item.providerEventsFound || 0), 0), totalEventsToImport: successful.reduce((sum: number, item: any) => sum + Number(item.eventsToImport || 0), 0), totalLiveStatsFound: successful.reduce((sum: number, item: any) => sum + Number(item.liveStatsFound || 0), 0), totalImportedMatchEvents: successful.reduce((sum: number, item: any) => sum + Number(item.importedMatchEvents || 0), 0), snapshotsSaved: successful.filter((item: any) => item.snapshotSaved).length, statusUpdated: successful.filter((item: any) => item.statusUpdated).length, results, config: getTheStatsApiConfigStatus() }, { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } });
   } catch (error: any) {
     return NextResponse.json({ ok: false, provider: 'THE_STATS_API', mode: 'the_stats_live_catchup', error: safeTheStatsApiError(error), config: getTheStatsApiConfigStatus() }, { status: Number(error?.status) || 500, headers: { 'Cache-Control': 'no-store' } });
   }
