@@ -15,6 +15,49 @@ type Pair = { home: number | null; away: number | null } | null;
 type Side = 'home' | 'away';
 type PlayerCard = { name: string; number?: string | number | null; image?: string | null };
 
+const AR_TEAM_NAMES: Record<string, string> = {
+  swe: 'السويد',
+  sweden: 'السويد',
+  tun: 'تونس',
+  tunisia: 'تونس',
+  egy: 'مصر',
+  egypt: 'مصر',
+  arg: 'الأرجنتين',
+  argentina: 'الأرجنتين',
+  bra: 'البرازيل',
+  brazil: 'البرازيل',
+  fra: 'فرنسا',
+  france: 'فرنسا',
+  ger: 'ألمانيا',
+  germany: 'ألمانيا',
+  esp: 'إسبانيا',
+  spain: 'إسبانيا',
+  eng: 'إنجلترا',
+  england: 'إنجلترا',
+  por: 'البرتغال',
+  portugal: 'البرتغال',
+  bel: 'بلجيكا',
+  belgium: 'بلجيكا',
+  ned: 'هولندا',
+  netherlands: 'هولندا',
+  usa: 'أمريكا',
+  'united states': 'أمريكا',
+  mex: 'المكسيك',
+  mexico: 'المكسيك',
+  can: 'كندا',
+  canada: 'كندا',
+  mar: 'المغرب',
+  morocco: 'المغرب',
+  ksa: 'السعودية',
+  'saudi arabia': 'السعودية',
+  qat: 'قطر',
+  qatar: 'قطر',
+  irn: 'إيران',
+  iran: 'إيران',
+  nzl: 'نيوزيلندا',
+  'new zealand': 'نيوزيلندا',
+};
+
 function n(value: unknown) {
   if (value === null || value === undefined || value === '') return null;
   const number = Number(typeof value === 'string' ? value.replace('%', '').trim() : value);
@@ -40,8 +83,15 @@ function arr(...values: unknown[]) {
   return [];
 }
 
+function text(value: unknown) {
+  return String(value || '').toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9\u0600-\u06ff]+/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
 function teamName(team: any, fallback: string) {
-  return team?.name || team?.code || fallback;
+  const raw = String(team?.name || team?.code || fallback);
+  const byName = AR_TEAM_NAMES[text(raw)];
+  const byCode = AR_TEAM_NAMES[String(team?.code || '').toLowerCase()];
+  return byName || byCode || raw;
 }
 
 function latest(match: any, provider: string) {
@@ -111,10 +161,6 @@ function sideLineup(lineup: Record<string, any>, side: Side) {
   return obj(lineup[side]);
 }
 
-function normalize(value: unknown) {
-  return String(value || '').toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9\u0600-\u06ff]+/g, ' ').replace(/\s+/g, ' ').trim();
-}
-
 function parsePlayer(row: any): PlayerCard | null {
   const player = obj(row?.player || row?.athlete || row?.person);
   const name = player.name || player.full_name || row?.name || row?.playerName || row?.display_name;
@@ -127,8 +173,8 @@ function parsePlayer(row: any): PlayerCard | null {
 }
 
 function matchAsset(player: PlayerCard, squad: any[]) {
-  const key = normalize(player.name);
-  return squad.find((asset) => normalize(asset.name) === key || normalize(asset.code) === key) || squad.find((asset) => normalize(asset.name).includes(key) || key.includes(normalize(asset.name)));
+  const key = text(player.name);
+  return squad.find((asset) => text(asset.name) === key || text(asset.code) === key) || squad.find((asset) => text(asset.name).includes(key) || key.includes(text(asset.name)));
 }
 
 function withImages(players: PlayerCard[], squad: any[]) {
@@ -195,7 +241,7 @@ function LineupPanel({ team, lineup, squad, side }: { team: any; lineup: Record<
   const players = lineupPlayers(lineup, squad);
   const substitutes = usedSubs(lineup, squad);
   const tone = side === 'home' ? 'border-[#0FF0FC]/20 bg-[#0FF0FC]/[.04] text-[#69d7ff]' : 'border-[#ff4d5e]/20 bg-[#ff4d5e]/[.04] text-[#ff858f]';
-  return <div className={`rounded-2xl border p-3 ${tone}`}><div className="mb-3 flex items-center justify-between gap-3"><div><h3 className="text-xl font-black text-white">{teamName(team, 'الفريق')}</h3><p className="text-xs font-bold text-gray-400">١١ لاعبًا أساسيًا</p></div><b className="rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-2xl">{formation || '—'}</b></div><Pitch players={players} formation={formation} side={side} /><div className="mt-3 rounded-2xl border border-white/10 bg-black/25 p-3"><div className="mb-2 flex items-center justify-between"><p className="text-sm font-black text-white">البدلاء المشاركون</p><span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-black">{fmt(substitutes.length)}</span></div>{substitutes.length ? <div className="flex flex-wrap gap-2">{substitutes.map((player) => <PlayerDot key={player.name} player={player} side={side} />)}</div> : <p className="text-xs font-bold text-gray-500">غير متوفر من بيانات التبديلات الرسمية.</p>}</div></div>;
+  return <div className={`rounded-2xl border p-3 ${tone}`} dir="rtl"><div className="mb-3 flex items-center justify-between gap-3"><div><h3 className="text-xl font-black text-white">{teamName(team, 'الفريق')}</h3><p className="text-xs font-bold text-gray-400">١١ لاعبًا أساسيًا</p></div><b className="rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-2xl">{formation || '—'}</b></div><Pitch players={players} formation={formation} side={side} /><div className="mt-3 rounded-2xl border border-white/10 bg-black/25 p-3"><div className="mb-2 flex items-center justify-between"><p className="text-sm font-black text-white">البدلاء المشاركون</p><span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-black">{fmt(substitutes.length)}</span></div>{substitutes.length ? <div className="flex flex-wrap gap-2">{substitutes.map((player) => <PlayerDot key={player.name} player={player} side={side} />)}</div> : <p className="text-xs font-bold text-gray-500">غير متوفر من بيانات التبديلات الرسمية.</p>}</div></div>;
 }
 
 function EventPanel({ events }: { events: any[] }) {
@@ -235,5 +281,5 @@ export default async function MatchCenterPage({ params }: { params: Promise<{ id
     ['بطاقات صفراء', pair(baseSnapshot, stats, 'yellowCards', 'homeYellowCards', 'awayYellowCards'), ''],
     ['بطاقات حمراء', pair(baseSnapshot, stats, 'redCards', 'homeRedCards', 'awayRedCards'), ''],
   ] as const;
-  return <main className="min-h-screen bg-[#02060d] px-3 py-4 text-white sm:px-6" dir="rtl"><section className="mx-auto max-w-7xl space-y-5"><section className="relative overflow-hidden rounded-[1.8rem] border border-white/10 bg-[#030912] px-4 py-6 text-center shadow-[0_0_70px_rgba(0,0,0,.55)] sm:px-6"><div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_16%,rgba(15,240,252,.20),transparent_34%),radial-gradient(circle_at_82%_14%,rgba(255,48,69,.18),transparent_34%),linear-gradient(180deg,rgba(255,215,0,.08),transparent_36%)]" /><div className="relative"><h1 className="text-3xl font-black text-[#FFD700] sm:text-5xl">إحصائيات المباراة</h1><p className="mt-2 text-sm font-bold text-gray-300">عرض موحّد للأرقام والأحداث في مكان واحد</p></div><div className="relative mt-8 grid items-center gap-5 lg:grid-cols-[1fr_auto_1fr]" dir="ltr"><div className="flex items-center justify-center gap-4 lg:justify-start"><FlagBadge team={match.homeTeam} side="home" /><p className="text-2xl font-black text-white sm:text-4xl">{teamName(match.homeTeam, 'Home')}</p></div><div><div className="inline-flex items-center justify-center gap-5 rounded-[1.3rem] border border-white/10 bg-black/45 px-6 py-3"><span className="text-5xl font-black text-[#FFD700] sm:text-7xl">{fmt(match.homeScore)}</span><span className="text-4xl font-black text-white/80 sm:text-6xl">-</span><span className="text-5xl font-black text-white sm:text-7xl">{fmt(match.awayScore)}</span></div><div className="mx-auto mt-3 inline-flex min-h-9 items-center rounded-xl border border-[#FFD700]/30 bg-[#FFD700]/10 px-5 text-sm font-black text-[#FFD700]">نهاية المباراة</div></div><div className="flex items-center justify-center gap-4 lg:justify-end"><p className="text-2xl font-black text-white sm:text-4xl">{teamName(match.awayTeam, 'Away')}</p><FlagBadge team={match.awayTeam} side="away" /></div></div></section><section className="rounded-[1.6rem] border border-white/10 bg-white/[.035] p-4"><div className="mb-3 grid grid-cols-[1fr_auto_1fr] items-center gap-3"><h2 className="text-left text-lg font-black text-[#69d7ff]">{teamName(match.homeTeam, 'Home')}</h2><div className="rounded-full border border-white/10 bg-black/35 px-4 py-1 text-[10px] font-black uppercase tracking-[.24em] text-gray-400">Stats Board</div><h2 className="text-right text-lg font-black text-[#ff6b7a]">{teamName(match.awayTeam, 'Away')}</h2></div><div className="rounded-[1.2rem] border border-white/10 bg-black/30 px-2 sm:px-4">{rows.map(([label, value, suffix]) => <StatRow key={label} label={label} value={value} suffix={suffix} />)}</div></section><div className="grid gap-5 xl:grid-cols-[.7fr_1.15fr_.7fr]"><section className="rounded-[1.45rem] border border-white/10 bg-white/[.035] p-4"><h2 className="mb-4 text-xl font-black text-[#69d7ff]">إحصائيات متقدمة</h2><div className="grid gap-3"><AdvancedCard label="xG" description="الأهداف المتوقعة" value={xg} decimal /><AdvancedCard label="npxG" description="الأهداف المتوقعة بدون ركلات جزاء" value={npxg} decimal /><AdvancedCard label="Big Chances" description="الفرص الكبيرة" value={bigChances} /></div></section><section className="rounded-[1.45rem] border border-white/10 bg-white/[.035] p-4"><div className="mb-4 flex items-center justify-between"><h2 className="text-xl font-black text-white">التشكيلات المؤكدة</h2></div><div className="grid gap-4 lg:grid-cols-2"><LineupPanel team={match.homeTeam} lineup={sideLineup(lineup, 'home')} squad={homeSquad} side="home" /><LineupPanel team={match.awayTeam} lineup={sideLineup(lineup, 'away')} squad={awaySquad} side="away" /></div></section><EventPanel events={match.events || []} /></div><section className="rounded-[1.6rem] border border-[#FFD700]/20 bg-[#030912] p-5"><div className="text-center"><p className="text-sm font-black text-[#69d7ff]">Match Intelligence</p><h2 className="mt-1 text-3xl font-black text-[#FFD700]">قراءة ذكية للمباراة</h2></div><div className="mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-4"><div className="rounded-2xl border border-[#0FF0FC]/25 bg-[#0FF0FC]/[.06] p-4"><div className="mb-3 text-2xl text-[#FFD700]">✓</div><h3 className="text-lg font-black text-white">بيانات موثقة</h3><p className="mt-2 text-xs font-bold leading-6 text-gray-300">الأرقام المعروضة تأتي من قاعدة البيانات فقط، وأي رقم غير متوفر يظهر بشرطة.</p></div><div className="rounded-2xl border border-[#0FF0FC]/25 bg-[#0FF0FC]/[.06] p-4"><div className="mb-3 text-2xl text-[#FFD700]">xG</div><h3 className="text-lg font-black text-white">جودة الفرص</h3><p className="mt-2 text-xs font-bold leading-6 text-gray-300">xG يعني الأهداف المتوقعة، و npxG يعني الأهداف المتوقعة بدون ركلات جزاء.</p></div></div></section></section></main>;
+  return <main className="min-h-screen bg-[#02060d] px-3 py-4 text-white sm:px-6" dir="rtl"><section className="mx-auto max-w-7xl space-y-5"><section className="relative overflow-hidden rounded-[1.8rem] border border-white/10 bg-[#030912] px-4 py-6 text-center shadow-[0_0_70px_rgba(0,0,0,.55)] sm:px-6"><div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_16%,rgba(15,240,252,.20),transparent_34%),radial-gradient(circle_at_82%_14%,rgba(255,48,69,.18),transparent_34%),linear-gradient(180deg,rgba(255,215,0,.08),transparent_36%)]" /><div className="relative"><h1 className="text-3xl font-black text-[#FFD700] sm:text-5xl">إحصائيات المباراة</h1><p className="mt-2 text-sm font-bold text-gray-300">عرض موحّد للأرقام والأحداث في مكان واحد</p></div><div className="relative mt-8 grid items-center gap-5 lg:grid-cols-[1fr_auto_1fr]" dir="ltr"><div className="flex items-center justify-center gap-4 lg:justify-start"><FlagBadge team={match.homeTeam} side="home" /><p className="text-2xl font-black text-white sm:text-4xl">{teamName(match.homeTeam, 'Home')}</p></div><div><div className="inline-flex items-center justify-center gap-5 rounded-[1.3rem] border border-white/10 bg-black/45 px-6 py-3"><span className="text-5xl font-black text-[#FFD700] sm:text-7xl">{fmt(match.homeScore)}</span><span className="text-4xl font-black text-white/80 sm:text-6xl">-</span><span className="text-5xl font-black text-white sm:text-7xl">{fmt(match.awayScore)}</span></div><div className="mx-auto mt-3 inline-flex min-h-9 items-center rounded-xl border border-[#FFD700]/30 bg-[#FFD700]/10 px-5 text-sm font-black text-[#FFD700]">نهاية المباراة</div></div><div className="flex items-center justify-center gap-4 lg:justify-end"><p className="text-2xl font-black text-white sm:text-4xl">{teamName(match.awayTeam, 'Away')}</p><FlagBadge team={match.awayTeam} side="away" /></div></div></section><section className="rounded-[1.6rem] border border-white/10 bg-white/[.035] p-4" dir="ltr"><div className="mb-3 grid grid-cols-[1fr_auto_1fr] items-center gap-3"><h2 className="text-left text-lg font-black text-[#69d7ff]">{teamName(match.homeTeam, 'Home')}</h2><div className="rounded-full border border-white/10 bg-black/35 px-4 py-1 text-[10px] font-black uppercase tracking-[.24em] text-gray-400">Stats Board</div><h2 className="text-right text-lg font-black text-[#ff6b7a]">{teamName(match.awayTeam, 'Away')}</h2></div><div className="rounded-[1.2rem] border border-white/10 bg-black/30 px-2 sm:px-4">{rows.map(([label, value, suffix]) => <StatRow key={label} label={label} value={value} suffix={suffix} />)}</div></section><div className="grid gap-5 xl:grid-cols-[.7fr_1.15fr_.7fr]"><section className="rounded-[1.45rem] border border-white/10 bg-white/[.035] p-4"><h2 className="mb-4 text-xl font-black text-[#69d7ff]">إحصائيات متقدمة</h2><div className="grid gap-3"><AdvancedCard label="xG" description="الأهداف المتوقعة" value={xg} decimal /><AdvancedCard label="npxG" description="الأهداف المتوقعة بدون ركلات جزاء" value={npxg} decimal /><AdvancedCard label="Big Chances" description="الفرص الكبيرة" value={bigChances} /></div></section><section className="rounded-[1.45rem] border border-white/10 bg-white/[.035] p-4"><div className="mb-4 flex items-center justify-between"><h2 className="text-xl font-black text-white">التشكيلات المؤكدة</h2></div><div className="grid gap-4 lg:grid-cols-2" dir="ltr"><LineupPanel team={match.homeTeam} lineup={sideLineup(lineup, 'home')} squad={homeSquad} side="home" /><LineupPanel team={match.awayTeam} lineup={sideLineup(lineup, 'away')} squad={awaySquad} side="away" /></div></section><EventPanel events={match.events || []} /></div></section></main>;
 }
