@@ -1,12 +1,23 @@
 import type { EventCategory, EventFilterKey, EventSide, MatchEvent, Team } from './types';
 
+function cleanType(type?: string | null) {
+  return String(type || '').toLowerCase().replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+export function isGoalEventType(type?: string | null) {
+  const value = cleanType(type);
+  if (!value) return false;
+  if (/(goal kick|goal attempt|shot on goal|saved goal|goalkeeper|disallowed goal|no goal|goal line)/.test(value)) return false;
+  return value === 'goal' || value === 'penalty goal' || value === 'own goal' || value === 'penalty scored' || value === 'goal scored';
+}
+
 export function eventCategory(type: string): EventCategory {
-  const value = type.toLowerCase();
-  if (value.includes('goal')) return 'goals';
+  const value = cleanType(type);
+  if (isGoalEventType(value)) return 'goals';
   if (value.includes('corner')) return 'corners';
   if (value.includes('yellow') || value.includes('red') || value.includes('card')) return 'cards';
   if (value.includes('danger')) return 'danger';
-  if (value.includes('shot') || value.includes('on-target') || value.includes('off-target')) return 'shots';
+  if (value.includes('shot') || value.includes('on target') || value.includes('off target')) return 'shots';
   return 'other';
 }
 
@@ -16,8 +27,8 @@ export function eventMatchesFilter(event: MatchEvent, filter: EventFilterKey) {
 }
 
 export function eventIcon(type: string) {
-  const value = type.toLowerCase();
-  if (value.includes('goal')) return '⚽';
+  const value = cleanType(type);
+  if (isGoalEventType(value)) return '⚽';
   if (value.includes('corner')) return '🚩';
   if (value.includes('yellow')) return '🟨';
   if (value.includes('red')) return '🟥';
@@ -28,8 +39,8 @@ export function eventIcon(type: string) {
 }
 
 export function eventLabel(type: string) {
-  const value = type.toLowerCase();
-  if (value.includes('goal')) return 'هدف';
+  const value = cleanType(type);
+  if (isGoalEventType(value)) return value === 'penalty goal' || value === 'penalty scored' ? 'هدف من ركلة جزاء' : 'هدف';
   if (value.includes('corner')) return 'ركنية';
   if (value.includes('yellow')) return 'بطاقة صفراء';
   if (value.includes('red')) return 'بطاقة حمراء';
