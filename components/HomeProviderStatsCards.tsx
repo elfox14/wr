@@ -176,6 +176,9 @@ export default async function HomeProviderStatsCards({ playersCount, teamsCount 
   const biggest = summary?.biggestScore || null;
   const bestClean = summary?.teamLeaders?.bestCleanSheetTeam || null;
   const top = leaders?.leaders?.topScorer || null;
+  const topSource = top?.sourceName || leaders?.sources?.topScorer?.provider || top?.source || (top ? 'DB' : unavailableSource);
+  const topTeam = top?.team?.name || top?.team?.code || top?.teamName || '';
+  const topSubtitle = top?.value ? `${fmt(Number(top.value))} هدف${topTeam ? ` • ${trim(String(topTeam), 18)}` : ''}` : 'غير متوفر من مصدر الهدافين';
   const penalties = nested(summary, 'penal' + 'ties');
   const hasPenaltySource = Boolean(penalties && (penalties.available || hasStat(summary, 'penalties') || hasStat(summary, 'penaltiesScored') || hasStat(summary, 'penaltiesMissed')));
   const penaltyText = hasPenaltySource ? `${fmt(pick(penalties?.scored))} مسجلة • ${fmt(pick(penalties?.missed))} ضائعة` : 'غير متوفر من المصدر';
@@ -217,7 +220,7 @@ export default async function HomeProviderStatsCards({ playersCount, teamsCount 
         <div className="rounded-full border border-white/10 bg-white/[0.05] px-3 py-1.5 text-[11px] font-bold text-gray-300">الأرقام تظهر فقط عند توفرها من المصدر أو قاعدة اللقطات</div>
       </div>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
-        <Card item={{ title: 'الهداف', value: top?.name ? trim(String(top.name), 24) : 'غير متوفر', subtitle: top?.value ? `${fmt(Number(top.value))} هدف` : 'غير متوفر من جدول اللاعبين', tone: 'gold', source: top ? 'DB' : unavailableSource }} href="/players" />
+        <Card item={{ title: 'الهداف', value: top?.name ? trim(String(top.name), 24) : 'غير متوفر', subtitle: topSubtitle, tone: 'gold', source: top ? topSource : unavailableSource }} href="/players" />
         {mainCards.map((item) => <Card key={item.title} item={item} href={item.title === 'المنتخبات' ? '/teams' : '/matches'} />)}
         <CardsCard yellow={hasCards ? pick(nested(summary, 'yellow' + 'Cards')) : null} red={hasCards ? pick(nested(summary, 'red' + 'Cards')) : null} source={hasCards ? sourceName : unavailableSource} />
         {advancedCards.map((item) => <Card key={item.title} item={item} />)}
