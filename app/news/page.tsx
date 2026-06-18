@@ -34,6 +34,7 @@ const CATEGORIES = [
 const STATUS_FILTERS = [
   { key: 'published', label: 'المنشور' },
   { key: 'draft', label: 'المسودات' },
+  { key: 'archived', label: 'الأرشيف' },
   { key: 'all', label: 'الكل' },
 ];
 
@@ -111,6 +112,12 @@ function categoryHref(category: string, status: string, isAdminView: boolean) {
   return query ? `/news?${query}` : '/news';
 }
 
+function statusLabel(status: string) {
+  if (status === 'draft') return 'مسودة';
+  if (status === 'archived') return 'مؤرشف';
+  return 'منشور';
+}
+
 type NewsPageProps = {
   searchParams: Promise<{ category?: string; status?: string }>;
 };
@@ -119,9 +126,9 @@ export default async function NewsPage({ searchParams }: NewsPageProps) {
   const resolvedSearchParams = await searchParams;
   const currentCategory = resolvedSearchParams.category || 'all';
   const session = await getServerSession(authOptions as any) as AdminSession;
-  const canViewDrafts = isAdmin(session);
+  const canViewAdminStatus = isAdmin(session);
   const requestedStatus = String(resolvedSearchParams.status || 'published');
-  const currentStatus = canViewDrafts && ['published', 'draft', 'all'].includes(requestedStatus) ? requestedStatus : 'published';
+  const currentStatus = canViewAdminStatus && ['published', 'draft', 'archived', 'all'].includes(requestedStatus) ? requestedStatus : 'published';
 
   await ensurePressNewsTable();
   try {
@@ -165,8 +172,9 @@ export default async function NewsPage({ searchParams }: NewsPageProps) {
   const heroMatchUrl = heroItem ? matchCenterUrl(heroItem) : '';
   const listItems = newsItems.slice(1);
   const isMatchCenterCategory = currentCategory === MATCH_CENTER_ANALYSIS_CATEGORY;
-  const isDraftView = canViewDrafts && currentStatus === 'draft';
-  const isAdminAllStatusView = canViewDrafts && currentStatus === 'all';
+  const isDraftView = canViewAdminStatus && currentStatus === 'draft';
+  const isArchiveView = canViewAdminStatus && currentStatus === 'archived';
+  const isAdminAllStatusView = canViewAdminStatus && currentStatus === 'all';
 
   return (
     <main className="min-h-screen bg-[#050505] text-white px-4 py-8 sm:px-6 lg:px-8" dir="rtl">
@@ -196,7 +204,7 @@ export default async function NewsPage({ searchParams }: NewsPageProps) {
             return (
               <Link
                 key={cat.key}
-                href={categoryHref(cat.key, currentStatus, canViewDrafts)}
+                href={categoryHref(cat.key, currentStatus, canViewAdminStatus)}
                 className={`rounded-2xl px-4 py-2 text-xs font-black transition-all ${
                   isActive
                     ? 'bg-[#0FF0FC] text-black shadow-[0_0_15px_rgba(15,240,252,0.3)]'
@@ -211,7 +219,7 @@ export default async function NewsPage({ searchParams }: NewsPageProps) {
           })}
         </nav>
 
-        {canViewDrafts && (
+        {canViewAdminStatus && (
           <section className="rounded-2xl border border-[#FFD700]/15 bg-[#FFD700]/5 p-4">
             <div className="mb-3 text-xs font-black text-[#FFD700]">فلتر إداري لحالة النشر</div>
             <div className="flex flex-wrap gap-2">
@@ -232,9 +240,9 @@ export default async function NewsPage({ searchParams }: NewsPageProps) {
                 );
               })}
             </div>
-            {(isDraftView || isAdminAllStatusView) && (
+            {(isDraftView || isArchiveView || isAdminAllStatusView) && (
               <p className="mt-3 text-xs font-bold leading-6 text-gray-400">
-                هذا الفلتر يظهر للأدمن فقط. المسودات لا تظهر للزوار ولا لمحركات البحث حتى يتم نشرها.
+                هذا الفلتر يظهر للأدمن فقط. المسودات والأرشيف لا يظهران للزوار ولا لمحركات البحث حتى يتم نشر المقال.
               </p>
             )}
           </section>
@@ -255,9 +263,9 @@ export default async function NewsPage({ searchParams }: NewsPageProps) {
                     <span className="rounded-xl bg-[#FFD700]/10 border border-[#FFD700]/25 px-3 py-1 text-[11px] font-black text-[#FFD700]">
                       {heroItem.category}
                     </span>
-                    {canViewDrafts && heroItem.status !== 'published' && (
+                    {canViewAdminStatus && heroItem.status !== 'published' && (
                       <span className="rounded-xl border border-[#FFD700]/25 bg-[#FFD700]/10 px-3 py-1 text-[11px] font-black text-[#FFD700]">
-                        {heroItem.status}
+                        {statusLabel(heroItem.status)}
                       </span>
                     )}
                     <span className="text-xs font-bold text-gray-500 flex items-center gap-1">
@@ -281,8 +289,11 @@ export default async function NewsPage({ searchParams }: NewsPageProps) {
                     المصدر: <span className="text-gray-300">{heroItem.sourceName}</span>
                   </span>
                   <div className="flex flex-wrap gap-2">
-                    {canViewDrafts && heroItem.status !== 'published' && (
+                    {canViewAdminStatus && heroItem.status !== 'published' && (
                       <NewsStatusButton id={heroItem.id} currentStatus={heroItem.status} targetStatus="published" />
+                    )}
+                    {canViewAdminStatus && heroItem.status === 'published' && (
+                      <NewsStatusButton id={heroItem.id} currentStatus={heroItem.status} targetStatus="archived" />
                     )}
                     {heroMatchUrl && (
                       <Link
@@ -328,9 +339,11 @@ export default async function NewsPage({ searchParams }: NewsPageProps) {
             <p className="mt-2 text-sm font-bold text-gray-500">
               {isDraftView
                 ? 'لا توجد مسودات مطابقة لهذا التصنيف حاليًا.'
-                : isMatchCenterCategory
-                  ? 'سيظهر هنا أي مقال يتم إنشاؤه من صفحة المباراة عند حفظه تحت تصنيف تحليل صفحة المباراة.'
-                  : 'اختر تصنيفًا آخر أو تصفح في وقت لاحق.'}
+                : isArchiveView
+                  ? 'لا توجد مقالات مؤرشفة مطابقة لهذا التصنيف حاليًا.'
+                  : isMatchCenterCategory
+                    ? 'سيظهر هنا أي مقال يتم إنشاؤه من صفحة المباراة عند حفظه تحت تصنيف تحليل صفحة المباراة.'
+                    : 'اختر تصنيفًا آخر أو تصفح في وقت لاحق.'}
             </p>
           </div>
         )}
@@ -371,9 +384,9 @@ export default async function NewsPage({ searchParams }: NewsPageProps) {
                           </span>
                           <span>{formatDate(item.publishedAt)}</span>
                         </div>
-                        {canViewDrafts && item.status !== 'published' && (
+                        {canViewAdminStatus && item.status !== 'published' && (
                           <span className="inline-flex rounded-lg border border-[#FFD700]/20 bg-[#FFD700]/10 px-2 py-1 text-[10px] font-black text-[#FFD700]">
-                            {item.status}
+                            {statusLabel(item.status)}
                           </span>
                         )}
                         {itemMatchUrl && (
@@ -394,8 +407,11 @@ export default async function NewsPage({ searchParams }: NewsPageProps) {
                       <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-white/5 pt-3 text-xs font-bold text-gray-500">
                         <span>{item.sourceName}</span>
                         <div className="flex flex-wrap items-center gap-2">
-                          {canViewDrafts && item.status !== 'published' && (
+                          {canViewAdminStatus && item.status !== 'published' && (
                             <NewsStatusButton id={item.id} currentStatus={item.status} targetStatus="published" compact />
+                          )}
+                          {canViewAdminStatus && item.status === 'published' && (
+                            <NewsStatusButton id={item.id} currentStatus={item.status} targetStatus="archived" compact />
                           )}
                           <Link href={`/news/${item.id}`} className="text-[#0FF0FC] hover:underline flex items-center gap-1">
                             التفاصيل ←
