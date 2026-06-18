@@ -52,7 +52,7 @@ function teamLabel(team: any) {
   return team?.name || team?.code || 'غير متوفر';
 }
 
-function trim(value: string, max = 22) {
+function trim(value: string, max = 34) {
   return value.length > max ? `${value.slice(0, max - 1)}…` : value;
 }
 
@@ -77,25 +77,29 @@ async function readJson(base: string | null, path: string) {
 
 function toneClass(tone: Tone) {
   return {
-    gold: 'border-[#FFD700]/25 text-[#FFD700]',
-    cyan: 'border-[#0FF0FC]/25 text-[#0FF0FC]',
-    green: 'border-[#00FF88]/25 text-[#00FF88]',
-    red: 'border-red-300/25 text-red-100',
+    gold: 'border-[#FFD700]/28 text-[#FFD700] hover:border-[#FFD700]/45',
+    cyan: 'border-[#0FF0FC]/28 text-[#0FF0FC] hover:border-[#0FF0FC]/45',
+    green: 'border-[#00FF88]/28 text-[#00FF88] hover:border-[#00FF88]/45',
+    red: 'border-red-300/28 text-red-100 hover:border-red-300/45',
   }[tone];
 }
 
 function Badge({ source = sourceName }: { source?: string }) {
-  return <span className="rounded-full border border-white/10 bg-white/[0.06] px-1.5 py-0.5 text-[8px] font-black text-gray-300">{source}</span>;
+  return <span className="shrink-0 rounded-full border border-white/10 bg-white/[0.07] px-2.5 py-1 text-[9px] font-black leading-none text-gray-300">{source}</span>;
 }
 
 function Card({ item, href = '/matches', source = sourceName }: { item: CardItem; href?: string; source?: string }) {
   return (
-    <Link href={href} className="block">
-      <article className={`group flex min-h-[128px] flex-col justify-between overflow-hidden rounded-2xl border bg-[linear-gradient(180deg,rgba(255,255,255,0.052),rgba(0,0,0,0.25))] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_8px_22px_rgba(0,0,0,0.16)] transition hover:-translate-y-0.5 ${toneClass(item.tone)}`}>
-        <div className="flex items-start justify-between gap-2"><div className="truncate text-[10px] font-black">{item.title}</div><Badge source={source} /></div>
-        <div className="flex min-h-[76px] flex-col items-center justify-center rounded-xl border border-white/10 bg-black/20 px-2 py-2 text-center">
-          <div className="truncate text-3xl font-black leading-none">{item.value}</div>
-          <div className="mt-1 truncate text-[9px] font-bold text-gray-400">{item.subtitle}</div>
+    <Link href={href} className="block h-full min-w-0">
+      <article className={`group relative flex h-full min-h-[168px] flex-col justify-between overflow-hidden rounded-3xl border bg-[linear-gradient(180deg,rgba(255,255,255,0.07),rgba(0,0,0,0.26))] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.07),0_12px_28px_rgba(0,0,0,0.20)] transition hover:-translate-y-0.5 ${toneClass(item.tone)}`}>
+        <div className="pointer-events-none absolute inset-x-5 top-0 h-px bg-current opacity-40" />
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 text-right text-sm font-black leading-5 md:text-[15px]">{item.title}</div>
+          <Badge source={source} />
+        </div>
+        <div className="mt-4 flex min-h-[92px] flex-1 flex-col items-center justify-center rounded-2xl border border-white/10 bg-black/24 px-3 py-3 text-center">
+          <div className="max-w-full break-words text-[clamp(1.55rem,3vw,2.35rem)] font-black leading-tight tracking-tight">{item.value}</div>
+          <div className="mt-2 max-w-full break-words text-[11px] font-bold leading-5 text-gray-400">{item.subtitle}</div>
         </div>
       </article>
     </Link>
@@ -104,11 +108,11 @@ function Card({ item, href = '/matches', source = sourceName }: { item: CardItem
 
 function CardsCard({ yellow, red }: { yellow: number | null; red: number | null }) {
   return (
-    <article className="flex min-h-[128px] flex-col gap-2 rounded-2xl border border-red-300/25 bg-[linear-gradient(180deg,rgba(255,255,255,0.052),rgba(0,0,0,0.25))] p-3 text-red-100">
-      <div className="flex items-start justify-between gap-2"><div className="truncate text-[10px] font-black">الكروت</div><Badge /></div>
-      <div className="grid flex-1 grid-cols-2 gap-2">
-        <div className="flex flex-col justify-between rounded-xl bg-[#FFD700] p-2 text-black"><span className="text-[8px] font-black">Yellow</span><span className="text-4xl font-black leading-none">{fmt(yellow)}</span><span className="text-[9px] font-black">صفراء</span></div>
-        <div className="flex flex-col justify-between rounded-xl bg-red-600 p-2 text-white"><span className="text-[8px] font-black">Red</span><span className="text-4xl font-black leading-none">{fmt(red)}</span><span className="text-[9px] font-black">حمراء</span></div>
+    <article className="flex h-full min-h-[168px] flex-col gap-3 rounded-3xl border border-red-300/28 bg-[linear-gradient(180deg,rgba(255,255,255,0.07),rgba(0,0,0,0.26))] p-4 text-red-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.07),0_12px_28px_rgba(0,0,0,0.20)]">
+      <div className="flex items-start justify-between gap-3"><div className="text-sm font-black leading-5 md:text-[15px]">الكروت</div><Badge /></div>
+      <div className="grid flex-1 grid-cols-2 gap-3">
+        <div className="flex min-h-[92px] flex-col justify-between rounded-2xl bg-[#FFD700] p-3 text-black"><span className="text-[9px] font-black uppercase tracking-[0.12em] opacity-60">Yellow</span><span className="text-[clamp(1.6rem,3vw,2.35rem)] font-black leading-none">{fmt(yellow)}</span><span className="text-[11px] font-black opacity-70">صفراء</span></div>
+        <div className="flex min-h-[92px] flex-col justify-between rounded-2xl bg-red-600 p-3 text-white"><span className="text-[9px] font-black uppercase tracking-[0.12em] opacity-70">Red</span><span className="text-[clamp(1.6rem,3vw,2.35rem)] font-black leading-none">{fmt(red)}</span><span className="text-[11px] font-black opacity-80">حمراء</span></div>
       </div>
     </article>
   );
@@ -132,7 +136,7 @@ export default async function HomeProviderStatsCards({ playersCount, teamsCount 
     { title: 'متوسط الأهداف', value: dec(pick(summary?.averageGoalsPerFinishedMatch)), subtitle: 'هدف لكل مباراة', tone: 'cyan' },
     { title: 'التسديدات', value: `${fmt(pick(finalStats?.totalShots))} / ${fmt(pick(finalStats?.totalShotsOnTarget))}`, subtitle: 'إجمالي / على المرمى', tone: 'cyan' },
     { title: 'أكبر نتيجة', value: biggest ? `${fmt(biggest.homeScore)}-${fmt(biggest.awayScore)}` : '—', subtitle: biggest ? trim(`${teamLabel(biggest.homeTeam)} ضد ${teamLabel(biggest.awayTeam)}`) : 'تظهر بعد بيانات المصدر', tone: 'gold' },
-    { title: 'الشباك النظيفة', value: fmt(pick(summary?.cleanSheets)), subtitle: bestClean ? trim(teamLabel(bestClean), 18) : 'غير متوفر من المصدر', tone: 'green' },
+    { title: 'الشباك النظيفة', value: fmt(pick(summary?.cleanSheets)), subtitle: bestClean ? trim(teamLabel(bestClean), 24) : 'غير متوفر من المصدر', tone: 'green' },
     { title: 'المنتخبات', value: fmt(pick(summary?.teamCount, teamsCount)), subtitle: `${fmt(playersCount || playerFallback)} لاعب`, tone: 'green' },
     { title: 'ركلات الجزاء', value: penalties?.available ? fmt(pick(penalties?.total)) : 'غير متوفر', subtitle: penaltyText, tone: 'gold' },
   ];
@@ -148,15 +152,18 @@ export default async function HomeProviderStatsCards({ playersCount, teamsCount 
     { title: 'الركنيات', value: fmt(pick(finalStats?.totalCorners, power?.corners)), subtitle: 'Corner Kicks', tone: 'cyan' },
     { title: 'الأخطاء', value: fmt(pick(finalStats?.fouls, power?.fouls)), subtitle: 'Fouls', tone: 'red' },
     { title: 'التسللات', value: fmt(pick(finalStats?.offsides)), subtitle: 'Offsides', tone: 'cyan' },
-    { title: 'المحجوبة', value: fmt(pick(finalStats?.blockedShots)), subtitle: 'تسديدات محجوبة', tone: 'cyan' },
-    { title: 'داخل المنطقة', value: fmt(pick(finalStats?.shotsInsideBox)), subtitle: 'Shots Inside Box', tone: 'gold' },
-    { title: 'خارج المنطقة', value: fmt(pick(finalStats?.shotsOutsideBox)), subtitle: 'Shots Outside Box', tone: 'cyan' },
+    { title: 'التسديدات المحجوبة', value: fmt(pick(finalStats?.blockedShots)), subtitle: 'Blocked Shots', tone: 'cyan' },
+    { title: 'تسديدات داخل المنطقة', value: fmt(pick(finalStats?.shotsInsideBox)), subtitle: 'Shots Inside Box', tone: 'gold' },
+    { title: 'تسديدات خارج المنطقة', value: fmt(pick(finalStats?.shotsOutsideBox)), subtitle: 'Shots Outside Box', tone: 'cyan' },
   ];
   return (
-    <section dir="rtl" className="mx-auto mb-4 max-w-7xl overflow-hidden rounded-3xl border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(255,215,0,0.11),transparent_23%),radial-gradient(circle_at_bottom_left,rgba(15,240,252,0.07),transparent_28%),linear-gradient(135deg,rgba(7,24,18,0.96),rgba(3,12,11,0.99))] p-3 text-white shadow-[0_16px_44px_rgba(0,0,0,0.32)] backdrop-blur" aria-label="إحصائيات البطولة من المصدر">
-      <div className="mb-2.5"><div className="inline-flex items-center gap-2 rounded-full border border-[#FFD700]/25 bg-[#FFD700]/10 px-2 py-0.5 text-[8px] font-black uppercase tracking-[0.14em] text-[#FFD700]"><span className="h-1.5 w-1.5 rounded-full bg-[#FFD700]" />DATA CENTER</div><h1 className="mt-1.5 text-lg font-black leading-tight text-white md:text-xl">الإحصائيات</h1></div>
-      <div className="grid auto-rows-[128px] grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-8 xl:grid-cols-12">
-        <Card item={{ title: 'الهداف', value: top?.name ? trim(String(top.name), 18) : 'غير متوفر', subtitle: top?.value ? `${fmt(Number(top.value))} هدف` : 'من جدول اللاعبين', tone: 'gold' }} href="/players" source={top ? 'DB' : '—'} />
+    <section dir="rtl" className="mx-auto mb-6 max-w-7xl rounded-[2rem] border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(255,215,0,0.12),transparent_26%),radial-gradient(circle_at_bottom_left,rgba(15,240,252,0.08),transparent_30%),linear-gradient(135deg,rgba(7,24,18,0.96),rgba(3,12,11,0.99))] p-4 text-white shadow-[0_18px_48px_rgba(0,0,0,0.34)] backdrop-blur sm:p-5" aria-label="إحصائيات البطولة من المصدر">
+      <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
+        <div><div className="inline-flex items-center gap-2 rounded-full border border-[#FFD700]/25 bg-[#FFD700]/10 px-3 py-1 text-[9px] font-black uppercase tracking-[0.14em] text-[#FFD700]"><span className="h-1.5 w-1.5 rounded-full bg-[#FFD700]" />DATA CENTER</div><h1 className="mt-2 text-2xl font-black leading-tight text-white md:text-3xl">الإحصائيات</h1></div>
+        <div className="rounded-full border border-white/10 bg-white/[0.05] px-3 py-1.5 text-[11px] font-bold text-gray-300">كل كارت يعرض بيانًا مستقلًا من المصدر</div>
+      </div>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+        <Card item={{ title: 'الهداف', value: top?.name ? trim(String(top.name), 24) : 'غير متوفر', subtitle: top?.value ? `${fmt(Number(top.value))} هدف` : 'من جدول اللاعبين', tone: 'gold' }} href="/players" source={top ? 'DB' : '—'} />
         {mainCards.map((item) => <Card key={item.title} item={item} href={item.title === 'المنتخبات' ? '/teams' : '/matches'} source={item.title === 'المنتخبات' ? 'ثابت' : sourceName} />)}
         <CardsCard yellow={pick(nested(summary, 'yellow' + 'Cards'))} red={pick(nested(summary, 'red' + 'Cards'))} />
         {advancedCards.map((item) => <Card key={item.title} item={item} />)}
