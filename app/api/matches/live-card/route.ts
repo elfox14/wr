@@ -20,7 +20,8 @@ const MATCH_SELECT = {
   awayTeam: { select: TEAM_SELECT },
 };
 
-const LIVE_STATUSES = ['1H', '2H', 'ET', 'BT', 'P', 'LIVE', 'IN_PLAY', 'HT'];
+const LIVE_STATUSES = ['1H', '2H', 'ET', 'BT', 'P', 'LIVE', 'IN_PLAY'];
+const HALF_TIME_STATUSES = ['HT', 'HALFTIME', 'HALF_TIME', 'HALF-TIME', 'PAUSED'];
 const SCHEDULED_STATUSES = ['SCHEDULED', 'TIMED', 'NOT_STARTED', 'NS'];
 const FINISHED_STATUSES = ['FT', 'AET', 'PEN', 'FINISHED'];
 const GROUP_STAGE_MAX_LIVE_MINUTES = 115;
@@ -29,34 +30,39 @@ const FRESH_LIVE_SNAPSHOT_MS = 4 * 60 * 1000;
 const STALE_FINAL_SNAPSHOT_MS = 7 * 60 * 1000;
 const FINAL_MINUTE_FLOOR = 85;
 const FINAL_LOCAL_MINUTE_FALLBACK = 100;
-const SCHEDULED_LIVE_FALLBACK_AFTER_MINUTES = 5;
 
 function dateKey(date = new Date()) {
   return date.toISOString().slice(0, 10);
 }
 
+function normalizeStatus(value?: string | null) {
+  return String(value || '').toUpperCase();
+}
+
 function minutesFromKickoff(matchDate: Date, now: Date) {
-  return Math.floor((now.getTime() - matchDate.getTime()) / 60_000) + 1;
+  const time = new Date(matchDate).getTime();
+  if (!Number.isFinite(time)) return 0;
+  return Math.floor((now.getTime() - time) / 60_000) + 1;
 }
 
 function rawStatus(value: any) {
-  return String(value?.fixture?.status?.short || value?.fixture?.status?.long || value?.status || '').toUpperCase();
+  return String(value?.fixture?.status?.short || value?.fixture?.status?.long || value?.providerStatus || value?.status || '').toUpperCase();
 }
 
 function isHalftimeStatus(status: string) {
-  return ['HT', 'HALFTIME', 'HALF_TIME', 'HALF-TIME'].includes(status);
+  return HALF_TIME_STATUSES.includes(normalizeStatus(status));
 }
 
 function isProviderLiveStatus(status: string) {
-  return LIVE_STATUSES.includes(status) || isHalftimeStatus(status);
+  return LIVE_STATUSES.includes(normalizeStatus(status));
 }
 
 function isScheduledStatus(status: string) {
-  return SCHEDULED_STATUSES.includes(status);
+  return SCHEDULED_STATUSES.includes(normalizeStatus(status));
 }
 
 function isFinishedStatus(status: string) {
-  return FINISHED_STATUSES.includes(status);
+  return FINISHED_STATUSES.includes(normalizeStatus(status));
 }
 
 function isGroupStage(match: any) {
@@ -66,10 +72,6 @@ function isGroupStage(match: any) {
 
 function maxLiveMinutes(match: any) {
   return isGroupStage(match) ? GROUP_STAGE_MAX_LIVE_MINUTES : KNOCKOUT_MAX_LIVE_MINUTES;
-}
-
-function isStaleByTime(match: any, localMinute: number) {
-  return localMinute >= maxLiveMinutes(match);
 }
 
 function nullableNumber(value: unknown) {
@@ -86,10 +88,6 @@ function providerMinute(value: any) {
   const raw = value?.fixture?.status?.elapsed ?? value?.fixture?.status?.minute ?? value?.minute ?? value?.elapsed;
   const n = Number(raw);
   return Number.isFinite(n) ? Math.max(1, Math.min(150, Math.round(n))) : null;
-}
-
-function quoteSql(value: string) {
-  return `'${String(value).replace(/'/g, "''")}'`;
 }
 
 function pickLiveScore(providerValue: unknown, snapshotValue: unknown, matchValue: unknown) {
@@ -121,15 +119,16 @@ function isFreshLiveSnapshot(snapshotState: any, now: Date) {
 async function fetchLatestScoreSnapshots(matchIds: string[]) {
   if (!matchIds.length) return new Map<string, any>();
   try {
-    const idList = matchIds.map(quoteSql).join(',');
-    const rows = await prisma.$queryRawUnsafe<any[]>(`
-      SELECT DISTINCT ON ("matchId")
-        "matchId", "minute", "homeScore", "awayScore", "capturedAt"
-      FROM "MatchStatsSnapshot"
-      WHERE "matchId" IN (${idList})
-      ORDER BY "matchId", "capturedAt" DESC
-    `);
-    return new Map(rows.map((row) => [row.matchId, row]));
+    const rows = await prisma.matchStatsSnapshot.findMany({
+      where: { matchId: { in: matchIds } },
+      select: { matchId: true, minute: true, homeScore: true, awayScore: true, capturedAt: true, rawData: true },
+      orderBy: { capturedAt: 'desc' },
+    });
+    const latestByMatch = new Map<string, any>();
+    for (const row of rows) {
+      if (!latestByMatch.has(row.matchId)) latestByMatch.set(row.matchId, row);
+    }
+    return latestByMatch;
   } catch (error: any) {
     if (!String(error?.message || '').includes('MatchStatsSnapshot')) {
       console.warn('live-card score snapshot lookup failed:', error?.message || error);
@@ -164,29 +163,21 @@ async function fetchAnimationLiveState() {
 function decorateMatch(match: any, now: Date, providerState?: any, snapshotState?: any) {
   const matchDate = new Date(match.matchDate);
   const localMinute = minutesFromKickoff(matchDate, now);
-  const dbStatus = String(match.status || '').toUpperCase();
-  const providerStatus = String(providerState?.status || '').toUpperCase();
+  const dbStatus = normalizeStatus(match.status);
+  const providerStatus = normalizeStatus(providerState?.status || rawStatus(snapshotState?.rawData));
   const effectiveStatus = providerStatus || dbStatus;
   const providerHasState = Boolean(providerStatus);
-  const providerHasMinute = providerState?.minute != null;
   const snapshotMinute = nullableNumber(snapshotState?.minute);
-  const hasSnapshotMinute = snapshotMinute !== null && !isFinalSnapshotStale(snapshotState, now);
   const freshSnapshot = isFreshLiveSnapshot(snapshotState, now);
-  const staleByTime = isStaleByTime(match, localMinute);
+  const staleByTime = localMinute >= maxLiveMinutes(match);
   const staleFinalSnapshot = !providerHasState && isFinalSnapshotStale(snapshotState, now);
   const noProviderFinalFallback = !providerHasState && (dbStatus === 'IN_PLAY' || dbStatus === 'LIVE') && localMinute >= FINAL_LOCAL_MINUTE_FALLBACK;
   const isFinished = staleByTime || staleFinalSnapshot || noProviderFinalFallback || isFinishedStatus(dbStatus) || isFinishedStatus(effectiveStatus);
-  const isHalfTimeFromProvider = !isFinished && isHalftimeStatus(effectiveStatus);
-  const isLocalHalftimeFallback = !isFinished && !providerHasState && freshSnapshot && snapshotMinute !== null && snapshotMinute >= 45 && localMinute >= 46 && localMinute <= 70;
-  const isHalfTime = isHalfTimeFromProvider || isLocalHalftimeFallback;
+  const isHalfTime = !isFinished && isHalftimeStatus(effectiveStatus);
   const isProviderLive = !isFinished && isProviderLiveStatus(providerStatus);
   const isDbLive = !isFinished && !isHalfTime && (dbStatus === 'IN_PLAY' || dbStatus === 'LIVE') && (providerHasState || freshSnapshot || localMinute < FINAL_LOCAL_MINUTE_FALLBACK);
   const isLikelyLiveByFreshSnapshot = !isFinished && !isHalfTime && !providerHasState && isScheduledStatus(dbStatus) && freshSnapshot && localMinute >= 1 && localMinute < maxLiveMinutes(match);
-  const isLikelyLiveByElapsedTime = !isFinished && !isHalfTime && !providerHasState && isScheduledStatus(dbStatus) && localMinute >= SCHEDULED_LIVE_FALLBACK_AFTER_MINUTES && localMinute < maxLiveMinutes(match);
-  const isLiveNow = !isFinished && !isHalfTime && (isDbLive || isProviderLive || isLikelyLiveByFreshSnapshot || isLikelyLiveByElapsedTime);
-  const localSafeMinute = isLiveNow && localMinute >= 1 && localMinute < maxLiveMinutes(match) ? Math.max(1, Math.min(150, localMinute)) : null;
-  const displayMinute = isHalfTime ? null : (providerHasMinute && !staleByTime ? providerState.minute : (hasSnapshotMinute ? snapshotMinute : null));
-  const fallbackLabel = isLiveNow && localSafeMinute && localSafeMinute > 65 ? 'الشوط الثاني جارٍ' : null;
+  const isLiveNow = !isFinished && !isHalfTime && (isDbLive || isProviderLive || isLikelyLiveByFreshSnapshot);
   const providerHasScore = hasAnyNumber(providerState?.homeScore, providerState?.awayScore);
   const snapshotHasScore = hasAnyNumber(snapshotState?.homeScore, snapshotState?.awayScore);
   const useSnapshotScore = !providerHasScore && snapshotHasScore && (isLiveNow || isHalfTime || isFinished);
@@ -194,17 +185,17 @@ function decorateMatch(match: any, now: Date, providerState?: any, snapshotState
 
   return {
     ...match,
-    status: isFinished ? 'FINISHED' : isHalfTime ? 'HT' : (isProviderLive || isLikelyLiveByFreshSnapshot || isLikelyLiveByElapsedTime ? 'IN_PLAY' : match.status),
+    status: isFinished ? 'FINISHED' : isHalfTime ? 'HT' : (isLiveNow ? 'IN_PLAY' : match.status),
     homeScore: pickLiveScore(providerState?.homeScore, useSnapshotScore ? snapshotState?.homeScore : null, match.homeScore),
     awayScore: pickLiveScore(providerState?.awayScore, useSnapshotScore ? snapshotState?.awayScore : null, match.awayScore),
     scoreSource,
     isLiveNow,
     isHalfTime,
-    isLikelyLiveByTime: isLikelyLiveByFreshSnapshot || isLikelyLiveByElapsedTime,
+    isLikelyLiveByTime: isLikelyLiveByFreshSnapshot,
     isStaleAutoFinished: isFinished && (staleByTime || staleFinalSnapshot || noProviderFinalFallback),
     displayStatus: isFinished ? 'FINISHED' : isHalfTime ? 'HT' : (isLiveNow ? 'IN_PLAY' : match.status),
-    minute: isFinished || isHalfTime ? null : displayMinute,
-    liveLabel: isFinished ? 'انتهت المباراة' : isHalfTime ? 'استراحة بين الشوطين' : (isLiveNow ? (displayMinute ? `الدقيقة ${displayMinute}` : (fallbackLabel || 'جارية الآن')) : null),
+    minute: null,
+    liveLabel: isFinished ? 'انتهت المباراة' : isHalfTime ? 'استراحة بين الشوطين' : (isLiveNow ? 'جارية الآن' : null),
   };
 }
 
@@ -244,7 +235,6 @@ export async function GET() {
   ]);
 
   const scoreSnapshots = await fetchLatestScoreSnapshots([...windowMatches, ...recentlyFinished].map((match) => match.id));
-
   const decoratedWindow = windowMatches.map((match) => decorateMatch(match, now, match.animationMatchId ? providerStates.get(Number(match.animationMatchId)) : null, scoreSnapshots.get(match.id)));
   const decoratedFinished = recentlyFinished.map((match) => decorateMatch(match, now, match.animationMatchId ? providerStates.get(Number(match.animationMatchId)) : null, scoreSnapshots.get(match.id)));
 
