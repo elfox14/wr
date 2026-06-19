@@ -35,6 +35,8 @@ type Props = {
   awayTeam: TeamLike;
   homePlayers: PlayerLike[];
   awayPlayers: PlayerLike[];
+  homeScore?: number | null;
+  awayScore?: number | null;
 };
 
 const FILTERS: { key: FilterKey; label: string }[] = [
@@ -72,6 +74,15 @@ function cleanText(value: unknown) {
   return String(value || '').toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/[_-]+/g, ' ').replace(/[^a-z0-9\u0600-\u06ff]+/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
+function scoreGoalCount(homeScore?: number | null, awayScore?: number | null) {
+  const home = Number(homeScore);
+  const away = Number(awayScore);
+  const hasHome = Number.isFinite(home);
+  const hasAway = Number.isFinite(away);
+  if (!hasHome && !hasAway) return null;
+  return Math.max(0, hasHome ? home : 0) + Math.max(0, hasAway ? away : 0);
+}
+
 function initials(name: string) {
   return name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join('');
 }
@@ -104,7 +115,6 @@ function has(event: MatchEventLike | null, english: string, arabic: string) {
 function isGoal(event: MatchEventLike | null) {
   const type = eventType(event);
   if (isStrictGoalType(type)) return true;
-  // Arabic details from trusted imports can still say "هدف" while type is exact goal-like.
   if (/(goal kick|goal attempt|shot on goal|saved goal|goalkeeper|disallowed goal|no goal|goal line)/.test(eventText(event))) return false;
   return type === 'goal' || type === 'penalty goal' || type === 'own goal';
 }
@@ -253,7 +263,7 @@ function TeamHalfLineup({ team, players, currentEvent, side }: { team: TeamLike;
   );
 }
 
-export default function LiveBroadcastPreview({ matchId, events, homeTeam, awayTeam, homePlayers, awayPlayers }: Props) {
+export default function LiveBroadcastPreview({ matchId, events, homeTeam, awayTeam, homePlayers, awayPlayers, homeScore, awayScore }: Props) {
   const [filter, setFilter] = useState<FilterKey>('important');
   const sorted = useMemo(() => [...events].sort((a, b) => Number(a.minute ?? 0) - Number(b.minute ?? 0)), [events]);
   const visible = useMemo(() => sorted.filter((event) => eventMatchesFilter(event, filter)), [sorted, filter]);
@@ -262,7 +272,8 @@ export default function LiveBroadcastPreview({ matchId, events, homeTeam, awayTe
   const currentIndex = visible.length ? Math.max(0, Math.min(visible.length - 1, selectedIndex ?? visible.length - 1)) : -1;
   const currentEvent = currentIndex >= 0 ? visible[currentIndex] : sorted[sorted.length - 1] || null;
   const ball = ballPosition(currentEvent);
-  const goals = events.filter(isGoal).length;
+  const eventGoals = events.filter(isGoal).length;
+  const goals = scoreGoalCount(homeScore, awayScore) ?? eventGoals;
   const corners = events.filter(isCorner).length;
   const cards = events.filter(isCard).length;
   const canNavigate = visible.length > 0;
