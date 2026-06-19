@@ -124,19 +124,6 @@ export default function HomeLiveMatchTicker({ matches = [] }: Props) {
   return (
     <section className="relative overflow-hidden rounded-[1.6rem] border border-white/10 bg-[#03110d]/80 p-3 text-white shadow-[0_18px_50px_rgba(0,0,0,.28)] backdrop-blur-xl">
       <motion.div className="pointer-events-none absolute inset-0 opacity-60" animate={{ backgroundPosition: ['0% 50%', '100% 50%', '0% 50%'] }} transition={{ duration: 12, repeat: Infinity, ease: 'linear' }} style={{ backgroundImage: 'linear-gradient(90deg, rgba(15,240,252,.13), rgba(255,215,0,.10), rgba(0,255,136,.10), rgba(15,240,252,.13))', backgroundSize: '240% 240%' }} />
-      <div className="relative mb-2 flex items-center justify-between gap-3 px-1">
-        <div className="flex items-center gap-2">
-          <span className="relative flex h-7 w-7 items-center justify-center rounded-xl border border-[#00FF88]/25 bg-[#00FF88]/10">
-            <span className="absolute h-2.5 w-2.5 animate-ping rounded-full bg-[#00FF88]/60" />
-            <span className="relative h-2 w-2 rounded-full bg-[#00FF88]" />
-          </span>
-          <div>
-            <h2 className="text-sm font-black text-white">شريط المباريات الذكي</h2>
-            <p className="text-[10px] font-bold text-gray-400">متحرك • تفاعلي • محدث تلقائيًا</p>
-          </div>
-        </div>
-        <Link href="/matches" className="rounded-xl border border-[#FFD700]/20 bg-[#FFD700]/10 px-3 py-2 text-[10px] font-black text-[#FFD700] transition hover:bg-[#FFD700] hover:text-black">كل المباريات</Link>
-      </div>
       <div className="relative flex gap-2 overflow-x-auto pb-1 scrollbar-none" dir="rtl">
         {displayMatches.map((match) => {
           const key = matchKey(match);
