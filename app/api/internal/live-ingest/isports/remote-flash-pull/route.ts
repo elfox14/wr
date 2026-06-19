@@ -13,6 +13,7 @@ type FrameMode = 'live' | 'timeline';
 type FlashRecord = { id: string; dataType: string; teamId: string; eventType: string; minute: number | null; injuryTime: number | null; raw: string };
 const HOSTS = new Set(['isportslive8.com', 'www.isportslive8.com']);
 const FLASH_SOURCE = 'ISPORTS_FLASH';
+const FINAL_MINUTE_FALLBACK = 120;
 
 function json(value: unknown, status = 200) { return NextResponse.json(value, { status, headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } }); }
 function clamp(value: string | null, fallback: number, min: number, max: number) { const n = Number(value); return Number.isFinite(n) ? Math.max(min, Math.min(max, Math.floor(n))) : fallback; }
@@ -21,6 +22,7 @@ function safeUrl(value: string) { const url = new URL(value); if (!HOSTS.has(url
 function md5(value: string) { return createHash('md5').update(value).digest('hex').toUpperCase(); }
 function lastRegexValue(text: string, regex: RegExp) { let found: string | null = null; for (const match of text.matchAll(regex)) if (match?.[1]) found = match[1]; return found; }
 function numberFrom(value: unknown) { const n = Number(String(value ?? '').replace('%', '').trim()); return Number.isFinite(n) ? Math.round(n) : null; }
+function isFinalMinute(minute: number | null) { return minute !== null && minute >= FINAL_MINUTE_FALLBACK; }
 function extractFrameCredentials(html: string) {
   const ak = lastRegexValue(html, /USER_FEIJING88\.ak\s*=\s*["']([^"']+)["']/g) || lastRegexValue(html, /\bak\s*:\s*["']([^"']+)["']/g);
   const sk = lastRegexValue(html, /USER_FEIJING88\.sk\s*=\s*["']([^"']+)["']/g) || lastRegexValue(html, /\bsk\s*:\s*["']([^"']+)["']/g);
@@ -190,11 +192,13 @@ function parseFlashStats(text: string) {
 }
 function providerStatus(matchState: unknown, minute: number | null) {
   const state = String(matchState ?? '').trim().toUpperCase();
-  if (state === '-1' || state === 'FT' || state === 'FINISHED') return 'FINISHED';
+  if (state === '-1' || state === '4' || state === 'FT' || state === 'FINISHED' || state === 'ENDED' || state === 'COMPLETED') return 'FINISHED';
+  if (isFinalMinute(minute) && !['ET', 'AET', 'P', 'PEN', '5'].includes(state)) return 'FINISHED';
   if (state === '2' || state === 'HT' || state.includes('HALF')) return 'HT';
   if (state === '3' || state === '2H' || state.includes('SECOND')) return '2H';
   if (state === '1' || state === '1H' || state.includes('FIRST')) return '1H';
-  return null;
+  if (state === '5' || state === 'P' || state === 'PEN') return 'PEN';
+  return isFinalMinute(minute) ? 'FINISHED' : null;
 }
 async function getMatch(input: { dbMatchId?: string | null; providerMatchId: number }) {
   if (input.dbMatchId) return prisma.match.findUnique({ where: { id: input.dbMatchId }, include: { homeTeam: { select: { id: true, name: true, code: true } }, awayTeam: { select: { id: true, name: true, code: true } } } });
@@ -232,7 +236,7 @@ export async function GET(req: Request) {
     const rendered = await callBrowserless(frameUrl, timeoutMs, waitMs); const flashText = String(rendered.data?.flashFetch?.text || ''); const parsed = parseFlashStats(flashText);
     const match = (save || url.searchParams.get('includeMatch') === 'true') ? await getMatch({ dbMatchId: url.searchParams.get('dbMatchId'), providerMatchId }) : null;
     const saveResult = save ? match ? await saveSnapshot(match, providerMatchId, parsed.stats, { source: FLASH_SOURCE, wrapperUrl, frameUrl: maskUrl(frameUrl), loader: rendered.loader, flashMeta: parsed.meta, recordsSample: parsed.records.slice(0, 20) }, replace) : { deleted: 0, inserted: 0, snapshotId: null, error: 'No local match found' } : null;
-    return json({ ok: true, mode: 'isports_remote_flash_pull', frameMode: mode, loader: rendered.loader, remoteBrowser: { ok: rendered.ok, status: rendered.status, endpoint: maskMaybe(rendered.endpoint), attempts: rendered.attempts, rawLength: rendered.rawLength, error: rendered.rawSample || null }, wrapper: { sourceUrl: wrapperUrl, ok: wrapper.ok, status: wrapper.status, htmlLength: wrapper.html.length }, frame: { sourceUrl: maskUrl(frameUrl) }, match: match ? { id: match.id, status: match.status, homeTeam: match.homeTeam, awayTeam: match.awayTeam } : null, hasStats: hasUsefulStats(parsed.stats), stats: parsed.stats, flash: { ok: rendered.data?.flashFetch?.ok ?? null, status: rendered.data?.flashFetch?.status ?? null, scheduleID: rendered.data?.scheduleID || parsed.meta.scheduleID, attackBarsLength: rendered.data?.attackBarsLength ?? null, recordsCount: parsed.records.length, meta: parsed.meta, providerStatus: providerStatus(parsed.meta.matchState, parsed.stats.minute) }, save: saveResult, note: 'Parses iSports flashdata and updates score plus match phase when provider exposes matchState. Falls back from Browserless /function to /content + direct flashdata when /function is unavailable.' });
+    return json({ ok: true, mode: 'isports_remote_flash_pull', frameMode: mode, loader: rendered.loader, remoteBrowser: { ok: rendered.ok, status: rendered.status, endpoint: maskMaybe(rendered.endpoint), attempts: rendered.attempts, rawLength: rendered.rawLength, error: rendered.rawSample || null }, wrapper: { sourceUrl: wrapperUrl, ok: wrapper.ok, status: wrapper.status, htmlLength: wrapper.html.length }, frame: { sourceUrl: maskUrl(frameUrl) }, match: match ? { id: match.id, status: match.status, homeTeam: match.homeTeam, awayTeam: match.awayTeam } : null, hasStats: hasUsefulStats(parsed.stats), stats: parsed.stats, flash: { ok: rendered.data?.flashFetch?.ok ?? null, status: rendered.data?.flashFetch?.status ?? null, scheduleID: rendered.data?.scheduleID || parsed.meta.scheduleID, attackBarsLength: rendered.data?.attackBarsLength ?? null, recordsCount: parsed.records.length, meta: parsed.meta, providerStatus: providerStatus(parsed.meta.matchState, parsed.stats.minute) }, save: saveResult, note: 'Parses iSports flashdata and updates score plus match phase when provider exposes matchState. If iSports keeps state as second-half while minute reaches 120+, the match is treated as finished to stop stale running clocks.' });
   } catch (error: any) {
     return json({ ok: false, error: error?.message || 'Internal Server Error' }, 500);
   }
