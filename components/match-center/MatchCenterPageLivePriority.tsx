@@ -184,6 +184,17 @@ function inferHalfTime(_match: any, status: string, minute: number | null) {
   return minute !== null && minute >= 45 && minute <= 65;
 }
 
+function liveClockText(status: string, minute: number | null) {
+  if (minute === null) {
+    if (status === '1H') return 'الشوط الأول';
+    if (status === '2H') return 'الشوط الثاني';
+    return 'مباشرة الآن';
+  }
+  if (status === '1H') return `الشوط الأول — د${fmt(Math.floor(minute))}`;
+  if (status === '2H') return `الشوط الثاني — د${fmt(Math.floor(minute))}`;
+  return `د${fmt(Math.floor(minute))}`;
+}
+
 function clockLabel(match: any, sources: any[]) {
   const dbStatus = String(match.status || '').toUpperCase();
   const rawMinute = minuteFrom(match, sources);
@@ -197,7 +208,7 @@ function clockLabel(match: any, sources: any[]) {
   if (FINISHED.includes(status)) return 'انتهت';
   if (HALF_TIME.includes(status)) return 'استراحة';
   if (inferHalfTime(match, status, minute)) return 'استراحة';
-  if (LIVE.includes(status)) return minute === null ? 'مباشرة الآن' : `د${fmt(Math.floor(minute))}`;
+  if (LIVE.includes(status)) return liveClockText(status, minute);
 
   if (minute !== null) return `د${fmt(Math.floor(minute))}`;
   const snapshotScore = sources.map(scoreFromSnapshot).find(Boolean) as ScorePair | null;
