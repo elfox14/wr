@@ -14,7 +14,7 @@ export const metadata: Metadata = {
 };
 
 type Pair = { home: number | null; away: number | null } | null;
-type ScorePair = { home: number | null; away: number | null };
+type ScorePair = { home: number | null; away: number | null; source: string };
 
 const FINISHED = ['FINISHED', 'FT', 'AET', 'PEN', 'COMPLETED', 'ENDED'];
 const HALF_TIME = ['HT', 'HALFTIME', 'HALF_TIME', 'HALF-TIME'];
@@ -70,6 +70,16 @@ function firstPair(...pairs: Pair[]): Pair {
   return pairs.find((pair) => pair && (pair.home !== null || pair.away !== null)) || null;
 }
 
+function sourceName(snapshot: any) {
+  const p = provider(snapshot);
+  if (p.includes('THE_STATS') && p.includes('LIVE')) return 'TheStatsAPI Live';
+  if (p.includes('THE_STATS')) return 'TheStatsAPI';
+  if (p.includes('ISPORTS_FLASH')) return 'iSport Flash Stats';
+  if (p.includes('ISPORT')) return 'iSport Animation';
+  if (snapshot) return 'قاعدة البيانات';
+  return 'غير متوفر';
+}
+
 function scoreFromSnapshot(snapshot: any): ScorePair | null {
   if (!snapshot) return null;
   const data = raw(snapshot);
@@ -77,19 +87,21 @@ function scoreFromSnapshot(snapshot: any): ScorePair | null {
   const meta = obj(data.meta);
   const home = n(snapshot.homeScore ?? data.homeScore ?? data.home_goals ?? meta.home_goals ?? counts.homeScore);
   const away = n(snapshot.awayScore ?? data.awayScore ?? data.away_goals ?? meta.away_goals ?? counts.awayScore);
-  return home === null && away === null ? null : { home, away };
+  if (home === null && away === null) return null;
+  return { home, away, source: sourceName(snapshot) };
 }
 
 function scoreForDisplay(match: any, snapshots: any[]): ScorePair {
   const matchHome = n(match.homeScore);
   const matchAway = n(match.awayScore);
+  const matchScore: ScorePair = { home: matchHome, away: matchAway, source: 'قاعدة المباراة' };
   const matchTotal = Number(matchHome || 0) + Number(matchAway || 0);
   const snapshotScore = snapshots.map(scoreFromSnapshot).find(Boolean) as ScorePair | null;
   const snapshotTotal = Number(snapshotScore?.home || 0) + Number(snapshotScore?.away || 0);
 
   if (snapshotScore && snapshotTotal > matchTotal) return snapshotScore;
-  if (matchHome !== null || matchAway !== null) return { home: matchHome, away: matchAway };
-  return snapshotScore || { home: null, away: null };
+  if (matchHome !== null || matchAway !== null) return matchScore;
+  return snapshotScore || { home: null, away: null, source: 'غير متوفر' };
 }
 
 function isFinalMinute(minute: number | null) {
@@ -229,6 +241,7 @@ export default async function MatchCenterPageLivePriority({ matchId }: { matchId
   const iSportsTimeline = latest(match, (p) => p.includes('ISPORTS_TIMELINE'));
   const dbFallback = snapshots[0] || null;
   const sources = [theStatsLive, theStats, iSportsFlash, iSportsLive, iSportsTimeline, dbFallback].filter(Boolean);
+  const primary = sources[0] || null;
   const displayScore = scoreForDisplay(match, sources);
 
   const rows = [
@@ -269,6 +282,9 @@ export default async function MatchCenterPageLivePriority({ matchId }: { matchId
               <div className="mx-auto mt-3 inline-flex min-h-9 items-center rounded-xl border border-[#FFD700]/30 bg-[#FFD700]/10 px-5 text-sm font-black text-[#FFD700]">{clockLabel(match, sources)}</div>
             </div>
             <TeamBlock team={match.awayTeam} side="away" />
+          </div>
+          <div className="relative mt-4 rounded-2xl border border-white/10 bg-black/25 p-3 text-xs font-bold leading-6 text-gray-300">
+            <b className="text-[#FFD700]">ترتيب مصادر العرض:</b> النتيجة من صف المباراة المحدث عبر TheStats/iSport، ثم أحدث Snapshot عند الحاجة. الأرقام: TheStatsAPI Live ثم TheStatsAPI ثم iSport Flash/Animation ثم آخر Snapshot. <span className="text-[#69d7ff]">المصدر الأساسي الحالي: {sourceName(primary)}</span>{displayScore.source ? <span> — مصدر النتيجة: {displayScore.source}</span> : null}
           </div>
         </section>
 
