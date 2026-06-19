@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import { getTeamFlagUrl } from '@/lib/teamFlags';
 
@@ -178,7 +179,7 @@ function TeamFlag({ team, side }: { team: TeamLike; side: 'home' | 'away' }) {
   );
 }
 
-export default function LiveBroadcastPreview({ events, homeTeam, awayTeam, homeScore, awayScore }: Props) {
+export default function LiveBroadcastPreview({ matchId, events, homeTeam, awayTeam, homeScore, awayScore }: Props) {
   const [filter, setFilter] = useState<FilterKey>('important');
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const sorted = useMemo(() => [...events].sort((a, b) => Number(a.minute ?? 0) - Number(b.minute ?? 0)), [events]);
@@ -202,6 +203,9 @@ export default function LiveBroadcastPreview({ events, homeTeam, awayTeam, homeS
           <h2 className="text-2xl font-black text-white">البث الحي</h2>
           <p className="mt-1 text-sm font-bold text-gray-400">ملعب تفاعلي للأحداث مع عرض لحظة المباراة الحالية.</p>
         </div>
+        <Link href={`/match-live/${matchId}`} className="inline-flex items-center justify-center rounded-full border border-[#FFD700]/25 bg-[#FFD700]/10 px-4 py-2 text-xs font-black text-[#FFD700] transition hover:bg-[#FFD700]/15">
+          فتح الصفحة الكاملة
+        </Link>
       </div>
 
       <div className="mt-4 grid gap-3 sm:grid-cols-4">
