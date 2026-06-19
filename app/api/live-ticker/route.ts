@@ -17,7 +17,8 @@ type TickerItem = {
 };
 
 const LIVE_STATUSES = ['IN_PLAY', 'LIVE', 'HT', '1H', '2H', 'ET'];
-const FINISHED_STATUSES = ['FINISHED', 'FT', 'AET', 'PEN', 'COMPLETED'];
+const FINISHED_STATUSES = ['FINISHED', 'FT', 'AET', 'PEN', 'COMPLETED', 'ENDED'];
+const FINAL_MINUTE_FALLBACK = 120;
 
 function nullableNumber(value: unknown) {
   if (value === null || value === undefined || value === '') return null;
@@ -25,20 +26,25 @@ function nullableNumber(value: unknown) {
   return Number.isFinite(n) ? n : null;
 }
 
-function normalizeStatus(status?: string | null) {
+function isFinalMinute(minute: number | null) {
+  return minute !== null && minute >= FINAL_MINUTE_FALLBACK;
+}
+
+function normalizeStatus(status?: string | null, minute?: number | null) {
   const value = String(status || '').toUpperCase();
+  if (FINISHED_STATUSES.includes(value) || value === '-1' || value === '4') return 'FINISHED';
+  if (isFinalMinute(minute ?? null) && !['ET', 'AET', 'P', 'PEN', '5'].includes(value)) return 'FINISHED';
   if (value === '1H' || value === '2H' || value === 'ET' || value === 'IN_PLAY' || value === 'LIVE') return 'IN_PLAY';
   if (value === 'HT' || value === 'HALFTIME' || value === 'HALF_TIME' || value === 'HALF-TIME') return 'HT';
-  if (FINISHED_STATUSES.includes(value)) return 'FINISHED';
   return value || 'SCHEDULED';
 }
 
 function matchStatusLabel(status?: string | null, scoreSnapshot?: any) {
-  const value = normalizeStatus(status);
+  const snapshotMinute = nullableNumber(scoreSnapshot?.minute);
+  const value = normalizeStatus(status, snapshotMinute);
+  if (value === 'FINISHED') return 'انتهت';
   if (value === 'HT') return 'استراحة';
   if (value === 'IN_PLAY') return 'مباشر الآن';
-  if (value === 'FINISHED') return 'انتهت';
-  const snapshotMinute = nullableNumber(scoreSnapshot?.minute);
   const snapshotScore = (nullableNumber(scoreSnapshot?.homeScore) || 0) + (nullableNumber(scoreSnapshot?.awayScore) || 0);
   if (snapshotMinute !== null || snapshotScore > 0) return 'مباشر الآن';
   return 'قادمة';
@@ -141,10 +147,11 @@ function fallbackMatchItems(now: Date): TickerItem[] {
 }
 
 function hasLiveEvidence(match: any, scoreSnapshot: any, now: Date) {
-  const status = normalizeStatus(match.status);
-  if (status === 'IN_PLAY' || status === 'HT') return true;
-  if (status === 'FINISHED') return false;
   const snapshotMinute = nullableNumber(scoreSnapshot?.minute);
+  const status = normalizeStatus(match.status, snapshotMinute);
+  if (status === 'FINISHED') return false;
+  if (isFinalMinute(snapshotMinute)) return false;
+  if (status === 'IN_PLAY' || status === 'HT') return true;
   const snapshotScore = (nullableNumber(scoreSnapshot?.homeScore) || 0) + (nullableNumber(scoreSnapshot?.awayScore) || 0);
   if (snapshotMinute !== null || snapshotScore > 0) return true;
   const start = new Date(match.matchDate || '').getTime();
