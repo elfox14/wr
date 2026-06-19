@@ -179,6 +179,15 @@ function minuteFrom(_match: any, sources: any[]) {
   return null;
 }
 
+function inferHalfTime(match: any, status: string, minute: number | null) {
+  if (status === '2H' || FINISHED.includes(status) || HALF_TIME.includes(status)) return false;
+  if (minute !== null && minute >= 45 && minute <= 65) return true;
+  const startMs = new Date(match.matchDate || '').getTime();
+  if (!Number.isFinite(startMs)) return false;
+  const elapsedRealMinutes = Math.floor((Date.now() - startMs) / 60_000);
+  return elapsedRealMinutes >= 45 && elapsedRealMinutes <= 65;
+}
+
 function clockLabel(match: any, sources: any[]) {
   const dbStatus = String(match.status || '').toUpperCase();
   const minute = minuteFrom(match, sources);
@@ -190,6 +199,7 @@ function clockLabel(match: any, sources: any[]) {
 
   if (FINISHED.includes(status)) return 'انتهت';
   if (HALF_TIME.includes(status)) return 'استراحة';
+  if (inferHalfTime(match, status, minute)) return 'استراحة';
   if (LIVE.includes(status)) return minute === null ? 'مباشرة الآن' : `د${fmt(Math.floor(minute))}`;
 
   // If the DB status is still SCHEDULED but a trusted provider snapshot already has a minute/score,
@@ -226,13 +236,13 @@ function TeamBlock({ team, side }: { team: any; side: 'home' | 'away' }) {
 }
 
 function EventsPanel({ events }: { events: any[] }) {
-  return <section className="rounded-[1.45rem] border border-white/10 bg-white/[.035] p-4"><div className="mb-4 flex items-center justify-between"><h2 className="text-xl font-black text-[#69d7ff]">أحداث المباراة</h2><b className="rounded-full border border-white/10 bg-black/25 px-3 py-1 text-xs text-gray-400">{fmt(events.length)} حدث</b></div>{events.length ? <div className="relative space-y-3 before:absolute before:right-[21px] before:top-2 before:h-[calc(100%-16px)] before:w-px before:bg-[#0FF0FC]/35">{events.map((event) => <div key={event.id} className="relative pr-12"><div className="absolute right-0 top-1 flex h-11 w-11 items-center justify-center rounded-full border border-[#0FF0FC]/25 bg-[#0FF0FC]/10 text-xs font-black text-[#69d7ff]">{eventMinute(event)}</div><div className="rounded-2xl border border-white/10 bg-black/30 p-3"><p className="text-sm font-black text-white">{event.detail || event.type || 'حدث'}</p>{event.playerName ? <p className="mt-1 text-xs font-bold text-[#FFD700]">{event.playerName}</p> : null}</div></div>)}</div> : <div className="rounded-2xl border border-white/10 bg-black/25 p-5 text-center text-sm font-bold text-gray-400">لا توجد أحداث محفوظة من timeline.</div>}</section>;
+  return <section className="rounded-[1.45rem] border border-white/10 bg-white/[.035] p-4"><div className="mb-4 flex items-center justify-between"><h2 className="text-xl font-black text-[#69d7ff]">أحداث المباراة</h2><b className="rounded-full border border-white/10 bg-black/25 px-3 py-1 text-xs text-gray-400">{fmt(events.length)} حدث</b></div>{events.length ? <div className="relative space-y-3 before:absolute before:right-[21px] before:top-2 before:h-[calc(100%-16px)] before:w-px before:bg-[#0FF0FC]/35">{events.map((event) => <div key={event.id} className="relative pr-12"><div className="absolute right-0 top-1 flex h-11 w-11 items-center justify-center rounded-full border border-[#0FF0FC]/25 bg-[#0FF0FC]/10 text-xs font-black text-[#69d7ff]">{eventMinute(event)}</div><div className="rounded-xl border border-white/10 bg-black/30 p-3"><div className="flex flex-wrap items-center gap-2"><b className="rounded-full bg-[#FFD700]/15 px-2 py-1 text-xs text-[#FFD700]">{event.type}</b>{event.playerName ? <span className="text-sm font-bold text-white">{event.playerName}</span> : null}</div><p className="mt-1 text-sm leading-7 text-gray-200">{event.detail || 'حدث مباراة'}</p><small className="text-[10px] uppercase tracking-wider text-gray-500">{event.sourceName || 'manual'}</small></div></div>)}</div> : <p className="rounded-xl border border-white/10 bg-black/25 p-4 text-center text-sm text-gray-400">لا توجد أحداث مسجلة بعد.</p>}</section>;
 }
 
-async function getMatch(id: string) {
+export default async function MatchCenterPageLivePriority({ matchId }: { matchId: string }) {
   noStore();
-  return prisma.match.findUnique({
-    where: { id },
+  const match = await prisma.match.findUnique({
+    where: { id: matchId },
     include: {
       homeTeam: true,
       awayTeam: true,
@@ -240,21 +250,20 @@ async function getMatch(id: string) {
       statsSnapshots: { orderBy: { capturedAt: 'desc' }, take: 25 },
     },
   });
-}
 
-export default async function MatchCenterPageLivePriority({ params }: { params: Promise<{ id: string }> | { id: string } }) {
-  const resolved = await params;
-  const match = await getMatch(resolved.id);
   if (!match) notFound();
 
+  const snapshots = match.statsSnapshots || [];
   const theStatsLive = latest(match, (p) => p.includes('THE_STATS') && p.includes('LIVE'));
-  const theStatsOfficial = latest(match, (p) => p.includes('THE_STATS') && !p.includes('LIVE'));
-  const iSportFlash = latest(match, (p) => p.includes('ISPORTS_FLASH'));
-  const iSport = latest(match, (p) => p.includes('ISPORT') && !p.includes('FLASH'));
-  const dbFallback = match.statsSnapshots?.[0] || null;
-  const sources = [theStatsLive, theStatsOfficial, iSportFlash, iSport, dbFallback].filter(Boolean);
+  const theStats = latest(match, (p) => p.includes('THE_STATS'));
+  const iSportsFlash = latest(match, (p) => p.includes('ISPORTS_FLASH'));
+  const iSportsLive = latest(match, (p) => p.includes('ISPORTS_REMOTE_LIVE'));
+  const iSportsTimeline = latest(match, (p) => p.includes('ISPORTS_TIMELINE'));
+  const dbFallback = snapshots[0] || null;
+  const sources = [theStatsLive, theStats, iSportsFlash, iSportsLive, iSportsTimeline, dbFallback].filter(Boolean);
   const primary = sources[0] || null;
-  const displayScore = scoreForDisplay(match, match.statsSnapshots || []);
+  const displayScore = scoreForDisplay(match, sources);
+
   const rows = [
     ['الاستحواذ', metric(sources, 'possession', 'homePossession', 'awayPossession'), '%'],
     ['الهجمات', metric(sources, 'attacks', 'homeAttacks', 'awayAttacks'), ''],
