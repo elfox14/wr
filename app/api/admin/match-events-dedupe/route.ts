@@ -31,8 +31,24 @@ function normalizeText(value: any) {
     .trim();
 }
 
+function isCancelledGoalText(value: string) {
+  return value.includes('disallowed')
+    || value.includes('cancelled')
+    || value.includes('canceled')
+    || value.includes('ruled out')
+    || value.includes('overturned')
+    || value.includes('no goal')
+    || value.includes('goal not awarded')
+    || value.includes('هدف ملغي')
+    || value.includes('هدف ملغى')
+    || value.includes('الغاء هدف')
+    || value.includes('إلغاء هدف')
+    || value.includes('ملغي');
+}
+
 function eventFamily(type: any, detail: any) {
   const value = `${normalizeText(type)} ${normalizeText(detail)}`;
+  if (isCancelledGoalText(value)) return 'disallowed_goal';
   if (value.includes('penalty') || value.includes('جزاء')) return value.includes('miss') || value.includes('مهد') ? 'penalty_missed' : 'goal';
   if (value.includes('goal') || value.includes('هدف') || value.includes('score_update')) return 'goal';
   if (value.includes('sub') || value.includes('تبديل')) return 'substitution';
@@ -78,7 +94,7 @@ export async function GET(req: Request) {
   const includeManual = bool(url.searchParams.get('includeManual'), false);
   const cleanupSynthetic = bool(url.searchParams.get('cleanupSynthetic'), true);
   const preferTheStats = bool(url.searchParams.get('preferTheStats'), true);
-  const preferTheStatsMinEvents = int(url.searchParams.get('preferTheStatsMinEvents'), 5, 1, 500);
+  const preferTheStatsMinEvents = int(url.searchParams.get('preferTheStatsMinEvents'), 1, 1, 500);
 
   if (!matchId) return json({ ok: false, error: 'matchId is required' }, 400);
 
@@ -154,6 +170,7 @@ export async function GET(req: Request) {
       officialTheStatsTimelineReplacesISportsWhenAvailable: preferTheStats,
       manualEventsProtectedByDefault: !includeManual,
       syntheticScoreEventsRemovedWhenRealGoalsExist: cleanupSynthetic,
+      cancelledGoalsAreKeptSeparateFromValidGoals: true,
     },
     deletePreview: [...toDelete.values()].slice(0, 50),
   });
