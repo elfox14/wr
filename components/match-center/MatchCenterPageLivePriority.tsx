@@ -16,9 +16,10 @@ export const metadata: Metadata = {
 type Pair = { home: number | null; away: number | null } | null;
 type ScorePair = { home: number | null; away: number | null; source: string };
 
-const FINISHED = ['FINISHED', 'FT', 'AET', 'PEN'];
+const FINISHED = ['FINISHED', 'FT', 'AET', 'PEN', 'COMPLETED', 'ENDED'];
 const HALF_TIME = ['HT', 'HALFTIME', 'HALF_TIME', 'HALF-TIME'];
 const LIVE = ['IN_PLAY', 'LIVE', '1H', '2H', 'ET'];
+const FINAL_MINUTE_FALLBACK = 120;
 
 function n(value: unknown) {
   if (value === null || value === undefined || value === '') return null;
@@ -103,15 +104,27 @@ function scoreForDisplay(match: any, snapshots: any[]): ScorePair {
   return snapshotScore || { home: null, away: null, source: 'غير متوفر' };
 }
 
-function statusFromProviderValue(value: unknown) {
+function isFinalMinute(minute: number | null) {
+  return minute !== null && minute >= FINAL_MINUTE_FALLBACK;
+}
+
+function statusFromProviderValue(value: unknown, minute: number | null) {
   const status = String(value ?? '').trim().toUpperCase();
-  if (!status) return null;
-  if (['-1', 'FT', 'FINISHED', 'ENDED', 'COMPLETED'].includes(status)) return 'FINISHED';
+  if (['-1', '4', 'FT', 'FINISHED', 'ENDED', 'COMPLETED'].includes(status)) return 'FINISHED';
+  if (isFinalMinute(minute) && !['ET', 'AET', 'P', 'PEN', '5'].includes(status)) return 'FINISHED';
   if (['2', 'HT', 'HALFTIME', 'HALF_TIME', 'HALF-TIME'].includes(status) || status.includes('HALF')) return 'HT';
   if (['1', '1H', 'FIRST_HALF', 'FIRST HALF'].includes(status) || status.includes('FIRST')) return '1H';
   if (['3', '2H', 'SECOND_HALF', 'SECOND HALF'].includes(status) || status.includes('SECOND')) return '2H';
+  if (['5', 'P', 'PEN'].includes(status)) return 'PEN';
   if (['LIVE', 'IN_PLAY', 'ET'].includes(status)) return status;
-  return null;
+  return isFinalMinute(minute) ? 'FINISHED' : null;
+}
+
+function snapshotMinute(snapshot: any) {
+  const data = raw(snapshot);
+  const meta = obj(data.meta);
+  const flashMeta = obj(data.flashMeta);
+  return n(snapshot?.minute ?? data.minute ?? data.elapsed ?? data.currentMinute ?? meta.elapsed_minutes ?? meta.minute ?? flashMeta.scheduleMinute);
 }
 
 function statusFromSources(sources: any[]) {
@@ -119,7 +132,8 @@ function statusFromSources(sources: any[]) {
     const data = raw(snapshot);
     const flashMeta = obj(data.flashMeta);
     const meta = obj(data.meta);
-    const status = statusFromProviderValue(data.status ?? data.providerStatus ?? data.matchState ?? flashMeta.matchState ?? meta.status ?? meta.matchState);
+    const minute = snapshotMinute(snapshot);
+    const status = statusFromProviderValue(data.status ?? data.providerStatus ?? data.matchState ?? flashMeta.matchState ?? meta.status ?? meta.matchState, minute);
     if (status) return status;
   }
   return null;
@@ -144,10 +158,7 @@ function metric(sources: any[], key: string, homeKey: string, awayKey: string): 
 
 function minuteFrom(match: any, sources: any[]) {
   for (const snapshot of sources) {
-    const data = raw(snapshot);
-    const meta = obj(data.meta);
-    const flashMeta = obj(data.flashMeta);
-    const minute = n(snapshot?.minute ?? data.minute ?? data.elapsed ?? data.currentMinute ?? meta.elapsed_minutes ?? meta.minute ?? flashMeta.scheduleMinute);
+    const minute = snapshotMinute(snapshot);
     if (minute !== null) return minute;
   }
 
@@ -157,9 +168,12 @@ function minuteFrom(match: any, sources: any[]) {
 }
 
 function clockLabel(match: any, sources: any[]) {
-  const providerStatus = statusFromSources(sources);
   const dbStatus = String(match.status || '').toUpperCase();
   const minute = minuteFrom(match, sources);
+  if (FINISHED.includes(dbStatus)) return 'انتهت';
+  if (isFinalMinute(minute)) return 'انتهت';
+
+  const providerStatus = statusFromSources(sources);
   const status = providerStatus || dbStatus;
 
   if (FINISHED.includes(status)) return 'انتهت';
