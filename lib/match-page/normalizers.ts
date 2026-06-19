@@ -6,8 +6,15 @@ export const HALF_TIME_STATUSES = ['HT', 'HALFTIME', 'HALF_TIME', 'HALF-TIME', '
 export const SCHEDULED_STATUSES = ['SCHEDULED', 'TIMED', 'NOT_STARTED', 'NS'];
 
 const FINAL_MINUTE_FALLBACK = 120;
-
 type Pair = { home: number | null; away: number | null; source?: string } | null;
+
+type StatusCandidate = {
+  status: string;
+  minute: number | null;
+  priority: number;
+  capturedAt: number;
+  sourceKey: string;
+};
 
 export function toNumber(value: unknown) {
   if (value === null || value === undefined || value === '') return null;
@@ -129,13 +136,21 @@ export function buildStatMetric(sources: any[], key: string, label: string, home
   };
 }
 
+function flashMetaFrom(data: Record<string, any>) {
+  const flashMeta = asObject(data.flashMeta);
+  const meta = asObject(data.meta);
+  const nestedFlashMeta = asObject(asObject(data.theStatsApi).flashMeta);
+  return { flashMeta, meta, nestedFlashMeta };
+}
+
 export function snapshotMinute(snapshot: any) {
   const data = rawData(snapshot);
-  const meta = asObject(data.meta);
-  const flashMeta = asObject(data.flashMeta);
-  const directMinute = toNumber(snapshot?.minute ?? data.minute ?? data.elapsed ?? data.currentMinute ?? meta.elapsed_minutes ?? meta.minute);
+  const { flashMeta, meta, nestedFlashMeta } = flashMetaFrom(data);
+  const directMinute = toNumber(snapshot?.minute ?? data.minute ?? data.elapsed ?? data.currentMinute ?? flashMeta.minute ?? flashMeta.scheduleMinute ?? nestedFlashMeta.scheduleMinute ?? meta.elapsed_minutes ?? meta.minute);
   if (providerKey(snapshot) === 'isports-flash') {
-    const scheduleMinute = toNumber(flashMeta.scheduleMinute);
+    const matchState = String(data.matchState ?? data.providerStatus ?? flashMeta.matchState ?? nestedFlashMeta.matchState ?? meta.matchState ?? '').trim();
+    if (matchState === '2' || normalizeStatusValue(matchState).includes('HALF')) return null;
+    const scheduleMinute = toNumber(flashMeta.scheduleMinute ?? nestedFlashMeta.scheduleMinute);
     const recordsSample = Array.isArray(data.recordsSample) ? data.recordsSample : [];
     if (directMinute !== null && scheduleMinute !== null && directMinute === scheduleMinute && recordsSample.length === 0) return null;
   }
@@ -144,26 +159,41 @@ export function snapshotMinute(snapshot: any) {
 
 function statusFromProviderValue(value: unknown, minute: number | null) {
   const status = normalizeStatusValue(String(value ?? ''));
+  if (!status) return minute !== null && minute >= FINAL_MINUTE_FALLBACK ? 'FINISHED' : null;
   if (['-1', '4', 'FT', 'FINISHED', 'ENDED', 'COMPLETED'].includes(status)) return 'FINISHED';
-  if (minute !== null && minute >= FINAL_MINUTE_FALLBACK && !['ET', 'AET', 'P', 'PEN', '5'].includes(status)) return 'FINISHED';
   if (['2', 'HT', 'HALFTIME', 'HALF_TIME', 'HALF-TIME', 'PAUSED'].includes(status) || status.includes('HALF')) return 'HT';
-  if (['1', '1H', 'FIRST_HALF', 'FIRST HALF'].includes(status) || status.includes('FIRST')) return '1H';
   if (['3', '2H', 'SECOND_HALF', 'SECOND HALF'].includes(status) || status.includes('SECOND')) return '2H';
+  if (['1', '1H', 'FIRST_HALF', 'FIRST HALF'].includes(status) || status.includes('FIRST')) return '1H';
   if (['5', 'P', 'PEN'].includes(status)) return 'PEN';
   if (['LIVE', 'IN_PLAY', 'ET'].includes(status)) return status;
-  return minute !== null && minute >= FINAL_MINUTE_FALLBACK ? 'FINISHED' : null;
+  if (minute !== null && minute >= FINAL_MINUTE_FALLBACK && !['ET', 'AET', 'P', 'PEN', '5'].includes(status)) return 'FINISHED';
+  return null;
+}
+
+function statusCandidate(snapshot: any): StatusCandidate | null {
+  const data = rawData(snapshot);
+  const { flashMeta, meta, nestedFlashMeta } = flashMetaFrom(data);
+  const minute = snapshotMinute(snapshot);
+  const rawStatus = data.status ?? data.providerStatus ?? data.matchState ?? flashMeta.matchState ?? nestedFlashMeta.matchState ?? meta.status ?? meta.matchState;
+  const status = statusFromProviderValue(rawStatus, minute);
+  if (!status) return null;
+  return {
+    status,
+    minute,
+    priority: providerPriority(snapshot),
+    capturedAt: snapshot?.capturedAt ? new Date(snapshot.capturedAt).getTime() : 0,
+    sourceKey: providerKey(snapshot),
+  };
 }
 
 export function statusFromSnapshots(sources: any[]) {
-  for (const snapshot of sources) {
-    const data = rawData(snapshot);
-    const flashMeta = asObject(data.flashMeta);
-    const meta = asObject(data.meta);
-    const minute = snapshotMinute(snapshot);
-    const status = statusFromProviderValue(data.status ?? data.providerStatus ?? data.matchState ?? flashMeta.matchState ?? meta.status ?? meta.matchState, minute);
-    if (status) return { status, minute };
-  }
-  return null;
+  const candidates = sources.map(statusCandidate).filter(Boolean) as StatusCandidate[];
+  const flash = candidates
+    .filter((candidate) => candidate.sourceKey === 'isports-flash')
+    .sort((a, b) => b.capturedAt - a.capturedAt)[0];
+  if (flash && ['HT', 'FINISHED', '2H', '1H', 'PEN'].includes(flash.status)) return { status: flash.status, minute: flash.minute };
+  const best = candidates.sort((a, b) => a.priority - b.priority || b.capturedAt - a.capturedAt)[0];
+  return best ? { status: best.status, minute: best.minute } : null;
 }
 
 export function scoreFromSnapshot(snapshot: any): MatchScore | null {
@@ -171,8 +201,9 @@ export function scoreFromSnapshot(snapshot: any): MatchScore | null {
   const data = rawData(snapshot);
   const counts = asObject(data.counts);
   const meta = asObject(data.meta);
-  const home = toNumber(snapshot.homeScore ?? data.homeScore ?? data.home_goals ?? meta.home_goals ?? counts.homeScore);
-  const away = toNumber(snapshot.awayScore ?? data.awayScore ?? data.away_goals ?? meta.away_goals ?? counts.awayScore);
+  const flashMeta = asObject(data.flashMeta);
+  const home = toNumber(snapshot.homeScore ?? data.homeScore ?? data.home_goals ?? flashMeta.homeScore ?? meta.home_goals ?? counts.homeScore);
+  const away = toNumber(snapshot.awayScore ?? data.awayScore ?? data.away_goals ?? flashMeta.awayScore ?? meta.away_goals ?? counts.awayScore);
   if (home === null && away === null) return null;
   return { home, away, source: providerName(snapshot) };
 }
@@ -204,10 +235,11 @@ export function buildStatusView(match: any, sources: any[]): MatchStatusView {
   const minute = fromSource?.minute ?? sources.map(snapshotMinute).find((value) => value !== null) ?? null;
   const kind = statusKind(raw);
   if (kind === 'finished') return { raw, kind, label: 'انتهت المباراة', shortLabel: 'انتهت', minute: null, isLive: false, isFinished: true, isScheduled: false };
-  if (kind === 'halftime') return { raw, kind, label: 'استراحة بين الشوطين', shortLabel: 'استراحة', minute: null, isLive: true, isFinished: false, isScheduled: false };
+  if (kind === 'halftime') return { raw, kind, label: 'استراحة بين الشوطين', shortLabel: 'استراحة', minute: null, isLive: false, isFinished: false, isScheduled: false };
   if (kind === 'live') {
     const phase = raw === '1H' ? 'الشوط الأول' : raw === '2H' ? 'الشوط الثاني' : raw === 'ET' ? 'وقت إضافي' : 'مباشرة الآن';
-    return { raw, kind, label: minute ? `${phase} — الدقيقة ${Math.floor(minute).toLocaleString('ar-EG')}` : phase, shortLabel: minute ? `د${Math.floor(minute).toLocaleString('ar-EG')}` : 'مباشر', minute: minute ? Math.floor(minute) : null, isLive: true, isFinished: false, isScheduled: false };
+    const minuteLabel = minute ? `د${Math.floor(minute).toLocaleString('ar-EG')}` : '';
+    return { raw, kind, label: minute ? `${phase} — ${minuteLabel}` : phase, shortLabel: minute ? `${phase} ${minuteLabel}` : phase, minute: minute ? Math.floor(minute) : null, isLive: true, isFinished: false, isScheduled: false };
   }
   const startMs = new Date(match.matchDate || '').getTime();
   if (Number.isFinite(startMs) && Date.now() > startMs + 5 * 60_000 && kind === 'scheduled') {
