@@ -69,7 +69,7 @@ export default async function MatchCenterLayout({ children, params }: { children
         <LiveBroadcastPreviewSlot>
           <div className="bg-[#02060d] px-3 pb-5 text-white sm:px-6" dir="rtl">
             <div className="mx-auto max-w-7xl">
-              <LiveBroadcastPreview matchId={match.id} events={match.events || []} homeTeam={match.homeTeam} awayTeam={match.awayTeam} homePlayers={homePlayers} awayPlayers={awayPlayers} />
+              <LiveBroadcastPreview matchId={match.id} events={match.events || []} homeTeam={match.homeTeam} awayTeam={match.awayTeam} homePlayers={homePlayers} awayPlayers={awayPlayers} homeScore={match.homeScore} awayScore={match.awayScore} />
             </div>
           </div>
         </LiveBroadcastPreviewSlot>
