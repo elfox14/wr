@@ -3,7 +3,7 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
-export default function MatchAutoRefresh({ intervalMs = 30000, hardReload = true }: { intervalMs?: number; hardReload?: boolean }) {
+export default function MatchAutoRefresh({ intervalMs = 30000, hardReload = false }: { intervalMs?: number; hardReload?: boolean }) {
   const router = useRouter();
 
   useEffect(() => {
@@ -18,7 +18,6 @@ export default function MatchAutoRefresh({ intervalMs = 30000, hardReload = true
       }
     };
     const timer = window.setInterval(run, safeInterval);
-
     return () => window.clearInterval(timer);
   }, [router, intervalMs, hardReload]);
 
