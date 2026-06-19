@@ -10,6 +10,8 @@ const CACHE_KEY = 'matches:the-stats-summary-stats:v1';
 const PROVIDER = 'THE_STATS_API';
 const LIVE_STATUSES = ['IN_PLAY', 'LIVE', 'HT', '1H', '2H', 'ET', 'BREAK'];
 const FINISHED_STATUSES = ['FINISHED', 'FT', 'AET', 'PEN', 'FULL_TIME', 'ENDED'];
+const RECENT_FINISHED_REFRESH_WINDOW_MS = 3 * 60 * 60 * 1000;
+const FRESH_STATS_HEADERS = { 'Cache-Control': 'no-store, no-cache, must-revalidate' };
 
 type CacheRow = {
   key: string;
@@ -116,6 +118,7 @@ function withCacheMeta(payload: any, meta: Record<string, any>) {
 async function isMatchWindowActive(now: Date) {
   const preMatchWindow = new Date(now.getTime() - 30 * 60 * 1000);
   const postKickoffWindow = new Date(now.getTime() + 150 * 60 * 1000);
+  const recentlyFinishedWindow = new Date(now.getTime() - RECENT_FINISHED_REFRESH_WINDOW_MS);
   const activeCount = await prisma.match.count({
     where: {
       OR: [
@@ -123,6 +126,10 @@ async function isMatchWindowActive(now: Date) {
         {
           status: { notIn: FINISHED_STATUSES },
           matchDate: { gte: preMatchWindow, lte: postKickoffWindow },
+        },
+        {
+          status: { in: FINISHED_STATUSES },
+          matchDate: { gte: recentlyFinishedWindow, lte: now },
         },
       ],
     },
@@ -155,15 +162,15 @@ async function fetchFreshSummary() {
 export async function GET() {
   const now = new Date();
   const normalCacheMs = envInt('THE_STATS_API_SUMMARY_DB_CACHE_MS', 60 * 60 * 1000, 10 * 60 * 1000, 24 * 60 * 60 * 1000);
-  const liveCacheMs = envInt('THE_STATS_API_SUMMARY_LIVE_DB_CACHE_MS', 10 * 60 * 1000, 60 * 1000, 60 * 60 * 1000);
-  const lockMs = envInt('THE_STATS_API_SUMMARY_REFRESH_LOCK_MS', 2 * 60 * 1000, 30 * 1000, 10 * 60 * 1000);
+  const liveCacheMs = envInt('THE_STATS_API_SUMMARY_LIVE_DB_CACHE_MS', 60 * 1000, 30 * 1000, 10 * 60 * 1000);
+  const lockMs = envInt('THE_STATS_API_SUMMARY_REFRESH_LOCK_MS', 45 * 1000, 15 * 1000, 10 * 60 * 1000);
 
   try {
     await ensureCacheTable();
 
     const matchWindowActive = await isMatchWindowActive(now);
     const cacheMs = matchWindowActive ? liveCacheMs : normalCacheMs;
-    const mode = matchWindowActive ? 'live_10_minutes' : 'normal_hourly';
+    const mode = matchWindowActive ? 'match_or_recent_final_refresh' : 'normal_hourly';
     const row = await readCacheRow();
     const fetchedAtMs = row?.fetchedAt ? new Date(row.fetchedAt).getTime() : 0;
     const nextRefreshAt = fetchedAtMs ? new Date(fetchedAtMs + cacheMs) : null;
@@ -179,7 +186,7 @@ export async function GET() {
         fetchedAt: iso(row.fetchedAt),
         nextRefreshAt: iso(nextRefreshAt),
         matchWindowActive,
-      }), { headers: { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=120' } });
+      }), { headers: FRESH_STATS_HEADERS });
     }
 
     if (row?.payload && row.refreshLockUntil && new Date(row.refreshLockUntil).getTime() > now.getTime()) {
@@ -193,7 +200,7 @@ export async function GET() {
         nextRefreshAt: iso(nextRefreshAt),
         refreshLockUntil: iso(row.refreshLockUntil),
         matchWindowActive,
-      }), { headers: { 'Cache-Control': 'private, max-age=15, stale-while-revalidate=60' } });
+      }), { headers: FRESH_STATS_HEADERS });
     }
 
     if (row?.payload) {
@@ -208,7 +215,7 @@ export async function GET() {
           fetchedAt: iso(row.fetchedAt),
           nextRefreshAt: iso(nextRefreshAt),
           matchWindowActive,
-        }), { headers: { 'Cache-Control': 'private, max-age=15, stale-while-revalidate=60' } });
+        }), { headers: FRESH_STATS_HEADERS });
       }
     }
 
@@ -226,7 +233,7 @@ export async function GET() {
         fetchedAt: iso(now),
         nextRefreshAt: iso(expiresAt),
         matchWindowActive,
-      }), { headers: { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=120' } });
+      }), { headers: FRESH_STATS_HEADERS });
     } catch (error: any) {
       const safeError = safeTheStatsApiError(error);
       if (row?.payload) {
@@ -241,12 +248,12 @@ export async function GET() {
           nextRefreshAt: iso(nextRefreshAt),
           matchWindowActive,
           refreshError: safeError,
-        }), { headers: { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=120' } });
+        }), { headers: FRESH_STATS_HEADERS });
       }
 
-      return NextResponse.json({ ok: false, provider: PROVIDER, error: safeError }, { status: safeError.status || 502, headers: { 'Cache-Control': 'no-store' } });
+      return NextResponse.json({ ok: false, provider: PROVIDER, error: safeError }, { status: safeError.status || 502, headers: FRESH_STATS_HEADERS });
     }
   } catch (error: any) {
-    return NextResponse.json({ ok: false, provider: PROVIDER, error: safeTheStatsApiError(error) }, { status: error?.status || 500, headers: { 'Cache-Control': 'no-store' } });
+    return NextResponse.json({ ok: false, provider: PROVIDER, error: safeTheStatsApiError(error) }, { status: error?.status || 500, headers: FRESH_STATS_HEADERS });
   }
 }
