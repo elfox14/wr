@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { getTeamFlagUrl } from '@/lib/teamFlags';
@@ -71,17 +71,22 @@ function mergeById(baseMatches: TickerMatch[], updates: TickerMatch[]) {
   for (const update of updates) if (!merged.some((match) => matchKey(match) === matchKey(update))) merged.unshift(update);
   return merged;
 }
+function timeLabel(match: TickerMatch) {
+  if (!match.matchDate) return 'قريبًا';
+  const date = new Date(match.matchDate);
+  if (!Number.isFinite(date.getTime())) return 'قريبًا';
+  return new Intl.DateTimeFormat('ar-EG', { hour: '2-digit', minute: '2-digit' }).format(date);
+}
+function statusBadge(match: TickerMatch) {
+  if (isFinished(match)) return 'انتهت';
+  if (isLive(match)) return liveStatusText(match);
+  return timeLabel(match);
+}
 
 export default function HomeLiveMatchTicker({ matches = [] }: Props) {
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const safeMatches = Array.isArray(matches) ? (matches as TickerMatch[]) : [];
   const [apiMatches, setApiMatches] = useState<TickerMatch[]>([]);
-  const [now, setNow] = useState(() => new Date());
-
-  useEffect(() => {
-    const timer = window.setInterval(() => setNow(new Date()), 1000);
-    return () => window.clearInterval(timer);
-  }, []);
+  const [activeKey, setActiveKey] = useState<string>('');
 
   useEffect(() => {
     let cancelled = false;
@@ -100,50 +105,71 @@ export default function HomeLiveMatchTicker({ matches = [] }: Props) {
     return () => { cancelled = true; window.clearInterval(timer); };
   }, []);
 
-  const displayMatches = useMemo(() => mergeById(safeMatches, apiMatches).slice(0, 15), [safeMatches, apiMatches]);
+  const displayMatches = useMemo(() => mergeById(safeMatches, apiMatches).slice(0, 8), [safeMatches, apiMatches]);
+
+  useEffect(() => {
+    if (!displayMatches.length) return;
+    if (!activeKey) setActiveKey(matchKey(displayMatches[0]));
+    const timer = window.setInterval(() => {
+      setActiveKey((current) => {
+        const index = Math.max(0, displayMatches.findIndex((match) => matchKey(match) === current));
+        return matchKey(displayMatches[(index + 1) % displayMatches.length]);
+      });
+    }, 4500);
+    return () => window.clearInterval(timer);
+  }, [displayMatches, activeKey]);
+
   if (displayMatches.length === 0) return null;
 
   return (
-    <div className="relative -mx-3 w-[calc(100%+1.5rem)] overflow-hidden py-1 sm:mx-0 sm:w-full">
-      <div className="pointer-events-none absolute bottom-0 left-0 top-0 z-10 w-6 bg-gradient-to-r from-[#04110D] to-transparent sm:w-8" />
-      <div className="pointer-events-none absolute bottom-0 right-0 top-0 z-10 w-6 bg-gradient-to-l from-[#04110D] to-transparent sm:w-8" />
-      <div ref={scrollContainerRef} className="scrollbar-none flex cursor-grab snap-x snap-mandatory gap-2.5 overflow-x-auto px-3 py-2 active:cursor-grabbing sm:gap-3 sm:px-4">
+    <section className="relative overflow-hidden rounded-[1.6rem] border border-white/10 bg-[#03110d]/80 p-3 text-white shadow-[0_18px_50px_rgba(0,0,0,.28)] backdrop-blur-xl">
+      <motion.div className="pointer-events-none absolute inset-0 opacity-60" animate={{ backgroundPosition: ['0% 50%', '100% 50%', '0% 50%'] }} transition={{ duration: 12, repeat: Infinity, ease: 'linear' }} style={{ backgroundImage: 'linear-gradient(90deg, rgba(15,240,252,.13), rgba(255,215,0,.10), rgba(0,255,136,.10), rgba(15,240,252,.13))', backgroundSize: '240% 240%' }} />
+      <div className="relative mb-2 flex items-center justify-between gap-3 px-1">
+        <div className="flex items-center gap-2">
+          <span className="relative flex h-7 w-7 items-center justify-center rounded-xl border border-[#00FF88]/25 bg-[#00FF88]/10">
+            <span className="absolute h-2.5 w-2.5 animate-ping rounded-full bg-[#00FF88]/60" />
+            <span className="relative h-2 w-2 rounded-full bg-[#00FF88]" />
+          </span>
+          <div>
+            <h2 className="text-sm font-black text-white">شريط المباريات الذكي</h2>
+            <p className="text-[10px] font-bold text-gray-400">متحرك • تفاعلي • محدث تلقائيًا</p>
+          </div>
+        </div>
+        <Link href="/matches" className="rounded-xl border border-[#FFD700]/20 bg-[#FFD700]/10 px-3 py-2 text-[10px] font-black text-[#FFD700] transition hover:bg-[#FFD700] hover:text-black">كل المباريات</Link>
+      </div>
+      <div className="relative flex gap-2 overflow-x-auto pb-1 scrollbar-none" dir="rtl">
         {displayMatches.map((match) => {
+          const key = matchKey(match);
+          const active = key === activeKey;
           const finished = isFinished(match);
           const live = isLive(match);
-          const halfTime = isHalfTime(match) && !finished;
           const homeFlag = match.homeTeam?.image || getTeamFlagUrl({ code: match.homeTeam?.code, name: match.homeTeam?.name }, 40);
           const awayFlag = match.awayTeam?.image || getTeamFlagUrl({ code: match.awayTeam?.code, name: match.awayTeam?.name }, 40);
-          const matchHref = match.id ? `/matches/${match.id}` : '/matches';
+          const href = match.id ? `/match-center/${match.id}` : '/matches';
           return (
-            <Link key={matchKey(match)} href={matchHref} className="shrink-0 snap-center">
-              <motion.div whileHover={{ y: -2 }} className={`relative flex min-h-[104px] w-[min(17.25rem,calc(100vw-2rem))] items-center justify-between gap-3 rounded-2xl border bg-black/45 p-3 backdrop-blur-md transition-all duration-300 sm:w-64 ${live ? 'border-[#00FF88]/40 shadow-[0_0_12px_rgba(0,255,136,0.06)]' : 'border-white/10 hover:border-[#0FF0FC]/30'}`}>
-                <div className="flex min-w-[4.7rem] flex-col gap-1.5">
-                  {live ? (
-                    <span className={`inline-flex items-center gap-1 text-[10px] font-black tracking-wide ${halfTime ? 'text-[#FFD700]' : 'text-[#00FF88]'}`}>
-                      <span className={`h-1.5 w-1.5 rounded-full ${halfTime ? 'bg-[#FFD700]' : 'animate-pulse bg-[#00FF88]'}`} />
-                      {liveStatusText(match)}
-                    </span>
-                  ) : finished ? <span className="text-[10px] font-bold text-gray-500">انتهت</span> : (
-                    <span className="text-[10px] font-bold text-[#0FF0FC]">{match.matchDate ? new Intl.DateTimeFormat('ar-EG', { hour: '2-digit', minute: '2-digit' }).format(new Date(match.matchDate)) : 'قريباً'}</span>
-                  )}
-                  <span className="max-w-[5.1rem] truncate text-[9px] font-bold text-gray-400">{groupNumberLabel(match)}</span>
-                </div>
-                <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex min-w-0 items-center gap-1.5"><img src={homeFlag || undefined} alt="" className="h-5 w-5 shrink-0 rounded-md object-cover" /><span className="truncate text-[12px] font-bold text-white">{match.homeTeam?.name}</span></div>
-                    {(live || finished) && <span className="text-sm font-black text-white">{match.homeScore}</span>}
+            <Link key={key} href={href} onMouseEnter={() => setActiveKey(key)} className="shrink-0">
+              <motion.div layout whileHover={{ y: -3, scale: 1.01 }} className={`relative flex h-[84px] w-[248px] items-center gap-3 rounded-2xl border px-3 transition ${active ? 'border-[#FFD700]/45 bg-black/55 shadow-[0_0_24px_rgba(255,215,0,.10)]' : 'border-white/10 bg-black/30 hover:border-[#0FF0FC]/35'} ${live ? 'ring-1 ring-[#00FF88]/20' : ''}`}>
+                {active ? <motion.span layoutId="smartTickerGlow" className="absolute inset-x-5 -top-px h-px bg-gradient-to-r from-transparent via-[#FFD700] to-transparent" /> : null}
+                <div className="flex min-w-0 flex-1 flex-col gap-1">
+                  <div className="flex items-center gap-1.5">
+                    <span className={`h-1.5 w-1.5 rounded-full ${live ? 'animate-pulse bg-[#00FF88]' : finished ? 'bg-gray-500' : 'bg-[#0FF0FC]'}`} />
+                    <span className={`truncate text-[10px] font-black ${live ? 'text-[#00FF88]' : finished ? 'text-gray-400' : 'text-[#0FF0FC]'}`}>{statusBadge(match)}</span>
                   </div>
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex min-w-0 items-center gap-1.5"><img src={awayFlag || undefined} alt="" className="h-5 w-5 shrink-0 rounded-md object-cover" /><span className="truncate text-[12px] font-bold text-white">{match.awayTeam?.name}</span></div>
-                    {(live || finished) && <span className="text-sm font-black text-white">{match.awayScore}</span>}
+                  <div className="flex items-center justify-between gap-2 text-xs font-black text-white">
+                    <span className="flex min-w-0 items-center gap-1.5"><img src={homeFlag || undefined} alt="" className="h-5 w-5 rounded-md object-cover" /><span className="truncate">{match.homeTeam?.name || 'Home'}</span></span>
+                    {(live || finished) ? <b className="text-[#FFD700]">{match.homeScore ?? 0}</b> : null}
+                  </div>
+                  <div className="flex items-center justify-between gap-2 text-xs font-black text-white">
+                    <span className="flex min-w-0 items-center gap-1.5"><img src={awayFlag || undefined} alt="" className="h-5 w-5 rounded-md object-cover" /><span className="truncate">{match.awayTeam?.name || 'Away'}</span></span>
+                    {(live || finished) ? <b className="text-[#FFD700]">{match.awayScore ?? 0}</b> : null}
                   </div>
                 </div>
+                <span className="hidden rounded-xl border border-white/10 bg-white/[.05] px-2 py-1 text-[9px] font-black text-gray-300 sm:block">{groupNumberLabel(match)}</span>
               </motion.div>
             </Link>
           );
         })}
       </div>
-    </div>
+    </section>
   );
 }
