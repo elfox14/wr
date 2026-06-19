@@ -18,7 +18,10 @@ function reasonFrom(error: any) {
 function hasKey(req: Request, url: URL) {
   const valid = [process.env.CRON_SECRET, process.env.ADMIN_API_SECRET].map((v) => String(v || '').trim()).filter(Boolean);
   if (valid.length === 0) return true;
+  const auth = req.headers.get('authorization') || '';
+  const bearer = auth.startsWith('Bearer ') ? auth.slice(7).trim() : '';
   const candidates = [
+    bearer,
     url.searchParams.get('key')?.trim() || '',
     url.searchParams.get('cronSecret')?.trim() || '',
     url.searchParams.get('adminSecret')?.trim() || '',
