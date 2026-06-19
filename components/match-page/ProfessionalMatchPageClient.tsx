@@ -4,14 +4,13 @@ import type { ReactNode } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { BarChart3, CalendarDays, Clock, FileText, Flag, Radio, RefreshCw, Share2, Shield, Sparkles, Trophy, Users } from 'lucide-react';
+import { BarChart3, CalendarDays, Clock, FileText, Flag, Radio, RefreshCw, Share2, Trophy, Users } from 'lucide-react';
 import MatchAutoRefresh from '@/components/match-center/MatchAutoRefresh';
 import type { MatchEventView, MatchPageData, MatchPlayerLite, MatchStatMetric, OfficialLineupPlayer, OfficialLineupTeam, StandingRow } from '@/lib/match-page/types';
 
 const ar = new Intl.NumberFormat('ar-EG');
 const tabs = [
   ['events', 'الأحداث', Radio],
-  ['overview', 'نظرة عامة', Sparkles],
   ['stats', 'الإحصائيات', BarChart3],
   ['lineups', 'التشكيل', Users],
   ['standings', 'الترتيب', Trophy],
@@ -28,6 +27,15 @@ const statusClasses = {
 
 type TabId = (typeof tabs)[number][0];
 type VoteTotals = { home: number; draw: number; away: number; total: number };
+type PitchSide = 'home' | 'away';
+type PitchPlayer = OfficialLineupPlayer | MatchPlayerLite;
+
+type PitchSlot = {
+  player: PitchPlayer;
+  x: number;
+  y: number;
+  side: PitchSide;
+};
 
 function fmt(value: number | null | undefined, suffix = '') {
   if (value === null || value === undefined || Number.isNaN(value)) return 'غير متوفر';
@@ -37,6 +45,9 @@ function shortDate(value: string) { return new Intl.DateTimeFormat('ar-EG', { mo
 function fullDate(value: string) { return new Intl.DateTimeFormat('ar-EG', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(value)); }
 function pct(home: number | null, away: number | null) { const h = Math.max(0, Number(home || 0)); const a = Math.max(0, Number(away || 0)); const total = h + a; if (!total) return { home: 50, away: 50 }; const width = Math.max(6, Math.min(94, (h / total) * 100)); return { home: width, away: 100 - width }; }
 function gd(value: number) { return value > 0 ? `+${ar.format(value)}` : ar.format(value); }
+function initials(name?: string | null) { return String(name || 'لاعب').trim().split(/\s+/).slice(0, 2).map((part) => part[0]).join('').toUpperCase(); }
+function playerNumber(player: PitchPlayer) { return 'number' in player ? player.number : null; }
+function playerCaptain(player: PitchPlayer) { return 'isCaptain' in player ? Boolean(player.isCaptain) : false; }
 
 function Empty({ title, body }: { title: string; body: string }) {
   return <div className="rounded-2xl border border-dashed border-white/15 bg-black/20 p-5 text-center"><p className="font-black text-white">{title}</p><p className="mt-2 text-sm font-bold leading-7 text-slate-400">{body}</p></div>;
@@ -67,21 +78,14 @@ function StickyTabs({ active, onSelect }: { active: TabId; onSelect: (id: TabId)
   return <><div className="h-[54px] lg:h-[58px]" /><nav className="fixed inset-x-0 top-[64px] z-40 border-y border-white/10 bg-[#04110D]/96 shadow-[0_12px_32px_rgba(0,0,0,.36)] backdrop-blur-xl lg:top-[84px]">{content}</nav></>;
 }
 
-function PredictionWidget({ data }: { data: MatchPageData }) {
-  const [vote, setVote] = useState<string | null>(null);
-  const [totals, setTotals] = useState<VoteTotals>({ home: 0, draw: 0, away: 0, total: 0 });
-  const opts = [{ id: 'home', label: data.homeTeam.name }, { id: 'draw', label: 'تعادل' }, { id: 'away', label: data.awayTeam.name }] as const;
-  useEffect(() => { let cancelled = false; fetch(data.voteEndpoint, { cache: 'no-store' }).then((r) => r.ok ? r.json() : null).then((body) => { if (!cancelled && body?.ok) { setVote(body.myVote || null); setTotals(body.totals || { home: 0, draw: 0, away: 0, total: 0 }); } }).catch(() => undefined); return () => { cancelled = true; }; }, [data.voteEndpoint]);
-  async function choose(id: string) { setVote(id); const res = await fetch(data.voteEndpoint, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ choice: id }) }).catch(() => null); const body = res?.ok ? await res.json().catch(() => null) : null; if (body?.ok) setTotals(body.totals); }
-  return <div className="rounded-2xl border border-[#F8C846]/20 bg-[#F8C846]/10 p-4"><h3 className="mb-3 text-lg font-black text-[#F8C846]">توقع الجمهور</h3><div className="grid gap-2 sm:grid-cols-3">{opts.map((o) => { const value = totals[o.id] || 0; const percent = totals.total ? Math.round((value / totals.total) * 100) : 0; return <button key={o.id} onClick={() => choose(o.id)} className={`rounded-xl border px-3 py-3 text-sm font-black ${vote === o.id ? 'border-[#18E58F] bg-[#18E58F] text-black' : 'border-white/10 bg-black/25 text-white'}`}><span className="block truncate">{o.label}</span><span className="mt-1 block text-[11px] opacity-75">{ar.format(percent)}%</span></button>; })}</div><p className="mt-3 text-xs font-bold text-slate-400">إجمالي الأصوات: {ar.format(totals.total)}</p></div>;
+function LiveEventPitch({ data }: { data: MatchPageData }) {
+  const plotted = data.events.slice(-12);
+  const latest = data.events[data.events.length - 1] || null;
+  return <div className="relative min-h-[360px] overflow-hidden rounded-[1.4rem] border border-[#18E58F]/25 bg-[#0c3f2b] p-3 shadow-inner"><div className="absolute inset-3 rounded-[1rem] border-2 border-white/35" /><div className="absolute left-1/2 top-3 h-[calc(100%-1.5rem)] w-px -translate-x-1/2 bg-white/35" /><div className="absolute left-1/2 top-1/2 h-24 w-24 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white/35" /><div className="absolute right-3 top-1/2 h-28 w-12 -translate-y-1/2 rounded-l-2xl border-y-2 border-l-2 border-white/30" /><div className="absolute left-3 top-1/2 h-28 w-12 -translate-y-1/2 rounded-r-2xl border-y-2 border-r-2 border-white/30" /><div className="relative z-10 flex items-center justify-between rounded-2xl bg-black/25 px-3 py-2 text-xs font-black text-white"><span>{data.awayTeam.name}</span><span className="text-[#F8C846]">خريطة الأحداث</span><span>{data.homeTeam.name}</span></div>{plotted.map((event, index) => { const isHome = event.teamId === data.homeTeam.id; const isAway = event.teamId === data.awayTeam.id; const baseX = isHome ? 68 : isAway ? 32 : 50; const x = Math.max(12, Math.min(88, baseX + ((index % 3) - 1) * 7)); const minute = typeof event.minute === 'number' ? event.minute : index * 8; const y = Math.max(18, Math.min(86, 18 + (minute / 100) * 68)); return <span key={`${event.id}-dot`} title={`${event.minuteLabel} ${event.type}`} className={`absolute z-20 flex h-8 w-8 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border text-sm font-black shadow-lg ${isHome ? 'border-[#F8C846]/80 bg-[#F8C846] text-black' : isAway ? 'border-[#18E58F]/80 bg-[#18E58F] text-black' : 'border-white/60 bg-white text-black'}`} style={{ left: `${x}%`, top: `${y}%` }}>{event.icon}</span>; })}{latest ? <div className="absolute inset-x-4 bottom-4 z-20 rounded-2xl border border-white/10 bg-black/55 p-3 backdrop-blur"><p className="text-xs font-black text-[#F8C846]">آخر حدث — {latest.minuteLabel}</p><p className="mt-1 line-clamp-2 text-xs font-bold leading-5 text-white">{latest.detail}</p></div> : <div className="absolute inset-x-4 bottom-4 z-20 rounded-2xl border border-white/10 bg-black/45 p-3 text-center text-xs font-bold text-slate-300">تظهر نقاط الأحداث هنا فور وصولها.</div>}</div>;
 }
 
-function Overview({ data }: { data: MatchPageData }) {
-  return <Section id="overview" title="نظرة عامة" icon={<Sparkles size={22} />} hint="ملخص سريع قبل وأثناء وبعد المباراة"><div className="grid gap-4 lg:grid-cols-[1.2fr_.8fr]"><div className="space-y-4"><div className="rounded-2xl border border-white/10 bg-black/20 p-4"><h3 className="mb-3 text-lg font-black text-white">مفاتيح المباراة</h3><ul className="space-y-2">{data.tacticalKeys.map((item) => <li key={item} className="flex gap-2 rounded-xl bg-white/[0.04] p-3 text-sm font-bold leading-7 text-slate-200"><Shield className="mt-1 shrink-0 text-[#18E58F]" size={16} />{item}</li>)}</ul></div>{data.digest?.summary ? <div className="rounded-2xl border border-sky-300/20 bg-sky-400/10 p-4"><h3 className="mb-2 text-lg font-black text-sky-100">ملخص التقرير</h3><p className="text-sm font-bold leading-8 text-slate-200">{data.digest.summary}</p></div> : null}</div><PredictionWidget data={data} /></div></Section>;
-}
-
-function EventsPanel({ events }: { events: MatchEventView[] }) {
-  return <Section id="events" title="الأحداث المباشرة" icon={<Radio size={22} />} hint="TheStatsAPI و iSport يعملان تلقائيًا أثناء وبعد المباراة"><div className="relative space-y-3 before:absolute before:right-[22px] before:top-3 before:h-[calc(100%-24px)] before:w-px before:bg-[#18E58F]/30">{events.length ? events.map((event) => <article key={event.id} className="relative pr-12"><div className="absolute right-0 top-1 flex h-11 w-11 items-center justify-center rounded-full border border-[#18E58F]/30 bg-[#18E58F]/12 text-sm font-black"><span>{event.icon}</span></div><div className="rounded-2xl border border-white/10 bg-black/25 p-3"><div className="mb-1 flex flex-wrap items-center gap-2"><b className="rounded-full bg-white/10 px-2 py-1 text-xs text-white">{event.minuteLabel}</b><span className="rounded-full bg-[#F8C846]/15 px-2 py-1 text-xs font-black text-[#F8C846]">{event.type}</span>{event.playerName ? <span className="text-sm font-black text-white">{event.playerName}</span> : null}</div><p className="text-sm font-bold leading-7 text-slate-200">{event.detail}</p></div></article>) : <Empty title="لا توجد أحداث بعد" body="الأحداث ستظهر تلقائيًا فور وصولها من مزودي البيانات أثناء البث المباشر." />}</div></Section>;
+function EventsPanel({ data }: { data: MatchPageData }) {
+  return <Section id="events" title="الأحداث المباشرة" icon={<Radio size={22} />} hint="قائمة الأحداث مع ملعب تفاعلي يوضح جهة الحدث"><div className="grid gap-4 xl:grid-cols-[1.05fr_.95fr]"><div className="relative space-y-3 before:absolute before:right-[22px] before:top-3 before:h-[calc(100%-24px)] before:w-px before:bg-[#18E58F]/30">{data.events.length ? data.events.map((event) => <article key={event.id} className="relative pr-12"><div className="absolute right-0 top-1 flex h-11 w-11 items-center justify-center rounded-full border border-[#18E58F]/30 bg-[#18E58F]/12 text-sm font-black"><span>{event.icon}</span></div><div className="rounded-2xl border border-white/10 bg-black/25 p-3"><div className="mb-1 flex flex-wrap items-center gap-2"><b className="rounded-full bg-white/10 px-2 py-1 text-xs text-white">{event.minuteLabel}</b><span className="rounded-full bg-[#F8C846]/15 px-2 py-1 text-xs font-black text-[#F8C846]">{event.type}</span>{event.playerName ? <span className="text-sm font-black text-white">{event.playerName}</span> : null}</div><p className="text-sm font-bold leading-7 text-slate-200">{event.detail}</p></div></article>) : <Empty title="لا توجد أحداث بعد" body="الأحداث ستظهر تلقائيًا فور وصولها من مزودي البيانات أثناء البث المباشر." />}</div><LiveEventPitch data={data} /></div></Section>;
 }
 
 function StatRow({ metric, homeName, awayName }: { metric: MatchStatMetric; homeName: string; awayName: string }) {
@@ -94,9 +98,55 @@ function StatsPanel({ data }: { data: MatchPageData }) {
   return <Section id="stats" title="إحصائيات المباراة" icon={<BarChart3 size={22} />} hint={`${ar.format(count)} من ${ar.format(data.stats.length)} مؤشر متوفر`}><div className="mb-4 grid grid-cols-3 gap-2 rounded-2xl border border-white/10 bg-black/25 p-3 text-center text-xs font-black text-slate-300"><span>{data.homeTeam.name}</span><span>المؤشر</span><span>{data.awayTeam.name}</span></div><div className="grid gap-3 lg:grid-cols-2">{data.stats.map((metric) => <StatRow key={metric.key} metric={metric} homeName={data.homeTeam.name} awayName={data.awayTeam.name} />)}</div></Section>;
 }
 
-function PlayerPill({ player }: { player: OfficialLineupPlayer | MatchPlayerLite }) {
-  const number = 'number' in player ? player.number : null;
+function PlayerPill({ player }: { player: PitchPlayer }) {
+  const number = playerNumber(player);
   return <div className="flex items-center justify-between gap-2 rounded-xl bg-white/[0.04] px-3 py-2"><span className="min-w-0 truncate text-sm font-bold text-white">{number ? <b className="ml-2 text-[#F8C846]">{number}</b> : null}{player.name}</span><span className="shrink-0 text-xs font-bold text-slate-500">{player.position || 'غير محدد'}</span></div>;
+}
+
+function formationLines(formation: string | null | undefined, count: number) {
+  const raw = String(formation || '').match(/\d+/g)?.map((n) => Number(n)).filter((n) => Number.isFinite(n) && n > 0) || [];
+  if (raw.length && raw.reduce((sum, n) => sum + n, 1) <= Math.max(count, 11) + 1) return [1, ...raw];
+  if (count >= 11) return [1, 4, 3, 3];
+  if (count >= 7) return [1, 3, 2, count - 6];
+  if (count >= 4) return [1, 2, count - 3];
+  return [Math.max(1, count)];
+}
+
+function slotsFor(players: PitchPlayer[], formation: string | null | undefined, side: PitchSide): PitchSlot[] {
+  const starters = players.slice(0, 11);
+  const lines = formationLines(formation, starters.length);
+  const slots: PitchSlot[] = [];
+  let cursor = 0;
+  const totalLines = Math.max(1, lines.length - 1);
+  lines.forEach((lineCount, lineIndex) => {
+    const actual = Math.max(1, Math.min(lineCount, starters.length - cursor));
+    for (let i = 0; i < actual; i += 1) {
+      const player = starters[cursor++];
+      if (!player) continue;
+      const progress = totalLines ? lineIndex / totalLines : 0;
+      const x = side === 'home' ? 94 - progress * 42 : 6 + progress * 42;
+      const y = actual === 1 ? 50 : 16 + (68 * i) / (actual - 1);
+      slots.push({ player, x, y, side });
+    }
+  });
+  return slots;
+}
+
+function PitchPlayerToken({ slot }: { slot: PitchSlot }) {
+  const image = slot.player.image;
+  const number = playerNumber(slot.player);
+  const captain = playerCaptain(slot.player);
+  return <div className="absolute z-20 flex w-16 -translate-x-1/2 -translate-y-1/2 flex-col items-center text-center sm:w-20" style={{ left: `${slot.x}%`, top: `${slot.y}%` }} title={slot.player.name}><div className={`relative flex h-10 w-10 items-center justify-center overflow-hidden rounded-full border-2 shadow-xl sm:h-12 sm:w-12 ${slot.side === 'home' ? 'border-[#F8C846] bg-[#F8C846]/20' : 'border-[#18E58F] bg-[#18E58F]/20'}`}>{image ? <img src={image} alt={slot.player.name} className="h-full w-full object-cover" loading="lazy" /> : <span className="text-xs font-black text-white">{initials(slot.player.name)}</span>}{number ? <b className="absolute -bottom-1 -right-1 rounded-full bg-black px-1.5 py-0.5 text-[9px] text-white">{number}</b> : null}{captain ? <b className="absolute -left-1 -top-1 rounded-full bg-[#F8C846] px-1 text-[9px] text-black">C</b> : null}</div><span className="mt-1 line-clamp-2 rounded-lg bg-black/55 px-1.5 py-0.5 text-[9px] font-black leading-3 text-white backdrop-blur sm:text-[10px]">{slot.player.name}</span></div>;
+}
+
+function OfficialPitch({ data }: { data: MatchPageData }) {
+  const official = data.officialLineup;
+  const homePlayers: PitchPlayer[] = official?.home?.startingXi?.length ? official.home.startingXi : data.homePlayers.slice(0, 11);
+  const awayPlayers: PitchPlayer[] = official?.away?.startingXi?.length ? official.away.startingXi : data.awayPlayers.slice(0, 11);
+  const homeFormation = official?.home?.formation || '4-3-3';
+  const awayFormation = official?.away?.formation || '4-3-3';
+  const slots = [...slotsFor(awayPlayers, awayFormation, 'away'), ...slotsFor(homePlayers, homeFormation, 'home')];
+  return <div className="relative overflow-hidden rounded-[1.6rem] border border-[#18E58F]/25 bg-[#0b3b28] p-3"><div className="mb-3 flex items-center justify-between gap-2 rounded-2xl bg-black/25 px-3 py-2 text-xs font-black text-white"><span>{data.awayTeam.name} · {awayFormation}</span><span className="text-[#F8C846]">التشكيلة الرسمية على الملعب</span><span>{data.homeTeam.name} · {homeFormation}</span></div><div className="relative h-[620px] overflow-hidden rounded-[1.35rem] border-2 border-white/35 bg-[linear-gradient(90deg,rgba(255,255,255,.05)_0_50%,rgba(255,255,255,.08)_50%_100%)] sm:h-[680px] lg:h-[560px]"><div className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-white/45" /><div className="absolute left-1/2 top-1/2 h-28 w-28 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white/35" /><div className="absolute left-0 top-1/2 h-40 w-16 -translate-y-1/2 rounded-r-3xl border-y-2 border-r-2 border-white/30" /><div className="absolute right-0 top-1/2 h-40 w-16 -translate-y-1/2 rounded-l-3xl border-y-2 border-l-2 border-white/30" /><div className="absolute inset-x-4 top-4 flex justify-between text-[10px] font-black text-white/70"><span>نصف {data.awayTeam.name}</span><span>نصف {data.homeTeam.name}</span></div>{slots.length ? slots.map((slot, index) => <PitchPlayerToken key={`${slot.side}-${slot.player.name}-${index}`} slot={slot} />) : <div className="absolute inset-0 grid place-items-center p-6"><Empty title="التشكيل لم يصل بعد" body="سيظهر تلقائيًا على الملعب عند وصول التشكيل الرسمي من مزودي البيانات." /></div>}</div>{official ? <p className="mt-3 text-center text-xs font-bold text-slate-300">المصدر: {official.source}</p> : <p className="mt-3 text-center text-xs font-bold text-slate-300">عرض مؤقت من قائمة اللاعبين لحين وصول التشكيل الرسمي.</p>}</div>;
 }
 
 function OfficialLineupColumn({ title, team }: { title: string; team: OfficialLineupTeam | null }) {
@@ -104,25 +154,26 @@ function OfficialLineupColumn({ title, team }: { title: string; team: OfficialLi
   return <div className="rounded-2xl border border-white/10 bg-black/25 p-4"><div className="mb-3 flex items-center justify-between gap-2"><h3 className="text-lg font-black text-white">{team.teamName || title}</h3>{team.formation ? <span className="rounded-full bg-[#18E58F]/15 px-2 py-1 text-xs font-black text-[#18E58F]">{team.formation}</span> : null}</div><div className="space-y-3"><div><p className="mb-2 text-xs font-black text-[#F8C846]">الأساسي</p><div className="grid gap-2">{team.startingXi.map((p, i) => <PlayerPill key={`${p.name}-${i}`} player={p} />)}</div></div>{team.substitutes.length ? <div><p className="mb-2 text-xs font-black text-slate-400">البدلاء</p><div className="grid gap-2">{team.substitutes.map((p, i) => <PlayerPill key={`${p.name}-sub-${i}`} player={p} />)}</div></div> : null}</div></div>;
 }
 
-function FallbackPlayersColumn({ title, team, players }: { title: string; team: MatchPageData['homeTeam']; players: MatchPlayerLite[] }) {
-  return <div className="rounded-2xl border border-white/10 bg-black/25 p-4"><div className="mb-3 flex items-center gap-2"><FlagImg team={team} small /><h3 className="text-lg font-black text-white">{title}</h3></div>{players.length ? <div className="grid gap-2">{players.map((p) => <PlayerPill key={p.id} player={p} />)}</div> : <Empty title="التشكيل الرسمي غير متوفر الآن" body="سيتم جلبه تلقائيًا بمجرد ظهوره في مزودي البيانات، بدون تدخل يدوي." />}</div>;
-}
-
 function LineupsPanel({ data }: { data: MatchPageData }) {
   const official = data.officialLineup;
-  return <Section id="lineups" title="التشكيل والقوائم" icon={<Users size={22} />} hint={official ? `تشكيل رسمي من ${official.source}` : 'يتم تحديث التشكيل تلقائيًا عند توفره'}>{official ? <div className="grid gap-4 lg:grid-cols-2"><OfficialLineupColumn title={data.homeTeam.name} team={official.home} /><OfficialLineupColumn title={data.awayTeam.name} team={official.away} /></div> : <div className="grid gap-4 lg:grid-cols-2"><FallbackPlayersColumn title={data.homeTeam.name} team={data.homeTeam} players={data.homePlayers} /><FallbackPlayersColumn title={data.awayTeam.name} team={data.awayTeam} players={data.awayPlayers} /></div>}</Section>;
+  return <Section id="lineups" title="التشكيل الرسمي" icon={<Users size={22} />} hint={official ? `خطة ${data.homeTeam.name}: ${official.home?.formation || 'غير متوفر'} · خطة ${data.awayTeam.name}: ${official.away?.formation || 'غير متوفر'}` : 'سيظهر التشكيل الرسمي تلقائيًا على الملعب عند توفره'}><div className="space-y-4"><OfficialPitch data={data} />{official ? <div className="grid gap-4 lg:grid-cols-2"><OfficialLineupColumn title={data.homeTeam.name} team={official.home} /><OfficialLineupColumn title={data.awayTeam.name} team={official.away} /></div> : null}</div></Section>;
 }
 
 function StandingMobileCard({ row, compact = false }: { row: StandingRow; compact?: boolean }) {
   return <article className="rounded-2xl border border-white/10 bg-black/25 p-3 text-white"><div className="mb-3 flex items-center justify-between gap-2"><div className="flex min-w-0 items-center gap-2"><span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[#F8C846] text-sm font-black text-black">{ar.format(row.rank)}</span>{row.image ? <img src={row.image} alt="" className="h-5 w-7 shrink-0 rounded object-cover" /> : null}<span className="truncate text-sm font-black">{row.teamName}</span></div>{compact ? <span className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-black ${row.qualifies ? 'bg-[#18E58F] text-black' : 'bg-white/10 text-slate-300'}`}>{row.qualifies ? 'يتأهل' : 'ينتظر'}</span> : null}</div><div className="grid grid-cols-4 gap-1.5 text-center text-[10px] font-black"><span className="rounded-xl bg-white/[0.06] p-2"><b className="block text-[#F8C846]">{ar.format(row.played)}</b>لعب</span><span className="rounded-xl bg-white/[0.06] p-2"><b className="block text-[#18E58F]">{ar.format(row.points)}</b>نقاط</span><span className="rounded-xl bg-white/[0.06] p-2"><b className="block text-white">{gd(row.goalDifference)}</b>فارق</span><span className="rounded-xl bg-white/[0.06] p-2"><b className="block text-white">{ar.format(row.goalsFor)}</b>أهداف</span></div></article>;
 }
 
-function StandingsTable({ rows, compact = false }: { rows: StandingRow[]; compact?: boolean }) {
-  return <div>{rows.length ? <div className="grid gap-2 md:hidden">{rows.map((row) => <StandingMobileCard key={`${row.teamId}-${row.rank}-mobile`} row={row} compact={compact} />)}</div> : <Empty title="الترتيب غير متوفر" body="سيظهر ترتيب المجموعة بعد توفر مباريات المجموعة ونتائجها." />}<div className="hidden overflow-x-auto md:block"><table className="w-full min-w-[620px] border-separate border-spacing-y-2 text-right text-sm"><thead><tr className="text-xs text-slate-500"><th className="px-3">#</th><th className="px-3">المنتخب</th><th className="px-3">لعب</th><th className="px-3">ف</th><th className="px-3">ت</th><th className="px-3">خ</th><th className="px-3">له</th><th className="px-3">عليه</th><th className="px-3">فارق</th><th className="px-3">نقاط</th>{compact ? <th className="px-3">الحالة</th> : null}</tr></thead><tbody>{rows.map((row) => <tr key={`${row.teamId}-${row.rank}`} className="bg-black/25 text-white"><td className="rounded-r-xl px-3 py-3 font-black text-[#F8C846]">{ar.format(row.rank)}</td><td className="px-3 py-3"><span className="inline-flex items-center gap-2 font-black">{row.image ? <img src={row.image} alt="" className="h-4 w-6 rounded object-cover" /> : null}{row.teamName}</span></td><td className="px-3">{ar.format(row.played)}</td><td className="px-3">{ar.format(row.won)}</td><td className="px-3">{ar.format(row.drawn)}</td><td className="px-3">{ar.format(row.lost)}</td><td className="px-3">{ar.format(row.goalsFor)}</td><td className="px-3">{ar.format(row.goalsAgainst)}</td><td className="px-3">{gd(row.goalDifference)}</td><td className="px-3 font-black text-[#18E58F]">{ar.format(row.points)}</td>{compact ? <td className="rounded-l-xl px-3"><span className={`rounded-full px-2 py-1 text-[11px] font-black ${row.qualifies ? 'bg-[#18E58F] text-black' : 'bg-white/10 text-slate-300'}`}>{row.qualifies ? 'يتأهل' : 'ينتظر'}</span></td> : <td className="rounded-l-xl" />}</tr>)}</tbody></table></div></div>;
+function StandingsTable({ rows }: { rows: StandingRow[] }) {
+  return <div>{rows.length ? <div className="grid gap-2 md:hidden">{rows.map((row) => <StandingMobileCard key={`${row.teamId}-${row.rank}-mobile`} row={row} />)}</div> : <Empty title="الترتيب غير متوفر" body="سيظهر ترتيب المجموعة بعد توفر مباريات المجموعة ونتائجها." />}<div className="hidden overflow-x-auto md:block"><table className="w-full min-w-[620px] border-separate border-spacing-y-2 text-right text-sm"><thead><tr className="text-xs text-slate-500"><th className="px-3">#</th><th className="px-3">المنتخب</th><th className="px-3">لعب</th><th className="px-3">ف</th><th className="px-3">ت</th><th className="px-3">خ</th><th className="px-3">له</th><th className="px-3">عليه</th><th className="px-3">فارق</th><th className="px-3">نقاط</th></tr></thead><tbody>{rows.map((row) => <tr key={`${row.teamId}-${row.rank}`} className="bg-black/25 text-white"><td className="rounded-r-xl px-3 py-3 font-black text-[#F8C846]">{ar.format(row.rank)}</td><td className="px-3 py-3"><span className="inline-flex items-center gap-2 font-black">{row.image ? <img src={row.image} alt="" className="h-4 w-6 rounded object-cover" /> : null}{row.teamName}</span></td><td className="px-3">{ar.format(row.played)}</td><td className="px-3">{ar.format(row.won)}</td><td className="px-3">{ar.format(row.drawn)}</td><td className="px-3">{ar.format(row.lost)}</td><td className="px-3">{ar.format(row.goalsFor)}</td><td className="px-3">{ar.format(row.goalsAgainst)}</td><td className="px-3">{gd(row.goalDifference)}</td><td className="rounded-l-xl px-3 font-black text-[#18E58F]">{ar.format(row.points)}</td></tr>)}</tbody></table></div></div>;
+}
+
+function ThirdsRail({ rows }: { rows: StandingRow[] }) {
+  if (!rows.length) return <Empty title="أفضل الثوالث غير متوفر" body="سيظهر تلقائيًا بعد اكتمال بيانات المجموعات." />;
+  return <div className="-mx-3 overflow-x-auto px-3 pb-2"><div className="flex min-w-max gap-3">{rows.map((row) => <article key={`${row.teamId}-${row.rank}-third`} className="w-[170px] shrink-0 rounded-2xl border border-white/10 bg-black/25 p-3 text-white"><div className="mb-2 flex items-center justify-between"><span className="rounded-xl bg-[#F8C846] px-2 py-1 text-xs font-black text-black">#{ar.format(row.rank)}</span><span className={`rounded-full px-2 py-1 text-[10px] font-black ${row.qualifies ? 'bg-[#18E58F] text-black' : 'bg-white/10 text-slate-300'}`}>{row.qualifies ? 'يتأهل' : 'ينتظر'}</span></div><div className="flex items-center gap-2">{row.image ? <img src={row.image} alt="" className="h-5 w-7 rounded object-cover" /> : null}<h4 className="truncate text-sm font-black">{row.teamName}</h4></div><div className="mt-3 grid grid-cols-3 gap-1 text-center text-[10px] font-black"><span className="rounded-lg bg-white/[0.06] p-2"><b className="block text-[#18E58F]">{ar.format(row.points)}</b>نقاط</span><span className="rounded-lg bg-white/[0.06] p-2"><b className="block text-white">{gd(row.goalDifference)}</b>فارق</span><span className="rounded-lg bg-white/[0.06] p-2"><b className="block text-white">{ar.format(row.goalsFor)}</b>أهداف</span></div></article>)}</div></div>;
 }
 
 function StandingsPanel({ data }: { data: MatchPageData }) {
-  return <Section id="standings" title="الترتيب وتأثير النتيجة" icon={<Trophy size={22} />} hint="يحسب من نتائج المجموعة وأفضل الثوالث"><div className="grid gap-4 xl:grid-cols-[1fr_.9fr]"><div><h3 className="mb-3 text-lg font-black text-white">{data.groupLabel || 'ترتيب المجموعة'}</h3><StandingsTable rows={data.groupStandings} /></div><div className="space-y-4"><div className="rounded-2xl border border-[#18E58F]/20 bg-[#18E58F]/10 p-3 sm:p-4"><h3 className="mb-3 text-lg font-black text-[#18E58F]">تأثير النتيجة</h3>{data.matchImpact.length ? <ul className="grid gap-2">{data.matchImpact.map((item) => <li key={item} className="rounded-xl bg-black/25 p-3 text-sm font-bold leading-7 text-slate-200">{item}</li>)}</ul> : <Empty title="التأثير غير متوفر" body="سيظهر تلقائيًا بعد حساب ترتيب المجموعة." />}</div><div><h3 className="mb-3 text-lg font-black text-white">أفضل الثوالث</h3><StandingsTable rows={data.thirdPlaceTable.slice(0, 8)} compact /></div></div></div></Section>;
+  return <Section id="standings" title="الترتيب وتأثير النتيجة" icon={<Trophy size={22} />} hint="ترتيب المجموعة وأفضل الثوالث بالعرض"><div className="space-y-5"><div><h3 className="mb-3 text-lg font-black text-white">{data.groupLabel || 'ترتيب المجموعة'}</h3><StandingsTable rows={data.groupStandings} /></div><div className="rounded-2xl border border-[#18E58F]/20 bg-[#18E58F]/10 p-3 sm:p-4"><h3 className="mb-3 text-lg font-black text-[#18E58F]">تأثير النتيجة</h3>{data.matchImpact.length ? <ul className="grid gap-2 sm:grid-cols-2">{data.matchImpact.map((item) => <li key={item} className="rounded-xl bg-black/25 p-3 text-sm font-bold leading-7 text-slate-200">{item}</li>)}</ul> : <Empty title="التأثير غير متوفر" body="سيظهر تلقائيًا بعد حساب ترتيب المجموعة." />}</div><div><h3 className="mb-3 text-lg font-black text-white">أفضل الثوالث</h3><ThirdsRail rows={data.thirdPlaceTable.slice(0, 8)} /></div></div></Section>;
 }
 
 function AnalysisPanel({ data }: { data: MatchPageData }) {
@@ -139,5 +190,5 @@ export default function ProfessionalMatchPageClient({ data }: { data: MatchPageD
   function selectTab(id: TabId) { setActiveTab(id); const target = document.getElementById(id); if (!target || typeof window === 'undefined') return; if (lockRef.current) window.clearTimeout(lockRef.current); const offset = window.innerWidth < 1024 ? 126 : 150; const top = target.getBoundingClientRect().top + window.scrollY - offset; window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' }); lockRef.current = window.setTimeout(() => { lockRef.current = null; }, 900); }
   useEffect(() => { const observer = new IntersectionObserver((entries) => { if (lockRef.current) return; const visible = entries.filter((entry) => entry.isIntersecting).sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0]; if (visible?.target?.id) setActiveTab(visible.target.id as TabId); }, { rootMargin: '-34% 0px -55% 0px', threshold: [0.1, 0.35, 0.6] }); tabs.forEach(([id]) => { const el = document.getElementById(id); if (el) observer.observe(el); }); return () => observer.disconnect(); }, []);
   async function share() { const text = `${pageTitle} — ${data.status.label}`; if (typeof window === 'undefined') return; const nav = window.navigator as Navigator & { share?: (shareData: ShareData) => Promise<void>; clipboard?: Clipboard }; if (typeof nav.share === 'function') { await nav.share({ title: data.title, text, url: window.location.href }).catch(() => undefined); return; } if (nav.clipboard) await nav.clipboard.writeText(`${text}\n${window.location.href}`).catch(() => undefined); }
-  return <main className="min-h-screen bg-[#04110D] px-2 pb-20 pt-3 text-white sm:px-4 sm:pt-4" dir="rtl"><MatchAutoRefresh intervalMs={refreshMs} /><div className="mx-auto max-w-7xl space-y-4 sm:space-y-5"><Hero data={data} onRefresh={refresh} onShare={share} /><StickyTabs active={activeTab} onSelect={selectTab} /><EventsPanel events={data.events} /><Overview data={data} /><StatsPanel data={data} /><LineupsPanel data={data} /><StandingsPanel data={data} /><AnalysisPanel data={data} /></div></main>;
+  return <main className="min-h-screen bg-[#04110D] px-2 pb-20 pt-3 text-white sm:px-4 sm:pt-4" dir="rtl"><MatchAutoRefresh intervalMs={refreshMs} /><div className="mx-auto max-w-7xl space-y-4 sm:space-y-5"><Hero data={data} onRefresh={refresh} onShare={share} /><StickyTabs active={activeTab} onSelect={selectTab} /><EventsPanel data={data} /><StatsPanel data={data} /><LineupsPanel data={data} /><StandingsPanel data={data} /><AnalysisPanel data={data} /></div></main>;
 }
