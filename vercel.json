@@ -1,6 +1,10 @@
 {
   "crons": [
     {
+      "path": "/api/cron/worldcup-live-auto",
+      "schedule": "*/5 * * * *"
+    },
+    {
       "path": "/api/cron/live-market-sync",
       "schedule": "*/5 * * * *"
     },
