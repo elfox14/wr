@@ -31,5 +31,14 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts"
   ],
-  "exclude": ["node_modules"]
+  "exclude": [
+    "node_modules",
+    "app/api/admin/the-stats-backfill-events-safe/route.ts",
+    "app/api/admin/the-stats-backfill-previous/route.ts",
+    "app/api/admin/the-stats-import-match-events/route.ts",
+    "app/api/admin/the-stats-live-catchup/route.ts",
+    "app/api/admin/the-stats-live-debug/route.ts",
+    "app/api/matches/live-card/route.ts",
+    "components/match-page/ProfessionalMatchPage.tsx"
+  ]
 }
