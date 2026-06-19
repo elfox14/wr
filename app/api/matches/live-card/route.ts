@@ -22,7 +22,6 @@ const MATCH_SELECT = {
 
 const LIVE_STATUSES = ['1H', '2H', 'ET', 'BT', 'P', 'LIVE', 'IN_PLAY'];
 const SECOND_HALF_STATUSES = ['2H'];
-const FIRST_HALF_STATUSES = ['1H'];
 const HALF_TIME_STATUSES = ['HT', 'HALFTIME', 'HALF_TIME', 'HALF-TIME', 'PAUSED'];
 const SCHEDULED_STATUSES = ['SCHEDULED', 'TIMED', 'NOT_STARTED', 'NS'];
 const FINISHED_STATUSES = ['FT', 'AET', 'PEN', 'FINISHED', 'FULL_TIME', 'ENDED'];
@@ -38,6 +37,12 @@ function normalizeStatus(value?: string | null) {
 
 function rawStatus(value: any) {
   return String(value?.fixture?.status?.short || value?.fixture?.status?.long || value?.providerStatus || value?.status || '').toUpperCase();
+}
+
+function nullableNumber(value: unknown) {
+  if (value === null || value === undefined || value === '') return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
 }
 
 function statusFromISportsState(value: unknown, minute: number | null) {
@@ -76,16 +81,6 @@ function isFinishedStatus(status: string) {
 
 function isSecondHalfStatus(status: string) {
   return SECOND_HALF_STATUSES.includes(normalizeStatus(status));
-}
-
-function isFirstHalfStatus(status: string) {
-  return FIRST_HALF_STATUSES.includes(normalizeStatus(status));
-}
-
-function nullableNumber(value: unknown) {
-  if (value === null || value === undefined || value === '') return null;
-  const n = Number(value);
-  return Number.isFinite(n) ? n : null;
 }
 
 function hasAnyNumber(...values: unknown[]) {
@@ -128,31 +123,13 @@ function liveMinuteForStatus(status: string, providerState: any, snapshotState: 
   return rawMinute;
 }
 
-function liveMinuteLabel(minute: number | null, status: string) {
-  if (minute === null) return null;
-  const normalized = normalizeStatus(status);
-  if (isFirstHalfStatus(normalized) && minute > 45 && minute < 60) return `45+${minute - 45}`;
-  if (isSecondHalfStatus(normalized) && minute < 45) return '45';
-  if (minute > 90 && minute < 120) return `90+${minute - 90}`;
-  return String(minute);
-}
-
 function phaseStatus(status: string) {
   const normalized = normalizeStatus(status);
-  if (isSecondHalfStatus(normalized)) return '2H';
-  if (isFirstHalfStatus(normalized)) return '1H';
+  if (normalized === '2H') return '2H';
+  if (normalized === '1H') return '1H';
   if (normalized === 'ET') return 'ET';
   if (normalized === 'P' || normalized === 'PEN') return 'PEN';
   return 'IN_PLAY';
-}
-
-function liveLabelFor(status: string, minuteLabel: string | null) {
-  const phase = phaseStatus(status);
-  if (phase === '1H') return minuteLabel ? `الشوط الأول — د${minuteLabel}` : 'الشوط الأول';
-  if (phase === '2H') return minuteLabel ? `الشوط الثاني — د${minuteLabel}` : 'الشوط الثاني';
-  if (phase === 'ET') return minuteLabel ? `وقت إضافي — د${minuteLabel}` : 'وقت إضافي';
-  if (phase === 'PEN') return 'ركلات الترجيح';
-  return minuteLabel ? `جارية الآن — د${minuteLabel}` : 'جارية الآن';
 }
 
 async function fetchLatestScoreSnapshots(matchIds: string[]) {
@@ -220,7 +197,6 @@ function decorateMatch(match: any, now: Date, providerState?: any, snapshotState
   const useSnapshotScore = !providerHasScore && snapshotHasScore && (isLiveNow || isHalfTime || isFinished);
   const scoreSource = providerHasScore ? 'provider' : useSnapshotScore ? 'snapshot' : 'match';
   const minute = isLiveNow ? liveMinuteForStatus(effectiveStatus, providerState, snapshotState, freshSnapshot) : null;
-  const minuteLabel = liveMinuteLabel(minute, effectiveStatus);
   const currentLiveStatus = isLiveNow ? phaseStatus(effectiveStatus) : match.status;
 
   return {
@@ -235,7 +211,6 @@ function decorateMatch(match: any, now: Date, providerState?: any, snapshotState
     isStaleAutoFinished: false,
     displayStatus: isFinished ? 'FINISHED' : isHalfTime ? 'HT' : currentLiveStatus,
     minute,
-    liveLabel: isFinished ? 'انتهت' : isHalfTime ? 'استراحة' : (isLiveNow ? liveLabelFor(effectiveStatus, minuteLabel) : null),
   };
 }
 
