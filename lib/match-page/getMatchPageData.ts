@@ -73,11 +73,11 @@ function sourceChecklist(match: any, statsAvailable: boolean, eventsCount: numbe
   const hasISport = providers.some((provider) => provider.includes('ISPORT'));
   return [
     { label: 'بيانات المباراة والمنتخبين', status: match ? 'ready' : 'missing', note: 'من جدول Match المرتبط بمنتخبي المباراة.' },
-    { label: 'الإحصائيات الحية', status: statsAvailable ? 'ready' : 'missing', note: statsAvailable ? 'تقرأ من MatchStatsSnapshot بأولوية TheStatsAPI ثم iSport.' : 'تحتاج Snapshot من مزود بيانات أو إدخال يدوي.' },
-    { label: 'أحداث المباراة', status: eventsCount > 0 ? 'ready' : 'missing', note: eventsCount > 0 ? 'موجودة في MatchEvent.' : 'أضف الأهداف والبطاقات والتبديلات إلى MatchEvent.' },
-    { label: 'TheStatsAPI Live', status: hasTheStats ? 'ready' : 'optional', note: hasTheStats ? 'موجود في اللقطات الحالية.' : 'مصدر مقترح للإحصائيات الحية.' },
-    { label: 'iSport / Animation', status: hasISport ? 'ready' : 'optional', note: hasISport ? 'مستخدم كدعم للبث والإحصائيات.' : 'مفيد للبث التفاعلي والـTimeline.' },
-    { label: 'التشكيل الرسمي', status: lineup ? 'ready' : 'optional', note: lineup ? `تم العثور على تشكيل من ${lineup.source}.` : 'شغّل TheStatsAPI enrichment أو iSport lineups لظهور التشكيل الرسمي.' },
+    { label: 'الإحصائيات الحية', status: statsAvailable ? 'ready' : 'missing', note: statsAvailable ? 'تقرأ من MatchStatsSnapshot بأولوية TheStatsAPI ثم iSport.' : 'تظهر تلقائيًا بعد وصول Snapshot من مزودي البيانات.' },
+    { label: 'أحداث المباراة', status: eventsCount > 0 ? 'ready' : 'missing', note: eventsCount > 0 ? 'موجودة في MatchEvent.' : 'تصل تلقائيًا من TheStatsAPI وiSport أثناء وبعد المباراة.' },
+    { label: 'TheStatsAPI Live', status: hasTheStats ? 'ready' : 'optional', note: hasTheStats ? 'موجود في اللقطات الحالية.' : 'سيتم فحصه تلقائيًا عبر الكرون.' },
+    { label: 'iSport / Animation', status: hasISport ? 'ready' : 'optional', note: hasISport ? 'مستخدم كدعم للبث والإحصائيات.' : 'سيتم فحصه تلقائيًا عبر الكرون.' },
+    { label: 'التشكيل الرسمي', status: lineup ? 'ready' : 'optional', note: lineup ? `تم العثور على تشكيل من ${lineup.source}.` : 'سيتم جلب التشكيل الرسمي تلقائيًا عند ظهوره في TheStatsAPI أو iSport Lineups.' },
   ];
 }
 
