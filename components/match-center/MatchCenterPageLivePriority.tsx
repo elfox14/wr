@@ -124,7 +124,19 @@ function snapshotMinute(snapshot: any) {
   const data = raw(snapshot);
   const meta = obj(data.meta);
   const flashMeta = obj(data.flashMeta);
-  return n(snapshot?.minute ?? data.minute ?? data.elapsed ?? data.currentMinute ?? meta.elapsed_minutes ?? meta.minute ?? flashMeta.scheduleMinute);
+  const p = provider(snapshot);
+  const directMinute = n(snapshot?.minute ?? data.minute ?? data.elapsed ?? data.currentMinute ?? meta.elapsed_minutes ?? meta.minute);
+
+  // Do not show iSports Flash scheduleMinute as the live clock.
+  // It can be derived from the scheduled kickoff / stale flash metadata and may show a false minute
+  // before reliable timeline records exist. Prefer no minute over a wrong live clock.
+  if (p.includes('ISPORTS_FLASH')) {
+    const scheduleMinute = n(flashMeta.scheduleMinute);
+    const recordsSample = Array.isArray(data.recordsSample) ? data.recordsSample : [];
+    if (directMinute !== null && scheduleMinute !== null && directMinute === scheduleMinute && recordsSample.length === 0) return null;
+  }
+
+  return directMinute;
 }
 
 function statusFromSources(sources: any[]) {
@@ -156,14 +168,14 @@ function metric(sources: any[], key: string, homeKey: string, awayKey: string): 
   return firstPair(...sources.map((snapshot) => snapshotPair(snapshot, key, homeKey, awayKey)));
 }
 
-function minuteFrom(match: any, sources: any[]) {
+function minuteFrom(_match: any, sources: any[]) {
   for (const snapshot of sources) {
     const minute = snapshotMinute(snapshot);
     if (minute !== null) return minute;
   }
 
-  const startMs = new Date(match.matchDate || '').getTime();
-  if (LIVE.includes(String(match.status || '').toUpperCase()) && Number.isFinite(startMs)) return Math.max(1, Math.min(130, Math.floor((Date.now() - startMs) / 60000) + 1));
+  // Never calculate the visible match clock from the scheduled kickoff time.
+  // Schedule/timezone drift is worse than showing "مباشرة الآن" until a provider minute arrives.
   return null;
 }
 
@@ -180,7 +192,7 @@ function clockLabel(match: any, sources: any[]) {
   if (HALF_TIME.includes(status)) return 'استراحة';
   if (LIVE.includes(status)) return minute === null ? 'مباشرة الآن' : `د${fmt(Math.floor(minute))}`;
 
-  // If the DB status is still SCHEDULED but a live provider snapshot already has a minute/score,
+  // If the DB status is still SCHEDULED but a trusted provider snapshot already has a minute/score,
   // treat the match as live instead of showing "delayed start".
   if (minute !== null) return `د${fmt(Math.floor(minute))}`;
   const snapshotScore = sources.map(scoreFromSnapshot).find(Boolean) as ScorePair | null;
