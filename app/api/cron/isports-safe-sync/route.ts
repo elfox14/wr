@@ -59,6 +59,105 @@ function hasLikelyFinalSnapshot(match: any, latest: any) {
   return capturedAt >= start + 105 * 60_000;
 }
 
+function num(value: any) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+function teamName(match: any, side: 'home' | 'away') {
+  const team = side === 'home' ? match.homeTeam : match.awayTeam;
+  return team?.name || team?.code || (side === 'home' ? 'الفريق الأول' : 'الفريق الثاني');
+}
+
+function teamId(match: any, side: 'home' | 'away') {
+  return side === 'home' ? match.homeTeamId : match.awayTeamId;
+}
+
+async function latestISportsSnapshot(matchId: string) {
+  try {
+    return await prisma.matchStatsSnapshot.findFirst({
+      where: { matchId, provider: 'ISPORTS' },
+      orderBy: { capturedAt: 'desc' },
+    });
+  } catch {
+    return null;
+  }
+}
+
+async function saveGeneratedEvent(match: any, event: { minute: number | null; type: string; side: 'home' | 'away'; detail: string }) {
+  const detail = event.detail.slice(0, 240);
+  const existing = await prisma.matchEvent.findFirst({
+    where: {
+      matchId: match.id,
+      minute: event.minute,
+      type: event.type,
+      detail,
+      sourceName: 'MC PRIME iSport Monitor',
+    },
+    select: { id: true },
+  });
+  if (existing) return null;
+  return prisma.matchEvent.create({
+    data: {
+      matchId: match.id,
+      minute: event.minute,
+      type: event.type,
+      teamId: teamId(match, event.side),
+      playerName: null,
+      detail,
+      sourceName: 'MC PRIME iSport Monitor',
+      sourceUrl: null,
+    },
+  });
+}
+
+async function generateISportsDeltaEvents(match: any, previous: any, stats: any) {
+  if (!stats) return [];
+  const minute = num(stats.minute);
+  const events: Array<{ minute: number | null; type: string; side: 'home' | 'away'; detail: string }> = [];
+
+  function addDelta(side: 'home' | 'away', field: string, type: string, label: string, minDelta = 1) {
+    const before = previous ? num(previous[field]) : 0;
+    const after = num(stats[field]);
+    if (after === null || before === null || after - before < minDelta) return;
+    const diff = after - before;
+    const suffix = diff > 1 ? ` +${diff}` : '';
+    events.push({ minute, type, side, detail: `${teamName(match, side)} - د${minute ?? '-'}' - ${label}${suffix} (الإجمالي ${after})` });
+  }
+
+  function addScore(side: 'home' | 'away') {
+    const field = side === 'home' ? 'homeScore' : 'awayScore';
+    const before = previous ? num(previous[field]) : num(match[field]);
+    const after = num(stats[field]);
+    if (after === null || before === null || after <= before) return;
+    events.push({ minute, type: 'goal', side, detail: `${teamName(match, side)} - د${minute ?? '-'}' - هدف من iSport Animation (النتيجة ${stats.homeScore ?? match.homeScore}-${stats.awayScore ?? match.awayScore})` });
+  }
+
+  addScore('home');
+  addScore('away');
+  addDelta('home', 'homeShotsOnTarget', 'shot_on_target', 'تسديدة على المرمى');
+  addDelta('away', 'awayShotsOnTarget', 'shot_on_target', 'تسديدة على المرمى');
+  addDelta('home', 'homeShots', 'shot', 'تسديدة');
+  addDelta('away', 'awayShots', 'shot', 'تسديدة');
+  addDelta('home', 'homeShotsOffTarget', 'shot_off_target', 'تسديدة خارج المرمى');
+  addDelta('away', 'awayShotsOffTarget', 'shot_off_target', 'تسديدة خارج المرمى');
+  addDelta('home', 'homeCorners', 'corner', 'ركنية');
+  addDelta('away', 'awayCorners', 'corner', 'ركنية');
+  addDelta('home', 'homeDangerousAttacks', 'dangerous_attack', 'هجمة خطيرة');
+  addDelta('away', 'awayDangerousAttacks', 'dangerous_attack', 'هجمة خطيرة');
+  addDelta('home', 'homeYellowCards', 'yellow_card', 'بطاقة صفراء');
+  addDelta('away', 'awayYellowCards', 'yellow_card', 'بطاقة صفراء');
+  addDelta('home', 'homeRedCards', 'red_card', 'بطاقة حمراء');
+  addDelta('away', 'awayRedCards', 'red_card', 'بطاقة حمراء');
+
+  const saved = [];
+  for (const event of events) {
+    const row = await saveGeneratedEvent(match, event);
+    if (row) saved.push(row);
+  }
+  return saved;
+}
+
 async function fallback(match: any, reason: string, debug: boolean) {
   try {
     return await syncFootballDataFallbackForMatch(match, { reason, debug });
@@ -128,15 +227,16 @@ export async function GET(req: Request) {
 
     for (const match of matches) {
       const latest = await getLatestSnapshot(match.id);
-      const ageMinutes = snapshotAgeMinutes(latest);
+      const latestISports = await latestISportsSnapshot(match.id);
+      const ageMinutes = snapshotAgeMinutes(latestISports || latest);
 
-      if (!hasSingleMatchId && latest && ageMinutes < minStatsIntervalMinutes && !isFinished(match.status)) {
-        processed.push({ matchId: match.id, status: 'recent_snapshot_skipped', snapshotId: latest.id, ageMinutes: Math.round(ageMinutes * 10) / 10, minStatsIntervalMinutes });
+      if (!hasSingleMatchId && latestISports && ageMinutes < minStatsIntervalMinutes && !isFinished(match.status)) {
+        processed.push({ matchId: match.id, status: 'recent_isports_snapshot_skipped', snapshotId: latestISports.id, ageMinutes: Math.round(ageMinutes * 10) / 10, minStatsIntervalMinutes });
         continue;
       }
 
       if (!hasSingleMatchId && isFinished(match.status) && hasLikelyFinalSnapshot(match, latest)) {
-        processed.push({ matchId: match.id, status: 'final_snapshot_already_saved', snapshotId: latest.id, minute: latest.minute, capturedAt: latest.capturedAt });
+        processed.push({ matchId: match.id, status: 'final_snapshot_already_saved', snapshotId: latest?.id, minute: latest?.minute, capturedAt: latest?.capturedAt });
         continue;
       }
 
@@ -148,7 +248,8 @@ export async function GET(req: Request) {
 
       try {
         const result = await syncMatchStats(match, { debug });
-        processed.push({ matchId: match.id, status: result.status, snapshotId: result.snapshotId, stats: result.stats, savedEventsCount: result.savedEvents?.length || 0 });
+        const deltaEvents = await generateISportsDeltaEvents(match, latestISports, result.stats);
+        processed.push({ matchId: match.id, status: result.status, snapshotId: result.snapshotId, stats: result.stats, savedEventsCount: (result.savedEvents?.length || 0) + deltaEvents.length, rawSavedEventsCount: result.savedEvents?.length || 0, deltaSavedEventsCount: deltaEvents.length });
       } catch (error: any) {
         const why = reasonFrom(error);
         if (isProviderQuotaError(error)) {
