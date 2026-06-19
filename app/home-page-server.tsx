@@ -138,6 +138,7 @@ export default async function Home() {
   let upcomingMatchesCount = 0;
   let upcomingMatches: unknown[] = [];
   let tickerMatches: unknown[] = [];
+  let regionTeams: unknown[] = [];
   let nextMarqueeMatch: any = null;
 
   try {
@@ -149,6 +150,7 @@ export default async function Home() {
       tickerMatchesRaw,
       liveCandidatesRaw,
       nextMatchRaw,
+      regionTeamsRaw,
     ] = await Promise.all([
       prisma.asset.count({ where: { type: 'PLAYER' } }),
       prisma.asset.count({ where: { type: 'TEAM' } }),
@@ -190,6 +192,11 @@ export default async function Home() {
         orderBy: { matchDate: 'asc' },
         include: { homeTeam: true, awayTeam: true },
       }),
+      prisma.asset.findMany({
+        where: { type: 'TEAM' },
+        select: { id: true, name: true, code: true, image: true, continent: true, group: true },
+        orderBy: [{ continent: 'asc' }, { name: 'asc' }],
+      }),
     ]);
 
     const freshLiveMatch = await findFreshLiveCandidate(liveCandidatesRaw, now);
@@ -198,11 +205,13 @@ export default async function Home() {
     upcomingMatchesCount = totalUpcomingMatches;
     upcomingMatches = JSON.parse(JSON.stringify(upcomingMatchesRaw));
     tickerMatches = JSON.parse(JSON.stringify(tickerMatchesRaw));
+    regionTeams = JSON.parse(JSON.stringify(regionTeamsRaw));
     nextMarqueeMatch = freshLiveMatch || nextMatchRaw ? JSON.parse(JSON.stringify(freshLiveMatch || nextMatchRaw)) : null;
   } catch (error) {
     console.error('Error fetching dashboard data:', error);
     upcomingMatches = [];
     tickerMatches = [];
+    regionTeams = [];
   }
 
   return (
@@ -210,6 +219,7 @@ export default async function Home() {
       upcomingMatches={upcomingMatches}
       tickerMatches={tickerMatches}
       nextMarqueeMatch={nextMarqueeMatch}
+      regionTeams={regionTeams}
       playersCount={playersCount}
       teamsCount={teamsCount}
       upcomingMatchesCount={upcomingMatchesCount}
