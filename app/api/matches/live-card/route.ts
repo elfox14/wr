@@ -26,12 +26,7 @@ const FIRST_HALF_STATUSES = ['1H'];
 const HALF_TIME_STATUSES = ['HT', 'HALFTIME', 'HALF_TIME', 'HALF-TIME', 'PAUSED'];
 const SCHEDULED_STATUSES = ['SCHEDULED', 'TIMED', 'NOT_STARTED', 'NS'];
 const FINISHED_STATUSES = ['FT', 'AET', 'PEN', 'FINISHED', 'FULL_TIME', 'ENDED'];
-const GROUP_STAGE_MAX_LIVE_MINUTES = 115;
-const KNOCKOUT_MAX_LIVE_MINUTES = 150;
-const FRESH_LIVE_SNAPSHOT_MS = 4 * 60 * 1000;
-const STALE_FINAL_SNAPSHOT_MS = 7 * 60 * 1000;
-const FINAL_MINUTE_FLOOR = 85;
-const FINAL_LOCAL_MINUTE_FALLBACK = 100;
+const FRESH_LIVE_SNAPSHOT_MS = 8 * 60 * 1000;
 
 function dateKey(date = new Date()) {
   return date.toISOString().slice(0, 10);
@@ -41,14 +36,26 @@ function normalizeStatus(value?: string | null) {
   return String(value || '').toUpperCase();
 }
 
-function minutesFromKickoff(matchDate: Date, now: Date) {
-  const time = new Date(matchDate).getTime();
-  if (!Number.isFinite(time)) return 0;
-  return Math.floor((now.getTime() - time) / 60_000) + 1;
-}
-
 function rawStatus(value: any) {
   return String(value?.fixture?.status?.short || value?.fixture?.status?.long || value?.providerStatus || value?.status || '').toUpperCase();
+}
+
+function statusFromISportsState(value: unknown, minute: number | null) {
+  const state = String(value ?? '').trim().toUpperCase();
+  if (state === '-1' || state === '4' || state === 'FT' || state === 'FINISHED' || state === 'ENDED' || state === 'COMPLETED') return 'FINISHED';
+  if (state === '2' || state === 'HT' || state.includes('HALF')) return 'HT';
+  if (state === '3' || state === '2H' || state.includes('SECOND')) return '2H';
+  if (state === '1' || state === '1H' || state.includes('FIRST')) return '1H';
+  if (state === '5' || state === 'P' || state === 'PEN') return 'PEN';
+  if (minute !== null && minute >= 120) return 'FINISHED';
+  return '';
+}
+
+function statusFromSnapshot(snapshotState: any) {
+  const rawData = snapshotState?.rawData || {};
+  const flashMeta = rawData?.flashMeta || {};
+  const minute = nullableNumber(snapshotState?.minute ?? flashMeta?.scheduleMinute);
+  return rawStatus(rawData) || statusFromISportsState(flashMeta?.matchState, minute);
 }
 
 function isHalftimeStatus(status: string) {
@@ -73,15 +80,6 @@ function isSecondHalfStatus(status: string) {
 
 function isFirstHalfStatus(status: string) {
   return FIRST_HALF_STATUSES.includes(normalizeStatus(status));
-}
-
-function isGroupStage(match: any) {
-  const value = String(match.groupPhase || match.stage || '').toUpperCase();
-  return value.includes('GROUP');
-}
-
-function maxLiveMinutes(match: any) {
-  return isGroupStage(match) ? GROUP_STAGE_MAX_LIVE_MINUTES : KNOCKOUT_MAX_LIVE_MINUTES;
 }
 
 function nullableNumber(value: unknown) {
@@ -114,16 +112,10 @@ function snapshotAgeMs(snapshotState: any, now: Date) {
   return now.getTime() - capturedAt.getTime();
 }
 
-function isFinalSnapshotStale(snapshotState: any, now: Date) {
-  const minute = nullableNumber(snapshotState?.minute);
-  const age = snapshotAgeMs(snapshotState, now);
-  return Boolean(minute !== null && minute >= FINAL_MINUTE_FLOOR && age !== null && age >= STALE_FINAL_SNAPSHOT_MS);
-}
-
 function isFreshLiveSnapshot(snapshotState: any, now: Date) {
   const minute = nullableNumber(snapshotState?.minute);
   const age = snapshotAgeMs(snapshotState, now);
-  return Boolean(minute !== null && age !== null && age <= FRESH_LIVE_SNAPSHOT_MS && !isFinalSnapshotStale(snapshotState, now));
+  return Boolean(minute !== null && age !== null && age <= FRESH_LIVE_SNAPSHOT_MS);
 }
 
 function liveMinuteForStatus(status: string, providerState: any, snapshotState: any, freshSnapshot: boolean) {
@@ -145,18 +137,40 @@ function liveMinuteLabel(minute: number | null, status: string) {
   return String(minute);
 }
 
+function phaseStatus(status: string) {
+  const normalized = normalizeStatus(status);
+  if (isSecondHalfStatus(normalized)) return '2H';
+  if (isFirstHalfStatus(normalized)) return '1H';
+  if (normalized === 'ET') return 'ET';
+  if (normalized === 'P' || normalized === 'PEN') return 'PEN';
+  return 'IN_PLAY';
+}
+
+function liveLabelFor(status: string, minuteLabel: string | null) {
+  const phase = phaseStatus(status);
+  if (phase === '1H') return minuteLabel ? `الشوط الأول — د${minuteLabel}` : 'الشوط الأول';
+  if (phase === '2H') return minuteLabel ? `الشوط الثاني — د${minuteLabel}` : 'الشوط الثاني';
+  if (phase === 'ET') return minuteLabel ? `وقت إضافي — د${minuteLabel}` : 'وقت إضافي';
+  if (phase === 'PEN') return 'ركلات الترجيح';
+  return minuteLabel ? `جارية الآن — د${minuteLabel}` : 'جارية الآن';
+}
+
 async function fetchLatestScoreSnapshots(matchIds: string[]) {
   if (!matchIds.length) return new Map<string, any>();
   try {
     const rows = await prisma.matchStatsSnapshot.findMany({
       where: { matchId: { in: matchIds } },
-      select: { matchId: true, minute: true, homeScore: true, awayScore: true, capturedAt: true, rawData: true },
+      select: { matchId: true, provider: true, minute: true, homeScore: true, awayScore: true, capturedAt: true, rawData: true },
       orderBy: { capturedAt: 'desc' },
     });
     const latestByMatch = new Map<string, any>();
+    const preferredByMatch = new Map<string, any>();
     for (const row of rows) {
       if (!latestByMatch.has(row.matchId)) latestByMatch.set(row.matchId, row);
+      const provider = String(row.provider || '').toUpperCase();
+      if (!preferredByMatch.has(row.matchId) && (provider.includes('ISPORTS_FLASH') || row.rawData?.flashMeta?.matchState)) preferredByMatch.set(row.matchId, row);
     }
+    for (const [matchId, row] of preferredByMatch) latestByMatch.set(matchId, row);
     return latestByMatch;
   } catch (error: any) {
     if (!String(error?.message || '').includes('MatchStatsSnapshot')) {
@@ -190,44 +204,38 @@ async function fetchAnimationLiveState() {
 }
 
 function decorateMatch(match: any, now: Date, providerState?: any, snapshotState?: any) {
-  const matchDate = new Date(match.matchDate);
-  const localMinute = minutesFromKickoff(matchDate, now);
   const dbStatus = normalizeStatus(match.status);
-  const providerStatus = normalizeStatus(providerState?.status || rawStatus(snapshotState?.rawData));
+  const providerStatus = normalizeStatus(providerState?.status || statusFromSnapshot(snapshotState));
   const effectiveStatus = providerStatus || dbStatus;
-  const providerHasState = Boolean(providerStatus);
   const freshSnapshot = isFreshLiveSnapshot(snapshotState, now);
-  const dbLiveStatus = dbStatus === 'IN_PLAY' || dbStatus === 'LIVE';
-  const canAutoFinishByElapsedTime = providerHasState || dbLiveStatus || freshSnapshot;
-  const staleByTime = canAutoFinishByElapsedTime && localMinute >= maxLiveMinutes(match);
-  const staleFinalSnapshot = !providerHasState && isFinalSnapshotStale(snapshotState, now);
-  const noProviderFinalFallback = !providerHasState && dbLiveStatus && localMinute >= FINAL_LOCAL_MINUTE_FALLBACK;
-  const isFinished = staleByTime || staleFinalSnapshot || noProviderFinalFallback || isFinishedStatus(dbStatus) || isFinishedStatus(effectiveStatus);
+  const dbLiveStatus = dbStatus === 'IN_PLAY' || dbStatus === 'LIVE' || dbStatus === '1H' || dbStatus === '2H';
+  const isFinished = isFinishedStatus(dbStatus) || isFinishedStatus(effectiveStatus);
   const isHalfTime = !isFinished && isHalftimeStatus(effectiveStatus);
-  const isProviderLive = !isFinished && isProviderLiveStatus(providerStatus);
-  const isDbLive = !isFinished && !isHalfTime && dbLiveStatus && (providerHasState || freshSnapshot || localMinute < FINAL_LOCAL_MINUTE_FALLBACK);
-  const isLikelyLiveByFreshSnapshot = !isFinished && !isHalfTime && !providerHasState && isScheduledStatus(dbStatus) && freshSnapshot && localMinute >= 1 && localMinute < maxLiveMinutes(match);
-  const isLiveNow = !isFinished && !isHalfTime && (isDbLive || isProviderLive || isLikelyLiveByFreshSnapshot);
+  const isProviderLive = !isFinished && isProviderLiveStatus(effectiveStatus);
+  const isDbLive = !isFinished && !isHalfTime && dbLiveStatus;
+  const isLikelyLiveByFreshSnapshot = !isFinished && !isHalfTime && !providerStatus && isScheduledStatus(dbStatus) && freshSnapshot;
+  const isLiveNow = !isFinished && !isHalfTime && (isProviderLive || isDbLive || isLikelyLiveByFreshSnapshot);
   const providerHasScore = hasAnyNumber(providerState?.homeScore, providerState?.awayScore);
   const snapshotHasScore = hasAnyNumber(snapshotState?.homeScore, snapshotState?.awayScore);
   const useSnapshotScore = !providerHasScore && snapshotHasScore && (isLiveNow || isHalfTime || isFinished);
   const scoreSource = providerHasScore ? 'provider' : useSnapshotScore ? 'snapshot' : 'match';
   const minute = isLiveNow ? liveMinuteForStatus(effectiveStatus, providerState, snapshotState, freshSnapshot) : null;
   const minuteLabel = liveMinuteLabel(minute, effectiveStatus);
+  const currentLiveStatus = isLiveNow ? phaseStatus(effectiveStatus) : match.status;
 
   return {
     ...match,
-    status: isFinished ? 'FINISHED' : isHalfTime ? 'HT' : (isLiveNow ? (isSecondHalfStatus(effectiveStatus) ? '2H' : 'IN_PLAY') : match.status),
+    status: isFinished ? 'FINISHED' : isHalfTime ? 'HT' : currentLiveStatus,
     homeScore: pickLiveScore(providerState?.homeScore, useSnapshotScore ? snapshotState?.homeScore : null, match.homeScore),
     awayScore: pickLiveScore(providerState?.awayScore, useSnapshotScore ? snapshotState?.awayScore : null, match.awayScore),
     scoreSource,
     isLiveNow,
     isHalfTime,
     isLikelyLiveByTime: isLikelyLiveByFreshSnapshot,
-    isStaleAutoFinished: isFinished && (staleByTime || staleFinalSnapshot || noProviderFinalFallback),
-    displayStatus: isFinished ? 'FINISHED' : isHalfTime ? 'HT' : (isLiveNow ? (isSecondHalfStatus(effectiveStatus) ? '2H' : 'IN_PLAY') : match.status),
+    isStaleAutoFinished: false,
+    displayStatus: isFinished ? 'FINISHED' : isHalfTime ? 'HT' : currentLiveStatus,
     minute,
-    liveLabel: isFinished ? 'انتهت' : isHalfTime ? 'استراحة' : (isLiveNow ? (minuteLabel ? `الدقيقة ${minuteLabel}` : 'جارية الآن') : null),
+    liveLabel: isFinished ? 'انتهت' : isHalfTime ? 'استراحة' : (isLiveNow ? liveLabelFor(effectiveStatus, minuteLabel) : null),
   };
 }
 
@@ -250,7 +258,7 @@ export async function GET() {
   const [windowMatches, recentlyFinished, providerStates] = await Promise.all([
     prisma.match.findMany({
       where: {
-        status: { in: ['SCHEDULED', 'TIMED', 'NOT_STARTED', 'NS', 'IN_PLAY', 'LIVE', 'HT'] },
+        status: { in: ['SCHEDULED', 'TIMED', 'NOT_STARTED', 'NS', 'IN_PLAY', 'LIVE', 'HT', '1H', '2H'] },
         matchDate: { gte: liveWindowStart, lte: upcomingUntil },
       },
       orderBy: { matchDate: 'asc' },
