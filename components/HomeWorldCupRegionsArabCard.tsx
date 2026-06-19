@@ -22,8 +22,26 @@ const ARAB_TEAMS = [
   { name: 'الأردن', code: 'JOR', flag: '🇯🇴', region: 'آسيا' },
 ];
 
+const HOST_TEAMS = [
+  { name: 'الولايات المتحدة', code: 'USA', flag: '🇺🇸', note: 'الدولة المستضيفة' },
+  { name: 'كندا', code: 'CAN', flag: '🇨🇦', note: 'الدولة المستضيفة' },
+  { name: 'المكسيك', code: 'MEX', flag: '🇲🇽', note: 'الدولة المستضيفة' },
+];
+
 function formatCount(value: number) {
   return new Intl.NumberFormat('ar-EG').format(value);
+}
+
+function TeamMiniCard({ team }: { team: { name: string; code: string; flag: string; region?: string; note?: string } }) {
+  return (
+    <Link href={`/teams?search=${encodeURIComponent(team.code)}`} className="group/team flex min-w-0 items-center gap-2 rounded-2xl border border-white/10 bg-white/[0.045] px-2.5 py-2 transition hover:border-[#FFD700]/30 hover:bg-white/[0.075]">
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-black/35 text-lg shadow-[0_8px_18px_rgba(0,0,0,0.22)]">{team.flag}</span>
+      <span className="min-w-0 text-right">
+        <span className="block truncate text-xs font-black text-white">{team.name}</span>
+        <span className="mt-0.5 block truncate text-[9px] font-bold text-gray-500">{team.code} • {team.region || team.note}</span>
+      </span>
+    </Link>
+  );
 }
 
 export default function HomeWorldCupRegionsArabCard() {
@@ -38,8 +56,8 @@ export default function HomeWorldCupRegionsArabCard() {
           <span className="inline-flex items-center gap-2 rounded-full border border-[#FFD700]/25 bg-[#FFD700]/10 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.16em] text-[#FFD700]">
             🌐 WORLD MAP
           </span>
-          <h2 className="mt-2 text-xl font-black leading-tight text-white sm:text-2xl">المناطق والدول العربية</h2>
-          <p className="mt-1 text-xs font-bold text-gray-400">توزيع المنتخبات الـ{formatCount(totalTeams)} حسب المناطق الكروية مع إبراز المنتخبات العربية.</p>
+          <h2 className="mt-2 text-xl font-black leading-tight text-white sm:text-2xl">خريطة المونديال</h2>
+          <p className="mt-1 text-xs font-bold text-gray-400">توزيع المنتخبات الـ{formatCount(totalTeams)} حسب المناطق، مع المنتخبات العربية والدول المستضيفة.</p>
         </div>
         <Link href="/teams" className="mobile-tap rounded-full border border-[#0FF0FC]/25 bg-[#0FF0FC]/10 px-3 py-2 text-[11px] font-black text-[#0FF0FC] transition hover:bg-[#0FF0FC]/15">
           كل المنتخبات
@@ -56,25 +74,33 @@ export default function HomeWorldCupRegionsArabCard() {
         ))}
       </div>
 
-      <div className="mt-4 rounded-[1.25rem] border border-white/10 bg-black/30 p-3">
-        <div className="mb-3 flex items-center justify-between gap-2">
-          <div>
-            <h3 className="text-sm font-black text-[#FFD700]">المنتخبات العربية</h3>
-            <p className="mt-0.5 text-[10px] font-bold text-gray-500">{formatCount(ARAB_TEAMS.length)} منتخبات عربية في البطولة</p>
+      <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(260px,0.52fr)]">
+        <div className="rounded-[1.25rem] border border-white/10 bg-black/30 p-3">
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <div>
+              <h3 className="text-sm font-black text-[#FFD700]">المنتخبات العربية</h3>
+              <p className="mt-0.5 text-[10px] font-bold text-gray-500">{formatCount(ARAB_TEAMS.length)} منتخبات عربية في البطولة</p>
+            </div>
+            <span className="rounded-full border border-white/10 bg-white/[0.06] px-2.5 py-1 text-[10px] font-black text-gray-300">CAF + AFC</span>
           </div>
-          <span className="rounded-full border border-white/10 bg-white/[0.06] px-2.5 py-1 text-[10px] font-black text-gray-300">CAF + AFC</span>
+
+          <div className="grid gap-2 sm:grid-cols-4">
+            {ARAB_TEAMS.map((team) => <TeamMiniCard key={team.code} team={team} />)}
+          </div>
         </div>
 
-        <div className="grid gap-2 sm:grid-cols-4">
-          {ARAB_TEAMS.map((team) => (
-            <Link key={team.code} href={`/teams?search=${encodeURIComponent(team.code)}`} className="group/team flex min-w-0 items-center gap-2 rounded-2xl border border-white/10 bg-white/[0.045] px-2.5 py-2 transition hover:border-[#FFD700]/30 hover:bg-white/[0.075]">
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-black/35 text-lg shadow-[0_8px_18px_rgba(0,0,0,0.22)]">{team.flag}</span>
-              <span className="min-w-0 text-right">
-                <span className="block truncate text-xs font-black text-white">{team.name}</span>
-                <span className="mt-0.5 block text-[9px] font-bold text-gray-500">{team.code} • {team.region}</span>
-              </span>
-            </Link>
-          ))}
+        <div className="rounded-[1.25rem] border border-[#0FF0FC]/15 bg-[#0FF0FC]/[0.055] p-3">
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <div>
+              <h3 className="text-sm font-black text-[#0FF0FC]">الدول المستضيفة</h3>
+              <p className="mt-0.5 text-[10px] font-bold text-gray-500">{formatCount(HOST_TEAMS.length)} دول تنظم مونديال ٢٠٢٦</p>
+            </div>
+            <span className="rounded-full border border-[#FFD700]/20 bg-[#FFD700]/10 px-2.5 py-1 text-[10px] font-black text-[#FFD700]">HOSTS</span>
+          </div>
+
+          <div className="grid gap-2 sm:grid-cols-3 lg:grid-cols-1">
+            {HOST_TEAMS.map((team) => <TeamMiniCard key={team.code} team={team} />)}
+          </div>
         </div>
       </div>
     </section>
