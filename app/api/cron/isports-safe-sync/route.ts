@@ -77,7 +77,7 @@ export async function GET(req: Request) {
   const backfillDays = clampNumber(url.searchParams.get('backfillDays'), 7, 1, allowHistoricalBackfill ? 120 : 7);
   const backfillMissing = allowHistoricalBackfill && url.searchParams.get('backfillMissing') === 'true';
   const take = hasSingleMatchId ? 1 : clampNumber(url.searchParams.get('take'), 2, 1, allowHistoricalBackfill ? 24 : 4);
-  const minStatsIntervalMinutes = hasSingleMatchId ? 0 : clampNumber(url.searchParams.get('minStatsIntervalMinutes'), 30, 10, 180);
+  const minStatsIntervalMinutes = hasSingleMatchId ? 0 : clampNumber(url.searchParams.get('minStatsIntervalMinutes'), 5, 2, 180);
   const footballDataFallbackLimit = clampNumber(url.searchParams.get('footballDataFallbackLimit'), 1, 0, 4);
   const finishedSince = new Date(Date.now() - finishedHours * 60 * 60 * 1000);
   const backfillSince = new Date(Date.now() - backfillDays * 24 * 60 * 60 * 1000);
