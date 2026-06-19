@@ -321,13 +321,6 @@ function MatchCenter({ fallbackMatches = [], nextMatch = null }: { fallbackMatch
 
   return (
     <section className="overflow-hidden rounded-[1.6rem] border border-[#FFD700]/15 bg-[radial-gradient(circle_at_top,rgba(255,215,0,0.10),transparent_35%),linear-gradient(180deg,rgba(255,255,255,0.055),rgba(0,0,0,0.22))] p-3 shadow-[0_18px_50px_rgba(0,0,0,0.28)] backdrop-blur sm:p-4">
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <span className="inline-flex items-center gap-2 rounded-full border border-[#00FF88]/25 bg-[#00FF88]/10 px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.14em] text-[#00FF88]"><span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#00FF88]" />LIVE CENTER</span>
-          <h1 className="mt-1.5 text-xl font-black leading-tight text-white sm:text-2xl">مركز مباريات اليوم</h1>
-        </div>
-        <Link href="/matches" className="mobile-tap rounded-full border border-[#FFD700]/20 bg-[#FFD700]/10 px-3 py-1.5 text-[11px] font-black text-[#FFD700] transition hover:bg-[#FFD700]/15">كل المباريات</Link>
-      </div>
       {primary ? (
         <div className="space-y-3">
           <MatchRow match={primary} now={now} variant={isConfirmedLive(primary) ? 'live' : 'primary'} />
