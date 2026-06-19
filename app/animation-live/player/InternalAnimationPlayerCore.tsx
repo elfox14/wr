@@ -110,6 +110,13 @@ function matchClockMinute(snapshot: Snapshot, events: MatchEvent[], status?: str
   return { minute: finalEventMinute !== null ? finalEventMinute : null, source: finalEventMinute !== null ? 'final_event' : 'unavailable' };
 }
 
+function scoreGoalCount(match: LiveStatsResponse['match'] | undefined) {
+  const home = Number(match?.homeScore);
+  const away = Number(match?.awayScore);
+  if (!Number.isFinite(home) && !Number.isFinite(away)) return null;
+  return Math.max(0, Number.isFinite(home) ? home : 0) + Math.max(0, Number.isFinite(away) ? away : 0);
+}
+
 export default function InternalAnimationPlayerCore({ matchId = '', dbMatchId = '' }: InternalAnimationPlayerCoreProps) {
   const [statsData, setStatsData] = useState<LiveStatsResponse | null>(null);
   const [eventsData, setEventsData] = useState<LiveEventsResponse | null>(null);
@@ -192,6 +199,7 @@ export default function InternalAnimationPlayerCore({ matchId = '', dbMatchId = 
   const clockSource = rawClock.source !== 'unavailable' ? rawClock.source : stableMatchClock.minute !== null ? 'cached' : 'unavailable';
   const provider = statsData?.sourceStatus?.statsProvider || statsData?.sourceStatus?.primary;
   const updatedAt = statsData?.updatedAt || eventsData?.updatedAt;
+  const goalCountOverride = scoreGoalCount(match);
 
   useEffect(() => {
     if (rawClock.minute !== null) setStableMatchClock(rawClock);
@@ -237,6 +245,7 @@ export default function InternalAnimationPlayerCore({ matchId = '', dbMatchId = 
         eventFilter={eventFilter}
         onFilterChange={setEventFilter}
         onSelectEvent={setSelectedEventId}
+        goalCountOverride={goalCountOverride}
       />
 
       <LiveStatsPanel snapshot={snapshot} provider={provider} updatedAt={updatedAt} />
