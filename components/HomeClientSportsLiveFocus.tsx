@@ -75,7 +75,7 @@ function MatchStatePill({ match, now }: { match: HomeMatch; now: Date }) {
   const parts = countdownParts(match, now);
   if (!parts.active) return <span className="rounded-xl border border-[#FFD700]/20 bg-[#FFD700]/10 px-2.5 py-1.5 text-[11px] font-black text-[#FFD700]">بانتظار المصدر</span>;
   const visibleParts = parts.days > 0 ? `${formatCount(parts.days)}ي ${formatCount(parts.hours)}س` : parts.hours > 0 ? `${formatCount(parts.hours)}س ${formatCount(parts.minutes)}د` : `${formatCount(parts.minutes)}د ${formatCount(parts.seconds)}ث`;
-  return <span className="inline-flex items-center gap-1.5 rounded-xl border border-[#0FF0FC]/25 bg-[#0FF0FC]/10 px-2.5 py-1.5 text-[11px] font-black text-[#0FF0FC]"><span className="h-1.5 w-1.5 rounded-full bg-[#0FF0FC] shadow-[0_0_12px_rgba(15,240,252,0.8)]" /> بعد {visibleParts}</span>;
+  return <span className="inline-flex items-center gap-1 rounded-xl border border-[#0FF0FC]/25 bg-[linear-gradient(90deg,rgba(15,240,252,.14),rgba(255,215,0,.10))] px-2.5 py-1.5 text-[11px] font-black text-[#BFFBFF] shadow-[inset_0_1px_0_rgba(255,255,255,.08)]"><span className="text-[10px] leading-none">⏱</span><span className="tabular-nums text-[#FFD700]">{visibleParts}</span></span>;
 }
 function MatchRow({ match, now, variant = 'normal' }: { match: HomeMatch; now: Date; variant?: 'live' | 'primary' | 'normal' }) {
   const isPrimary = variant === 'primary' || variant === 'live';
