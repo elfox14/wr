@@ -29,6 +29,7 @@ type LivePitchTimelinePanelProps = {
   eventFilter: EventFilterKey;
   onFilterChange: (filter: EventFilterKey) => void;
   onSelectEvent: (id: string) => void;
+  goalCountOverride?: number | null;
 };
 
 function sideLabel(side: EventSide, home: Team, away: Team) {
@@ -47,10 +48,12 @@ function minuteText(minute?: number | null) {
   return `د${ar(Math.max(0, Math.floor(minute)))}`;
 }
 
-function eventSummary(events: MatchEvent[]) {
+function eventSummary(events: MatchEvent[], goalCountOverride?: number | null) {
   return QUICK_FILTERS.map((filter) => ({
     ...filter,
-    count: events.filter((event) => eventMatchesFilter(event, filter.key)).length,
+    count: filter.key === 'goals' && typeof goalCountOverride === 'number'
+      ? Math.max(0, goalCountOverride)
+      : events.filter((event) => eventMatchesFilter(event, filter.key)).length,
   })).filter((item) => item.count > 0);
 }
 
@@ -64,13 +67,14 @@ export default function LivePitchTimelinePanel({
   eventFilter,
   onFilterChange,
   onSelectEvent,
+  goalCountOverride,
 }: LivePitchTimelinePanelProps) {
   const [isReplaying, setIsReplaying] = useState(false);
   const [replayIndex, setReplayIndex] = useState<number | null>(null);
 
   const sortedEvents = useMemo(() => [...events].sort(sortEventsByMinute), [events]);
   const visibleEvents = useMemo(() => sortedEvents.filter((event) => eventMatchesFilter(event, eventFilter)), [sortedEvents, eventFilter]);
-  const summary = useMemo(() => eventSummary(sortedEvents), [sortedEvents]);
+  const summary = useMemo(() => eventSummary(sortedEvents, goalCountOverride), [sortedEvents, goalCountOverride]);
   const selectedEvent = sortedEvents.find((event) => event.id === selectedEventId) || null;
   const replayEvent = replayIndex !== null ? visibleEvents[replayIndex] || null : null;
   const currentEvent = replayEvent || selectedEvent || activeEvent || visibleEvents[visibleEvents.length - 1] || sortedEvents[sortedEvents.length - 1] || null;
@@ -217,42 +221,30 @@ export default function LivePitchTimelinePanel({
                   <div className="mt-1 text-sm font-bold leading-6 text-white">
                     {currentEvent ? cleanEventDetail(currentEvent.detail) || eventLabel(currentEvent.type) : 'عند وصول الأحداث ستظهر حركة الكرة هنا.'}
                   </div>
+                  <div className="mt-1 text-[10px] font-black text-gray-500">{sideLabel(currentSide, home, away)}</div>
                 </div>
-                <div className="shrink-0 rounded-full border border-white/10 bg-black/30 px-3 py-1 text-[10px] font-black text-gray-300">
-                  {sideLabel(currentSide, home, away)}
-                </div>
+                <div className="text-3xl">{currentEvent ? eventIcon(currentEvent.type) : '•'}</div>
               </div>
             </div>
           </div>
 
-          <div className="relative mt-4 h-20 rounded-2xl border border-white/10 bg-black/25 px-3">
+          <div className="relative mt-4 h-16 rounded-2xl border border-white/10 bg-black/25 px-3">
             <div className="absolute left-3 right-3 top-1/2 h-1 -translate-y-1/2 rounded-full bg-white/10" />
-            {typeof currentMinute === 'number' && Number.isFinite(currentMinute) ? (
-              <div className="absolute top-2 z-10 flex -translate-x-1/2 flex-col items-center gap-1" style={{ left: `${timelineLeft(currentMinute)}%` }}>
-                <span className="rounded-full border border-[#0FF0FC]/30 bg-[#0FF0FC]/10 px-2 py-0.5 text-[9px] font-black text-[#0FF0FC]">{minuteText(currentMinute)}</span>
-                <span className="h-11 w-px bg-[#0FF0FC]/60" />
-              </div>
-            ) : null}
             {[0, 15, 30, 45, 60, 75, 90].map((minute) => (
-              <div key={minute} className="absolute top-1/2 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-2" style={{ left: `${timelineLeft(minute)}%` }}>
+              <div key={minute} className="absolute top-1/2 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-1" style={{ left: `${timelineLeft(minute)}%` }}>
                 <span className="h-3 w-px bg-white/20" />
                 <span className="text-[9px] font-black text-gray-500">{minute}</span>
               </div>
             ))}
-            {visibleEvents.slice(-22).map((event) => {
-              const minute = eventMinute(event) ?? 0;
+            {visibleEvents.slice(-26).map((event) => {
               const active = event.id === currentEvent?.id;
               return (
                 <button
                   key={event.id}
                   type="button"
-                  onClick={() => {
-                    setIsReplaying(false);
-                    setReplayIndex(visibleEvents.findIndex((item) => item.id === event.id));
-                    onSelectEvent(event.id);
-                  }}
+                  onClick={() => goToReplayIndex(visibleEvents.findIndex((item) => item.id === event.id))}
                   className={`absolute top-1/2 flex h-7 w-7 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border text-xs transition ${active ? 'border-[#FFD700] bg-[#FFD700] text-black' : 'border-white/20 bg-black text-white hover:border-[#0FF0FC]'}`}
-                  style={{ left: `${timelineLeft(minute)}%` }}
+                  style={{ left: `${timelineLeft(eventMinute(event))}%` }}
                   title={`${eventMinuteLabel(event)} · ${eventLabel(event.type)}`}
                 >
                   {eventIcon(event.type)}
@@ -262,38 +254,37 @@ export default function LivePitchTimelinePanel({
           </div>
         </div>
 
-        <div className="max-h-[470px] overflow-y-auto rounded-2xl border border-white/10 bg-black/25 p-3">
-          <div className="mb-3 flex items-center justify-between gap-2 text-[10px] font-black text-gray-400">
-            <span>قائمة الأحداث</span>
-            <span>{eventFilter === 'all' ? 'كل الأنواع' : EVENT_FILTERS.find((filter) => filter.key === eventFilter)?.label}</span>
+        <aside className="flex max-h-[520px] flex-col overflow-hidden rounded-[1.25rem] border border-white/10 bg-black/25 p-3">
+          <div className="mb-3 flex items-center justify-between gap-2 border-b border-white/10 pb-3">
+            <div>
+              <p className="text-xs font-black text-[#0FF0FC]">أحداث المباراة</p>
+              <p className="mt-1 text-xl font-black text-white">{ar(visibleEvents.length)} حدث</p>
+            </div>
+            <div className="text-center">
+              <p className="text-2xl">{currentEvent ? eventIcon(currentEvent.type) : '•'}</p>
+              <p className="text-[10px] font-black text-[#FFD700]">{canReplay ? `${ar(replayPosition || 1)} / ${ar(visibleEvents.length)}` : '—'}</p>
+            </div>
           </div>
-          <div className="space-y-2">
-            {visibleEvents.length ? visibleEvents.slice().reverse().map((event) => (
-              <button
-                key={event.id}
-                type="button"
-                onClick={() => {
-                  setIsReplaying(false);
-                  setReplayIndex(visibleEvents.findIndex((item) => item.id === event.id));
-                  onSelectEvent(event.id);
-                }}
-                className={`w-full rounded-2xl border p-3 text-right transition ${event.id === currentEvent?.id ? 'border-[#FFD700]/40 bg-[#FFD700]/10' : 'border-white/10 bg-black/25 hover:border-[#0FF0FC]/40'}`}
-              >
-                <div className="flex items-center justify-between gap-2 text-[10px] font-black">
-                  <span className="text-[#FFD700]">{eventMinuteLabel(event)}</span>
-                  <span className="text-gray-500">{eventIcon(event.type)} {eventLabel(event.type)}</span>
-                </div>
-                <div className="mt-1 text-[11px] font-bold leading-5 text-gray-200">
-                  {cleanEventDetail(event.detail) || eventLabel(event.type)}
-                </div>
-              </button>
-            )) : (
-              <div className="rounded-2xl border border-white/10 bg-black/25 p-3 text-center text-xs font-bold text-gray-500">
-                لا توجد أحداث مطابقة لهذا الفلتر.
-              </div>
-            )}
+          <div className="space-y-2 overflow-y-auto pr-1">
+            {visibleEvents.length ? visibleEvents.slice().reverse().map((event) => {
+              const active = event.id === currentEvent?.id;
+              return (
+                <button
+                  key={event.id}
+                  type="button"
+                  onClick={() => goToReplayIndex(visibleEvents.findIndex((item) => item.id === event.id))}
+                  className={`w-full rounded-2xl border p-3 text-right transition ${active ? 'border-[#FFD700]/40 bg-[#FFD700]/10' : 'border-white/10 bg-black/25 hover:border-[#0FF0FC]/40'}`}
+                >
+                  <div className="flex items-center justify-between gap-2 text-[10px] font-black">
+                    <span className="text-[#FFD700]">{eventMinuteLabel(event)}</span>
+                    <span className="text-gray-500">{eventIcon(event.type)} {eventLabel(event.type)}</span>
+                  </div>
+                  <div className="mt-1 line-clamp-2 text-[11px] font-bold leading-5 text-gray-200">{cleanEventDetail(event.detail) || eventLabel(event.type)}</div>
+                </button>
+              );
+            }) : <div className="rounded-2xl border border-white/10 bg-black/25 p-3 text-center text-xs font-bold text-gray-500">لا توجد أحداث مطابقة لهذا الفلتر.</div>}
           </div>
-        </div>
+        </aside>
       </div>
     </section>
   );
