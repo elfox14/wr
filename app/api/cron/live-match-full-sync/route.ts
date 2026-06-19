@@ -22,27 +22,14 @@ function int(value: string | null, fallback: number, min: number, max: number) {
   return Number.isFinite(parsed) ? Math.max(min, Math.min(max, Math.floor(parsed))) : fallback;
 }
 
-function secret() {
-  return String(process.env.CRON_SECRET || process.env.ADMIN_API_SECRET || '').trim();
-}
-
-function maskUrl(value: string) {
-  return value.replace(/(key=|adminSecret=|cronSecret=)[^&]+/gi, '$1***').replace(/([?&]token=)[^&]+/gi, '$1***');
-}
-
-function json(value: unknown, status = 200) {
-  return NextResponse.json(value, { status, headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } });
-}
+function secret() { return String(process.env.CRON_SECRET || process.env.ADMIN_API_SECRET || '').trim(); }
+function maskUrl(value: string) { return value.replace(/(key=|adminSecret=|cronSecret=)[^&]+/gi, '$1***').replace(/([?&]token=)[^&]+/gi, '$1***'); }
+function json(value: unknown, status = 200) { return NextResponse.json(value, { status, headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } }); }
 
 function cleanOrigin(value: string | null | undefined) {
   const raw = String(value || '').trim();
   if (!raw) return null;
-  try {
-    const withProtocol = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
-    return new URL(withProtocol).origin;
-  } catch {
-    return null;
-  }
+  try { return new URL(/^https?:\/\//i.test(raw) ? raw : `https://${raw}`).origin; } catch { return null; }
 }
 
 function publicOrigin(req: Request, currentUrl: URL) {
@@ -57,7 +44,7 @@ function publicOrigin(req: Request, currentUrl: URL) {
   return DEFAULT_PUBLIC_ORIGIN;
 }
 
-async function callJson(name: string, url: URL, timeoutMs = 45000): Promise<StageResult> {
+async function callJson(name: string, url: URL, timeoutMs = 30000): Promise<StageResult> {
   const startedAt = Date.now();
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -69,32 +56,20 @@ async function callJson(name: string, url: URL, timeoutMs = 45000): Promise<Stag
     return { name, ok: res.ok, status: res.status, url: maskUrl(url.toString()), durationMs: Date.now() - startedAt, body };
   } catch (error: any) {
     return { name, ok: false, status: null, url: maskUrl(url.toString()), durationMs: Date.now() - startedAt, error: String(error?.message || error).slice(0, 1000) };
-  } finally {
-    clearTimeout(timer);
-  }
+  } finally { clearTimeout(timer); }
 }
 
-function withSecret(url: URL, key: string) {
-  url.searchParams.set('key', key);
-  url.searchParams.set('adminSecret', key);
-  url.searchParams.set('cronSecret', key);
-  return url;
-}
-
-function makeUrl(origin: string, path: string, key: string) {
-  return withSecret(new URL(path, origin), key);
-}
+function withSecret(url: URL, key: string) { url.searchParams.set('key', key); url.searchParams.set('adminSecret', key); url.searchParams.set('cronSecret', key); return url; }
+function makeUrl(origin: string, path: string, key: string) { return withSecret(new URL(path, origin), key); }
 
 async function selectSyncMatches(minutesBack: number, minutesForward: number, limit: number) {
   const now = Date.now();
   return prisma.match.findMany({
-    where: {
-      OR: [
-        { status: { in: LIVE } },
-        { matchDate: { gte: new Date(now - minutesBack * 60_000), lte: new Date(now + minutesForward * 60_000) }, status: { notIn: FINISHED } },
-        { matchDate: { gte: new Date(now - minutesBack * 60_000), lte: new Date(now + 30 * 60_000) }, status: { in: FINISHED } },
-      ],
-    },
+    where: { OR: [
+      { status: { in: LIVE } },
+      { matchDate: { gte: new Date(now - minutesBack * 60_000), lte: new Date(now + minutesForward * 60_000) }, status: { notIn: FINISHED } },
+      { matchDate: { gte: new Date(now - minutesBack * 60_000), lte: new Date(now + 30 * 60_000) }, status: { in: FINISHED } },
+    ] },
     include: {
       homeTeam: { select: { name: true, code: true } },
       awayTeam: { select: { name: true, code: true } },
@@ -105,65 +80,18 @@ async function selectSyncMatches(minutesBack: number, minutesForward: number, li
   });
 }
 
-function resultRows(body: any): any[] {
-  return Array.isArray(body?.results) ? body.results : [];
-}
-
-function catchupResult(body: any, matchId: string) {
-  return resultRows(body).find((item: any) => String(item?.matchId || '') === matchId) || null;
-}
-
-function providerIdsFromCatchup(body: any) {
-  const map = new Map<string, string>();
-  for (const item of resultRows(body)) {
-    if (item?.matchId && item?.resolvedProviderMatchId) map.set(String(item.matchId), String(item.resolvedProviderMatchId));
-  }
-  return map;
-}
-
-function hasLineupSnapshot(match: any) {
-  return (match.statsSnapshots || []).some((snapshot: any) => {
-    const data = snapshot?.rawData as any;
-    const lineup = data?.lineup || data?.lineups || data?.theStatsApi?.lineup;
-    if (!lineup || lineup.error) return false;
-    const home = lineup.home || lineup.homeTeam;
-    const away = lineup.away || lineup.awayTeam;
-    const homeCount = Number(home?.startingXi?.length || home?.starting_xi?.length || home?.lineup?.length || 0);
-    const awayCount = Number(away?.startingXi?.length || away?.starting_xi?.length || away?.lineup?.length || 0);
-    return homeCount + awayCount > 0;
-  });
-}
-
-function hasOfficialTimeline(result: any, minEvents: number) {
-  return Boolean(result?.timelineOk !== false && Number(result?.providerEventsFound || 0) >= minEvents);
-}
-
-function isNotLiveConflict(result: any) {
-  const error = result?.liveStatsError || result?.error;
-  const status = Number(error?.status || error?.payload?.error?.status_code || 0);
-  const message = [error?.message, error?.code, error?.payload?.error?.message, error?.payload?.error?.code].map((value) => String(value || '').toLowerCase()).join(' ');
-  return status === 409 && (message.includes('not live') || message.includes('conflict'));
-}
-
-function isFinishedStatus(status: any) {
-  return FINISHED.includes(String(status || '').toUpperCase());
-}
-
-async function autoFinishFromTheStats(match: any, result: any, dryRun: boolean) {
-  const latestMinute = Number(result?.latestMinute || 0);
-  const providerEventsFound = Number(result?.providerEventsFound || 0);
-  const shouldFinish = isNotLiveConflict(result) && providerEventsFound > 0 && latestMinute >= 90;
-  if (!shouldFinish) return { checked: true, shouldFinish: false, isNotLiveConflict: isNotLiveConflict(result), latestMinute, providerEventsFound };
-  if (!dryRun && !isFinishedStatus(match.status)) await prisma.match.update({ where: { id: match.id }, data: { status: 'FINISHED' } });
-  return { checked: true, shouldFinish: true, updated: !dryRun, latestMinute, providerEventsFound };
-}
+function resultRows(body: any): any[] { return Array.isArray(body?.results) ? body.results : []; }
+function catchupResult(body: any, matchId: string) { return resultRows(body).find((item: any) => String(item?.matchId || '') === matchId) || null; }
+function providerIdsFromCatchup(body: any) { const map = new Map<string, string>(); for (const item of resultRows(body)) if (item?.matchId && item?.resolvedProviderMatchId) map.set(String(item.matchId), String(item.resolvedProviderMatchId)); return map; }
+function hasLineupSnapshot(match: any) { return (match.statsSnapshots || []).some((snapshot: any) => { const data = snapshot?.rawData as any; const lineup = data?.lineup || data?.lineups || data?.theStatsApi?.lineup; if (!lineup || lineup.error) return false; const home = lineup.home || lineup.homeTeam; const away = lineup.away || lineup.awayTeam; const homeCount = Number(home?.startingXi?.length || home?.starting_xi?.length || home?.lineup?.length || 0); const awayCount = Number(away?.startingXi?.length || away?.starting_xi?.length || away?.lineup?.length || 0); return homeCount + awayCount > 0; }); }
+function hasOfficialTimeline(result: any, minEvents: number) { return Boolean(result?.timelineOk !== false && Number(result?.providerEventsFound || 0) >= minEvents); }
+function isNotLiveConflict(result: any) { const error = result?.liveStatsError || result?.error; const status = Number(error?.status || error?.payload?.error?.status_code || 0); const message = [error?.message, error?.code, error?.payload?.error?.message, error?.payload?.error?.code].map((value) => String(value || '').toLowerCase()).join(' '); return status === 409 && (message.includes('not live') || message.includes('conflict')); }
+function isFinishedStatus(status: any) { return FINISHED.includes(String(status || '').toUpperCase()); }
+async function autoFinishFromTheStats(match: any, result: any, dryRun: boolean) { const latestMinute = Number(result?.latestMinute || 0); const providerEventsFound = Number(result?.providerEventsFound || 0); const shouldFinish = isNotLiveConflict(result) && providerEventsFound > 0 && latestMinute >= 90; if (!shouldFinish) return { checked: true, shouldFinish: false, isNotLiveConflict: isNotLiveConflict(result), latestMinute, providerEventsFound }; if (!dryRun && !isFinishedStatus(match.status)) await prisma.match.update({ where: { id: match.id }, data: { status: 'FINISHED' } }); return { checked: true, shouldFinish: true, updated: !dryRun, latestMinute, providerEventsFound }; }
 
 export async function GET(req: Request) {
-  const auth = await requireAdmin(req);
-  if (!auth.authorized) return auth.error;
-
-  const key = secret();
-  if (!key) return json({ ok: false, error: 'CRON_SECRET or ADMIN_API_SECRET is required' }, 500);
+  const auth = await requireAdmin(req); if (!auth.authorized) return auth.error;
+  const key = secret(); if (!key) return json({ ok: false, error: 'CRON_SECRET or ADMIN_API_SECRET is required' }, 500);
 
   const url = new URL(req.url);
   const origin = publicOrigin(req, url);
@@ -173,6 +101,8 @@ export async function GET(req: Request) {
   const runISports = forceCoreISports || bool(url.searchParams.get('isports'), true);
   const runISportStats = forceCoreISports || bool(url.searchParams.get('isportStats'), true);
   const runISportVisualStats = bool(url.searchParams.get('isportVisualStats'), false);
+  const runISportSafeCron = forceCoreISports || bool(url.searchParams.get('isportSafeCron'), true);
+  const perMatchISports = bool(url.searchParams.get('perMatchISports'), Boolean(url.searchParams.get('dbMatchId') || url.searchParams.get('id')));
   const runDedupe = bool(url.searchParams.get('dedupe'), true);
   const mapISports = forceCoreISports || bool(url.searchParams.get('mapISports'), true);
   const runEnrichment = bool(url.searchParams.get('theStatsEnrichment'), true);
@@ -187,133 +117,34 @@ export async function GET(req: Request) {
   const minutesForward = int(url.searchParams.get('minutesForward'), 300, 0, 360);
   const delayMs = int(url.searchParams.get('delayMs'), 500, 0, 5000);
 
-  const out: any = {
-    ok: true,
-    mode: 'live_match_full_sync',
-    dryRun,
-    publicOrigin: origin,
-    matchesFound: 0,
-    policy: {
-      forceCoreISports,
-      theStats: 'primary provider for official stats, final timeline, and post-match replacement',
-      iSport: 'core live provider for animation timeline and flash stats while TheStats live events are incomplete',
-      lineups: 'TheStats enrichment is called automatically until official lineup appears in snapshots',
-      postmatch: 'when TheStats timeline is available, dedupe removes iSport timeline events to prevent duplicates',
-      cancelledGoals: 'dedupe keeps cancelled/disallowed goals separate from valid goals',
-      officialTimelineMinEvents,
-    },
-    iSportLiveMap: null,
-    theStatsCatchup: null,
-    perMatch: [] as any[],
-  };
+  const out: any = { ok: true, mode: 'live_match_full_sync', dryRun, publicOrigin: origin, matchesFound: 0, policy: { forceCoreISports, perMatchISports, theStats: 'primary provider for official stats, final timeline, and post-match replacement', iSport: 'core live provider through cron-safe async timeline/flash sync; direct per-match pulls are optional', lineups: 'TheStats enrichment is called automatically until official lineup appears in snapshots', postmatch: 'when TheStats timeline is available, dedupe removes iSport timeline events to prevent duplicates', cancelledGoals: 'dedupe keeps cancelled/disallowed goals separate from valid goals', officialTimelineMinEvents }, iSportLiveMap: null, iSportSafeSync: null, theStatsCatchup: null, perMatch: [] as any[] };
 
-  if (mapISports) {
-    const liveMap = makeUrl(origin, '/api/cron/live-market-sync', key);
-    liveMap.searchParams.set('forceLive', 'true');
-    liveMap.searchParams.set('forceProviderFetch', 'true');
-    out.iSportLiveMap = await callJson('isport_live_map', liveMap, 45000);
-  }
+  if (mapISports) { const liveMap = makeUrl(origin, '/api/cron/live-market-sync', key); liveMap.searchParams.set('forceLive', 'true'); liveMap.searchParams.set('forceProviderFetch', 'true'); out.iSportLiveMap = await callJson('isport_live_map', liveMap, 25000); }
+  if (runISports && runISportSafeCron) { const safe = makeUrl(origin, '/api/cron/isports-live-sync', key); safe.searchParams.set('take', String(int(url.searchParams.get('isportsTake'), 3, 1, 5))); safe.searchParams.set('save', String(!dryRun)); safe.searchParams.set('replace', 'true'); safe.searchParams.set('includeTimeline', 'true'); safe.searchParams.set('includeFlash', String(runISportStats)); safe.searchParams.set('asyncFlash', 'true'); safe.searchParams.set('includeLive', String(runISportVisualStats)); safe.searchParams.set('asyncLive', 'true'); safe.searchParams.set('timeoutMs', String(isportStatsTimeoutMs)); safe.searchParams.set('waitMs', String(isportStatsWaitMs)); out.iSportSafeSync = await callJson('isports_cron_safe_sync', safe, 12000); }
 
   const matches = await selectSyncMatches(minutesBack, minutesForward, limit);
   out.matchesFound = matches.length;
 
   let providerIds = new Map<string, string>();
-  if (runTheStats) {
-    const catchup = makeUrl(origin, '/api/admin/the-stats-live-catchup', key);
-    catchup.searchParams.set('dryRun', String(dryRun));
-    catchup.searchParams.set('limit', String(limit));
-    catchup.searchParams.set('minutesBack', String(minutesBack));
-    catchup.searchParams.set('minutesForward', String(minutesForward));
-    catchup.searchParams.set('skipSimilarExisting', 'true');
-    out.theStatsCatchup = await callJson('the_stats_live_catchup', catchup, 65000);
-    providerIds = providerIdsFromCatchup(out.theStatsCatchup?.body);
-  }
+  if (runTheStats) { const catchup = makeUrl(origin, '/api/admin/the-stats-live-catchup', key); catchup.searchParams.set('dryRun', String(dryRun)); catchup.searchParams.set('limit', String(limit)); catchup.searchParams.set('minutesBack', String(minutesBack)); catchup.searchParams.set('minutesForward', String(minutesForward)); catchup.searchParams.set('skipSimilarExisting', 'true'); out.theStatsCatchup = await callJson('the_stats_live_catchup', catchup, 45000); providerIds = providerIdsFromCatchup(out.theStatsCatchup?.body); }
 
   for (const [index, match] of matches.entries()) {
     if (index > 0 && delayMs > 0) await new Promise((resolve) => setTimeout(resolve, delayMs));
     const theStatsResult = runTheStats ? catchupResult(out.theStatsCatchup?.body, match.id) : null;
     const providerMatchId = providerIds.get(match.id) || (String(match.externalId || '').startsWith('mt_') ? String(match.externalId) : null);
-    const item: any = {
-      matchId: match.id,
-      teams: `${match.homeTeam?.name || 'Home'} vs ${match.awayTeam?.name || 'Away'}`,
-      previousStatus: match.status,
-      externalId: match.externalId,
-      animationMatchId: match.animationMatchId,
-      providerMatchId,
-      theStatsEventsFound: Number(theStatsResult?.providerEventsFound || 0),
-      officialTheStatsTimelineAvailable: hasOfficialTimeline(theStatsResult, officialTimelineMinEvents),
-      hasOfficialLineupSnapshot: hasLineupSnapshot(match),
-      theStatsAutoFinish: null,
-      lineupsEnrichment: null,
-      postmatchEnrichment: null,
-      isportsTimeline: null,
-      isportsStats: null,
-      isportsVisualStats: null,
-      dedupe: null,
-    };
+    const item: any = { matchId: match.id, teams: `${match.homeTeam?.name || 'Home'} vs ${match.awayTeam?.name || 'Away'}`, previousStatus: match.status, externalId: match.externalId, animationMatchId: match.animationMatchId, providerMatchId, theStatsEventsFound: Number(theStatsResult?.providerEventsFound || 0), officialTheStatsTimelineAvailable: hasOfficialTimeline(theStatsResult, officialTimelineMinEvents), hasOfficialLineupSnapshot: hasLineupSnapshot(match), theStatsAutoFinish: null, lineupsEnrichment: null, postmatchEnrichment: null, isportsTimeline: null, isportsStats: null, isportsVisualStats: null, dedupe: null };
 
     if (autoFinish && theStatsResult) item.theStatsAutoFinish = await autoFinishFromTheStats(match, theStatsResult, dryRun);
     const finishedNow = isFinishedStatus(match.status) || item.theStatsAutoFinish?.shouldFinish || isNotLiveConflict(theStatsResult);
     const shouldLineupEnrich = runTheStats && runEnrichment && enrichLineups && !item.hasOfficialLineupSnapshot;
     const shouldFinalEnrich = runTheStats && runEnrichment && postmatchTheStats && finishedNow;
 
-    if (shouldLineupEnrich || shouldFinalEnrich) {
-      const enrichment = makeUrl(origin, '/api/admin/the-stats-import-match-enrichment', key);
-      enrichment.searchParams.set('matchId', match.id);
-      enrichment.searchParams.set('dryRun', String(dryRun));
-      enrichment.searchParams.set('importEvents', String(shouldFinalEnrich));
-      if (providerMatchId) enrichment.searchParams.set('providerMatchId', providerMatchId);
-      const stageName = shouldFinalEnrich ? 'the_stats_postmatch_enrichment' : 'the_stats_lineup_enrichment';
-      const result = await callJson(stageName, enrichment, 65000);
-      if (shouldFinalEnrich) item.postmatchEnrichment = result;
-      else item.lineupsEnrichment = result;
-    }
+    if (shouldLineupEnrich || shouldFinalEnrich) { const enrichment = makeUrl(origin, '/api/admin/the-stats-import-match-enrichment', key); enrichment.searchParams.set('matchId', match.id); enrichment.searchParams.set('dryRun', String(dryRun)); enrichment.searchParams.set('importEvents', String(shouldFinalEnrich)); if (providerMatchId) enrichment.searchParams.set('providerMatchId', providerMatchId); const stageName = shouldFinalEnrich ? 'the_stats_postmatch_enrichment' : 'the_stats_lineup_enrichment'; const result = await callJson(stageName, enrichment, 45000); if (shouldFinalEnrich) item.postmatchEnrichment = result; else item.lineupsEnrichment = result; }
 
-    if (runISports && match.animationMatchId) {
-      const isports = makeUrl(origin, '/api/internal/live-ingest/isports/remote-frame-pull-v4', key);
-      isports.searchParams.set('mode', 'timeline');
-      isports.searchParams.set('matchId', String(match.animationMatchId));
-      isports.searchParams.set('dbMatchId', match.id);
-      isports.searchParams.set('save', String(!dryRun));
-      isports.searchParams.set('replace', 'true');
-      item.isportsTimeline = await callJson('isports_animation_timeline', isports, 70000);
-    } else if (runISports) {
-      item.isportsTimeline = { name: 'isports_animation_timeline', ok: true, skipped: true, reason: 'No animationMatchId mapped for this match' };
-    }
+    if (perMatchISports && runISports && match.animationMatchId) { const isports = makeUrl(origin, '/api/internal/live-ingest/isports/remote-frame-pull-v4', key); isports.searchParams.set('mode', 'timeline'); isports.searchParams.set('matchId', String(match.animationMatchId)); isports.searchParams.set('dbMatchId', match.id); isports.searchParams.set('save', String(!dryRun)); isports.searchParams.set('replace', 'true'); item.isportsTimeline = await callJson('isports_animation_timeline_direct', isports, 30000); } else if (runISports) { item.isportsTimeline = { name: 'isports_animation_timeline_direct', ok: true, skipped: true, reason: perMatchISports ? 'No animationMatchId mapped for this match' : 'Handled by cron-safe iSport sync' }; }
+    if (perMatchISports && runISports && runISportStats && match.animationMatchId) { const stats = makeUrl(origin, '/api/internal/live-ingest/isports/remote-flash-pull', key); stats.searchParams.set('mode', 'live'); stats.searchParams.set('matchId', String(match.animationMatchId)); stats.searchParams.set('dbMatchId', match.id); stats.searchParams.set('save', String(!dryRun)); stats.searchParams.set('replace', 'true'); stats.searchParams.set('timeoutMs', String(isportStatsTimeoutMs)); stats.searchParams.set('waitMs', String(isportStatsWaitMs)); item.isportsStats = await callJson('isports_flash_stats_direct', stats, Math.min(45000, isportStatsTimeoutMs + isportStatsWaitMs + 8000)); } else if (runISports && runISportStats) { item.isportsStats = { name: 'isports_flash_stats_direct', ok: true, skipped: true, reason: perMatchISports ? 'No animationMatchId mapped for this match' : 'Handled by cron-safe iSport sync' }; }
 
-    if (runISports && runISportStats && match.animationMatchId) {
-      const stats = makeUrl(origin, '/api/internal/live-ingest/isports/remote-flash-pull', key);
-      stats.searchParams.set('mode', 'live');
-      stats.searchParams.set('matchId', String(match.animationMatchId));
-      stats.searchParams.set('dbMatchId', match.id);
-      stats.searchParams.set('save', String(!dryRun));
-      stats.searchParams.set('replace', 'true');
-      stats.searchParams.set('timeoutMs', String(isportStatsTimeoutMs));
-      stats.searchParams.set('waitMs', String(isportStatsWaitMs));
-      item.isportsStats = await callJson('isports_flash_stats', stats, Math.min(85000, isportStatsTimeoutMs + isportStatsWaitMs + 20000));
-    } else if (runISports && runISportStats) {
-      item.isportsStats = { name: 'isports_flash_stats', ok: true, skipped: true, reason: 'No animationMatchId mapped for this match' };
-    }
-
-    if (runISports && runISportVisualStats && match.animationMatchId) {
-      const visual = makeUrl(origin, '/api/internal/live-ingest/isports/remote-visual-stats-pull', key);
-      visual.searchParams.set('matchId', String(match.animationMatchId));
-      visual.searchParams.set('dbMatchId', match.id);
-      visual.searchParams.set('save', String(!dryRun));
-      visual.searchParams.set('timeoutMs', String(isportStatsTimeoutMs));
-      visual.searchParams.set('waitMs', String(isportStatsWaitMs));
-      item.isportsVisualStats = await callJson('isports_visual_stats', visual, Math.min(85000, isportStatsTimeoutMs + isportStatsWaitMs + 20000));
-    }
-
-    if (runDedupe) {
-      const dedupe = makeUrl(origin, '/api/admin/match-events-dedupe', key);
-      dedupe.searchParams.set('matchId', match.id);
-      dedupe.searchParams.set('dryRun', String(dryRun));
-      dedupe.searchParams.set('preferTheStats', 'true');
-      dedupe.searchParams.set('preferTheStatsMinEvents', String(officialTimelineMinEvents));
-      item.dedupe = await callJson('match_events_dedupe', dedupe, 30000);
-    }
-
+    if (runDedupe) { const dedupe = makeUrl(origin, '/api/admin/match-events-dedupe', key); dedupe.searchParams.set('matchId', match.id); dedupe.searchParams.set('dryRun', String(dryRun)); dedupe.searchParams.set('preferTheStats', 'true'); dedupe.searchParams.set('preferTheStatsMinEvents', String(officialTimelineMinEvents)); item.dedupe = await callJson('match_events_dedupe', dedupe, 20000); }
     out.perMatch.push(item);
   }
 
