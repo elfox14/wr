@@ -22,7 +22,6 @@ type TickerMatch = {
   isLikelyLiveByTime?: boolean;
   isStaleAutoFinished?: boolean;
   minute?: number | null;
-  liveLabel?: string | null;
   groupPhase?: string | null;
   group?: string | null;
   stage?: string | null;
@@ -50,8 +49,6 @@ function isLive(match: TickerMatch) { if (isFinished(match)) return false; const
 function minuteLabel(match: TickerMatch) { const minute = Number(match.minute); return Number.isFinite(minute) && minute > 0 ? formatCount(Math.floor(minute)) : null; }
 function liveStatusText(match: TickerMatch) {
   if (isHalfTime(match)) return 'استراحة';
-  const label = String(match.liveLabel || '').trim();
-  if (label) return label.replace('انتهت المباراة', 'انتهت');
   const minute = minuteLabel(match);
   const status = matchStatus(match);
   if (status === '1H') return minute ? `الشوط الأول — د${minute}` : 'الشوط الأول';
