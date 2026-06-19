@@ -173,30 +173,15 @@ function minuteFrom(_match: any, sources: any[]) {
   return null;
 }
 
-function elapsedMinuteFromKickoff(match: any) {
-  const startMs = new Date(match.matchDate || '').getTime();
-  if (!Number.isFinite(startMs)) return null;
-  const elapsed = Math.floor((Date.now() - startMs) / 60_000);
-  if (elapsed < 1 || elapsed > 130) return null;
-  return elapsed;
-}
-
-function displayMinute(match: any, status: string, providerMinute: number | null) {
-  const estimated = elapsedMinuteFromKickoff(match);
-  if (estimated === null) return providerMinute;
-  if (FINISHED.includes(status) || HALF_TIME.includes(status)) return providerMinute;
-  if (!LIVE.includes(status) && status !== '1H' && status !== '2H') return providerMinute;
-  const capped = Math.min(90, Math.max(status === '2H' ? 46 : 1, estimated));
-  if (providerMinute === null) return capped;
-  if (capped - providerMinute >= 8) return capped;
+function displayMinute(_match: any, _status: string, providerMinute: number | null) {
+  // Do not estimate the match clock from kickoff time.
+  // Real kickoff/halftime delays can make schedule-based clocks wrong.
   return providerMinute;
 }
 
-function inferHalfTime(match: any, status: string, minute: number | null) {
+function inferHalfTime(_match: any, status: string, minute: number | null) {
   if (status === '2H' || FINISHED.includes(status) || HALF_TIME.includes(status)) return false;
-  if (minute !== null && minute >= 45 && minute <= 65) return true;
-  const elapsedRealMinutes = elapsedMinuteFromKickoff(match);
-  return elapsedRealMinutes !== null && elapsedRealMinutes >= 45 && elapsedRealMinutes <= 65;
+  return minute !== null && minute >= 45 && minute <= 65;
 }
 
 function clockLabel(match: any, sources: any[]) {
