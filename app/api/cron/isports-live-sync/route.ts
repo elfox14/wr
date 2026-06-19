@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/adminAuth';
 import prisma from '@/lib/prisma';
 import { GET as remoteFlashPullGET } from '@/app/api/internal/live-ingest/isports/remote-flash-pull/route';
-import { GET as remoteTimelinePullGET } from '@/app/api/internal/live-ingest/isports/remote-frame-pull/route';
+import { GET as remoteTimelinePullGET } from '@/app/api/internal/live-ingest/isports/remote-frame-pull-v4/route';
 import { GET as remoteVisualStatsPullGET } from '@/app/api/internal/live-ingest/isports/remote-visual-stats-pull/route';
 
 export const dynamic = 'force-dynamic';
@@ -21,7 +21,7 @@ function requestOrigin(req: Request) { const fallback = new URL(req.url).origin;
 async function routeJson(response: Response | undefined) { if (!response) return { status: 500, ok: false, result: { ok: false, error: 'route returned no response' } }; const text = await response.text(); let parsed: any = null; try { parsed = JSON.parse(text); } catch {} return { status: response.status, ok: response.ok, result: parsed || { rawSample: text.slice(0, 1000) } }; }
 async function callRoute(handler: RouteHandler, url: URL, adminSecret: string) { const response = await handler(new Request(url.toString(), { method: 'GET', headers: adminSecret ? { 'x-admin-secret': adminSecret } : {} })); return routeJson(response); }
 function compactFlash(result: any) { return { ok: Boolean(result?.ok), hasStats: Boolean(result?.hasStats), stats: result?.stats || null, save: result?.save || null, flash: result?.flash || null, error: result?.error || null }; }
-function compactTimeline(result: any) { return { ok: Boolean(result?.ok), eventsCount: result?.timeline?.eventsCount || 0, save: result?.timeline?.save || null, statsSave: result?.timeline?.statsSave || null, eventsPreview: Array.isArray(result?.timeline?.events) ? result.timeline.events.slice(0, 4) : [], error: result?.error || null }; }
+function compactTimeline(result: any) { return { ok: Boolean(result?.ok), eventsCount: result?.timeline?.eventsCount || 0, save: result?.timeline?.save || null, statsSave: result?.timeline?.statsSave || null, eventsPreview: Array.isArray(result?.timeline?.events) ? result.timeline.events.slice(0, 4) : [], error: result?.error || null, loader: result?.loader || null, remoteBrowser: result?.remoteBrowser || null, directFrame: result?.directFrame || null }; }
 function compactLive(result: any) { return { ok: Boolean(result?.ok), hasStats: Boolean(result?.hasStats), stats: result?.stats || null, validation: result?.validation || null, save: result?.save || null, textSample: result?.textSample || null, error: result?.error || null }; }
 function buildFlashUrl(origin: string, match: any, providerMatchId: number, save: boolean, replace: boolean, timeoutMs: number, waitMs: number) {
   const flashUrl = new URL('/api/internal/live-ingest/isports/remote-flash-pull', origin);
@@ -84,8 +84,14 @@ export async function GET(req: Request) {
       const item: any = { dbMatchId: match.id, providerMatchId, local: `${match.homeTeam.name} vs ${match.awayTeam.name}`, status: match.status, matchDate: match.matchDate.toISOString() };
       try {
         if (includeTimeline) {
-          const timelineUrl = new URL('/api/internal/live-ingest/isports/remote-frame-pull', origin);
-          timelineUrl.searchParams.set('matchId', String(providerMatchId)); timelineUrl.searchParams.set('dbMatchId', match.id); timelineUrl.searchParams.set('mode', 'timeline'); timelineUrl.searchParams.set('save', save ? 'true' : 'false'); timelineUrl.searchParams.set('replace', replace ? 'true' : 'false'); timelineUrl.searchParams.set('timeoutMs', String(timeoutMs)); timelineUrl.searchParams.set('waitMs', String(waitMs));
+          const timelineUrl = new URL('/api/internal/live-ingest/isports/remote-frame-pull-v4', origin);
+          timelineUrl.searchParams.set('matchId', String(providerMatchId));
+          timelineUrl.searchParams.set('dbMatchId', match.id);
+          timelineUrl.searchParams.set('mode', 'timeline');
+          timelineUrl.searchParams.set('save', save ? 'true' : 'false');
+          timelineUrl.searchParams.set('replace', replace ? 'true' : 'false');
+          timelineUrl.searchParams.set('timeoutMs', String(timeoutMs));
+          timelineUrl.searchParams.set('waitMs', String(waitMs));
           const timeline = await callRoute(remoteTimelinePullGET, timelineUrl, adminSecret);
           item.timelineHttpStatus = timeline.status; item.timeline = compactTimeline(timeline.result);
         }
@@ -116,7 +122,7 @@ export async function GET(req: Request) {
     }
 
     const queued = results.some((item) => item.flash?.queued || item.live?.queued);
-    return json({ ok: true, mode: 'cron_isports_live_sync', save, includeFlash, includeTimeline, includeLive, asyncFlash, asyncLive, processed: results.length, durationMs: Date.now() - startedAt, window: { start: start.toISOString(), end: end.toISOString() }, results, note: queued ? 'Some heavy iSports pulls were queued in the background to avoid external cron timeout.' : 'Cron-safe route. Timeline saves events, flash saves event-derived details, and visual stats run last for possession/shots/visible attack totals.' });
+    return json({ ok: true, mode: 'cron_isports_live_sync', save, includeFlash, includeTimeline, includeLive, asyncFlash, asyncLive, processed: results.length, durationMs: Date.now() - startedAt, window: { start: start.toISOString(), end: end.toISOString() }, results, note: queued ? 'Some heavy iSports pulls were queued in the background to avoid external cron timeout.' : 'Cron-safe route. Timeline uses v4 direct-first with Browserless/Render fallback, flash saves event-derived details, and visual stats run last for possession/shots/visible attack totals.' });
   } catch (error: any) {
     return json({ ok: false, error: error?.message || 'Internal Server Error' }, 500);
   }
