@@ -33,6 +33,8 @@ type Props = {
   compact?: boolean;
 };
 
+const STANDINGS_REFRESH_MS = 30_000;
+
 function formatCount(value?: number | null, fallback = 0) {
   return new Intl.NumberFormat('ar-EG').format(typeof value === 'number' && Number.isFinite(value) ? value : fallback);
 }
@@ -66,7 +68,7 @@ function ThirdPlacedCard({ rows, compact }: { rows: ThirdPlaceRow[]; compact: bo
       </div>
 
       {rows.length ? (
-        <div className="grid grid-cols-2 gap-1.5">
+        <div className="grid gap-1.5 sm:grid-cols-2">
           {rows.map((row, index) => {
             const flagUrl = getTeamFlagUrl({ code: row.code, name: row.team }, 32);
             const teamId = `team-${row.code.toLowerCase()}`;
@@ -76,15 +78,20 @@ function ThirdPlacedCard({ rows, compact }: { rows: ThirdPlaceRow[]; compact: bo
               <Link
                 key={`${row.groupKey}-${row.code}`}
                 href={`/teams/${teamId}`}
-                className="mobile-tap flex min-w-0 items-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.04] px-1.5 py-1.5 transition hover:border-[#0FF0FC]/35 hover:bg-white/[0.07]"
-                title={`${row.team} - المجموعة ${formatCount(row.groupNumber)}`}
+                className="mobile-tap grid min-w-0 grid-cols-[auto_auto_minmax(0,1fr)_auto] items-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.04] px-1.5 py-1.5 transition hover:border-[#0FF0FC]/35 hover:bg-white/[0.07]"
+                title={`${row.team} - المجموعة ${formatCount(row.groupNumber)} - ${formatCount(row.points)} نقطة`}
               >
                 <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-md bg-[#FFD700] text-[9px] font-black text-black">{formatCount(index + 1)}</span>
                 <img src={flagUrl || undefined} alt="" className="h-3.5 w-5 shrink-0 rounded-[3px] object-cover" />
-                <span className="min-w-0 flex-1 truncate text-[10px] font-black text-white">{row.team}</span>
-                <span className="shrink-0 text-[9px] font-black text-gray-500">م{formatCount(row.groupNumber)}</span>
-                <span className="shrink-0 rounded-md bg-[#FFD700]/10 px-1 text-[9px] font-black text-[#FFD700]">{formatCount(row.points)}ن</span>
-                <span className="hidden shrink-0 text-[9px] font-bold text-gray-500 sm:inline">{gd}</span>
+                <span className="min-w-0">
+                  <span className="block truncate text-[10px] font-black text-white">{row.team}</span>
+                  <span className="mt-0.5 block text-[8px] font-black text-gray-500">م{formatCount(row.groupNumber)}</span>
+                </span>
+                <span className="flex shrink-0 items-center gap-1">
+                  <span className="rounded-md bg-[#FFD700]/10 px-1.5 py-0.5 text-[9px] font-black text-[#FFD700]">{formatCount(row.points)} نقطة</span>
+                  <span className="rounded-md bg-white/[0.06] px-1 py-0.5 text-[8px] font-bold text-gray-300">فارق {gd}</span>
+                  <span className="hidden rounded-md bg-white/[0.06] px-1 py-0.5 text-[8px] font-bold text-gray-300 sm:inline">أهداف {formatCount(row.goalsFor)}</span>
+                </span>
               </Link>
             );
           })}
@@ -95,7 +102,7 @@ function ThirdPlacedCard({ rows, compact }: { rows: ThirdPlaceRow[]; compact: bo
         </div>
       )}
 
-      <div className="mt-2 text-[9px] font-bold text-gray-500">نقاط • فارق • أهداف</div>
+      <div className="mt-2 text-[9px] font-bold text-gray-500">الترتيب حسب: النقاط • فارق الأهداف • الأهداف المسجلة</div>
     </section>
   );
 }
@@ -106,24 +113,45 @@ export default function HomeGroupStandingsWidget({ compact = false }: Props = {}
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let cancelled = false;
+
     async function loadStandings() {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+
       try {
-        const res = await fetch('/api/groups/standings');
+        const res = await fetch('/api/groups/standings', { cache: 'no-store' });
         if (!res.ok) return;
         const data = await res.json();
+        if (cancelled) return;
+
         if (data.ok && Array.isArray(data.groups)) {
           setGroups(data.groups);
-          if (data.groups.length > 0) {
-            setSelectedGroupKey(data.groups[0].key);
-          }
+          setSelectedGroupKey((current) => {
+            if (data.groups.some((group: GroupData) => group.key === current)) return current;
+            return data.groups[0]?.key || 'A';
+          });
         }
       } catch (err) {
         console.error('Failed to load standings', err);
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     }
+
     loadStandings();
+    const timer = window.setInterval(loadStandings, STANDINGS_REFRESH_MS);
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') void loadStandings();
+    };
+    window.addEventListener('focus', loadStandings);
+    document.addEventListener('visibilitychange', onVisible);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+      window.removeEventListener('focus', loadStandings);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
   }, []);
 
   const selectedGroup = groups.find((g) => g.key === selectedGroupKey);
