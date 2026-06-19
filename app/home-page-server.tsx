@@ -1,4 +1,4 @@
-import HomeClientSportsLiveFocus from '@/components/HomeClientSportsLiveFocus';
+import HomeClientLoader from '@/components/HomeClientLoader';
 import prisma from '@/lib/prisma';
 
 export const dynamic = 'force-dynamic';
@@ -28,7 +28,7 @@ function validMinute(value: unknown) {
 }
 
 function normalizeStatus(value?: string | null) {
-  return String(value || []).toUpperCase();
+  return String(value || '').toUpperCase();
 }
 
 function isHalfTimeStatus(value?: string | null) {
@@ -41,7 +41,7 @@ function isSecondHalfStatus(value?: string | null) {
 }
 
 function isGroupStage(match: MatchCandidate) {
-  const value = String(match.groupPhase || match.stage || []).toUpperCase();
+  const value = String(match.groupPhase || match.stage || '').toUpperCase();
   return value.includes('GROUP');
 }
 
@@ -57,60 +57,27 @@ function minutesFromKickoff(match: MatchCandidate, now: Date) {
 
 function decorateLiveCandidateWithSnapshot<T extends MatchCandidate>(match: T, snapshot?: { minute: number; capturedAt: Date }) {
   const status = normalizeStatus(match.status);
-
   if (isHalfTimeStatus(status)) {
-    return {
-      ...match,
-      status: 'HT',
-      displayStatus: 'HT',
-      isLiveNow: false,
-      isHalfTime: true,
-      isLikelyLiveByTime: false,
-      minute: null,
-      liveLabel: 'استراحة',
-    };
+    return { ...match, status: 'HT', displayStatus: 'HT', isLiveNow: false, isHalfTime: true, isLikelyLiveByTime: false, minute: null, liveLabel: 'استراحة' };
   }
-
   const snapshotMinute = validMinute(snapshot?.minute);
-  const minute = isSecondHalfStatus(status)
-    ? snapshotMinute && snapshotMinute >= 46 ? snapshotMinute : 46
-    : snapshotMinute;
-
-  return {
-    ...match,
-    status: isSecondHalfStatus(status) ? '2H' : 'IN_PLAY',
-    displayStatus: isSecondHalfStatus(status) ? '2H' : 'IN_PLAY',
-    isLiveNow: true,
-    isHalfTime: false,
-    isLikelyLiveByTime: false,
-    minute,
-    liveLabel: minute ? `الدقيقة ${minute}` : 'جارية الآن',
-  };
+  const minute = isSecondHalfStatus(status) ? snapshotMinute && snapshotMinute >= 46 ? snapshotMinute : 46 : snapshotMinute;
+  return { ...match, status: isSecondHalfStatus(status) ? '2H' : 'IN_PLAY', displayStatus: isSecondHalfStatus(status) ? '2H' : 'IN_PLAY', isLiveNow: true, isHalfTime: false, isLikelyLiveByTime: false, minute, liveLabel: minute ? `الدقيقة ${minute}` : 'جارية الآن' };
 }
 
 async function findFreshLiveCandidate<T extends MatchCandidate>(candidates: T[], now: Date) {
   if (!candidates.length) return null;
-
   const snapshots = await prisma.matchStatsSnapshot.findMany({
-    where: {
-      matchId: { in: candidates.map((match) => match.id) },
-      minute: { not: null },
-    },
-    select: {
-      matchId: true,
-      minute: true,
-      capturedAt: true,
-    },
+    where: { matchId: { in: candidates.map((match) => match.id) }, minute: { not: null } },
+    select: { matchId: true, minute: true, capturedAt: true },
     orderBy: { capturedAt: 'desc' },
   });
-
   const latestByMatch = new Map<string, { minute: number; capturedAt: Date }>();
   for (const snapshot of snapshots) {
     if (latestByMatch.has(snapshot.matchId)) continue;
     const minute = validMinute(snapshot.minute);
     if (minute !== null) latestByMatch.set(snapshot.matchId, { minute, capturedAt: snapshot.capturedAt });
   }
-
   const candidate = candidates.find((match) => {
     if (isHalfTimeStatus(match.status)) return true;
     const localMinute = minutesFromKickoff(match, now);
@@ -122,8 +89,11 @@ async function findFreshLiveCandidate<T extends MatchCandidate>(candidates: T[],
     if (snapshot.minute >= FINAL_MINUTE_FLOOR && snapshotAge >= STALE_FINAL_SNAPSHOT_MS) return false;
     return true;
   });
-
   return candidate ? decorateLiveCandidateWithSnapshot(candidate, latestByMatch.get(candidate.id)) : null;
+}
+
+function safeJson<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value));
 }
 
 export default async function Home() {
@@ -141,78 +111,25 @@ export default async function Home() {
   let nextMarqueeMatch: any = null;
 
   try {
-    const [
-      totalPlayers,
-      totalTeams,
-      totalUpcomingMatches,
-      upcomingMatchesRaw,
-      tickerMatchesRaw,
-      liveCandidatesRaw,
-      nextMatchRaw,
-    ] = await Promise.all([
+    const [totalPlayers, totalTeams, totalUpcomingMatches, upcomingMatchesRaw, tickerMatchesRaw, liveCandidatesRaw, nextMatchRaw] = await Promise.all([
       prisma.asset.count({ where: { type: 'PLAYER' } }),
       prisma.asset.count({ where: { type: 'TEAM' } }),
-      prisma.match.count({
-        where: {
-          status: { in: ACTIVE_HOME_STATUSES },
-          matchDate: { gte: liveWindowStart, lte: upcomingUntil },
-        },
-      }),
-      prisma.match.findMany({
-        where: {
-          status: { in: ACTIVE_HOME_STATUSES },
-          matchDate: { gte: liveWindowStart, lte: upcomingUntil },
-        },
-        orderBy: { matchDate: 'asc' },
-        take: 5,
-        include: { homeTeam: true, awayTeam: true },
-      }),
-      prisma.match.findMany({
-        where: { matchDate: { gte: tickerStart, lte: tickerEnd } },
-        orderBy: { matchDate: 'asc' },
-        take: 15,
-        include: { homeTeam: true, awayTeam: true },
-      }),
-      prisma.match.findMany({
-        where: {
-          status: { in: LIVE_STATUSES },
-          matchDate: { gte: liveWindowStart, lte: upcomingUntil },
-        },
-        orderBy: { matchDate: 'desc' },
-        take: 4,
-        include: { homeTeam: true, awayTeam: true },
-      }),
-      prisma.match.findFirst({
-        where: {
-          status: { in: SCHEDULED_STATUSES },
-          matchDate: { gte: liveWindowStart, lte: upcomingUntil },
-        },
-        orderBy: { matchDate: 'asc' },
-        include: { homeTeam: true, awayTeam: true },
-      }),
+      prisma.match.count({ where: { status: { in: ACTIVE_HOME_STATUSES }, matchDate: { gte: liveWindowStart, lte: upcomingUntil } } }),
+      prisma.match.findMany({ where: { status: { in: ACTIVE_HOME_STATUSES }, matchDate: { gte: liveWindowStart, lte: upcomingUntil } }, orderBy: { matchDate: 'asc' }, take: 5, include: { homeTeam: true, awayTeam: true } }),
+      prisma.match.findMany({ where: { matchDate: { gte: tickerStart, lte: tickerEnd } }, orderBy: { matchDate: 'asc' }, take: 15, include: { homeTeam: true, awayTeam: true } }),
+      prisma.match.findMany({ where: { status: { in: LIVE_STATUSES }, matchDate: { gte: liveWindowStart, lte: upcomingUntil } }, orderBy: { matchDate: 'desc' }, take: 4, include: { homeTeam: true, awayTeam: true } }),
+      prisma.match.findFirst({ where: { status: { in: SCHEDULED_STATUSES }, matchDate: { gte: liveWindowStart, lte: upcomingUntil } }, orderBy: { matchDate: 'asc' }, include: { homeTeam: true, awayTeam: true } }),
     ]);
-
     const freshLiveMatch = await findFreshLiveCandidate(liveCandidatesRaw, now);
     playersCount = totalPlayers;
     teamsCount = totalTeams;
     upcomingMatchesCount = totalUpcomingMatches;
-    upcomingMatches = JSON.parse(JSON.stringify(upcomingMatchesRaw));
-    tickerMatches = JSON.parse(JSON.stringify(tickerMatchesRaw));
-    nextMarqueeMatch = freshLiveMatch || nextMatchRaw ? JSON.parse(JSON.stringify(freshLiveMatch || nextMatchRaw)) : null;
+    upcomingMatches = safeJson(upcomingMatchesRaw);
+    tickerMatches = safeJson(tickerMatchesRaw);
+    nextMarqueeMatch = freshLiveMatch || nextMatchRaw ? safeJson(freshLiveMatch || nextMatchRaw) : null;
   } catch (error) {
-    console.error('Error fetching dashboard data:', error);
-    upcomingMatches = [];
-    tickerMatches = [];
+    console.error('Home dashboard fallback activated:', error);
   }
 
-  return (
-    <HomeClientSportsLiveFocus
-      upcomingMatches={upcomingMatches}
-      tickerMatches={tickerMatches}
-      nextMarqueeMatch={nextMarqueeMatch}
-      playersCount={playersCount}
-      teamsCount={teamsCount}
-      upcomingMatchesCount={upcomingMatchesCount}
-    />
-  );
+  return <HomeClientLoader upcomingMatches={upcomingMatches} tickerMatches={tickerMatches} nextMarqueeMatch={nextMarqueeMatch} playersCount={playersCount} teamsCount={teamsCount} upcomingMatchesCount={upcomingMatchesCount} />;
 }
