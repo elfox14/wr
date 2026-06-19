@@ -8,6 +8,7 @@ import { NotificationProvider } from "@/components/ui/NotificationProvider";
 import { Navbar } from "@/components/ui/Navbar";
 import { Footer } from "@/components/ui/Footer";
 import { HardNavigationGuard } from "@/components/ui/HardNavigationGuard";
+import HomeLiveMatchTicker from "@/components/HomeLiveMatchTicker";
 
 const cairo = Cairo({
   variable: "--font-cairo",
@@ -55,7 +56,12 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           <NotificationProvider>
             <HardNavigationGuard />
             <Navbar />
-            <div className="min-h-[calc(100vh-180px)]">{children}</div>
+            <div className="sticky top-[64px] z-40 border-b border-white/10 bg-[#04110D]/96 shadow-[0_12px_30px_rgba(0,0,0,0.24)] backdrop-blur-xl lg:top-[84px]">
+              <div className="mx-auto max-w-[1400px] px-3 sm:px-6 lg:px-8">
+                <HomeLiveMatchTicker matches={[]} />
+              </div>
+            </div>
+            <div className="min-h-[calc(100vh-220px)]">{children}</div>
             <Footer />
           </NotificationProvider>
         </Providers>
