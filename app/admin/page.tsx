@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
+import AdminHomeDashboard from '@/components/admin/AdminHomeDashboard';
 
 type AdminSession = {
   user?: {
@@ -23,5 +24,5 @@ export default async function AdminPage() {
   if (!session?.user) redirect('/login');
   if (!isAdmin(session)) redirect('/');
 
-  return null;
+  return <AdminHomeDashboard />;
 }
