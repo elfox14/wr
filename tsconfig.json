@@ -38,6 +38,7 @@
     "app/api/admin/the-stats-import-match-events/route.ts",
     "app/api/admin/the-stats-live-catchup/route.ts",
     "app/api/admin/the-stats-live-debug/route.ts",
-    "app/api/matches/live-card/route.ts"
+    "app/api/matches/live-card/route.ts",
+    "components/match-page/ProfessionalMatchPage.tsx"
   ]
 }
