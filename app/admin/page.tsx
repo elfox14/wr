@@ -3,6 +3,9 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import AdminHomeDashboard from '@/components/admin/AdminHomeDashboard';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 type AdminSession = {
   user?: {
     email?: string | null;
