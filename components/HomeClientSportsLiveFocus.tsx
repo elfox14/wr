@@ -25,7 +25,6 @@ type HomeMatch = {
   isLikelyLiveByTime?: boolean;
   isStaleAutoFinished?: boolean;
   minute?: number | null;
-  liveLabel?: string | null;
 };
 type Props = { upcomingMatches?: HomeMatch[] | unknown[]; tickerMatches?: HomeMatch[] | unknown[]; nextMarqueeMatch?: HomeMatch | null | unknown; playersCount?: number; teamsCount?: number; upcomingMatchesCount?: number };
 
@@ -55,7 +54,7 @@ function isScheduled(match?: HomeMatch | null) { return !isFinished(match) && SC
 function isConfirmedLive(match?: HomeMatch | null) { const status = normalizeStatus(match); return !isFinished(match) && !isHalfTime(match) && (LIVE_STATUSES.includes(status) || Boolean(match?.isLiveNow) || Boolean(match?.isLikelyLiveByTime)); }
 function isWaitingForStartConfirmation(match: HomeMatch, now: Date) { return isScheduled(match) && hasKickoffPassed(match, now) && !isConfirmedLive(match) && !isHalfTime(match); }
 function displayMinute(match: HomeMatch) { if (isHalfTime(match) || isFinished(match)) return null; const minute = Number(match.minute); const status = normalizeStatus(match); if (SECOND_HALF_STATUSES.includes(status) && (!Number.isFinite(minute) || minute < 45)) return 45; if (!Number.isFinite(minute) || minute <= 0) return null; return Math.max(1, Math.min(150, Math.floor(minute))); }
-function liveStateLabel(match: HomeMatch) { const label = String(match.liveLabel || '').trim(); if (label) return label; const minute = displayMinute(match); const status = normalizeStatus(match); if (status === '1H') return minute ? `الشوط الأول — د${formatCount(minute)}` : 'الشوط الأول'; if (status === '2H') return minute ? `الشوط الثاني — د${formatCount(minute)}` : 'الشوط الثاني'; return minute ? `جارية الآن — د${formatCount(minute)}` : 'جارية الآن'; }
+function liveStateLabel(match: HomeMatch) { const minute = displayMinute(match); const status = normalizeStatus(match); if (status === '1H') return minute ? `الشوط الأول — د${formatCount(minute)}` : 'الشوط الأول'; if (status === '2H') return minute ? `الشوط الثاني — د${formatCount(minute)}` : 'الشوط الثاني'; if (status === 'ET') return minute ? `وقت إضافي — د${formatCount(minute)}` : 'وقت إضافي'; if (status === 'P' || status === 'PEN') return 'ركلات الترجيح'; return minute ? `جارية الآن — د${formatCount(minute)}` : 'جارية الآن'; }
 function uniqueMatches(list: HomeMatch[]) { const seen = new Set<string>(); return list.filter((match) => { const key = matchKey(match); if (seen.has(key)) return false; seen.add(key); return true; }); }
 function groupNumberLabel(match: HomeMatch) { const raw = String(match.groupPhase || match.group || match.stage || '').trim().toUpperCase(); const letter = raw.match(/GROUP[_\s-]*([A-L])/)?.[1] || (/^[A-L]$/.test(raw) ? raw : ''); if (letter) return `المجموعة ${formatCount(GROUP_LETTERS.indexOf(letter) + 1)}`; const number = raw.match(/(?:GROUP|المجموعة)?[_\s-]*(\d{1,2})/)?.[1]; if (number) return `المجموعة ${formatCount(Number(number))}`; return 'كأس العالم 2026'; }
 function formatMatchDate(value?: string | Date | null) { if (!value) return 'موعد غير متوفر'; const date = new Date(value); if (!Number.isFinite(date.getTime())) return 'موعد غير متوفر'; return new Intl.DateTimeFormat('ar-EG', { weekday: 'short', day: 'numeric', month: 'short' }).format(date); }
