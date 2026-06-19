@@ -81,6 +81,10 @@ function withSecret(url: URL, key: string) {
   return url;
 }
 
+function makeUrl(origin: string, path: string, key: string) {
+  return withSecret(new URL(path, origin), key);
+}
+
 async function selectSyncMatches(minutesBack: number, minutesForward: number, limit: number) {
   const now = Date.now();
   return prisma.match.findMany({
@@ -154,10 +158,6 @@ async function autoFinishFromTheStats(match: any, result: any, dryRun: boolean) 
   return { checked: true, shouldFinish: true, updated: !dryRun, latestMinute, providerEventsFound };
 }
 
-function makeUrl(origin: string, path: string, key: string) {
-  return withSecret(new URL(path, origin), key);
-}
-
 export async function GET(req: Request) {
   const auth = await requireAdmin(req);
   if (!auth.authorized) return auth.error;
@@ -169,11 +169,12 @@ export async function GET(req: Request) {
   const origin = publicOrigin(req, url);
   const dryRun = bool(url.searchParams.get('dryRun'), false);
   const runTheStats = bool(url.searchParams.get('theStats'), true);
-  const runISports = bool(url.searchParams.get('isports'), true);
-  const runISportStats = bool(url.searchParams.get('isportStats'), true);
+  const forceCoreISports = bool(url.searchParams.get('forceCoreISports'), true);
+  const runISports = forceCoreISports || bool(url.searchParams.get('isports'), true);
+  const runISportStats = forceCoreISports || bool(url.searchParams.get('isportStats'), true);
   const runISportVisualStats = bool(url.searchParams.get('isportVisualStats'), false);
   const runDedupe = bool(url.searchParams.get('dedupe'), true);
-  const mapISports = bool(url.searchParams.get('mapISports'), true);
+  const mapISports = forceCoreISports || bool(url.searchParams.get('mapISports'), true);
   const runEnrichment = bool(url.searchParams.get('theStatsEnrichment'), true);
   const enrichLineups = bool(url.searchParams.get('enrichLineups'), true);
   const postmatchTheStats = bool(url.searchParams.get('postmatchTheStats'), true);
@@ -193,6 +194,7 @@ export async function GET(req: Request) {
     publicOrigin: origin,
     matchesFound: 0,
     policy: {
+      forceCoreISports,
       theStats: 'primary provider for official stats, final timeline, and post-match replacement',
       iSport: 'core live provider for animation timeline and flash stats while TheStats live events are incomplete',
       lineups: 'TheStats enrichment is called automatically until official lineup appears in snapshots',
@@ -251,7 +253,6 @@ export async function GET(req: Request) {
     };
 
     if (autoFinish && theStatsResult) item.theStatsAutoFinish = await autoFinishFromTheStats(match, theStatsResult, dryRun);
-
     const finishedNow = isFinishedStatus(match.status) || item.theStatsAutoFinish?.shouldFinish || isNotLiveConflict(theStatsResult);
     const shouldLineupEnrich = runTheStats && runEnrichment && enrichLineups && !item.hasOfficialLineupSnapshot;
     const shouldFinalEnrich = runTheStats && runEnrichment && postmatchTheStats && finishedNow;
