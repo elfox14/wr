@@ -3,17 +3,26 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
-export default function MatchAutoRefresh({ intervalMs = 30000 }: { intervalMs?: number }) {
+export default function MatchAutoRefresh({ intervalMs = 30000, hardReload = false }: { intervalMs?: number; hardReload?: boolean }) {
   const router = useRouter();
 
   useEffect(() => {
     const safeInterval = Math.max(10000, intervalMs);
-    const timer = window.setInterval(() => {
-      if (document.visibilityState === 'visible') router.refresh();
-    }, safeInterval);
+    let tick = 0;
+    const run = () => {
+      if (document.visibilityState !== 'visible') return;
+      tick += 1;
+      router.refresh();
+      if (hardReload) {
+        window.setTimeout(() => {
+          if (document.visibilityState === 'visible') window.location.reload();
+        }, 1200);
+      }
+    };
+    const timer = window.setInterval(run, safeInterval);
 
     return () => window.clearInterval(timer);
-  }, [router, intervalMs]);
+  }, [router, intervalMs, hardReload]);
 
   return null;
 }
