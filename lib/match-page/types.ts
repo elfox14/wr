@@ -19,6 +19,30 @@ export type MatchPlayerLite = {
   teamId?: string | null;
 };
 
+export type OfficialLineupPlayer = {
+  id?: string | null;
+  name: string;
+  number?: string | number | null;
+  image?: string | null;
+  position?: string | null;
+  rating?: number | null;
+  isCaptain?: boolean | null;
+};
+
+export type OfficialLineupTeam = {
+  teamName?: string | null;
+  formation?: string | null;
+  startingXi: OfficialLineupPlayer[];
+  substitutes: OfficialLineupPlayer[];
+};
+
+export type OfficialLineupView = {
+  confirmed: boolean;
+  source: string;
+  home: OfficialLineupTeam | null;
+  away: OfficialLineupTeam | null;
+} | null;
+
 export type MatchScore = {
   home: number | null;
   away: number | null;
@@ -115,6 +139,8 @@ export type MatchPageData = {
   events: MatchEventView[];
   homePlayers: MatchPlayerLite[];
   awayPlayers: MatchPlayerLite[];
+  officialLineup: OfficialLineupView;
+  voteEndpoint: string;
   groupStandings: StandingRow[];
   thirdPlaceTable: StandingRow[];
   tacticalKeys: string[];
