@@ -60,6 +60,8 @@ function rankThirdPlaced(groups: GroupData[]) {
 }
 
 function ThirdPlacedCard({ rows, compact }: { rows: ThirdPlaceRow[]; compact: boolean }) {
+  const rowGrid = 'grid-cols-[auto_auto_minmax(0,1fr)_2rem_2rem_2rem]';
+
   return (
     <section className={`rounded-[1.2rem] border border-[#FFD700]/15 bg-black/25 ${compact ? 'p-2.5' : 'p-3'} shadow-[0_14px_38px_rgba(0,0,0,0.16)]`}>
       <div className="mb-2 flex items-center justify-between gap-2">
@@ -68,33 +70,41 @@ function ThirdPlacedCard({ rows, compact }: { rows: ThirdPlaceRow[]; compact: bo
       </div>
 
       {rows.length ? (
-        <div className="grid gap-1.5 sm:grid-cols-2">
-          {rows.map((row, index) => {
-            const flagUrl = getTeamFlagUrl({ code: row.code, name: row.team }, 32);
-            const teamId = `team-${row.code.toLowerCase()}`;
-            const gd = formatGoalDifference(row.goalDifference);
+        <div className="space-y-1.5">
+          <div className={`grid ${rowGrid} items-center gap-1.5 px-1.5 text-[8px] font-black text-gray-500`}>
+            <span className="col-span-3">المنتخب</span>
+            <span className="text-center">نقاط</span>
+            <span className="text-center">فارق</span>
+            <span className="text-center">أهداف</span>
+          </div>
 
-            return (
-              <Link
-                key={`${row.groupKey}-${row.code}`}
-                href={`/teams/${teamId}`}
-                className="mobile-tap grid min-w-0 grid-cols-[auto_auto_minmax(0,1fr)_auto] items-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.04] px-1.5 py-1.5 transition hover:border-[#0FF0FC]/35 hover:bg-white/[0.07]"
-                title={`${row.team} - المجموعة ${formatCount(row.groupNumber)} - ${formatCount(row.points)} نقطة`}
-              >
-                <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-md bg-[#FFD700] text-[9px] font-black text-black">{formatCount(index + 1)}</span>
-                <img src={flagUrl || undefined} alt="" className="h-3.5 w-5 shrink-0 rounded-[3px] object-cover" />
-                <span className="min-w-0">
-                  <span className="block truncate text-[10px] font-black text-white">{row.team}</span>
-                  <span className="mt-0.5 block text-[8px] font-black text-gray-500">م{formatCount(row.groupNumber)}</span>
-                </span>
-                <span className="flex shrink-0 items-center gap-1">
-                  <span className="rounded-md bg-[#FFD700]/10 px-1.5 py-0.5 text-[9px] font-black text-[#FFD700]">{formatCount(row.points)} نقطة</span>
-                  <span className="rounded-md bg-white/[0.06] px-1 py-0.5 text-[8px] font-bold text-gray-300">فارق {gd}</span>
-                  <span className="hidden rounded-md bg-white/[0.06] px-1 py-0.5 text-[8px] font-bold text-gray-300 sm:inline">أهداف {formatCount(row.goalsFor)}</span>
-                </span>
-              </Link>
-            );
-          })}
+          <div className="grid gap-1.5">
+            {rows.map((row, index) => {
+              const displayTeam = row.team || row.code || `منتخب م${formatCount(row.groupNumber)}`;
+              const flagUrl = getTeamFlagUrl({ code: row.code, name: displayTeam }, 32);
+              const teamId = `team-${row.code.toLowerCase()}`;
+              const gd = formatGoalDifference(row.goalDifference);
+
+              return (
+                <Link
+                  key={`${row.groupKey}-${row.code}`}
+                  href={`/teams/${teamId}`}
+                  className={`mobile-tap grid min-w-0 ${rowGrid} items-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.04] px-1.5 py-1.5 transition hover:border-[#0FF0FC]/35 hover:bg-white/[0.07]`}
+                  title={`${displayTeam} - المجموعة ${formatCount(row.groupNumber)}`}
+                >
+                  <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-md bg-[#FFD700] text-[9px] font-black text-black">{formatCount(index + 1)}</span>
+                  <img src={flagUrl || undefined} alt="" className="h-3.5 w-5 shrink-0 rounded-[3px] object-cover" />
+                  <span className="min-w-0">
+                    <span className="block truncate text-[10px] font-black text-white">{displayTeam}</span>
+                    <span className="mt-0.5 block text-[8px] font-black text-gray-500">م{formatCount(row.groupNumber)}</span>
+                  </span>
+                  <span className="rounded-md bg-[#FFD700]/10 px-1 py-0.5 text-center text-[9px] font-black text-[#FFD700]">{formatCount(row.points)}</span>
+                  <span className="rounded-md bg-white/[0.06] px-1 py-0.5 text-center text-[9px] font-bold text-gray-300">{gd}</span>
+                  <span className="rounded-md bg-white/[0.06] px-1 py-0.5 text-center text-[9px] font-bold text-gray-300">{formatCount(row.goalsFor)}</span>
+                </Link>
+              );
+            })}
+          </div>
         </div>
       ) : (
         <div className="rounded-xl border border-dashed border-white/10 bg-black/20 p-3 text-center text-[10px] font-bold text-gray-500">
