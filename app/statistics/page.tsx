@@ -68,32 +68,6 @@ function dateLabel(value?: string | null) {
   return new Intl.DateTimeFormat('ar-EG', { dateStyle: 'medium', timeStyle: 'short' }).format(date);
 }
 
-const STAT_EXPLANATIONS: Record<string, { meaning: string; formula: string; details: string }> = {
-  'المباريات': { meaning: 'يوضح تقدم البطولة: عدد المباريات المنتهية مقارنة بإجمالي المباريات المسجلة، مع المباريات المباشرة والقادمة.', formula: 'المنتهية / الإجمالي، ثم قراءة liveMatches وscheduledMatches من ملخص المباريات.', details: 'يعتمد على حالة المباراة في قاعدة البيانات، وفي الرئيسية يتم تصحيح حالة المباريات المباشرة من live-card.' },
-  'أهداف البطولة': { meaning: 'إجمالي الأهداف المسجلة في المباريات التي انتهت رسميًا.', formula: 'مجموع homeScore + awayScore للمباريات المنتهية فقط.', details: 'لا تدخل المباراة في هذا الرقم كنهائية إلا بعد تحول حالتها إلى FINISHED أو ما يعادلها.' },
-  'متوسط الأهداف': { meaning: 'مؤشر سريع على غزارة البطولة تهديفيًا في المباراة الواحدة.', formula: 'إجمالي الأهداف ÷ عدد المباريات المنتهية.', details: 'كلما ارتفع الرقم زادت كثافة الأهداف في البطولة.' },
-  'التسديدات': { meaning: 'يعرض إجمالي التسديدات ثم التسديدات على المرمى، ومعها دقة التسديد.', formula: 'دقة التسديد = التسديدات على المرمى ÷ إجمالي التسديدات × 100.', details: 'يعتمد على المباريات التي لديها إحصائيات تفصيلية من TheStatsAPI أو snapshots.' },
-  'الهداف': { meaning: 'أكثر لاعب سجّل أهدافًا في مصادر البطولة المتاحة.', formula: 'تجميع أهداف اللاعب من Football-Data raw goals أو MatchEvent، ثم fallback إلى PlayerPerformance.', details: 'إذا ظهر المصدر PlayerPerformance فهذا يعني عدم توفر مصدر أهداف أحدث كفاية.' },
-  'صانع الأهداف': { meaning: 'أكثر لاعب صنع أهدافًا حسب بيانات الأداء المخزنة.', formula: 'تجميع assists لكل لاعب من PlayerPerformance.', details: 'يمكن ترقيته لاحقًا إذا توفر مصدر assists مباشر من API خارجي.' },
-  'عدد اللاعبين': { meaning: 'عدد اللاعبين المرتبطين بمنتخبات بعد إزالة الصفوف المكررة.', formula: 'Assets من نوع PLAYER ثم dedupePlayers ثم احتساب اللاعبين المرتبطين بفريق.', details: 'يعرض أيضًا عدد المنتخبات والصفوف المكررة المخفية.' },
-  'أفضل هجوم': { meaning: 'المنتخب الأكثر تسجيلًا للأهداف في المباريات المنتهية.', formula: 'تجميع goalsFor لكل منتخب ثم اختيار الأعلى.', details: 'يعتمد فقط على المباريات المنتهية حتى لا تتغير الأرقام أثناء اللعب.' },
-  'الأكثر استقبالًا': { meaning: 'المنتخب الذي استقبل أكبر عدد من الأهداف.', formula: 'تجميع goalsAgainst لكل منتخب ثم اختيار الأعلى.', details: 'مفيد لتحديد أضعف دفاع رقميًا حتى اللحظة.' },
-  'أفضل شباك نظيفة': { meaning: 'المنتخب الأكثر خروجًا من المباريات دون استقبال أهداف.', formula: 'كل مباراة أهدافها المستقبلة = 0 تُحسب شباكًا نظيفة.', details: 'يعتمد على نتائج المباريات المنتهية.' },
-  'نسبة الشباك النظيفة': { meaning: 'نسبة مرات خروج أحد طرفي المباراة بشباك نظيفة.', formula: 'إجمالي الشباك النظيفة ÷ (المباريات المنتهية × 2) × 100.', details: 'كل مباراة تمنح فرصتين للشباك النظيفة: فرصة لكل منتخب.' },
-  'xG': { meaning: 'الأهداف المتوقعة: جودة الفرص المتاحة للتسجيل، وليس عدد الأهداف الفعلي فقط.', formula: 'مجموع قيم xG المتاحة من المصدر لكل المباريات.', details: 'يظهر فقط عند توفر xG من TheStatsAPI أو snapshots.' },
-  'فرص كبيرة': { meaning: 'عدد الفرص التي يصنفها المصدر كفرص عالية الجودة للتسجيل.', formula: 'مجموع bigChances من البيانات التفصيلية.', details: 'مؤشر مباشر على جودة الهجوم لا مجرد عدد التسديدات.' },
-  'متوسط التسديدات': { meaning: 'كثافة التسديد في المباراة الواحدة.', formula: 'إجمالي التسديدات ÷ عدد المباريات المنتهية.', details: 'يساعد في مقارنة رتم البطولة هجوميًا.' },
-  'متوسط الاستحواذ': { meaning: 'متوسط عينات الاستحواذ المسجلة في snapshots.', formula: 'مجموع عينات possession ÷ عدد العينات.', details: 'ليس ترتيبًا لفريق محدد؛ هو مؤشر تغطية ومتوسط عام.' },
-  'دقة التمرير': { meaning: 'نسبة التمريرات الناجحة من إجمالي التمريرات عند توفرها من المصدر.', formula: 'تمريرات ناجحة ÷ إجمالي التمريرات × 100 أو نسبة جاهزة من المصدر.', details: 'قد لا تظهر إذا لم يرسلها مزود البيانات.' },
-  'ركنيات': { meaning: 'إجمالي الضربات الركنية المسجلة في المباريات المتاحة.', formula: 'homeCorners + awayCorners لكل مباراة لديها snapshot.', details: 'يعتمد على توفر إحصائيات تفصيلية للمباراة.' },
-  'هجمات': { meaning: 'إجمالي الهجمات المسجلة من المصدر.', formula: 'homeAttacks + awayAttacks لكل snapshot نهائي متاح.', details: 'يعطي تصورًا عن حجم التحرك الهجومي العام.' },
-  'هجمات خطيرة': { meaning: 'الهجمات التي يصنفها المصدر كأخطر من الهجمات العادية.', formula: 'homeDangerousAttacks + awayDangerousAttacks لكل snapshot متاح.', details: 'مؤشر أقرب للخطورة الفعلية من عدد الهجمات فقط.' },
-  'البطاقات الصفراء': { meaning: 'عدد البطاقات الصفراء المسجلة في البطولة.', formula: 'أعلى قيمة موثقة بين snapshots/bookings وMatchEvent fallback.', details: 'نستخدم الأعلى لتقليل فقدان البيانات عند نقص snapshots.' },
-  'البطاقات الحمراء': { meaning: 'عدد البطاقات الحمراء المسجلة في البطولة.', formula: 'أعلى قيمة موثقة بين snapshots/bookings وMatchEvent fallback.', details: 'يشمل الحمراء المباشرة وما يمكن استنتاجه من البيانات الخام.' },
-  'ركلات الجزاء': { meaning: 'إجمالي ركلات الجزاء المحتسبة، مع فصل المسجلة والضائعة وغير المحددة.', formula: 'rawData.penalties أو أهداف من نوع PENALTY، ثم fallback إلى MatchEvent.', details: 'إذا ظهرت غير متاحة فهذا يعني أن المصدر لم يرسل تفاصيل الجزاءات أو لم تُحفظ بعد.' },
-  'نسبة تسجيل الجزاءات': { meaning: 'كفاءة تنفيذ ركلات الجزاء المسجلة في البيانات.', formula: 'الجزاءات المسجلة ÷ إجمالي الجزاءات × 100.', details: 'لا تُحسب بدقة إلا عندما يكون إجمالي الجزاءات متاحًا.' },
-};
-
 function StatCard({ title, value, subtitle, source, tone = 'cyan' }: { title: string; value: string; subtitle?: string; source?: string; tone?: 'gold' | 'cyan' | 'green' | 'red' | 'neutral' }) {
   const toneClass = {
     gold: 'text-[#FFD700] border-[#FFD700]/18 bg-[#FFD700]/10',
@@ -102,32 +76,17 @@ function StatCard({ title, value, subtitle, source, tone = 'cyan' }: { title: st
     red: 'text-red-100 border-red-300/16 bg-red-400/10',
     neutral: 'text-white border-white/10 bg-white/[0.04]',
   }[tone];
-  const info = STAT_EXPLANATIONS[title];
 
   return (
-    <article className={`flex h-full flex-col gap-3 rounded-2xl border p-4 shadow-[0_12px_32px_rgba(0,0,0,0.2)] ${toneClass}`}>
+    <article className={`flex h-full min-h-[128px] flex-col justify-between gap-3 rounded-2xl border p-4 shadow-[0_12px_32px_rgba(0,0,0,0.2)] ${toneClass}`}>
       <div className="flex items-start justify-between gap-2">
         <h3 className="text-xs font-black text-gray-300">{title}</h3>
         {source && source !== '—' ? <span className="shrink-0 rounded-full border border-white/10 bg-black/25 px-2 py-0.5 text-[9px] font-black text-gray-300">{source}</span> : null}
       </div>
-      <div className="text-3xl font-black leading-none">{value}</div>
-      {subtitle ? <p className="text-xs font-bold leading-5 text-gray-400">{subtitle}</p> : null}
-      {info ? (
-        <div className="space-y-2 text-right">
-          <div className="rounded-xl border border-white/8 bg-black/20 p-3">
-            <div className="mb-1 text-[10px] font-black text-gray-500">الشرح</div>
-            <p className="text-xs font-bold leading-6 text-gray-300">{info.meaning}</p>
-          </div>
-          <div className="rounded-xl border border-white/8 bg-black/20 p-3">
-            <div className="mb-1 text-[10px] font-black text-gray-500">طريقة الحساب</div>
-            <p className="text-xs font-bold leading-6 text-gray-300">{info.formula}</p>
-          </div>
-          <div className="rounded-xl border border-white/8 bg-black/20 p-3">
-            <div className="mb-1 text-[10px] font-black text-gray-500">تفاصيل وملاحظات</div>
-            <p className="text-xs font-bold leading-6 text-gray-300">{info.details}</p>
-          </div>
-        </div>
-      ) : null}
+      <div>
+        <div className="truncate text-3xl font-black leading-none">{value}</div>
+        {subtitle ? <p className="mt-2 text-xs font-bold leading-5 text-gray-400">{subtitle}</p> : null}
+      </div>
     </article>
   );
 }
@@ -257,13 +216,39 @@ export default function StatisticsPage() {
   const yellowCards = pickNumber(data.summary?.yellowCards, data.database?.yellowCards);
   const redCards = pickNumber(data.summary?.redCards, data.database?.redCards);
   const xg = pickNumber(data.finalStats?.totalXg, data.finalStats?.xg, data.summary?.powerStats?.totalXg, data.summary?.powerStats?.xg);
-  const bigChances = pickNumber(data.finalStats?.bigChances, data.summary?.powerStats?.bigChances);
-  const passAccuracy = pickNumber(data.finalStats?.passAccuracyPercent, data.summary?.powerStats?.passAccuracyPercent);
+  const npxg = pickNumber(data.finalStats?.totalNpxg, data.summary?.powerStats?.totalNpxg);
+  const xa = pickNumber(data.finalStats?.totalXa, data.summary?.powerStats?.totalXa);
+  const highXgChances = pickNumber(data.finalStats?.totalHighXgChances, data.summary?.powerStats?.bigChances);
   const averageShots = pickNumber(data.finalStats?.averageShotsPerFinishedMatch, data.summary?.powerStats?.averageShotsPerFinishedMatch);
   const averagePossession = pickNumber(data.finalStats?.averagePossessionSample, data.summary?.powerStats?.averagePossessionSample);
   const corners = pickNumber(data.finalStats?.totalCorners, data.finalStats?.corners, data.summary?.powerStats?.totalCorners, data.summary?.powerStats?.corners);
   const attacks = pickNumber(data.finalStats?.totalAttacks, data.summary?.powerStats?.totalAttacks, data.summary?.powerStats?.attacks);
   const dangerousAttacks = pickNumber(data.finalStats?.totalDangerousAttacks, data.summary?.powerStats?.totalDangerousAttacks, data.summary?.powerStats?.dangerousAttacks);
+  const passes = pickNumber(data.finalStats?.totalPasses);
+  const accuratePasses = pickNumber(data.finalStats?.totalAccuratePasses);
+  const passAccuracy = pickNumber(data.finalStats?.passAccuracyPercent, percent(accuratePasses, passes));
+  const keyPasses = pickNumber(data.finalStats?.totalKeyPasses);
+  const crosses = pickNumber(data.finalStats?.totalCrosses);
+  const accurateCrosses = pickNumber(data.finalStats?.totalAccurateCrosses);
+  const crossAccuracy = pickNumber(data.finalStats?.crossAccuracyPercent, percent(accurateCrosses, crosses));
+  const tackles = pickNumber(data.finalStats?.totalTackles);
+  const interceptions = pickNumber(data.finalStats?.totalInterceptions);
+  const clearances = pickNumber(data.finalStats?.totalClearances);
+  const blocks = pickNumber(data.finalStats?.totalBlocks);
+  const saves = pickNumber(data.finalStats?.totalSaves);
+  const goalsPrevented = pickNumber(data.finalStats?.totalGoalsPrevented);
+  const touches = pickNumber(data.finalStats?.totalTouches);
+  const foulsCommitted = pickNumber(data.finalStats?.totalFoulsCommitted, data.summary?.powerStats?.fouls, data.summary?.powerStats?.totalFouls);
+  const foulsWon = pickNumber(data.finalStats?.totalFoulsWon);
+  const duelsWon = pickNumber(data.finalStats?.totalDuelsWon);
+  const duelsLost = pickNumber(data.finalStats?.totalDuelsLost);
+  const duelWinPercent = pickNumber(data.finalStats?.duelWinPercent, percent(duelsWon, (duelsWon || 0) + (duelsLost || 0)));
+  const aerialWon = pickNumber(data.finalStats?.totalAerialWon);
+  const detailedEvents = pickNumber(data.finalStats?.totalDetailedEvents);
+  const substitutions = pickNumber(data.finalStats?.totalSubstitutions);
+  const varReviews = pickNumber(data.finalStats?.totalVarReviews);
+  const playerStatsRows = pickNumber(data.finalStats?.totalPlayerStatsRows);
+  const theStatsMatches = pickNumber(data.finalStats?.matchesWithTheStatsExtras);
 
   return (
     <main dir="rtl" className="mx-auto max-w-7xl space-y-5 px-3 py-6 text-white sm:px-4 lg:px-6">
@@ -272,7 +257,6 @@ export default function StatisticsPage() {
           <div>
             <p className="inline-flex rounded-full border border-[#FFD700]/25 bg-[#FFD700]/10 px-3 py-1 text-[10px] font-black text-[#FFD700]">DATA CENTER</p>
             <h1 className="mt-3 text-2xl font-black sm:text-3xl">كل إحصائيات البطولة</h1>
-            <p className="mt-2 text-sm font-bold leading-7 text-gray-400">كل كارت يعرض الرقم، مصدره، شرحه، طريقة حسابه، وملاحظات تساعد الزائر على فهم دلالة الإحصائية.</p>
           </div>
           <Link href="/" className="rounded-full border border-white/10 bg-white/[0.06] px-4 py-2 text-xs font-black text-gray-200 transition hover:border-[#FFD700]/25 hover:text-[#FFD700]">العودة للرئيسية</Link>
         </div>
@@ -290,10 +274,11 @@ export default function StatisticsPage() {
           </section>
 
           <Section title="اللاعبون">
-            <div className="grid items-stretch gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid items-stretch gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <StatCard title="الهداف" value={playerName(topScorer)} subtitle={playerSubtitle(topScorer, 'هدف')} source={topScorer?.sourceName || state.playerLeaders?.sources?.topScorer?.provider || '—'} tone="gold" />
-              <StatCard title="صانع الأهداف" value={playerName(topAssister)} subtitle={playerSubtitle(topAssister, 'أسيست')} source={topAssister?.sourceName || 'PlayerPerformance'} tone="cyan" />
-              <StatCard title="عدد اللاعبين" value={formatNumber(data.database?.playerCount)} subtitle={`${formatNumber(data.database?.teamCount)} منتخب • ${formatNumber(data.database?.hiddenDuplicatePlayerRows)} صفوف مكررة مخفية`} source="DB/Snapshots" tone="green" />
+              <StatCard title="صانع الأهداف" value={playerName(topAssister)} subtitle={playerSubtitle(topAssister, 'أسيست')} source={topAssister?.sourceName || state.playerLeaders?.sources?.topAssister?.provider || '—'} tone="cyan" />
+              <StatCard title="عدد اللاعبين" value={formatNumber(data.database?.playerCount)} subtitle={`${formatNumber(data.database?.teamCount)} منتخب`} source="DB/Snapshots" tone="green" />
+              <StatCard title="صفوف أداء اللاعبين" value={formatNumber(playerStatsRows)} source="TheStats" tone="neutral" />
             </div>
           </Section>
 
@@ -308,23 +293,53 @@ export default function StatisticsPage() {
 
           <Section title="اللعب والهجوم">
             <div className="grid items-stretch gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <StatCard title="xG" value={formatDecimal(xg)} subtitle="الأهداف المتوقعة" source={data.source} tone="cyan" />
-              <StatCard title="فرص كبيرة" value={formatNumber(bigChances)} subtitle="إجمالي الفرص الكبيرة" source={data.source} tone="cyan" />
-              <StatCard title="متوسط التسديدات" value={formatDecimal(averageShots)} subtitle="لكل مباراة منتهية" source={data.source} tone="cyan" />
-              <StatCard title="متوسط الاستحواذ" value={formatPercent(averagePossession)} subtitle="متوسط عينات الاستحواذ" source={data.source} tone="cyan" />
-              <StatCard title="دقة التمرير" value={formatPercent(passAccuracy)} subtitle="نسبة النجاح" source={data.source} tone="cyan" />
-              <StatCard title="ركنيات" value={formatNumber(corners)} subtitle="إجمالي الركنيات" source={data.source} tone="cyan" />
-              <StatCard title="هجمات" value={formatNumber(attacks)} subtitle="إجمالي الهجمات" source={data.source} tone="cyan" />
-              <StatCard title="هجمات خطيرة" value={formatNumber(dangerousAttacks)} subtitle="إجمالي الخطورة" source={data.source} tone="cyan" />
+              <StatCard title="xG" value={formatDecimal(xg)} source={data.source} tone="cyan" />
+              <StatCard title="npxG" value={formatDecimal(npxg)} source={data.source} tone="cyan" />
+              <StatCard title="xA" value={formatDecimal(xa)} source={data.source} tone="cyan" />
+              <StatCard title="فرص xG عالية" value={formatNumber(highXgChances)} source={data.source} tone="cyan" />
+              <StatCard title="متوسط التسديدات" value={formatDecimal(averageShots)} source={data.source} tone="cyan" />
+              <StatCard title="متوسط الاستحواذ" value={formatPercent(averagePossession)} source={data.source} tone="cyan" />
+              <StatCard title="ركنيات" value={formatNumber(corners)} source={data.source} tone="cyan" />
+              <StatCard title="هجمات خطيرة" value={formatNumber(dangerousAttacks)} source={data.source} tone="cyan" />
             </div>
           </Section>
 
-          <Section title="الانضباط وركلات الجزاء">
+          <Section title="التمرير وصناعة اللعب">
+            <div className="grid items-stretch gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <StatCard title="تمريرات" value={formatNumber(passes)} source="TheStats" tone="cyan" />
+              <StatCard title="تمريرات صحيحة" value={formatNumber(accuratePasses)} source="TheStats" tone="green" />
+              <StatCard title="دقة التمرير" value={formatPercent(passAccuracy)} source="TheStats" tone="green" />
+              <StatCard title="تمريرات مفتاحية" value={formatNumber(keyPasses)} source="TheStats" tone="gold" />
+              <StatCard title="عرضيات" value={formatNumber(crosses)} source="TheStats" tone="cyan" />
+              <StatCard title="عرضيات صحيحة" value={formatNumber(accurateCrosses)} source="TheStats" tone="green" />
+              <StatCard title="دقة العرضيات" value={formatPercent(crossAccuracy)} source="TheStats" tone="green" />
+              <StatCard title="لمسات" value={formatNumber(touches)} source="TheStats" tone="neutral" />
+            </div>
+          </Section>
+
+          <Section title="الدفاع والحراسة">
+            <div className="grid items-stretch gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <StatCard title="تدخلات" value={formatNumber(tackles)} source="TheStats" tone="green" />
+              <StatCard title="اعتراضات" value={formatNumber(interceptions)} source="TheStats" tone="green" />
+              <StatCard title="تشتيت" value={formatNumber(clearances)} source="TheStats" tone="green" />
+              <StatCard title="بلوكات" value={formatNumber(blocks)} source="TheStats" tone="green" />
+              <StatCard title="تصديات" value={formatNumber(saves)} source="TheStats" tone="cyan" />
+              <StatCard title="أهداف مُنعت" value={formatDecimal(goalsPrevented)} source="TheStats" tone="cyan" />
+              <StatCard title="التحامات فائزة" value={formatNumber(duelsWon)} source="TheStats" tone="neutral" />
+              <StatCard title="نسبة الالتحامات" value={formatPercent(duelWinPercent)} source="TheStats" tone="neutral" />
+            </div>
+          </Section>
+
+          <Section title="الانضباط والأحداث">
             <div className="grid items-stretch gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <StatCard title="البطاقات الصفراء" value={formatNumber(yellowCards)} source={cardsSource} tone="gold" />
               <StatCard title="البطاقات الحمراء" value={formatNumber(redCards)} source={cardsSource} tone="red" />
-              <StatCard title="ركلات الجزاء" value={formatNumber(data.penalties?.total)} subtitle={`${formatNumber(data.penalties?.scored)} مسجلة • ${formatNumber(data.penalties?.missed)} ضائعة • ${formatNumber(data.penalties?.unknown)} غير محددة`} source={state.penaltiesSummary?.provider || data.penalties?.source || '—'} tone="gold" />
-              <StatCard title="نسبة تسجيل الجزاءات" value={formatPercent(percent(data.penalties?.scored, data.penalties?.total))} subtitle="المسجلة من الإجمالي" source={state.penaltiesSummary?.provider || data.penalties?.source || '—'} tone="green" />
+              <StatCard title="أخطاء مرتكبة" value={formatNumber(foulsCommitted)} source="TheStats" tone="red" />
+              <StatCard title="أخطاء مكتسبة" value={formatNumber(foulsWon)} source="TheStats" tone="green" />
+              <StatCard title="تبديلات" value={formatNumber(substitutions)} source="TheStats" tone="neutral" />
+              <StatCard title="VAR" value={formatNumber(varReviews)} source="TheStats" tone="neutral" />
+              <StatCard title="الأحداث التفصيلية" value={formatNumber(detailedEvents)} source="TheStats" tone="neutral" />
+              <StatCard title="ركلات الجزاء" value={formatNumber(data.penalties?.total)} subtitle={`${formatNumber(data.penalties?.scored)} مسجلة • ${formatNumber(data.penalties?.missed)} ضائعة`} source={state.penaltiesSummary?.provider || data.penalties?.source || '—'} tone="gold" />
             </div>
           </Section>
 
@@ -332,11 +347,10 @@ export default function StatisticsPage() {
             <div className="rounded-2xl border border-white/10 bg-black/20">
               <DetailRow label="المصدر الأساسي المعروض" value={data.source} />
               <DetailRow label="مباريات لها لقطات إحصائية نهائية" value={formatNumber(data.finalStats?.matchesWithFinalSnapshots)} />
+              <DetailRow label="مباريات لها بيانات TheStats" value={formatNumber(theStatsMatches)} />
               <DetailRow label="عدد اللقطات المحفوظة" value={formatNumber(data.database?.snapshotsCount)} />
               <DetailRow label="مباريات لها بيانات كروت" value={formatNumber(data.database?.matchesWithCardSnapshots)} />
               <DetailRow label="مباريات لها بيانات جزاءات" value={formatNumber(data.database?.penaltySource?.matchesWithPenaltySnapshots)} />
-              <DetailRow label="آخر تحديث للكروت" value={dateLabel(data.database?.latestCardsUpdatedAt)} />
-              <DetailRow label="آخر تحديث للجزاءات" value={dateLabel(data.database?.latestPenaltyUpdatedAt)} />
               <DetailRow label="آخر تحديث للإحصائيات التفصيلية" value={dateLabel(data.database?.latestFinalStatsUpdatedAt)} />
               <DetailRow label="آخر تحديث عام" value={dateLabel(data.summary?.latestUpdatedAt || data.database?.latestUpdatedAt)} />
             </div>
