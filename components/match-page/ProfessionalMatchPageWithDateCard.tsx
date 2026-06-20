@@ -170,25 +170,26 @@ function addPlayerStatsNotice(data: MatchPageData) {
 
 function standingsGrid() {
   const standingsSection = document.getElementById('standings') as HTMLElement | null;
-  if (!standingsSection) return { standingsSection: null, mainGrid: null, thirdsPanel: null };
+  if (!standingsSection) return { standingsSection: null, mainGrid: null, groupPanel: null, thirdsPanel: null };
   const mainGrid = Array.from(standingsSection.children).find((child) => {
     if (!(child instanceof HTMLElement)) return false;
     const text = String(child.textContent || '');
     return child.className.includes('grid') && text.includes('ترتيب المجموعة') && text.includes('أفضل الثوالث');
   }) as HTMLElement | null;
   const panels = mainGrid ? Array.from(mainGrid.children).filter((child) => child instanceof HTMLElement) as HTMLElement[] : [];
+  const groupPanel = panels.find((panel) => String(panel.textContent || '').includes('ترتيب المجموعة')) || panels[0] || null;
   const thirdsPanel = panels.find((panel) => String(panel.textContent || '').includes('أفضل الثوالث')) || panels[1] || null;
-  return { standingsSection, mainGrid, thirdsPanel };
+  return { standingsSection, mainGrid, groupPanel, thirdsPanel };
 }
 
-function makeHalf(rows: StandingRow[]) {
+function makeHalf(rows: StandingRow[], compactTeam = false) {
   const half = document.createElement('div');
   half.className = 'space-y-1.5';
 
   const header = document.createElement('div');
   header.className = 'grid items-center gap-1 rounded-xl border border-white/10 bg-white/[0.045] px-2 py-2 text-center text-[10px] font-black text-slate-400';
   header.dir = 'rtl';
-  header.style.gridTemplateColumns = '38px minmax(92px,1fr) repeat(8,minmax(28px,40px))';
+  header.style.gridTemplateColumns = compactTeam ? '36px minmax(80px,1fr) repeat(8,minmax(25px,34px))' : '38px minmax(92px,1fr) repeat(8,minmax(28px,40px))';
   ['#', 'المنتخب', 'لعب', 'فاز', 'تعادل', 'خسر', 'له', 'عليه', 'فارق', 'نقاط'].forEach((label) => header.appendChild(makeText('span', '', label)));
   half.appendChild(header);
 
@@ -196,7 +197,7 @@ function makeHalf(rows: StandingRow[]) {
     const line = document.createElement('div');
     line.className = 'grid items-center gap-1 rounded-2xl border border-[#18E58F]/60 bg-black/25 px-2 py-2 text-center text-[11px] font-black text-white shadow-inner';
     line.dir = 'rtl';
-    line.style.gridTemplateColumns = '38px minmax(92px,1fr) repeat(8,minmax(28px,40px))';
+    line.style.gridTemplateColumns = compactTeam ? '36px minmax(80px,1fr) repeat(8,minmax(25px,34px))' : '38px minmax(92px,1fr) repeat(8,minmax(28px,40px))';
 
     const rank = makeText('span', 'inline-grid h-7 w-7 place-items-center rounded-full bg-[#F8C846] text-black justify-self-center', num(row.rank));
     const team = document.createElement('span');
@@ -223,29 +224,32 @@ function makeHalf(rows: StandingRow[]) {
   return half;
 }
 
-function renderThirdsTable(data: MatchPageData, isDesktop: boolean) {
-  const { thirdsPanel } = standingsGrid();
-  if (!thirdsPanel || !data.thirdPlaceTable.length) return;
-
-  const oldList = Array.from(thirdsPanel.children).find((child) => child instanceof HTMLElement && child.className.includes('space-y-2')) as HTMLElement | null;
+function hideOriginalList(panel: HTMLElement | null) {
+  if (!panel) return;
+  const oldList = Array.from(panel.children).find((child) => child instanceof HTMLElement && child.className.includes('space-y-2')) as HTMLElement | null;
   if (oldList) oldList.style.display = 'none';
+}
 
-  let custom = thirdsPanel.querySelector('[data-custom-thirds-table="true"]') as HTMLElement | null;
+function renderStandingTable(panel: HTMLElement | null, rows: StandingRow[], key: string, split: boolean, compactTeam = false) {
+  if (!panel || !rows.length) return;
+  hideOriginalList(panel);
+
+  let custom = panel.querySelector(`[data-custom-standing-table="${key}"]`) as HTMLElement | null;
   if (custom) custom.remove();
 
   custom = document.createElement('div');
-  custom.setAttribute('data-custom-thirds-table', 'true');
+  custom.setAttribute('data-custom-standing-table', key);
   custom.className = 'mt-3 grid gap-3';
-  custom.style.gridTemplateColumns = isDesktop ? 'minmax(0,1fr) minmax(0,1fr)' : 'minmax(0,1fr)';
+  custom.style.gridTemplateColumns = split ? 'minmax(0,1fr) minmax(0,1fr)' : 'minmax(0,1fr)';
 
-  const midpoint = Math.ceil(data.thirdPlaceTable.length / 2);
-  const groups = isDesktop ? [data.thirdPlaceTable.slice(0, midpoint), data.thirdPlaceTable.slice(midpoint)] : [data.thirdPlaceTable];
-  groups.filter((rows) => rows.length).forEach((rows) => custom!.appendChild(makeHalf(rows)));
-  thirdsPanel.appendChild(custom);
+  const midpoint = Math.ceil(rows.length / 2);
+  const groups = split ? [rows.slice(0, midpoint), rows.slice(midpoint)] : [rows];
+  groups.filter((groupRows) => groupRows.length).forEach((groupRows) => custom!.appendChild(makeHalf(groupRows, compactTeam)));
+  panel.appendChild(custom);
 }
 
 function makeTablesResponsive(data: MatchPageData) {
-  const { standingsSection, mainGrid } = standingsGrid();
+  const { standingsSection, mainGrid, groupPanel, thirdsPanel } = standingsGrid();
   if (!standingsSection || !mainGrid) return;
   const isDesktop = window.matchMedia('(min-width: 1024px)').matches;
 
@@ -263,7 +267,8 @@ function makeTablesResponsive(data: MatchPageData) {
     child.style.setProperty('min-width', '0', 'important');
   });
 
-  renderThirdsTable(data, isDesktop);
+  renderStandingTable(groupPanel, data.groupStandings, 'group', false, isDesktop);
+  renderStandingTable(thirdsPanel, data.thirdPlaceTable, 'thirds', isDesktop, isDesktop);
 }
 
 function enhanceMatchPage(data: MatchPageData) {
