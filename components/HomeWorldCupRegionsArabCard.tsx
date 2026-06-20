@@ -64,16 +64,16 @@ export default function HomeWorldCupRegionsArabCard() {
         <span className="rounded-full border border-[#FFD700]/15 bg-[#FFD700]/10 px-2.5 py-1 text-[10px] font-black text-[#FFD700]">٤٨ منتخبًا</span>
       </div>
 
-      <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+      <div className="grid gap-2">
         {REGIONS.map((region) => (
-          <div key={region.label} className={`rounded-2xl border p-2.5 ${region.tone}`}>
-            <div className="mb-2 flex items-center justify-between gap-2">
-              <span className="truncate text-xs font-black text-white">{region.label}</span>
-              <span className="shrink-0 rounded-lg bg-black/20 px-2 py-1 text-[10px] font-black text-current">{formatCount(region.count)}</span>
+          <div key={region.label} className={`rounded-2xl border p-2.5 ${region.tone} lg:grid lg:grid-cols-[118px_1fr] lg:items-start lg:gap-3`}>
+            <div className="mb-2 flex items-center justify-between gap-2 lg:mb-0 lg:flex-col lg:items-stretch">
+              <span className="truncate text-xs font-black text-white lg:text-center">{region.label}</span>
+              <span className="shrink-0 rounded-lg bg-black/20 px-2 py-1 text-center text-[10px] font-black text-current">{formatCount(region.count)}</span>
             </div>
             <div className="grid grid-cols-7 gap-1">
               {region.teams.map((team) => (
-                <span key={team} className="flex min-h-[22px] items-center justify-center rounded-md border border-white/10 bg-black/20 px-0.5 py-0.5 text-center text-[7px] font-bold leading-3 text-white/90">
+                <span key={team} className="flex min-h-[22px] items-center justify-center rounded-md border border-white/10 bg-black/20 px-0.5 py-0.5 text-center text-[7px] font-bold leading-3 text-white/90 sm:text-[8px]">
                   {team}
                 </span>
               ))}
@@ -81,24 +81,24 @@ export default function HomeWorldCupRegionsArabCard() {
           </div>
         ))}
 
-        <div className="rounded-2xl border border-white/10 bg-black/25 p-2.5">
-          <div className="mb-2 flex items-center justify-between gap-2">
-            <span className="text-xs font-black text-[#FFD700]">المنتخبات العربية</span>
-            <span className="shrink-0 rounded-lg bg-black/20 px-2 py-1 text-[10px] font-black text-[#FFD700]">{formatCount(ARAB_TEAMS.length)}</span>
+        <div className="rounded-2xl border border-white/10 bg-black/25 p-2.5 lg:grid lg:grid-cols-[118px_1fr] lg:items-start lg:gap-3">
+          <div className="mb-2 flex items-center justify-between gap-2 lg:mb-0 lg:flex-col lg:items-stretch">
+            <span className="text-xs font-black text-[#FFD700] lg:text-center">المنتخبات العربية</span>
+            <span className="shrink-0 rounded-lg bg-black/20 px-2 py-1 text-center text-[10px] font-black text-[#FFD700]">{formatCount(ARAB_TEAMS.length)}</span>
           </div>
-          <div className="grid grid-cols-4 gap-1.5 sm:grid-cols-4 lg:grid-cols-4">
+          <div className="grid grid-cols-4 gap-1.5 sm:grid-cols-4 lg:grid-cols-8">
             {ARAB_TEAMS.map((name) => (
               <TextCard key={name}>{name}</TextCard>
             ))}
           </div>
         </div>
 
-        <div className="rounded-2xl border border-[#0FF0FC]/15 bg-[#0FF0FC]/[0.055] p-2.5">
-          <div className="mb-2 flex items-center justify-between gap-2">
-            <span className="text-xs font-black text-[#0FF0FC]">الدول المستضيفة</span>
-            <span className="shrink-0 rounded-lg bg-black/20 px-2 py-1 text-[10px] font-black text-[#0FF0FC]">{formatCount(HOST_TEAMS.length)}</span>
+        <div className="rounded-2xl border border-[#0FF0FC]/15 bg-[#0FF0FC]/[0.055] p-2.5 lg:grid lg:grid-cols-[118px_1fr] lg:items-start lg:gap-3">
+          <div className="mb-2 flex items-center justify-between gap-2 lg:mb-0 lg:flex-col lg:items-stretch">
+            <span className="text-xs font-black text-[#0FF0FC] lg:text-center">الدول المستضيفة</span>
+            <span className="shrink-0 rounded-lg bg-black/20 px-2 py-1 text-center text-[10px] font-black text-[#0FF0FC]">{formatCount(HOST_TEAMS.length)}</span>
           </div>
-          <div className="grid grid-cols-3 gap-1.5">
+          <div className="grid grid-cols-3 gap-1.5 lg:grid-cols-7">
             {HOST_TEAMS.map((name) => (
               <TextCard key={name} className="border-[#0FF0FC]/15 bg-black/20 text-white">{name}</TextCard>
             ))}
