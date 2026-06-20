@@ -150,44 +150,81 @@ function addPlayerStatsNotice(data: MatchPageData) {
   }
 }
 
-function makeTablesSideBySide() {
-  const standingsSection = document.getElementById('standings');
+function resetThirdsList(list: HTMLElement | null) {
+  if (!list) return;
+  list.style.removeProperty('display');
+  list.style.removeProperty('grid-template-columns');
+  list.style.removeProperty('gap');
+  Array.from(list.children).forEach((child) => {
+    if (!(child instanceof HTMLElement)) return;
+    child.style.removeProperty('margin-top');
+    child.style.removeProperty('margin-bottom');
+  });
+}
+
+function makeTablesResponsive() {
+  const standingsSection = document.getElementById('standings') as HTMLElement | null;
   if (!standingsSection) return;
 
-  standingsSection.style.overflowX = 'auto';
-  standingsSection.style.paddingBottom = '0.75rem';
-
-  const titleGrids = Array.from(standingsSection.querySelectorAll('div.grid')) as HTMLElement[];
-  const mainGrid = titleGrids.find((grid) => {
-    const text = String(grid.textContent || '');
-    return text.includes('ترتيب المجموعة') && text.includes('أفضل الثوالث');
-  });
+  const mainGrid = Array.from(standingsSection.children).find((child) => {
+    if (!(child instanceof HTMLElement)) return false;
+    const text = String(child.textContent || '');
+    return child.className.includes('grid') && text.includes('ترتيب المجموعة') && text.includes('أفضل الثوالث');
+  }) as HTMLElement | null;
   if (!mainGrid) return;
 
-  mainGrid.classList.remove('xl:grid-cols-2');
-  mainGrid.classList.add('grid-cols-2');
-  mainGrid.style.gridTemplateColumns = 'minmax(280px, 1fr) minmax(280px, 1fr)';
-  mainGrid.style.minWidth = '620px';
-  mainGrid.style.alignItems = 'start';
+  const panels = Array.from(mainGrid.children).filter((child) => child instanceof HTMLElement) as HTMLElement[];
+  const thirdsPanel = panels.find((panel) => String(panel.textContent || '').includes('أفضل الثوالث')) || panels[1] || null;
+  const thirdsList = thirdsPanel ? Array.from(thirdsPanel.children).find((child) => child instanceof HTMLElement && child.className.includes('space-y-2')) as HTMLElement | null : null;
+  const isDesktop = window.matchMedia('(min-width: 1024px)').matches;
 
-  Array.from(mainGrid.children).forEach((child) => {
-    if (!(child instanceof HTMLElement)) return;
-    child.style.minWidth = '0';
-  });
+  standingsSection.style.setProperty('overflow-x', 'visible', 'important');
+  standingsSection.style.setProperty('padding-bottom', '0', 'important');
+  mainGrid.classList.remove('xl:grid-cols-2');
+  mainGrid.style.setProperty('min-width', '0', 'important');
+  mainGrid.style.setProperty('align-items', 'start', 'important');
+
+  if (isDesktop) {
+    mainGrid.style.setProperty('display', 'grid', 'important');
+    mainGrid.style.setProperty('grid-template-columns', 'minmax(0, 1fr) minmax(0, 1fr)', 'important');
+    mainGrid.style.setProperty('gap', '1rem', 'important');
+    if (thirdsList) {
+      thirdsList.style.setProperty('display', 'grid', 'important');
+      thirdsList.style.setProperty('grid-template-columns', 'minmax(0, 1fr) minmax(0, 1fr)', 'important');
+      thirdsList.style.setProperty('gap', '0.5rem', 'important');
+      Array.from(thirdsList.children).forEach((child) => {
+        if (!(child instanceof HTMLElement)) return;
+        child.style.setProperty('margin-top', '0', 'important');
+        child.style.setProperty('margin-bottom', '0', 'important');
+      });
+    }
+  } else {
+    mainGrid.style.setProperty('display', 'grid', 'important');
+    mainGrid.style.setProperty('grid-template-columns', 'minmax(0, 1fr)', 'important');
+    mainGrid.style.setProperty('gap', '1rem', 'important');
+    resetThirdsList(thirdsList);
+  }
+
+  panels.forEach((panel) => panel.style.setProperty('min-width', '0', 'important'));
 }
 
 function enhanceMatchPage(data: MatchPageData) {
   arrangeInfoCards(matchClockText(data), matchClockCardLabel(data));
   compactEmptyGap();
   addPlayerStatsNotice(data);
-  makeTablesSideBySide();
+  makeTablesResponsive();
 }
 
 export default function ProfessionalMatchPageWithDateCard({ data }: { data: MatchPageData }) {
   useEffect(() => {
     enhanceMatchPage(data);
     const timers = [250, 900].map((ms) => window.setTimeout(() => enhanceMatchPage(data), ms));
-    return () => timers.forEach((id) => window.clearTimeout(id));
+    const onResize = () => enhanceMatchPage(data);
+    window.addEventListener('resize', onResize);
+    return () => {
+      timers.forEach((id) => window.clearTimeout(id));
+      window.removeEventListener('resize', onResize);
+    };
   }, [data]);
 
   return <ProfessionalMatchPageClient data={data} />;
