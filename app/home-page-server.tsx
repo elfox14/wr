@@ -1,7 +1,8 @@
 import HomeClientSportsLiveFocus from '@/components/HomeClientSportsLiveFocus';
 import prisma from '@/lib/prisma';
 
-export const revalidate = 60;
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 const LIVE_STATUSES = ['LIVE', 'IN_PLAY', '1H', '2H', 'ET', 'HT'];
 const SCHEDULED_STATUSES = ['SCHEDULED', 'TIMED', 'NOT_STARTED', 'NS'];
@@ -66,7 +67,7 @@ function decorateLiveCandidateWithSnapshot<T extends MatchCandidate>(match: T, s
       isHalfTime: true,
       isLikelyLiveByTime: false,
       minute: null,
-      liveLabel: 'Half-time',
+      liveLabel: 'استراحة',
     };
   }
 
@@ -83,7 +84,7 @@ function decorateLiveCandidateWithSnapshot<T extends MatchCandidate>(match: T, s
     isHalfTime: false,
     isLikelyLiveByTime: false,
     minute,
-    liveLabel: minute ? `Minute ${minute}` : 'Live now',
+    liveLabel: minute ? `الدقيقة ${minute}` : 'جارية الآن',
   };
 }
 
