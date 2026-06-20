@@ -21,6 +21,9 @@ function int(value: string | null, fallback: number, min: number, max: number) {
   const parsed = Number(value ?? fallback);
   return Number.isFinite(parsed) ? Math.max(min, Math.min(max, Math.floor(parsed))) : fallback;
 }
+function endpointMode(value: string | null): 'essential' | 'full' {
+  return value === 'full' || value === 'all' ? 'full' : 'essential';
+}
 
 export async function GET(req: Request) {
   const auth = await requireAdmin(req);
@@ -31,7 +34,9 @@ export async function GET(req: Request) {
   const save = bool(url.searchParams.get('save'), true);
   const includeRaw = bool(url.searchParams.get('includeRaw'), false);
   const timeoutMs = int(url.searchParams.get('timeoutMs'), 15000, 3000, 60000);
-  const limit = int(url.searchParams.get('limit'), 3, 1, 8);
+  const delayMs = int(url.searchParams.get('delayMs'), 700, 0, 5000);
+  const mode = endpointMode(url.searchParams.get('endpointMode') || url.searchParams.get('mode'));
+  const limit = int(url.searchParams.get('limit'), 1, 1, 3);
   const minutesBack = int(url.searchParams.get('minutesBack'), 720, 30, 1440);
   const now = Date.now();
   const query = defaultTheStatsQuery(url.searchParams);
@@ -45,14 +50,19 @@ export async function GET(req: Request) {
     for (const match of matches) {
       if (!FINISHED.includes(String(match.status || '').toUpperCase()) && !matchId) continue;
       try {
-        results.push(await collectTheStatsMatchExtras(match, { dryRun, save, includeRaw, timeoutMs, query }));
+        const result = await collectTheStatsMatchExtras(match, { dryRun, save, includeRaw, timeoutMs, query, endpointMode: mode, delayMs });
+        results.push(result);
+        if ((result as any).rateLimited) break;
       } catch (error: any) {
-        results.push({ ok: false, matchId: match.id, error: safeTheStatsApiError(error) });
+        const safe = safeTheStatsApiError(error);
+        results.push({ ok: false, matchId: match.id, rateLimited: Number(safe?.status) === 429, error: safe });
+        if (Number(safe?.status) === 429) break;
       }
     }
 
     const successful = results.filter((item: any) => item.ok);
-    return json({ ok: true, provider: 'THE_STATS_API', mode: 'match_postmatch_extras', dryRun, saved: !dryRun && save, matchesFound: matches.length, successful: successful.length, failed: results.length - successful.length, snapshotsSaved: successful.filter((item: any) => item.saved).length, results, config: getTheStatsApiConfigStatus() });
+    const rateLimited = results.some((item: any) => item.rateLimited || item.error?.status === 429);
+    return json({ ok: true, provider: 'THE_STATS_API', mode: 'match_postmatch_extras', endpointMode: mode, delayMs, dryRun, saved: !dryRun && save, rateLimited, advice: rateLimited ? 'TheStats rate limit reached. Wait 1-2 minutes, then retry. Default mode now uses only essential endpoints sequentially.' : undefined, matchesFound: matches.length, successful: successful.length, failed: results.length - successful.length, snapshotsSaved: successful.filter((item: any) => item.saved).length, results, config: getTheStatsApiConfigStatus() });
   } catch (error: any) {
     return json({ ok: false, provider: 'THE_STATS_API', mode: 'match_postmatch_extras', error: safeTheStatsApiError(error), config: getTheStatsApiConfigStatus() }, Number(error?.status) || 500);
   }
