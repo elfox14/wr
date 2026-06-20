@@ -1,5 +1,6 @@
 'use client';
 
+import type { ReactNode } from 'react';
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -31,6 +32,7 @@ type ThirdPlaceRow = TableRow & {
 
 type Props = {
   compact?: boolean;
+  children?: ReactNode;
 };
 
 const STANDINGS_REFRESH_MS = 30_000;
@@ -117,7 +119,7 @@ function ThirdPlacedCard({ rows, compact }: { rows: ThirdPlaceRow[]; compact: bo
   );
 }
 
-export default function HomeGroupStandingsWidget({ compact = false }: Props = {}) {
+export default function HomeGroupStandingsWidget({ compact = false, children }: Props = {}) {
   const [groups, setGroups] = useState<GroupData[]>([]);
   const [selectedGroupKey, setSelectedGroupKey] = useState<string>('A');
   const [loading, setLoading] = useState(true);
@@ -173,7 +175,7 @@ export default function HomeGroupStandingsWidget({ compact = false }: Props = {}
   const cellPadding = compact ? 'px-1 py-1.5' : 'px-1.5 py-2.5 sm:px-2';
 
   return (
-    <div className="grid h-auto grid-cols-1 gap-2 xl:grid-cols-2">
+    <div className="grid h-auto grid-cols-1 gap-2">
       <section className={`flex h-full min-w-0 flex-col rounded-[1.45rem] border border-white/10 bg-white/[0.04] ${sectionPadding} text-white shadow-[0_14px_38px_rgba(0,0,0,0.2)] backdrop-blur sm:rounded-3xl`}>
         {loading ? (
           <div className="flex min-h-[12rem] items-center justify-center rounded-2xl border border-white/10 bg-black/20">
@@ -261,6 +263,7 @@ export default function HomeGroupStandingsWidget({ compact = false }: Props = {}
         )}
       </section>
 
+      {!loading && groups.length && children ? <div>{children}</div> : null}
       {!loading && groups.length ? <ThirdPlacedCard rows={thirdPlacedRows} compact={compact} /> : null}
     </div>
   );
