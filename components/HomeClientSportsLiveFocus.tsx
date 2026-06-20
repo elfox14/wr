@@ -400,8 +400,8 @@ export default function HomeClientSportsLiveFocus({ upcomingMatches, tickerMatch
 
   return (
     <main dir="rtl" className="mx-auto max-w-7xl space-y-4 px-3 pb-8 pt-3 sm:space-y-6 sm:px-4 sm:py-5 lg:px-6">
-      <MatchCenter fallbackMatches={safeUpcomingMatches} nextMatch={safeNextMatch} />
       <QuickHomeNav />
+      <MatchCenter fallbackMatches={safeUpcomingMatches} nextMatch={safeNextMatch} />
       <div id="ticker">
         <HomeLiveMatchTicker matches={safeTickerMatches} />
       </div>
