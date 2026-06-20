@@ -90,6 +90,65 @@ export type MatchEventView = {
   detail: string;
   sourceName?: string | null;
   sourceUrl?: string | null;
+  x?: number | null;
+  y?: number | null;
+  shot?: MatchShotMapItem | null;
+};
+
+export type MatchShotMapItem = {
+  id?: string | null;
+  minute?: number | null;
+  playerName?: string | null;
+  teamName?: string | null;
+  teamId?: string | null;
+  x?: number | null;
+  y?: number | null;
+  xg?: number | null;
+  npxg?: number | null;
+  outcome?: string | null;
+  situation?: string | null;
+  bodyPart?: string | null;
+  isGoal?: boolean | null;
+  isOnTarget?: boolean | null;
+  isBlocked?: boolean | null;
+  isPenalty?: boolean | null;
+};
+
+export type MatchPlayerStatItem = {
+  playerId?: string | null;
+  playerName?: string | null;
+  teamId?: string | null;
+  teamName?: string | null;
+  position?: string | null;
+  rating?: number | null;
+  started?: boolean | null;
+  played?: boolean | null;
+  minutes?: number | null;
+  goals?: number | null;
+  assists?: number | null;
+  shots?: number | null;
+  shotsOnTarget?: number | null;
+  passes?: number | null;
+  accuratePasses?: number | null;
+  keyPasses?: number | null;
+  crosses?: number | null;
+  tackles?: number | null;
+  interceptions?: number | null;
+  clearances?: number | null;
+  foulsCommitted?: number | null;
+  foulsWon?: number | null;
+  saves?: number | null;
+};
+
+export type MatchAdvancedData = {
+  venue?: string | null;
+  city?: string | null;
+  referee?: string | null;
+  finalScore?: { home: number | null; away: number | null } | null;
+  npxg?: { home: number | null; away: number | null } | null;
+  events: MatchEventView[];
+  shotmap: MatchShotMapItem[];
+  playerStats: MatchPlayerStatItem[];
 };
 
 export type StandingRow = {
@@ -128,6 +187,8 @@ export type MatchPageData = {
   title: string;
   matchDate: string;
   venue: string | null;
+  city?: string | null;
+  referee?: string | null;
   competition: string;
   groupLabel: string | null;
   stageLabel: string;
@@ -140,6 +201,7 @@ export type MatchPageData = {
   homePlayers: MatchPlayerLite[];
   awayPlayers: MatchPlayerLite[];
   officialLineup: OfficialLineupView;
+  advanced: MatchAdvancedData;
   voteEndpoint: string;
   groupStandings: StandingRow[];
   thirdPlaceTable: StandingRow[];
