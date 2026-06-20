@@ -31,7 +31,7 @@ function safeNumber(value: unknown) {
 
 function nullableNumber(value: unknown) {
   if (value === null || value === undefined || value === '') return null;
-  const number = Number(value);
+  const number = Number(typeof value === 'string' ? value.replace('%', '').trim() : value);
   return Number.isFinite(number) ? number : null;
 }
 
@@ -73,6 +73,18 @@ function firstNumber(...values: unknown[]) {
     if (number !== null) return number;
   }
   return null;
+}
+
+function sumNumbers(rows: any[], key: string) {
+  return rows.reduce((sum, row) => sum + safeNumber(row?.[key]), 0);
+}
+
+function countRows(rows: any[], predicate: (row: any) => boolean) {
+  return rows.reduce((sum, row) => sum + (predicate(row) ? 1 : 0), 0);
+}
+
+function eventText(event: any) {
+  return `${event?.normalizedType || ''} ${event?.type || ''} ${event?.detail || ''}`.toLowerCase();
 }
 
 function cardTypeFromBooking(booking: any) {
@@ -165,18 +177,59 @@ function bestPenaltyTotalsFromSnapshots(snapshots: any[]) {
 
 function latestFinalStatsFromSnapshots(snapshots: any[]) {
   for (const snapshot of snapshots) {
+    const normalized = snapshot?.rawData?.normalized || {};
+    const playerStats = safeArray(normalized?.playerStats);
+    const shotmap = safeArray(normalized?.shotmap);
+    const events = safeArray(normalized?.eventsDetailed?.all);
+    const shotmapXg = sumNumbers(shotmap, 'xg');
+    const playerXg = sumNumbers(playerStats, 'xg');
+    const shotmapNpxg = sumNumbers(shotmap, 'npxg');
+    const playerNpxg = sumNumbers(playerStats, 'npxg');
+    const passes = sumNumbers(playerStats, 'passes');
+    const accuratePasses = sumNumbers(playerStats, 'accuratePasses');
+    const touches = sumNumbers(playerStats, 'touches');
+    const substitutions = countRows(events, (event) => eventText(event).includes('sub'));
+    const varReviews = countRows(events, (event) => eventText(event).includes('var'));
+
     const stats = {
-      shots: safeNumber(snapshot.homeShots) + safeNumber(snapshot.awayShots),
-      shotsOnTarget: safeNumber(snapshot.homeShotsOnTarget) + safeNumber(snapshot.awayShotsOnTarget),
+      shots: safeNumber(snapshot.homeShots) + safeNumber(snapshot.awayShots) || shotmap.length,
+      shotsOnTarget: safeNumber(snapshot.homeShotsOnTarget) + safeNumber(snapshot.awayShotsOnTarget) || countRows(shotmap, (shot) => Boolean(shot?.isOnTarget)),
       corners: safeNumber(snapshot.homeCorners) + safeNumber(snapshot.awayCorners),
       attacks: safeNumber(snapshot.homeAttacks) + safeNumber(snapshot.awayAttacks),
       dangerousAttacks: safeNumber(snapshot.homeDangerousAttacks) + safeNumber(snapshot.awayDangerousAttacks),
       possessionSamples: [nullableNumber(snapshot.homePossession), nullableNumber(snapshot.awayPossession)].filter((value) => value !== null) as number[],
+      xg: playerXg || shotmapXg,
+      npxg: playerNpxg || shotmapNpxg,
+      xa: sumNumbers(playerStats, 'xa'),
+      passes,
+      accuratePasses,
+      passAccuracySamples: passes > 0 && accuratePasses > 0 ? [Number(((accuratePasses / passes) * 100).toFixed(1))] : [] as number[],
+      keyPasses: sumNumbers(playerStats, 'keyPasses'),
+      crosses: sumNumbers(playerStats, 'crosses'),
+      accurateCrosses: sumNumbers(playerStats, 'accurateCrosses'),
+      tackles: sumNumbers(playerStats, 'tackles'),
+      interceptions: sumNumbers(playerStats, 'interceptions'),
+      clearances: sumNumbers(playerStats, 'clearances'),
+      blocks: sumNumbers(playerStats, 'blocks'),
+      saves: sumNumbers(playerStats, 'saves'),
+      goalsPrevented: sumNumbers(playerStats, 'goalsPrevented'),
+      touches,
+      foulsCommitted: sumNumbers(playerStats, 'foulsCommitted'),
+      foulsWon: sumNumbers(playerStats, 'foulsWon'),
+      duelsWon: sumNumbers(playerStats, 'duelsWon'),
+      duelsLost: sumNumbers(playerStats, 'duelsLost'),
+      aerialWon: sumNumbers(playerStats, 'aerialWon'),
+      highXgChances: countRows(shotmap, (shot) => safeNumber(shot?.xg) >= 0.35),
+      detailedEvents: events.length,
+      substitutions,
+      varReviews,
+      playerStatsRows: playerStats.length,
+      hasTheStatsExtras: snapshot?.provider === 'THE_STATS_API_EXTRAS' || playerStats.length > 0 || shotmap.length > 0 || events.length > 0,
     };
-    const hasData = stats.shots > 0 || stats.shotsOnTarget > 0 || stats.corners > 0 || stats.attacks > 0 || stats.dangerousAttacks > 0 || stats.possessionSamples.length > 0;
+    const hasData = stats.shots > 0 || stats.shotsOnTarget > 0 || stats.corners > 0 || stats.attacks > 0 || stats.dangerousAttacks > 0 || stats.possessionSamples.length > 0 || stats.playerStatsRows > 0 || stats.detailedEvents > 0;
     if (hasData) return { ...stats, hasData: true, capturedAt: snapshot.capturedAt };
   }
-  return { shots: 0, shotsOnTarget: 0, corners: 0, attacks: 0, dangerousAttacks: 0, possessionSamples: [] as number[], hasData: false, capturedAt: snapshots[0]?.capturedAt || null };
+  return { shots: 0, shotsOnTarget: 0, corners: 0, attacks: 0, dangerousAttacks: 0, possessionSamples: [] as number[], xg: 0, npxg: 0, xa: 0, passes: 0, accuratePasses: 0, passAccuracySamples: [] as number[], keyPasses: 0, crosses: 0, accurateCrosses: 0, tackles: 0, interceptions: 0, clearances: 0, blocks: 0, saves: 0, goalsPrevented: 0, touches: 0, foulsCommitted: 0, foulsWon: 0, duelsWon: 0, duelsLost: 0, aerialWon: 0, highXgChances: 0, detailedEvents: 0, substitutions: 0, varReviews: 0, playerStatsRows: 0, hasTheStatsExtras: false, hasData: false, capturedAt: snapshots[0]?.capturedAt || null };
 }
 
 type TeamAggregate = {
@@ -319,13 +372,41 @@ export async function GET() {
     let matchesWithCardSnapshots = 0;
     let matchesWithPenaltySnapshots = 0;
     let matchesWithFinalSnapshots = 0;
+    let matchesWithTheStatsExtras = 0;
     let totalShots = 0;
     let totalShotsOnTarget = 0;
     let totalCorners = 0;
     let totalAttacks = 0;
     let totalDangerousAttacks = 0;
+    let totalXg = 0;
+    let totalNpxg = 0;
+    let totalXa = 0;
+    let totalPasses = 0;
+    let totalAccuratePasses = 0;
+    let totalKeyPasses = 0;
+    let totalCrosses = 0;
+    let totalAccurateCrosses = 0;
+    let totalTackles = 0;
+    let totalInterceptions = 0;
+    let totalClearances = 0;
+    let totalBlocks = 0;
+    let totalSaves = 0;
+    let totalGoalsPrevented = 0;
+    let totalTouches = 0;
+    let totalFoulsCommitted = 0;
+    let totalFoulsWon = 0;
+    let totalDuelsWon = 0;
+    let totalDuelsLost = 0;
+    let totalAerialWon = 0;
+    let totalHighXgChances = 0;
+    let totalDetailedEvents = 0;
+    let totalSubstitutions = 0;
+    let totalVarReviews = 0;
+    let totalPlayerStatsRows = 0;
     let possessionSampleTotal = 0;
     let possessionSampleCount = 0;
+    let passAccuracySampleTotal = 0;
+    let passAccuracySampleCount = 0;
     let latestCardsUpdatedAt: string | null = null;
     let latestPenaltyUpdatedAt: string | null = null;
     let latestFinalStatsUpdatedAt: string | null = null;
@@ -382,13 +463,41 @@ export async function GET() {
       const finalStats = latestFinalStatsFromSnapshots(match.statsSnapshots);
       if (finalStats.hasData) {
         matchesWithFinalSnapshots += 1;
+        if (finalStats.hasTheStatsExtras) matchesWithTheStatsExtras += 1;
         totalShots += finalStats.shots;
         totalShotsOnTarget += finalStats.shotsOnTarget;
         totalCorners += finalStats.corners;
         totalAttacks += finalStats.attacks;
         totalDangerousAttacks += finalStats.dangerousAttacks;
+        totalXg += finalStats.xg;
+        totalNpxg += finalStats.npxg;
+        totalXa += finalStats.xa;
+        totalPasses += finalStats.passes;
+        totalAccuratePasses += finalStats.accuratePasses;
+        totalKeyPasses += finalStats.keyPasses;
+        totalCrosses += finalStats.crosses;
+        totalAccurateCrosses += finalStats.accurateCrosses;
+        totalTackles += finalStats.tackles;
+        totalInterceptions += finalStats.interceptions;
+        totalClearances += finalStats.clearances;
+        totalBlocks += finalStats.blocks;
+        totalSaves += finalStats.saves;
+        totalGoalsPrevented += finalStats.goalsPrevented;
+        totalTouches += finalStats.touches;
+        totalFoulsCommitted += finalStats.foulsCommitted;
+        totalFoulsWon += finalStats.foulsWon;
+        totalDuelsWon += finalStats.duelsWon;
+        totalDuelsLost += finalStats.duelsLost;
+        totalAerialWon += finalStats.aerialWon;
+        totalHighXgChances += finalStats.highXgChances;
+        totalDetailedEvents += finalStats.detailedEvents;
+        totalSubstitutions += finalStats.substitutions;
+        totalVarReviews += finalStats.varReviews;
+        totalPlayerStatsRows += finalStats.playerStatsRows;
         possessionSampleTotal += finalStats.possessionSamples.reduce((sum, value) => sum + value, 0);
         possessionSampleCount += finalStats.possessionSamples.length;
+        passAccuracySampleTotal += finalStats.passAccuracySamples.reduce((sum, value) => sum + value, 0);
+        passAccuracySampleCount += finalStats.passAccuracySamples.length;
       }
       const finalStatsCapturedAt = finalStats.capturedAt instanceof Date ? finalStats.capturedAt.toISOString() : String(finalStats.capturedAt || '');
       if (finalStatsCapturedAt && (!latestFinalStatsUpdatedAt || finalStatsCapturedAt > latestFinalStatsUpdatedAt)) latestFinalStatsUpdatedAt = finalStatsCapturedAt;
@@ -437,6 +546,9 @@ export async function GET() {
     const averageGoalsPerFinishedMatch = finishedMatches > 0 ? Number((totalGoals / finishedMatches).toFixed(2)) : null;
     const averageShotsPerFinishedMatch = finishedMatches > 0 && totalShots > 0 ? Number((totalShots / finishedMatches).toFixed(1)) : null;
     const averagePossessionSample = possessionSampleCount > 0 ? Number((possessionSampleTotal / possessionSampleCount).toFixed(1)) : null;
+    const passAccuracyPercent = totalPasses > 0 && totalAccuratePasses > 0 ? Number(((totalAccuratePasses / totalPasses) * 100).toFixed(1)) : passAccuracySampleCount > 0 ? Number((passAccuracySampleTotal / passAccuracySampleCount).toFixed(1)) : null;
+    const crossAccuracyPercent = totalCrosses > 0 && totalAccurateCrosses > 0 ? Number(((totalAccurateCrosses / totalCrosses) * 100).toFixed(1)) : null;
+    const duelWinPercent = totalDuelsWon + totalDuelsLost > 0 ? Number(((totalDuelsWon / (totalDuelsWon + totalDuelsLost)) * 100).toFixed(1)) : null;
 
     return NextResponse.json({
       ok: true,
@@ -474,11 +586,40 @@ export async function GET() {
       cleanSheets,
       finalStats: {
         matchesWithFinalSnapshots,
+        matchesWithTheStatsExtras,
         totalShots,
         totalShotsOnTarget,
         totalCorners,
         totalAttacks,
         totalDangerousAttacks,
+        totalXg: Number(totalXg.toFixed(2)),
+        totalNpxg: Number(totalNpxg.toFixed(2)),
+        totalXa: Number(totalXa.toFixed(2)),
+        totalPasses,
+        totalAccuratePasses,
+        passAccuracyPercent,
+        totalKeyPasses,
+        totalCrosses,
+        totalAccurateCrosses,
+        crossAccuracyPercent,
+        totalTackles,
+        totalInterceptions,
+        totalClearances,
+        totalBlocks,
+        totalSaves,
+        totalGoalsPrevented: Number(totalGoalsPrevented.toFixed(2)),
+        totalTouches,
+        totalFoulsCommitted,
+        totalFoulsWon,
+        totalDuelsWon,
+        totalDuelsLost,
+        duelWinPercent,
+        totalAerialWon,
+        totalHighXgChances,
+        totalDetailedEvents,
+        totalSubstitutions,
+        totalVarReviews,
+        totalPlayerStatsRows,
         averageShotsPerFinishedMatch,
         averagePossessionSample,
       },
