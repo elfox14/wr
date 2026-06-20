@@ -71,9 +71,9 @@ export default function HomeWorldCupRegionsArabCard() {
               <span className="truncate text-xs font-black text-white">{region.label}</span>
               <span className="shrink-0 rounded-lg bg-black/20 px-2 py-1 text-[10px] font-black text-current">{formatCount(region.count)}</span>
             </div>
-            <div className="grid grid-cols-3 gap-1.5">
+            <div className="grid grid-cols-7 gap-1">
               {region.teams.map((team) => (
-                <span key={team} className="flex min-h-[24px] items-center justify-center rounded-lg border border-white/10 bg-black/20 px-1 py-0.5 text-center text-[8.5px] font-bold leading-3 text-white/90">
+                <span key={team} className="flex min-h-[22px] items-center justify-center rounded-md border border-white/10 bg-black/20 px-0.5 py-0.5 text-center text-[7px] font-bold leading-3 text-white/90">
                   {team}
                 </span>
               ))}
