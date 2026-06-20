@@ -131,10 +131,37 @@ function addPlayerStatsNotice(data: MatchPageData) {
   }
 }
 
+function makeTablesSideBySide() {
+  const standingsSection = document.getElementById('standings');
+  if (!standingsSection) return;
+
+  standingsSection.style.overflowX = 'auto';
+  standingsSection.style.paddingBottom = '0.75rem';
+
+  const titleGrids = Array.from(standingsSection.querySelectorAll('div.grid')) as HTMLElement[];
+  const mainGrid = titleGrids.find((grid) => {
+    const text = String(grid.textContent || '');
+    return text.includes('ترتيب المجموعة') && text.includes('أفضل الثوالث');
+  });
+  if (!mainGrid) return;
+
+  mainGrid.classList.remove('xl:grid-cols-2');
+  mainGrid.classList.add('grid-cols-2');
+  mainGrid.style.gridTemplateColumns = 'minmax(280px, 1fr) minmax(280px, 1fr)';
+  mainGrid.style.minWidth = '620px';
+  mainGrid.style.alignItems = 'start';
+
+  Array.from(mainGrid.children).forEach((child) => {
+    if (!(child instanceof HTMLElement)) return;
+    child.style.minWidth = '0';
+  });
+}
+
 function enhanceMatchPage(data: MatchPageData) {
   arrangeInfoCards(fullDate(data.matchDate));
   compactEmptyGap();
   addPlayerStatsNotice(data);
+  makeTablesSideBySide();
 }
 
 export default function ProfessionalMatchPageWithDateCard({ data }: { data: MatchPageData }) {
