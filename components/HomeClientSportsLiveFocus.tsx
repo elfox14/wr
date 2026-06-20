@@ -6,7 +6,6 @@ import HomeLiveMatchTicker from '@/components/HomeLiveMatchTicker';
 import HomeTournamentStatsCard from '@/components/HomeTournamentStatsCard';
 import HomeGroupStandingsWidget from '@/components/HomeGroupStandingsWidget';
 import HomeWorldCupRegionsArabCard from '@/components/HomeWorldCupRegionsArabCard';
-import HomeTodayMatchesCard from '@/components/home/HomeTodayMatchesCard';
 import HomeQualificationScenariosCard from '@/components/home/HomeQualificationScenariosCard';
 import HomeSeoSection from '@/components/home/HomeSeoSection';
 import { getTeamFlagUrl } from '@/lib/teamFlags';
@@ -316,7 +315,7 @@ function MatchRow({ match, now, variant = 'normal' }: { match: HomeMatch; now: D
   );
 }
 
-function MatchCenter({ fallbackMatches = [], nextMatch = null, onUpdated }: { fallbackMatches?: HomeMatch[]; nextMatch?: HomeMatch | null; onUpdated?: (date: Date) => void }) {
+function MatchCenter({ fallbackMatches = [], nextMatch = null }: { fallbackMatches?: HomeMatch[]; nextMatch?: HomeMatch | null }) {
   const [matches, setMatches] = useState<HomeMatch[]>([]);
   const [now, setNow] = useState(() => new Date());
 
@@ -333,11 +332,7 @@ function MatchCenter({ fallbackMatches = [], nextMatch = null, onUpdated }: { fa
         const response = await fetch('/api/matches/live-card', { cache: 'no-store' });
         const data = response.ok ? await response.json() : null;
         const next = Array.isArray(data?.matches) ? data.matches : [];
-        if (!cancelled) {
-          const stamp = new Date();
-          setMatches(next);
-          onUpdated?.(stamp);
-        }
+        if (!cancelled) setMatches(next);
       } catch {
         if (!cancelled) setMatches([]);
       }
@@ -346,7 +341,7 @@ function MatchCenter({ fallbackMatches = [], nextMatch = null, onUpdated }: { fa
     loadMatches();
     const timer = window.setInterval(loadMatches, MATCH_REFRESH_MS);
     return () => { cancelled = true; window.clearInterval(timer); };
-  }, [onUpdated]);
+  }, []);
 
   const displayMatches = useMemo(() => {
     const source = matches.length ? matches : fallbackMatches;
@@ -380,7 +375,7 @@ function MatchCenter({ fallbackMatches = [], nextMatch = null, onUpdated }: { fa
 
 function QuickHomeNav() {
   const items = [
-    { href: '#today-matches', label: TEXT.todayMatches },
+    { href: '#ticker', label: TEXT.todayMatches },
     { href: '#standings', label: TEXT.standings },
     { href: '#stats', label: TEXT.stats },
     { href: '#latest-analysis', label: TEXT.latest },
@@ -401,17 +396,17 @@ export default function HomeClientSportsLiveFocus({ upcomingMatches, tickerMatch
   const safeUpcomingMatches = Array.isArray(upcomingMatches) ? (upcomingMatches as HomeMatch[]) : [];
   const safeTickerMatches = Array.isArray(tickerMatches) ? (tickerMatches as HomeMatch[]) : [];
   const safeNextMatch = nextMarqueeMatch as HomeMatch | null;
-  const [lastUpdatedAt, setLastUpdatedAt] = useState(() => new Date());
   const mergedHomeMatches = useMemo(() => uniqueMatches([...safeTickerMatches, ...safeUpcomingMatches, ...(safeNextMatch ? [safeNextMatch] : [])]), [safeTickerMatches, safeUpcomingMatches, safeNextMatch]);
 
   return (
     <main dir="rtl" className="mx-auto max-w-7xl space-y-4 px-3 pb-8 pt-3 sm:space-y-6 sm:px-4 sm:py-5 lg:px-6">
+      <MatchCenter fallbackMatches={safeUpcomingMatches} nextMatch={safeNextMatch} />
       <QuickHomeNav />
-      <MatchCenter fallbackMatches={safeUpcomingMatches} nextMatch={safeNextMatch} onUpdated={setLastUpdatedAt} />
-      <HomeLiveMatchTicker matches={safeTickerMatches} />
+      <div id="ticker">
+        <HomeLiveMatchTicker matches={safeTickerMatches} />
+      </div>
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3 lg:items-start lg:gap-5">
         <div className="space-y-4 lg:col-span-2">
-          <HomeTodayMatchesCard matches={mergedHomeMatches} updatedAt={lastUpdatedAt} />
           <HomeWorldCupRegionsArabCard />
         </div>
         <div id="standings" className="space-y-3 lg:col-span-1">
