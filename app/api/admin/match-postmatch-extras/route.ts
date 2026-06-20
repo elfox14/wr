@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/adminAuth';
 import prisma from '@/lib/prisma';
@@ -30,6 +31,46 @@ function providerIdParam(url: URL) {
   const trimmed = value.trim();
   return trimmed.startsWith('mt_') ? trimmed : `mt_${trimmed.replace(/^mt_/i, '')}`;
 }
+function realText(value: unknown) {
+  const text = String(value || '').trim();
+  return Boolean(text && text !== '[object Object]' && !/^null|undefined|-$/i.test(text));
+}
+function usefulResult(result: any) {
+  const endpointsOk = Array.isArray(result?.endpointsOk) ? result.endpointsOk.length : 0;
+  const counts = result?.counts || {};
+  const matchInfo = result?.matchInfo || {};
+  const hasCounts = Number(counts.shots || 0) > 0 || Number(counts.detailedEvents || 0) > 0 || Number(counts.playerStats || 0) > 0 || Number(counts.goalkeeperStats || 0) > 0 || Number(counts.standings || 0) > 0;
+  const hasInfo = realText(matchInfo.venue) || realText(matchInfo.city) || realText(matchInfo.referee) || matchInfo.finalScore?.home !== null || matchInfo.finalScore?.away !== null;
+  return endpointsOk > 0 && (hasCounts || hasInfo);
+}
+async function saveUsefulSnapshot(matchId: string, result: any, includeRaw: boolean) {
+  const normalized = result?.debug?.normalizedPreview || result?.debug?.normalized || null;
+  if (!normalized) return null;
+  const endpointSummaries = result?.debug?.endpointSummaries || [];
+  const rawData: Record<string, any> = {
+    provider: 'THE_STATS_API',
+    mode: 'match_extras',
+    endpointMode: result.endpointMode,
+    rateLimited: Boolean(result.rateLimited),
+    resolvedProviderMatchId: result.resolvedProviderMatchId,
+    resolvedBy: result.resolvedBy,
+    importedAt: new Date().toISOString(),
+    endpoints: endpointSummaries.map((item: any) => ({ key: item.key, path: item.path, ok: item.ok, error: item.error || null, keySummary: item.keySummary || null })),
+    normalized,
+  };
+  if (includeRaw && result?.debug?.endpoints) rawData.raw = Object.fromEntries(Object.entries(result.debug.endpoints).filter(([, value]: any) => value?.ok).map(([key, value]: any) => [key, value.payload]));
+  const snapshot = await prisma.matchStatsSnapshot.create({
+    data: {
+      id: randomUUID(),
+      matchId,
+      provider: 'THE_STATS_API_EXTRAS',
+      providerMatchId: Number(String(result.resolvedProviderMatchId || '').replace(/\D/g, '')) || 0,
+      rawData,
+    },
+    select: { id: true },
+  });
+  return snapshot.id;
+}
 
 export async function GET(req: Request) {
   const auth = await requireAdmin(req);
@@ -58,9 +99,12 @@ export async function GET(req: Request) {
       if (!FINISHED.includes(String(match.status || '').toUpperCase()) && !matchId) continue;
       try {
         const matchForProvider = forcedProviderMatchId ? { ...match, externalId: forcedProviderMatchId } : match;
-        const result = await collectTheStatsMatchExtras(matchForProvider, { dryRun, save, includeRaw, timeoutMs, query, endpointMode: mode, delayMs });
-        results.push(result);
-        if ((result as any).rateLimited) break;
+        const result: any = await collectTheStatsMatchExtras(matchForProvider, { dryRun, save: false, includeRaw, timeoutMs, query, endpointMode: mode, delayMs });
+        const useful = usefulResult(result);
+        let snapshotId: string | null = null;
+        if (!dryRun && save && useful) snapshotId = await saveUsefulSnapshot(match.id, result, includeRaw);
+        results.push({ ...result, ok: useful, saved: Boolean(snapshotId), snapshotId, rejectedEmptySnapshot: !useful, advice: useful ? result.advice : forcedProviderMatchId ? 'Provider match id returned no valid endpoint data. Check the real TheStats match id; example IDs like mt_12345 will return 404 and will not be saved.' : result.advice });
+        if (result.rateLimited) break;
       } catch (error: any) {
         const safe = safeTheStatsApiError(error);
         results.push({ ok: false, matchId: match.id, rateLimited: Number(safe?.status) === 429, error: safe });
@@ -71,7 +115,8 @@ export async function GET(req: Request) {
     const successful = results.filter((item: any) => item.ok);
     const rateLimited = results.some((item: any) => item.rateLimited || item.error?.status === 429);
     const unresolved = results.some((item: any) => item.error === 'Could not resolve TheStats provider match id');
-    return json({ ok: true, provider: 'THE_STATS_API', mode: 'match_postmatch_extras', endpointMode: mode, delayMs, forcedProviderMatchId: forcedProviderMatchId || null, dryRun, saved: !dryRun && save, rateLimited, unresolved, advice: rateLimited ? 'TheStats rate limit reached. Wait 1-2 minutes, then retry. Default mode uses only essential endpoints sequentially.' : unresolved ? 'Could not match this database match to TheStats automatically. Retry with providerMatchId=mt_xxx from TheStats.' : undefined, matchesFound: matches.length, successful: successful.length, failed: results.length - successful.length, snapshotsSaved: successful.filter((item: any) => item.saved).length, results, config: getTheStatsApiConfigStatus() });
+    const snapshotsSaved = results.filter((item: any) => item.saved).length;
+    return json({ ok: true, provider: 'THE_STATS_API', mode: 'match_postmatch_extras', endpointMode: mode, delayMs, forcedProviderMatchId: forcedProviderMatchId || null, dryRun, saveRequested: save, saved: snapshotsSaved > 0, rateLimited, unresolved, advice: rateLimited ? 'TheStats rate limit reached. Wait 1-2 minutes, then retry. Default mode uses only essential endpoints sequentially.' : unresolved ? 'Could not match this database match to TheStats automatically. Retry with providerMatchId=mt_xxx from TheStats.' : undefined, matchesFound: matches.length, successful: successful.length, failed: results.length - successful.length, snapshotsSaved, results, config: getTheStatsApiConfigStatus() });
   } catch (error: any) {
     return json({ ok: false, provider: 'THE_STATS_API', mode: 'match_postmatch_extras', error: safeTheStatsApiError(error), config: getTheStatsApiConfigStatus() }, Number(error?.status) || 500);
   }
