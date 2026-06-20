@@ -238,17 +238,16 @@ main[dir="rtl"] ::selection,
   overflow-x: auto;
 }
 
-/* Match page: keep group standings and best thirds side by side. */
+/* Match page standings: mobile stacked, desktop side by side. */
 main[dir="rtl"] #standings {
-  overflow-x: auto !important;
-  -webkit-overflow-scrolling: touch;
-  padding-bottom: 0.75rem !important;
+  overflow-x: visible !important;
+  padding-bottom: 0 !important;
 }
 
 main[dir="rtl"] #standings > div:nth-of-type(2) {
   display: grid !important;
-  grid-template-columns: minmax(280px, 1fr) minmax(280px, 1fr) !important;
-  min-width: 620px !important;
+  grid-template-columns: minmax(0, 1fr) !important;
+  min-width: 0 !important;
   align-items: start !important;
   gap: 1rem !important;
 }
@@ -259,6 +258,6 @@ main[dir="rtl"] #standings > div:nth-of-type(2) > div {
 
 @media (min-width: 1024px) {
   main[dir="rtl"] #standings > div:nth-of-type(2) {
-    min-width: 0 !important;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
   }
 }
