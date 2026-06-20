@@ -9,7 +9,6 @@ import HomeWorldCupRegionsArabCard from '@/components/HomeWorldCupRegionsArabCar
 import HomeTodayMatchesCard from '@/components/home/HomeTodayMatchesCard';
 import HomeQualificationScenariosCard from '@/components/home/HomeQualificationScenariosCard';
 import HomeSeoSection from '@/components/home/HomeSeoSection';
-import HomeLastUpdatedStrip from '@/components/home/HomeLastUpdatedStrip';
 import { getTeamFlagUrl } from '@/lib/teamFlags';
 
 type Team = {
@@ -70,8 +69,6 @@ const TEXT = {
   unavailableDate: '\u0645\u0648\u0639\u062f \u063a\u064a\u0631 \u0645\u062a\u0648\u0641\u0631',
   waitingKickoff: '\u0628\u0627\u0646\u062a\u0638\u0627\u0631 \u062a\u0623\u0643\u064a\u062f \u0627\u0644\u0628\u062f\u0627\u064a\u0629',
   waitingSource: '\u0628\u0627\u0646\u062a\u0638\u0627\u0631 \u0627\u0644\u0645\u0635\u062f\u0631',
-  liveCenter: '\u0645\u0631\u0643\u0632 \u0627\u0644\u0645\u062a\u0627\u0628\u0639\u0629 \u0627\u0644\u0645\u0628\u0627\u0634\u0631\u0629',
-  heroTitle: '\u0645\u0628\u0627\u0631\u064a\u0627\u062a \u0643\u0623\u0633 \u0627\u0644\u0639\u0627\u0644\u0645 \u0627\u0644\u0622\u0646',
   interactive: '\u0627\u0644\u0628\u062b \u0627\u0644\u062a\u0641\u0627\u0639\u0644\u064a',
   matchDetails: '\u062a\u0641\u0627\u0635\u064a\u0644 \u0627\u0644\u0645\u0628\u0627\u0631\u0627\u0629',
   noMatches: '\u0644\u0627 \u062a\u0648\u062c\u062f \u0645\u0628\u0627\u0631\u064a\u0627\u062a \u0642\u0631\u064a\u0628\u0629 \u0644\u0644\u0639\u0631\u0636 \u0627\u0644\u0622\u0646.',
@@ -322,7 +319,6 @@ function MatchRow({ match, now, variant = 'normal' }: { match: HomeMatch; now: D
 function MatchCenter({ fallbackMatches = [], nextMatch = null, onUpdated }: { fallbackMatches?: HomeMatch[]; nextMatch?: HomeMatch | null; onUpdated?: (date: Date) => void }) {
   const [matches, setMatches] = useState<HomeMatch[]>([]);
   const [now, setNow] = useState(() => new Date());
-  const [updatedAt, setUpdatedAt] = useState(() => new Date());
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(new Date()), 1000);
@@ -340,7 +336,6 @@ function MatchCenter({ fallbackMatches = [], nextMatch = null, onUpdated }: { fa
         if (!cancelled) {
           const stamp = new Date();
           setMatches(next);
-          setUpdatedAt(stamp);
           onUpdated?.(stamp);
         }
       } catch {
@@ -368,13 +363,6 @@ function MatchCenter({ fallbackMatches = [], nextMatch = null, onUpdated }: { fa
 
   return (
     <section className="overflow-hidden rounded-[1.6rem] border border-[#FFD700]/15 bg-[radial-gradient(circle_at_top,rgba(255,215,0,0.10),transparent_35%),linear-gradient(180deg,rgba(255,255,255,0.055),rgba(0,0,0,0.22))] p-3 shadow-[0_18px_50px_rgba(0,0,0,0.28)] backdrop-blur sm:p-4">
-      <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <p className="text-[10px] font-black text-[#0FF0FC]">{TEXT.liveCenter}</p>
-          <h1 className="mt-0.5 text-lg font-black text-white sm:text-2xl">{TEXT.heroTitle}</h1>
-        </div>
-        <HomeLastUpdatedStrip updatedAt={updatedAt} compact />
-      </div>
       {primary ? (
         <div className="space-y-3">
           <MatchRow match={primary} now={now} variant={isConfirmedLive(primary) ? 'live' : 'primary'} />
@@ -418,8 +406,8 @@ export default function HomeClientSportsLiveFocus({ upcomingMatches, tickerMatch
 
   return (
     <main dir="rtl" className="mx-auto max-w-7xl space-y-4 px-3 pb-8 pt-3 sm:space-y-6 sm:px-4 sm:py-5 lg:px-6">
-      <MatchCenter fallbackMatches={safeUpcomingMatches} nextMatch={safeNextMatch} onUpdated={setLastUpdatedAt} />
       <QuickHomeNav />
+      <MatchCenter fallbackMatches={safeUpcomingMatches} nextMatch={safeNextMatch} onUpdated={setLastUpdatedAt} />
       <HomeLiveMatchTicker matches={safeTickerMatches} />
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3 lg:items-start lg:gap-5">
         <div className="space-y-4 lg:col-span-2">
