@@ -3,8 +3,10 @@
 import { useEffect } from 'react';
 import ProfessionalMatchPageClient from './ProfessionalMatchPageClient';
 import type { MatchPageData, StandingRow } from '@/lib/match-page/types';
+import { getTeamFlagUrl } from '@/lib/teamFlags';
 
 const arNumber = new Intl.NumberFormat('ar-EG');
+type StandingTableMode = 'group' | 'thirds';
 
 function fullDate(value: string) {
   return new Intl.DateTimeFormat('ar-EG', {
@@ -23,6 +25,10 @@ function num(value: number) {
 function gd(value: number) {
   const safe = Number(value || 0);
   return safe > 0 ? `+${num(safe)}` : num(safe);
+}
+
+function flagUrl(row: StandingRow) {
+  return getTeamFlagUrl({ code: row.code, name: row.teamName, image: row.image }, 40);
 }
 
 function matchClockText(data: MatchPageData) {
@@ -182,40 +188,56 @@ function standingsGrid() {
   return { standingsSection, mainGrid, groupPanel, thirdsPanel };
 }
 
-function makeHalf(rows: StandingRow[], compactTeam = false) {
+function columnsFor(mode: StandingTableMode, compactTeam: boolean) {
+  if (mode === 'thirds') return compactTeam ? '36px minmax(88px,1fr) repeat(3,minmax(34px,46px))' : '38px minmax(112px,1fr) repeat(3,minmax(42px,58px))';
+  return compactTeam ? '36px minmax(80px,1fr) repeat(8,minmax(25px,34px))' : '38px minmax(92px,1fr) repeat(8,minmax(28px,40px))';
+}
+
+function labelsFor(mode: StandingTableMode) {
+  return mode === 'thirds' ? ['#', 'المنتخب', 'نقاط', 'فارق', 'أهداف'] : ['#', 'المنتخب', 'لعب', 'فاز', 'تعادل', 'خسر', 'له', 'عليه', 'فارق', 'نقاط'];
+}
+
+function valuesFor(row: StandingRow, mode: StandingTableMode) {
+  return mode === 'thirds' ? [row.points, row.goalDifference, row.goalsFor] : [row.played, row.won, row.drawn, row.lost, row.goalsFor, row.goalsAgainst, row.goalDifference, row.points];
+}
+
+function makeHalf(rows: StandingRow[], compactTeam = false, mode: StandingTableMode = 'group') {
   const half = document.createElement('div');
   half.className = 'space-y-1.5';
 
   const header = document.createElement('div');
   header.className = 'grid items-center gap-1 rounded-xl border border-white/10 bg-white/[0.045] px-2 py-2 text-center text-[10px] font-black text-slate-400';
   header.dir = 'rtl';
-  header.style.gridTemplateColumns = compactTeam ? '36px minmax(80px,1fr) repeat(8,minmax(25px,34px))' : '38px minmax(92px,1fr) repeat(8,minmax(28px,40px))';
-  ['#', 'المنتخب', 'لعب', 'فاز', 'تعادل', 'خسر', 'له', 'عليه', 'فارق', 'نقاط'].forEach((label) => header.appendChild(makeText('span', '', label)));
+  header.style.gridTemplateColumns = columnsFor(mode, compactTeam);
+  labelsFor(mode).forEach((label) => header.appendChild(makeText('span', '', label)));
   half.appendChild(header);
 
   rows.forEach((row) => {
     const line = document.createElement('div');
     line.className = 'grid items-center gap-1 rounded-2xl border border-[#18E58F]/60 bg-black/25 px-2 py-2 text-center text-[11px] font-black text-white shadow-inner';
     line.dir = 'rtl';
-    line.style.gridTemplateColumns = compactTeam ? '36px minmax(80px,1fr) repeat(8,minmax(25px,34px))' : '38px minmax(92px,1fr) repeat(8,minmax(28px,40px))';
+    line.style.gridTemplateColumns = columnsFor(mode, compactTeam);
 
     const rank = makeText('span', 'inline-grid h-7 w-7 place-items-center rounded-full bg-[#F8C846] text-black justify-self-center', num(row.rank));
     const team = document.createElement('span');
     team.className = 'flex min-w-0 items-center justify-start gap-1.5 text-right text-xs font-black';
-    if (row.image) {
+    const imageUrl = flagUrl(row);
+    if (imageUrl) {
       const img = document.createElement('img');
-      img.src = row.image;
+      img.src = imageUrl;
       img.alt = row.teamName;
-      img.className = 'h-4 w-6 rounded object-cover';
+      img.className = 'h-4 w-6 rounded object-cover shadow-sm ring-1 ring-white/15';
       team.appendChild(img);
     }
     const name = makeText('b', 'truncate', row.teamName);
     team.appendChild(name);
 
-    const values = [row.played, row.won, row.drawn, row.lost, row.goalsFor, row.goalsAgainst, row.goalDifference, row.points];
+    const values = valuesFor(row, mode);
     line.append(rank, team);
     values.forEach((value, index) => {
-      const cell = makeText('span', `rounded-lg bg-white/[0.055] px-1 py-1 tabular-nums ${index === 7 ? 'bg-[#F8C846]/20 text-[#F8C846]' : ''} ${index === 6 && Number(value) < 0 ? 'text-rose-300' : ''}`, index === 6 ? gd(Number(value)) : num(Number(value)));
+      const isGoalDifference = mode === 'thirds' ? index === 1 : index === 6;
+      const isPoints = mode === 'thirds' ? index === 0 : index === 7;
+      const cell = makeText('span', `rounded-lg bg-white/[0.055] px-1 py-1 tabular-nums ${isPoints ? 'bg-[#F8C846]/20 text-[#F8C846]' : ''} ${isGoalDifference && Number(value) < 0 ? 'text-rose-300' : ''}`, isGoalDifference ? gd(Number(value)) : num(Number(value)));
       line.appendChild(cell);
     });
     half.appendChild(line);
@@ -230,7 +252,7 @@ function hideOriginalList(panel: HTMLElement | null) {
   if (oldList) oldList.style.display = 'none';
 }
 
-function renderStandingTable(panel: HTMLElement | null, rows: StandingRow[], key: string, split: boolean, compactTeam = false) {
+function renderStandingTable(panel: HTMLElement | null, rows: StandingRow[], key: StandingTableMode, split: boolean, compactTeam = false) {
   if (!panel || !rows.length) return;
   hideOriginalList(panel);
 
@@ -244,7 +266,7 @@ function renderStandingTable(panel: HTMLElement | null, rows: StandingRow[], key
 
   const midpoint = Math.ceil(rows.length / 2);
   const groups = split ? [rows.slice(0, midpoint), rows.slice(midpoint)] : [rows];
-  groups.filter((groupRows) => groupRows.length).forEach((groupRows) => custom!.appendChild(makeHalf(groupRows, compactTeam)));
+  groups.filter((groupRows) => groupRows.length).forEach((groupRows) => custom!.appendChild(makeHalf(groupRows, compactTeam, key)));
   panel.appendChild(custom);
 }
 
