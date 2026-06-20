@@ -57,27 +57,61 @@ function extractOfficialLineup(snapshots: any[]): OfficialLineupView {
   return null;
 }
 
+function cleanVenue(value: any) {
+  if (typeof value === 'string') {
+    const text = value.trim();
+    if (text && !/^unknown|n\/a|null|undefined$/i.test(text)) return text;
+  }
+  if (value && typeof value === 'object') {
+    const text = value.name || value.stadium || value.venue || value.title || value.fullName || value.full_name;
+    return cleanVenue(text);
+  }
+  return null;
+}
+
+function findVenueDeep(value: any, depth = 0): string | null {
+  if (!value || depth > 5) return null;
+  const direct = cleanVenue(value?.venue) || cleanVenue(value?.stadium) || cleanVenue(value?.ground) || cleanVenue(value?.arena);
+  if (direct) return direct;
+  if (typeof value !== 'object') return null;
+  const candidates = [
+    value.fixture,
+    value.match,
+    value.game,
+    value.event,
+    value.meta,
+    value.info,
+    value.location,
+    value.data,
+    value.response,
+    value.result,
+    value.liveStats,
+    value.theStatsApi,
+    value.raw,
+  ];
+  for (const item of candidates) {
+    const found = findVenueDeep(item, depth + 1);
+    if (found) return found;
+  }
+  return null;
+}
+
 function extractVenue(match: any, snapshots: any[]) {
-  const direct = match.venue || match.stadium || match.location;
-  if (direct) return String(direct);
+  const direct = cleanVenue(match.venue) || cleanVenue(match.stadium) || cleanVenue(match.location);
+  if (direct) return direct;
   for (const snapshot of snapshots) {
-    const data = rawData(snapshot);
-    const venue = data.venue || data.stadium || data.location || data.meta?.venue || data.meta?.stadium || data.fixture?.venue?.name;
-    if (venue) return String(venue);
+    const found = findVenueDeep(rawData(snapshot));
+    if (found) return found;
   }
   return null;
 }
 
 function sourceChecklist(match: any, statsAvailable: boolean, eventsCount: number, providers: string[], lineup: OfficialLineupView): SourceChecklistItem[] {
-  const hasTheStats = providers.some((provider) => provider.includes('THE_STATS'));
-  const hasISport = providers.some((provider) => provider.includes('ISPORT'));
   return [
-    { label: 'بيانات المباراة والمنتخبين', status: match ? 'ready' : 'missing', note: 'من جدول Match المرتبط بمنتخبي المباراة.' },
-    { label: 'الإحصائيات الحية', status: statsAvailable ? 'ready' : 'missing', note: statsAvailable ? 'تقرأ من MatchStatsSnapshot بأولوية TheStatsAPI ثم iSport.' : 'تظهر تلقائيًا بعد وصول Snapshot من مزودي البيانات.' },
-    { label: 'أحداث المباراة', status: eventsCount > 0 ? 'ready' : 'missing', note: eventsCount > 0 ? 'موجودة في MatchEvent.' : 'تصل تلقائيًا من TheStatsAPI وiSport أثناء وبعد المباراة.' },
-    { label: 'TheStatsAPI Live', status: hasTheStats ? 'ready' : 'optional', note: hasTheStats ? 'موجود في اللقطات الحالية.' : 'سيتم فحصه تلقائيًا عبر الكرون.' },
-    { label: 'iSport / Animation', status: hasISport ? 'ready' : 'optional', note: hasISport ? 'مستخدم كدعم للبث والإحصائيات.' : 'سيتم فحصه تلقائيًا عبر الكرون.' },
-    { label: 'التشكيل الرسمي', status: lineup ? 'ready' : 'optional', note: lineup ? `تم العثور على تشكيل من ${lineup.source}.` : 'سيتم جلب التشكيل الرسمي تلقائيًا عند ظهوره في TheStatsAPI أو iSport Lineups.' },
+    { label: 'بيانات المباراة والمنتخبين', status: match ? 'ready' : 'missing', note: 'الفرق، الموعد، الحالة والنتيجة الأساسية.' },
+    { label: 'الإحصائيات الحية والنهائية', status: statsAvailable ? 'ready' : 'missing', note: statsAvailable ? 'تم حفظ Snapshot إحصائي من مزود البيانات.' : 'سيتم تحديثها تلقائيًا عند وصول Snapshot جديد.' },
+    { label: 'أحداث المباراة', status: eventsCount > 0 ? 'ready' : 'missing', note: eventsCount > 0 ? 'الأحداث محفوظة في قاعدة البيانات.' : 'يتم فحص الأحداث تلقائيًا أثناء وبعد المباراة.' },
+    { label: 'التشكيل الرسمي', status: lineup ? 'ready' : 'optional', note: lineup ? 'تم العثور على تشكيل رسمي.' : 'سيتم جلب التشكيل الرسمي تلقائيًا عند توفره.' },
   ];
 }
 
@@ -93,7 +127,7 @@ function buildTacticalKeys(homeName: string, awayName: string, statsAvailable: b
   if (digest?.turningPoint) keys.push(`نقطة التحول: ${digest.turningPoint}`);
   keys.push(`مفتاح المتابعة: تعامل ${homeName} مع ضغط ${awayName} أثناء بناء اللعب والتحولات.`);
   keys.push('راقب جودة الخروج من الخلف والكرات الثانية والمساحات خلف الظهيرين.');
-  keys.push(statsAvailable ? 'كل رقم ظاهر في الصفحة مأخوذ من Snapshot موثق، وأي رقم غائب يظهر كغير متوفر.' : 'الإحصائيات التفصيلية ستظهر بعد وصول Snapshot موثق أو إدخال يدوي.');
+  keys.push(statsAvailable ? 'كل رقم ظاهر في الصفحة مأخوذ من Snapshot موثق.' : 'الإحصائيات التفصيلية ستظهر بعد وصول Snapshot موثق أو إدخال يدوي.');
   return keys.slice(0, 4);
 }
 
@@ -153,7 +187,7 @@ export async function getMatchPageData(matchId: string): Promise<MatchPageData |
     matchImpact: buildMatchImpact(match.homeTeamId, match.awayTeamId, standings, thirdPlaceTable),
     digest: digest ? { summary: digest.summary, turningPoint: digest.turningPoint, scoreLine: digest.scoreLine, href: `/match-digests/${match.id}` } : null,
     relatedArticles: relatedArticlesFrom(relatedNews, digest, match.id),
-    sources: [{ key: 'db-match', name: 'قاعدة المباراة', status: 'active', priority: 0, lastCheckedAt: maxDateIso([match.matchDate]), details: 'الفرق، الموعد، الحالة، النتيجة الأساسية' }, ...buildSourceList(snapshots)],
+    sources: [{ key: 'db-match', name: 'بيانات المباراة', status: 'active', priority: 0, lastCheckedAt: maxDateIso([match.matchDate]), details: 'الفرق، الموعد، الحالة، النتيجة الأساسية' }, ...buildSourceList(snapshots)],
     sourceChecklist: sourceChecklist(match, statsAvailable, events.length, providers, officialLineup),
     lastUpdatedAt: maxDateIso([...(match.statsSnapshots || []).map((snapshot) => snapshot.capturedAt), ...(match.events || []).map((event) => event.updatedAt), match.matchDate]),
   };
