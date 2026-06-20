@@ -16,6 +16,23 @@ type StatusCandidate = {
   sourceKey: string;
 };
 
+const STAT_ALIASES: Record<string, string[]> = {
+  possession: ['possession', 'ball_possession', 'ballPossession'],
+  shots: ['shots', 'total_shots', 'totalShots'],
+  shotsOnTarget: ['shotsOnTarget', 'shots_on_target', 'on_target_shots', 'shotsOnGoal'],
+  shotsOffTarget: ['shotsOffTarget', 'shots_off_target', 'off_target_shots', 'shotsOffGoal', 'shots_wide'],
+  corners: ['corners', 'corner_kicks', 'cornerKicks'],
+  yellowCards: ['yellowCards', 'yellow_cards'],
+  redCards: ['redCards', 'red_cards'],
+  attacks: ['attacks'],
+  dangerousAttacks: ['dangerousAttacks', 'dangerous_attacks'],
+  fouls: ['fouls'],
+  offsides: ['offsides'],
+  xg: ['xg', 'expected_goals', 'expectedGoals'],
+  npxg: ['npxg', 'non_penalty_xg', 'nonPenaltyXg', 'non_penalty_expected_goals', 'expected_goals_without_penalties', 'np_expected_goals'],
+  bigChances: ['bigChances', 'big_chances'],
+};
+
 export function toNumber(value: unknown) {
   if (value === null || value === undefined || value === '') return null;
   const number = Number(typeof value === 'string' ? value.replace('%', '').trim() : value);
@@ -64,14 +81,13 @@ export function stageLabel(stage?: string | null, groupPhase?: string | null) {
 
 export function providerName(snapshot: any) {
   const provider = normalizeStatusValue(snapshot?.provider);
-  if (provider.includes('THE_STATS') && provider.includes('LIVE')) return 'TheStatsAPI Live';
-  if (provider.includes('THE_STATS')) return 'TheStatsAPI';
-  if (provider.includes('ISPORTS_FLASH')) return 'iSport Flash Stats';
-  if (provider.includes('ISPORTS_REMOTE_LIVE')) return 'iSport Remote Live';
-  if (provider.includes('ISPORTS_TIMELINE')) return 'iSport Timeline';
-  if (provider.includes('ISPORT')) return 'iSport Animation';
+  if (provider.includes('THE_STATS')) return 'TheStats';
+  if (provider.includes('ISPORTS_FLASH')) return 'iSport';
+  if (provider.includes('ISPORTS_REMOTE_LIVE')) return 'iSport';
+  if (provider.includes('ISPORTS_TIMELINE')) return 'iSport';
+  if (provider.includes('ISPORT')) return 'iSport';
   if (snapshot) return 'قاعدة البيانات';
-  return 'غير متوفر';
+  return '';
 }
 
 export function providerKey(snapshot: any) {
@@ -103,15 +119,33 @@ export function rawData(snapshot: any) {
 export function rawStats(snapshot: any) {
   const data = rawData(snapshot);
   const nested = asObject(data.theStatsApi);
-  return asObject(data.stats || data.providerStats || nested.stats || nested.providerStats);
+  const liveStatsPayload = asObject(data.liveStats?.data || data.liveStats);
+  return {
+    ...asObject(nested.providerStats),
+    ...asObject(nested.stats),
+    ...asObject(liveStatsPayload.providerStats),
+    ...asObject(liveStatsPayload.stats),
+    ...asObject(liveStatsPayload.overview),
+    ...asObject(data.providerStats),
+    ...asObject(data.stats),
+  };
+}
+
+function pairFromValue(value: any, source: string): Pair {
+  const stat = asObject(value);
+  const all = asObject(stat.all);
+  const home = toNumber(stat.home ?? stat.home_value ?? stat.homeValue ?? all.home);
+  const away = toNumber(stat.away ?? stat.away_value ?? stat.awayValue ?? all.away);
+  return home === null && away === null ? null : { home, away, source };
 }
 
 function statPairFromRaw(stats: Record<string, any>, key: string, source: string): Pair {
-  const stat = asObject(stats[key]);
-  const all = asObject(stat.all);
-  const home = toNumber(stat.home ?? all.home);
-  const away = toNumber(stat.away ?? all.away);
-  return home === null && away === null ? null : { home, away, source };
+  const aliases = Array.from(new Set([key, ...(STAT_ALIASES[key] || [])]));
+  for (const alias of aliases) {
+    const pair = pairFromValue(stats[alias], source);
+    if (pair) return pair;
+  }
+  return null;
 }
 
 function snapshotPair(snapshot: any, key: string, homeKey: string, awayKey: string): Pair {
@@ -131,7 +165,7 @@ export function buildStatMetric(sources: any[], key: string, label: string, home
     home: pair?.home ?? null,
     away: pair?.away ?? null,
     suffix,
-    source: pair?.source || 'غير متوفر في المصادر',
+    source: pair?.source || '',
     available: Boolean(pair),
   };
 }
@@ -217,7 +251,7 @@ export function scoreForDisplay(match: any, sources: any[]): MatchScore {
   const snapshotTotal = Number(snapshotScore?.home || 0) + Number(snapshotScore?.away || 0);
   if (snapshotScore && snapshotTotal > matchTotal) return snapshotScore;
   if (matchHome !== null || matchAway !== null) return matchScore;
-  return snapshotScore || { home: null, away: null, source: 'غير متوفر في المصادر' };
+  return snapshotScore || { home: null, away: null, source: '' };
 }
 
 function statusKind(status: string): MatchStatusKind {
