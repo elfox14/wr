@@ -1,9 +1,9 @@
 import { unstable_noStore as noStore } from 'next/cache';
 import prisma from '@/lib/prisma';
 import { getTeamFlagUrl } from '@/lib/teamFlags';
-import type { MatchPageData, MatchPlayerLite, MatchTeamLite, OfficialLineupPlayer, OfficialLineupTeam, OfficialLineupView, RelatedArticle, SourceChecklistItem } from './types';
+import type { MatchAdvancedData, MatchEventView, MatchPlayerLite, MatchShotMapItem, MatchTeamLite, OfficialLineupPlayer, OfficialLineupTeam, OfficialLineupView, RelatedArticle, SourceChecklistItem } from './types';
 import { buildBestThirdsTable, buildGroupStandings, buildMatchImpact } from './standings';
-import { buildEventView, buildSourceList, buildStatMetric, buildStatusView, groupLabel, metricDefinitions, normalizeGroupKey, providerName, providerPriority, rawData, scoreForDisplay, stageLabel } from './normalizers';
+import { buildEventView, buildSourceList, buildStatMetric, buildStatusView, groupLabel, metricDefinitions, normalizeGroupKey, providerName, providerPriority, rawData, scoreForDisplay, stageLabel, toNumber } from './normalizers';
 
 function teamLite(team: any): MatchTeamLite {
   return {
@@ -48,7 +48,8 @@ function lineupTeam(raw: any): OfficialLineupTeam | null {
 function extractOfficialLineup(snapshots: any[]): OfficialLineupView {
   for (const snapshot of snapshots) {
     const data = rawData(snapshot);
-    const lineup = data.lineup || data.theStatsApi?.lineup || data.lineups || null;
+    const normalized = data.normalized || null;
+    const lineup = data.lineup || data.theStatsApi?.lineup || data.lineups || normalized?.lineups || null;
     if (!lineup || lineup.error) continue;
     const home = lineupTeam(lineup.home || lineup.homeTeam);
     const away = lineupTeam(lineup.away || lineup.awayTeam);
@@ -70,25 +71,11 @@ function cleanVenue(value: any) {
 }
 
 function findVenueDeep(value: any, depth = 0): string | null {
-  if (!value || depth > 5) return null;
+  if (!value || depth > 6) return null;
   const direct = cleanVenue(value?.venue) || cleanVenue(value?.stadium) || cleanVenue(value?.ground) || cleanVenue(value?.arena);
   if (direct) return direct;
   if (typeof value !== 'object') return null;
-  const candidates = [
-    value.fixture,
-    value.match,
-    value.game,
-    value.event,
-    value.meta,
-    value.info,
-    value.location,
-    value.data,
-    value.response,
-    value.result,
-    value.liveStats,
-    value.theStatsApi,
-    value.raw,
-  ];
+  const candidates = [value.fixture, value.match, value.game, value.event, value.meta, value.info, value.location, value.data, value.response, value.result, value.liveStats, value.theStatsApi, value.raw, value.normalized, value.matchInfo];
   for (const item of candidates) {
     const found = findVenueDeep(item, depth + 1);
     if (found) return found;
@@ -104,6 +91,69 @@ function extractVenue(match: any, snapshots: any[]) {
     if (found) return found;
   }
   return null;
+}
+
+function textKey(value: any) {
+  return String(value || '').trim().toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f\u064B-\u065F\u0670]/g, '').replace(/[^a-z0-9\u0600-\u06ff]+/g, ' ').replace(/\s+/g, ' ').trim();
+}
+function sameTeam(value: any, team: MatchTeamLite) {
+  const a = textKey(value);
+  const b = textKey(team.name);
+  const c = textKey(team.code);
+  return Boolean(a && ((b && (a === b || a.includes(b) || b.includes(a))) || (c && a === c)));
+}
+function teamIdFromName(value: any, homeTeam: MatchTeamLite, awayTeam: MatchTeamLite) {
+  if (sameTeam(value, homeTeam)) return homeTeam.id;
+  if (sameTeam(value, awayTeam)) return awayTeam.id;
+  return null;
+}
+function eventIcon(type: string) {
+  const value = textKey(type);
+  if (value.includes('goal')) return '⚽';
+  if (value.includes('yellow')) return '🟨';
+  if (value.includes('red')) return '🟥';
+  if (value.includes('sub')) return '🔁';
+  if (value.includes('corner')) return '🚩';
+  if (value.includes('var')) return '📺';
+  if (value.includes('shot')) return '🎯';
+  if (value.includes('offside')) return '🚫';
+  if (value.includes('foul')) return '✋';
+  return '•';
+}
+function minuteLabel(minute: number | null | undefined, extra?: number | null) {
+  if (minute === null || minute === undefined) return '—';
+  return extra ? `${minute}+${extra}د` : `${minute}د`;
+}
+function eventLabel(type: string) {
+  const map: Record<string, string> = { goal: 'هدف', shot_on_target: 'تسديدة على المرمى', shot_off_target: 'تسديدة خارج المرمى', shot_blocked: 'تسديدة محجوبة', corner_kick: 'ركنية', foul: 'خطأ', yellow_card: 'بطاقة صفراء', red_card: 'بطاقة حمراء', substitution: 'تبديل', var: 'VAR', offside: 'تسلل', added_time: 'وقت بدل ضائع', period_start: 'بداية شوط', period_end: 'نهاية شوط' };
+  return map[type] || type;
+}
+function list(value: any): any[] { return Array.isArray(value) ? value : []; }
+
+function extractAdvancedData(snapshots: any[], homeTeam: MatchTeamLite, awayTeam: MatchTeamLite): MatchAdvancedData {
+  const extras = snapshots.find((snapshot) => String(snapshot.provider || '').toUpperCase() === 'THE_STATS_API_EXTRAS');
+  const normalized = extras?.rawData && typeof extras.rawData === 'object' ? (extras.rawData as any).normalized || {} : {};
+  const matchInfo = normalized.matchInfo || {};
+  const npxgRaw = matchInfo.npxgSummary?.live || matchInfo.npxgSummary?.stored || null;
+  const shotmap: MatchShotMapItem[] = list(normalized.shotmap).map((shot) => ({ ...shot, teamId: teamIdFromName(shot.teamName, homeTeam, awayTeam) || shot.teamId || null }));
+  const events: MatchEventView[] = list(normalized.eventsDetailed?.all).map((event, index) => {
+    const type = String(event.type || 'event');
+    const minute = toNumber(event.minute);
+    const extra = toNumber(event.extraTime ?? event.extra_time);
+    const teamId = teamIdFromName(event.teamName, homeTeam, awayTeam);
+    return { id: `thestats-${event.sequence || index}-${type}-${minute ?? 'na'}`, minute, minuteLabel: minuteLabel(minute, extra), type: eventLabel(type), icon: eventIcon(type), teamId, playerName: event.playerName || null, detail: event.detail || `${eventLabel(type)}${event.playerName ? ` - ${event.playerName}` : ''}${event.teamName ? ` (${event.teamName})` : ''}`, sourceName: 'TheStats' };
+  });
+  const playerStats = list(normalized.playerStats).map((player) => ({ ...player, teamId: teamIdFromName(player.teamName, homeTeam, awayTeam) || player.teamId || null }));
+  return {
+    venue: matchInfo.venue || null,
+    city: matchInfo.city || null,
+    referee: matchInfo.referee || null,
+    finalScore: matchInfo.finalScore || null,
+    npxg: npxgRaw ? { home: toNumber(npxgRaw.home_team ?? npxgRaw.home), away: toNumber(npxgRaw.away_team ?? npxgRaw.away) } : null,
+    events,
+    shotmap,
+    playerStats,
+  };
 }
 
 function sourceChecklist(match: any, statsAvailable: boolean, eventsCount: number, providers: string[], lineup: OfficialLineupView): SourceChecklistItem[] {
@@ -136,7 +186,7 @@ function maxDateIso(values: Array<Date | string | null | undefined>) {
   return new Date(times.length ? Math.max(...times) : Date.now()).toISOString();
 }
 
-export async function getMatchPageData(matchId: string): Promise<MatchPageData | null> {
+export async function getMatchPageData(matchId: string): Promise<any | null> {
   noStore();
   const match = await prisma.match.findUnique({
     where: { id: matchId },
@@ -150,24 +200,29 @@ export async function getMatchPageData(matchId: string): Promise<MatchPageData |
   const relatedNews = await prisma.pressNews.findMany({ where: { status: 'published', OR: [{ relatedMatchId: match.id }, { relatedTeamId: { in: [match.homeTeamId, match.awayTeamId] } }] }, orderBy: { publishedAt: 'desc' }, take: 5 }).catch(() => []);
 
   const snapshots = [...(match.statsSnapshots || [])].sort((a, b) => providerPriority(a) - providerPriority(b) || new Date(b.capturedAt).getTime() - new Date(a.capturedAt).getTime());
+  const homeTeam = teamLite(match.homeTeam);
+  const awayTeam = teamLite(match.awayTeam);
+  const advanced = extractAdvancedData(snapshots, homeTeam, awayTeam);
   const score = scoreForDisplay(match, snapshots);
   const status = buildStatusView(match, snapshots);
-  const stats = metricDefinitions().map(([key, label, homeKey, awayKey, suffix]) => buildStatMetric(snapshots, key, label, homeKey, awayKey, suffix));
+  const statsBase = metricDefinitions().map(([key, label, homeKey, awayKey, suffix]) => buildStatMetric(snapshots, key, label, homeKey, awayKey, suffix));
+  const stats = advanced.npxg && !statsBase.some((metric) => metric.key === 'npxg' && metric.available) ? statsBase.map((metric) => metric.key === 'npxg' ? { ...metric, home: advanced.npxg?.home ?? null, away: advanced.npxg?.away ?? null, available: true, source: 'TheStats' } : metric) : statsBase;
   const statsAvailable = stats.some((metric) => metric.available);
   const providers = snapshots.map((snapshot) => String(snapshot.provider || '').toUpperCase());
   const officialLineup = extractOfficialLineup(snapshots);
   const groupKey = normalizeGroupKey(match.groupPhase || match.stage);
   const standings = buildGroupStandings(allMatches as any[], groupKey);
   const thirdPlaceTable = buildBestThirdsTable(allMatches as any[]);
-  const homeTeam = teamLite(match.homeTeam);
-  const awayTeam = teamLite(match.awayTeam);
-  const events = (match.events || []).map(buildEventView);
+  const dbEvents = (match.events || []).map(buildEventView);
+  const events = dbEvents.length ? dbEvents : advanced.events;
 
   return {
     id: match.id,
     title: `${homeTeam.name} ضد ${awayTeam.name}`,
     matchDate: match.matchDate.toISOString(),
-    venue: extractVenue(match, snapshots),
+    venue: advanced.venue || extractVenue(match, snapshots),
+    city: advanced.city || null,
+    referee: advanced.referee || null,
     competition: process.env.NEXT_PUBLIC_COMPETITION_NAME || 'كأس العالم 2026',
     groupLabel: groupLabel(match.groupPhase || match.stage),
     stageLabel: stageLabel(match.stage, match.groupPhase),
@@ -180,6 +235,7 @@ export async function getMatchPageData(matchId: string): Promise<MatchPageData |
     homePlayers: players.filter((player) => player.teamId === match.homeTeamId).map(playerLite),
     awayPlayers: players.filter((player) => player.teamId === match.awayTeamId).map(playerLite),
     officialLineup,
+    advanced,
     voteEndpoint: `/api/matches/${match.id}/votes`,
     groupStandings: standings,
     thirdPlaceTable,
