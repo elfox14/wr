@@ -238,163 +238,27 @@ main[dir="rtl"] ::selection,
   overflow-x: auto;
 }
 
-.market-page table {
-  max-width: none;
+/* Match page: keep group standings and best thirds side by side. */
+main[dir="rtl"] #standings {
+  overflow-x: auto !important;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 0.75rem !important;
 }
 
-.custom-scrollbar,
-.mobile-scrollbar {
-  scrollbar-width: thin;
-  scrollbar-color: rgba(var(--wc-green-rgb), 0.25) transparent;
+main[dir="rtl"] #standings > div:nth-of-type(2) {
+  display: grid !important;
+  grid-template-columns: minmax(280px, 1fr) minmax(280px, 1fr) !important;
+  min-width: 620px !important;
+  align-items: start !important;
+  gap: 1rem !important;
 }
 
-.custom-scrollbar::-webkit-scrollbar,
-.mobile-scrollbar::-webkit-scrollbar {
-  width: 5px;
-  height: 5px;
-}
-
-.custom-scrollbar::-webkit-scrollbar-thumb,
-.mobile-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(var(--wc-green-rgb), 0.25);
-  border-radius: 999px;
-}
-
-.mobile-safe-bottom {
-  padding-bottom: calc(env(safe-area-inset-bottom) + 6rem);
-}
-
-.mobile-card {
-  border-radius: 1.35rem;
-  border: 1px solid var(--wc-border);
-  background: rgba(255,255,255,0.035);
-}
-
-.mobile-tap {
-  min-height: 44px;
-}
-
-.pro-card {
-  position: relative;
-  overflow: hidden;
-  border: 1px solid var(--wc-border);
-  background: linear-gradient(145deg, rgba(24,229,143,0.065), rgba(248,200,70,0.035));
-  box-shadow: 0 14px 34px rgba(0,0,0,0.24);
-}
-
-.pro-card::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background: radial-gradient(circle at 18% 0%, rgba(var(--wc-green-rgb),0.13), transparent 28%), radial-gradient(circle at 100% 100%, rgba(var(--wc-gold-rgb),0.10), transparent 28%);
-  opacity: 0.78;
-}
-
-.pro-interactive {
-  transition: transform 180ms ease, border-color 180ms ease, background-color 180ms ease, box-shadow 180ms ease;
-}
-
-.pro-interactive:hover {
-  transform: translateY(-2px);
-  border-color: rgba(var(--wc-green-rgb),0.38);
-  box-shadow: 0 18px 42px rgba(0,0,0,0.34), 0 0 22px rgba(var(--wc-green-rgb),0.10);
-}
-
-.pro-interactive:active {
-  transform: scale(0.985);
-}
-
-.skeleton-shimmer {
-  background: linear-gradient(90deg, rgba(255,255,255,0.04), rgba(var(--wc-green-rgb),0.12), rgba(255,255,255,0.04));
-  background-size: 240% 100%;
-  animation: skeleton-shimmer 1.25s ease-in-out infinite;
-}
-
-@keyframes skeleton-shimmer {
-  0% { background-position: 100% 0; }
-  100% { background-position: -100% 0; }
-}
-
-/* ─── Team Intelligence Reports ─── */
-article p.text-xs.leading-6.text-gray-400 {
-  white-space: pre-line;
-  line-height: 1.95;
-}
-
-article p.text-xs.leading-6.text-gray-400::selection {
-  background: rgba(var(--wc-green-rgb), 0.22);
+main[dir="rtl"] #standings > div:nth-of-type(2) > div {
+  min-width: 0 !important;
 }
 
 @media (min-width: 1024px) {
-  article p.text-xs.leading-6.text-gray-400 {
-    max-height: 34rem;
-    overflow-y: auto;
-    padding-left: 0.25rem;
-    scrollbar-width: thin;
-    scrollbar-color: rgba(255,255,255,0.18) transparent;
-  }
-}
-
-/* ─── Mobile UX polish for the World Cup home experience ─── */
-main[dir="rtl"] a,
-main[dir="rtl"] button {
-  -webkit-tap-highlight-color: transparent;
-}
-
-main[dir="rtl"] a:active,
-main[dir="rtl"] button:active {
-  transform: scale(0.985);
-}
-
-main[dir="rtl"] .overflow-x-auto {
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(var(--wc-green-rgb),0.26) transparent;
-}
-
-main[dir="rtl"] .overflow-x-auto::-webkit-scrollbar {
-  height: 5px;
-}
-
-main[dir="rtl"] .overflow-x-auto::-webkit-scrollbar-thumb {
-  background: rgba(var(--wc-green-rgb),0.26);
-  border-radius: 999px;
-}
-
-@media (max-width: 640px) {
-  main[dir="rtl"] {
-    padding: 0.75rem 0.75rem 1.5rem !important;
-  }
-
-  main[dir="rtl"] > div.relative.mx-auto.max-w-7xl {
-    display: flex;
-    flex-direction: column;
-    gap: 0.85rem;
-  }
-
-  main[dir="rtl"] section,
-  main[dir="rtl"] article {
-    border-radius: 1.1rem !important;
-  }
-
-  main[dir="rtl"] h1 {
-    font-size: clamp(1.55rem, 8vw, 2.15rem) !important;
-    line-height: 1.18 !important;
-    letter-spacing: -0.03em;
-  }
-
-  main[dir="rtl"] h2,
-  main[dir="rtl"] h3 {
-    line-height: 1.35 !important;
-  }
-
-  main[dir="rtl"] .grid-cols-4 {
-    gap: 0.35rem !important;
-  }
-
-  main[dir="rtl"] a,
-  main[dir="rtl"] button {
-    min-height: 40px;
+  main[dir="rtl"] #standings > div:nth-of-type(2) {
+    min-width: 0 !important;
   }
 }
