@@ -43,6 +43,25 @@ function makeDateCard(value: string) {
   return card;
 }
 
+function makePlayerStatsNotice(isFinished: boolean) {
+  const notice = document.createElement('div');
+  notice.setAttribute('data-player-stats-notice', 'true');
+  notice.className = 'mt-4 rounded-2xl border border-dashed border-white/15 bg-black/20 p-4 text-center';
+
+  const title = document.createElement('p');
+  title.className = 'font-black text-white';
+  title.textContent = isFinished ? 'جاري جلب إحصائيات اللاعبين' : 'ستتوفر إحصائيات اللاعبين بعد المباراة';
+
+  const body = document.createElement('p');
+  body.className = 'mt-2 text-sm font-bold leading-7 text-slate-400';
+  body.textContent = isFinished
+    ? 'لم تصل إحصائيات اللاعبين بعد. ستظهر هنا تلقائيًا فور حفظ بيانات ما بعد المباراة.'
+    : 'أثناء البث المباشر لا نعرض أرقامًا غير مكتملة. ستظهر إحصائيات اللاعبين بعد نهاية المباراة ووصول البيانات الموثقة.';
+
+  notice.append(title, body);
+  return notice;
+}
+
 function arrangeInfoCards(dateText: string) {
   const header = document.querySelector('header');
   if (!header) return;
@@ -74,12 +93,56 @@ function arrangeInfoCards(dateText: string) {
   if (scheduledPill) scheduledPill.style.display = 'none';
 }
 
+function compactEmptyGap() {
+  const header = document.querySelector('header');
+  const spacer = header?.nextElementSibling as HTMLElement | null;
+  if (!spacer) return;
+  const className = String(spacer.getAttribute('class') || '');
+  if (!className.includes('h-[54px]')) return;
+  spacer.style.height = '0px';
+  spacer.style.minHeight = '0px';
+  spacer.style.margin = '0px';
+  spacer.style.padding = '0px';
+  spacer.style.overflow = 'hidden';
+}
+
+function addPlayerStatsNotice(data: MatchPageData) {
+  const lineupsSection = document.getElementById('lineups');
+  if (!lineupsSection) return;
+
+  const hasPlayerStatsTable = String(lineupsSection.textContent || '').includes('إحصائيات لاعبي التشكيل والبدلاء');
+  let notice = lineupsSection.querySelector('[data-player-stats-notice="true"]') as HTMLElement | null;
+
+  if (hasPlayerStatsTable) {
+    notice?.remove();
+    return;
+  }
+
+  if (!notice) {
+    notice = makePlayerStatsNotice(data.status.isFinished);
+    lineupsSection.appendChild(notice);
+  } else {
+    const title = notice.querySelector('p');
+    const body = notice.querySelectorAll('p')[1];
+    if (title) title.textContent = data.status.isFinished ? 'جاري جلب إحصائيات اللاعبين' : 'ستتوفر إحصائيات اللاعبين بعد المباراة';
+    if (body) body.textContent = data.status.isFinished
+      ? 'لم تصل إحصائيات اللاعبين بعد. ستظهر هنا تلقائيًا فور حفظ بيانات ما بعد المباراة.'
+      : 'أثناء البث المباشر لا نعرض أرقامًا غير مكتملة. ستظهر إحصائيات اللاعبين بعد نهاية المباراة ووصول البيانات الموثقة.';
+  }
+}
+
+function enhanceMatchPage(data: MatchPageData) {
+  arrangeInfoCards(fullDate(data.matchDate));
+  compactEmptyGap();
+  addPlayerStatsNotice(data);
+}
+
 export default function ProfessionalMatchPageWithDateCard({ data }: { data: MatchPageData }) {
   useEffect(() => {
-    arrangeInfoCards(fullDate(data.matchDate));
-    const id = window.setTimeout(() => arrangeInfoCards(fullDate(data.matchDate)), 250);
-    return () => window.clearTimeout(id);
-  }, [data.matchDate, data.venue, data.city, data.referee, data.groupLabel, data.stageLabel, data.status.kind]);
+    enhanceMatchPage(data);
+    const timers = [250, 900].map((ms) => window.setTimeout(() => enhanceMatchPage(data), ms));
+    return () => timers.forEach((id) => window.clearTimeout(id));
+  }, [data]);
 
   return <ProfessionalMatchPageClient data={data} />;
 }
