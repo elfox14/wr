@@ -14,16 +14,7 @@ function n(value: any) {
 }
 
 function key(value: any) {
-  return String(value || '')
-    .toLowerCase()
-    .normalize('NFKD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/&/g, ' and ')
-    .replace(/[^a-z0-9\u0600-\u06ff]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .replace('czechia', 'czech republic')
-    .replace('usa', 'united states');
+  return String(value || '').toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/&/g, ' and ').replace(/[^a-z0-9\u0600-\u06ff]+/g, ' ').replace(/\s+/g, ' ').trim().replace('czechia', 'czech republic').replace('usa', 'united states');
 }
 
 function teamMatch(providerName: any, localTeam: any) {
@@ -53,6 +44,7 @@ function payloadData(payload: any) {
 function listFrom(payload: any, fields: string[]) {
   if (Array.isArray(payload)) return payload;
   const data = payloadData(payload);
+  if (Array.isArray(data)) return data;
   for (const field of fields) if (Array.isArray(data?.[field])) return data[field];
   for (const field of fields) if (Array.isArray(payload?.[field])) return payload[field];
   return [];
@@ -82,11 +74,34 @@ export async function resolveTheStatsProviderId(match: any, query: Record<string
 function compactShot(row: any, sourcePath: string) {
   const player = row?.player || row?.athlete || row?.shooter || row?.scorer || {};
   const team = row?.team || row?.side || {};
-  const minute = n(row?.minute ?? row?.time?.minute ?? row?.elapsed ?? row?.match_minute ?? row?.event_minute);
-  const x = n(row?.x ?? row?.pitchX ?? row?.location?.x ?? row?.coordinates?.x ?? row?.position?.x ?? row?.shot?.x);
-  const y = n(row?.y ?? row?.pitchY ?? row?.location?.y ?? row?.coordinates?.y ?? row?.position?.y ?? row?.shot?.y);
   const outcome = str(row?.outcome, row?.result, row?.shot_outcome, row?.status, row?.type);
-  return { minute, playerName: str(player?.name, row?.player_name, row?.playerName, row?.shooter_name), teamName: str(team?.name, row?.team_name, row?.teamName), x, y, xg: n(row?.xg ?? row?.expected_goals ?? row?.expectedGoals ?? row?.shot?.xg), npxg: n(row?.npxg ?? row?.non_penalty_xg ?? row?.nonPenaltyXg ?? row?.shot?.npxg), outcome, bodyPart: str(row?.body_part, row?.bodyPart, row?.shot?.body_part, row?.shot?.bodyPart), isOnTarget: /on target|saved|goal/i.test(String(outcome || '')) || Boolean(row?.on_target ?? row?.is_on_target), isGoal: /goal|scored/i.test(String(outcome || row?.type || '')), isPenalty: /penalty/i.test(String(row?.type || row?.situation || row?.playPattern || '')) || Boolean(row?.is_penalty), sourcePath };
+  return {
+    id: str(row?.id),
+    playerId: str(player?.id, row?.player_id, row?.playerId),
+    teamId: str(team?.id, row?.team_id, row?.teamId),
+    minute: n(row?.minute ?? row?.time?.minute ?? row?.elapsed ?? row?.match_minute ?? row?.event_minute),
+    playerName: str(player?.name, row?.player_name, row?.playerName, row?.shooter_name),
+    teamName: str(team?.name, row?.team_name, row?.teamName),
+    x: n(row?.x ?? row?.pitchX ?? row?.location?.x ?? row?.coordinates?.x ?? row?.position?.x ?? row?.shot?.x),
+    y: n(row?.y ?? row?.pitchY ?? row?.location?.y ?? row?.coordinates?.y ?? row?.position?.y ?? row?.shot?.y),
+    xg: n(row?.xg ?? row?.expected_goals ?? row?.expectedGoals ?? row?.shot?.xg),
+    npxg: n(row?.npxg ?? row?.non_penalty_xg ?? row?.nonPenaltyXg ?? row?.np_expected_goals ?? row?.shot?.npxg),
+    outcome,
+    situation: str(row?.situation, row?.play_pattern, row?.playPattern),
+    bodyPart: str(row?.body_part, row?.bodyPart, row?.shot?.body_part, row?.shot?.bodyPart),
+    goalType: str(row?.goal_type, row?.goalType),
+    goalMouthLocation: str(row?.goal_mouth_location, row?.goalMouthLocation),
+    goalMouthCoordinates: row?.goal_mouth_coordinates || row?.goalMouthCoordinates || null,
+    blockCoordinates: row?.block_coordinates || row?.blockCoordinates || null,
+    goalkeeper: row?.goalkeeper || null,
+    isBlocked: Boolean(row?.is_blocked_shot ?? row?.isBlockedShot),
+    isOnTarget: /on target|saved|save|goal/i.test(String(outcome || '')) || Boolean(row?.on_target ?? row?.is_on_target ?? row?.isOnTarget),
+    isGoal: /goal|scored/i.test(String(outcome || row?.type || '')) || Boolean(row?.is_goal ?? row?.isGoal),
+    isHeaded: Boolean(row?.is_headed ?? row?.isHeaded),
+    isOutsideBox: Boolean(row?.is_outside_box ?? row?.isOutsideBox),
+    isPenalty: /penalty/i.test(String(row?.type || row?.situation || row?.playPattern || '')) || Boolean(row?.is_penalty ?? row?.isPenalty),
+    sourcePath,
+  };
 }
 
 function compactEvent(row: any, sourcePath: string) {
@@ -96,14 +111,68 @@ function compactEvent(row: any, sourcePath: string) {
   const player = row?.player || row?.athlete || row?.scorer || {};
   const playerIn = row?.player_in || row?.playerIn || row?.sub_in || row?.subIn || row?.in || row?.incoming || {};
   const playerOut = row?.player_out || row?.playerOut || row?.sub_out || row?.subOut || row?.out || row?.outgoing || {};
-  return { type: str(row?.type, row?.event_type, row?.incident_type, row?.name) || rawType || 'event', normalizedType: rawType, minute, teamName: str(team?.name, row?.team_name, row?.teamName), playerName: str(player?.name, row?.player_name, row?.playerName, row?.scorer?.name), playerIn: str(playerIn?.name, row?.player_in_name, row?.playerInName, row?.in_name), playerOut: str(playerOut?.name, row?.player_out_name, row?.playerOutName, row?.out_name), reason: str(row?.reason, row?.card_reason, row?.description, row?.comment, row?.text), outcome: str(row?.outcome, row?.result, row?.decision), detail: str(row?.detail, row?.description, row?.comment, row?.text, row?.message), sourcePath };
+  const type = str(row?.type, row?.event_type, row?.incident_type, row?.name) || rawType || 'event';
+  const playerName = str(player?.name, row?.player_name, row?.playerName, row?.scorer?.name);
+  const teamName = str(team?.name, row?.team_name, row?.teamName);
+  return { type, normalizedType: rawType, sequence: n(row?.sequence), period: str(row?.period), minute, extraTime: n(row?.extra_time ?? row?.extraTime), teamId: str(team?.id, row?.team_id, row?.teamId), teamName, playerId: str(player?.id, row?.player_id, row?.playerId), playerName, playerIn: str(playerIn?.name, row?.player_in_name, row?.playerInName, row?.in_name), playerOut: str(playerOut?.name, row?.player_out_name, row?.playerOutName, row?.out_name), reason: str(row?.reason, row?.card_reason, row?.description, row?.comment, row?.text), outcome: str(row?.outcome, row?.result, row?.decision), detail: str(row?.detail, row?.description, row?.comment, row?.text, row?.message, playerName ? `${type} - ${playerName}${teamName ? ` (${teamName})` : ''}` : teamName ? `${type} - ${teamName}` : type), sourcePath };
 }
 
 function compactPlayerStat(row: any, sourcePath: string) {
   const player = row?.player || row?.athlete || row?.person || row;
   const team = row?.team || {};
   const stats = row?.stats || row?.statistics || row;
-  return { id: str(player?.id, row?.player_id, row?.id), name: str(player?.name, player?.full_name, row?.name, row?.playerName, row?.display_name), teamName: str(team?.name, row?.team_name, row?.teamName), position: str(player?.position, row?.position), rating: n(stats?.rating ?? row?.rating), minutes: n(stats?.minutes ?? stats?.minutes_played ?? row?.minutes), shots: n(stats?.shots ?? stats?.total_shots), shotsOnTarget: n(stats?.shots_on_target ?? stats?.shotsOnTarget), goals: n(stats?.goals), assists: n(stats?.assists), passes: n(stats?.passes ?? stats?.total_passes), keyPasses: n(stats?.key_passes ?? stats?.keyPasses), crosses: n(stats?.crosses), tackles: n(stats?.tackles), interceptions: n(stats?.interceptions), clearances: n(stats?.clearances), blocks: n(stats?.blocks), duels: n(stats?.duels ?? stats?.duels_total), foulsCommitted: n(stats?.fouls_committed ?? stats?.foulsCommitted), foulsWon: n(stats?.fouls_won ?? stats?.foulsWon), saves: n(stats?.saves ?? stats?.goalkeeper_saves), goalsPrevented: n(stats?.goals_prevented ?? stats?.goalsPrevented ?? stats?.psxg_minus_goals), savesInsideBox: n(stats?.saves_inside_box ?? stats?.savesInsideBox), sourcePath };
+  const passing = row?.passing || stats?.passing || {};
+  const shooting = row?.shooting || stats?.shooting || {};
+  const duels = row?.duels || stats?.duels || {};
+  const defending = row?.defending || stats?.defending || {};
+  const goalkeeping = row?.goalkeeping || stats?.goalkeeping || {};
+  const general = row?.general || stats?.general || {};
+  const playerName = str(player?.name, player?.full_name, row?.player_name, row?.playerName, row?.name, row?.display_name);
+  return {
+    id: str(player?.id, row?.player_id, row?.playerId, row?.id),
+    playerId: str(player?.id, row?.player_id, row?.playerId, row?.id),
+    name: playerName,
+    playerName,
+    teamId: str(team?.id, row?.team_id, row?.teamId),
+    teamName: str(team?.name, row?.team_name, row?.teamName),
+    position: str(player?.position, row?.position),
+    rating: n(stats?.rating ?? row?.rating),
+    started: Boolean(row?.started),
+    played: Boolean(row?.played ?? true),
+    minutes: n(stats?.minutes ?? stats?.minutes_played ?? row?.minutes_played ?? row?.minutes),
+    goals: n(shooting?.goals ?? stats?.goals ?? row?.goals),
+    assists: n(passing?.assists ?? stats?.assists ?? row?.assists),
+    shots: n(shooting?.total_shots ?? stats?.shots ?? stats?.total_shots ?? row?.shots),
+    shotsOnTarget: n(shooting?.shots_on_target ?? stats?.shots_on_target ?? stats?.shotsOnTarget ?? row?.shots_on_target),
+    shotsOffTarget: n(shooting?.shots_off_target ?? stats?.shots_off_target ?? row?.shots_off_target),
+    blockedShots: n(shooting?.blocked_shots ?? stats?.blocked_shots ?? row?.blocked_shots),
+    xg: n(shooting?.expected_goals ?? stats?.expected_goals ?? stats?.xg ?? row?.expected_goals),
+    xa: n(shooting?.expected_assists ?? passing?.expected_assists ?? stats?.expected_assists ?? row?.expected_assists),
+    npxg: n(shooting?.np_expected_goals ?? stats?.np_expected_goals ?? stats?.npxg ?? row?.np_expected_goals),
+    passes: n(passing?.total_passes ?? stats?.passes ?? stats?.total_passes ?? row?.passes),
+    accuratePasses: n(passing?.accurate_passes ?? stats?.accurate_passes ?? row?.accurate_passes),
+    keyPasses: n(passing?.key_passes ?? stats?.key_passes ?? stats?.keyPasses ?? row?.key_passes),
+    crosses: n(passing?.total_crosses ?? stats?.crosses ?? row?.crosses),
+    accurateCrosses: n(passing?.accurate_crosses ?? row?.accurate_crosses),
+    longBalls: n(passing?.total_long_balls ?? row?.total_long_balls),
+    tackles: n(defending?.tackles ?? stats?.tackles ?? row?.tackles),
+    interceptions: n(defending?.interceptions ?? stats?.interceptions ?? row?.interceptions),
+    clearances: n(defending?.clearances ?? stats?.clearances ?? row?.clearances),
+    blocks: n(defending?.blocks ?? stats?.blocks ?? row?.blocks),
+    duelsWon: n(duels?.duel_won ?? stats?.duels_won ?? row?.duel_won),
+    duelsLost: n(duels?.duel_lost ?? row?.duel_lost),
+    aerialWon: n(duels?.aerial_won ?? row?.aerial_won),
+    foulsCommitted: n(general?.fouls ?? stats?.fouls_committed ?? stats?.foulsCommitted ?? row?.fouls_committed),
+    foulsWon: n(general?.was_fouled ?? stats?.fouls_won ?? stats?.foulsWon ?? row?.fouls_won),
+    touches: n(general?.touches ?? row?.touches),
+    possessionLost: n(general?.possession_lost ?? row?.possession_lost),
+    yellowCards: n(general?.yellow_cards ?? row?.yellow_cards),
+    redCards: n(general?.red_cards ?? row?.red_cards),
+    saves: n(goalkeeping?.saves ?? stats?.saves ?? stats?.goalkeeper_saves ?? row?.saves),
+    goalsPrevented: n(goalkeeping?.goals_prevented ?? stats?.goals_prevented ?? stats?.goalsPrevented ?? stats?.psxg_minus_goals ?? row?.goals_prevented),
+    savesInsideBox: n(goalkeeping?.saves_inside_box ?? stats?.saves_inside_box ?? stats?.savesInsideBox ?? row?.saves_inside_box),
+    sourcePath,
+  };
 }
 
 function eventBuckets(events: any[]) {
@@ -116,7 +185,8 @@ function matchInfoFromPayloads(payloads: Record<string, any>) {
   const venue = fixture?.venue || fixture?.stadium || fixture?.ground || matchPayload?.venue || matchPayload?.stadium || {};
   const referee = fixture?.referee || matchPayload?.referee || matchPayload?.officials?.referee || matchPayload?.officials?.[0];
   const weather = fixture?.weather || matchPayload?.weather || null;
-  return { venue: str(venue?.name, venue?.stadium, venue, fixture?.venue_name, matchPayload?.venue_name), city: str(venue?.city, fixture?.city, matchPayload?.city), country: str(venue?.country, fixture?.country, matchPayload?.country), referee: str(referee?.name, referee, fixture?.referee_name, matchPayload?.referee_name), attendance: n(fixture?.attendance ?? matchPayload?.attendance), weather, finalScore: { home: n(fixture?.home_goals ?? matchPayload?.home_goals ?? matchPayload?.meta?.home_goals), away: n(fixture?.away_goals ?? matchPayload?.away_goals ?? matchPayload?.meta?.away_goals) }, manOfTheMatch: str(matchPayload?.man_of_the_match?.name, matchPayload?.manOfTheMatch?.name, matchPayload?.motm?.name, matchPayload?.player_of_the_match?.name) };
+  const shotmap = payloads.shotmap?.payload || {};
+  return { venue: str(venue?.name, venue?.stadium, venue, fixture?.venue_name, matchPayload?.venue_name), city: str(venue?.city, fixture?.city, matchPayload?.city), country: str(venue?.country, fixture?.country, matchPayload?.country), referee: str(referee?.name, referee, fixture?.referee_name, matchPayload?.referee_name), attendance: n(fixture?.attendance ?? matchPayload?.attendance), weather, finalScore: { home: n(fixture?.home_goals ?? matchPayload?.home_goals ?? matchPayload?.score?.home ?? matchPayload?.meta?.home_goals), away: n(fixture?.away_goals ?? matchPayload?.away_goals ?? matchPayload?.score?.away ?? matchPayload?.meta?.away_goals) }, npxgSummary: shotmap?.np_xg_summary || null, shotmapFinal: shotmap?.meta?.is_final ?? null, manOfTheMatch: str(matchPayload?.man_of_the_match?.name, matchPayload?.manOfTheMatch?.name, matchPayload?.motm?.name, matchPayload?.player_of_the_match?.name) };
 }
 
 function compactStandings(payload: any) {
@@ -160,9 +230,9 @@ function normalizeExtras(endpointResults: Record<string, any>) {
   const timeline = listFrom(endpointResults.timeline?.payload, ['timeline', 'events', 'incidents', 'commentary', 'items', 'results']);
   const incidents = listFrom(endpointResults.incidents?.payload, ['timeline', 'events', 'incidents', 'commentary', 'items', 'results']);
   const events = [...timeline, ...incidents].map((row) => compactEvent(row, endpointResults.incidents?.ok ? 'incidents/timeline' : 'timeline'));
-  const shotRows = [...listFrom(endpointResults.shotmap?.payload, ['shotmap', 'shots', 'events', 'items', 'results']), ...listFrom(endpointResults.shots?.payload, ['shots', 'shotmap', 'events', 'items', 'results'])];
+  const shotRows = [...listFrom(endpointResults.shotmap?.payload, ['data', 'shotmap', 'shots', 'events', 'items', 'results']), ...listFrom(endpointResults.shots?.payload, ['data', 'shots', 'shotmap', 'events', 'items', 'results'])];
   const shotmap = shotRows.map((row) => compactShot(row, 'shotmap/shots'));
-  const playerRows = [...listFrom(endpointResults.playerStats?.payload, ['players', 'player_stats', 'statistics', 'items', 'results']), ...listFrom(endpointResults.playerStatistics?.payload, ['players', 'player_stats', 'statistics', 'items', 'results']), ...listFrom(endpointResults.players?.payload, ['players', 'items', 'results'])];
+  const playerRows = [...listFrom(endpointResults.playerStats?.payload, ['data', 'players', 'player_stats', 'statistics', 'items', 'results']), ...listFrom(endpointResults.playerStatistics?.payload, ['data', 'players', 'player_stats', 'statistics', 'items', 'results']), ...listFrom(endpointResults.players?.payload, ['data', 'players', 'items', 'results'])];
   const playerStats = playerRows.map((row) => compactPlayerStat(row, 'player-stats'));
   return { matchInfo: matchInfoFromPayloads(endpointResults), shotmap, eventsDetailed: { all: events, ...eventBuckets(events) }, playerStats, goalkeeperStats: playerStats.filter((player) => player.saves !== null || player.goalsPrevented !== null || player.savesInsideBox !== null), standings: compactStandings(endpointResults.standings?.payload) };
 }
