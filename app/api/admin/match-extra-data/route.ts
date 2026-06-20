@@ -1,5 +1,56 @@
-export const dynamic = 'force-dynamic';
+import { NextResponse } from 'next/server';
+import { requireAdmin } from '@/lib/adminAuth';
+import prisma from '@/lib/prisma';
+import { collectTheStatsMatchExtras, defaultTheStatsQuery } from '@/lib/theStatsMatchExtras';
+import { getTheStatsApiConfigStatus, safeTheStatsApiError } from '@/lib/theStatsApi';
 
-export async function GET() {
-  return Response.json({ ok: true });
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+export const runtime = 'nodejs';
+
+function json(value: unknown, status = 200) {
+  return NextResponse.json(value, { status, headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } });
 }
+function bool(value: string | null, fallback = true) {
+  if (value === null) return fallback;
+  return !['false', '0', 'no', 'off'].includes(value.toLowerCase());
+}
+function int(value: string | null, fallback: number, min: number, max: number) {
+  const parsed = Number(value ?? fallback);
+  return Number.isFinite(parsed) ? Math.max(min, Math.min(max, Math.floor(parsed))) : fallback;
+}
+
+export async function GET(req: Request) {
+  const auth = await requireAdmin(req);
+  if (!auth.authorized) return auth.error;
+  const url = new URL(req.url);
+  const matchId = url.searchParams.get('matchId') || url.searchParams.get('dbMatchId') || url.searchParams.get('id') || '';
+  const dryRun = bool(url.searchParams.get('dryRun'), false);
+  const save = bool(url.searchParams.get('save'), true);
+  const includeRaw = bool(url.searchParams.get('includeRaw'), false);
+  const timeoutMs = int(url.searchParams.get('timeoutMs'), 15000, 3000, 60000);
+  const limit = int(url.searchParams.get('limit'), 4, 1, 12);
+  const minutesBack = int(url.searchParams.get('minutesBack'), 240, 15, 720);
+  const minutesForward = int(url.searchParams.get('minutesForward'), 180, 0, 720);
+  const now = Date.now();
+  const query = defaultTheStatsQuery(url.searchParams);
+
+  try {
+    const matches = matchId
+      ? await prisma.match.findMany({ where: { id: matchId }, include: { homeTeam: true, awayTeam: true }, take: 1 })
+      : await prisma.match.findMany({ where: { matchDate: { gte: new Date(now - minutesBack * 60_000), lte: new Date(now + minutesForward * 60_000) } }, include: { homeTeam: true, awayTeam: true }, orderBy: { matchDate: 'asc' }, take: limit });
+
+    const results = [];
+    for (const match of matches) {
+      try { results.push(await collectTheStatsMatchExtras(match, { dryRun, save, includeRaw, timeoutMs, query })); }
+      catch (error: any) { results.push({ ok: false, matchId: match.id, error: safeTheStatsApiError(error) }); }
+    }
+
+    const successful = results.filter((item: any) => item.ok);
+    return json({ ok: true, provider: 'THE_STATS_API', mode: 'match_extra_data', dryRun, saved: !dryRun && save, matchesFound: matches.length, successful: successful.length, failed: results.length - successful.length, snapshotsSaved: successful.filter((item: any) => item.saved).length, results, config: getTheStatsApiConfigStatus() });
+  } catch (error: any) {
+    return json({ ok: false, provider: 'THE_STATS_API', mode: 'match_extra_data', error: safeTheStatsApiError(error), config: getTheStatsApiConfigStatus() }, Number(error?.status) || 500);
+  }
+}
+
+export async function POST(req: Request) { return GET(req); }
