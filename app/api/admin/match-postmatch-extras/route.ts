@@ -43,6 +43,9 @@ function usefulResult(result: any) {
   const hasInfo = realText(matchInfo.venue) || realText(matchInfo.city) || realText(matchInfo.referee) || matchInfo.finalScore?.home !== null || matchInfo.finalScore?.away !== null;
   return endpointsOk > 0 && (hasCounts || hasInfo);
 }
+function isProviderBlocked(result: any) {
+  return Boolean(result?.rateLimited || result?.error?.status === 429 || result?.error?.status === 412 || result?.error?.code === 'provider_disabled');
+}
 async function saveUsefulSnapshot(matchId: string, result: any, includeRaw: boolean) {
   const normalized = result?.debug?.normalizedPreview || result?.debug?.normalized || null;
   if (!normalized) return null;
@@ -59,16 +62,7 @@ async function saveUsefulSnapshot(matchId: string, result: any, includeRaw: bool
     normalized,
   };
   if (includeRaw && result?.debug?.endpoints) rawData.raw = Object.fromEntries(Object.entries(result.debug.endpoints).filter(([, value]: any) => value?.ok).map(([key, value]: any) => [key, value.payload]));
-  const snapshot = await prisma.matchStatsSnapshot.create({
-    data: {
-      id: randomUUID(),
-      matchId,
-      provider: 'THE_STATS_API_EXTRAS',
-      providerMatchId: Number(String(result.resolvedProviderMatchId || '').replace(/\D/g, '')) || 0,
-      rawData,
-    },
-    select: { id: true },
-  });
+  const snapshot = await prisma.matchStatsSnapshot.create({ data: { id: randomUUID(), matchId, provider: 'THE_STATS_API_EXTRAS', providerMatchId: Number(String(result.resolvedProviderMatchId || '').replace(/\D/g, '')) || 0, rawData }, select: { id: true } });
   return snapshot.id;
 }
 
@@ -101,13 +95,28 @@ export async function GET(req: Request) {
         const matchForProvider = forcedProviderMatchId ? { ...match, externalId: forcedProviderMatchId } : match;
         const result: any = await collectTheStatsMatchExtras(matchForProvider, { dryRun, save: false, includeRaw, timeoutMs, query, endpointMode: mode, delayMs });
         const useful = usefulResult(result);
+        const blocked = isProviderBlocked(result);
         let snapshotId: string | null = null;
         if (!dryRun && save && useful) snapshotId = await saveUsefulSnapshot(match.id, result, includeRaw);
-        results.push({ ...result, ok: useful, saved: Boolean(snapshotId), snapshotId, rejectedEmptySnapshot: !useful, advice: useful ? result.advice : forcedProviderMatchId ? 'Provider match id returned no valid endpoint data. Check the real TheStats match id; example IDs like mt_12345 will return 404 and will not be saved.' : result.advice });
+        results.push({
+          ...result,
+          ok: useful,
+          saved: Boolean(snapshotId),
+          snapshotId,
+          rejectedEmptySnapshot: !useful && !blocked,
+          providerBlocked: blocked,
+          advice: blocked
+            ? result.advice || 'TheStats is temporarily unavailable or rate limited. Wait before retrying; no empty snapshot was saved.'
+            : useful
+              ? result.advice
+              : forcedProviderMatchId
+                ? 'Provider match id returned no valid endpoint data. Check the real TheStats match id; example IDs like mt_12345 will return 404 and will not be saved.'
+                : result.advice,
+        });
         if (result.rateLimited) break;
       } catch (error: any) {
         const safe = safeTheStatsApiError(error);
-        results.push({ ok: false, matchId: match.id, rateLimited: Number(safe?.status) === 429, error: safe });
+        results.push({ ok: false, matchId: match.id, providerBlocked: Number(safe?.status) === 429 || Number(safe?.status) === 412, rateLimited: Number(safe?.status) === 429, error: safe });
         if (Number(safe?.status) === 429) break;
       }
     }
@@ -116,7 +125,7 @@ export async function GET(req: Request) {
     const rateLimited = results.some((item: any) => item.rateLimited || item.error?.status === 429);
     const unresolved = results.some((item: any) => item.error === 'Could not resolve TheStats provider match id');
     const snapshotsSaved = results.filter((item: any) => item.saved).length;
-    return json({ ok: true, provider: 'THE_STATS_API', mode: 'match_postmatch_extras', endpointMode: mode, delayMs, forcedProviderMatchId: forcedProviderMatchId || null, dryRun, saveRequested: save, saved: snapshotsSaved > 0, rateLimited, unresolved, advice: rateLimited ? 'TheStats rate limit reached. Wait 1-2 minutes, then retry. Default mode uses only essential endpoints sequentially.' : unresolved ? 'Could not match this database match to TheStats automatically. Retry with providerMatchId=mt_xxx from TheStats.' : undefined, matchesFound: matches.length, successful: successful.length, failed: results.length - successful.length, snapshotsSaved, results, config: getTheStatsApiConfigStatus() });
+    return json({ ok: true, provider: 'THE_STATS_API', mode: 'match_postmatch_extras', endpointMode: mode, delayMs, forcedProviderMatchId: forcedProviderMatchId || null, dryRun, saveRequested: save, saved: snapshotsSaved > 0, rateLimited, unresolved, advice: rateLimited ? 'TheStats rate limit reached while resolving or fetching the match. Stop retrying for a few minutes, then run once again.' : unresolved ? 'Could not match this database match to TheStats automatically. Retry with providerMatchId=mt_xxx from TheStats.' : undefined, matchesFound: matches.length, successful: successful.length, failed: results.length - successful.length, snapshotsSaved, results, config: getTheStatsApiConfigStatus() });
   } catch (error: any) {
     return json({ ok: false, provider: 'THE_STATS_API', mode: 'match_postmatch_extras', error: safeTheStatsApiError(error), config: getTheStatsApiConfigStatus() }, Number(error?.status) || 500);
   }
