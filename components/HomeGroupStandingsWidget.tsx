@@ -63,14 +63,14 @@ function ThirdPlacedCard({ rows, compact }: { rows: ThirdPlaceRow[]; compact: bo
   const rowGrid = 'grid-cols-[auto_auto_minmax(0,1fr)_2rem_2rem_2rem]';
 
   return (
-    <section className={`rounded-[1.2rem] border border-[#FFD700]/15 bg-black/25 ${compact ? 'p-2.5' : 'p-3'} shadow-[0_14px_38px_rgba(0,0,0,0.16)]`}>
+    <section className={`flex h-full min-w-0 flex-col rounded-[1.2rem] border border-[#FFD700]/15 bg-black/25 ${compact ? 'p-2.5' : 'p-3'} shadow-[0_14px_38px_rgba(0,0,0,0.16)]`}>
       <div className="mb-2 flex items-center justify-between gap-2">
         <h3 className="text-[11px] font-black text-white">أفضل ٨ ثوالث</h3>
         <span className="rounded-full border border-[#00FF88]/20 bg-[#00FF88]/10 px-2 py-0.5 text-[9px] font-black text-[#00FF88]">يتأهلون</span>
       </div>
 
       {rows.length ? (
-        <div className="space-y-1.5">
+        <div className="flex-1 space-y-1.5">
           <div className={`grid ${rowGrid} items-center gap-1.5 px-1.5 text-[8px] font-black text-gray-500`}>
             <span className="col-span-3">المنتخب</span>
             <span className="text-center">نقاط</span>
@@ -173,8 +173,8 @@ export default function HomeGroupStandingsWidget({ compact = false }: Props = {}
   const cellPadding = compact ? 'px-1 py-1.5' : 'px-1.5 py-2.5 sm:px-2';
 
   return (
-    <div className="flex h-auto flex-col gap-2">
-      <section className={`flex h-auto flex-col rounded-[1.45rem] border border-white/10 bg-white/[0.04] ${sectionPadding} text-white shadow-[0_14px_38px_rgba(0,0,0,0.2)] backdrop-blur sm:rounded-3xl`}>
+    <div className="grid h-auto grid-cols-1 gap-2 xl:grid-cols-2">
+      <section className={`flex h-full min-w-0 flex-col rounded-[1.45rem] border border-white/10 bg-white/[0.04] ${sectionPadding} text-white shadow-[0_14px_38px_rgba(0,0,0,0.2)] backdrop-blur sm:rounded-3xl`}>
         {loading ? (
           <div className="flex min-h-[12rem] items-center justify-center rounded-2xl border border-white/10 bg-black/20">
             <div className="h-6 w-6 animate-spin rounded-full border-2 border-[#0FF0FC] border-t-transparent" />
