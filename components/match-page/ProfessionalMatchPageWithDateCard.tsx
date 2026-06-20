@@ -14,11 +14,21 @@ function fullDate(value: string) {
   }).format(new Date(value));
 }
 
+function matchClockText(data: MatchPageData) {
+  if (data.status.isScheduled) return fullDate(data.matchDate);
+  if (data.status.isFinished) return 'نهاية المباراة';
+  return data.status.label || data.status.shortLabel || 'زمن المباراة';
+}
+
+function matchClockCardLabel(data: MatchPageData) {
+  return data.status.isScheduled ? 'موعد المباراة' : 'زمن المباراة';
+}
+
 function cardLabel(card: Element) {
   return String(card.querySelector('span')?.textContent || '').trim();
 }
 
-function makeDateCard(value: string) {
+function makeDateCard(value: string, labelText = 'موعد المباراة') {
   const card = document.createElement('div');
   card.setAttribute('data-match-date-card', 'true');
   card.className = 'min-w-0 rounded-2xl border border-white/10 bg-black/25 p-2.5 text-center sm:p-3 sm:text-right';
@@ -32,7 +42,7 @@ function makeDateCard(value: string) {
 
   const label = document.createElement('span');
   label.className = 'text-[10px] font-black sm:text-xs';
-  label.textContent = 'موعد المباراة';
+  label.textContent = labelText;
 
   const body = document.createElement('p');
   body.className = 'line-clamp-2 min-h-[2.35rem] text-[10px] font-black leading-5 text-white sm:min-h-0 sm:text-sm sm:font-bold sm:leading-6';
@@ -62,7 +72,15 @@ function makePlayerStatsNotice(isFinished: boolean) {
   return notice;
 }
 
-function arrangeInfoCards(dateText: string) {
+function hideScoreClock(header: Element) {
+  const clockPill = Array.from(header.querySelectorAll('p')).find((node) => {
+    const className = String(node.getAttribute('class') || '');
+    return className.includes('mx-auto') && className.includes('rounded-full') && className.includes('border');
+  }) as HTMLElement | undefined;
+  if (clockPill) clockPill.style.display = 'none';
+}
+
+function arrangeInfoCards(clockText: string, labelText: string) {
   const header = document.querySelector('header');
   if (!header) return;
 
@@ -82,15 +100,16 @@ function arrangeInfoCards(dateText: string) {
   const referee = cards.find((card) => cardLabel(card) === 'الحكم') || null;
   const group = cards.find((card) => cardLabel(card) === 'المجموعة') || null;
   let dateCard = infoGrid.querySelector('[data-match-date-card="true"]') as HTMLElement | null;
-  if (!dateCard) dateCard = makeDateCard(dateText);
+  if (!dateCard) dateCard = makeDateCard(clockText, labelText);
+
+  const labelNode = dateCard.querySelector('span:nth-of-type(2)') || dateCard.querySelector('div span:last-child');
+  if (labelNode) labelNode.textContent = labelText;
   const valueNode = dateCard.querySelector('p');
-  if (valueNode) valueNode.textContent = dateText || '—';
+  if (valueNode) valueNode.textContent = clockText || '—';
 
   const ordered = [venue, dateCard, referee, city, group].filter(Boolean) as HTMLElement[];
   ordered.forEach((card) => infoGrid.appendChild(card));
-
-  const scheduledPill = Array.from(header.querySelectorAll('p')).find((node) => String(node.textContent || '').includes('موعد المباراة:')) as HTMLElement | undefined;
-  if (scheduledPill) scheduledPill.style.display = 'none';
+  hideScoreClock(header);
 }
 
 function compactEmptyGap() {
@@ -158,7 +177,7 @@ function makeTablesSideBySide() {
 }
 
 function enhanceMatchPage(data: MatchPageData) {
-  arrangeInfoCards(fullDate(data.matchDate));
+  arrangeInfoCards(matchClockText(data), matchClockCardLabel(data));
   compactEmptyGap();
   addPlayerStatsNotice(data);
   makeTablesSideBySide();
