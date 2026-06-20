@@ -77,16 +77,6 @@ function shortText(value: string, max = 24) {
   return value.length > max ? `${value.slice(0, max - 1)}…` : value;
 }
 
-function hasProviderStat(summary: any, key: string) {
-  const availability = finiteNumber(summary?.statAvailability?.[key]);
-  return availability !== null && availability > 0;
-}
-
-function hasSnapshotValue(summary: any, ...values: unknown[]) {
-  const matches = pickNumber(summary?.finalStats?.matchesWithFinalSnapshots);
-  return matches !== null && pickNumber(...values) !== null;
-}
-
 function toneClass(tone: Tone) {
   return {
     gold: 'text-[#FFD700] border-[#FFD700]/25 bg-[#FFD700]/10 hover:border-[#FFD700]/45',
@@ -144,7 +134,7 @@ function PlayerImage({ leader }: { leader: any }) {
 
 function PlayerSpotlight({ title, leader, metricLabel, tone = 'gold' }: { title: string; leader: any; metricLabel: string; tone?: Tone }) {
   const rawId = String(leader?.id || '');
-  const href = rawId && !rawId.startsWith('provider-scorer:') ? `/players/${encodeURIComponent(rawId)}` : '/players';
+  const href = rawId && !rawId.startsWith('provider-') ? `/players/${encodeURIComponent(rawId)}` : '/players';
   const playerName = leader?.name ? shortText(String(leader.name), 24) : unavailable;
   const team = leader?.team?.name || leader?.team?.code || '';
   const value = pickNumber(leader?.value);
@@ -280,8 +270,8 @@ export default function HomeTournamentStatsCard({ playersCount: serverPlayersCou
   const finishedMatches = pickNumber(summary?.finishedMatches, databaseSummary?.finishedMatches);
   const liveMatches = pickNumber(summary?.liveMatches, databaseSummary?.liveMatches);
   const scheduledMatches = pickNumber(summary?.scheduledMatches, databaseSummary?.scheduledMatches);
-  const totalShots = hasProviderStat(summary, 'shots') || hasSnapshotValue(summary, finalStats?.totalShots) ? pickNumber(finalStats?.totalShots, finalStats?.shots) : null;
-  const totalShotsOnTarget = hasProviderStat(summary, 'shotsOnTarget') || hasSnapshotValue(summary, finalStats?.totalShotsOnTarget) ? pickNumber(finalStats?.totalShotsOnTarget) : null;
+  const totalShots = pickNumber(finalStats?.totalShots, finalStats?.shots);
+  const totalShotsOnTarget = pickNumber(finalStats?.totalShotsOnTarget, finalStats?.shotsOnTarget);
   const shotAccuracy = percent(totalShotsOnTarget, totalShots);
   const cardTotalYellow = pickNumber(read(summary, 'yellow' + 'Cards'), read(databaseSummary, 'yellow' + 'Cards'));
   const cardTotalRed = pickNumber(read(summary, 'red' + 'Cards'), read(databaseSummary, 'red' + 'Cards'));
@@ -300,28 +290,42 @@ export default function HomeTournamentStatsCard({ playersCount: serverPlayersCou
   const progress = percent(finishedMatches, totalMatches);
 
   const xg = pickNumber(powerStats?.totalXg, powerStats?.xg);
-  const bigChances = pickNumber(powerStats?.bigChances);
+  const npxg = pickNumber(powerStats?.totalNpxg);
+  const xa = pickNumber(powerStats?.totalXa);
+  const highXgChances = pickNumber(powerStats?.totalHighXgChances, powerStats?.bigChances);
   const passAccuracy = pickNumber(powerStats?.passAccuracyPercent);
+  const passes = pickNumber(powerStats?.totalPasses);
+  const keyPasses = pickNumber(powerStats?.totalKeyPasses);
+  const touches = pickNumber(powerStats?.totalTouches);
   const corners = pickNumber(powerStats?.corners, powerStats?.totalCorners, powerStats?.cornerKicks);
   const attacks = pickNumber(powerStats?.attacks, powerStats?.totalAttacks);
   const dangerousAttacks = pickNumber(powerStats?.dangerousAttacks, powerStats?.totalDangerousAttacks);
-  const fouls = pickNumber(powerStats?.fouls, powerStats?.totalFouls);
-  const offsides = pickNumber(powerStats?.offsides, powerStats?.totalOffsides);
+  const fouls = pickNumber(powerStats?.totalFoulsCommitted, powerStats?.fouls, powerStats?.totalFouls);
   const averageShots = pickNumber(powerStats?.averageShotsPerFinishedMatch);
   const averagePossession = pickNumber(powerStats?.averagePossessionSample);
+  const tackles = pickNumber(powerStats?.totalTackles);
+  const interceptions = pickNumber(powerStats?.totalInterceptions);
+  const saves = pickNumber(powerStats?.totalSaves);
+  const substitutions = pickNumber(powerStats?.totalSubstitutions);
+  const varReviews = pickNumber(powerStats?.totalVarReviews);
 
   const technicalCards = [
     { title: 'xG', value: formatDecimal(xg), subtitle: 'الأهداف المتوقعة' },
-    { title: 'فرص كبيرة', value: formatCount(bigChances), subtitle: 'إجمالي الفرص' },
+    { title: 'npxG', value: formatDecimal(npxg), subtitle: 'بدون ركلات جزاء' },
+    { title: 'xA', value: formatDecimal(xa), subtitle: 'الأسيست المتوقع' },
+    { title: 'فرص xG عالية', value: formatCount(highXgChances), subtitle: 'xG 0.35+' },
+    { title: 'تمريرات', value: formatCount(passes), subtitle: 'إجمالي التمريرات' },
     { title: 'دقة التمرير', value: formatPercent(passAccuracy), subtitle: 'نسبة النجاح' },
+    { title: 'تمريرات مفتاحية', value: formatCount(keyPasses), subtitle: 'صناعة فرص' },
+    { title: 'لمسات', value: formatCount(touches), subtitle: 'إجمالي اللمسات' },
     { title: 'دقة التسديد', value: formatPercent(shotAccuracy), subtitle: 'على المرمى / إجمالي' },
     { title: 'متوسط التسديدات', value: formatDecimal(averageShots), subtitle: 'لكل مباراة منتهية' },
     { title: 'متوسط الاستحواذ', value: formatPercent(averagePossession), subtitle: 'عينات اللقطات' },
     { title: 'ركنيات', value: formatCount(corners), subtitle: 'إجمالي الركنيات' },
     { title: 'هجمات', value: formatCount(attacks), subtitle: 'إجمالي الهجمات' },
     { title: 'هجمات خطيرة', value: formatCount(dangerousAttacks), subtitle: 'إجمالي الخطورة' },
-    { title: 'أخطاء', value: formatCount(fouls), subtitle: 'إجمالي الأخطاء' },
-    { title: 'تسللات', value: formatCount(offsides), subtitle: 'إجمالي التسللات' },
+    { title: 'تدخلات', value: formatCount(tackles), subtitle: 'إجمالي التدخلات' },
+    { title: 'تصديات', value: formatCount(saves), subtitle: 'حراس المرمى' },
   ];
 
   function renderActiveTab() {
@@ -361,7 +365,9 @@ export default function HomeTournamentStatsCard({ playersCount: serverPlayersCou
           <CardsCard yellow={cardTotalYellow} red={cardTotalRed} />
           <PenaltyCard penalties={penalties} />
           <CardShell title="أخطاء" value={formatCount(fouls)} subtitle="إجمالي الأخطاء" tone="red" href="/statistics" />
-          <CardShell title="تسللات" value={formatCount(offsides)} subtitle="إجمالي التسللات" tone="neutral" href="/statistics" />
+          <CardShell title="VAR" value={formatCount(varReviews)} subtitle="مراجعات الفيديو" tone="neutral" href="/statistics" />
+          <CardShell title="تبديلات" value={formatCount(substitutions)} subtitle="إجمالي التبديلات" tone="neutral" href="/statistics" />
+          <CardShell title="اعتراضات" value={formatCount(interceptions)} subtitle="إجمالي الاعتراضات" tone="green" href="/statistics" />
         </div>
       );
     }
