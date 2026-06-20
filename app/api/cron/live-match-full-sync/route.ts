@@ -29,7 +29,7 @@ function catchupResultFromBody(body: any, matchId: string) { return resultsFromC
 function resolvedIdsFromTheStats(body: any) { const map = new Map<string, string>(); for (const item of resultsFromCatchupBody(body)) if (item?.matchId && item?.resolvedProviderMatchId) map.set(String(item.matchId), String(item.resolvedProviderMatchId)); return map; }
 function hasOfficialTheStatsTimeline(result: any, minEvents: number) { return Boolean(result?.timelineOk !== false && Number(result?.providerEventsFound || 0) >= minEvents); }
 function isNotLiveConflict(result: any) { const error = result?.liveStatsError || result?.error; const status = Number(error?.status || error?.payload?.error?.status_code || 0); const message = [error?.message, error?.code, error?.payload?.error?.message, error?.payload?.error?.code].map((v) => String(v || '').toLowerCase()).join(' '); return status === 409 && (message.includes('not live') || message.includes('conflict')); }
-async function autoFinishFromOfficialTimeline(match: any, result: any, dryRun: boolean) { const latestMinute = Number(result?.latestMinute || 0); const providerEventsFound = Number(result?.providerEventsFound || 0); const shouldFinish = isNotLiveConflict(result) && providerEventsFound > 0 && latestMinute >= 90; if (!shouldFinish) return { checked: true, shouldFinish: false, reason: 'official_timeline_does_not_confirm_finished', isNotLiveConflict: isNotLiveConflict(result), latestMinute, providerEventsFound }; if (!dryRun && String(match.status || '').toUpperCase() !== 'FINISHED') await prisma.match.update({ where: { id: match.id }, data: { status: 'FINISHED' } }); return { checked: true, shouldFinish: true, updated: !dryRun, reason: 'TheStats timeline exists, latestMinute >= 90, and live-stats says match is not live', latestMinute, providerEventsFound }; }
+async function autoFinishFromOfficialTimeline(match: any, result: any, dryRun: boolean) { const latestMinute = Number(result?.latestMinute || 0); const providerEventsFound = Number(result?.providerEventsFound || 0); const liveStatsOk = Boolean(result?.liveStatsOk); const conflictFinish = isNotLiveConflict(result) && providerEventsFound > 0 && latestMinute >= 90; const staleOverLimitFinish = latestMinute >= 120 && liveStatsOk; const shouldFinish = conflictFinish || staleOverLimitFinish; if (!shouldFinish) return { checked: true, shouldFinish: false, reason: 'official_timeline_does_not_confirm_finished', isNotLiveConflict: isNotLiveConflict(result), latestMinute, providerEventsFound, liveStatsOk }; if (!dryRun && String(match.status || '').toUpperCase() !== 'FINISHED') await prisma.match.update({ where: { id: match.id }, data: { status: 'FINISHED' } }); return { checked: true, shouldFinish: true, updated: !dryRun, reason: staleOverLimitFinish ? 'TheStats live minute reached 120+, so stale IN_PLAY clock was closed as FINISHED' : 'TheStats timeline exists, latestMinute >= 90, and live-stats says match is not live', latestMinute, providerEventsFound, liveStatsOk }; }
 
 export async function GET(req: Request) {
   const auth = await requireAdmin(req);
@@ -41,18 +41,18 @@ export async function GET(req: Request) {
   const origin = publicOrigin(req, url);
   const requestedMatchId = url.searchParams.get('matchId') || url.searchParams.get('dbMatchId') || url.searchParams.get('id') || '';
   const dryRun = bool(url.searchParams.get('dryRun'), false);
-  const forceCoreISports = bool(url.searchParams.get('forceCoreISports'), true);
+  const forceCoreISports = bool(url.searchParams.get('forceCoreISports'), !requestedMatchId);
   const runTheStats = bool(url.searchParams.get('theStats'), true);
   const runTheStatsExtras = bool(url.searchParams.get('theStatsExtras'), false);
   const runTheStatsExtrasRaw = bool(url.searchParams.get('theStatsExtrasRaw'), false);
   const runLineups = bool(url.searchParams.get('lineups'), false);
-  const runISports = forceCoreISports || bool(url.searchParams.get('isports'), true);
-  const runISportStats = forceCoreISports || bool(url.searchParams.get('isportStats'), true);
+  const runISports = forceCoreISports || bool(url.searchParams.get('isports'), false);
+  const runISportStats = forceCoreISports || bool(url.searchParams.get('isportStats'), false);
   const runISportVisualStats = bool(url.searchParams.get('isportVisualStats'), false);
   const runDedupe = bool(url.searchParams.get('dedupe'), true);
-  const mapISports = forceCoreISports || bool(url.searchParams.get('mapISports'), true);
+  const mapISports = forceCoreISports || bool(url.searchParams.get('mapISports'), false);
   const runISportSafeCron = runISports && bool(url.searchParams.get('isportSafeCron'), true);
-  const perMatchISports = bool(url.searchParams.get('perMatchISports'), Boolean(requestedMatchId));
+  const perMatchISports = bool(url.searchParams.get('perMatchISports'), Boolean(requestedMatchId && runISports));
   const autoFinish = bool(url.searchParams.get('autoFinish'), true);
   const runTheStatsPostmatch = bool(url.searchParams.get('theStatsPostmatch'), true);
   const officialTimelineMinEvents = int(url.searchParams.get('officialTimelineMinEvents'), 1, 1, 500);
@@ -64,7 +64,7 @@ export async function GET(req: Request) {
   const postMatchMinutes = int(url.searchParams.get('postMatchMinutes'), 360, 30, 720);
   const delayMs = int(url.searchParams.get('delayMs'), 1000, 0, 5000);
 
-  const out: any = { ok: true, mode: 'live_match_full_sync_light', dryRun, requestedMatchId: requestedMatchId || null, publicOrigin: origin, matchesFound: 0, policy: { theStats: 'primary lightweight live source for live-stats, timeline, score, and events', theStatsExtras: runTheStatsExtras ? 'enabled only when explicitly requested or for finished matches below' : 'disabled by default during live to avoid TheStats rate limits', theStatsPostmatch: runTheStatsPostmatch ? `enabled for FINISHED matches from the last ${postMatchMinutes} minutes` : 'disabled', lineups: runLineups ? 'enabled' : 'disabled by default during live to reduce API calls', iSport: runISportSafeCron ? 'cron-safe visual/fallback layer' : 'disabled unless explicitly enabled', database: 'frontend reads database snapshots/events only', officialTimelineMinEvents }, iSportLiveMap: null, iSportSafeSync: null, theStatsCatchup: null, theStatsLineups: null, perMatch: [] as any[] };
+  const out: any = { ok: true, mode: 'live_match_full_sync_light', dryRun, requestedMatchId: requestedMatchId || null, publicOrigin: origin, matchesFound: 0, policy: { theStats: 'primary lightweight live source for live-stats, timeline, score, and events', theStatsExtras: runTheStatsExtras ? 'enabled only when explicitly requested or for finished matches below' : 'disabled by default during live to avoid TheStats rate limits', theStatsPostmatch: runTheStatsPostmatch ? `enabled for FINISHED matches from the last ${postMatchMinutes} minutes` : 'disabled', lineups: runLineups ? 'enabled' : 'disabled by default during live to reduce API calls', iSport: runISportSafeCron ? 'enabled only when explicitly requested for a specific match, or by global cron' : 'disabled by default for specific matchId to protect Browserless quota', database: 'frontend reads database snapshots/events only', officialTimelineMinEvents }, iSportLiveMap: null, iSportSafeSync: null, theStatsCatchup: null, theStatsLineups: null, perMatch: [] as any[] };
 
   if (mapISports && !requestedMatchId) { const liveMap = withSecrets(new URL('/api/cron/live-market-sync', origin), key); liveMap.searchParams.set('forceLive', 'true'); liveMap.searchParams.set('forceProviderFetch', 'false'); out.iSportLiveMap = await callJson('isports_live_map', liveMap, 15_000); }
   else if (mapISports && requestedMatchId) out.iSportLiveMap = { skipped: true, reason: 'Specific matchId provided; global iSport live map skipped' };
@@ -79,6 +79,7 @@ export async function GET(req: Request) {
   else if (runLineups) out.theStatsLineups = { skipped: true, reason: 'TheStats rate limited; lineups skipped to protect quota' };
 
   if (runISportSafeCron) { const safe = withSecrets(new URL('/api/cron/isports-live-sync', origin), key); safe.searchParams.set('take', String(int(url.searchParams.get('isportsTake'), requestedMatchId ? 1 : 2, 1, 5))); safe.searchParams.set('save', String(!dryRun)); safe.searchParams.set('replace', 'true'); safe.searchParams.set('includeTimeline', 'true'); safe.searchParams.set('includeFlash', String(runISportStats)); safe.searchParams.set('asyncFlash', 'true'); safe.searchParams.set('includeLive', String(runISportVisualStats)); safe.searchParams.set('asyncLive', 'true'); safe.searchParams.set('timeoutMs', String(isportStatsTimeoutMs)); safe.searchParams.set('waitMs', String(isportStatsWaitMs)); out.iSportSafeSync = await callJson('isports_safe_visual_fallback', safe, 12_000); }
+  else out.iSportSafeSync = { skipped: true, reason: requestedMatchId ? 'Specific matchId uses TheStats-only by default. Add forceCoreISports=true only when you need iSports.' : 'iSports disabled by request' };
 
   const providerIds = resolvedIdsFromTheStats((out.theStatsCatchup as any)?.body);
   for (const [index, match] of matches.entries()) {
