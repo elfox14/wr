@@ -52,6 +52,12 @@ function normalizeText(value?: string | null) {
     .trim();
 }
 
+function toNumber(value: unknown) {
+  if (value === null || value === undefined || value === '') return null;
+  const number = Number(typeof value === 'string' ? value.replace('%', '').trim() : value);
+  return Number.isFinite(number) ? number : null;
+}
+
 function topLeader(rows: any[], metric: LeaderMetric): LeaderRow | null {
   const map = new Map<string, LeaderRow>();
 
@@ -146,6 +152,80 @@ function addGoal(map: Map<string, GoalLeaderRow>, params: {
   map.set(key, current);
 }
 
+function addPlayerMetric(map: Map<string, GoalLeaderRow>, params: {
+  name: string;
+  teamId?: string | null;
+  teamName?: string | null;
+  value: number;
+  sourceName: string;
+  sourceUrl?: string | null;
+  source: string;
+  example: string;
+}) {
+  const name = params.name.trim();
+  const value = Number(params.value || 0);
+  if (!name || !Number.isFinite(value) || value <= 0) return;
+  const key = `${normalizeText(name)}|${params.teamId || normalizeText(params.teamName) || 'unknown-team'}`;
+  const current = map.get(key) || {
+    key,
+    name,
+    teamId: params.teamId || null,
+    teamName: params.teamName || null,
+    value: 0,
+    sourceName: params.sourceName,
+    sourceUrl: params.sourceUrl || null,
+    source: params.source,
+    sourceCount: 0,
+    examples: [],
+  };
+  current.value += value;
+  current.sourceCount += 1;
+  if (!current.teamId && params.teamId) current.teamId = params.teamId;
+  if (!current.teamName && params.teamName) current.teamName = params.teamName;
+  if (current.examples.length < 5) current.examples.push(params.example);
+  map.set(key, current);
+}
+
+async function resolveLeaderAsset(top: GoalLeaderRow) {
+  const playerAssets = await prisma.asset.findMany({
+    where: { type: 'PLAYER' },
+    select: {
+      id: true,
+      name: true,
+      code: true,
+      image: true,
+      teamId: true,
+      team: { select: { id: true, name: true, code: true, image: true } },
+    },
+    take: 2500,
+  });
+
+  const normalizedTopName = normalizeText(top.name);
+  const normalizedTopTeam = normalizeText(top.teamName);
+  const exactMatches = playerAssets.filter((asset) => normalizeText(asset.name) === normalizedTopName);
+  const matchedAsset = exactMatches.find((asset) => !normalizedTopTeam || normalizeText(asset.team?.name).includes(normalizedTopTeam) || normalizedTopTeam.includes(normalizeText(asset.team?.name)))
+    || exactMatches[0]
+    || playerAssets.find((asset) => normalizeText(asset.name).includes(normalizedTopName) || normalizedTopName.includes(normalizeText(asset.name)));
+
+  const team = matchedAsset?.team || (top.teamId ? await prisma.asset.findFirst({ where: { id: top.teamId }, select: { id: true, name: true, code: true, image: true } }) : null);
+
+  return {
+    player: matchedAsset || {
+      id: `provider-player:${top.key}`,
+      name: top.name,
+      code: null,
+      image: null,
+      teamId: top.teamId,
+      team,
+    },
+    value: top.value,
+    sourceName: top.sourceName,
+    sourceUrl: top.sourceUrl,
+    source: top.source,
+    sourceCount: top.sourceCount,
+  } as LeaderRow;
+}
+
 async function buildFootballDataGoalLeaders() {
   const byPlayer = new Map<string, GoalLeaderRow>();
   const latestSnapshots = await prisma.matchStatsSnapshot.findMany({
@@ -228,46 +308,53 @@ async function buildFootballDataGoalLeaders() {
 
   const leaders = Array.from(byPlayer.values()).sort((a, b) => b.value - a.value || a.name.localeCompare(b.name, 'ar'));
   const top = leaders[0] || null;
-  if (!top) return null;
+  return top ? resolveLeaderAsset(top) : null;
+}
 
-  const playerAssets = await prisma.asset.findMany({
-    where: { type: 'PLAYER' },
-    select: {
-      id: true,
-      name: true,
-      code: true,
-      image: true,
-      teamId: true,
-      team: { select: { id: true, name: true, code: true, image: true } },
-    },
-    take: 2500,
+async function buildTheStatsAssistLeader() {
+  const byPlayer = new Map<string, GoalLeaderRow>();
+  const latestSnapshots = await prisma.matchStatsSnapshot.findMany({
+    where: { provider: 'THE_STATS_API_EXTRAS' },
+    select: { matchId: true, rawData: true, capturedAt: true },
+    orderBy: { capturedAt: 'desc' },
+    take: 600,
   });
-  const normalizedTopName = normalizeText(top.name);
-  const matchedAsset = playerAssets.find((asset) => normalizeText(asset.name) === normalizedTopName)
-    || playerAssets.find((asset) => normalizeText(asset.name).includes(normalizedTopName) || normalizedTopName.includes(normalizeText(asset.name)));
 
-  const team = matchedAsset?.team || (top.teamId ? await prisma.asset.findFirst({ where: { id: top.teamId }, select: { id: true, name: true, code: true, image: true } }) : null);
+  const seenSnapshotMatches = new Set<string>();
 
-  return {
-    player: matchedAsset || {
-      id: `provider-scorer:${top.key}`,
-      name: top.name,
-      code: null,
-      image: null,
-      teamId: top.teamId,
-      team,
-    },
-    value: top.value,
-    sourceName: top.sourceName,
-    sourceUrl: top.sourceUrl,
-    source: top.source,
-    sourceCount: top.sourceCount,
-  } as LeaderRow;
+  for (const snapshot of latestSnapshots) {
+    if (seenSnapshotMatches.has(snapshot.matchId)) continue;
+    seenSnapshotMatches.add(snapshot.matchId);
+    const rawData = snapshot.rawData as any;
+    const playerStats = Array.isArray(rawData?.normalized?.playerStats) ? rawData.normalized.playerStats : [];
+    if (!playerStats.length) continue;
+
+    for (const player of playerStats) {
+      const assists = toNumber(player?.assists);
+      if (!assists || assists <= 0) continue;
+      const name = String(player?.playerName || player?.name || '').trim();
+      if (!name) continue;
+      addPlayerMetric(byPlayer, {
+        name,
+        teamId: player?.teamId || null,
+        teamName: player?.teamName || null,
+        value: assists,
+        sourceName: 'THE_STATS_API_EXTRAS',
+        sourceUrl: 'https://thestatsapi.com/',
+        source: 'MatchStatsSnapshot.rawData.normalized.playerStats.assists',
+        example: `${snapshot.matchId}:${name}:${assists}`,
+      });
+    }
+  }
+
+  const leaders = Array.from(byPlayer.values()).sort((a, b) => b.value - a.value || a.name.localeCompare(b.name, 'ar'));
+  const top = leaders[0] || null;
+  return top ? resolveLeaderAsset(top) : null;
 }
 
 export async function GET() {
   try {
-    const [performanceRows, footballDataTopScorer] = await Promise.all([
+    const [performanceRows, footballDataTopScorer, theStatsTopAssister] = await Promise.all([
       prisma.playerPerformance.findMany({
         where: { OR: [{ goals: { gt: 0 } }, { assists: { gt: 0 } }] },
         select: {
@@ -286,15 +373,17 @@ export async function GET() {
         },
       }),
       buildFootballDataGoalLeaders(),
+      buildTheStatsAssistLeader(),
     ]);
 
     const performanceTopScorer = topLeader(performanceRows, 'goals');
-    const topAssister = topLeader(performanceRows, 'assists');
+    const performanceTopAssister = topLeader(performanceRows, 'assists');
     const topScorer = footballDataTopScorer || performanceTopScorer;
+    const topAssister = theStatsTopAssister || performanceTopAssister;
 
     return NextResponse.json({
       ok: true,
-      source: footballDataTopScorer ? 'football_data_full_goals_events' : 'database_player_performance',
+      source: theStatsTopAssister ? 'the_stats_api_extras_player_stats' : footballDataTopScorer ? 'football_data_full_goals_events' : 'database_player_performance',
       refreshSeconds: 60,
       updatedAt: new Date().toISOString(),
       sources: {
@@ -308,6 +397,17 @@ export async function GET() {
           source: 'database_player_performance',
           sourceUrl: null,
           sourceCount: performanceTopScorer?.value || 0,
+        },
+        topAssister: theStatsTopAssister ? {
+          provider: theStatsTopAssister.sourceName,
+          source: theStatsTopAssister.source,
+          sourceUrl: theStatsTopAssister.sourceUrl,
+          sourceCount: theStatsTopAssister.sourceCount,
+        } : {
+          provider: 'PlayerPerformance',
+          source: 'database_player_performance',
+          sourceUrl: null,
+          sourceCount: performanceTopAssister?.value || 0,
         },
       },
       leaders: {
