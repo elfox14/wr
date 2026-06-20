@@ -2,7 +2,9 @@
 
 import { useEffect } from 'react';
 import ProfessionalMatchPageClient from './ProfessionalMatchPageClient';
-import type { MatchPageData } from '@/lib/match-page/types';
+import type { MatchPageData, StandingRow } from '@/lib/match-page/types';
+
+const arNumber = new Intl.NumberFormat('ar-EG');
 
 function fullDate(value: string) {
   return new Intl.DateTimeFormat('ar-EG', {
@@ -12,6 +14,15 @@ function fullDate(value: string) {
     hour: '2-digit',
     minute: '2-digit',
   }).format(new Date(value));
+}
+
+function num(value: number) {
+  return arNumber.format(Number(value || 0));
+}
+
+function gd(value: number) {
+  const safe = Number(value || 0);
+  return safe > 0 ? `+${num(safe)}` : num(safe);
 }
 
 function matchClockText(data: MatchPageData) {
@@ -26,6 +37,13 @@ function matchClockCardLabel(data: MatchPageData) {
 
 function cardLabel(card: Element) {
   return String(card.querySelector('span')?.textContent || '').trim();
+}
+
+function makeText(tag: string, className: string, text: string) {
+  const node = document.createElement(tag);
+  node.className = className;
+  node.textContent = text;
+  return node;
 }
 
 function makeDateCard(value: string, labelText = 'موعد المباراة') {
@@ -150,69 +168,109 @@ function addPlayerStatsNotice(data: MatchPageData) {
   }
 }
 
-function resetThirdsList(list: HTMLElement | null) {
-  if (!list) return;
-  list.style.removeProperty('display');
-  list.style.removeProperty('grid-template-columns');
-  list.style.removeProperty('gap');
-  Array.from(list.children).forEach((child) => {
-    if (!(child instanceof HTMLElement)) return;
-    child.style.removeProperty('margin-top');
-    child.style.removeProperty('margin-bottom');
-  });
-}
-
-function makeTablesResponsive() {
+function standingsGrid() {
   const standingsSection = document.getElementById('standings') as HTMLElement | null;
-  if (!standingsSection) return;
-
+  if (!standingsSection) return { standingsSection: null, mainGrid: null, thirdsPanel: null };
   const mainGrid = Array.from(standingsSection.children).find((child) => {
     if (!(child instanceof HTMLElement)) return false;
     const text = String(child.textContent || '');
     return child.className.includes('grid') && text.includes('ترتيب المجموعة') && text.includes('أفضل الثوالث');
   }) as HTMLElement | null;
-  if (!mainGrid) return;
-
-  const panels = Array.from(mainGrid.children).filter((child) => child instanceof HTMLElement) as HTMLElement[];
+  const panels = mainGrid ? Array.from(mainGrid.children).filter((child) => child instanceof HTMLElement) as HTMLElement[] : [];
   const thirdsPanel = panels.find((panel) => String(panel.textContent || '').includes('أفضل الثوالث')) || panels[1] || null;
-  const thirdsList = thirdsPanel ? Array.from(thirdsPanel.children).find((child) => child instanceof HTMLElement && child.className.includes('space-y-2')) as HTMLElement | null : null;
+  return { standingsSection, mainGrid, thirdsPanel };
+}
+
+function makeHalf(rows: StandingRow[]) {
+  const half = document.createElement('div');
+  half.className = 'space-y-1.5';
+
+  const header = document.createElement('div');
+  header.className = 'grid items-center gap-1 rounded-xl border border-white/10 bg-white/[0.045] px-2 py-2 text-center text-[10px] font-black text-slate-400';
+  header.dir = 'rtl';
+  header.style.gridTemplateColumns = '38px minmax(92px,1fr) repeat(8,minmax(28px,40px))';
+  ['#', 'المنتخب', 'لعب', 'فاز', 'تعادل', 'خسر', 'له', 'عليه', 'فارق', 'نقاط'].forEach((label) => header.appendChild(makeText('span', '', label)));
+  half.appendChild(header);
+
+  rows.forEach((row) => {
+    const line = document.createElement('div');
+    line.className = 'grid items-center gap-1 rounded-2xl border border-[#18E58F]/60 bg-black/25 px-2 py-2 text-center text-[11px] font-black text-white shadow-inner';
+    line.dir = 'rtl';
+    line.style.gridTemplateColumns = '38px minmax(92px,1fr) repeat(8,minmax(28px,40px))';
+
+    const rank = makeText('span', 'inline-grid h-7 w-7 place-items-center rounded-full bg-[#F8C846] text-black justify-self-center', num(row.rank));
+    const team = document.createElement('span');
+    team.className = 'flex min-w-0 items-center justify-start gap-1.5 text-right text-xs font-black';
+    if (row.image) {
+      const img = document.createElement('img');
+      img.src = row.image;
+      img.alt = row.teamName;
+      img.className = 'h-4 w-6 rounded object-cover';
+      team.appendChild(img);
+    }
+    const name = makeText('b', 'truncate', row.teamName);
+    team.appendChild(name);
+
+    const values = [row.played, row.won, row.drawn, row.lost, row.goalsFor, row.goalsAgainst, row.goalDifference, row.points];
+    line.append(rank, team);
+    values.forEach((value, index) => {
+      const cell = makeText('span', `rounded-lg bg-white/[0.055] px-1 py-1 tabular-nums ${index === 7 ? 'bg-[#F8C846]/20 text-[#F8C846]' : ''} ${index === 6 && Number(value) < 0 ? 'text-rose-300' : ''}`, index === 6 ? gd(Number(value)) : num(Number(value)));
+      line.appendChild(cell);
+    });
+    half.appendChild(line);
+  });
+
+  return half;
+}
+
+function renderThirdsTable(data: MatchPageData, isDesktop: boolean) {
+  const { thirdsPanel } = standingsGrid();
+  if (!thirdsPanel || !data.thirdPlaceTable.length) return;
+
+  const oldList = Array.from(thirdsPanel.children).find((child) => child instanceof HTMLElement && child.className.includes('space-y-2')) as HTMLElement | null;
+  if (oldList) oldList.style.display = 'none';
+
+  let custom = thirdsPanel.querySelector('[data-custom-thirds-table="true"]') as HTMLElement | null;
+  if (custom) custom.remove();
+
+  custom = document.createElement('div');
+  custom.setAttribute('data-custom-thirds-table', 'true');
+  custom.className = 'mt-3 grid gap-3';
+  custom.style.gridTemplateColumns = isDesktop ? 'minmax(0,1fr) minmax(0,1fr)' : 'minmax(0,1fr)';
+
+  const midpoint = Math.ceil(data.thirdPlaceTable.length / 2);
+  const groups = isDesktop ? [data.thirdPlaceTable.slice(0, midpoint), data.thirdPlaceTable.slice(midpoint)] : [data.thirdPlaceTable];
+  groups.filter((rows) => rows.length).forEach((rows) => custom!.appendChild(makeHalf(rows)));
+  thirdsPanel.appendChild(custom);
+}
+
+function makeTablesResponsive(data: MatchPageData) {
+  const { standingsSection, mainGrid } = standingsGrid();
+  if (!standingsSection || !mainGrid) return;
   const isDesktop = window.matchMedia('(min-width: 1024px)').matches;
 
   standingsSection.style.setProperty('overflow-x', 'visible', 'important');
   standingsSection.style.setProperty('padding-bottom', '0', 'important');
   mainGrid.classList.remove('xl:grid-cols-2');
+  mainGrid.style.setProperty('display', 'grid', 'important');
+  mainGrid.style.setProperty('grid-template-columns', isDesktop ? 'minmax(0, 1fr) minmax(0, 1fr)' : 'minmax(0, 1fr)', 'important');
+  mainGrid.style.setProperty('gap', '1rem', 'important');
   mainGrid.style.setProperty('min-width', '0', 'important');
   mainGrid.style.setProperty('align-items', 'start', 'important');
 
-  if (isDesktop) {
-    mainGrid.style.setProperty('display', 'grid', 'important');
-    mainGrid.style.setProperty('grid-template-columns', 'minmax(0, 1fr) minmax(0, 1fr)', 'important');
-    mainGrid.style.setProperty('gap', '1rem', 'important');
-    if (thirdsList) {
-      thirdsList.style.setProperty('display', 'grid', 'important');
-      thirdsList.style.setProperty('grid-template-columns', 'minmax(0, 1fr) minmax(0, 1fr)', 'important');
-      thirdsList.style.setProperty('gap', '0.5rem', 'important');
-      Array.from(thirdsList.children).forEach((child) => {
-        if (!(child instanceof HTMLElement)) return;
-        child.style.setProperty('margin-top', '0', 'important');
-        child.style.setProperty('margin-bottom', '0', 'important');
-      });
-    }
-  } else {
-    mainGrid.style.setProperty('display', 'grid', 'important');
-    mainGrid.style.setProperty('grid-template-columns', 'minmax(0, 1fr)', 'important');
-    mainGrid.style.setProperty('gap', '1rem', 'important');
-    resetThirdsList(thirdsList);
-  }
+  Array.from(mainGrid.children).forEach((child) => {
+    if (!(child instanceof HTMLElement)) return;
+    child.style.setProperty('min-width', '0', 'important');
+  });
 
-  panels.forEach((panel) => panel.style.setProperty('min-width', '0', 'important'));
+  renderThirdsTable(data, isDesktop);
 }
 
 function enhanceMatchPage(data: MatchPageData) {
   arrangeInfoCards(matchClockText(data), matchClockCardLabel(data));
   compactEmptyGap();
   addPlayerStatsNotice(data);
-  makeTablesResponsive();
+  makeTablesResponsive(data);
 }
 
 export default function ProfessionalMatchPageWithDateCard({ data }: { data: MatchPageData }) {
