@@ -62,6 +62,14 @@ function providerPriority(snapshot: SnapshotLike) {
   return 9;
 }
 
+function view(state: string, rest: Omit<ReturnType<typeof baseView>, 'state' | 'raw'>) {
+  return { raw: state, state, ...rest };
+}
+
+function baseView() {
+  return { raw: '', state: '', kind: 'scheduled' as const, label: '', shortLabel: '', minute: null as number | null, isLive: false, isFinished: false, isScheduled: false };
+}
+
 export function getProviderMatchClock(match: MatchLike, snapshots: SnapshotLike[] = []) {
   const candidates = snapshots
     .map((snapshot) => ({ state: snapshotState(snapshot), minute: snapshotMinute(snapshot), priority: providerPriority(snapshot), capturedAt: snapshot.capturedAt ? new Date(String(snapshot.capturedAt)).getTime() : 0 }))
@@ -74,14 +82,14 @@ export function getProviderMatchClock(match: MatchLike, snapshots: SnapshotLike[
   const state = best?.state || normalizeMatchState(match.status, matchMinute) || 'SCHEDULED';
   const minute = best?.minute ?? matchMinute;
 
-  if (state === 'FINISHED') return { state, kind: 'finished' as const, label: 'انتهت المباراة', shortLabel: 'انتهت', minute: null, isLive: false, isFinished: true, isScheduled: false };
-  if (state === 'HT') return { state, kind: 'halftime' as const, label: 'استراحة بين الشوطين', shortLabel: 'استراحة', minute: null, isLive: false, isFinished: false, isScheduled: false };
+  if (state === 'FINISHED') return view(state, { kind: 'finished', label: 'انتهت المباراة', shortLabel: 'انتهت', minute: null, isLive: false, isFinished: true, isScheduled: false });
+  if (state === 'HT') return view(state, { kind: 'halftime', label: 'استراحة بين الشوطين', shortLabel: 'استراحة', minute: null, isLive: false, isFinished: false, isScheduled: false });
   if (state === '1H' || state === '2H' || state === 'ET' || state === 'LIVE' || state === 'IN_PLAY') {
     const safeMinute = minute !== null && minute !== undefined ? Math.floor(minute) : null;
     const phase = state === '1H' ? 'الشوط الأول' : state === '2H' ? 'الشوط الثاني' : state === 'ET' ? 'وقت إضافي' : 'مباشرة الآن';
     const minuteLabel = safeMinute && safeMinute > 0 ? `د${safeMinute.toLocaleString('ar-EG')}` : '';
-    return { state, kind: 'live' as const, label: minuteLabel ? `${phase} — ${minuteLabel}` : phase, shortLabel: minuteLabel ? `${phase} ${minuteLabel}` : phase, minute: minuteLabel ? safeMinute : null, isLive: true, isFinished: false, isScheduled: false };
+    return view(state, { kind: 'live', label: minuteLabel ? `${phase} — ${minuteLabel}` : phase, shortLabel: minuteLabel ? `${phase} ${minuteLabel}` : phase, minute: minuteLabel ? safeMinute : null, isLive: true, isFinished: false, isScheduled: false });
   }
-  if (state === 'SCHEDULED' || state === 'TIMED' || state === 'NOT_STARTED' || state === 'NS') return { state, kind: 'scheduled' as const, label: 'لم تبدأ', shortLabel: 'لم تبدأ', minute: null, isLive: false, isFinished: false, isScheduled: true };
-  return { state, kind: 'delayed' as const, label: state || 'بانتظار تحديث الحالة', shortLabel: state || 'تحديث الحالة', minute: null, isLive: false, isFinished: false, isScheduled: false };
+  if (state === 'SCHEDULED' || state === 'TIMED' || state === 'NOT_STARTED' || state === 'NS') return view(state, { kind: 'scheduled', label: 'لم تبدأ', shortLabel: 'لم تبدأ', minute: null, isLive: false, isFinished: false, isScheduled: true });
+  return view(state, { kind: 'delayed', label: state || 'بانتظار تحديث الحالة', shortLabel: state || 'تحديث الحالة', minute: null, isLive: false, isFinished: false, isScheduled: false });
 }
