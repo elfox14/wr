@@ -59,12 +59,14 @@ async function callJson(name: string, url: URL, timeoutMs = 30_000): Promise<Sta
     return { name, ok: false, status: null, durationMs: Date.now() - startedAt, url: maskUrl(url.toString()), error: String(error?.message || error).slice(0, 1000) };
   } finally { clearTimeout(timer); }
 }
-async function selectActiveMatches(minutesBack: number, minutesForward: number, limit: number) {
+function isFinishedStatus(value: any) { return FINISHED.includes(String(value || '').toUpperCase()); }
+async function selectActiveMatches(minutesBack: number, minutesForward: number, postMatchMinutes: number, limit: number) {
   const now = Date.now();
   return prisma.match.findMany({
     where: { OR: [
       { status: { in: LIVE } },
       { matchDate: { gte: new Date(now - minutesBack * 60_000), lte: new Date(now + minutesForward * 60_000) }, status: { notIn: FINISHED } },
+      { status: { in: FINISHED }, matchDate: { gte: new Date(now - postMatchMinutes * 60_000), lte: new Date(now) } },
     ] },
     include: { homeTeam: { select: { name: true, code: true } }, awayTeam: { select: { name: true, code: true } } },
     orderBy: { matchDate: 'asc' },
@@ -114,12 +116,14 @@ export async function GET(req: Request) {
   const runISportSafeCron = runISports && bool(url.searchParams.get('isportSafeCron'), true);
   const perMatchISports = bool(url.searchParams.get('perMatchISports'), Boolean(url.searchParams.get('dbMatchId') || url.searchParams.get('id') || url.searchParams.get('matchId')));
   const autoFinish = bool(url.searchParams.get('autoFinish'), true);
+  const runTheStatsPostmatch = bool(url.searchParams.get('theStatsPostmatch'), true);
   const officialTimelineMinEvents = int(url.searchParams.get('officialTimelineMinEvents'), 1, 1, 500);
   const isportStatsTimeoutMs = int(url.searchParams.get('isportStatsTimeoutMs'), 30000, 5000, 80000);
   const isportStatsWaitMs = int(url.searchParams.get('isportStatsWaitMs'), 6000, 1000, 35000);
   const limit = int(url.searchParams.get('limit'), 8, 1, 20);
   const minutesBack = int(url.searchParams.get('minutesBack'), 240, 15, 480);
   const minutesForward = int(url.searchParams.get('minutesForward'), 300, 0, 360);
+  const postMatchMinutes = int(url.searchParams.get('postMatchMinutes'), 360, 30, 720);
   const delayMs = int(url.searchParams.get('delayMs'), 250, 0, 5000);
 
   const out: any = {
@@ -130,6 +134,7 @@ export async function GET(req: Request) {
     matchesFound: 0,
     policy: {
       theStats: 'primary source for live-stats, timeline, score, official lineups, post-match stats, and events',
+      theStatsPostmatch: runTheStatsPostmatch ? `enabled for FINISHED matches from the last ${postMatchMinutes} minutes` : 'disabled',
       iSport: runISportSafeCron ? 'cron-safe visual/fallback layer; no heavy per-match pulls by default' : 'disabled unless explicitly enabled',
       perMatchISports,
       iSportMapping: mapISports ? 'enabled to map animationMatchId values' : 'disabled',
@@ -150,7 +155,7 @@ export async function GET(req: Request) {
     out.iSportLiveMap = await callJson('isports_live_map', liveMap, 15_000);
   }
 
-  const matches = await selectActiveMatches(minutesBack, minutesForward, limit);
+  const matches = await selectActiveMatches(minutesBack, minutesForward, postMatchMinutes, limit);
   out.matchesFound = matches.length;
 
   if (runTheStats) {
@@ -200,6 +205,7 @@ export async function GET(req: Request) {
       resolvedTheStatsMatchId: providerIds.get(match.id) || null,
       officialTheStatsTimelineAvailable: hasOfficialTheStatsTimeline(theStatsMatchResult, officialTimelineMinEvents),
       theStatsAutoFinish: null,
+      theStatsPostmatchFinal: null,
       isportsTimeline: null,
       isportsStats: null,
       isportsVisualStats: null,
@@ -207,6 +213,16 @@ export async function GET(req: Request) {
     };
 
     if (autoFinish && theStatsMatchResult) item.theStatsAutoFinish = await autoFinishFromOfficialTimeline(match, theStatsMatchResult, dryRun);
+
+    const finishedBeforeSync = isFinishedStatus(match.status);
+    const finishedByTheStatsNow = Boolean(item.theStatsAutoFinish?.shouldFinish);
+    if (runTheStats && runTheStatsPostmatch && (finishedBeforeSync || finishedByTheStatsNow)) {
+      const finalCatchup = withSecrets(new URL('/api/admin/the-stats-live-catchup', origin), key);
+      finalCatchup.searchParams.set('matchId', match.id);
+      finalCatchup.searchParams.set('dryRun', String(dryRun));
+      finalCatchup.searchParams.set('skipSimilarExisting', 'true');
+      item.theStatsPostmatchFinal = await callJson('the_stats_postmatch_final_by_match_id', finalCatchup, 30_000);
+    }
 
     if (perMatchISports && runISports && match.animationMatchId) {
       const isports = withSecrets(new URL('/api/internal/live-ingest/isports/remote-frame-pull-v4', origin), key);
