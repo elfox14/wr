@@ -263,15 +263,36 @@ function statusKind(status: string): MatchStatusKind {
   return 'delayed';
 }
 
+function elapsedMinuteFromKickoff(match: any) {
+  const startMs = new Date(match.matchDate || '').getTime();
+  if (!Number.isFinite(startMs)) return null;
+  const elapsed = Math.floor((Date.now() - startMs) / 60_000);
+  if (!Number.isFinite(elapsed) || elapsed < 0) return null;
+  return Math.max(1, Math.min(130, elapsed));
+}
+
+function safeLiveMinute(match: any, rawStatus: string, rawMinute: number | null) {
+  const minute = rawMinute === null || rawMinute === undefined ? null : Math.floor(rawMinute);
+  const elapsed = elapsedMinuteFromKickoff(match);
+  if (minute === null) return elapsed && elapsed <= 130 ? elapsed : null;
+  if (elapsed !== null && elapsed < 15 && minute > elapsed + 6) return elapsed;
+  if (elapsed !== null && minute > elapsed + 12 && minute >= 30) return elapsed;
+  const status = normalizeStatusValue(rawStatus);
+  if ((status === '1H' || status.includes('FIRST')) && minute > 55) return elapsed && elapsed < 55 ? elapsed : null;
+  if ((status === '2H' || status.includes('SECOND')) && minute < 40) return elapsed && elapsed >= 40 ? elapsed : null;
+  return minute;
+}
+
 export function buildStatusView(match: any, sources: any[]): MatchStatusView {
   const fromSource = statusFromSnapshots(sources);
   const raw = fromSource?.status || normalizeStatusValue(match.status || 'SCHEDULED');
-  const minute = fromSource?.minute ?? sources.map(snapshotMinute).find((value) => value !== null) ?? null;
+  const rawMinute = fromSource?.minute ?? sources.map(snapshotMinute).find((value) => value !== null) ?? null;
   const kind = statusKind(raw);
   if (kind === 'finished') return { raw, kind, label: 'انتهت المباراة', shortLabel: 'انتهت', minute: null, isLive: false, isFinished: true, isScheduled: false };
   if (kind === 'halftime') return { raw, kind, label: 'استراحة بين الشوطين', shortLabel: 'استراحة', minute: null, isLive: false, isFinished: false, isScheduled: false };
   if (kind === 'live') {
     const phase = raw === '1H' ? 'الشوط الأول' : raw === '2H' ? 'الشوط الثاني' : raw === 'ET' ? 'وقت إضافي' : 'مباشرة الآن';
+    const minute = safeLiveMinute(match, raw, rawMinute);
     const minuteLabel = minute ? `د${Math.floor(minute).toLocaleString('ar-EG')}` : '';
     return { raw, kind, label: minute ? `${phase} — ${minuteLabel}` : phase, shortLabel: minute ? `${phase} ${minuteLabel}` : phase, minute: minute ? Math.floor(minute) : null, isLive: true, isFinished: false, isScheduled: false };
   }
