@@ -8,6 +8,7 @@ import HomeGroupStandingsWidget from '@/components/HomeGroupStandingsWidget';
 import HomeWorldCupRegionsArabCard from '@/components/HomeWorldCupRegionsArabCard';
 import HomeQualificationScenariosCard from '@/components/home/HomeQualificationScenariosCard';
 import HomeSeoSection from '@/components/home/HomeSeoSection';
+import HomeMatchScheduleTable from '@/components/home/HomeMatchScheduleTable';
 import { getTeamFlagUrl } from '@/lib/teamFlags';
 
 type Team = {
@@ -350,18 +351,22 @@ function MatchCenter({ fallbackMatches = [], nextMatch = null }: { fallbackMatch
       const bLive = isConfirmedLive(b) ? 0 : 1;
       if (aLive !== bLive) return aLive - bLive;
       return matchTime(a) - matchTime(b);
-    }).slice(0, 5);
+    }).slice(0, 8);
   }, [matches, fallbackMatches]);
 
   const primary = displayMatches[0] || nextMatch;
+  const scheduleMatches = primary ? uniqueMatches([...displayMatches, primary]) : displayMatches;
   const rest = displayMatches.filter((match) => matchKey(match) !== matchKey(primary)).slice(0, 4);
 
   return (
     <section className="overflow-hidden rounded-[1.6rem] border border-[#FFD700]/15 bg-[radial-gradient(circle_at_top,rgba(255,215,0,0.10),transparent_35%),linear-gradient(180deg,rgba(255,255,255,0.055),rgba(0,0,0,0.22))] p-3 shadow-[0_18px_50px_rgba(0,0,0,0.28)] backdrop-blur sm:p-4">
       {primary ? (
-        <div className="space-y-3">
-          <MatchRow match={primary} now={now} variant={isConfirmedLive(primary) ? 'live' : 'primary'} />
-          {rest.length ? <div className="grid gap-2 sm:grid-cols-2">{rest.map((match) => <MatchRow key={matchKey(match)} match={match} now={now} />)}</div> : null}
+        <div className="grid gap-3 xl:grid-cols-[minmax(0,1.18fr)_minmax(22rem,.82fr)]">
+          <div className="min-w-0 space-y-3">
+            <MatchRow match={primary} now={now} variant={isConfirmedLive(primary) ? 'live' : 'primary'} />
+            {rest.length ? <div className="grid gap-2 sm:grid-cols-2">{rest.map((match) => <MatchRow key={matchKey(match)} match={match} now={now} />)}</div> : null}
+          </div>
+          <HomeMatchScheduleTable matches={scheduleMatches} now={now} />
         </div>
       ) : (
         <div className="rounded-3xl border border-white/10 bg-black/25 p-5 text-center">
@@ -382,12 +387,14 @@ function QuickHomeNav() {
   ];
 
   return (
-    <nav className="grid grid-cols-2 gap-2 sm:grid-cols-4" aria-label="homepage quick links">
-      {items.map((item) => (
-        <Link key={item.href} href={item.href} className="mobile-tap rounded-2xl border border-white/10 bg-white/[0.045] px-3 py-2.5 text-center text-[11px] font-black text-white transition hover:border-[#0FF0FC]/30 hover:bg-white/[0.075]">
-          {item.label}
-        </Link>
-      ))}
+    <nav className="sticky top-0 z-40 -mx-3 rounded-b-3xl border-b border-[#00FF88]/15 bg-[#001b12]/90 px-3 py-2 shadow-[0_16px_40px_rgba(0,0,0,0.22)] backdrop-blur sm:-mx-4 sm:px-4 lg:-mx-6 lg:px-6" aria-label="homepage quick links">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        {items.map((item) => (
+          <Link key={item.href} href={item.href} className="mobile-tap rounded-2xl border border-[#00FF88]/25 bg-white/[0.045] px-3 py-2.5 text-center text-[11px] font-black text-white transition hover:border-[#0FF0FC]/40 hover:bg-white/[0.075]">
+            {item.label}
+          </Link>
+        ))}
+      </div>
     </nav>
   );
 }
@@ -399,19 +406,20 @@ export default function HomeClientSportsLiveFocus({ upcomingMatches, tickerMatch
   const mergedHomeMatches = useMemo(() => uniqueMatches([...safeTickerMatches, ...safeUpcomingMatches, ...(safeNextMatch ? [safeNextMatch] : [])]), [safeTickerMatches, safeUpcomingMatches, safeNextMatch]);
 
   return (
-    <main dir="rtl" className="mx-auto max-w-7xl space-y-4 px-3 pb-8 pt-3 sm:space-y-6 sm:px-4 sm:py-5 lg:px-6">
+    <main dir="rtl" className="mx-auto max-w-7xl space-y-4 px-3 pb-8 pt-0 sm:space-y-6 sm:px-4 sm:pb-5 lg:px-6">
       <QuickHomeNav />
-      <MatchCenter fallbackMatches={safeUpcomingMatches} nextMatch={safeNextMatch} />
       <div id="ticker">
         <HomeLiveMatchTicker matches={safeTickerMatches} />
       </div>
+      <MatchCenter fallbackMatches={safeUpcomingMatches} nextMatch={safeNextMatch} />
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3 lg:items-start lg:gap-5">
         <div className="space-y-4 lg:col-span-2">
           <HomeWorldCupRegionsArabCard />
         </div>
         <div id="standings" className="space-y-3 lg:col-span-1">
-          <HomeGroupStandingsWidget compact />
-          <HomeQualificationScenariosCard matches={mergedHomeMatches} />
+          <HomeGroupStandingsWidget compact>
+            <HomeQualificationScenariosCard matches={mergedHomeMatches} />
+          </HomeGroupStandingsWidget>
         </div>
       </div>
       <div id="stats">
