@@ -24,12 +24,19 @@ function int(value: string | null, fallback: number, min: number, max: number) {
 function endpointMode(value: string | null): 'essential' | 'full' {
   return value === 'full' || value === 'all' ? 'full' : 'essential';
 }
+function providerIdParam(url: URL) {
+  const value = url.searchParams.get('providerMatchId') || url.searchParams.get('theStatsMatchId') || url.searchParams.get('providerId') || '';
+  if (!value.trim()) return '';
+  const trimmed = value.trim();
+  return trimmed.startsWith('mt_') ? trimmed : `mt_${trimmed.replace(/^mt_/i, '')}`;
+}
 
 export async function GET(req: Request) {
   const auth = await requireAdmin(req);
   if (!auth.authorized) return auth.error;
   const url = new URL(req.url);
   const matchId = url.searchParams.get('matchId') || url.searchParams.get('dbMatchId') || url.searchParams.get('id') || '';
+  const forcedProviderMatchId = providerIdParam(url);
   const dryRun = bool(url.searchParams.get('dryRun'), false);
   const save = bool(url.searchParams.get('save'), true);
   const includeRaw = bool(url.searchParams.get('includeRaw'), false);
@@ -50,7 +57,8 @@ export async function GET(req: Request) {
     for (const match of matches) {
       if (!FINISHED.includes(String(match.status || '').toUpperCase()) && !matchId) continue;
       try {
-        const result = await collectTheStatsMatchExtras(match, { dryRun, save, includeRaw, timeoutMs, query, endpointMode: mode, delayMs });
+        const matchForProvider = forcedProviderMatchId ? { ...match, externalId: forcedProviderMatchId } : match;
+        const result = await collectTheStatsMatchExtras(matchForProvider, { dryRun, save, includeRaw, timeoutMs, query, endpointMode: mode, delayMs });
         results.push(result);
         if ((result as any).rateLimited) break;
       } catch (error: any) {
@@ -62,7 +70,8 @@ export async function GET(req: Request) {
 
     const successful = results.filter((item: any) => item.ok);
     const rateLimited = results.some((item: any) => item.rateLimited || item.error?.status === 429);
-    return json({ ok: true, provider: 'THE_STATS_API', mode: 'match_postmatch_extras', endpointMode: mode, delayMs, dryRun, saved: !dryRun && save, rateLimited, advice: rateLimited ? 'TheStats rate limit reached. Wait 1-2 minutes, then retry. Default mode now uses only essential endpoints sequentially.' : undefined, matchesFound: matches.length, successful: successful.length, failed: results.length - successful.length, snapshotsSaved: successful.filter((item: any) => item.saved).length, results, config: getTheStatsApiConfigStatus() });
+    const unresolved = results.some((item: any) => item.error === 'Could not resolve TheStats provider match id');
+    return json({ ok: true, provider: 'THE_STATS_API', mode: 'match_postmatch_extras', endpointMode: mode, delayMs, forcedProviderMatchId: forcedProviderMatchId || null, dryRun, saved: !dryRun && save, rateLimited, unresolved, advice: rateLimited ? 'TheStats rate limit reached. Wait 1-2 minutes, then retry. Default mode uses only essential endpoints sequentially.' : unresolved ? 'Could not match this database match to TheStats automatically. Retry with providerMatchId=mt_xxx from TheStats.' : undefined, matchesFound: matches.length, successful: successful.length, failed: results.length - successful.length, snapshotsSaved: successful.filter((item: any) => item.saved).length, results, config: getTheStatsApiConfigStatus() });
   } catch (error: any) {
     return json({ ok: false, provider: 'THE_STATS_API', mode: 'match_postmatch_extras', error: safeTheStatsApiError(error), config: getTheStatsApiConfigStatus() }, Number(error?.status) || 500);
   }
