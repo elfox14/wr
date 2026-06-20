@@ -12,14 +12,8 @@ const DEFAULT_PUBLIC_ORIGIN = 'https://worldcup.mcprim.com';
 
 type Stage = { name: string; ok?: boolean; skipped?: boolean; url?: string; status?: number | null; body?: any; error?: string; durationMs?: number };
 
-function bool(value: string | null, fallback = true) {
-  if (value === null) return fallback;
-  return !['false', '0', 'no', 'off'].includes(value.toLowerCase());
-}
-function int(value: string | null, fallback: number, min: number, max: number) {
-  const parsed = Number(value ?? fallback);
-  return Number.isFinite(parsed) ? Math.max(min, Math.min(max, Math.floor(parsed))) : fallback;
-}
+function bool(value: string | null, fallback = true) { if (value === null) return fallback; return !['false', '0', 'no', 'off'].includes(value.toLowerCase()); }
+function int(value: string | null, fallback: number, min: number, max: number) { const parsed = Number(value ?? fallback); return Number.isFinite(parsed) ? Math.max(min, Math.min(max, Math.floor(parsed))) : fallback; }
 function secret() { return String(process.env.CRON_SECRET || process.env.ADMIN_API_SECRET || '').trim(); }
 function maskUrl(value: string) { return value.replace(/(key=|adminSecret=|cronSecret=)[^&]+/gi, '$1***').replace(/([?&]token=)[^&]+/gi, '$1***'); }
 function json(value: unknown, status = 200) { return NextResponse.json(value, { status, headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } }); }
@@ -29,7 +23,7 @@ function withSecrets(url: URL, key: string) { url.searchParams.set('key', key); 
 async function callJson(name: string, url: URL, timeoutMs = 30_000): Promise<Stage> { const startedAt = Date.now(); const controller = new AbortController(); const timer = setTimeout(() => controller.abort(), timeoutMs); try { const res = await fetch(url.toString(), { cache: 'no-store', signal: controller.signal, headers: { accept: 'application/json' } }); const text = await res.text(); let body: any = text; try { body = JSON.parse(text); } catch {} return { name, ok: res.ok, status: res.status, durationMs: Date.now() - startedAt, url: maskUrl(url.toString()), body }; } catch (error: any) { return { name, ok: false, status: null, durationMs: Date.now() - startedAt, url: maskUrl(url.toString()), error: String(error?.message || error).slice(0, 1000) }; } finally { clearTimeout(timer); } }
 function isFinishedStatus(value: any) { return FINISHED.includes(String(value || '').toUpperCase()); }
 function hasRateLimit(stage: any) { const body = stage?.body || {}; const text = JSON.stringify(body).toLowerCase(); return Number(stage?.status) === 429 || text.includes('rate_limited') || text.includes('rate limit'); }
-async function selectActiveMatches(minutesBack: number, minutesForward: number, postMatchMinutes: number, limit: number) { const now = Date.now(); return prisma.match.findMany({ where: { OR: [ { status: { in: LIVE } }, { matchDate: { gte: new Date(now - minutesBack * 60_000), lte: new Date(now + minutesForward * 60_000) }, status: { notIn: FINISHED } }, { status: { in: FINISHED }, matchDate: { gte: new Date(now - postMatchMinutes * 60_000), lte: new Date(now) } }, ] }, include: { homeTeam: { select: { name: true, code: true } }, awayTeam: { select: { name: true, code: true } } }, orderBy: { matchDate: 'asc' }, take: limit }); }
+async function selectActiveMatches(matchId: string, minutesBack: number, minutesForward: number, postMatchMinutes: number, limit: number) { const now = Date.now(); const include = { homeTeam: { select: { name: true, code: true } }, awayTeam: { select: { name: true, code: true } } }; if (matchId) return prisma.match.findMany({ where: { id: matchId }, include, take: 1 }); return prisma.match.findMany({ where: { OR: [ { status: { in: LIVE } }, { matchDate: { gte: new Date(now - minutesBack * 60_000), lte: new Date(now + minutesForward * 60_000) }, status: { notIn: FINISHED } }, { status: { in: FINISHED }, matchDate: { gte: new Date(now - postMatchMinutes * 60_000), lte: new Date(now) } }, ] }, include, orderBy: { matchDate: 'asc' }, take: limit }); }
 function resultsFromCatchupBody(body: any): any[] { return Array.isArray(body?.results) ? body.results : []; }
 function catchupResultFromBody(body: any, matchId: string) { return resultsFromCatchupBody(body).find((item: any) => String(item?.matchId || '') === matchId) || null; }
 function resolvedIdsFromTheStats(body: any) { const map = new Map<string, string>(); for (const item of resultsFromCatchupBody(body)) if (item?.matchId && item?.resolvedProviderMatchId) map.set(String(item.matchId), String(item.resolvedProviderMatchId)); return map; }
@@ -45,6 +39,7 @@ export async function GET(req: Request) {
 
   const url = new URL(req.url);
   const origin = publicOrigin(req, url);
+  const requestedMatchId = url.searchParams.get('matchId') || url.searchParams.get('dbMatchId') || url.searchParams.get('id') || '';
   const dryRun = bool(url.searchParams.get('dryRun'), false);
   const forceCoreISports = bool(url.searchParams.get('forceCoreISports'), true);
   const runTheStats = bool(url.searchParams.get('theStats'), true);
@@ -57,32 +52,33 @@ export async function GET(req: Request) {
   const runDedupe = bool(url.searchParams.get('dedupe'), true);
   const mapISports = forceCoreISports || bool(url.searchParams.get('mapISports'), true);
   const runISportSafeCron = runISports && bool(url.searchParams.get('isportSafeCron'), true);
-  const perMatchISports = bool(url.searchParams.get('perMatchISports'), Boolean(url.searchParams.get('dbMatchId') || url.searchParams.get('id') || url.searchParams.get('matchId')));
+  const perMatchISports = bool(url.searchParams.get('perMatchISports'), Boolean(requestedMatchId));
   const autoFinish = bool(url.searchParams.get('autoFinish'), true);
   const runTheStatsPostmatch = bool(url.searchParams.get('theStatsPostmatch'), true);
   const officialTimelineMinEvents = int(url.searchParams.get('officialTimelineMinEvents'), 1, 1, 500);
   const isportStatsTimeoutMs = int(url.searchParams.get('isportStatsTimeoutMs'), 30000, 5000, 80000);
   const isportStatsWaitMs = int(url.searchParams.get('isportStatsWaitMs'), 6000, 1000, 35000);
-  const limit = int(url.searchParams.get('limit'), 3, 1, 20);
+  const limit = requestedMatchId ? 1 : int(url.searchParams.get('limit'), 3, 1, 20);
   const minutesBack = int(url.searchParams.get('minutesBack'), 240, 15, 480);
   const minutesForward = int(url.searchParams.get('minutesForward'), 300, 0, 360);
   const postMatchMinutes = int(url.searchParams.get('postMatchMinutes'), 360, 30, 720);
   const delayMs = int(url.searchParams.get('delayMs'), 1000, 0, 5000);
 
-  const out: any = { ok: true, mode: 'live_match_full_sync_light', dryRun, publicOrigin: origin, matchesFound: 0, policy: { theStats: 'primary lightweight live source for live-stats, timeline, score, and events', theStatsExtras: runTheStatsExtras ? 'enabled only when explicitly requested or for finished matches below' : 'disabled by default during live to avoid TheStats rate limits', theStatsPostmatch: runTheStatsPostmatch ? `enabled for FINISHED matches from the last ${postMatchMinutes} minutes` : 'disabled', lineups: runLineups ? 'enabled' : 'disabled by default during live to reduce API calls', iSport: runISportSafeCron ? 'cron-safe visual/fallback layer' : 'disabled unless explicitly enabled', database: 'frontend reads database snapshots/events only', officialTimelineMinEvents }, iSportLiveMap: null, iSportSafeSync: null, theStatsCatchup: null, theStatsLineups: null, perMatch: [] as any[] };
+  const out: any = { ok: true, mode: 'live_match_full_sync_light', dryRun, requestedMatchId: requestedMatchId || null, publicOrigin: origin, matchesFound: 0, policy: { theStats: 'primary lightweight live source for live-stats, timeline, score, and events', theStatsExtras: runTheStatsExtras ? 'enabled only when explicitly requested or for finished matches below' : 'disabled by default during live to avoid TheStats rate limits', theStatsPostmatch: runTheStatsPostmatch ? `enabled for FINISHED matches from the last ${postMatchMinutes} minutes` : 'disabled', lineups: runLineups ? 'enabled' : 'disabled by default during live to reduce API calls', iSport: runISportSafeCron ? 'cron-safe visual/fallback layer' : 'disabled unless explicitly enabled', database: 'frontend reads database snapshots/events only', officialTimelineMinEvents }, iSportLiveMap: null, iSportSafeSync: null, theStatsCatchup: null, theStatsLineups: null, perMatch: [] as any[] };
 
-  if (mapISports) { const liveMap = withSecrets(new URL('/api/cron/live-market-sync', origin), key); liveMap.searchParams.set('forceLive', 'true'); liveMap.searchParams.set('forceProviderFetch', 'false'); out.iSportLiveMap = await callJson('isports_live_map', liveMap, 15_000); }
+  if (mapISports && !requestedMatchId) { const liveMap = withSecrets(new URL('/api/cron/live-market-sync', origin), key); liveMap.searchParams.set('forceLive', 'true'); liveMap.searchParams.set('forceProviderFetch', 'false'); out.iSportLiveMap = await callJson('isports_live_map', liveMap, 15_000); }
+  else if (mapISports && requestedMatchId) out.iSportLiveMap = { skipped: true, reason: 'Specific matchId provided; global iSport live map skipped' };
 
-  const matches = await selectActiveMatches(minutesBack, minutesForward, postMatchMinutes, limit);
+  const matches = await selectActiveMatches(requestedMatchId, minutesBack, minutesForward, postMatchMinutes, limit);
   out.matchesFound = matches.length;
 
-  if (runTheStats) { const catchup = withSecrets(new URL('/api/admin/the-stats-live-catchup', origin), key); catchup.searchParams.set('dryRun', String(dryRun)); catchup.searchParams.set('limit', String(limit)); catchup.searchParams.set('minutesBack', String(minutesBack)); catchup.searchParams.set('minutesForward', String(minutesForward)); catchup.searchParams.set('skipSimilarExisting', 'true'); out.theStatsCatchup = await callJson('the_stats_live_stats_and_timeline', catchup, 30_000); }
+  if (runTheStats) { const catchup = withSecrets(new URL('/api/admin/the-stats-live-catchup', origin), key); catchup.searchParams.set('dryRun', String(dryRun)); if (requestedMatchId) catchup.searchParams.set('matchId', requestedMatchId); else { catchup.searchParams.set('limit', String(limit)); catchup.searchParams.set('minutesBack', String(minutesBack)); catchup.searchParams.set('minutesForward', String(minutesForward)); } catchup.searchParams.set('skipSimilarExisting', 'true'); out.theStatsCatchup = await callJson('the_stats_live_stats_and_timeline', catchup, 30_000); }
   const theStatsBlocked = hasRateLimit(out.theStatsCatchup);
 
-  if (runLineups && !theStatsBlocked) { const lineups = withSecrets(new URL('/api/admin/the-stats-lineups-sync', origin), key); lineups.searchParams.set('dryRun', String(dryRun)); lineups.searchParams.set('limit', String(Math.min(limit, 2))); lineups.searchParams.set('minutesBack', String(Math.min(minutesBack, 180))); lineups.searchParams.set('minutesForward', String(Math.min(Math.max(minutesForward, 120), 360))); out.theStatsLineups = await callJson('the_stats_official_lineups', lineups, 22_000); }
+  if (runLineups && !theStatsBlocked) { const lineups = withSecrets(new URL('/api/admin/the-stats-lineups-sync', origin), key); lineups.searchParams.set('dryRun', String(dryRun)); if (requestedMatchId) lineups.searchParams.set('matchId', requestedMatchId); else { lineups.searchParams.set('limit', String(Math.min(limit, 2))); lineups.searchParams.set('minutesBack', String(Math.min(minutesBack, 180))); lineups.searchParams.set('minutesForward', String(Math.min(Math.max(minutesForward, 120), 360))); } out.theStatsLineups = await callJson('the_stats_official_lineups', lineups, 22_000); }
   else if (runLineups) out.theStatsLineups = { skipped: true, reason: 'TheStats rate limited; lineups skipped to protect quota' };
 
-  if (runISportSafeCron) { const safe = withSecrets(new URL('/api/cron/isports-live-sync', origin), key); safe.searchParams.set('take', String(int(url.searchParams.get('isportsTake'), 2, 1, 5))); safe.searchParams.set('save', String(!dryRun)); safe.searchParams.set('replace', 'true'); safe.searchParams.set('includeTimeline', 'true'); safe.searchParams.set('includeFlash', String(runISportStats)); safe.searchParams.set('asyncFlash', 'true'); safe.searchParams.set('includeLive', String(runISportVisualStats)); safe.searchParams.set('asyncLive', 'true'); safe.searchParams.set('timeoutMs', String(isportStatsTimeoutMs)); safe.searchParams.set('waitMs', String(isportStatsWaitMs)); out.iSportSafeSync = await callJson('isports_safe_visual_fallback', safe, 12_000); }
+  if (runISportSafeCron) { const safe = withSecrets(new URL('/api/cron/isports-live-sync', origin), key); safe.searchParams.set('take', String(int(url.searchParams.get('isportsTake'), requestedMatchId ? 1 : 2, 1, 5))); safe.searchParams.set('save', String(!dryRun)); safe.searchParams.set('replace', 'true'); safe.searchParams.set('includeTimeline', 'true'); safe.searchParams.set('includeFlash', String(runISportStats)); safe.searchParams.set('asyncFlash', 'true'); safe.searchParams.set('includeLive', String(runISportVisualStats)); safe.searchParams.set('asyncLive', 'true'); safe.searchParams.set('timeoutMs', String(isportStatsTimeoutMs)); safe.searchParams.set('waitMs', String(isportStatsWaitMs)); out.iSportSafeSync = await callJson('isports_safe_visual_fallback', safe, 12_000); }
 
   const providerIds = resolvedIdsFromTheStats((out.theStatsCatchup as any)?.body);
   for (const [index, match] of matches.entries()) {
