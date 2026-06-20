@@ -107,6 +107,8 @@ export async function GET(req: Request) {
   const dryRun = bool(url.searchParams.get('dryRun'), false);
   const forceCoreISports = bool(url.searchParams.get('forceCoreISports'), true);
   const runTheStats = bool(url.searchParams.get('theStats'), true);
+  const runTheStatsExtras = bool(url.searchParams.get('theStatsExtras'), true);
+  const runTheStatsExtrasRaw = bool(url.searchParams.get('theStatsExtrasRaw'), false);
   const runLineups = bool(url.searchParams.get('lineups'), true);
   const runISports = forceCoreISports || bool(url.searchParams.get('isports'), true);
   const runISportStats = forceCoreISports || bool(url.searchParams.get('isportStats'), true);
@@ -134,6 +136,7 @@ export async function GET(req: Request) {
     matchesFound: 0,
     policy: {
       theStats: 'primary source for live-stats, timeline, score, official lineups, post-match stats, and events',
+      theStatsExtras: runTheStatsExtras ? 'enabled: shotmap, player stats, detailed events, match info, standings, and debug summaries saved in rawData only' : 'disabled',
       theStatsPostmatch: runTheStatsPostmatch ? `enabled for FINISHED matches from the last ${postMatchMinutes} minutes` : 'disabled',
       iSport: runISportSafeCron ? 'cron-safe visual/fallback layer; no heavy per-match pulls by default' : 'disabled unless explicitly enabled',
       perMatchISports,
@@ -206,6 +209,7 @@ export async function GET(req: Request) {
       officialTheStatsTimelineAvailable: hasOfficialTheStatsTimeline(theStatsMatchResult, officialTimelineMinEvents),
       theStatsAutoFinish: null,
       theStatsPostmatchFinal: null,
+      theStatsExtras: null,
       isportsTimeline: null,
       isportsStats: null,
       isportsVisualStats: null,
@@ -222,6 +226,16 @@ export async function GET(req: Request) {
       finalCatchup.searchParams.set('dryRun', String(dryRun));
       finalCatchup.searchParams.set('skipSimilarExisting', 'true');
       item.theStatsPostmatchFinal = await callJson('the_stats_postmatch_final_by_match_id', finalCatchup, 30_000);
+    }
+
+    if (runTheStats && runTheStatsExtras) {
+      const extras = withSecrets(new URL('/api/admin/match-extra-data', origin), key);
+      extras.searchParams.set('matchId', match.id);
+      extras.searchParams.set('dryRun', String(dryRun));
+      extras.searchParams.set('save', String(!dryRun));
+      extras.searchParams.set('includeRaw', String(runTheStatsExtrasRaw));
+      extras.searchParams.set('timeoutMs', '15000');
+      item.theStatsExtras = await callJson('the_stats_match_extra_data', extras, 80_000);
     }
 
     if (perMatchISports && runISports && match.animationMatchId) {
