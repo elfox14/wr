@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { getTeamFlagUrl } from '@/lib/teamFlags';
 
@@ -109,12 +109,7 @@ function pickNumber(...values: unknown[]) {
   return null;
 }
 
-function percent(numerator?: number | null, denominator?: number | null) {
-  if (typeof numerator !== 'number' || typeof denominator !== 'number' || !Number.isFinite(numerator) || !Number.isFinite(denominator) || denominator <= 0) return null;
-  return Math.max(0, Math.min(100, (numerator / denominator) * 100));
-}
-
-function short(value?: string | null, max = 46) {
+function short(value?: string | null, max = 56) {
   const text = String(value || '').replace(/\s+/g, ' ').trim();
   return text.length > max ? `${text.slice(0, max - 1)}…` : text;
 }
@@ -196,17 +191,11 @@ function rankThirds(groups: GroupData[]) {
     .map((row, index) => ({ ...row, rank: index + 1 }));
 }
 
-function matchTitle(match?: Match | null) {
-  if (!match) return 'مباراة غير محددة';
-  return `${teamName(match.homeTeam)} × ${teamName(match.awayTeam)}`;
-}
-
 function currentMatchSnapshot(match?: Match | null, demo?: DemoData | null) {
   const matchId = String(match?.id || '');
   const fromMatch = Array.isArray(match?.statsSnapshots) ? match?.statsSnapshots?.[0] : null;
   if (fromMatch) return fromMatch;
-  const fromDemo = demo?.matches?.find((item) => String(item.id || '') === matchId)?.statsSnapshots?.[0];
-  return fromDemo || null;
+  return demo?.matches?.find((item) => String(item.id || '') === matchId)?.statsSnapshots?.[0] || null;
 }
 
 async function fetchJson(url: string) {
@@ -215,18 +204,35 @@ async function fetchJson(url: string) {
   return response.json();
 }
 
-function SectionShell({ title, eyebrow, action, children }: { title: string; eyebrow?: string; action?: React.ReactNode; children: React.ReactNode }) {
+function LayoutBlock({ id, number, title, subtitle, children }: { id: string; number: string; title: string; subtitle: string; children: ReactNode }) {
   return (
-    <section className="overflow-hidden rounded-[1.7rem] border border-white/10 bg-white/[0.045] p-3 text-white shadow-[0_18px_55px_rgba(0,0,0,0.22)] backdrop-blur sm:p-4">
+    <section id={id} className="scroll-mt-28 space-y-3">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+        <div className="flex items-start gap-3">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl border border-[#FFD700]/25 bg-[#FFD700]/10 text-sm font-black text-[#FFD700]">{number}</span>
+          <div>
+            <h2 className="text-xl font-black text-white sm:text-2xl">{title}</h2>
+            <p className="mt-1 text-xs font-bold leading-6 text-gray-400 sm:text-sm">{subtitle}</p>
+          </div>
+        </div>
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function Card({ title, eyebrow, action, children, className = '' }: { title: string; eyebrow?: string; action?: ReactNode; children: ReactNode; className?: string }) {
+  return (
+    <div className={`overflow-hidden rounded-[1.7rem] border border-white/10 bg-white/[0.045] p-3 text-white shadow-[0_18px_55px_rgba(0,0,0,0.22)] backdrop-blur sm:p-4 ${className}`}>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div>
           {eyebrow ? <div className="text-[9px] font-black uppercase tracking-[0.18em] text-[#0FF0FC]">{eyebrow}</div> : null}
-          <h2 className="mt-0.5 text-base font-black sm:text-lg">{title}</h2>
+          <h3 className="mt-0.5 text-base font-black sm:text-lg">{title}</h3>
         </div>
         {action}
       </div>
       {children}
-    </section>
+    </div>
   );
 }
 
@@ -274,6 +280,66 @@ function MetricBar({ label, home, away, homeLabel, awayLabel }: { label: string;
   );
 }
 
+function StatTile({ label, value, sub, tone = 'white' }: { label: string; value: string; sub: string; tone?: 'white' | 'green' | 'gold' | 'cyan' | 'red' }) {
+  const toneClass = {
+    white: 'border-white/10 bg-white/[0.045] text-white',
+    green: 'border-[#00FF88]/25 bg-[#00FF88]/10 text-[#00FF88]',
+    gold: 'border-[#FFD700]/25 bg-[#FFD700]/10 text-[#FFD700]',
+    cyan: 'border-[#0FF0FC]/25 bg-[#0FF0FC]/10 text-[#0FF0FC]',
+    red: 'border-red-300/25 bg-red-400/10 text-red-100',
+  }[tone];
+  return (
+    <div className={`rounded-2xl border p-3 ${toneClass}`}>
+      <div className="text-[10px] font-black opacity-80">{label}</div>
+      <div className="mt-1 text-2xl font-black leading-none">{value}</div>
+      <div className="mt-1 text-[9px] font-bold text-gray-400">{sub}</div>
+    </div>
+  );
+}
+
+function DashboardNav() {
+  const items = [
+    ['live', 'المباشر'],
+    ['qualification', 'التأهل'],
+    ['intelligence', 'التحليل'],
+    ['market', 'السوق والنجوم'],
+    ['approval', 'الموافقة'],
+  ];
+  return (
+    <div className="sticky top-2 z-20 rounded-[1.4rem] border border-white/10 bg-[#06110d]/88 p-2 shadow-[0_18px_50px_rgba(0,0,0,0.35)] backdrop-blur-xl">
+      <div className="flex gap-2 overflow-x-auto text-[10px] font-black sm:text-xs">
+        {items.map(([id, label]) => (
+          <a key={id} href={`#${id}`} className="shrink-0 rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-gray-300 transition hover:border-[#0FF0FC]/35 hover:text-white">
+            {label}
+          </a>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function TournamentRadar({ summary, demo }: { summary: any; demo?: DemoData | null }) {
+  const finalStats = summary?.finalStats || {};
+  const totalMatches = pickNumber(summary?.totalMatches);
+  const finished = pickNumber(summary?.finishedMatches);
+  const live = pickNumber(summary?.liveMatches);
+  const goals = pickNumber(summary?.totalGoals);
+  const cards = (pickNumber(summary?.yellowCards) || 0) + (pickNumber(summary?.redCards) || 0);
+  const xg = pickNumber(finalStats?.totalXg, summary?.powerStats?.totalXg);
+  const recentEvents = demo?.health?.recentEvents || demo?.turningPoints?.length || 0;
+
+  return (
+    <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-6">
+      <StatTile label="تقدم البطولة" value={totalMatches && finished !== null ? `${ar(finished)} / ${ar(totalMatches)}` : ar(totalMatches)} sub="منتهية / إجمالي" />
+      <StatTile label="مباشر الآن" value={ar(live)} sub="مباريات جارية" tone="green" />
+      <StatTile label="أهداف البطولة" value={ar(goals)} sub="من النتائج المحفوظة" tone="gold" />
+      <StatTile label="xG محفوظ" value={arDecimal(xg)} sub="إثراء إحصائي" tone="cyan" />
+      <StatTile label="الكروت" value={ar(cards)} sub="صفراء + حمراء" tone="red" />
+      <StatTile label="أحداث 24 ساعة" value={ar(recentEvents)} sub="نقاط تحول" />
+    </div>
+  );
+}
+
 function MatchPulse({ match, demo }: { match?: Match | null; demo?: DemoData | null }) {
   const snapshot = currentMatchSnapshot(match, demo);
   const homeScore = pickNumber(match?.homeScore, snapshot?.homeScore) ?? 0;
@@ -286,21 +352,17 @@ function MatchPulse({ match, demo }: { match?: Match | null; demo?: DemoData | n
       : 'ضغط متوازن';
 
   return (
-    <SectionShell
-      title="نبض المباراة الآن"
-      eyebrow="MATCH PULSE"
-      action={<StatusPill match={match} />}
-    >
+    <Card title="نبض المباراة الآن" eyebrow="MATCH PULSE" action={<StatusPill match={match} />} className="h-full">
       {match ? (
         <div className="space-y-3">
           <div className="rounded-[1.4rem] border border-[#FFD700]/20 bg-[radial-gradient(circle_at_top,rgba(255,215,0,0.14),transparent_36%),rgba(0,0,0,0.26)] p-3">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-[10px] font-black text-gray-400">
               <span>{formatDateTime(match.matchDate)}</span>
-              <span>مصدر النتيجة: {match.scoreSource || match.dataSource || snapshot?.provider || 'قاعدة البيانات'}</span>
+              <span>المصدر: {match.scoreSource || match.dataSource || snapshot?.provider || 'قاعدة البيانات'}</span>
             </div>
-            <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2">
+            <div className="grid grid-cols-1 items-center gap-2 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
               <TeamMini team={match.homeTeam} />
-              <Link href={matchHref(match)} className="rounded-2xl border border-[#FFD700]/30 bg-black/45 px-3 py-2 text-center transition hover:border-[#FFD700]/60">
+              <Link href={matchHref(match)} className="rounded-2xl border border-[#FFD700]/30 bg-black/45 px-3 py-3 text-center transition hover:border-[#FFD700]/60">
                 <div className="text-3xl font-black text-[#FFD700]" dir="ltr">{ar(homeScore)} - {ar(awayScore)}</div>
                 <div className="mt-1 text-[10px] font-black text-[#0FF0FC]">فتح مركز المباراة</div>
               </Link>
@@ -327,50 +389,20 @@ function MatchPulse({ match, demo }: { match?: Match | null; demo?: DemoData | n
           </div>
         </div>
       ) : (
-        <div className="rounded-2xl border border-dashed border-white/10 bg-black/20 p-5 text-sm font-bold text-gray-400">لا توجد مباراة جاهزة للعرض في نافذة الديمو.</div>
+        <EmptyState text="لا توجد مباراة جاهزة للعرض في نافذة الديمو." />
       )}
-    </SectionShell>
+    </Card>
   );
 }
 
-function TournamentRadar({ summary, demo }: { summary: any; demo?: DemoData | null }) {
-  const finalStats = summary?.finalStats || {};
-  const totalMatches = pickNumber(summary?.totalMatches);
-  const finished = pickNumber(summary?.finishedMatches);
-  const live = pickNumber(summary?.liveMatches);
-  const goals = pickNumber(summary?.totalGoals);
-  const cards = (pickNumber(summary?.yellowCards) || 0) + (pickNumber(summary?.redCards) || 0);
-  const xg = pickNumber(finalStats?.totalXg, summary?.powerStats?.totalXg);
-  const recentEvents = demo?.health?.recentEvents || demo?.turningPoints?.length || 0;
-
-  const tiles = [
-    { label: 'تقدم البطولة', value: totalMatches && finished !== null ? `${ar(finished)} / ${ar(totalMatches)}` : ar(totalMatches), sub: 'مباريات منتهية / إجمالي', tone: 'border-white/10 bg-white/[0.045] text-white' },
-    { label: 'مباشر الآن', value: ar(live), sub: 'مباريات جارية', tone: 'border-[#00FF88]/25 bg-[#00FF88]/10 text-[#00FF88]' },
-    { label: 'أهداف البطولة', value: ar(goals), sub: 'من النتائج المؤكدة/المحفوظة', tone: 'border-[#FFD700]/25 bg-[#FFD700]/10 text-[#FFD700]' },
-    { label: 'xG محفوظ', value: arDecimal(xg), sub: 'إثراء إحصائي', tone: 'border-[#0FF0FC]/25 bg-[#0FF0FC]/10 text-[#0FF0FC]' },
-    { label: 'الكروت', value: ar(cards), sub: 'صفراء + حمراء', tone: 'border-red-300/25 bg-red-400/10 text-red-100' },
-    { label: 'أحداث 24 ساعة', value: ar(recentEvents), sub: 'نقاط تحول محفوظة', tone: 'border-white/10 bg-black/25 text-white' },
-  ];
-
-  return (
-    <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-6">
-      {tiles.map((tile) => (
-        <div key={tile.label} className={`rounded-2xl border p-3 ${tile.tone}`}>
-          <div className="text-[10px] font-black opacity-80">{tile.label}</div>
-          <div className="mt-1 text-2xl font-black leading-none">{tile.value}</div>
-          <div className="mt-1 text-[9px] font-bold text-gray-400">{tile.sub}</div>
-        </div>
-      ))}
-    </div>
-  );
+function EmptyState({ text }: { text: string }) {
+  return <div className="rounded-2xl border border-dashed border-white/10 bg-black/20 p-5 text-sm font-bold text-gray-400">{text}</div>;
 }
 
 function ThirdsLiveCard({ groups }: { groups: GroupData[] }) {
-  const thirds = useMemo(() => rankThirds(groups), [groups]);
-  const rows = thirds.slice(0, 10);
-
+  const rows = useMemo(() => rankThirds(groups).slice(0, 10), [groups]);
   return (
-    <SectionShell title="أفضل الثوالث — Live Qualification" eyebrow="TOP THIRD PLACES" action={<span className="rounded-full border border-[#00FF88]/25 bg-[#00FF88]/10 px-2.5 py-1 text-[10px] font-black text-[#00FF88]">أول ٨ يتأهلون الآن</span>}>
+    <Card title="أفضل الثوالث" eyebrow="LIVE QUALIFICATION" action={<span className="rounded-full border border-[#00FF88]/25 bg-[#00FF88]/10 px-2.5 py-1 text-[10px] font-black text-[#00FF88]">أول ٨ يتأهلون</span>}>
       {rows.length ? (
         <div className="space-y-1.5">
           <div className="grid grid-cols-[2rem_minmax(0,1fr)_2.3rem_2.5rem_2.3rem_4.8rem] gap-1.5 px-1 text-[9px] font-black text-gray-500">
@@ -380,7 +412,7 @@ function ThirdsLiveCard({ groups }: { groups: GroupData[] }) {
             const safe = row.rank <= 8;
             const flag = getTeamFlagUrl({ code: row.code, name: row.team }, 32);
             return (
-              <Link key={`${row.groupKey}-${row.code}`} href={`/teams/team-${String(row.code || '').toLowerCase()}`} className={`grid grid-cols-[2rem_minmax(0,1fr)_2.3rem_2.5rem_2.3rem_4.8rem] items-center gap-1.5 rounded-xl border px-2 py-2 transition hover:border-[#0FF0FC]/35 ${safe ? 'border-[#00FF88]/18 bg-[#00FF88]/7' : 'border-white/10 bg-black/20'}`}>
+              <div key={`${row.groupKey}-${row.code}`} className={`grid grid-cols-[2rem_minmax(0,1fr)_2.3rem_2.5rem_2.3rem_4.8rem] items-center gap-1.5 rounded-xl border px-2 py-2 ${safe ? 'border-[#00FF88]/18 bg-[#00FF88]/7' : 'border-white/10 bg-black/20'}`}>
                 <span className={`flex h-6 w-6 items-center justify-center rounded-lg text-[10px] font-black ${safe ? 'bg-[#00FF88]/15 text-[#00FF88]' : 'bg-white/5 text-gray-400'}`}>{ar(row.rank)}</span>
                 <span className="flex min-w-0 items-center gap-2">
                   <img src={flag || undefined} alt="" className="h-4 w-5 shrink-0 rounded-sm object-cover" />
@@ -393,15 +425,13 @@ function ThirdsLiveCard({ groups }: { groups: GroupData[] }) {
                 <span className="text-center text-[11px] font-bold text-gray-300">{gd(row.goalDifference)}</span>
                 <span className="text-center text-[11px] font-bold text-gray-300">{ar(row.goalsFor)}</span>
                 <span className={`rounded-lg px-1.5 py-1 text-center text-[8px] font-black ${safe ? 'bg-[#00FF88]/10 text-[#00FF88]' : 'bg-red-400/10 text-red-100'}`}>{safe ? 'يتأهل' : 'خارج'}</span>
-              </Link>
+              </div>
             );
           })}
-          <div className="pt-1 text-[9px] font-bold text-gray-500">الترتيب التجريبي: نقاط ثم فارق أهداف ثم أهداف مسجلة. يمكن إضافة قواعد FIFA التفصيلية لاحقًا.</div>
+          <div className="pt-1 text-[9px] font-bold text-gray-500">ترتيب تجريبي: نقاط ثم فارق أهداف ثم أهداف مسجلة. قواعد FIFA التفصيلية تُضاف في مرحلة الاعتماد.</div>
         </div>
-      ) : (
-        <div className="rounded-2xl border border-dashed border-white/10 bg-black/20 p-4 text-sm font-bold text-gray-400">بيانات الثوالث غير متوفرة الآن.</div>
-      )}
-    </SectionShell>
+      ) : <EmptyState text="بيانات الثوالث غير متوفرة الآن." />}
+    </Card>
   );
 }
 
@@ -414,7 +444,7 @@ function RoundOf32Preview({ groups }: { groups: GroupData[] }) {
   })).filter((item) => item.a && item.b);
 
   return (
-    <SectionShell title="لو انتهت الآن: شكل دور الـ32" eyebrow="BRACKET SIMULATOR" action={<span className="rounded-full border border-[#FFD700]/25 bg-[#FFD700]/10 px-2 py-1 text-[9px] font-black text-[#FFD700]">محاكاة غير رسمية</span>}>
+    <Card title="لو انتهت الآن" eyebrow="ROUND OF 32 SIMULATOR" action={<span className="rounded-full border border-[#FFD700]/25 bg-[#FFD700]/10 px-2 py-1 text-[9px] font-black text-[#FFD700]">غير رسمي</span>}>
       <div className="space-y-2">
         {fixtures.length ? fixtures.slice(0, 6).map((item) => (
           <div key={item.label} className="rounded-2xl border border-white/10 bg-black/25 p-2.5">
@@ -425,9 +455,9 @@ function RoundOf32Preview({ groups }: { groups: GroupData[] }) {
               <span className="truncate text-left text-white">{item.b?.team}</span>
             </div>
           </div>
-        )) : <div className="rounded-2xl border border-dashed border-white/10 bg-black/20 p-4 text-sm font-bold text-gray-400">يظهر بعد توفر ترتيب المجموعات.</div>}
+        )) : <EmptyState text="يظهر بعد توفر ترتيب المجموعات." />}
       </div>
-    </SectionShell>
+    </Card>
   );
 }
 
@@ -443,7 +473,7 @@ function DramaIndex({ summary, demo }: { summary: any; demo?: DemoData | null })
   const label = score >= 75 ? 'بطولة مولعة' : score >= 50 ? 'إيقاع عالي' : score >= 30 ? 'تسخين تدريجي' : 'هدوء نسبي';
 
   return (
-    <SectionShell title="مؤشر دراما البطولة" eyebrow="DRAMA INDEX">
+    <Card title="مؤشر الدراما" eyebrow="DRAMA INDEX">
       <div className="grid gap-3 md:grid-cols-[auto_minmax(0,1fr)] md:items-center">
         <div className="flex h-32 w-32 items-center justify-center rounded-[2rem] border border-[#FFD700]/25 bg-[#FFD700]/10 text-center shadow-[0_0_40px_rgba(255,215,0,0.12)]">
           <div>
@@ -462,32 +492,7 @@ function DramaIndex({ summary, demo }: { summary: any; demo?: DemoData | null })
           </div>
         </div>
       </div>
-    </SectionShell>
-  );
-}
-
-function MomentumBoard({ demo }: { demo?: DemoData | null }) {
-  const movers = demo?.movers || [];
-  const news = demo?.marketNews || [];
-  const top = movers.length ? movers : news.map((item) => ({ ...item.asset, changePercent: item.changePercent, direction: item.changePercent > 0 ? 'up' : item.changePercent < 0 ? 'down' : 'flat', reason: item.titleAr }));
-
-  return (
-    <SectionShell title="الساخن والهابط فنيًا" eyebrow="MOMENTUM BOARD">
-      <div className="space-y-2">
-        {top.length ? top.slice(0, 6).map((item: any, index: number) => {
-          const up = item.direction === 'up' || Number(item.changePercent) > 0;
-          return (
-            <Link key={item.id || `${item.name}-${index}`} href={item.id ? `/asset/${encodeURIComponent(String(item.id))}` : '/market'} className="flex items-center justify-between gap-2 rounded-2xl border border-white/10 bg-black/25 p-2.5 transition hover:border-[#0FF0FC]/35">
-              <span className="min-w-0">
-                <span className="block truncate text-sm font-black text-white">{item.name || 'أصل غير محدد'}</span>
-                <span className="block truncate text-[10px] font-bold text-gray-500">{short(item.reason || item.type || 'حركة محفوظة في قاعدة البيانات', 54)}</span>
-              </span>
-              <span className={`shrink-0 rounded-xl px-2.5 py-1 text-[11px] font-black ${up ? 'bg-[#00FF88]/10 text-[#00FF88]' : 'bg-red-400/10 text-red-100'}`}>{up ? '+' : ''}{pct(Number(item.changePercent || item.change || 0))}</span>
-            </Link>
-          );
-        }) : <div className="rounded-2xl border border-dashed border-white/10 bg-black/20 p-4 text-sm font-bold text-gray-400">لا توجد حركة سعرية/فنية محفوظة بعد.</div>}
-      </div>
-    </SectionShell>
+    </Card>
   );
 }
 
@@ -497,7 +502,7 @@ function TacticalSnapshot({ demo, match }: { demo?: DemoData | null; match?: Mat
   const report = byMatchTeam || reports[0];
 
   return (
-    <SectionShell title="لقطة تكتيكية قبل المباراة" eyebrow="TACTICAL SNAPSHOT" action={report?.confidence ? <span className="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-[9px] font-black text-gray-300">ثقة {report.confidence}</span> : undefined}>
+    <Card title="لقطة تكتيكية" eyebrow="TACTICAL SNAPSHOT" action={report?.confidence ? <span className="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-[9px] font-black text-gray-300">ثقة {report.confidence}</span> : undefined}>
       {report ? (
         <div className="space-y-3">
           <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-black/25 p-3">
@@ -510,23 +515,18 @@ function TacticalSnapshot({ demo, match }: { demo?: DemoData | null; match?: Mat
           <p className="rounded-2xl border border-white/10 bg-black/20 p-3 text-sm font-bold leading-6 text-gray-200">{report.summary}</p>
           <div className="grid gap-2 md:grid-cols-2">
             <div className="rounded-2xl border border-[#00FF88]/20 bg-[#00FF88]/10 p-3">
-              <div className="text-[10px] font-black text-[#00FF88]">نقاط قوة</div>
+              <div className="text-[10px] font-black text-[#00FF88]">قوة</div>
               <div className="mt-1 text-xs font-bold text-white">{report.strengths?.length ? report.strengths.map((x: string) => short(x, 34)).join(' • ') : 'غير متوفر في المصادر'}</div>
             </div>
             <div className="rounded-2xl border border-red-300/20 bg-red-400/10 p-3">
-              <div className="text-[10px] font-black text-red-100">نقاط ضعف</div>
+              <div className="text-[10px] font-black text-red-100">ضعف</div>
               <div className="mt-1 text-xs font-bold text-white">{report.weaknesses?.length ? report.weaknesses.map((x: string) => short(x, 34)).join(' • ') : 'غير متوفر في المصادر'}</div>
             </div>
           </div>
-          <div className="flex flex-wrap gap-1.5">
-            {(report.tacticalTags || []).slice(0, 6).map((tag: string) => <span key={tag} className="rounded-full border border-[#FFD700]/20 bg-[#FFD700]/10 px-2 py-1 text-[9px] font-black text-[#FFD700]">{tag}</span>)}
-          </div>
           <div className="text-[9px] font-bold text-gray-500">المصدر: {report.sourceName || 'مصدر تحريري'} • {timeAgo(report.publishedAt)}</div>
         </div>
-      ) : (
-        <div className="rounded-2xl border border-dashed border-white/10 bg-black/20 p-4 text-sm font-bold text-gray-400">لا توجد تقارير تكتيكية منشورة بعد.</div>
-      )}
-    </SectionShell>
+      ) : <EmptyState text="لا توجد تقارير تكتيكية منشورة بعد." />}
+    </Card>
   );
 }
 
@@ -539,28 +539,27 @@ function DataTrustPanel({ summary, demo, liveMatches }: { summary: any; demo?: D
   ];
 
   return (
-    <SectionShell title="مصباح الثقة في البيانات" eyebrow="DATA TRUST">
+    <Card title="مصباح الثقة" eyebrow="DATA TRUST">
       <div className="grid gap-2 sm:grid-cols-2">
         {items.map((item) => (
           <div key={item.label} className={`rounded-2xl border p-3 ${item.ok ? 'border-[#00FF88]/20 bg-[#00FF88]/10' : 'border-[#FFD700]/20 bg-[#FFD700]/10'}`}>
             <div className="text-[10px] font-black text-gray-400">{item.label}</div>
             <div className={`mt-1 text-base font-black ${item.ok ? 'text-[#00FF88]' : 'text-[#FFD700]'}`}>{item.value}</div>
-            <div className="mt-1 text-[9px] font-bold text-gray-500">{item.sub}</div>
+            <div className="mt-1 truncate text-[9px] font-bold text-gray-500">{item.sub}</div>
           </div>
         ))}
       </div>
-      <div className="mt-3 rounded-2xl border border-white/10 bg-black/20 p-3 text-[10px] font-bold leading-5 text-gray-400">الصفحة لا تقرأ من provider خارجي مباشرة في الواجهة؛ تعرض ما تم حفظه أو تلخيصه في قاعدة البيانات، مع توضيح المصدر كلما أمكن.</div>
-    </SectionShell>
+    </Card>
   );
 }
 
 function TurningPoints({ demo }: { demo?: DemoData | null }) {
   const events = demo?.turningPoints || [];
   const priority = ['goal', 'red_card', 'penalty', 'var', 'yellow_card'];
-  const rows = [...events].sort((a: any, b: any) => priority.indexOf(a.impactType) - priority.indexOf(b.impactType)).slice(0, 8);
+  const rows = [...events].sort((a: any, b: any) => priority.indexOf(a.impactType) - priority.indexOf(b.impactType)).slice(0, 6);
 
   return (
-    <SectionShell title="أكبر تحولات آخر ٢٤ ساعة" eyebrow="TURNING POINTS">
+    <Card title="نقاط التحول" eyebrow="TURNING POINTS">
       <div className="space-y-2">
         {rows.length ? rows.map((event: any) => (
           <Link key={event.id} href={event.match?.id ? `/match-center/${encodeURIComponent(String(event.match.id))}` : '/matches'} className="block rounded-2xl border border-white/10 bg-black/25 p-3 transition hover:border-[#FFD700]/30">
@@ -571,9 +570,34 @@ function TurningPoints({ demo }: { demo?: DemoData | null }) {
             <div className="text-sm font-black text-white">{event.match ? `${teamName(event.match.homeTeam)} ${event.match.score} ${teamName(event.match.awayTeam)}` : 'حدث عام'}</div>
             <div className="mt-1 text-xs font-bold leading-5 text-gray-300">{event.playerName ? `${event.playerName}: ` : ''}{event.detail}</div>
           </Link>
-        )) : <div className="rounded-2xl border border-dashed border-white/10 bg-black/20 p-4 text-sm font-bold text-gray-400">لا توجد نقاط تحول محفوظة في آخر ٢٤ ساعة.</div>}
+        )) : <EmptyState text="لا توجد نقاط تحول محفوظة في آخر ٢٤ ساعة." />}
       </div>
-    </SectionShell>
+    </Card>
+  );
+}
+
+function MomentumBoard({ demo }: { demo?: DemoData | null }) {
+  const movers = demo?.movers || [];
+  const news = demo?.marketNews || [];
+  const top = movers.length ? movers : news.map((item) => ({ ...item.asset, changePercent: item.changePercent, direction: item.changePercent > 0 ? 'up' : item.changePercent < 0 ? 'down' : 'flat', reason: item.titleAr }));
+
+  return (
+    <Card title="الأكثر سخونة" eyebrow="MOMENTUM BOARD">
+      <div className="space-y-2">
+        {top.length ? top.slice(0, 6).map((item: any, index: number) => {
+          const up = item.direction === 'up' || Number(item.changePercent) > 0;
+          return (
+            <Link key={item.id || `${item.name}-${index}`} href={item.id ? `/asset/${encodeURIComponent(String(item.id))}` : '/market'} className="flex items-center justify-between gap-2 rounded-2xl border border-white/10 bg-black/25 p-2.5 transition hover:border-[#0FF0FC]/35">
+              <span className="min-w-0">
+                <span className="block truncate text-sm font-black text-white">{item.name || 'أصل غير محدد'}</span>
+                <span className="block truncate text-[10px] font-bold text-gray-500">{short(item.reason || item.type || 'حركة محفوظة في قاعدة البيانات', 54)}</span>
+              </span>
+              <span className={`shrink-0 rounded-xl px-2.5 py-1 text-[11px] font-black ${up ? 'bg-[#00FF88]/10 text-[#00FF88]' : 'bg-red-400/10 text-red-100'}`}>{up ? '+' : ''}{pct(Number(item.changePercent || item.change || 0))}</span>
+            </Link>
+          );
+        }) : <EmptyState text="لا توجد حركة سعرية/فنية محفوظة بعد." />}
+      </div>
+    </Card>
   );
 }
 
@@ -587,7 +611,7 @@ function PlayerRace({ leaders, summary }: { leaders: any; summary: any }) {
   ];
 
   return (
-    <SectionShell title="سباق النجوم" eyebrow="PLAYER RACE" action={<Link href="/players" className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[10px] font-black text-gray-300 transition hover:text-white">كل اللاعبين</Link>}>
+    <Card title="سباق النجوم" eyebrow="PLAYER RACE" action={<Link href="/players" className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[10px] font-black text-gray-300 transition hover:text-white">كل اللاعبين</Link>}>
       <div className="grid gap-2 md:grid-cols-2">
         {cards.map((card) => (
           <Link key={card.title} href={card.player?.id && !String(card.player.id).startsWith('provider-') ? `/players/${encodeURIComponent(String(card.player.id))}` : '/players'} className={`rounded-2xl border p-3 transition hover:border-white/25 ${card.tone}`}>
@@ -604,18 +628,22 @@ function PlayerRace({ leaders, summary }: { leaders: any; summary: any }) {
             </div>
           </Link>
         ))}
-        <div className="rounded-2xl border border-[#00FF88]/20 bg-[#00FF88]/10 p-3 text-[#00FF88]">
-          <div className="text-[10px] font-black">أكثر جودة فرص</div>
-          <div className="mt-1 text-2xl font-black">{arDecimal(pickNumber(finalStats.totalXg))}</div>
-          <div className="mt-1 text-[9px] font-bold text-gray-400">إجمالي xG محفوظ</div>
-        </div>
-        <div className="rounded-2xl border border-white/10 bg-black/25 p-3 text-white">
-          <div className="text-[10px] font-black text-gray-400">تصديات الحراس</div>
-          <div className="mt-1 text-2xl font-black">{ar(pickNumber(finalStats.totalSaves, summary?.powerStats?.saves))}</div>
-          <div className="mt-1 text-[9px] font-bold text-gray-400">من لقطات الإحصائيات</div>
-        </div>
+        <StatTile label="إجمالي xG" value={arDecimal(pickNumber(finalStats.totalXg))} sub="جودة فرص محفوظة" tone="green" />
+        <StatTile label="تصديات" value={ar(pickNumber(finalStats.totalSaves, summary?.powerStats?.saves))} sub="من snapshots" />
       </div>
-    </SectionShell>
+    </Card>
+  );
+}
+
+function ApprovalNotes() {
+  return (
+    <Card title="ملاحظات الموافقة قبل النقل" eyebrow="APPROVAL NOTES">
+      <div className="grid gap-2 text-sm font-bold leading-7 text-gray-300 md:grid-cols-3">
+        <p className="rounded-2xl border border-white/10 bg-black/25 p-3">هذه الصفحة مستقلة على `/home-demo` ويمكن تعديلها قبل نقل أي جزء للرئيسية.</p>
+        <p className="rounded-2xl border border-[#FFD700]/20 bg-[#FFD700]/10 p-3 text-[#FFD700]">محاكاة دور الـ٣٢ غير رسمية حتى نضيف جدول مواجهات FIFA النهائي.</p>
+        <p className="rounded-2xl border border-[#0FF0FC]/20 bg-[#0FF0FC]/10 p-3 text-[#0FF0FC]">أفضل أجزاء للنقل السريع: Match Pulse، Data Trust، أفضل الثوالث، وTournament Radar.</p>
+      </div>
+    </Card>
   );
 }
 
@@ -646,7 +674,8 @@ export default function HomeDemoCommandCenter() {
         if (cancelled) return;
         if (liveResult.status === 'fulfilled') {
           const value = liveResult.value;
-          setLiveMatches(Array.isArray(value) ? value : Array.isArray(value?.matches) ? value.matches : []);
+          const fromObject = [value?.primaryMatch, value?.primary, ...(value?.secondaryMatches || []), ...(value?.nextMatches || [])].filter(Boolean);
+          setLiveMatches(Array.isArray(value) ? value : Array.isArray(value?.matches) ? value.matches : fromObject);
         }
         if (groupsResult.status === 'fulfilled' && groupsResult.value?.ok && Array.isArray(groupsResult.value.groups)) setGroups(groupsResult.value.groups);
         if (providerResult.status === 'fulfilled' && providerResult.value?.ok) setProviderSummary(providerResult.value);
@@ -675,59 +704,60 @@ export default function HomeDemoCommandCenter() {
 
   return (
     <main dir="rtl" className="min-h-screen bg-[radial-gradient(circle_at_top_right,rgba(255,215,0,0.14),transparent_28%),radial-gradient(circle_at_top_left,rgba(15,240,252,0.12),transparent_28%),linear-gradient(180deg,#07140f,#020706)] px-3 py-4 text-white sm:px-4 lg:px-6">
-      <div className="mx-auto max-w-7xl space-y-4 sm:space-y-5">
-        <section className="overflow-hidden rounded-[2rem] border border-[#FFD700]/20 bg-[linear-gradient(135deg,rgba(255,215,0,0.13),rgba(15,240,252,0.06),rgba(0,0,0,0.28))] p-4 shadow-[0_24px_80px_rgba(0,0,0,0.35)] backdrop-blur sm:p-5">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+      <div className="mx-auto max-w-7xl space-y-5 sm:space-y-6">
+        <section className="overflow-hidden rounded-[2rem] border border-[#FFD700]/20 bg-[linear-gradient(135deg,rgba(255,215,0,0.13),rgba(15,240,252,0.06),rgba(0,0,0,0.28))] p-4 shadow-[0_24px_80px_rgba(0,0,0,0.35)] backdrop-blur sm:p-6">
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
             <div>
               <div className="inline-flex items-center gap-2 rounded-full border border-[#00FF88]/25 bg-[#00FF88]/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-[#00FF88]">
                 <span className="h-2 w-2 animate-pulse rounded-full bg-[#00FF88]" /> DEMO HOME COMMAND CENTER
               </div>
-              <h1 className="mt-3 max-w-3xl text-2xl font-black leading-tight sm:text-4xl">رئيسية تجريبية ذكية قبل الاعتماد</h1>
-              <p className="mt-2 max-w-3xl text-sm font-bold leading-7 text-gray-300">نسخة مستقلة تجمع كل الاقتراحات: نبض المباراة، أفضل الثوالث، محاكاة دور الـ٣٢، مؤشر الدراما، الثقة في البيانات، التحولات، واللقطة التكتيكية — بدون لمس الرئيسية الحالية.</p>
+              <h1 className="mt-3 max-w-3xl text-2xl font-black leading-tight sm:text-4xl">رئيسية تجريبية منظمة قبل الاعتماد</h1>
+              <p className="mt-2 max-w-3xl text-sm font-bold leading-7 text-gray-300">النسخة أصبحت مقسمة حسب قرار المستخدم: ماذا يحدث الآن؟ من يتأهل؟ ما التحليل؟ وما الأكثر سخونة؟</p>
             </div>
             <div className="flex flex-wrap gap-2 text-[10px] font-black">
               <Link href="/" className="rounded-full border border-white/10 bg-white/5 px-3 py-2 text-gray-300 transition hover:text-white">الرئيسية الحالية</Link>
-              <Link href="/statistics" className="rounded-full border border-[#0FF0FC]/25 bg-[#0FF0FC]/10 px-3 py-2 text-[#0FF0FC] transition hover:bg-[#0FF0FC]/15">كل الإحصائيات</Link>
+              <Link href="/statistics" className="rounded-full border border-[#0FF0FC]/25 bg-[#0FF0FC]/10 px-3 py-2 text-[#0FF0FC] transition hover:bg-[#0FF0FC]/15">الإحصائيات</Link>
               <span className="rounded-full border border-white/10 bg-black/25 px-3 py-2 text-gray-400">آخر تحديث: {loading ? 'جاري التحميل' : timeAgo(lastLoadedAt)}</span>
             </div>
           </div>
         </section>
 
+        <DashboardNav />
+
         <TournamentRadar summary={summary} demo={demo} />
 
-        <div className="grid gap-4 lg:grid-cols-3 lg:items-start">
-          <div className="lg:col-span-2">
+        <LayoutBlock id="live" number="١" title="المباشر أولًا" subtitle="الجزء الأهم في أعلى الصفحة: النتيجة، الضغط، آخر حدث، والإحصائيات الحية.">
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)] lg:items-start">
             <MatchPulse match={primaryMatch} demo={demo} />
-          </div>
-          <div className="space-y-4">
             <DataTrustPanel summary={summary} demo={demo} liveMatches={liveMatches} />
+          </div>
+        </LayoutBlock>
+
+        <LayoutBlock id="qualification" number="٢" title="من يتأهل الآن؟" subtitle="منطقة واحدة لكل ما يخص الترتيب، أفضل الثوالث، وسيناريو دور الـ٣٢.">
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)] lg:items-start">
+            <ThirdsLiveCard groups={groups} />
             <RoundOf32Preview groups={groups} />
           </div>
-        </div>
+        </LayoutBlock>
 
-        <div className="grid gap-4 lg:grid-cols-3 lg:items-start">
-          <div className="lg:col-span-2">
-            <ThirdsLiveCard groups={groups} />
+        <LayoutBlock id="intelligence" number="٣" title="التحليل والتحولات" subtitle="تفسير ما وراء الأرقام: لقطة تكتيكية، نقاط تحول، ومؤشر دراما البطولة.">
+          <div className="grid gap-4 lg:grid-cols-3 lg:items-start">
+            <TacticalSnapshot demo={demo} match={primaryMatch} />
+            <TurningPoints demo={demo} />
+            <DramaIndex summary={summary} demo={demo} />
           </div>
-          <DramaIndex summary={summary} demo={demo} />
-        </div>
+        </LayoutBlock>
 
-        <div className="grid gap-4 lg:grid-cols-3 lg:items-start">
-          <TacticalSnapshot demo={demo} match={primaryMatch} />
-          <MomentumBoard demo={demo} />
-          <PlayerRace leaders={leaders} summary={summary} />
-        </div>
+        <LayoutBlock id="market" number="٤" title="السوق والنجوم" subtitle="حركة اللاعبين والمنتخبات مع سباق الهدافين وصناع اللعب.">
+          <div className="grid gap-4 lg:grid-cols-2 lg:items-start">
+            <MomentumBoard demo={demo} />
+            <PlayerRace leaders={leaders} summary={summary} />
+          </div>
+        </LayoutBlock>
 
-        <div className="grid gap-4 lg:grid-cols-2 lg:items-start">
-          <TurningPoints demo={demo} />
-          <SectionShell title="ملاحظات الموافقة قبل النقل" eyebrow="APPROVAL NOTES">
-            <div className="space-y-2 text-sm font-bold leading-7 text-gray-300">
-              <p className="rounded-2xl border border-white/10 bg-black/25 p-3">هذه الصفحة مستقلة على `/home-demo` ويمكن تعديلها بحرية قبل نقل أي جزء إلى الرئيسية.</p>
-              <p className="rounded-2xl border border-[#FFD700]/20 bg-[#FFD700]/10 p-3 text-[#FFD700]">محاكاة دور الـ٣٢ في الديمو غير رسمية حتى نضيف جدول مواجهات FIFA النهائي وقواعد أفضل الثوالث بالتفصيل.</p>
-              <p className="rounded-2xl border border-[#0FF0FC]/20 bg-[#0FF0FC]/10 p-3 text-[#0FF0FC]">أفضل أجزاء جاهزة للنقل السريع: Match Pulse، Data Trust، تطوير أفضل الثوالث، وTournament Radar.</p>
-            </div>
-          </SectionShell>
-        </div>
+        <LayoutBlock id="approval" number="٥" title="قبل النقل للرئيسية" subtitle="ملحوظات مهمة حتى تكون الموافقة واضحة ولا ننقل شيئًا غير جاهز.">
+          <ApprovalNotes />
+        </LayoutBlock>
       </div>
     </main>
   );
