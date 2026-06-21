@@ -133,7 +133,6 @@ async function fetchLatestScoreSnapshots(matchIds: string[]) {
   const uniqueMatchIds = Array.from(new Set(matchIds.filter(Boolean)));
   if (!uniqueMatchIds.length) return new Map<string, any>();
   try {
-<<<<<<< HEAD
     const idList = uniqueMatchIds.map(quoteSql).join(',');
     const rows = await prisma.$queryRawUnsafe<any[]>(`
       SELECT DISTINCT ON ("matchId")
@@ -151,22 +150,6 @@ async function fetchLatestScoreSnapshots(matchIds: string[]) {
         "capturedAt" DESC
     `);
     return new Map(rows.map((row) => [row.matchId, row]));
-=======
-    const rows = await prisma.matchStatsSnapshot.findMany({
-      where: { matchId: { in: matchIds } },
-      select: { matchId: true, provider: true, minute: true, homeScore: true, awayScore: true, capturedAt: true, rawData: true },
-      orderBy: { capturedAt: 'desc' },
-    });
-    const latestByMatch = new Map<string, any>();
-    const preferredByMatch = new Map<string, any>();
-    for (const row of rows) {
-      if (!latestByMatch.has(row.matchId)) latestByMatch.set(row.matchId, row);
-      const provider = String(row.provider || '').toUpperCase();
-      if (!preferredByMatch.has(row.matchId) && (provider.includes('THE_STATS_API_LIVE') || provider.includes('ISPORTS_FLASH') || (row.rawData as any)?.flashMeta?.matchState)) preferredByMatch.set(row.matchId, row);
-    }
-    for (const [matchId, row] of preferredByMatch) latestByMatch.set(matchId, row);
-    return latestByMatch;
->>>>>>> parent of a6987c8 (0)
   } catch (error: any) {
     if (!String(error?.message || '').includes('MatchStatsSnapshot')) {
       console.warn('live-card score snapshot lookup failed:', error?.message || error);
@@ -190,7 +173,8 @@ function decorateMatch(match: any, now: Date, providerState?: any, snapshotState
   const providerHasScore = hasAnyNumber(providerState?.homeScore, providerState?.awayScore);
   const snapshotHasScore = hasAnyNumber(snapshotState?.homeScore, snapshotState?.awayScore);
   const useSnapshotScore = !providerHasScore && snapshotHasScore && (isLiveNow || isHalfTime || isFinished);
-  const minute = null;
+  const scoreSource = providerHasScore ? 'provider' : useSnapshotScore ? 'database_snapshot' : 'database_match';
+  const minute = isLiveNow ? liveMinuteForStatus(effectiveStatus, providerState, snapshotState, freshSnapshot) : null;
   const currentLiveStatus = isLiveNow ? phaseStatus(effectiveStatus) : match.status;
 
   return {
@@ -220,7 +204,6 @@ function uniqueById(matches: any[]) {
   });
 }
 
-<<<<<<< HEAD
 function json(payload: any, status = 200) {
   return NextResponse.json(payload, {
     status,
@@ -236,6 +219,7 @@ export async function GET() {
     }
 
     const now = new Date();
+<<<<<<< HEAD
 =======
 export async function GET() {
   const now = new Date();
@@ -244,6 +228,8 @@ export async function GET() {
 >>>>>>> parent of a6987c8 (0)
 =======
 >>>>>>> parent of a6987c8 (0)
+=======
+>>>>>>> parent of 0d8acd2 (01)
     const liveWindowStart = new Date(now.getTime() - 3 * 60 * 60 * 1000);
     const upcomingUntil = new Date(now.getTime() + 24 * 60 * 60 * 1000);
     const recentSince = new Date(now.getTime() - 6 * 60 * 60 * 1000);
@@ -282,12 +268,16 @@ export async function GET() {
 
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> parent of 0d8acd2 (01)
     const payload = { ok: true, dataSource: 'database', updatedAt: now.toISOString(), matches };
     liveCardCache = { createdAt: cacheNow, payload };
     return json(payload);
   } catch (error: any) {
     console.error('Error in live-card GET api:', error);
     return json({ ok: false, error: error?.message || 'Internal Server Error', matches: [] }, 500);
+<<<<<<< HEAD
 =======
 =======
 >>>>>>> parent of a6987c8 (0)
@@ -299,5 +289,7 @@ export async function GET() {
 >>>>>>> parent of a6987c8 (0)
 =======
 >>>>>>> parent of a6987c8 (0)
+=======
+>>>>>>> parent of 0d8acd2 (01)
   }
 }

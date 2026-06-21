@@ -129,10 +129,8 @@ function FlagImg({ team, small = false }: { team: MatchPageData['homeTeam']; sma
 function TeamSide({ team }: { team: MatchPageData['homeTeam'] }) { return <div className="flex min-w-0 flex-col items-center gap-2 sm:gap-3"><FlagImg team={team} /><div className="min-w-0 text-center"><p className="truncate text-base font-black text-white sm:text-3xl">{team.name}</p><div className="mt-1 flex flex-wrap justify-center gap-1.5 text-[10px] font-bold text-slate-400 sm:text-xs">{team.code ? <span>{team.code}</span> : null}{team.fifaRank ? <span>تصنيف {ar.format(team.fifaRank)}</span> : null}</div></div></div>; }
 function Info({ icon, label, value }: { icon: ReactNode; label: string; value: string }) { return <div className="min-w-0 rounded-2xl border border-white/10 bg-black/25 p-2.5 text-center sm:p-3 sm:text-right"><div className="mb-1 flex items-center justify-center gap-1.5 text-[#18E58F] sm:justify-start">{icon}<span className="text-[10px] font-black sm:text-xs">{label}</span></div><p className="line-clamp-2 min-h-[2.35rem] text-[10px] font-black leading-5 text-white sm:min-h-0 sm:text-sm sm:font-bold sm:leading-6">{value || '—'}</p></div>; }
 
-function Hero({ data, onRefresh, onShare, highlight }: { data: MatchPageData; onRefresh: () => void; onShare: () => void; highlight: 'home' | 'away' | null }) {
-  const homeHighlight = highlight === 'home' ? 'text-[#18E58F] scale-110 duration-200 animate-pulse font-black' : 'text-[#F8C846]';
-  const awayHighlight = highlight === 'away' ? 'text-[#18E58F] scale-110 duration-200 animate-pulse font-black' : 'text-white';
-  return <header className="relative overflow-hidden rounded-[1.5rem] border border-white/10 bg-[#04110D] p-3 text-center shadow-[0_24px_70px_rgba(0,0,0,.36)] sm:rounded-[2rem] sm:p-6"><div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_12%,rgba(24,229,143,.20),transparent_32%),radial-gradient(circle_at_82%_8%,rgba(248,200,70,.14),transparent_30%),linear-gradient(180deg,rgba(255,255,255,.06),transparent_42%)]" /><div className="relative"><div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 sm:gap-5" dir="rtl"><TeamSide team={data.homeTeam} /><div className="space-y-2"><div className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-black/45 px-3 py-2 shadow-inner sm:gap-5 sm:px-7 sm:py-3"><span className={`text-3xl font-black tabular-nums sm:text-7xl transition-all duration-300 ${homeHighlight}`}>{fmt(data.score.home)}</span><span className="text-2xl font-black text-white/70 sm:text-6xl">-</span><span className={`text-3xl font-black tabular-nums sm:text-7xl transition-all duration-300 ${awayHighlight}`}>{fmt(data.score.away)}</span></div><p className={`mx-auto inline-flex rounded-full border px-3 py-1.5 text-xs font-black sm:px-4 sm:py-2 ${statusClasses[data.status.kind]}`}>{matchClockLabel(data)}</p></div><TeamSide team={data.awayTeam} /></div><div className="mt-5 grid grid-cols-2 gap-2 text-right lg:grid-cols-4"><Info icon={<MapPin size={15} />} label="الملعب" value={data.venue || 'جاري جلب اسم الملعب'} /><Info icon={<Shield size={15} />} label="المدينة" value={data.city || '—'} /><Info icon={<Flag size={15} />} label="الحكم" value={data.referee || '—'} /><Info icon={<Trophy size={15} />} label="المجموعة" value={data.groupLabel || data.stageLabel} /></div><div className="mt-4 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center sm:justify-center"><button onClick={onRefresh} className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#18E58F] px-3 py-2 text-xs font-black text-black sm:text-sm"><RefreshCw size={16} /> تحديث</button><button onClick={onShare} className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-xs font-black text-white sm:text-sm"><Share2 size={16} /> مشاركة</button>{data.digest?.href ? <Link href={data.digest.href} className="col-span-2 inline-flex items-center justify-center gap-2 rounded-xl border border-[#F8C846]/30 bg-[#F8C846]/12 px-3 py-2 text-xs font-black text-[#F8C846] sm:col-span-1 sm:text-sm"><FileText size={16} /> تقرير المباراة</Link> : null}</div></div></header>;
+function Hero({ data, onRefresh, onShare }: { data: MatchPageData; onRefresh: () => void; onShare: () => void }) {
+  return <header className="relative overflow-hidden rounded-[1.5rem] border border-white/10 bg-[#04110D] p-3 text-center shadow-[0_24px_70px_rgba(0,0,0,.36)] sm:rounded-[2rem] sm:p-6"><div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_12%,rgba(24,229,143,.20),transparent_32%),radial-gradient(circle_at_82%_8%,rgba(248,200,70,.14),transparent_30%),linear-gradient(180deg,rgba(255,255,255,.06),transparent_42%)]" /><div className="relative"><div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 sm:gap-5" dir="rtl"><TeamSide team={data.homeTeam} /><div className="space-y-2"><div className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-black/45 px-3 py-2 shadow-inner sm:gap-5 sm:px-7 sm:py-3"><span className="text-3xl font-black text-[#F8C846] tabular-nums sm:text-7xl">{fmt(data.score.home)}</span><span className="text-2xl font-black text-white/70 sm:text-6xl">-</span><span className="text-3xl font-black text-white tabular-nums sm:text-7xl">{fmt(data.score.away)}</span></div><p className={`mx-auto inline-flex rounded-full border px-3 py-1.5 text-xs font-black sm:px-4 sm:py-2 ${statusClasses[data.status.kind]}`}>{matchClockLabel(data)}</p></div><TeamSide team={data.awayTeam} /></div><div className="mt-5 grid grid-cols-2 gap-2 text-right lg:grid-cols-4"><Info icon={<MapPin size={15} />} label="الملعب" value={data.venue || 'جاري جلب اسم الملعب'} /><Info icon={<Shield size={15} />} label="المدينة" value={data.city || '—'} /><Info icon={<Flag size={15} />} label="الحكم" value={data.referee || '—'} /><Info icon={<Trophy size={15} />} label="المجموعة" value={data.groupLabel || data.stageLabel} /></div><div className="mt-4 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center sm:justify-center"><button onClick={onRefresh} className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#18E58F] px-3 py-2 text-xs font-black text-black sm:text-sm"><RefreshCw size={16} /> تحديث</button><button onClick={onShare} className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-xs font-black text-white sm:text-sm"><Share2 size={16} /> مشاركة</button>{data.digest?.href ? <Link href={data.digest.href} className="col-span-2 inline-flex items-center justify-center gap-2 rounded-xl border border-[#F8C846]/30 bg-[#F8C846]/12 px-3 py-2 text-xs font-black text-[#F8C846] sm:col-span-1 sm:text-sm"><FileText size={16} /> تقرير المباراة</Link> : null}</div></div></header>;
 }
 function StickyTabs({ active, onSelect }: { active: TabId; onSelect: (id: TabId) => void }) { const content = <div className="mx-auto flex max-w-7xl gap-2 overflow-x-auto px-2 pb-1 pt-2 scrollbar-none sm:px-4">{tabs.map(([id, label, Icon]) => <button key={id} type="button" onClick={() => onSelect(id)} className={`inline-flex shrink-0 items-center gap-1.5 rounded-xl border px-3 py-2 text-[11px] font-black transition sm:text-xs ${active === id ? 'border-[#18E58F]/45 bg-[#18E58F] text-black' : 'border-white/10 bg-white/[0.05] text-slate-200'}`}><Icon size={15} />{label}</button>)}</div>; return <><div className="h-[54px] lg:h-[58px]" /><nav className="fixed inset-x-0 top-[64px] z-40 border-y border-white/10 bg-[#04110D]/96 shadow-[0_12px_32px_rgba(0,0,0,.36)] backdrop-blur-xl lg:top-[84px]">{content}</nav></>; }
 
@@ -189,88 +187,5 @@ export default function ProfessionalMatchPageClient({ data }: { data: MatchPageD
   function selectTab(id: TabId) { setActiveTab(id); const target = document.getElementById(id); if (!target || typeof window === 'undefined') return; if (lockRef.current) window.clearTimeout(lockRef.current); const offset = window.innerWidth < 1024 ? 126 : 150; const top = target.getBoundingClientRect().top + window.scrollY - offset; window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' }); lockRef.current = window.setTimeout(() => { lockRef.current = null; }, 900); }
   useEffect(() => { const observer = new IntersectionObserver((entries) => { if (lockRef.current) return; const visible = entries.filter((entry) => entry.isIntersecting).sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0]; if (visible?.target?.id) setActiveTab(visible.target.id as TabId); }, { rootMargin: '-34% 0px -55% 0px', threshold: [0.1, 0.35, 0.6] }); tabs.forEach(([id]) => { const el = document.getElementById(id); if (el) observer.observe(el); }); return () => observer.disconnect(); }, []);
   async function share() { const text = `${pageTitle} — ${data.status.label}`; if (typeof window === 'undefined') return; const nav = window.navigator as Navigator & { share?: (shareData: ShareData) => Promise<void>; clipboard?: Clipboard }; if (typeof nav.share === 'function') { await nav.share({ title: data.title, text, url: window.location.href }).catch(() => undefined); return; } if (nav.clipboard) await nav.clipboard.writeText(`${text}\n${window.location.href}`).catch(() => undefined); }
-
-  const prevScoreRef = useRef<{ home: number | null; away: number | null }>({ home: data.score.home, away: data.score.away });
-  const [goalAlert, setGoalAlert] = useState<{ teamName: string; player: string; minute: string; isHome: boolean } | null>(null);
-  const [alertVisible, setAlertVisible] = useState(false);
-  const [highlightScore, setHighlightScore] = useState<'home' | 'away' | null>(null);
-
-  useEffect(() => {
-    const prev = prevScoreRef.current;
-    const currentHome = data.score.home ?? 0;
-    const currentAway = data.score.away ?? 0;
-    const prevHome = prev.home ?? 0;
-    const prevAway = prev.away ?? 0;
-
-    let trigger = false;
-    let isHomeGoal = false;
-
-    if (currentHome > prevHome && prev.home !== null) {
-      trigger = true;
-      isHomeGoal = true;
-    } else if (currentAway > prevAway && prev.away !== null) {
-      trigger = true;
-      isHomeGoal = false;
-    }
-
-    prevScoreRef.current = { home: data.score.home, away: data.score.away };
-
-    if (trigger) {
-      const team = isHomeGoal ? data.homeTeam : data.awayTeam;
-      const goalEvents = data.events.filter((e) => {
-        const type = String(e.type || '').toLowerCase();
-        return (type.includes('goal') || type.includes('هدف') || e.icon === '⚽') && e.teamId === team.id;
-      });
-      const latestGoal = goalEvents[goalEvents.length - 1];
-      const player = latestGoal?.playerName || 'لاعب';
-      const minute = latestGoal?.minuteLabel || '—';
-
-      setHighlightScore(isHomeGoal ? 'home' : 'away');
-      const highlightTimer = setTimeout(() => setHighlightScore(null), 5000);
-
-      setGoalAlert({ teamName: team.name, player, minute, isHome: isHomeGoal });
-      const showTimer = setTimeout(() => setAlertVisible(true), 50);
-
-      const hideTimer = setTimeout(() => {
-        setAlertVisible(false);
-        setTimeout(() => setGoalAlert(null), 500);
-      }, 7000);
-
-      return () => {
-        clearTimeout(highlightTimer);
-        clearTimeout(showTimer);
-        clearTimeout(hideTimer);
-      };
-    }
-  }, [data.score.home, data.score.away, data.events, data.homeTeam, data.awayTeam]);
-
-  return <main className="min-h-screen bg-[#04110D] px-2 pb-20 pt-3 text-white sm:px-4 sm:pt-4" dir="rtl"><MatchAutoRefresh intervalMs={refreshMs} statusKind={data.status.kind} matchDate={data.matchDate} showPulse={true} /><div className="mx-auto max-w-7xl space-y-4 sm:space-y-5"><Hero data={data} onRefresh={refresh} onShare={share} highlight={highlightScore} /><StickyTabs active={activeTab} onSelect={selectTab} /><EventsPanel data={data} /><StatsPanel data={data} /><LineupsPanel data={data} /><StandingsPanel data={data} /><AnalysisPanel data={data} /></div>{goalAlert && (
-    <div
-      className={`fixed left-4 right-4 top-20 z-50 mx-auto max-w-sm rounded-2xl border-2 border-[#F8C846] bg-black/95 p-4 shadow-[0_20px_50px_rgba(248,200,70,0.35)] backdrop-blur-md transition-all duration-500 sm:left-auto sm:right-6 sm:top-24 sm:w-96 ${
-        alertVisible ? 'translate-y-0 opacity-100 scale-100' : '-translate-y-10 opacity-0 scale-95 pointer-events-none'
-      }`}
-      dir="rtl"
-    >
-      <div className="flex items-center gap-3">
-        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#F8C846]/20 text-[#F8C846] text-xl animate-pulse">
-          ⚽
-        </span>
-        <div className="flex-1 min-w-0">
-          <h4 className="text-xs font-black text-[#F8C846]">هدف جديد!</h4>
-          <p className="mt-0.5 text-xs font-bold text-white leading-5">
-            سجل <span className="font-black text-[#18E58F]">{goalAlert.player}</span> لمنتخب <span className="font-black">{goalAlert.teamName}</span> ({goalAlert.minute})
-          </p>
-        </div>
-        <button
-          onClick={() => {
-            setAlertVisible(false);
-            setTimeout(() => setGoalAlert(null), 500);
-          }}
-          className="text-slate-400 hover:text-white text-[10px] font-black px-2 py-1 rounded bg-white/10 transition"
-        >
-          إغلاق
-        </button>
-      </div>
-    </div>
-  )}</main>;
+  return <main className="min-h-screen bg-[#04110D] px-2 pb-20 pt-3 text-white sm:px-4 sm:pt-4" dir="rtl"><MatchAutoRefresh intervalMs={refreshMs} /><div className="mx-auto max-w-7xl space-y-4 sm:space-y-5"><Hero data={data} onRefresh={refresh} onShare={share} /><StickyTabs active={activeTab} onSelect={selectTab} /><EventsPanel data={data} /><StatsPanel data={data} /><LineupsPanel data={data} /><StandingsPanel data={data} /><AnalysisPanel data={data} /></div></main>;
 }

@@ -148,12 +148,7 @@ function providerMatchesLocal(providerMatch: ProviderMatchRow, localMatch: any) 
 
 function resolveProviderMatchId(localMatch: any, providerMatches: ProviderMatchRow[]) {
   const existing = String(localMatch.externalId || '').trim();
-  if (existing.startsWith('mt_') && existing !== 'mt_12345') {
-    const digits = existing.replace(/\D/g, '');
-    if (digits.length >= 8) {
-      return { resolvedProviderMatchId: existing, resolvedBy: 'local_external_id' };
-    }
-  }
+  if (existing.startsWith('mt_')) return { resolvedProviderMatchId: existing, resolvedBy: 'local_external_id' };
   const matched = providerMatches.find((row) => providerMatchesLocal(row, localMatch));
   return { resolvedProviderMatchId: matched?.providerId || null, resolvedBy: matched ? 'provider_match_list' : null };
 }

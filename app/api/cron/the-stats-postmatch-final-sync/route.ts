@@ -76,21 +76,10 @@ export async function GET(req: Request) {
 
   const matches = await prisma.match.findMany({
     where: {
-      AND: [
-        {
-          OR: [
-            { status: { in: FINISHED } },
-            { matchDate: { gte: new Date(now - minutesBack * 60_000), lte: new Date(now + minutesForward * 60_000) } },
-          ]
-        },
-        {
-          statsSnapshots: {
-            none: {
-              provider: 'THE_STATS_API_EXTRAS'
-            }
-          }
-        }
-      ]
+      OR: [
+        { status: { in: FINISHED } },
+        { matchDate: { gte: new Date(now - minutesBack * 60_000), lte: new Date(now + minutesForward * 60_000) } },
+      ],
     },
     include: { homeTeam: { select: { name: true } }, awayTeam: { select: { name: true } } },
     orderBy: { matchDate: 'desc' },
@@ -100,23 +89,11 @@ export async function GET(req: Request) {
   const results = [];
   for (const [index, match] of matches.entries()) {
     if (index > 0 && delayMs > 0) await new Promise((resolve) => setTimeout(resolve, delayMs));
-    
-    // 1. Core Enrichment (Events, Lineups, Ratings) -> THE_STATS_API snapshot
     const enrich = withSecret(new URL('/api/admin/the-stats-import-match-enrichment', origin), key);
     enrich.searchParams.set('matchId', match.id);
     enrich.searchParams.set('dryRun', String(dryRun));
     enrich.searchParams.set('importEvents', 'true');
     results.push(await callJson(`final_enrichment_${match.id}`, enrich, 28_000));
-
-    // Stagger slightly to respect provider limits
-    await new Promise((resolve) => setTimeout(resolve, 250));
-
-    // 2. Advanced Detailed Extras (Detailed PlayerStats, Shotmaps) -> THE_STATS_API_EXTRAS snapshot
-    const extras = withSecret(new URL('/api/admin/match-postmatch-extras', origin), key);
-    extras.searchParams.set('matchId', match.id);
-    extras.searchParams.set('dryRun', String(dryRun));
-    extras.searchParams.set('mode', 'full');
-    results.push(await callJson(`final_extras_${match.id}`, extras, 28_000));
   }
 
   return json({ ok: true, mode: 'the_stats_postmatch_final_sync', dryRun, origin, matchesFound: matches.length, successful: results.filter((item) => item.ok).length, failed: results.filter((item) => !item.ok).length, results });

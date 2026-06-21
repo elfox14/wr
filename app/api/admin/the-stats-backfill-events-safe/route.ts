@@ -92,12 +92,7 @@ function teamMatch(providerName: any, localTeam: any) {
 }
 async function resolveProviderId(match: any, query: Record<string, string | number>) {
   const external = String(match.externalId || '').trim();
-  if (external.startsWith('mt_') && external !== 'mt_12345') {
-    const digits = external.replace(/\D/g, '');
-    if (digits.length >= 8) {
-      return { id: external, by: 'local_external_id' };
-    }
-  }
+  if (external.startsWith('mt_')) return { id: external, by: 'local_external_id' };
   const rows = extractArray(await theStatsApiFetch('/api/football/matches', query, { timeoutMs: 15000 })).map(providerMatch).filter((row) => row.id);
   const found = rows.find((row) => teamMatch(row.home, match.homeTeam) && teamMatch(row.away, match.awayTeam) && hoursApart(row.date, match.matchDate) <= 4);
   return { id: found?.id || null, by: found ? 'provider_match_list' : null, searched: rows.length };

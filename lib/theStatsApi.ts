@@ -168,55 +168,36 @@ export async function theStatsApiFetch<T = any>(path: string, params: TheStatsAp
     throw new TheStatsApiError('THE_STATS_API_KEY is missing', 412, config, 'missing_api_key');
   }
 
-  const maxRetries = 3;
-  let attempt = 0;
+  const url = buildUrl(path, params);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs(options.timeoutMs));
 
-  while (true) {
-    attempt++;
-    const url = buildUrl(path, params);
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs(options.timeoutMs));
+  try {
+    const response = await fetch(url.toString(), {
+      method: 'GET',
+      cache: 'no-store',
+      signal: controller.signal,
+      headers: buildHeaders(apiKey),
+    });
 
-    try {
-      const response = await fetch(url.toString(), {
-        method: 'GET',
-        cache: 'no-store',
-        signal: controller.signal,
-        headers: buildHeaders(apiKey),
-      });
+    const contentType = response.headers.get('content-type') || '';
+    const payload = contentType.includes('application/json')
+      ? await response.json().catch(() => null)
+      : await response.text().catch(() => null);
 
-      const contentType = response.headers.get('content-type') || '';
-      const payload = contentType.includes('application/json')
-        ? await response.json().catch(() => null)
-        : await response.text().catch(() => null);
-
-      if (!response.ok) {
-        if (response.status === 429 && attempt <= maxRetries) {
-          const backoff = Math.pow(2, attempt) * 500 + Math.random() * 100;
-          await new Promise((resolve) => setTimeout(resolve, backoff));
-          continue;
-        }
-        throw new TheStatsApiError(`TheStatsAPI request failed with status ${response.status}`, response.status, payload, 'provider_request_failed');
-      }
-
-      return payload as T;
-    } catch (error: any) {
-      if (error instanceof TheStatsApiError) throw error;
-
-      const isAbort = error?.name === 'AbortError';
-      if (attempt <= maxRetries) {
-        const backoff = Math.pow(2, attempt) * 500 + Math.random() * 100;
-        await new Promise((resolve) => setTimeout(resolve, backoff));
-        continue;
-      }
-
-      if (isAbort) {
-        throw new TheStatsApiError('TheStatsAPI request timed out', 408, { timeoutMs: timeoutMs(options.timeoutMs) }, 'timeout');
-      }
-      throw new TheStatsApiError(error?.message || 'TheStatsAPI request failed', undefined, null, 'request_failed');
-    } finally {
-      clearTimeout(timer);
+    if (!response.ok) {
+      throw new TheStatsApiError(`TheStatsAPI request failed with status ${response.status}`, response.status, payload, 'provider_request_failed');
     }
+
+    return payload as T;
+  } catch (error: any) {
+    if (error?.name === 'AbortError') {
+      throw new TheStatsApiError('TheStatsAPI request timed out', 408, { timeoutMs: timeoutMs(options.timeoutMs) }, 'timeout');
+    }
+    if (error instanceof TheStatsApiError) throw error;
+    throw new TheStatsApiError(error?.message || 'TheStatsAPI request failed', undefined, null, 'request_failed');
+  } finally {
+    clearTimeout(timer);
   }
 }
 

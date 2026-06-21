@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import { requireAdmin } from '@/lib/adminAuth';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -10,11 +9,36 @@ const ALLOWED_JOBS: Record<string, string> = {
   'sync-animation-matches': '/api/cron/sync-animation-matches',
 };
 
+function getAuth(req: Request) {
+  const expected = process.env.CRON_SECRET || process.env.ADMIN_API_SECRET || '';
+  if (!expected) return { valid: false, method: 'missing_server_secret' };
 
+  const auth = req.headers.get('authorization') || '';
+  const bearer = auth.startsWith('Bearer ') ? auth.slice(7).trim() : '';
+  const cronHeader = req.headers.get('x-cron-secret') || '';
+  const adminHeader = req.headers.get('x-admin-secret') || '';
+  const { searchParams } = new URL(req.url);
+  const cronQuery = searchParams.get('cronSecret') || '';
+  const adminQuery = searchParams.get('adminSecret') || '';
+  const keyQuery = searchParams.get('key') || '';
+
+  const matched = [
+    { method: 'authorization_bearer', value: bearer },
+    { method: 'x-cron-secret', value: cronHeader },
+    { method: 'x-admin-secret', value: adminHeader },
+    { method: 'cronSecret_query', value: cronQuery },
+    { method: 'adminSecret_query', value: adminQuery },
+    { method: 'key_query', value: keyQuery },
+  ].find((item) => item.value && item.value === expected);
+
+  return matched ? { valid: true, method: matched.method } : { valid: false, method: null };
+}
 
 export async function GET(req: Request) {
-  const auth = await requireAdmin(req);
-  if (!auth.authorized) return auth.error;
+  const auth = getAuth(req);
+  if (!auth.valid) {
+    return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401, headers: { 'Cache-Control': 'no-store' } });
+  }
 
   const { searchParams } = new URL(req.url);
   const job = searchParams.get('job') || '';
@@ -54,7 +78,7 @@ export async function GET(req: Request) {
     ok: response.ok,
     job,
     target: path,
-    authMethod: (auth as any).mode,
+    authMethod: auth.method,
     status: response.status,
     payload,
   }, {
