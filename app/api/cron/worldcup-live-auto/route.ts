@@ -45,6 +45,10 @@ function secret() {
   return String(process.env.CRON_SECRET || process.env.ADMIN_API_SECRET || '').trim();
 }
 
+function hasPrimaryBrowserless() {
+  return Boolean(String(process.env.BROWSERLESS_ENDPOINT || process.env.BROWSERLESS_TOKEN || '').trim());
+}
+
 function maskUrl(value: string) {
   return value
     .replace(/(key=|adminSecret=|cronSecret=)[^&]+/gi, '$1***')
@@ -169,19 +173,23 @@ function buildFullSyncUrl(origin: string, key: string, url: URL, target: { dbMat
 
 function buildISportsTimelineUrl(origin: string, key: string, url: URL, target: { dbMatchId?: string | null; providerMatchId?: string | null }) {
   const targeted = Boolean(target.dbMatchId || target.providerMatchId);
+  const browserlessPrimary = hasPrimaryBrowserless();
+  const useBrowserless = targeted && browserlessPrimary;
   const next = new URL('/api/cron/isports-live-sync', origin);
   next.searchParams.set('take', String(int(url.searchParams.get('isportsTake'), targeted ? 1 : 5, 1, 5)));
   next.searchParams.set('save', 'true');
   next.searchParams.set('replace', 'true');
   next.searchParams.set('includeTimeline', 'true');
-  next.searchParams.set('includeFlash', bool(url.searchParams.get('includeFlash'), targeted ? false : true) ? 'true' : 'false');
-  next.searchParams.set('asyncFlash', bool(url.searchParams.get('asyncFlash'), true) ? 'true' : 'false');
+  next.searchParams.set('includeFlash', bool(url.searchParams.get('includeFlash'), useBrowserless ? true : targeted ? false : true) ? 'true' : 'false');
+  next.searchParams.set('asyncFlash', bool(url.searchParams.get('asyncFlash'), useBrowserless ? false : true) ? 'true' : 'false');
   next.searchParams.set('includeLive', 'false');
-  next.searchParams.set('timeoutMs', String(int(url.searchParams.get('isportsTimeoutMs'), targeted ? 12_000 : 26_000, 5_000, 45_000)));
-  next.searchParams.set('waitMs', String(int(url.searchParams.get('isportsWaitMs'), targeted ? 2_000 : 5_000, 1_000, 15_000)));
+  next.searchParams.set('timeoutMs', String(int(url.searchParams.get('isportsTimeoutMs'), useBrowserless ? 22_000 : targeted ? 12_000 : 26_000, 5_000, 45_000)));
+  next.searchParams.set('waitMs', String(int(url.searchParams.get('isportsWaitMs'), useBrowserless ? 3_000 : targeted ? 2_000 : 5_000, 1_000, 15_000)));
   next.searchParams.set('directTimeoutMs', String(int(url.searchParams.get('directTimeoutMs'), targeted ? 6_000 : 12_000, 2_000, 30_000)));
   next.searchParams.set('wrapperTimeoutMs', String(int(url.searchParams.get('wrapperTimeoutMs'), targeted ? 6_000 : 10_000, 2_000, 15_000)));
-  next.searchParams.set('skipBrowserFallback', bool(url.searchParams.get('skipBrowserFallback'), targeted) ? 'true' : 'false');
+  next.searchParams.set('skipBrowserFallback', bool(url.searchParams.get('skipBrowserFallback'), targeted && !browserlessPrimary) ? 'true' : 'false');
+  next.searchParams.set('stateSource', 'isports_flash_schedule_state');
+  next.searchParams.set('statusFromMinute', 'false');
   return withSecret(optionalTarget(next, target), key);
 }
 
@@ -241,6 +249,7 @@ export async function GET(req: Request) {
   const target = { dbMatchId, providerMatchId };
   const runTheStats = bool(url.searchParams.get('theStats'), true);
   const runISportsTimeline = bool(url.searchParams.get('isportsTimeline'), runTheStats);
+  const targetedBrowserless = Boolean(dbMatchId || providerMatchId) && hasPrimaryBrowserless();
 
   const stages: StageResult[] = [];
 
@@ -249,9 +258,9 @@ export async function GET(req: Request) {
     stages.push(await callJson('the_stats_full_sync', buildFullSyncUrl(origin, key, url, target), 14_000, startedAt, budgetMs));
   }
 
-  // Targeted iSports cron uses fast direct-only timeline by default to avoid external 30s timeouts.
+  // With a primary Browserless API configured, targeted iSports uses Browserless for timeline events and flash schedule state.
   if (runISportsTimeline) {
-    stages.push(await callJson('isports_timeline_flash_core', buildISportsTimelineUrl(origin, key, url, target), target.dbMatchId ? 13_000 : 18_000, startedAt, budgetMs));
+    stages.push(await callJson('isports_timeline_flash_core', buildISportsTimelineUrl(origin, key, url, target), targetedBrowserless ? 24_000 : target.dbMatchId ? 13_000 : 18_000, startedAt, budgetMs));
   }
 
   // Lower-priority confirmation/monitoring stages run on a cadence and only when time remains.
@@ -283,6 +292,7 @@ export async function GET(req: Request) {
     origin,
     target,
     budgetMs,
+    browserlessPrimary: hasPrimaryBrowserless(),
     durationMs: Date.now() - startedAt,
     summary: {
       stages: stages.length,
@@ -292,7 +302,7 @@ export async function GET(req: Request) {
     },
     stages,
     note: hardFailures.length
-      ? 'Cron completed in degraded mode before the external timeout. Critical TheStats live writes run first; targeted iSports uses fast direct-only timeline to avoid Browserless timeout. TheStats extras remain disabled.'
-      : 'Cron completed within the external timeout budget. Critical live events/stats/match-info run first; targeted iSports fallback is time-boxed. TheStats extras remain disabled.',
+      ? 'Cron completed in degraded mode before the external timeout. TheStats stays primary for stats; targeted iSports uses primary Browserless for events/state when configured.'
+      : 'Cron completed within the external timeout budget. TheStats handles stats and match info; targeted iSports uses Browserless timeline plus flash schedule state when configured.',
   });
 }
