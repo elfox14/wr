@@ -5,6 +5,7 @@ import prisma from '@/lib/prisma';
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 export const runtime = 'nodejs';
+export const maxDuration = 60;
 
 const FINISHED = ['FINISHED', 'FT', 'AET', 'PEN', 'COMPLETED'];
 const LIVE = ['IN_PLAY', 'LIVE', '1H', '2H', 'HT', 'ET'];

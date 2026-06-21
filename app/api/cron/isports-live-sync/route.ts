@@ -8,6 +8,7 @@ import { GET as remoteVisualStatsPullGET } from '@/app/api/internal/live-ingest/
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 export const runtime = 'nodejs';
+export const maxDuration = 60;
 
 const LIVE_STATUSES = ['IN_PLAY', 'LIVE', 'HT', '1H', '2H', 'ET'];
 

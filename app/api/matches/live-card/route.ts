@@ -134,7 +134,7 @@ async function fetchLatestScoreSnapshots(matchIds: string[]) {
     for (const row of rows) {
       if (!latestByMatch.has(row.matchId)) latestByMatch.set(row.matchId, row);
       const provider = String(row.provider || '').toUpperCase();
-      if (!preferredByMatch.has(row.matchId) && (provider.includes('THE_STATS_API_LIVE') || provider.includes('ISPORTS_FLASH') || row.rawData?.flashMeta?.matchState)) preferredByMatch.set(row.matchId, row);
+      if (!preferredByMatch.has(row.matchId) && (provider.includes('THE_STATS_API_LIVE') || provider.includes('ISPORTS_FLASH') || (row.rawData as any)?.flashMeta?.matchState)) preferredByMatch.set(row.matchId, row);
     }
     for (const [matchId, row] of preferredByMatch) latestByMatch.set(matchId, row);
     return latestByMatch;

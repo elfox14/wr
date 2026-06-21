@@ -153,5 +153,5 @@ export default function ProfessionalMatchPage({ data }: { data: MatchPageData })
     else if (typeof navigator !== 'undefined' && navigator.clipboard) await navigator.clipboard.writeText(`${text}\n${window.location.href}`).catch(() => undefined);
   }
 
-  return <main className="min-h-screen bg-[#04110D] px-4 pb-20 pt-4 text-white" dir="rtl"><MatchAutoRefresh intervalMs={refreshMs} /><div className="mx-auto max-w-7xl space-y-5"><Hero data={data} onRefresh={refresh} onShare={share} /><StickyTabs /><Overview data={data} /><EventsPanel events={data.events} /><StatsPanel data={data} /><LineupsPanel data={data} /><StandingsPanel data={data} /><AnalysisPanel data={data} /><SourcesPanel data={data} /></div></main>;
+  return <main className="min-h-screen bg-[#04110D] px-4 pb-20 pt-4 text-white" dir="rtl"><MatchAutoRefresh intervalMs={refreshMs} statusKind={data.status.kind} matchDate={data.matchDate} showPulse={true} /><div className="mx-auto max-w-7xl space-y-5"><Hero data={data} onRefresh={refresh} onShare={share} /><StickyTabs /><Overview data={data} /><EventsPanel events={data.events} /><StatsPanel data={data} /><LineupsPanel data={data} /><StandingsPanel data={data} /><AnalysisPanel data={data} /><SourcesPanel data={data} /></div></main>;
 }

@@ -45,7 +45,7 @@ async function fetchProviderMatches(query: Record<string, string | number>) {
     let payload: any;
     try { payload = await theStatsApiFetch('/api/football/matches', { ...base, page }, { timeoutMs: 15000 }); }
     catch (error: any) { if (page > 1 && isPageOutOfRange(error)) break; throw error; }
-    const list = extractList(payload).map(providerMatch).filter((row) => row.id);
+    const list = extractList(payload).map(providerMatch).filter((row: any) => row.id);
     for (const row of list) { if (seen.has(row.id)) continue; seen.add(row.id); rows.push(row); }
     if (list.length < perPage) break;
     await sleep(350);

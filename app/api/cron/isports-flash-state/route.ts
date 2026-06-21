@@ -120,6 +120,7 @@ async function readRemoteFlash(req: Request) {
   url.searchParams.set('save', 'false');
   url.searchParams.set('includeMatch', 'true');
   const response = await remoteFlashPullGET(new Request(url.toString(), { method: 'GET', headers: req.headers }));
+  if (!response) return { ok: false, status: 500, body: null };
   const text = await response.text();
   let body: any = text;
   try { body = JSON.parse(text); } catch {}
