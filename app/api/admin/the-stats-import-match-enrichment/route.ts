@@ -265,7 +265,12 @@ function summarizeLineup(payload: any) {
 
 async function resolveProviderMatchId(match: any, providerMatchesQuery: Record<string, string | number>) {
   const sourceProviderMatchId = String(match.externalId || '').trim() || null;
-  if (sourceProviderMatchId?.startsWith('mt_')) return { sourceProviderMatchId, resolvedProviderMatchId: sourceProviderMatchId, resolvedBy: 'local_external_id' };
+  if (sourceProviderMatchId?.startsWith('mt_') && sourceProviderMatchId !== 'mt_12345') {
+    const digits = sourceProviderMatchId.replace(/\D/g, '');
+    if (digits.length >= 8) {
+      return { sourceProviderMatchId, resolvedProviderMatchId: sourceProviderMatchId, resolvedBy: 'local_external_id' };
+    }
+  }
   const payload = await theStatsApiFetch('/api/football/matches', providerMatchesQuery, { timeoutMs: 15000 });
   const providerMatches = extractArray(payload).map(normalizeProviderMatch).filter((row) => row.providerId);
   const matched = providerMatches.find((candidate) => providerMatchesLocal(candidate, match));
@@ -537,7 +542,9 @@ export async function GET(req: Request) {
       });
     }
 
-    const numericProviderMatchId = Number.parseInt(String(resolved.sourceProviderMatchId || match.externalId || match.animationMatchId || 0), 10) || 0;
+    const rawTargetId = String(resolved.resolvedProviderMatchId || resolved.sourceProviderMatchId || match.externalId || 0);
+    const idDigits = rawTargetId.replace(/\D/g, '');
+    const numericProviderMatchId = idDigits.length >= 8 ? (Number.parseInt(idDigits, 10) || 0) : 0;
     const data = snapshotPreview(match, numericProviderMatchId, resolved.resolvedProviderMatchId, stats, derived, lineup, providerEvents, playerRatings, optionalSources);
 
     let created = null;

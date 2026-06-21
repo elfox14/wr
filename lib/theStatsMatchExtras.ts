@@ -29,7 +29,14 @@ function extractList(payload: any) { if (Array.isArray(payload)) return payload;
 function listFrom(payload: any, fields: string[]) { if (Array.isArray(payload)) return payload; const data = dataOf(payload); if (Array.isArray(data)) return data; for (const field of fields) if (Array.isArray(data?.[field])) return data[field]; for (const field of fields) if (Array.isArray(payload?.[field])) return payload[field]; return []; }
 function providerMatch(row: any) { const fixture = row?.fixture || row?.match || row; const teams = row?.teams || row?.participants || {}; const home = teams?.home || row?.home || row?.homeTeam || row?.home_team || {}; const away = teams?.away || row?.away || row?.awayTeam || row?.away_team || {}; return { id: str(fixture?.id, fixture?.matchId, fixture?.match_id, row?.id, row?.matchId, row?.match_id, row?.fixtureId, row?.fixture_id), home: str(home?.name, row?.homeName, row?.home_team_name, home), away: str(away?.name, row?.awayName, row?.away_team_name, away), date: str(fixture?.utc_date, fixture?.date, row?.utc_date, row?.date, row?.matchDate, row?.kickoff, row?.start_time), raw: row }; }
 function candidateScore(candidate: any, match: any) { const directHome = teamScore(candidate.home, match.homeTeam); const directAway = teamScore(candidate.away, match.awayTeam); const swappedHome = teamScore(candidate.home, match.awayTeam); const swappedAway = teamScore(candidate.away, match.homeTeam); const direct = (directHome + directAway) / 2; const swapped = (swappedHome + swappedAway) / 2; const reversed = swapped > direct; const team = Math.max(direct, swapped); const hours = hoursApart(candidate.date, match.matchDate); const time = hours <= 4 ? 25 : hours <= 12 ? 15 : hours <= 30 ? 8 : candidate.date ? -15 : 0; return { ...candidate, score: Math.round(team + time), teamScore: Math.round(team), timeHours: hours === 999 ? null : Number(hours.toFixed(2)), reversed }; }
-function normalizeProviderId(value: any) { const raw = str(value); if (!raw) return null; const id = raw.startsWith('mt_') ? raw : `mt_${raw.replace(/^mt_/i, '').replace(/\D/g, '')}`; return id && id !== 'mt_' && id !== 'mt_12345' ? id : null; }
+function normalizeProviderId(value: any) {
+  const raw = str(value);
+  if (!raw) return null;
+  const id = raw.startsWith('mt_') ? raw : `mt_${raw.replace(/^mt_/i, '').replace(/\D/g, '')}`;
+  const digits = id.replace(/\D/g, '');
+  if (digits.length < 8) return null; // Reject short iSports IDs like 537354
+  return id && id !== 'mt_' && id !== 'mt_12345' ? id : null;
+}
 function isPageOutOfRange(error: any) { const code = String(error?.payload?.error?.code || error?.code || '').toUpperCase(); const message = String(error?.payload?.error?.message || error?.message || '').toLowerCase(); return code === 'PAGE_OUT_OF_RANGE' || message.includes('out of range'); }
 function safeError(error: any) { return { name: error?.name || 'TheStatsApiError', message: String(error?.message || error), status: Number(error?.status || error?.payload?.error?.status_code || 0) || null, code: error?.code || error?.payload?.error?.code || null, payload: error?.payload || null }; }
 
@@ -65,7 +72,12 @@ async function existingProviderId(matchId: string) {
 
 export async function resolveTheStatsProviderId(match: any, query: Record<string, string | number>) {
   const external = String(match.externalId || '').trim();
-  if (external.startsWith('mt_') && external !== 'mt_12345') return { id: external, by: 'local_external_id' };
+  if (external.startsWith('mt_') && external !== 'mt_12345') {
+    const digits = external.replace(/\D/g, '');
+    if (digits.length >= 8) {
+      return { id: external, by: 'local_external_id' };
+    }
+  }
   const cached = await existingProviderId(match.id);
   if (cached) return { id: cached, by: 'cached_the_stats_snapshot' };
   const list = await fetchProviderMatches(query);

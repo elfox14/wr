@@ -86,7 +86,12 @@ async function resolveProviderId(match: any, params: URLSearchParams) {
   const explicit = String(params.get('providerMatchId') || '').trim();
   if (explicit) return { id: explicit, by: 'explicit_provider_match_id' };
   const external = String(match.externalId || '').trim();
-  if (external.startsWith('mt_')) return { id: external, by: 'local_external_id' };
+  if (external.startsWith('mt_')) {
+    const digits = external.replace(/\D/g, '');
+    if (digits.length >= 8) {
+      return { id: external, by: 'local_external_id' };
+    }
+  }
 
   const query = {
     competition_id: params.get('competition_id') || process.env.THE_STATS_API_WORLD_CUP_COMPETITION_ID || 'comp_6107',
