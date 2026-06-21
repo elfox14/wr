@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { getTeamFlagUrl } from '@/lib/teamFlags';
+import HomeLiveMatchTicker from '@/components/HomeLiveMatchTicker';
 
 type Team = {
   id?: string | number | null;
@@ -732,6 +733,8 @@ export default function HomeDemoCommandCenter() {
             </div>
           </div>
         </section>
+
+        <HomeLiveMatchTicker matches={liveMatches} />
 
         <DashboardNav />
 
