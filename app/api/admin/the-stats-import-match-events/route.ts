@@ -179,12 +179,7 @@ async function resolveProviderMatchId(match: any, providerMatchesQuery: Record<s
   const explicit = String(explicitProviderMatchId || '').trim() || null;
   if (explicit) return { sourceProviderMatchId: explicit, resolvedProviderMatchId: explicit, resolvedBy: 'explicit_provider_match_id' };
   const sourceProviderMatchId = String(match.externalId || '').trim() || null;
-  if (sourceProviderMatchId?.startsWith('mt_') && sourceProviderMatchId !== 'mt_12345') {
-    const digits = sourceProviderMatchId.replace(/\D/g, '');
-    if (digits.length >= 8) {
-      return { sourceProviderMatchId, resolvedProviderMatchId: sourceProviderMatchId, resolvedBy: 'local_external_id' };
-    }
-  }
+  if (sourceProviderMatchId?.startsWith('mt_')) return { sourceProviderMatchId, resolvedProviderMatchId: sourceProviderMatchId, resolvedBy: 'local_external_id' };
   const payload = await theStatsApiFetch('/api/football/matches', providerMatchesQuery, { timeoutMs: 15000 });
   const providerMatches = extractArray(payload).map(normalizeProviderMatch).filter((row) => row.providerId);
   const matched = providerMatches.find((candidate) => providerMatchesLocal(candidate, match));

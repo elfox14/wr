@@ -1,10 +1,34 @@
 import { NextResponse } from 'next/server';
-import { requireAdmin } from '@/lib/adminAuth';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 const CONTROL_KEYS = new Set(['key', 'cronSecret', 'adminSecret', 'apply', 'dryRun']);
+
+function configuredSecrets() {
+  return [process.env.CRON_SECRET, process.env.ADMIN_API_SECRET]
+    .map((value) => String(value || '').trim())
+    .filter(Boolean);
+}
+
+function getSuppliedSecret(req: Request, searchParams: URLSearchParams) {
+  const auth = req.headers.get('authorization') || '';
+  const bearer = auth.startsWith('Bearer ') ? auth.slice(7).trim() : '';
+  return String(
+    req.headers.get('x-cron-secret')?.trim() ||
+    req.headers.get('x-admin-secret')?.trim() ||
+    bearer ||
+    searchParams.get('cronSecret')?.trim() ||
+    searchParams.get('adminSecret')?.trim() ||
+    searchParams.get('key')?.trim() ||
+    '',
+  ).trim();
+}
+
+function isAuthorized(secret: string) {
+  const validSecrets = configuredSecrets();
+  return !!secret && validSecrets.includes(secret);
+}
 
 function internalOrigin(fallback: string) {
   const port = process.env.PORT;
@@ -12,10 +36,12 @@ function internalOrigin(fallback: string) {
 }
 
 export async function GET(req: Request) {
-  const auth = await requireAdmin(req);
-  if (!auth.authorized) return auth.error;
-
   const incomingUrl = new URL(req.url);
+  const suppliedSecret = getSuppliedSecret(req, incomingUrl.searchParams);
+
+  if (!isAuthorized(suppliedSecret)) {
+    return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401, headers: { 'Cache-Control': 'no-store' } });
+  }
 
   const adminUrl = new URL('/api/admin/the-stats-verify', internalOrigin(incomingUrl.origin));
   adminUrl.searchParams.set('providerPath', incomingUrl.searchParams.get('providerPath') || '/api/football/matches');
@@ -29,10 +55,9 @@ export async function GET(req: Request) {
     if (!CONTROL_KEYS.has(key) && !adminUrl.searchParams.has(key)) adminUrl.searchParams.set(key, value);
   }
 
-  const secret = process.env.ADMIN_API_SECRET || process.env.CRON_SECRET || '';
   const response = await fetch(adminUrl, {
     method: 'GET',
-    headers: { 'x-cron-secret': secret },
+    headers: { 'x-cron-secret': suppliedSecret },
     cache: 'no-store',
   });
 

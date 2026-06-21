@@ -1,8 +1,13 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { requireAdmin } from '@/lib/adminAuth';
 
-
+function isAuthorized(req: Request) {
+  const secret = process.env.CRON_SECRET || process.env.ADMIN_API_SECRET || '';
+  if (!secret) return true;
+  const auth = req.headers.get('authorization') || '';
+  const token = auth.replace(/^Bearer\s+/i, '').trim();
+  return token === secret;
+}
 
 function splitKeys(value?: string) {
   return value?.split(',').map((key) => key.trim()).filter(Boolean) || [];
@@ -95,8 +100,7 @@ function scoreCandidate(local: any, provider: any) {
 }
 
 export async function GET(req: Request) {
-  const auth = await requireAdmin(req);
-  if (!auth.authorized) return auth.error;
+  if (!isAuthorized(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   try {
     const { searchParams } = new URL(req.url);
