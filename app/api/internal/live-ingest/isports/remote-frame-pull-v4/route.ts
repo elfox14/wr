@@ -113,31 +113,34 @@ async function handler(req: Request) {
     const animationId = Math.floor(Number(url.searchParams.get('matchId') || url.searchParams.get('providerMatchId') || extractISportsMatchId(sourceUrl)));
     if (!Number.isFinite(animationId) || animationId <= 0) return json({ ok: false, error: 'matchId or sourceUrl is required' }, 400);
     const wrapperUrl = sourceUrl ? safeUrl(sourceUrl).toString() : defaultWrapper(animationId, mode, url.searchParams.get('lang') || 'en', url.searchParams.get('v') || '1');
-    const wrapper = await fetchText(wrapperUrl, 15000, { accept: 'text/html,*/*', 'user-agent': 'Mozilla/5.0 (compatible; MCPrimeISportsV4/1.0)' });
+    const wrapper = await fetchText(wrapperUrl, clamp(url.searchParams.get('wrapperTimeoutMs'), 8000, 2000, 15000), { accept: 'text/html,*/*', 'user-agent': 'Mozilla/5.0 (compatible; MCPrimeISportsV4/1.0)' });
     const creds = extractCredentials(wrapper.text);
     if (!creds) return json({ ok: false, mode: 'isports_remote_frame_pull_v4', error: 'Could not extract iframe credentials', wrapper: { sourceUrl: wrapperUrl, ok: wrapper.ok, status: wrapper.status, htmlLength: wrapper.text.length } }, 502);
     const frameUrl = buildFrame(wrapperUrl, animationId, mode, creds.ak, creds.sk);
     const timeoutMs = clamp(url.searchParams.get('timeoutMs'), 25000, 5000, 60000);
     const waitMs = clamp(url.searchParams.get('waitMs'), 8000, 1000, 25000);
+    const skipBrowserFallback = bool(url.searchParams.get('skipBrowserFallback')) || bool(url.searchParams.get('directOnly'));
     const replace = url.searchParams.get('replace') === null ? true : bool(url.searchParams.get('replace'));
     const shouldSave = bool(url.searchParams.get('save'));
     const dbMatchId = url.searchParams.get('dbMatchId');
     const match = await localMatch(dbMatchId, animationId);
     const mapping = shouldSave ? await mapAnimationId(match, animationId) : null;
-    const direct = await fetchText(frameUrl, clamp(url.searchParams.get('directTimeoutMs'), 12000, 3000, 30000), { accept: 'text/html,*/*', referer: 'https://www.isportslive8.com/', 'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome Safari/537.36' });
+    const direct = await fetchText(frameUrl, clamp(url.searchParams.get('directTimeoutMs'), 8000, 2000, 30000), { accept: 'text/html,*/*', referer: 'https://www.isportslive8.com/', 'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome Safari/537.36' });
     let html = direct.ok ? direct.text : '';
     let events = mode === 'timeline' ? extractEvents(html, match) : [];
     let loader = 'direct_signed_iframe_fetch';
     let browser: any = null;
-    if (!directUsable(html, events.length)) {
+    if (!directUsable(html, events.length) && !skipBrowserFallback) {
       browser = await renderWithBrowsers(frameUrl, timeoutMs, waitMs, url.searchParams.get('backupEndpoint') || url.searchParams.get('fallbackEndpoint'));
       if (browser.html) { html = browser.html; events = mode === 'timeline' ? extractEvents(html, match) : []; loader = 'browserless_primary_or_fallback'; }
       else { loader = 'direct_loading_shell_and_browserless_failed'; }
+    } else if (!directUsable(html, events.length) && skipBrowserFallback) {
+      loader = 'direct_unusable_browser_fallback_skipped';
     }
     const text = htmlToText(html);
     const saveResult = shouldSave ? await saveEvents(match, events, wrapperUrl, animationId, replace) : null;
     const cache = await cached(match?.id || dbMatchId);
-    return json({ ok: true, mode: 'isports_remote_frame_pull_v4', frameMode: mode, loader, wrapper: { sourceUrl: wrapperUrl, ok: wrapper.ok, status: wrapper.status, htmlLength: wrapper.text.length }, frame: { sourceUrl: mask(frameUrl), rendered: Boolean(html), htmlLength: html.length, textLength: text.length, textSample: text.slice(0, 1200) }, directFrame: { ok: direct.ok, status: direct.status, contentType: direct.contentType, rawLength: direct.text.length, textSample: htmlToText(direct.text).slice(0, 200), usable: directUsable(direct.text, mode === 'timeline' ? extractEvents(direct.text, match).length : 0), error: direct.error }, remoteBrowser: browser ? { used: true, ok: browser.ok, status: browser.status, contentType: browser.contentType, rawLength: browser.rawLength, htmlLength: browser.htmlLength, error: browser.error, attempts: browser.attempts } : { used: false }, match: match ? { id: match.id, status: match.status, animationMatchId: match.animationMatchId, homeTeam: match.homeTeam, awayTeam: match.awayTeam } : null, mapping, timeline: { eventsCount: events.length, events, save: saveResult }, cachedTimeline: { eventsCount: cache.events.length, events: cache.events.slice(-20), hasSnapshot: Boolean(cache.snapshot), snapshot: cache.snapshot, usedWhenCurrentPullEmpty: events.length === 0 && cache.events.length > 0 }, resilience: { directLoadingShellIsNotAccepted: true, fallbackEnv: 'BROWSERLESS_FALLBACK_ENDPOINT', noDeleteWhenCurrentPullEmpty: true, cacheReturned: true, renderFallbackGetsLongerTimeout: true } });
+    return json({ ok: true, mode: 'isports_remote_frame_pull_v4', frameMode: mode, loader, wrapper: { sourceUrl: wrapperUrl, ok: wrapper.ok, status: wrapper.status, htmlLength: wrapper.text.length }, frame: { sourceUrl: mask(frameUrl), rendered: Boolean(html), htmlLength: html.length, textLength: text.length, textSample: text.slice(0, 1200) }, directFrame: { ok: direct.ok, status: direct.status, contentType: direct.contentType, rawLength: direct.text.length, textSample: htmlToText(direct.text).slice(0, 200), usable: directUsable(direct.text, mode === 'timeline' ? extractEvents(direct.text, match).length : 0), error: direct.error }, remoteBrowser: browser ? { used: true, ok: browser.ok, status: browser.status, contentType: browser.contentType, rawLength: browser.rawLength, htmlLength: browser.htmlLength, error: browser.error, attempts: browser.attempts } : { used: false, skipped: skipBrowserFallback }, match: match ? { id: match.id, status: match.status, animationMatchId: match.animationMatchId, homeTeam: match.homeTeam, awayTeam: match.awayTeam } : null, mapping, timeline: { eventsCount: events.length, events, save: saveResult }, cachedTimeline: { eventsCount: cache.events.length, events: cache.events.slice(-20), hasSnapshot: Boolean(cache.snapshot), snapshot: cache.snapshot, usedWhenCurrentPullEmpty: events.length === 0 && cache.events.length > 0 }, resilience: { directLoadingShellIsNotAccepted: true, fallbackEnv: 'BROWSERLESS_FALLBACK_ENDPOINT', noDeleteWhenCurrentPullEmpty: true, cacheReturned: true, browserFallbackSkipped: skipBrowserFallback, renderFallbackGetsLongerTimeout: true } });
   } catch (error: any) { return json({ ok: false, mode: 'isports_remote_frame_pull_v4', error: error?.message || 'Internal Server Error' }, 500); }
 }
 export async function GET(req: Request) { return handler(req); }
