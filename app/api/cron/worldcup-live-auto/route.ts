@@ -17,7 +17,7 @@ type StageResult = {
 };
 
 const DEFAULT_PUBLIC_ORIGIN = 'https://worldcup.mcprim.com';
-const LIVE_STAGE_TIMEOUT_MS = 25_000;
+const LIVE_STAGE_TIMEOUT_MS = 27_000;
 
 function json(value: unknown, status = 200) {
   return NextResponse.json(value, {
@@ -169,14 +169,14 @@ function buildFullSyncUrl(origin: string, key: string, url: URL, target: { dbMat
 
 function buildISportsTimelineUrl(origin: string, key: string, url: URL, target: { dbMatchId?: string | null; providerMatchId?: string | null }) {
   const next = new URL('/api/cron/isports-live-sync', origin);
-  next.searchParams.set('take', String(int(url.searchParams.get('isportsTake'), 5, 1, 5)));
+  next.searchParams.set('take', String(int(url.searchParams.get('isportsTake'), target.dbMatchId ? 1 : 5, 1, 5)));
   next.searchParams.set('save', 'true');
   next.searchParams.set('replace', 'true');
   next.searchParams.set('includeTimeline', 'true');
   next.searchParams.set('includeFlash', 'true');
   next.searchParams.set('asyncFlash', bool(url.searchParams.get('asyncFlash'), true) ? 'true' : 'false');
   next.searchParams.set('includeLive', 'false');
-  next.searchParams.set('timeoutMs', String(int(url.searchParams.get('isportsTimeoutMs'), 22_000, 5_000, 45_000)));
+  next.searchParams.set('timeoutMs', String(int(url.searchParams.get('isportsTimeoutMs'), 26_000, 5_000, 45_000)));
   next.searchParams.set('waitMs', String(int(url.searchParams.get('isportsWaitMs'), 5_000, 1_000, 15_000)));
   return withSecret(optionalTarget(next, target), key);
 }
@@ -247,7 +247,7 @@ export async function GET(req: Request) {
 
   // iSports is the fallback/complement when TheStats is limited, so it gets the remaining time budget.
   if (runISportsTimeline) {
-    stages.push(await callJson('isports_timeline_flash_core', buildISportsTimelineUrl(origin, key, url, target), 18_000, startedAt, budgetMs));
+    stages.push(await callJson('isports_timeline_flash_core', buildISportsTimelineUrl(origin, key, url, target), target.dbMatchId ? 26_000 : 18_000, startedAt, budgetMs));
   }
 
   // Lower-priority confirmation/monitoring stages run on a cadence and only when time remains.
