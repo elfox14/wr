@@ -238,7 +238,11 @@ function Card({ title, eyebrow, action, children, className = '' }: { title: str
 
 function StatusPill({ match }: { match?: Match | null }) {
   if (!match) return <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[10px] font-black text-gray-400">بانتظار البيانات</span>;
-  if (isLive(match)) return <span className="rounded-full border border-[#00FF88]/25 bg-[#00FF88]/10 px-2.5 py-1 text-[10px] font-black text-[#00FF88]">{match.liveLabel || (match.minute ? `مباشر د${ar(match.minute)}` : 'مباشر الآن')}</span>;
+  if (isLive(match)) {
+    const status = normalizeStatus(match);
+    const label = status === '1H' ? 'الشوط الأول' : status === '2H' ? 'الشوط الثاني' : status === 'ET' ? 'وقت إضافي' : 'مباشر الآن';
+    return <span className="rounded-full border border-[#00FF88]/25 bg-[#00FF88]/10 px-2.5 py-1 text-[10px] font-black text-[#00FF88]">{match.liveLabel || label}</span>;
+  }
   if (isHalfTime(match)) return <span className="rounded-full border border-[#FFD700]/25 bg-[#FFD700]/10 px-2.5 py-1 text-[10px] font-black text-[#FFD700]">استراحة</span>;
   if (isFinished(match)) return <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[10px] font-black text-gray-300">انتهت</span>;
   if (isScheduled(match)) return <span className="rounded-full border border-[#0FF0FC]/25 bg-[#0FF0FC]/10 px-2.5 py-1 text-[10px] font-black text-[#0FF0FC]">قادمة</span>;
