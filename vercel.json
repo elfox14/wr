@@ -2,7 +2,7 @@
   "crons": [
     {
       "path": "/api/cron/worldcup-live-auto",
-      "schedule": "*/5 * * * *"
+      "schedule": "* * * * *"
     }
   ]
 }
