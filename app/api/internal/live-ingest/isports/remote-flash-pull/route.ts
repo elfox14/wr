@@ -11,9 +11,11 @@ export const runtime = 'nodejs';
 
 type FrameMode = 'live' | 'timeline';
 type FlashRecord = { id: string; dataType: string; teamId: string; eventType: string; minute: number | null; injuryTime: number | null; raw: string };
+
 const HOSTS = new Set(['isportslive8.com', 'www.isportslive8.com']);
 const FLASH_SOURCE = 'ISPORTS_FLASH';
 const FINAL_MINUTE_FALLBACK = 120;
+const DEFAULT_FALLBACK_ENDPOINT = 'https://browserless-backup-5k6y.onrender.com/content';
 
 function json(value: unknown, status = 200) { return NextResponse.json(value, { status, headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } }); }
 function clamp(value: string | null, fallback: number, min: number, max: number) { const n = Number(value); return Number.isFinite(n) ? Math.max(min, Math.min(max, Math.floor(n))) : fallback; }
@@ -23,6 +25,7 @@ function md5(value: string) { return createHash('md5').update(value).digest('hex
 function lastRegexValue(text: string, regex: RegExp) { let found: string | null = null; for (const match of text.matchAll(regex)) if (match?.[1]) found = match[1]; return found; }
 function numberFrom(value: unknown) { const n = Number(String(value ?? '').replace('%', '').trim()); return Number.isFinite(n) ? Math.round(n) : null; }
 function isFinalMinute(minute: number | null) { return minute !== null && minute >= FINAL_MINUTE_FALLBACK; }
+
 function extractFrameCredentials(html: string) {
   const ak = lastRegexValue(html, /USER_FEIJING88\.ak\s*=\s*["']([^"']+)["']/g) || lastRegexValue(html, /\bak\s*:\s*["']([^"']+)["']/g);
   const sk = lastRegexValue(html, /USER_FEIJING88\.sk\s*=\s*["']([^"']+)["']/g) || lastRegexValue(html, /\bsk\s*:\s*["']([^"']+)["']/g);
@@ -44,64 +47,39 @@ function buildFrameUrl(wrapperUrl: string, matchId: number, mode: FrameMode, ak:
 function maskUrl(value: string) { const url = new URL(value); for (const key of ['accessKey', 'auth', 'ts', 'r', 'token']) if (url.searchParams.has(key)) url.searchParams.set(key, '***'); return url.toString(); }
 function maskMaybe(value?: string | null) { if (!value) return value || null; try { return maskUrl(value); } catch { return value.replace(/([?&](?:accessKey|auth|ts|r|token)=)[^&\s]+/gi, '$1***'); } }
 async function fetchWrapper(url: string) { const response = await fetch(url, { cache: 'no-store', headers: { accept: 'text/html,*/*', 'user-agent': 'Mozilla/5.0 MCPrimeFlashPull/1.0' } }); return { ok: response.ok, status: response.status, html: await response.text() }; }
-function endpointTo(raw: string, path: 'content' | 'function', token?: string | null) {
+
+function endpointTo(raw: string, token?: string | null) {
   const url = new URL(raw);
-  if (url.pathname === '/' || url.pathname === '') url.pathname = `/${path}`;
-  else if (/\/(content|function)\/?$/i.test(url.pathname)) url.pathname = url.pathname.replace(/\/(content|function)\/?$/i, `/${path}`);
-  else url.pathname = `${url.pathname.replace(/\/$/, '')}/${path}`;
+  if (url.pathname === '/' || url.pathname === '') url.pathname = '/content';
+  else if (/\/function\/?$/i.test(url.pathname)) url.pathname = url.pathname.replace(/\/function\/?$/i, '/content');
+  else if (!/\/content\/?$/i.test(url.pathname)) url.pathname = `${url.pathname.replace(/\/$/, '')}/content`;
   if (token && !url.searchParams.has('token')) url.searchParams.set('token', token);
   return url.toString();
 }
-function browserlessEndpoints(path: 'content' | 'function') {
-  const candidates: string[] = [];
+function browserlessEndpoints() {
+  const preferFallback = boolParam(process.env.BROWSERLESS_PREFER_FALLBACK || null, false);
   const primaryRaw = process.env.BROWSERLESS_ENDPOINT || 'https://production-sfo.browserless.io/content';
   const primaryToken = process.env.BROWSERLESS_TOKEN;
-  if (primaryRaw && primaryToken) candidates.push(endpointTo(primaryRaw, path, primaryToken));
-  const fallbackRaw = process.env.BROWSERLESS_FALLBACK_ENDPOINT || process.env.BROWSERLESS_BACKUP_ENDPOINT || 'https://browserless-backup-5k6y.onrender.com/content';
-  const fallbackToken = process.env.BROWSERLESS_FALLBACK_TOKEN || process.env.BROWSERLESS_BACKUP_TOKEN || process.env.BROWSERLESS_TOKEN;
-  if (fallbackRaw) candidates.push(endpointTo(fallbackRaw, path, fallbackToken));
-  return [...new Set(candidates)];
+  const fallbackRaw = process.env.BROWSERLESS_FALLBACK_ENDPOINT || process.env.BROWSERLESS_BACKUP_ENDPOINT || DEFAULT_FALLBACK_ENDPOINT;
+  const fallbackToken = process.env.BROWSERLESS_FALLBACK_TOKEN || process.env.BROWSERLESS_BACKUP_TOKEN || (!preferFallback ? process.env.BROWSERLESS_TOKEN : undefined);
+  const primary = primaryRaw && primaryToken ? [endpointTo(primaryRaw, primaryToken)] : [];
+  const fallback = fallbackRaw ? [endpointTo(fallbackRaw, fallbackToken)] : [];
+  return [...new Set(preferFallback ? [...fallback, ...primary] : [...primary, ...fallback])];
 }
-function browserlessCode() {
-  return `export default async function ({ page, context }) {
-    const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-    await page.setViewport({ width: 1280, height: 720, deviceScaleFactor: 1 });
-    await page.goto(context.url, { waitUntil: 'domcontentloaded', timeout: context.timeoutMs });
-    await sleep(context.waitMs || 10000);
-    const payload = await page.evaluate(async () => {
-      const scheduleID = window.scheduleID || null;
-      let flashFetch = null;
-      if (scheduleID) {
-        try {
-          const res = await fetch('/flashdata/get?id=' + encodeURIComponent(scheduleID) + '&t=' + Date.now(), { cache: 'no-store' });
-          flashFetch = { ok: res.ok, status: res.status, contentType: res.headers.get('content-type'), text: await res.text() };
-        } catch (error) { flashFetch = { ok: false, error: String(error && error.message || error), text: '' }; }
-      }
-      const attack = window.attakBarList || [];
-      const goal = window.goalBarList || [];
-      return { scheduleID, matchState: typeof window.matchState !== 'undefined' ? window.matchState : null, bodyText: (document.body ? document.body.innerText : '').slice(0, 1500), attackBarsLength: attack.length || 0, goalBarsLength: goal.length || 0, flashFetch };
-    });
-    return { data: payload, type: 'application/json' };
-  }`;
-}
-async function callBrowserlessFunction(targetUrl: string, timeoutMs: number, waitMs: number) {
-  const attempts: any[] = [];
-  for (const endpoint of browserlessEndpoints('function')) {
+function htmlFromBrowserResponse(text: string, contentType: string | null) {
+  const trimmed = String(text || '').trim();
+  if (!trimmed) return '';
+  if (contentType?.includes('application/json') || /^[{[]/.test(trimmed)) {
     try {
-      const response = await fetch(endpoint, { method: 'POST', cache: 'no-store', headers: { 'content-type': 'application/json', accept: 'application/json,*/*' }, body: JSON.stringify({ code: browserlessCode(), context: { url: targetUrl, timeoutMs, waitMs } }) });
-      const text = await response.text(); let parsed: any = null; try { parsed = JSON.parse(text); } catch {}
-      const result = { ok: response.ok, status: response.status, endpoint: maskMaybe(endpoint), rawLength: text.length, contentType: response.headers.get('content-type'), data: parsed?.data || parsed || null, rawSample: parsed ? null : text.slice(0, 1200) };
-      attempts.push({ ...result, data: undefined });
-      if (response.ok && result.data?.flashFetch?.text) return { ...result, attempts, loader: 'browserless_function' };
-    } catch (error: any) {
-      attempts.push({ ok: false, status: null, endpoint: maskMaybe(endpoint), error: String(error?.message || error).slice(0, 1000) });
-    }
+      const parsed = JSON.parse(trimmed);
+      return String(parsed?.data || parsed?.html || parsed?.content || parsed?.body || text || '');
+    } catch {}
   }
-  return { ok: false, status: null, endpoint: null, rawLength: 0, contentType: null, data: null, rawSample: 'No Browserless function endpoint succeeded', attempts, loader: 'browserless_function_failed' };
+  return text;
 }
-async function callBrowserlessContent(targetUrl: string, timeoutMs: number, waitMs: number) {
+async function callBrowserContent(targetUrl: string, timeoutMs: number, waitMs: number) {
   const attempts: any[] = [];
-  for (const endpoint of browserlessEndpoints('content')) {
+  for (const endpoint of browserlessEndpoints()) {
     try {
       const response = await fetch(endpoint, {
         method: 'POST',
@@ -110,14 +88,15 @@ async function callBrowserlessContent(targetUrl: string, timeoutMs: number, wait
         body: JSON.stringify({ url: targetUrl, bestAttempt: true, gotoOptions: { waitUntil: 'domcontentloaded', timeout: timeoutMs }, waitForTimeout: waitMs }),
       });
       const text = await response.text();
-      const result = { ok: response.ok, status: response.status, endpoint: maskMaybe(endpoint), rawLength: text.length, contentType: response.headers.get('content-type'), html: text, rawSample: text.slice(0, 600) };
+      const html = htmlFromBrowserResponse(text, response.headers.get('content-type'));
+      const result = { ok: response.ok, status: response.status, endpoint: maskMaybe(endpoint), rawLength: text.length, htmlLength: html.length, contentType: response.headers.get('content-type'), html, rawSample: text.slice(0, 600) };
       attempts.push({ ...result, html: undefined });
-      if (response.ok && text && !/^\s*Loading\.?\s*$/i.test(text)) return { ...result, attempts, loader: 'browserless_content' };
+      if (response.ok && html && !/^\s*Loading\.?\s*$/i.test(html)) return { ...result, attempts };
     } catch (error: any) {
       attempts.push({ ok: false, status: null, endpoint: maskMaybe(endpoint), error: String(error?.message || error).slice(0, 1000) });
     }
   }
-  return { ok: false, status: null, endpoint: null, rawLength: 0, contentType: null, html: '', rawSample: 'No Browserless content endpoint succeeded', attempts, loader: 'browserless_content_failed' };
+  return { ok: false, status: null, endpoint: null, rawLength: 0, htmlLength: 0, contentType: null, html: '', rawSample: 'No browser content endpoint succeeded', attempts };
 }
 function extractScheduleID(text: string) {
   return lastRegexValue(text, /\bscheduleID\s*=\s*["']?([A-Za-z0-9_-]+)["']?/gi)
@@ -134,12 +113,9 @@ async function fetchFlashBySchedule(frameUrl: string, scheduleID: string) {
   return { ok: response.ok, status: response.status, contentType: response.headers.get('content-type'), url: maskMaybe(url.toString()), text: await response.text() };
 }
 async function callBrowserless(targetUrl: string, timeoutMs: number, waitMs: number) {
-  const fn = await callBrowserlessFunction(targetUrl, timeoutMs, waitMs);
-  if (fn.data?.flashFetch?.text) return fn;
-  const content = await callBrowserlessContent(targetUrl, timeoutMs, waitMs);
+  const content = await callBrowserContent(targetUrl, timeoutMs, waitMs);
   const scheduleID = extractScheduleID(content.html || '');
-  let flashFetch: any = null;
-  if (scheduleID) flashFetch = await fetchFlashBySchedule(targetUrl, scheduleID);
+  const flashFetch = scheduleID ? await fetchFlashBySchedule(targetUrl, scheduleID) : null;
   return {
     ok: Boolean(flashFetch?.text) || content.ok,
     status: flashFetch?.status ?? content.status,
@@ -148,8 +124,8 @@ async function callBrowserless(targetUrl: string, timeoutMs: number, waitMs: num
     contentType: content.contentType,
     data: { scheduleID, bodyText: String(content.html || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').slice(0, 1500), flashFetch },
     rawSample: flashFetch?.text ? null : content.rawSample,
-    attempts: [...(fn.attempts || []), ...(content.attempts || [])],
-    loader: flashFetch?.text ? 'browserless_content_plus_direct_flashdata' : 'browserless_content_no_schedule',
+    attempts: content.attempts,
+    loader: flashFetch?.text ? 'browser_content_plus_direct_flashdata' : 'browser_content_no_schedule',
   };
 }
 function emptyStats(): NormalizedStats { return { minute: null, homePossession: null, awayPossession: null, homeAttacks: null, awayAttacks: null, homeDangerousAttacks: null, awayDangerousAttacks: null, homeShots: null, awayShots: null, homeShotsOnTarget: null, awayShotsOnTarget: null, homeShotsOffTarget: null, awayShotsOffTarget: null, homeCorners: null, awayCorners: null, homeYellowCards: null, awayYellowCards: null, homeRedCards: null, awayRedCards: null, homeScore: null, awayScore: null }; }
@@ -236,7 +212,7 @@ export async function GET(req: Request) {
     const rendered = await callBrowserless(frameUrl, timeoutMs, waitMs); const flashText = String(rendered.data?.flashFetch?.text || ''); const parsed = parseFlashStats(flashText);
     const match = (save || url.searchParams.get('includeMatch') === 'true') ? await getMatch({ dbMatchId: url.searchParams.get('dbMatchId'), providerMatchId }) : null;
     const saveResult = save ? match ? await saveSnapshot(match, providerMatchId, parsed.stats, { source: FLASH_SOURCE, wrapperUrl, frameUrl: maskUrl(frameUrl), loader: rendered.loader, flashMeta: parsed.meta, recordsSample: parsed.records.slice(0, 20) }, replace) : { deleted: 0, inserted: 0, snapshotId: null, error: 'No local match found' } : null;
-    return json({ ok: true, mode: 'isports_remote_flash_pull', frameMode: mode, loader: rendered.loader, remoteBrowser: { ok: rendered.ok, status: rendered.status, endpoint: maskMaybe(rendered.endpoint), attempts: rendered.attempts, rawLength: rendered.rawLength, error: rendered.rawSample || null }, wrapper: { sourceUrl: wrapperUrl, ok: wrapper.ok, status: wrapper.status, htmlLength: wrapper.html.length }, frame: { sourceUrl: maskUrl(frameUrl) }, match: match ? { id: match.id, status: match.status, homeTeam: match.homeTeam, awayTeam: match.awayTeam } : null, hasStats: hasUsefulStats(parsed.stats), stats: parsed.stats, flash: { ok: rendered.data?.flashFetch?.ok ?? null, status: rendered.data?.flashFetch?.status ?? null, scheduleID: rendered.data?.scheduleID || parsed.meta.scheduleID, attackBarsLength: rendered.data?.attackBarsLength ?? null, recordsCount: parsed.records.length, meta: parsed.meta, providerStatus: providerStatus(parsed.meta.matchState, parsed.stats.minute) }, save: saveResult, note: 'Parses iSports flashdata and updates score plus match phase when provider exposes matchState. If iSports keeps state as second-half while minute reaches 120+, the match is treated as finished to stop stale running clocks.' });
+    return json({ ok: true, mode: 'isports_remote_flash_pull', frameMode: mode, loader: rendered.loader, remoteBrowser: { ok: rendered.ok, status: rendered.status, endpoint: maskMaybe(rendered.endpoint), attempts: rendered.attempts, rawLength: rendered.rawLength, error: rendered.rawSample || null }, wrapper: { sourceUrl: wrapperUrl, ok: wrapper.ok, status: wrapper.status, htmlLength: wrapper.html.length }, frame: { sourceUrl: maskUrl(frameUrl) }, match: match ? { id: match.id, status: match.status, homeTeam: match.homeTeam, awayTeam: match.awayTeam } : null, hasStats: hasUsefulStats(parsed.stats), stats: parsed.stats, flash: { ok: rendered.data?.flashFetch?.ok ?? null, status: rendered.data?.flashFetch?.status ?? null, scheduleID: rendered.data?.scheduleID || parsed.meta.scheduleID, recordsCount: parsed.records.length, meta: parsed.meta, providerStatus: providerStatus(parsed.meta.matchState, parsed.stats.minute) }, save: saveResult, note: 'Parses iSports flashdata and updates score plus match phase. Browser endpoint ordering respects BROWSERLESS_PREFER_FALLBACK=true, so fallback/Render can be tried before the primary Browserless endpoint.' });
   } catch (error: any) {
     return json({ ok: false, error: error?.message || 'Internal Server Error' }, 500);
   }
