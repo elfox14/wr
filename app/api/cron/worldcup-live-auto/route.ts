@@ -147,7 +147,7 @@ function buildFootballDataUrl(origin: string, key: string, url: URL) {
   return withSecret(next, key);
 }
 
-function buildFullSyncUrl(origin: string, key: string, url: URL) {
+function buildFullSyncUrl(origin: string, key: string, url: URL, target: { dbMatchId?: string | null; providerMatchId?: string | null }) {
   const next = new URL('/api/cron/live-match-full-sync', origin);
   next.searchParams.set('dryRun', 'false');
   next.searchParams.set('theStats', 'true');
@@ -164,7 +164,7 @@ function buildFullSyncUrl(origin: string, key: string, url: URL) {
   next.searchParams.set('limit', String(int(url.searchParams.get('limit'), 3, 1, 8)));
   next.searchParams.set('minutesBack', String(int(url.searchParams.get('minutesBack'), 240, 15, 480)));
   next.searchParams.set('minutesForward', String(int(url.searchParams.get('minutesForward'), 300, 0, 360)));
-  return withSecret(next, key);
+  return withSecret(optionalTarget(next, target), key);
 }
 
 function buildISportsTimelineUrl(origin: string, key: string, url: URL, target: { dbMatchId?: string | null; providerMatchId?: string | null }) {
@@ -176,8 +176,8 @@ function buildISportsTimelineUrl(origin: string, key: string, url: URL, target: 
   next.searchParams.set('includeFlash', 'true');
   next.searchParams.set('asyncFlash', bool(url.searchParams.get('asyncFlash'), true) ? 'true' : 'false');
   next.searchParams.set('includeLive', 'false');
-  next.searchParams.set('timeoutMs', String(int(url.searchParams.get('isportsTimeoutMs'), 18_000, 5_000, 45_000)));
-  next.searchParams.set('waitMs', String(int(url.searchParams.get('isportsWaitMs'), 4_000, 1_000, 15_000)));
+  next.searchParams.set('timeoutMs', String(int(url.searchParams.get('isportsTimeoutMs'), 22_000, 5_000, 45_000)));
+  next.searchParams.set('waitMs', String(int(url.searchParams.get('isportsWaitMs'), 5_000, 1_000, 15_000)));
   return withSecret(optionalTarget(next, target), key);
 }
 
@@ -242,12 +242,12 @@ export async function GET(req: Request) {
 
   // Critical live writes first: events, stats, score, venue/referee snapshot.
   if (runTheStats) {
-    stages.push(await callJson('the_stats_full_sync', buildFullSyncUrl(origin, key, url), 14_000, startedAt, budgetMs));
+    stages.push(await callJson('the_stats_full_sync', buildFullSyncUrl(origin, key, url, target), 14_000, startedAt, budgetMs));
   }
 
-  // iSports is a live fallback/complement, but it must not make the whole cron exceed external 30s limits.
+  // iSports is the fallback/complement when TheStats is limited, so it gets the remaining time budget.
   if (runISportsTimeline) {
-    stages.push(await callJson('isports_timeline_flash_core', buildISportsTimelineUrl(origin, key, url, target), 9_000, startedAt, budgetMs));
+    stages.push(await callJson('isports_timeline_flash_core', buildISportsTimelineUrl(origin, key, url, target), 18_000, startedAt, budgetMs));
   }
 
   // Lower-priority confirmation/monitoring stages run on a cadence and only when time remains.
@@ -288,7 +288,7 @@ export async function GET(req: Request) {
     },
     stages,
     note: hardFailures.length
-      ? 'Cron completed in degraded mode before the external timeout. Critical TheStats live writes run first; iSports and secondary confirmations run only within the time budget. TheStats extras remain disabled.'
+      ? 'Cron completed in degraded mode before the external timeout. Critical TheStats live writes run first; iSports gets the remaining budget as fallback. TheStats extras remain disabled.'
       : 'Cron completed within the external timeout budget. Critical live events/stats/match-info run first; iSports fallback and secondary checks are time-boxed. TheStats extras remain disabled.',
   });
 }
