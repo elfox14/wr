@@ -202,6 +202,10 @@ function buildPostmatchUrl(origin: string, key: string, url: URL, target: { dbMa
   return withSecret(optionalTarget(next, target), key);
 }
 
+function buildStaleGuardUrl(origin: string, key: string) {
+  return withSecret(new URL('/api/cron/expire-stale-matches', origin), key);
+}
+
 function buildStatusUrl(origin: string, key: string) {
   return withSecret(new URL('/api/admin/live-sources/status', origin), key);
 }
@@ -245,6 +249,10 @@ export async function GET(req: Request) {
     stages.push(await callJson('postmatch_timeline_safe', buildPostmatchUrl(origin, key, url, target), 6_000, startedAt, budgetMs));
   }
 
+  if (bool(url.searchParams.get('staleGuard'), true)) {
+    stages.push(await callJson('expire_stale_matches_guard', buildStaleGuardUrl(origin, key), 3_000, startedAt, budgetMs));
+  }
+
   if (bool(url.searchParams.get('status'), true)) {
     stages.push(await callJson('live_sources_status', buildStatusUrl(origin, key), 3_000, startedAt, budgetMs));
   }
@@ -266,7 +274,7 @@ export async function GET(req: Request) {
     },
     stages,
     note: hardFailures.length
-      ? 'Cron completed in degraded mode. TheStats and core iSports timeline/flash are treated as primary live inputs; inspect failed stages for provider-specific issues.'
-      : 'Cron completed. TheStats and iSports timeline/flash both ran as primary live inputs. Heavy visual stats remain optional unless isportsVisual=true.',
+      ? 'Cron completed in degraded mode. TheStats, iSports timeline/flash, postmatch confirmation, stale-match guard, and status monitoring are automated from this single endpoint.'
+      : 'Cron completed. This single endpoint automatically runs football-data, TheStats, iSports timeline/flash, postmatch confirmation, stale-match guard, and status monitoring.',
   });
 }
