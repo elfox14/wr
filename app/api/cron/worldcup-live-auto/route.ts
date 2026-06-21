@@ -180,14 +180,24 @@ function buildISportsTimelineUrl(origin: string, key: string, url: URL, target: 
   next.searchParams.set('save', 'true');
   next.searchParams.set('replace', 'true');
   next.searchParams.set('includeTimeline', 'true');
-  next.searchParams.set('includeFlash', bool(url.searchParams.get('includeFlash'), useBrowserless ? true : targeted ? false : true) ? 'true' : 'false');
-  next.searchParams.set('asyncFlash', bool(url.searchParams.get('asyncFlash'), useBrowserless ? false : true) ? 'true' : 'false');
+  next.searchParams.set('includeFlash', 'false');
+  next.searchParams.set('asyncFlash', 'false');
   next.searchParams.set('includeLive', 'false');
-  next.searchParams.set('timeoutMs', String(int(url.searchParams.get('isportsTimeoutMs'), useBrowserless ? 22_000 : targeted ? 12_000 : 26_000, 5_000, 45_000)));
+  next.searchParams.set('timeoutMs', String(int(url.searchParams.get('isportsTimeoutMs'), useBrowserless ? 18_000 : targeted ? 12_000 : 26_000, 5_000, 45_000)));
   next.searchParams.set('waitMs', String(int(url.searchParams.get('isportsWaitMs'), useBrowserless ? 3_000 : targeted ? 2_000 : 5_000, 1_000, 15_000)));
   next.searchParams.set('directTimeoutMs', String(int(url.searchParams.get('directTimeoutMs'), targeted ? 6_000 : 12_000, 2_000, 30_000)));
   next.searchParams.set('wrapperTimeoutMs', String(int(url.searchParams.get('wrapperTimeoutMs'), targeted ? 6_000 : 10_000, 2_000, 15_000)));
   next.searchParams.set('skipBrowserFallback', bool(url.searchParams.get('skipBrowserFallback'), targeted && !browserlessPrimary) ? 'true' : 'false');
+  return withSecret(optionalTarget(next, target), key);
+}
+
+function buildISportsFlashStateUrl(origin: string, key: string, url: URL, target: { dbMatchId?: string | null; providerMatchId?: string | null }) {
+  const next = new URL('/api/internal/live-ingest/isports/remote-flash-state-pull', origin);
+  next.searchParams.set('save', 'true');
+  next.searchParams.set('replace', 'true');
+  next.searchParams.set('mode', 'timeline');
+  next.searchParams.set('timeoutMs', String(int(url.searchParams.get('flashStateTimeoutMs'), 10_000, 5_000, 25_000)));
+  next.searchParams.set('waitMs', String(int(url.searchParams.get('flashStateWaitMs'), 2_000, 1_000, 10_000)));
   next.searchParams.set('stateSource', 'isports_flash_schedule_state');
   next.searchParams.set('statusFromMinute', 'false');
   return withSecret(optionalTarget(next, target), key);
@@ -253,17 +263,18 @@ export async function GET(req: Request) {
 
   const stages: StageResult[] = [];
 
-  // Critical live writes first: events, stats, score, venue/referee snapshot.
   if (runTheStats) {
     stages.push(await callJson('the_stats_full_sync', buildFullSyncUrl(origin, key, url, target), 14_000, startedAt, budgetMs));
   }
 
-  // With a primary Browserless API configured, targeted iSports uses Browserless for timeline events and flash schedule state.
   if (runISportsTimeline) {
-    stages.push(await callJson('isports_timeline_flash_core', buildISportsTimelineUrl(origin, key, url, target), targetedBrowserless ? 24_000 : target.dbMatchId ? 13_000 : 18_000, startedAt, budgetMs));
+    stages.push(await callJson('isports_timeline_core', buildISportsTimelineUrl(origin, key, url, target), targetedBrowserless ? 19_000 : target.dbMatchId ? 13_000 : 18_000, startedAt, budgetMs));
   }
 
-  // Lower-priority confirmation/monitoring stages run on a cadence and only when time remains.
+  if (runISportsTimeline && targetedBrowserless) {
+    stages.push(await callJson('isports_flash_state', buildISportsFlashStateUrl(origin, key, url, target), 8_000, startedAt, budgetMs));
+  }
+
   if (cadence(url.searchParams.get('footballData'), 5, minuteBucket)) {
     stages.push(await callJson('football_data_sync', buildFootballDataUrl(origin, key, url), 4_000, startedAt, budgetMs));
   }
@@ -302,7 +313,7 @@ export async function GET(req: Request) {
     },
     stages,
     note: hardFailures.length
-      ? 'Cron completed in degraded mode before the external timeout. TheStats stays primary for stats; targeted iSports uses primary Browserless for events/state when configured.'
+      ? 'Cron completed in degraded mode before the external timeout. TheStats stays primary for stats; targeted iSports uses Browserless for events and flash schedule state when configured.'
       : 'Cron completed within the external timeout budget. TheStats handles stats and match info; targeted iSports uses Browserless timeline plus flash schedule state when configured.',
   });
 }
