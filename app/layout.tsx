@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { Cairo } from "next/font/google";
 import "./globals.css";
 import "./brand-logo.css";
+import "./match-page-overrides.css";
 import { Providers } from "@/components/Providers";
 import { NotificationProvider } from "@/components/ui/NotificationProvider";
 import { Navbar } from "@/components/ui/Navbar";
