@@ -150,6 +150,7 @@ function buildFullSyncUrl(origin: string, key: string, url: URL) {
   next.searchParams.set('theStatsExtras', 'false');
   next.searchParams.set('theStatsExtrasRaw', 'false');
   next.searchParams.set('forceExtras', 'false');
+  next.searchParams.set('forceCoreISports', 'false');
   next.searchParams.set('isports', 'false');
   next.searchParams.set('isportStats', 'false');
   next.searchParams.set('dedupe', 'true');
