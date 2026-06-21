@@ -89,7 +89,7 @@ export async function GET(req: Request) {
   const postMatchMinutes = int(url.searchParams.get('postMatchMinutes'), 360, 30, 720);
   const delayMs = int(url.searchParams.get('delayMs'), 250, 0, 2000);
 
-  const out: any = { ok: true, mode: 'live_match_full_sync_priority', dryRun, requestedMatchId: requestedMatchId || null, publicOrigin: origin, matchesFound: 0, policy: { selection: 'LIVE and closest-to-now matches are prioritized before old scheduled/stale rows', theStats: 'per selected match by db matchId, so automatic cron behaves like manual cron', matchInfo: runMatchInfo ? 'enabled: lightweight venue/city/referee snapshot' : 'disabled', theStatsExtras: runTheStatsExtras ? 'enabled only when explicitly requested' : 'disabled by default', database: 'frontend reads database snapshots/events only' }, perMatch: [] as any[] };
+  const out: any = { ok: true, mode: 'live_match_full_sync_priority', dryRun, requestedMatchId: requestedMatchId || null, publicOrigin: origin, matchesFound: 0, policy: { selection: 'LIVE and closest-to-now matches are prioritized before old scheduled/stale rows', theStats: 'live uses /live-stats; postmatch final uses /stats', matchInfo: runMatchInfo ? 'enabled: lightweight venue/city/referee snapshot' : 'disabled', theStatsExtras: runTheStatsExtras ? 'enabled only when explicitly requested' : 'disabled by default', database: 'frontend reads database snapshots/events only' }, perMatch: [] as any[] };
 
   const matches = await selectActiveMatches(requestedMatchId, minutesBack, minutesForward, postMatchMinutes, limit);
   out.matchesFound = matches.length;
@@ -124,8 +124,8 @@ export async function GET(req: Request) {
     if (theStatsMatchResult) item.theStatsAutoFinish = await autoFinishFromOfficialTimeline(match, theStatsMatchResult, dryRun);
     const finishedBeforeSync = isFinishedStatus(match.status);
     const finishedByTheStatsNow = Boolean(item.theStatsAutoFinish?.shouldFinish);
-    const shouldRunPostmatch = runTheStats && runTheStatsPostmatch && !theStatsBlocked && (finishedBeforeSync || finishedByTheStatsNow);
-    if (shouldRunPostmatch) { const finalCatchup = withSecrets(new URL('/api/admin/the-stats-live-catchup', origin), key); finalCatchup.searchParams.set('matchId', match.id); finalCatchup.searchParams.set('dryRun', String(dryRun)); finalCatchup.searchParams.set('skipSimilarExisting', 'true'); item.theStatsPostmatchFinal = await callJson('the_stats_postmatch_final_by_match_id', finalCatchup, 22_000); }
+    const shouldRunPostmatch = runTheStats && runTheStatsPostmatch && !theStatsBlocked && (finishedBeforeSync || finishedByTheStatsNow || isNotLiveConflict(theStatsMatchResult));
+    if (shouldRunPostmatch) { const finalStats = withSecrets(new URL('/api/admin/the-stats-final-stats-sync', origin), key); finalStats.searchParams.set('matchId', match.id); finalStats.searchParams.set('dryRun', String(dryRun)); finalStats.searchParams.set('save', String(!dryRun)); finalStats.searchParams.set('replace', 'true'); if (item.resolvedTheStatsMatchId) finalStats.searchParams.set('providerMatchId', item.resolvedTheStatsMatchId); finalStats.searchParams.set('timeoutMs', '15000'); item.theStatsPostmatchFinal = await callJson('the_stats_postmatch_final_stats_by_match_id', finalStats, 22_000); }
     else if (runTheStatsPostmatch && theStatsBlocked) item.theStatsPostmatchFinal = { skipped: true, reason: 'TheStats rate limited; postmatch final skipped this cycle' };
 
     const shouldRunExtras = runTheStats && runTheStatsExtras && !theStatsBlocked && (finishedBeforeSync || finishedByTheStatsNow || bool(url.searchParams.get('forceExtras'), false));
