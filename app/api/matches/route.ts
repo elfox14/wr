@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 const LIVE_STATUSES = ['1H', '2H', 'ET', 'BT', 'P', 'IN_PLAY', 'LIVE'];
 const SCHEDULED_STATUSES = ['SCHEDULED', 'TIMED', 'NOT_STARTED', 'NS'];
 const FINISHED_STATUSES = ['FINISHED', 'FT', 'AET', 'PEN'];
@@ -9,6 +12,7 @@ const GROUP_STAGE_MAX_LIVE_MINUTES = 115;
 const KNOCKOUT_MAX_LIVE_MINUTES = 150;
 const FIRST_HALF_FALLBACK_CAP = 50;
 const DEFAULT_PROVIDER_SNAPSHOT_TTL_SECONDS = 5 * 60;
+const MAX_MATCHES_FOR_PAGE = 260;
 
 type SnapshotState = { minute: number | null; capturedAt: Date; providerStatus?: string | null };
 
@@ -146,9 +150,9 @@ function normalizeMatchForDisplay(match: any, now = Date.now(), snapshot?: Snaps
       isLiveNow: true,
       isLikelyLiveByTime: false,
       isHalfTime: false,
-      minute: null,
+      minute: displayMinute(match, freshSnapshot),
       liveLabel: livePhaseLabel(effectiveStatus),
-      minuteSource: freshSnapshot ? 'provider_snapshot_hidden' : 'provider_status_hidden',
+      minuteSource: freshSnapshot ? 'provider_snapshot' : 'provider_status',
     };
   }
 
@@ -204,32 +208,62 @@ function snapshotProviderStatus(rawData: unknown) {
   return raw?.providerStatus || raw?.status || raw?.fixture?.status?.short || raw?.fixture?.status?.long || null;
 }
 
-async function latestDocumentedSnapshots(matchIds: string[]) {
+async function latestFreshSnapshots(matchIds: string[], now = Date.now()) {
   if (matchIds.length === 0) return new Map<string, SnapshotState>();
 
+  const freshSince = new Date(now - providerSnapshotTtlMs());
   const snapshots = await prisma.matchStatsSnapshot.findMany({
-    where: { matchId: { in: matchIds } },
-    select: { matchId: true, minute: true, capturedAt: true, rawData: true },
+    where: {
+      matchId: { in: matchIds },
+      capturedAt: { gte: freshSince },
+    },
+    select: {
+      matchId: true,
+      minute: true,
+      capturedAt: true,
+      rawData: true,
+    },
     orderBy: { capturedAt: 'desc' },
+    take: Math.max(50, matchIds.length * 3),
   });
 
   const latestByMatch = new Map<string, SnapshotState>();
   for (const snapshot of snapshots) {
     if (latestByMatch.has(snapshot.matchId)) continue;
-    latestByMatch.set(snapshot.matchId, { minute: validMinute(snapshot.minute), capturedAt: snapshot.capturedAt, providerStatus: snapshotProviderStatus(snapshot.rawData) });
+    latestByMatch.set(snapshot.matchId, {
+      minute: validMinute(snapshot.minute),
+      capturedAt: snapshot.capturedAt,
+      providerStatus: snapshotProviderStatus(snapshot.rawData),
+    });
   }
   return latestByMatch;
 }
 
 export async function GET() {
+  const now = Date.now();
+
   try {
     const matches = await prisma.match.findMany({
-      include: { homeTeam: true, awayTeam: true },
+      select: {
+        id: true,
+        externalId: true,
+        animationMatchId: true,
+        homeTeamId: true,
+        awayTeamId: true,
+        matchDate: true,
+        status: true,
+        homeScore: true,
+        awayScore: true,
+        groupPhase: true,
+        stage: true,
+        homeTeam: { select: { id: true, name: true, code: true, image: true } },
+        awayTeam: { select: { id: true, name: true, code: true, image: true } },
+      },
       orderBy: { matchDate: 'asc' },
+      take: MAX_MATCHES_FOR_PAGE,
     });
 
-    const documentedSnapshots = await latestDocumentedSnapshots(matches.map((match) => match.id));
-    const now = Date.now();
+    const documentedSnapshots = await latestFreshSnapshots(matches.map((match) => match.id), now);
     const enrichedMatches = matches.map((match) => {
       const snapshot = documentedSnapshots.get(match.id);
       const freshSnapshot = isFreshProviderSnapshot(snapshot, now) ? snapshot : undefined;
@@ -240,6 +274,6 @@ export async function GET() {
     return NextResponse.json(dedupeMatches(enrichedMatches), { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } });
   } catch (error) {
     console.error('Error fetching matches:', error);
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500, headers: { 'Cache-Control': 'no-store' } });
+    return NextResponse.json([], { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } });
   }
 }
