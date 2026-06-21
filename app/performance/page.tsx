@@ -4,6 +4,9 @@ import { AssetImage } from '@/components/ui/AssetImage';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Activity, ArrowRight, BarChart3, Flame, ShieldAlert, Sparkles, Target, Trophy } from 'lucide-react';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 function getTodayStart() {
   const date = new Date();
   date.setHours(0, 0, 0, 0);
