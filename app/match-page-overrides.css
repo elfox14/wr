@@ -15,3 +15,48 @@ main[dir="rtl"] #lineups > div.mt-4 div.overflow-x-auto {
     align-items: start !important;
   }
 }
+
+/* Mobile match stats board
+   Show both teams' values and the stat name on one compact line:
+   Home value | Stat name | Away value. */
+@media (max-width: 639px) {
+  main[dir="rtl"] section[dir="ltr"] > div:last-child > div {
+    grid-template-columns: minmax(44px, 0.75fr) minmax(96px, 1.5fr) minmax(44px, 0.75fr) !important;
+    gap: 0.35rem !important;
+    padding-top: 0.45rem !important;
+    padding-bottom: 0.45rem !important;
+  }
+
+  main[dir="rtl"] section[dir="ltr"] > div:last-child > div > b {
+    font-size: 0.95rem !important;
+    line-height: 1.1 !important;
+    white-space: nowrap !important;
+  }
+
+  main[dir="rtl"] section[dir="ltr"] > div:last-child > div > b:first-child {
+    grid-column: 1 !important;
+    text-align: left !important;
+  }
+
+  main[dir="rtl"] section[dir="ltr"] > div:last-child > div > b:last-child {
+    grid-column: 3 !important;
+    text-align: right !important;
+  }
+
+  main[dir="rtl"] section[dir="ltr"] > div:last-child > div > div:nth-child(2),
+  main[dir="rtl"] section[dir="ltr"] > div:last-child > div > div:nth-child(4) {
+    display: none !important;
+  }
+
+  main[dir="rtl"] section[dir="ltr"] > div:last-child > div > div:nth-child(3) {
+    grid-column: 2 !important;
+    min-height: 2rem !important;
+    padding: 0.35rem 0.45rem !important;
+    font-size: 0.68rem !important;
+    line-height: 1.15 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    white-space: normal !important;
+  }
+}
