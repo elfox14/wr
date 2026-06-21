@@ -1,18 +1,12 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { requireAdmin } from '@/lib/adminAuth';
 
 const LIVE_STATUSES = ['IN_PLAY', 'LIVE', 'HT'];
 const MAX_LIVE_MINUTES = 180;
 const JOB_NAME = 'expire-stale-matches';
 
-function isAuthorized(request: Request) {
-  const secret = process.env.CRON_SECRET;
-  if (!secret) return true;
-  const headerToken = request.headers.get('authorization')?.replace(/^Bearer\s+/i, '');
-  const url = new URL(request.url);
-  const queryToken = url.searchParams.get('secret');
-  return headerToken === secret || queryToken === secret;
-}
+
 
 async function ensureCronRunLogTable() {
   await prisma.$executeRawUnsafe(`
@@ -49,9 +43,8 @@ async function insertCronRun(status: 'success' | 'error', startedAt: Date, messa
 }
 
 export async function GET(request: Request) {
-  if (!isAuthorized(request)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const auth = await requireAdmin(request);
+  if (!auth.authorized) return auth.error;
 
   const startedAt = new Date();
 

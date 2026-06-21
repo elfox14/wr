@@ -86,10 +86,13 @@ export async function getMatchPageData(matchId: string): Promise<MatchPageData |
   noStore();
   const match = await prisma.match.findUnique({ where: { id: matchId }, include: { homeTeam: true, awayTeam: true, events: { orderBy: [{ minute: 'asc' }, { createdAt: 'asc' }] }, statsSnapshots: { orderBy: { capturedAt: 'desc' }, take: 40 } } });
   if (!match) return null;
-  const players = await prisma.asset.findMany({ where: { type: 'PLAYER', teamId: { in: [match.homeTeamId, match.awayTeamId] } }, select: { id: true, name: true, code: true, image: true, position: true, teamId: true }, take: 100, orderBy: [{ position: 'asc' }, { name: 'asc' }] });
-  const allMatches = await getCachedMatches();
-  const digest = await prisma.matchDigest.findUnique({ where: { matchId: match.id } }).catch(() => null);
-  const relatedNews = await prisma.pressNews.findMany({ where: { status: 'published', OR: [{ relatedMatchId: match.id }, { relatedTeamId: { in: [match.homeTeamId, match.awayTeamId] } }] }, orderBy: { publishedAt: 'desc' }, take: 5 }).catch(() => []);
+
+  const [players, allMatches, digest, relatedNews] = await Promise.all([
+    prisma.asset.findMany({ where: { type: 'PLAYER', teamId: { in: [match.homeTeamId, match.awayTeamId] } }, select: { id: true, name: true, code: true, image: true, position: true, teamId: true }, take: 100, orderBy: [{ position: 'asc' }, { name: 'asc' }] }),
+    getCachedMatches(),
+    prisma.matchDigest.findUnique({ where: { matchId: match.id } }).catch(() => null),
+    prisma.pressNews.findMany({ where: { status: 'published', OR: [{ relatedMatchId: match.id }, { relatedTeamId: { in: [match.homeTeamId, match.awayTeamId] } }] }, orderBy: { publishedAt: 'desc' }, take: 5 }).catch(() => [])
+  ]);
   const snapshots = [...(match.statsSnapshots || [])].sort((a, b) => providerPriority(a) - providerPriority(b) || new Date(b.capturedAt).getTime() - new Date(a.capturedAt).getTime());
   const homeTeam = teamLite(match.homeTeam);
   const awayTeam = teamLite(match.awayTeam);

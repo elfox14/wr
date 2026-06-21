@@ -1,22 +1,30 @@
 import { NextResponse } from 'next/server';
 import { importDataHubTeams } from '@/lib/dataHubImport';
 import { clearPlaceholderApiFootballIds } from '@/lib/dataHubMaintenance';
+import { requireAdmin, hasValidAdminSecret } from '@/lib/adminAuth';
 
 export const dynamic = 'force-dynamic';
 
 const squadImportNotice = 'Data Hub general squad imports are disabled. football-data.org remains available only through a separate approved fallback or verification workflow when needed.';
 
-function getBearerToken(request: Request) {
-  const authorization = request.headers.get('authorization') || '';
-  if (!authorization.toLowerCase().startsWith('bearer ')) return '';
-  return authorization.slice(7).trim();
-}
+function isAuthorizedCustom(req: Request) {
+  if (hasValidAdminSecret(req)) return true;
 
-function isAuthorized(request: Request) {
-  const url = new URL(request.url);
-  const supplied = getBearerToken(request) || url.searchParams.get('token') || url.searchParams.get('secret') || '';
-  const expected = process.env.DATA_HUB_CRON_SECRET || process.env.ADMIN_CRON_SECRET || process.env.CRON_SECRET || process.env.ADMIN_API_SECRET || '';
-  return Boolean(expected && supplied && supplied === expected);
+  const expectedSecrets = [process.env.DATA_HUB_CRON_SECRET, process.env.ADMIN_CRON_SECRET]
+    .map((v) => String(v || '').trim())
+    .filter(Boolean);
+  if (!expectedSecrets.length) return false;
+
+  const auth = req.headers.get('authorization') || '';
+  const bearer = auth.startsWith('Bearer ') ? auth.slice(7).trim() : '';
+  const { searchParams } = new URL(req.url);
+  const candidates = [
+    bearer,
+    searchParams.get('token') || '',
+    searchParams.get('secret') || '',
+  ].map((value) => String(value || '').trim()).filter(Boolean);
+
+  return candidates.some((value) => expectedSecrets.includes(value));
 }
 
 function parseLimit(value: string | null, fallback = 8) {
@@ -26,7 +34,8 @@ function parseLimit(value: string | null, fallback = 8) {
 }
 
 async function run(request: Request) {
-  if (!isAuthorized(request)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const auth = await requireAdmin(request);
+  if (!auth.authorized && !isAuthorizedCustom(request)) return auth.error;
 
   const url = new URL(request.url);
   const mode = url.searchParams.get('mode') || 'teams';

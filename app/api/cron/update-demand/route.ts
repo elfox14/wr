@@ -1,14 +1,10 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { requireAdmin } from '@/lib/adminAuth';
 
 export async function GET(request: Request) {
-  // Security check: Only allow authorized cron requests (e.g., Vercel Cron or internal admin)
-  // In a real production app, verify an authorization header here.
-  const authHeader = request.headers.get('authorization');
-  if (process.env.CRON_SECRET && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    // return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    // Allowing it for now for easy testing.
-  }
+  const auth = await requireAdmin(request);
+  if (!auth.authorized) return auth.error;
 
   try {
     const sevenDaysAgo = new Date();

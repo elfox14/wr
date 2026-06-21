@@ -2,7 +2,7 @@ import { randomUUID } from 'crypto';
 import prisma from '@/lib/prisma';
 import { theStatsApiFetch } from '@/lib/theStatsApi';
 
-function str(...values: any[]) {
+function str(...values: any[]): string | null {
   for (const value of values) {
     if (value === undefined || value === null || value === '') continue;
     if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
@@ -11,7 +11,7 @@ function str(...values: any[]) {
       continue;
     }
     if (value && typeof value === 'object') {
-      const text = str(value.name, value.fullName, value.full_name, value.title, value.label, value.display_name, value.displayName);
+      const text: string | null = str(value.name, value.fullName, value.full_name, value.title, value.label, value.display_name, value.displayName);
       if (text) return text;
     }
   }

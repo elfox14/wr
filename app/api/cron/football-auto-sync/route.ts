@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { apiFootballFetch, normalizeName } from '@/lib/apiFootball';
 import { applyVolatilityCap } from '@/lib/liveEngine';
+import { requireAdmin } from '@/lib/adminAuth';
 
 const LIVE_STATUSES = new Set(['1H', 'HT', '2H', 'ET', 'BT', 'P', 'LIVE', 'IN_PLAY']);
 const FINISHED_STATUSES = new Set(['FT', 'AET', 'PEN', 'FINISHED', 'ENDED']);
@@ -24,17 +25,7 @@ function isActiveOrDone(status?: string | null) {
   return normalized === 'IN_PLAY' || normalized === 'FINISHED';
 }
 
-function hasValidCronSecret(req: Request) {
-  const expected = process.env.CRON_SECRET || process.env.ADMIN_API_SECRET;
-  if (!expected) return true;
 
-  const auth = req.headers.get('authorization') || '';
-  const bearer = auth.startsWith('Bearer ') ? auth.slice(7).trim() : '';
-  const cronHeader = req.headers.get('x-cron-secret') || '';
-  const adminHeader = req.headers.get('x-admin-secret') || '';
-
-  return [bearer, cronHeader, adminHeader].some((value) => value && value === expected);
-}
 
 function normalizeTeamName(name?: string | null) {
   return normalizeName(name || '')
@@ -329,9 +320,8 @@ async function syncPlayerPerformance(req: Request, fixtureId: number, force = fa
 }
 
 export async function GET(req: Request) {
-  if (!hasValidCronSecret(req)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const auth = await requireAdmin(req);
+  if (!auth.authorized) return auth.error;
 
   const { searchParams } = new URL(req.url);
   const date = searchParams.get('date') || toDateString();

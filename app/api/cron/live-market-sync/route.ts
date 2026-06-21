@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { apiFootballFetch, footballFetchFromProvider, normalizeName } from '@/lib/apiFootball';
 import { applyVolatilityCap } from '@/lib/liveEngine';
+import { requireAdmin } from '@/lib/adminAuth';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -39,31 +40,7 @@ function normalizeStatus(status?: string | null) {
   return value || 'SCHEDULED';
 }
 
-function validSecrets() {
-  return [process.env.CRON_SECRET, process.env.ADMIN_API_SECRET].map((value) => String(value || '').trim()).filter(Boolean);
-}
 
-function getCronAuth(req: Request) {
-  const expected = validSecrets();
-  if (expected.length === 0) return { valid: true, method: 'no_secret_configured' };
-  const auth = req.headers.get('authorization') || '';
-  const bearer = auth.startsWith('Bearer ') ? auth.slice(7).trim() : '';
-  const cronHeader = req.headers.get('x-cron-secret')?.trim() || '';
-  const adminHeader = req.headers.get('x-admin-secret')?.trim() || '';
-  const { searchParams } = new URL(req.url);
-  const cronQuery = searchParams.get('cronSecret')?.trim() || '';
-  const adminQuery = searchParams.get('adminSecret')?.trim() || '';
-  const keyQuery = searchParams.get('key')?.trim() || '';
-  const matched = [
-    { method: 'authorization_bearer', value: bearer },
-    { method: 'x-cron-secret', value: cronHeader },
-    { method: 'x-admin-secret', value: adminHeader },
-    { method: 'cronSecret_query', value: cronQuery },
-    { method: 'adminSecret_query', value: adminQuery },
-    { method: 'key_query', value: keyQuery },
-  ].find((item) => item.value && expected.includes(item.value));
-  return matched ? { valid: true, method: matched.method } : { valid: false, method: null };
-}
 
 function aliasTeamName(value: string) {
   if (value === 'south korea' || value === 'korea republic' || value === 'republic of korea') return 'korea republic';
@@ -293,8 +270,8 @@ function pickFixtures(payload: any) {
 }
 
 export async function GET(req: Request) {
-  const auth = getCronAuth(req);
-  if (!auth.valid) return NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers: { 'Cache-Control': 'no-store' } });
+  const auth = await requireAdmin(req);
+  if (!auth.authorized) return auth.error;
 
   const startedAt = new Date();
   const url = new URL(req.url);
@@ -316,7 +293,7 @@ export async function GET(req: Request) {
       processed.push(await processLiveFixture(fixture, data?._provider));
     }
     const fromThrottleCache = Boolean(data?._fromLocalThrottleCache);
-    return NextResponse.json({ success: true, mode: 'isports_budget_guard_live_market_sync', authMethod: auth.method, providerPriority: allowApiFootballFallback ? ['ISPORTS', 'API_FOOTBALL'] : ['ISPORTS'], providerFallbackAllowed: allowApiFootballFallback, providerUsed: data?._provider, externalRequestsUsed: fromThrottleCache ? 0 : 1, skippedProviderFetch: false, fromThrottleCache, throttle: { minIntervalSeconds: Math.round(ISPORTS_MIN_INTERVAL_MS / 1000), ageSeconds: data?._throttleAgeSeconds ?? 0, forceProviderFetchAllowed: true }, fixturesFetched: fixtures.length, processed, errors, startedAt: startedAt.toISOString(), finishedAt: new Date().toISOString() }, { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate' } });
+    return NextResponse.json({ success: true, mode: 'isports_budget_guard_live_market_sync', authMethod: (auth as any).mode, providerPriority: allowApiFootballFallback ? ['ISPORTS', 'API_FOOTBALL'] : ['ISPORTS'], providerFallbackAllowed: allowApiFootballFallback, providerUsed: data?._provider, externalRequestsUsed: fromThrottleCache ? 0 : 1, skippedProviderFetch: false, fromThrottleCache, throttle: { minIntervalSeconds: Math.round(ISPORTS_MIN_INTERVAL_MS / 1000), ageSeconds: data?._throttleAgeSeconds ?? 0, forceProviderFetchAllowed: true }, fixturesFetched: fixtures.length, processed, errors, startedAt: startedAt.toISOString(), finishedAt: new Date().toISOString() }, { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate' } });
   } catch (error: any) {
     errors.push({ message: error?.message || 'live sync failed', status: error?.status, provider: error?.provider, payload: error?.payload, apiFootballFallbackAllowed: allowApiFootballFallback });
     return NextResponse.json({ success: false, mode: 'isports_budget_guard_live_market_sync', providerFallbackAllowed: allowApiFootballFallback, errors, processed, startedAt: startedAt.toISOString(), finishedAt: new Date().toISOString() }, { status: 500, headers: { 'Cache-Control': 'no-store' } });
