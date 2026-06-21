@@ -133,6 +133,7 @@ async function fetchLatestScoreSnapshots(matchIds: string[]) {
   const uniqueMatchIds = Array.from(new Set(matchIds.filter(Boolean)));
   if (!uniqueMatchIds.length) return new Map<string, any>();
   try {
+<<<<<<< HEAD
     const idList = uniqueMatchIds.map(quoteSql).join(',');
     const rows = await prisma.$queryRawUnsafe<any[]>(`
       SELECT DISTINCT ON ("matchId")
@@ -150,6 +151,22 @@ async function fetchLatestScoreSnapshots(matchIds: string[]) {
         "capturedAt" DESC
     `);
     return new Map(rows.map((row) => [row.matchId, row]));
+=======
+    const rows = await prisma.matchStatsSnapshot.findMany({
+      where: { matchId: { in: matchIds } },
+      select: { matchId: true, provider: true, minute: true, homeScore: true, awayScore: true, capturedAt: true, rawData: true },
+      orderBy: { capturedAt: 'desc' },
+    });
+    const latestByMatch = new Map<string, any>();
+    const preferredByMatch = new Map<string, any>();
+    for (const row of rows) {
+      if (!latestByMatch.has(row.matchId)) latestByMatch.set(row.matchId, row);
+      const provider = String(row.provider || '').toUpperCase();
+      if (!preferredByMatch.has(row.matchId) && (provider.includes('THE_STATS_API_LIVE') || provider.includes('ISPORTS_FLASH') || (row.rawData as any)?.flashMeta?.matchState)) preferredByMatch.set(row.matchId, row);
+    }
+    for (const [matchId, row] of preferredByMatch) latestByMatch.set(matchId, row);
+    return latestByMatch;
+>>>>>>> parent of a6987c8 (0)
   } catch (error: any) {
     if (!String(error?.message || '').includes('MatchStatsSnapshot')) {
       console.warn('live-card score snapshot lookup failed:', error?.message || error);
@@ -173,8 +190,7 @@ function decorateMatch(match: any, now: Date, providerState?: any, snapshotState
   const providerHasScore = hasAnyNumber(providerState?.homeScore, providerState?.awayScore);
   const snapshotHasScore = hasAnyNumber(snapshotState?.homeScore, snapshotState?.awayScore);
   const useSnapshotScore = !providerHasScore && snapshotHasScore && (isLiveNow || isHalfTime || isFinished);
-  const scoreSource = providerHasScore ? 'provider' : useSnapshotScore ? 'database_snapshot' : 'database_match';
-  const minute = isLiveNow ? liveMinuteForStatus(effectiveStatus, providerState, snapshotState, freshSnapshot) : null;
+  const minute = null;
   const currentLiveStatus = isLiveNow ? phaseStatus(effectiveStatus) : match.status;
 
   return {
@@ -204,6 +220,7 @@ function uniqueById(matches: any[]) {
   });
 }
 
+<<<<<<< HEAD
 function json(payload: any, status = 200) {
   return NextResponse.json(payload, {
     status,
@@ -219,6 +236,11 @@ export async function GET() {
     }
 
     const now = new Date();
+=======
+export async function GET() {
+  const now = new Date();
+  try {
+>>>>>>> parent of a6987c8 (0)
     const liveWindowStart = new Date(now.getTime() - 3 * 60 * 60 * 1000);
     const upcomingUntil = new Date(now.getTime() + 24 * 60 * 60 * 1000);
     const recentSince = new Date(now.getTime() - 6 * 60 * 60 * 1000);
@@ -255,11 +277,18 @@ export async function GET() {
     const filler = [...decoratedFinished, ...other].filter((match) => !primary || match.id !== primary.id).filter((match) => !nextTwo.some((next) => next.id === match.id));
     const matches = uniqueById([...(primary ? [primary] : []), ...nextTwo, ...filler]).slice(0, 3);
 
+<<<<<<< HEAD
     const payload = { ok: true, dataSource: 'database', updatedAt: now.toISOString(), matches };
     liveCardCache = { createdAt: cacheNow, payload };
     return json(payload);
   } catch (error: any) {
     console.error('Error in live-card GET api:', error);
     return json({ ok: false, error: error?.message || 'Internal Server Error', matches: [] }, 500);
+=======
+    return NextResponse.json({ ok: true, dataSource: 'database', updatedAt: now.toISOString(), matches }, { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } });
+  } catch (error) {
+    console.error('Error in live-card GET api:', error);
+    return NextResponse.json({ ok: false, dataSource: 'fallback', updatedAt: now.toISOString(), matches: [] }, { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } });
+>>>>>>> parent of a6987c8 (0)
   }
 }

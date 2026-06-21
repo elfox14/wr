@@ -1,4 +1,4 @@
-import { unstable_noStore as noStore } from 'next/cache';
+import { unstable_noStore as noStore, unstable_cache } from 'next/cache';
 import prisma from '@/lib/prisma';
 import { getTeamFlagUrl } from '@/lib/teamFlags';
 import type { MatchAdvancedData, MatchEventView, MatchPageData, MatchPlayerLite, MatchShotMapItem, MatchStatusView, MatchTeamLite, OfficialLineupPlayer, OfficialLineupTeam, OfficialLineupView, RelatedArticle, SourceChecklistItem } from './types';
@@ -44,19 +44,62 @@ function relatedArticlesFrom(news: any[], digest: any | null, matchId: string): 
 function buildTacticalKeys(homeName: string, awayName: string, statsAvailable: boolean, digest?: any | null) { const keys: string[] = []; if (digest?.turningPoint) keys.push(`نقطة التحول: ${digest.turningPoint}`); keys.push(`مفتاح المتابعة: تعامل ${homeName} مع ضغط ${awayName} أثناء بناء اللعب والتحولات.`); keys.push('راقب جودة الخروج من الخلف والكرات الثانية والمساحات خلف الظهيرين.'); keys.push(statsAvailable ? 'كل رقم ظاهر في الصفحة مأخوذ من Snapshot موثق.' : 'الإحصائيات التفصيلية ستظهر بعد وصول Snapshot موثق أو إدخال يدوي.'); return keys.slice(0, 4); }
 function maxDateIso(values: Array<Date | string | null | undefined>) { const times = values.map((value) => (value ? new Date(value).getTime() : 0)).filter((value) => Number.isFinite(value)); return new Date(times.length ? Math.max(...times) : Date.now()).toISOString(); }
 
+const getCachedMatches = unstable_cache(
+  async () => {
+    return prisma.match.findMany({
+      select: {
+        id: true,
+        status: true,
+        groupPhase: true,
+        stage: true,
+        homeScore: true,
+        awayScore: true,
+        homeTeamId: true,
+        awayTeamId: true,
+        homeTeam: {
+          select: {
+            id: true,
+            name: true,
+            code: true,
+            image: true,
+            group: true,
+          }
+        },
+        awayTeam: {
+          select: {
+            id: true,
+            name: true,
+            code: true,
+            image: true,
+            group: true,
+          }
+        }
+      },
+      orderBy: { matchDate: 'asc' }
+    });
+  },
+  ['all-matches-summary'],
+  { revalidate: 30, tags: ['matches'] }
+);
+
 export async function getMatchPageData(matchId: string): Promise<MatchPageData | null> {
   noStore();
-  const match = await prisma.match.findUnique({ where: { id: matchId }, include: { homeTeam: true, awayTeam: true, events: { orderBy: [{ minute: 'asc' }, { createdAt: 'asc' }] }, statsSnapshots: { orderBy: { capturedAt: 'desc' }, take: 40 } } });
+  const match = await prisma.match.findUnique({ where: { id: matchId }, include: { homeTeam: true, awayTeam: true, events: { orderBy: [{ minute: 'asc' }, { createdAt: 'asc' }] }, statsSnapshots: { orderBy: { capturedAt: 'desc' }, take: 200 } } });
   if (!match) return null;
-  const players = await prisma.asset.findMany({ where: { type: 'PLAYER', teamId: { in: [match.homeTeamId, match.awayTeamId] } }, select: { id: true, name: true, code: true, image: true, position: true, teamId: true }, take: 100, orderBy: [{ position: 'asc' }, { name: 'asc' }] });
-  const allMatches = await prisma.match.findMany({ include: { homeTeam: true, awayTeam: true }, orderBy: { matchDate: 'asc' } });
-  const digest = await prisma.matchDigest.findUnique({ where: { matchId: match.id } }).catch(() => null);
-  const relatedNews = await prisma.pressNews.findMany({ where: { status: 'published', OR: [{ relatedMatchId: match.id }, { relatedTeamId: { in: [match.homeTeamId, match.awayTeamId] } }] }, orderBy: { publishedAt: 'desc' }, take: 5 }).catch(() => []);
+
+  const [players, allMatches, digest, relatedNews] = await Promise.all([
+    prisma.asset.findMany({ where: { type: 'PLAYER', teamId: { in: [match.homeTeamId, match.awayTeamId] } }, select: { id: true, name: true, code: true, image: true, position: true, teamId: true }, take: 100, orderBy: [{ position: 'asc' }, { name: 'asc' }] }),
+    getCachedMatches(),
+    prisma.matchDigest.findUnique({ where: { matchId: match.id } }).catch(() => null),
+    prisma.pressNews.findMany({ where: { status: 'published', OR: [{ relatedMatchId: match.id }, { relatedTeamId: { in: [match.homeTeamId, match.awayTeamId] } }] }, orderBy: { publishedAt: 'desc' }, take: 5 }).catch(() => [])
+  ]);
   const snapshots = [...(match.statsSnapshots || [])].sort((a, b) => providerPriority(a) - providerPriority(b) || new Date(b.capturedAt).getTime() - new Date(a.capturedAt).getTime());
   const homeTeam = teamLite(match.homeTeam);
   const awayTeam = teamLite(match.awayTeam);
   const advanced = extractAdvancedData(snapshots, homeTeam, awayTeam);
   const score = scoreForDisplay(match, snapshots);
+  const finalDbScore = FINISHED.includes(String(match.status || '').toUpperCase()) ? { home: toNumber(match.homeScore), away: toNumber(match.awayScore), source: 'قاعدة المباراة' } : null;
+  const displayScore = finalDbScore || score;
   const status = forceFinishedStatus(match, advanced, buildStatusView(match, snapshots));
   const statsBase = metricDefinitions().map(([key, label, homeKey, awayKey, suffix]) => buildStatMetric(snapshots, key, label, homeKey, awayKey, suffix));
   const stats = statsBase.map((metric) => applyAdvancedMetric(applyAdvancedMetric(metric, 'xg', advanced.xg || null), 'npxg', advanced.npxg || null));
@@ -74,5 +117,5 @@ export async function getMatchPageData(matchId: string): Promise<MatchPageData |
   const venue = standaloneInfo.venue || cleanVenue(advanced.venue) || extractVenue(match, snapshots);
   const city = standaloneInfo.city || cleanText(advanced.city) || extractCity(match, snapshots);
   const referee = standaloneInfo.referee || cleanText(advanced.referee) || extractReferee(match, snapshots);
-  return { id: match.id, title: `${homeTeam.name} ضد ${awayTeam.name}`, matchDate: match.matchDate.toISOString(), venue, city, referee, competition: process.env.NEXT_PUBLIC_COMPETITION_NAME || 'كأس العالم 2026', groupLabel: groupLabelValue, stageLabel: stageLabelValue, homeTeam, awayTeam, score, status, stats, events, homePlayers: players.filter((player) => player.teamId === match.homeTeamId).map(playerLite), awayPlayers: players.filter((player) => player.teamId === match.awayTeamId).map(playerLite), officialLineup, advanced, voteEndpoint: `/api/matches/${match.id}/votes`, groupStandings, thirdPlaceTable, tacticalKeys: buildTacticalKeys(homeTeam.name, awayTeam.name, statsAvailable, digest), matchImpact: buildMatchImpact(match.homeTeamId, match.awayTeamId, groupStandings, thirdPlaceTable), digest: digest ? { summary: digest.summary, turningPoint: digest.turningPoint, scoreLine: digest.scoreLine, href: `/match-digests/${match.id}` } : null, relatedArticles: relatedArticlesFrom(relatedNews, digest, match.id), sources: [{ key: 'db-match', name: 'بيانات المباراة', status: 'active', priority: 0, lastCheckedAt: maxDateIso([match.matchDate]), details: 'الفرق، الموعد، الحالة، النتيجة الأساسية' }, ...buildSourceList(snapshots)], sourceChecklist: sourceChecklist(match, statsAvailable, events.length, providers, officialLineup), lastUpdatedAt: maxDateIso([...(match.statsSnapshots || []).map((snapshot) => snapshot.capturedAt), ...(match.events || []).map((event) => event.updatedAt), match.matchDate]) };
+  return { id: match.id, title: `${homeTeam.name} ضد ${awayTeam.name}`, matchDate: match.matchDate.toISOString(), venue, city, referee, competition: process.env.NEXT_PUBLIC_COMPETITION_NAME || 'كأس العالم 2026', groupLabel: groupLabelValue, stageLabel: stageLabelValue, homeTeam, awayTeam, score: displayScore, status, stats, events, homePlayers: players.filter((player) => player.teamId === match.homeTeamId).map(playerLite), awayPlayers: players.filter((player) => player.teamId === match.awayTeamId).map(playerLite), officialLineup, advanced, voteEndpoint: `/api/matches/${match.id}/votes`, groupStandings, thirdPlaceTable, tacticalKeys: buildTacticalKeys(homeTeam.name, awayTeam.name, statsAvailable, digest), matchImpact: buildMatchImpact(match.homeTeamId, match.awayTeamId, groupStandings, thirdPlaceTable), digest: digest ? { summary: digest.summary, turningPoint: digest.turningPoint, scoreLine: digest.scoreLine, href: `/match-digests/${match.id}` } : null, relatedArticles: relatedArticlesFrom(relatedNews, digest, match.id), sources: [{ key: 'db-match', name: 'بيانات المباراة', status: 'active', priority: 0, lastCheckedAt: maxDateIso([match.matchDate]), details: 'الفرق، الموعد، الحالة، النتيجة الأساسية' }, ...buildSourceList(snapshots)], sourceChecklist: sourceChecklist(match, statsAvailable, events.length, providers, officialLineup), lastUpdatedAt: maxDateIso([...(match.statsSnapshots || []).map((snapshot) => snapshot.capturedAt), ...(match.events || []).map((event) => event.updatedAt), match.matchDate]) };
 }

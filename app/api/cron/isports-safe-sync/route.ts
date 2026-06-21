@@ -3,6 +3,7 @@ import prisma from '@/lib/prisma';
 import { ensureStatsTable, getLatestSnapshot, providerErrorDetails, syncMatchStats } from '@/lib/live-match-stats';
 import { blockProviderForHours, getProviderQuotaBlock, isProviderQuotaError } from '@/lib/provider-quota-guard';
 import { syncFootballDataFallbackForMatch } from '@/lib/football-data-fallback';
+import { requireAdmin } from '@/lib/adminAuth';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -15,21 +16,7 @@ function reasonFrom(error: any) {
   return error?.message || 'iSports daily limit reached';
 }
 
-function hasKey(req: Request, url: URL) {
-  const valid = [process.env.CRON_SECRET, process.env.ADMIN_API_SECRET].map((v) => String(v || '').trim()).filter(Boolean);
-  if (valid.length === 0) return true;
-  const auth = req.headers.get('authorization') || '';
-  const bearer = auth.startsWith('Bearer ') ? auth.slice(7).trim() : '';
-  const candidates = [
-    bearer,
-    url.searchParams.get('key')?.trim() || '',
-    url.searchParams.get('cronSecret')?.trim() || '',
-    url.searchParams.get('adminSecret')?.trim() || '',
-    req.headers.get('x-cron-secret')?.trim() || '',
-    req.headers.get('x-admin-secret')?.trim() || '',
-  ];
-  return candidates.some((value) => value && valid.includes(value));
-}
+
 
 function isFinished(status?: string | null) {
   const value = String(status || '').toUpperCase();
@@ -167,8 +154,10 @@ async function fallback(match: any, reason: string, debug: boolean) {
 }
 
 export async function GET(req: Request) {
+  const auth = await requireAdmin(req);
+  if (!auth.authorized) return auth.error;
+
   const url = new URL(req.url);
-  if (!hasKey(req, url)) return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
 
   const debug = url.searchParams.get('debug') === 'true';
   const singleMatchId = Number(url.searchParams.get('matchId') || 0);

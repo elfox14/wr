@@ -97,8 +97,17 @@ async function cachedProviderId(matchId: string) {
   }).catch(() => null);
   const raw = row?.rawData as any;
   const fromRaw = first(raw?.resolvedProviderMatchId, raw?.providerMatchId, raw?.matchId, raw?.source?.providerMatchId);
-  if (fromRaw) return String(fromRaw).startsWith('mt_') ? String(fromRaw) : `mt_${String(fromRaw).replace(/^mt_/i, '')}`;
-  if (row?.providerMatchId) return `mt_${row.providerMatchId}`;
+  if (fromRaw) {
+    const rawStr = String(fromRaw);
+    const id = rawStr.startsWith('mt_') ? rawStr : `mt_${rawStr.replace(/^mt_/i, '').replace(/\D/g, '')}`;
+    const digits = id.replace(/\D/g, '');
+    if (digits.length >= 8) return id;
+  }
+  if (row?.providerMatchId) {
+    const id = `mt_${row.providerMatchId}`;
+    const digits = id.replace(/\D/g, '');
+    if (digits.length >= 8) return id;
+  }
   return null;
 }
 
@@ -106,7 +115,16 @@ async function syncOne(matchId: string, save: boolean, replace: boolean, timeout
   const match = await prisma.match.findUnique({ where: { id: matchId }, include: { homeTeam: true, awayTeam: true } });
   if (!match) return { ok: false, matchId, error: 'match_not_found' };
   const cached = await cachedProviderId(match.id);
-  const providerId = forcedProviderId ? (forcedProviderId.startsWith('mt_') ? forcedProviderId : `mt_${forcedProviderId}`) : cached;
+  let providerId = null;
+  if (forcedProviderId) {
+    const id = forcedProviderId.startsWith('mt_') ? forcedProviderId : `mt_${forcedProviderId.replace(/\D/g, '')}`;
+    const digits = id.replace(/\D/g, '');
+    if (digits.length >= 8) {
+      providerId = id;
+    }
+  } else {
+    providerId = cached;
+  }
   if (!providerId) return { ok: false, matchId, error: 'could_not_resolve_the_stats_provider_match_id' };
 
   const path = `/api/football/matches/${encodeURIComponent(providerId)}/stats`;

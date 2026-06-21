@@ -10,38 +10,15 @@ import {
 import { footballFetchFromProvider } from '@/lib/apiFootball';
 import { getProviderQuotaBlock } from '@/lib/provider-quota-guard';
 
+import { requireAdmin } from '@/lib/adminAuth';
+
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-function validSecrets() {
-  return [process.env.CRON_SECRET, process.env.ADMIN_API_SECRET].map((value) => String(value || '').trim()).filter(Boolean);
-}
-
-function getCronAuth(req: Request) {
-  const expected = validSecrets();
-  if (expected.length === 0) return { valid: true, method: 'no_secret_configured' };
-  const auth = req.headers.get('authorization') || '';
-  const bearer = auth.startsWith('Bearer ') ? auth.slice(7).trim() : '';
-  const cronHeader = req.headers.get('x-cron-secret')?.trim() || '';
-  const adminHeader = req.headers.get('x-admin-secret')?.trim() || '';
-  const { searchParams } = new URL(req.url);
-  const cronQuery = searchParams.get('cronSecret')?.trim() || '';
-  const adminQuery = searchParams.get('adminSecret')?.trim() || '';
-  const keyQuery = searchParams.get('key')?.trim() || '';
-  const matched = [
-    { method: 'authorization_bearer', value: bearer },
-    { method: 'x-cron-secret', value: cronHeader },
-    { method: 'x-admin-secret', value: adminHeader },
-    { method: 'cronSecret_query', value: cronQuery },
-    { method: 'adminSecret_query', value: adminQuery },
-    { method: 'key_query', value: keyQuery },
-  ].find((item) => item.value && expected.includes(item.value));
-  return matched ? { valid: true, method: matched.method } : { valid: false, method: null };
-}
-
 export async function GET(req: Request) {
-  const auth = getCronAuth(req);
-  if (!auth.valid) return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
+  const auth = await requireAdmin(req);
+  if (!auth.authorized) return auth.error;
+
 
   try {
     await ensureStatsTable();
@@ -105,7 +82,7 @@ export async function GET(req: Request) {
         const stats = normalizeStats(raw);
         return NextResponse.json({
           ok: true,
-          authMethod: auth.method,
+          authMethod: (auth as any).mode,
           count: 1,
           linkedInDatabase: false,
           message: 'iSports analysis fetched directly, but this matchId is not linked to a Match row yet.',
@@ -114,7 +91,7 @@ export async function GET(req: Request) {
       } catch (error: any) {
         return NextResponse.json({
           ok: true,
-          authMethod: auth.method,
+          authMethod: (auth as any).mode,
           count: 1,
           linkedInDatabase: false,
           processed: [{ providerMatchId: singleMatchId, status: 'direct_fetch_failed', ...providerErrorDetails(error, debug) }],
@@ -142,7 +119,7 @@ export async function GET(req: Request) {
       }
     }
 
-    return NextResponse.json({ ok: true, authMethod: auth.method, count: processed.length, linkedInDatabase: matches.length > 0, pollHintSeconds: 300, finalStatsWindowHours: 3, processed }, { headers: { 'Cache-Control': 'no-store' } });
+    return NextResponse.json({ ok: true, authMethod: (auth as any).mode, count: processed.length, linkedInDatabase: matches.length > 0, pollHintSeconds: 300, finalStatsWindowHours: 3, processed }, { headers: { 'Cache-Control': 'no-store' } });
   } catch (error: any) {
     console.error('live-match-stats-sync error:', error);
     return NextResponse.json({ ok: false, error: error?.message || 'Internal Server Error' }, { status: 500 });

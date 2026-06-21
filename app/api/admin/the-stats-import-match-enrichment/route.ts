@@ -265,7 +265,12 @@ function summarizeLineup(payload: any) {
 
 async function resolveProviderMatchId(match: any, providerMatchesQuery: Record<string, string | number>) {
   const sourceProviderMatchId = String(match.externalId || '').trim() || null;
-  if (sourceProviderMatchId?.startsWith('mt_')) return { sourceProviderMatchId, resolvedProviderMatchId: sourceProviderMatchId, resolvedBy: 'local_external_id' };
+  if (sourceProviderMatchId?.startsWith('mt_') && sourceProviderMatchId !== 'mt_12345') {
+    const digits = sourceProviderMatchId.replace(/\D/g, '');
+    if (digits.length >= 8) {
+      return { sourceProviderMatchId, resolvedProviderMatchId: sourceProviderMatchId, resolvedBy: 'local_external_id' };
+    }
+  }
   const payload = await theStatsApiFetch('/api/football/matches', providerMatchesQuery, { timeoutMs: 15000 });
   const providerMatches = extractArray(payload).map(normalizeProviderMatch).filter((row) => row.providerId);
   const matched = providerMatches.find((candidate) => providerMatchesLocal(candidate, match));
@@ -283,15 +288,18 @@ function buildDerived(stats: ProviderStats) {
 }
 
 async function fetchOptionalMatchPayloads(providerMatchId: string, endpoints: string[]) {
-  return Promise.all(endpoints.map(async (endpoint) => {
+  const results = [];
+  for (const endpoint of endpoints) {
     const path = `/api/football/matches/${encodeURIComponent(providerMatchId)}/${endpoint}`;
     try {
       const payload = await theStatsApiFetch(path, {}, { timeoutMs: 15000 });
-      return { endpoint, path, ok: true, payload };
+      results.push({ endpoint, path, ok: true, payload });
     } catch (error: any) {
-      return { endpoint, path, ok: false, error: safeTheStatsApiError(error) };
+      results.push({ endpoint, path, ok: false, error: safeTheStatsApiError(error) });
     }
-  }));
+    await new Promise((resolve) => setTimeout(resolve, 200));
+  }
+  return results;
 }
 
 function eventMinute(row: any) {
@@ -502,12 +510,14 @@ export async function GET(req: Request) {
       }, { status: 404, headers: { 'Cache-Control': 'no-store' } });
     }
 
-    const [statsPayload, lineupPayload, eventPayloads, playerPayloads] = await Promise.all([
-      theStatsApiFetch(`/api/football/matches/${encodeURIComponent(resolved.resolvedProviderMatchId)}/stats`, {}, { timeoutMs: 15000 }),
-      theStatsApiFetch(`/api/football/matches/${encodeURIComponent(resolved.resolvedProviderMatchId)}/lineups`, {}, { timeoutMs: 15000 }).catch((error) => ({ error: safeTheStatsApiError(error) })),
-      fetchOptionalMatchPayloads(resolved.resolvedProviderMatchId, EVENT_ENDPOINTS),
-      fetchOptionalMatchPayloads(resolved.resolvedProviderMatchId, PLAYER_DETAIL_ENDPOINTS),
-    ]);
+    const statsPayload = await theStatsApiFetch(`/api/football/matches/${encodeURIComponent(resolved.resolvedProviderMatchId)}/stats`, {}, { timeoutMs: 15000 });
+    await new Promise((resolve) => setTimeout(resolve, 200));
+
+    const lineupPayload = await theStatsApiFetch(`/api/football/matches/${encodeURIComponent(resolved.resolvedProviderMatchId)}/lineups`, {}, { timeoutMs: 15000 }).catch((error) => ({ error: safeTheStatsApiError(error) }));
+    await new Promise((resolve) => setTimeout(resolve, 200));
+
+    const eventPayloads = await fetchOptionalMatchPayloads(resolved.resolvedProviderMatchId, EVENT_ENDPOINTS);
+    const playerPayloads = await fetchOptionalMatchPayloads(resolved.resolvedProviderMatchId, PLAYER_DETAIL_ENDPOINTS);
 
     const stats = parseProviderStats(statsPayload);
     const derived = buildDerived(stats);
@@ -532,7 +542,9 @@ export async function GET(req: Request) {
       });
     }
 
-    const numericProviderMatchId = Number.parseInt(String(resolved.sourceProviderMatchId || match.externalId || match.animationMatchId || 0), 10) || 0;
+    const rawTargetId = String(resolved.resolvedProviderMatchId || resolved.sourceProviderMatchId || match.externalId || 0);
+    const idDigits = rawTargetId.replace(/\D/g, '');
+    const numericProviderMatchId = idDigits.length >= 8 ? (Number.parseInt(idDigits, 10) || 0) : 0;
     const data = snapshotPreview(match, numericProviderMatchId, resolved.resolvedProviderMatchId, stats, derived, lineup, providerEvents, playerRatings, optionalSources);
 
     let created = null;

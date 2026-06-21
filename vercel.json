@@ -1,8 +1,12 @@
 {
   "crons": [
     {
-      "path": "/api/cron/worldcup-live-auto",
+      "path": "/api/cron/worldcup-live-auto?mode=primary",
       "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/cron/worldcup-live-auto?mode=secondary",
+      "schedule": "*/2 * * * *"
     }
   ]
 }

@@ -2,7 +2,11 @@ import { randomUUID } from 'crypto';
 import prisma from '@/lib/prisma';
 import { theStatsApiFetch } from '@/lib/theStatsApi';
 
-function str(...values: any[]) {
+export type TheStatsExtrasEndpointMode = 'essential' | 'full' | 'events' | 'shots' | 'players' | 'lineups' | 'info' | 'stats';
+
+type EndpointResult = { key: string; path: string; ok: boolean; payload?: any; error?: any };
+
+function str(...values: any[]): string | null {
   for (const value of values) {
     if (value === undefined || value === null || value === '') continue;
     if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
@@ -11,7 +15,7 @@ function str(...values: any[]) {
       continue;
     }
     if (value && typeof value === 'object') {
-      const text = str(value.name, value.fullName, value.full_name, value.title, value.label, value.display_name, value.displayName);
+      const text: string | null = str(value.name, value.fullName, value.full_name, value.title, value.label, value.display_name, value.displayName);
       if (text) return text;
     }
   }
@@ -29,9 +33,35 @@ function extractList(payload: any) { if (Array.isArray(payload)) return payload;
 function listFrom(payload: any, fields: string[]) { if (Array.isArray(payload)) return payload; const data = dataOf(payload); if (Array.isArray(data)) return data; for (const field of fields) if (Array.isArray(data?.[field])) return data[field]; for (const field of fields) if (Array.isArray(payload?.[field])) return payload[field]; return []; }
 function providerMatch(row: any) { const fixture = row?.fixture || row?.match || row; const teams = row?.teams || row?.participants || {}; const home = teams?.home || row?.home || row?.homeTeam || row?.home_team || {}; const away = teams?.away || row?.away || row?.awayTeam || row?.away_team || {}; return { id: str(fixture?.id, fixture?.matchId, fixture?.match_id, row?.id, row?.matchId, row?.match_id, row?.fixtureId, row?.fixture_id), home: str(home?.name, row?.homeName, row?.home_team_name, home), away: str(away?.name, row?.awayName, row?.away_team_name, away), date: str(fixture?.utc_date, fixture?.date, row?.utc_date, row?.date, row?.matchDate, row?.kickoff, row?.start_time), raw: row }; }
 function candidateScore(candidate: any, match: any) { const directHome = teamScore(candidate.home, match.homeTeam); const directAway = teamScore(candidate.away, match.awayTeam); const swappedHome = teamScore(candidate.home, match.awayTeam); const swappedAway = teamScore(candidate.away, match.homeTeam); const direct = (directHome + directAway) / 2; const swapped = (swappedHome + swappedAway) / 2; const reversed = swapped > direct; const team = Math.max(direct, swapped); const hours = hoursApart(candidate.date, match.matchDate); const time = hours <= 4 ? 25 : hours <= 12 ? 15 : hours <= 30 ? 8 : candidate.date ? -15 : 0; return { ...candidate, score: Math.round(team + time), teamScore: Math.round(team), timeHours: hours === 999 ? null : Number(hours.toFixed(2)), reversed }; }
-function normalizeProviderId(value: any) { const raw = str(value); if (!raw) return null; const id = raw.startsWith('mt_') ? raw : `mt_${raw.replace(/^mt_/i, '').replace(/\D/g, '')}`; return id && id !== 'mt_' && id !== 'mt_12345' ? id : null; }
+function normalizeProviderId(value: any) {
+  const raw = str(value);
+  if (!raw) return null;
+  const id = raw.startsWith('mt_') ? raw : `mt_${raw.replace(/^mt_/i, '').replace(/\D/g, '')}`;
+  const digits = id.replace(/\D/g, '');
+  if (digits.length < 8) return null;
+  return id && id !== 'mt_' && id !== 'mt_12345' ? id : null;
+}
 function isPageOutOfRange(error: any) { const code = String(error?.payload?.error?.code || error?.code || '').toUpperCase(); const message = String(error?.payload?.error?.message || error?.message || '').toLowerCase(); return code === 'PAGE_OUT_OF_RANGE' || message.includes('out of range'); }
 function safeError(error: any) { return { name: error?.name || 'TheStatsApiError', message: String(error?.message || error), status: Number(error?.status || error?.payload?.error?.status_code || 0) || null, code: error?.code || error?.payload?.error?.code || null, payload: error?.payload || null }; }
+function endpointStatus(item: any) { return Number(item?.error?.status || item?.error?.payload?.error?.status_code || 0) || null; }
+function isNotFoundEndpoint(item: any) { return endpointStatus(item) === 404; }
+function isRateLimitedEndpoint(item: any) { return endpointStatus(item) === 429; }
+function isCriticalProviderEndpoint(keyName: string) { return ['matchInfo', 'stats'].includes(keyName); }
+function snapshotHasCritical404(raw: any) {
+  const endpoints = Array.isArray(raw?.endpoints) ? raw.endpoints : [];
+  return endpoints.some((item: any) => isCriticalProviderEndpoint(String(item?.key || '')) && Number(item?.error?.status || item?.status || 0) === 404);
+}
+function snapshotHasUsefulProviderEvidence(raw: any) {
+  if (!raw || snapshotHasCritical404(raw)) return false;
+  const endpoints = Array.isArray(raw?.endpoints) ? raw.endpoints : [];
+  if (endpoints.some((item: any) => item?.ok && isCriticalProviderEndpoint(String(item?.key || '')))) return true;
+  const normalized = raw?.normalized || {};
+  if (Object.keys(normalized?.liveStats?.stats || {}).length > 0) return true;
+  if (Number(normalized?.eventsDetailed?.all?.length || 0) > 0) return true;
+  if (Number(normalized?.shotmap?.length || 0) > 0) return true;
+  if (Number(normalized?.playerStats?.length || 0) > 0) return true;
+  return Boolean(normalized?.matchInfo?.venue || normalized?.matchInfo?.referee || normalized?.lineups);
+}
 
 export function defaultTheStatsQuery(params: URLSearchParams) {
   const out: Record<string, string | number> = { competition_id: params.get('competition_id') || process.env.THE_STATS_API_WORLD_CUP_COMPETITION_ID || 'comp_6107', season_id: params.get('season_id') || process.env.THE_STATS_API_WORLD_CUP_SEASON_ID || 'sn_118868', per_page: Number(params.get('providerMatchesPerPage') || 100) };
@@ -45,7 +75,7 @@ async function fetchProviderMatches(query: Record<string, string | number>) {
     let payload: any;
     try { payload = await theStatsApiFetch('/api/football/matches', { ...base, page }, { timeoutMs: 15000 }); }
     catch (error: any) { if (page > 1 && isPageOutOfRange(error)) break; throw error; }
-    const list = extractList(payload).map(providerMatch).filter((row) => row.id);
+    const list = extractList(payload).map(providerMatch).filter((row: any) => row.id);
     for (const row of list) { if (seen.has(row.id)) continue; seen.add(row.id); rows.push(row); }
     if (list.length < perPage) break;
     await sleep(350);
@@ -57,6 +87,7 @@ async function existingProviderId(matchId: string) {
   const snapshots = await prisma.matchStatsSnapshot.findMany({ where: { matchId, provider: { startsWith: 'THE_STATS_API' } }, orderBy: { capturedAt: 'desc' }, take: 20, select: { providerMatchId: true, rawData: true } }).catch(() => []);
   for (const snapshot of snapshots) {
     const raw = snapshot?.rawData as any;
+    if (!snapshotHasUsefulProviderEvidence(raw)) continue;
     const candidates = [raw?.resolvedProviderMatchId, raw?.providerMatchId, raw?.matchId, raw?.source?.providerMatchId, raw?.source?.matchId, raw?.theStatsApi?.matchId, raw?.normalized?.matchInfo?.providerMatchId, snapshot?.providerMatchId ? `mt_${snapshot.providerMatchId}` : null];
     for (const candidate of candidates) { const id = normalizeProviderId(candidate); if (id) return id; }
   }
@@ -65,9 +96,12 @@ async function existingProviderId(matchId: string) {
 
 export async function resolveTheStatsProviderId(match: any, query: Record<string, string | number>) {
   const external = String(match.externalId || '').trim();
-  if (external.startsWith('mt_') && external !== 'mt_12345') return { id: external, by: 'local_external_id' };
+  if (external.startsWith('mt_') && external !== 'mt_12345') {
+    const digits = external.replace(/\D/g, '');
+    if (digits.length >= 8) return { id: external, by: 'local_external_id' };
+  }
   const cached = await existingProviderId(match.id);
-  if (cached) return { id: cached, by: 'cached_the_stats_snapshot' };
+  if (cached) return { id: cached, by: 'cached_the_stats_snapshot_validated' };
   const list = await fetchProviderMatches(query);
   const candidates = list.map((row) => candidateScore(row, match)).sort((a, b) => b.score - a.score).slice(0, 8);
   const found = candidates.find((row) => row.score >= 82 && row.teamScore >= 70 && (row.timeHours === null || row.timeHours <= 30));
@@ -82,15 +116,37 @@ function compactStats(payload: any) {
   return { meta: { source: 'match-stats' }, stats: out };
 }
 function compactMatchInfo(matchInfoPayload: any, statsPayload: any) { const data = dataOf(matchInfoPayload); const stats = dataOf(statsPayload); const venue = data?.venue || data?.fixture?.venue || data?.match?.venue || {}; const referee = data?.referee || data?.fixture?.referee || data?.match?.referee || {}; return { status: str(data?.status, stats?.status), venue: str(venue?.name, venue), city: str(venue?.city, data?.city), referee: str(referee?.name, referee), finalScore: data?.score?.final_score || data?.score || null, xgAvailable: Boolean(data?.xg_available || stats?.overview?.expected_goals) }; }
-function compactEvent(row: any) { const team = row?.team || {}; const player = row?.player || row?.athlete || row?.scorer || {}; return { type: str(row?.type, row?.event_type, row?.incident_type, row?.name) || 'event', minute: n(row?.minute ?? row?.time?.minute ?? row?.elapsed ?? row?.match_minute ?? row?.event_minute), teamId: str(team?.id, row?.team_id, row?.teamId), teamName: str(team?.name, row?.team_name, row?.teamName), playerId: str(player?.id, row?.player_id, row?.playerId), playerName: str(player?.name, row?.player_name, row?.playerName, row?.scorer?.name), detail: str(row?.detail, row?.description, row?.comment, row?.text, row?.message) };
-}
-function compactShot(row: any) { const player = row?.player || row?.athlete || row?.shooter || {}; const team = row?.team || {}; const outcome = str(row?.outcome, row?.result, row?.shot_outcome, row?.status, row?.type); return { minute: n(row?.minute ?? row?.time?.minute ?? row?.elapsed), playerName: str(player?.name, row?.player_name, row?.playerName), teamName: str(team?.name, row?.team_name, row?.teamName), x: n(row?.x ?? row?.pitchX ?? row?.location?.x), y: n(row?.y ?? row?.pitchY ?? row?.location?.y), xg: n(row?.xg ?? row?.expected_goals ?? row?.expectedGoals), npxg: n(row?.npxg ?? row?.non_penalty_xg ?? row?.nonPenaltyXg), outcome, isOnTarget: /on target|saved|goal/i.test(String(outcome || '')), isGoal: /goal|scored/i.test(String(outcome || row?.type || '')) };
-}
-function compactPlayerStat(row: any) { const player = row?.player || row?.athlete || row; const team = row?.team || {}; const stats = row?.stats || row?.statistics || row; const passing = row?.passing || stats?.passing || {}; const shooting = row?.shooting || stats?.shooting || {}; const defending = row?.defending || stats?.defending || {}; const goalkeeping = row?.goalkeeping || stats?.goalkeeping || {}; return { playerId: str(player?.id, row?.player_id, row?.playerId, row?.id), playerName: str(player?.name, row?.player_name, row?.playerName, row?.name), teamId: str(team?.id, row?.team_id, row?.teamId), teamName: str(team?.name, row?.team_name, row?.teamName), position: str(player?.position, row?.position), rating: n(stats?.rating ?? row?.rating), minutes: n(stats?.minutes ?? stats?.minutes_played ?? row?.minutes), goals: n(shooting?.goals ?? stats?.goals ?? row?.goals), assists: n(passing?.assists ?? stats?.assists ?? row?.assists), shots: n(shooting?.total_shots ?? stats?.shots ?? row?.shots), shotsOnTarget: n(shooting?.shots_on_target ?? stats?.shots_on_target ?? row?.shots_on_target), passes: n(passing?.total_passes ?? stats?.passes ?? row?.passes), accuratePasses: n(passing?.accurate_passes ?? stats?.accurate_passes ?? row?.accurate_passes), keyPasses: n(passing?.key_passes ?? stats?.key_passes ?? row?.key_passes), tackles: n(defending?.tackles ?? stats?.tackles ?? row?.tackles), interceptions: n(defending?.interceptions ?? stats?.interceptions ?? row?.interceptions), clearances: n(defending?.clearances ?? stats?.clearances ?? row?.clearances), saves: n(goalkeeping?.saves ?? stats?.saves ?? row?.saves) };
-}
-async function fetchEndpoint(keyName: string, path: string, timeoutMs: number) { try { return { key: keyName, path, ok: true, payload: await theStatsApiFetch(path, {}, { timeoutMs }) }; } catch (error: any) { return { key: keyName, path, ok: false, error: safeError(error) }; } }
+function compactEvent(row: any) { const team = row?.team || {}; const player = row?.player || row?.athlete || row?.scorer || {}; return { type: str(row?.type, row?.event_type, row?.incident_type, row?.name) || 'event', minute: n(row?.minute ?? row?.time?.minute ?? row?.elapsed ?? row?.match_minute ?? row?.event_minute), teamId: str(team?.id, row?.team_id, row?.teamId), teamName: str(team?.name, row?.team_name, row?.teamName), playerId: str(player?.id, row?.player_id, row?.playerId), playerName: str(player?.name, row?.player_name, row?.playerName, row?.scorer?.name), detail: str(row?.detail, row?.description, row?.comment, row?.text, row?.message) }; }
+function compactShot(row: any) { const player = row?.player || row?.athlete || row?.shooter || {}; const team = row?.team || {}; const outcome = str(row?.outcome, row?.result, row?.shot_outcome, row?.status, row?.type); return { minute: n(row?.minute ?? row?.time?.minute ?? row?.elapsed), playerName: str(player?.name, row?.player_name, row?.playerName), teamName: str(team?.name, row?.team_name, row?.teamName), x: n(row?.x ?? row?.pitchX ?? row?.location?.x), y: n(row?.y ?? row?.pitchY ?? row?.location?.y), xg: n(row?.xg ?? row?.expected_goals ?? row?.expectedGoals), npxg: n(row?.npxg ?? row?.non_penalty_xg ?? row?.nonPenaltyXg), outcome, isOnTarget: /on target|saved|goal/i.test(String(outcome || '')), isGoal: /goal|scored/i.test(String(outcome || row?.type || '')) }; }
+function compactPlayerStat(row: any) { const player = row?.player || row?.athlete || row; const team = row?.team || {}; const stats = row?.stats || row?.statistics || row; const passing = row?.passing || stats?.passing || {}; const shooting = row?.shooting || stats?.shooting || {}; const defending = row?.defending || stats?.defending || {}; const goalkeeping = row?.goalkeeping || stats?.goalkeeping || {}; return { playerId: str(player?.id, row?.player_id, row?.playerId, row?.id), playerName: str(player?.name, row?.player_name, row?.playerName, row?.name), teamId: str(team?.id, row?.team_id, row?.teamId), teamName: str(team?.name, row?.team_name, row?.teamName), position: str(player?.position, row?.position), rating: n(stats?.rating ?? row?.rating), minutes: n(stats?.minutes ?? stats?.minutes_played ?? row?.minutes), goals: n(shooting?.goals ?? stats?.goals ?? row?.goals), assists: n(passing?.assists ?? stats?.assists ?? row?.assists), shots: n(shooting?.total_shots ?? stats?.shots ?? row?.shots), shotsOnTarget: n(shooting?.shots_on_target ?? stats?.shots_on_target ?? row?.shots_on_target), passes: n(passing?.total_passes ?? stats?.passes ?? row?.passes), accuratePasses: n(passing?.accurate_passes ?? stats?.accurate_passes ?? row?.accurate_passes), keyPasses: n(passing?.key_passes ?? stats?.key_passes ?? row?.key_passes), tackles: n(defending?.tackles ?? stats?.tackles ?? row?.tackles), interceptions: n(defending?.interceptions ?? stats?.interceptions ?? row?.interceptions), clearances: n(defending?.clearances ?? stats?.clearances ?? row?.clearances), saves: n(goalkeeping?.saves ?? stats?.saves ?? row?.saves) }; }
+async function fetchEndpoint(keyName: string, path: string, timeoutMs: number): Promise<EndpointResult> { try { return { key: keyName, path, ok: true, payload: await theStatsApiFetch(path, {}, { timeoutMs }) }; } catch (error: any) { return { key: keyName, path, ok: false, error: safeError(error) }; } }
 
-export async function collectTheStatsMatchExtras(match: any, options: { dryRun?: boolean; save?: boolean; includeRaw?: boolean; timeoutMs?: number; query?: Record<string, string | number>; endpointMode?: 'essential' | 'full' | string; delayMs?: number } = {}) {
+function normalizeEndpointMode(value: any): TheStatsExtrasEndpointMode {
+  const mode = String(value || 'essential').toLowerCase().trim();
+  if (mode === 'all') return 'full';
+  if (mode === 'timeline' || mode === 'events') return 'events';
+  if (mode === 'shotmap' || mode === 'shots') return 'shots';
+  if (mode === 'player-stats' || mode === 'playerstats' || mode === 'players') return 'players';
+  if (mode === 'lineup' || mode === 'lineups') return 'lineups';
+  if (mode === 'match-info' || mode === 'matchinfo' || mode === 'info') return 'info';
+  if (mode === 'match-stats' || mode === 'stats') return 'stats';
+  return mode === 'full' ? 'full' : 'essential';
+}
+function endpointsForMode(mode: TheStatsExtrasEndpointMode, id: string) {
+  const endpoints: [string, string][] = {
+    info: [['matchInfo', `/api/football/matches/${id}`]],
+    stats: [['stats', `/api/football/matches/${id}/stats`]],
+    lineups: [['lineups', `/api/football/matches/${id}/lineups`]],
+    events: [['timeline', `/api/football/matches/${id}/timeline`]],
+    shots: [['shotmap', `/api/football/matches/${id}/shotmap`]],
+    players: [['playerStats', `/api/football/matches/${id}/player-stats`]],
+    essential: [['matchInfo', `/api/football/matches/${id}`], ['stats', `/api/football/matches/${id}/stats`], ['lineups', `/api/football/matches/${id}/lineups`]],
+    full: [['matchInfo', `/api/football/matches/${id}`], ['stats', `/api/football/matches/${id}/stats`], ['lineups', `/api/football/matches/${id}/lineups`], ['timeline', `/api/football/matches/${id}/timeline`], ['shotmap', `/api/football/matches/${id}/shotmap`], ['playerStats', `/api/football/matches/${id}/player-stats`]],
+  }[mode];
+  return endpoints;
+}
+
+export async function collectTheStatsMatchExtras(match: any, options: { dryRun?: boolean; save?: boolean; includeRaw?: boolean; timeoutMs?: number; query?: Record<string, string | number>; endpointMode?: TheStatsExtrasEndpointMode | 'all' | 'timeline' | 'shotmap' | 'player-stats' | string; delayMs?: number } = {}) {
   const dryRun = Boolean(options.dryRun);
   const save = options.save !== false;
   const includeRaw = Boolean(options.includeRaw);
@@ -99,15 +155,16 @@ export async function collectTheStatsMatchExtras(match: any, options: { dryRun?:
   const resolved = await resolveTheStatsProviderId(match, options.query || {});
   if (!resolved.id) return { ok: false, matchId: match.id, error: 'Could not resolve provider match id', resolved };
   const id = encodeURIComponent(String(resolved.id));
-  const mode = options.endpointMode === 'full' || options.endpointMode === 'all' ? 'full' : 'essential';
-  const endpoints = [
-    ['matchInfo', `/api/football/matches/${id}`],
-    ['stats', `/api/football/matches/${id}/stats`],
-    ['lineups', `/api/football/matches/${id}/lineups`],
-    ...(mode === 'full' ? [['timeline', `/api/football/matches/${id}/timeline`], ['shotmap', `/api/football/matches/${id}/shotmap`], ['playerStats', `/api/football/matches/${id}/player-stats`]] : []),
-  ];
-  const results: any[] = [];
-  for (const [keyName, path] of endpoints) { results.push(await fetchEndpoint(String(keyName), String(path), timeoutMs)); if (delayMs > 0) await sleep(delayMs); }
+  const mode = normalizeEndpointMode(options.endpointMode);
+  const endpoints = endpointsForMode(mode, id);
+  const results: EndpointResult[] = [];
+  for (const [keyName, path] of endpoints) {
+    const endpointResult = await fetchEndpoint(String(keyName), String(path), timeoutMs);
+    results.push(endpointResult);
+    if (isNotFoundEndpoint(endpointResult) && isCriticalProviderEndpoint(String(keyName))) break;
+    if (isRateLimitedEndpoint(endpointResult)) break;
+    if (delayMs > 0) await sleep(delayMs);
+  }
   const byKey: Record<string, any> = Object.fromEntries(results.map((item) => [item.key, item]));
   const stats = byKey.stats?.ok ? compactStats(byKey.stats.payload) : { meta: {}, stats: {} };
   const events = byKey.timeline?.ok ? listFrom(byKey.timeline.payload, ['timeline', 'events', 'incidents', 'commentary', 'items', 'results']).map(compactEvent) : [];
@@ -115,14 +172,15 @@ export async function collectTheStatsMatchExtras(match: any, options: { dryRun?:
   const playerStats = byKey.playerStats?.ok ? listFrom(byKey.playerStats.payload, ['data', 'players', 'player_stats', 'items', 'results']).map(compactPlayerStat) : [];
   const normalized = { matchInfo: compactMatchInfo(byKey.matchInfo?.payload, byKey.stats?.payload), liveStats: stats, lineups: byKey.lineups?.ok ? dataOf(byKey.lineups.payload) : null, eventsDetailed: { all: events }, shotmap, playerStats };
   const endpointSummaries = results.map((item) => ({ key: item.key, path: item.path, ok: item.ok, error: item.ok ? null : item.error, keySummary: item.ok ? null : item.error?.message || null }));
+  const invalidProviderMatchId = results.some((item) => isCriticalProviderEndpoint(item.key) && isNotFoundEndpoint(item));
   let snapshotId: string | null = null;
-  const useful = Object.keys(stats.stats || {}).length > 0 || events.length > 0 || shotmap.length > 0 || playerStats.length > 0 || Boolean(normalized.lineups) || Boolean(normalized.matchInfo?.venue || normalized.matchInfo?.referee);
+  const useful = !invalidProviderMatchId && (Object.keys(stats.stats || {}).length > 0 || events.length > 0 || shotmap.length > 0 || playerStats.length > 0 || Boolean(normalized.lineups) || Boolean(normalized.matchInfo?.venue || normalized.matchInfo?.referee));
   if (!dryRun && save && useful) {
     const rawData: Record<string, any> = { provider: 'THE_STATS_API', mode: 'match_extras_legacy_collect', endpointMode: mode, resolvedProviderMatchId: resolved.id, resolvedBy: resolved.by, importedAt: new Date().toISOString(), endpoints: endpointSummaries, normalized };
     if (includeRaw) rawData.raw = Object.fromEntries(results.filter((item) => item.ok).map((item) => [item.key, item.payload]));
     const snapshot = await prisma.matchStatsSnapshot.create({ data: { id: randomUUID(), matchId: match.id, provider: 'THE_STATS_API_EXTRAS', providerMatchId: Number(String(resolved.id).replace(/\D/g, '')) || 0, rawData }, select: { id: true } });
     snapshotId = snapshot.id;
   }
-  const rateLimited = results.some((item) => Number(item.error?.status) === 429);
-  return { ok: useful, matchId: match.id, endpointMode: mode, resolvedProviderMatchId: resolved.id, resolvedBy: resolved.by, rateLimited, endpointsOk: results.filter((item) => item.ok).map((item) => item.key), endpointsFailed: results.filter((item) => !item.ok).map((item) => ({ key: item.key, status: item.error?.status, code: item.error?.code, message: item.error?.message })), counts: { stats: Object.keys(stats.stats || {}).length, detailedEvents: events.length, shots: shotmap.length, playerStats: playerStats.length, lineups: normalized.lineups ? 1 : 0 }, matchInfo: normalized.matchInfo, saved: Boolean(snapshotId), snapshotId, debug: { endpointSummaries, normalizedPreview: normalized, endpoints: includeRaw ? Object.fromEntries(results.map((item) => [item.key, item])) : undefined } };
+  const rateLimited = !invalidProviderMatchId && results.some((item) => isRateLimitedEndpoint(item));
+  return { ok: useful, matchId: match.id, endpointMode: mode, resolvedProviderMatchId: resolved.id, resolvedBy: resolved.by, invalidProviderMatchId, rateLimited, endpointsOk: results.filter((item) => item.ok).map((item) => item.key), endpointsFailed: results.filter((item) => !item.ok).map((item) => ({ key: item.key, status: item.error?.status, code: item.error?.code, message: item.error?.message })), counts: { stats: Object.keys(stats.stats || {}).length, detailedEvents: events.length, shots: shotmap.length, playerStats: playerStats.length, lineups: normalized.lineups ? 1 : 0 }, matchInfo: normalized.matchInfo, saved: Boolean(snapshotId), snapshotId, advice: invalidProviderMatchId ? 'The cached or resolved TheStats match id returned 404 on a critical endpoint. The id was not useful; refresh provider matching before retrying this match.' : undefined, debug: { endpointSummaries, normalizedPreview: normalized, endpoints: includeRaw ? Object.fromEntries(results.map((item) => [item.key, item])) : undefined } };
 }

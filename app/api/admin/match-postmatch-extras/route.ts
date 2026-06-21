@@ -29,7 +29,10 @@ function providerIdParam(url: URL) {
   const value = url.searchParams.get('providerMatchId') || url.searchParams.get('theStatsMatchId') || url.searchParams.get('providerId') || '';
   if (!value.trim()) return '';
   const trimmed = value.trim();
-  return trimmed.startsWith('mt_') ? trimmed : `mt_${trimmed.replace(/^mt_/i, '')}`;
+  const id = trimmed.startsWith('mt_') ? trimmed : `mt_${trimmed.replace(/^mt_/i, '').replace(/\D/g, '')}`;
+  const digits = id.replace(/\D/g, '');
+  if (digits.length < 8) return '';
+  return id;
 }
 function realText(value: unknown) {
   const text = String(value || '').trim();
@@ -126,7 +129,14 @@ async function resolveProviderIdFromFirstPage(match: any, query: Record<string, 
   const list = extractList(payload).map(providerMatch).filter((row) => row.id);
   const candidates = list.map((row) => scoreCandidate(row, match)).sort((a, b) => b.score - a.score).slice(0, 8);
   const found = candidates.find((row) => row.score >= 82 && row.teamScore >= 70 && (row.timeHours === null || row.timeHours <= 30));
-  return { id: found?.id ? (String(found.id).startsWith('mt_') ? String(found.id) : `mt_${found.id}`) : null, by: found ? (found.reversed ? 'route_first_page_fuzzy_reversed' : 'route_first_page_fuzzy') : null, searched: list.length, confidence: found?.score || 0, candidates };
+  if (found?.id) {
+    const id = String(found.id).startsWith('mt_') ? String(found.id) : `mt_${found.id}`;
+    const digits = id.replace(/\D/g, '');
+    if (digits.length >= 8) {
+      return { id, by: found ? (found.reversed ? 'route_first_page_fuzzy_reversed' : 'route_first_page_fuzzy') : null, searched: list.length, confidence: found?.score || 0, candidates };
+    }
+  }
+  return { id: null, by: null, searched: list.length, confidence: 0, candidates };
 }
 async function saveUsefulSnapshot(matchId: string, result: any, includeRaw: boolean) {
   const normalized = result?.debug?.normalizedPreview || result?.debug?.normalized || null;

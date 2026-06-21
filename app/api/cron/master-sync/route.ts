@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { requireAdmin } from '@/lib/adminAuth';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -26,40 +27,8 @@ type SyncWindow = {
   recentWindowHours: number;
 };
 
-function configuredSecrets() {
-  return [process.env.CRON_SECRET, process.env.ADMIN_API_SECRET]
-    .map((value) => String(value || '').trim())
-    .filter(Boolean);
-}
-
 function downstreamSecret() {
   return String(process.env.CRON_SECRET || process.env.ADMIN_API_SECRET || '').trim();
-}
-
-function getAuth(req: Request) {
-  const validSecrets = configuredSecrets();
-  if (validSecrets.length === 0) return { valid: false, method: 'missing_server_secret' };
-
-  const url = new URL(req.url);
-  const auth = req.headers.get('authorization') || '';
-  const bearer = auth.startsWith('Bearer ') ? auth.slice(7).trim() : '';
-  const cronHeader = req.headers.get('x-cron-secret')?.trim() || '';
-  const adminHeader = req.headers.get('x-admin-secret')?.trim() || '';
-  const cronQuery = url.searchParams.get('cronSecret')?.trim() || '';
-  const adminQuery = url.searchParams.get('adminSecret')?.trim() || '';
-  const keyQuery = url.searchParams.get('key')?.trim() || '';
-
-  const candidates = [
-    { method: 'authorization_bearer', value: bearer },
-    { method: 'x-cron-secret', value: cronHeader },
-    { method: 'x-admin-secret', value: adminHeader },
-    { method: 'cronSecret_query', value: cronQuery },
-    { method: 'adminSecret_query', value: adminQuery },
-    { method: 'key_query', value: keyQuery },
-  ];
-
-  const matched = candidates.find((item) => item.value && validSecrets.includes(item.value));
-  return matched ? { valid: true, method: matched.method } : { valid: false, method: null };
 }
 
 function getCronBaseUrl(req: Request) {
@@ -241,10 +210,8 @@ function shouldReturnVerbose(req: Request) {
 }
 
 export async function GET(req: Request) {
-  const auth = getAuth(req);
-  if (!auth.valid) {
-    return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401, headers: { 'Cache-Control': 'no-store' } });
-  }
+  const auth = await requireAdmin(req);
+  if (!auth.authorized) return auth.error;
 
   const url = new URL(req.url);
   const baseUrl = getCronBaseUrl(req);
@@ -307,7 +274,7 @@ export async function GET(req: Request) {
     ok,
     mode: 'budget_aware_master_sync',
     responseMode: verbose ? 'verbose' : 'compact',
-    authMethod: auth.method,
+    authMethod: (auth as any).mode,
     baseUrl: baseUrl.replace(/(cronSecret|adminSecret|key)=([^&]+)/g, '$1=***'),
     startedAt: startedAt.toISOString(),
     finishedAt: new Date().toISOString(),

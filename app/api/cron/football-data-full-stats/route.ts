@@ -10,6 +10,7 @@ import {
   isProviderQuotaError,
   recordProviderRequest,
 } from '@/lib/provider-quota-guard';
+import { requireAdmin } from '@/lib/adminAuth';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -41,29 +42,7 @@ const MATCH_SELECT = {
   awayTeam: { select: TEAM_SELECT },
 };
 
-function validSecrets() {
-  return [process.env.CRON_SECRET, process.env.ADMIN_API_SECRET]
-    .map((value) => String(value || '').trim())
-    .filter(Boolean);
-}
 
-function getAuth(req: Request) {
-  const valid = validSecrets();
-  if (valid.length === 0) return { valid: false, method: 'missing_server_secret' };
-  const url = new URL(req.url);
-  const auth = req.headers.get('authorization') || '';
-  const bearer = auth.startsWith('Bearer ') ? auth.slice(7).trim() : '';
-  const candidates = [
-    { method: 'authorization_bearer', value: bearer },
-    { method: 'x-cron-secret', value: req.headers.get('x-cron-secret')?.trim() || '' },
-    { method: 'x-admin-secret', value: req.headers.get('x-admin-secret')?.trim() || '' },
-    { method: 'cronSecret_query', value: url.searchParams.get('cronSecret')?.trim() || '' },
-    { method: 'adminSecret_query', value: url.searchParams.get('adminSecret')?.trim() || '' },
-    { method: 'key_query', value: url.searchParams.get('key')?.trim() || '' },
-  ];
-  const match = candidates.find((item) => item.value && valid.includes(item.value));
-  return match ? { valid: true, method: match.method } : { valid: false, method: null };
-}
 
 function dateKey(date: Date) {
   return date.toISOString().slice(0, 10);
@@ -621,10 +600,8 @@ async function processProviderMatch(providerMatch: any, options: { createMissing
 }
 
 export async function GET(req: Request) {
-  const auth = getAuth(req);
-  if (!auth.valid) {
-    return NextResponse.json({ ok: false, error: 'Unauthorized', authMethod: auth.method }, { status: 401, headers: { 'Cache-Control': 'no-store' } });
-  }
+  const auth = await requireAdmin(req);
+  if (!auth.authorized) return auth.error;
 
   const startedAt = new Date();
   const url = new URL(req.url);
@@ -709,7 +686,7 @@ export async function GET(req: Request) {
       rateLimited,
       stopReason,
       mode: 'football_data_full_stats_sync',
-      authMethod: auth.method,
+      authMethod: (auth as any).mode,
       provider: 'FOOTBALL_DATA',
       competition,
       dateFrom,

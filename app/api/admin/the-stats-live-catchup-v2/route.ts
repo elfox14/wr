@@ -119,7 +119,10 @@ function providerIdParam(params: URLSearchParams) {
   const value = params.get('providerMatchId') || params.get('theStatsMatchId') || params.get('providerId') || '';
   if (!value.trim()) return '';
   const trimmed = value.trim();
-  return trimmed.startsWith('mt_') ? trimmed : `mt_${trimmed.replace(/^mt_/i, '')}`;
+  const id = trimmed.startsWith('mt_') ? trimmed : `mt_${trimmed.replace(/^mt_/i, '').replace(/\D/g, '')}`;
+  const digits = id.replace(/\D/g, '');
+  if (digits.length < 8) return '';
+  return id;
 }
 async function cachedProviderId(matchId: string) {
   const snapshot = await prisma.matchStatsSnapshot.findFirst({
@@ -129,12 +132,20 @@ async function cachedProviderId(matchId: string) {
   }).catch(() => null);
   const raw = snapshot?.rawData as any;
   const id = text(raw?.resolvedProviderMatchId, raw?.providerMatchId, raw?.matchId, snapshot?.providerMatchId ? `mt_${snapshot.providerMatchId}` : null);
-  return id && id !== 'mt_12345' ? id : null;
+  if (!id || id === 'mt_12345') return null;
+  const digits = id.replace(/\D/g, '');
+  if (digits.length < 8) return null;
+  return id;
 }
 async function resolveProviderId(match: any, query: Record<string, string | number>, forcedId = '') {
   if (forcedId) return { id: forcedId, by: 'forced_provider_match_id' };
   const external = String(match.externalId || '').trim();
-  if (external.startsWith('mt_') && external !== 'mt_12345') return { id: external, by: 'local_external_id' };
+  if (external.startsWith('mt_') && external !== 'mt_12345') {
+    const digits = external.replace(/\D/g, '');
+    if (digits.length >= 8) {
+      return { id: external, by: 'local_external_id' };
+    }
+  }
   const cached = await cachedProviderId(match.id);
   if (cached) return { id: cached, by: 'cached_the_stats_snapshot' };
   const payload = await theStatsApiFetch('/api/football/matches', { ...query, page: 1, per_page: Math.max(50, Math.min(100, Number(query.per_page || 100) || 100)) }, { timeoutMs: 15000 });

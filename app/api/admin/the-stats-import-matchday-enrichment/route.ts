@@ -283,7 +283,17 @@ async function enrichOne(match: any, providerMatches: ProviderMatch[], dryRun: b
   }
 
   const matched = providerMatches.find((providerMatch) => providerMatchesLocal(providerMatch, match));
-  const resolvedProviderMatchId = String(match.externalId || '').startsWith('mt_') ? String(match.externalId) : matched?.providerId || null;
+  let resolvedProviderMatchId = null;
+  const external = String(match.externalId || '').trim();
+  if (external.startsWith('mt_') && external !== 'mt_12345') {
+    const digits = external.replace(/\D/g, '');
+    if (digits.length >= 8) {
+      resolvedProviderMatchId = external;
+    }
+  }
+  if (!resolvedProviderMatchId) {
+    resolvedProviderMatchId = matched?.providerId || null;
+  }
   if (!resolvedProviderMatchId) {
     return { ok: false, matchId: match.id, localTeams: `${match.homeTeam?.name || 'Home'} vs ${match.awayTeam?.name || 'Away'}`, error: 'provider_match_not_resolved' };
   }

@@ -146,7 +146,12 @@ function providerMatchesLocal(provider: ProviderMatch, localMatch: any) {
 
 function resolveProviderMatchId(localMatch: any, providerMatches: ProviderMatch[]) {
   const source = String(localMatch.externalId || '').trim() || null;
-  if (source?.startsWith('mt_')) return { sourceProviderMatchId: source, resolvedProviderMatchId: source, resolvedBy: 'local_external_id' };
+  if (source?.startsWith('mt_') && source !== 'mt_12345') {
+    const digits = source.replace(/\D/g, '');
+    if (digits.length >= 8) {
+      return { sourceProviderMatchId: source, resolvedProviderMatchId: source, resolvedBy: 'local_external_id' };
+    }
+  }
   const matched = providerMatches.find((candidate) => providerMatchesLocal(candidate, localMatch));
   return { sourceProviderMatchId: source, resolvedProviderMatchId: matched?.providerId || null, resolvedBy: matched ? 'provider_match_list' : null };
 }

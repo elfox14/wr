@@ -67,7 +67,7 @@ function view(state: string, rest: Omit<ReturnType<typeof baseView>, 'state' | '
 }
 
 function baseView() {
-  return { raw: '', state: '', kind: 'scheduled' as const, label: '', shortLabel: '', minute: null as number | null, isLive: false, isFinished: false, isScheduled: false };
+  return { raw: '', state: '', kind: 'scheduled' as 'scheduled' | 'live' | 'halftime' | 'finished' | 'delayed', label: '', shortLabel: '', minute: null as number | null, isLive: false, isFinished: false, isScheduled: false };
 }
 
 export function getProviderMatchClock(match: MatchLike, snapshots: SnapshotLike[] = []) {
