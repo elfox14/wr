@@ -146,6 +146,7 @@ function buildFullSyncUrl(origin: string, key: string, url: URL) {
   const next = new URL('/api/cron/live-match-full-sync', origin);
   next.searchParams.set('dryRun', 'false');
   next.searchParams.set('theStats', 'true');
+  next.searchParams.set('matchInfo', 'true');
   next.searchParams.set('theStatsExtras', 'false');
   next.searchParams.set('theStatsExtrasRaw', 'false');
   next.searchParams.set('forceExtras', 'false');
@@ -162,7 +163,7 @@ function buildFullSyncUrl(origin: string, key: string, url: URL) {
 
 function buildISportsTimelineUrl(origin: string, key: string, url: URL, target: { dbMatchId?: string | null; providerMatchId?: string | null }) {
   const next = new URL('/api/cron/isports-live-sync', origin);
-  next.searchParams.set('take', String(int(url.searchParams.get('isportsTake'), 3, 1, 5)));
+  next.searchParams.set('take', String(int(url.searchParams.get('isportsTake'), 5, 1, 5)));
   next.searchParams.set('save', 'true');
   next.searchParams.set('replace', 'true');
   next.searchParams.set('includeTimeline', 'true');
@@ -277,7 +278,7 @@ export async function GET(req: Request) {
     },
     stages,
     note: hardFailures.length
-      ? 'Cron completed in degraded mode. TheStats, iSports timeline/flash, postmatch confirmation, stale-match guard, and status monitoring are automated from this single endpoint. TheStats extras are explicitly disabled in the automatic cycle.'
-      : 'Cron completed. This single endpoint automatically runs football-data, TheStats, iSports timeline/flash, postmatch confirmation, stale-match guard, and status monitoring. TheStats extras are explicitly disabled in the automatic cycle.',
+      ? 'Cron completed in degraded mode. TheStats, lightweight match info, iSports timeline/flash, postmatch confirmation, stale-match guard, and status monitoring are automated from this single endpoint. TheStats extras are explicitly disabled in the automatic cycle.'
+      : 'Cron completed. This single endpoint automatically runs football-data, TheStats, lightweight match info, iSports timeline/flash, postmatch confirmation, stale-match guard, and status monitoring. TheStats extras are explicitly disabled in the automatic cycle.',
   });
 }
