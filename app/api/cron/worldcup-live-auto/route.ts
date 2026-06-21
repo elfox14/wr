@@ -17,7 +17,7 @@ type StageResult = {
 };
 
 const DEFAULT_PUBLIC_ORIGIN = 'https://worldcup.mcprim.com';
-const LIVE_STAGE_TIMEOUT_MS = 24_000;
+const LIVE_STAGE_TIMEOUT_MS = 45_000;
 
 function json(value: unknown, status = 200) {
   return NextResponse.json(value, {
@@ -164,10 +164,10 @@ function buildISportsTimelineUrl(origin: string, key: string, url: URL, target: 
   next.searchParams.set('replace', 'true');
   next.searchParams.set('includeTimeline', 'true');
   next.searchParams.set('includeFlash', 'true');
-  next.searchParams.set('asyncFlash', 'true');
+  next.searchParams.set('asyncFlash', bool(url.searchParams.get('asyncFlash'), false) ? 'true' : 'false');
   next.searchParams.set('includeLive', 'false');
-  next.searchParams.set('timeoutMs', String(int(url.searchParams.get('isportsTimeoutMs'), 30_000, 5_000, 70_000)));
-  next.searchParams.set('waitMs', String(int(url.searchParams.get('isportsWaitMs'), 6_000, 1_000, 30_000)));
+  next.searchParams.set('timeoutMs', String(int(url.searchParams.get('isportsTimeoutMs'), 45_000, 5_000, 70_000)));
+  next.searchParams.set('waitMs', String(int(url.searchParams.get('isportsWaitMs'), 8_000, 1_000, 30_000)));
   return withSecret(optionalTarget(next, target), key);
 }
 
@@ -220,6 +220,8 @@ export async function GET(req: Request) {
   const dbMatchId = url.searchParams.get('dbMatchId') || url.searchParams.get('id');
   const providerMatchId = url.searchParams.get('matchId') || url.searchParams.get('providerMatchId');
   const target = { dbMatchId, providerMatchId };
+  const runTheStats = bool(url.searchParams.get('theStats'), true);
+  const runISportsTimeline = bool(url.searchParams.get('isportsTimeline'), runTheStats);
 
   const stages: StageResult[] = [];
 
@@ -227,15 +229,15 @@ export async function GET(req: Request) {
     stages.push(await callJson('football_data_sync', buildFootballDataUrl(origin, key, url), 8_000, startedAt, budgetMs));
   }
 
-  if (bool(url.searchParams.get('theStats'), true)) {
+  if (runTheStats) {
     stages.push(await callJson('the_stats_full_sync', buildFullSyncUrl(origin, key, url), 12_000, startedAt, budgetMs));
   }
 
-  if (bool(url.searchParams.get('isportsTimeline'), true)) {
-    stages.push(await callJson('isports_timeline_flash_async', buildISportsTimelineUrl(origin, key, url, target), 5_000, startedAt, budgetMs));
+  if (runISportsTimeline) {
+    stages.push(await callJson('isports_timeline_flash_core', buildISportsTimelineUrl(origin, key, url, target), 18_000, startedAt, budgetMs));
   }
 
-  if (bool(url.searchParams.get('isportsVisual'), true)) {
+  if (bool(url.searchParams.get('isportsVisual'), false)) {
     stages.push(await callJson('isports_visual_async', buildISportsVisualUrl(origin, key, url, target), 4_000, startedAt, budgetMs));
   }
 
@@ -264,11 +266,7 @@ export async function GET(req: Request) {
     },
     stages,
     note: hardFailures.length
-      ? 'Cron completed in degraded mode. Database-first display remains available; inspect failed stages for provider-specific issues.'
-      : 'Cron completed. Heavy iSports flash/visual pulls are queued through cron-safe async wrappers when enabled.',
+      ? 'Cron completed in degraded mode. TheStats and core iSports timeline/flash are treated as primary live inputs; inspect failed stages for provider-specific issues.'
+      : 'Cron completed. TheStats and iSports timeline/flash both ran as primary live inputs. Heavy visual stats remain optional unless isportsVisual=true.',
   });
-}
-
-export async function POST(req: Request) {
-  return GET(req);
 }
