@@ -219,17 +219,6 @@ export async function GET() {
     }
 
     const now = new Date();
-<<<<<<< HEAD
-=======
-export async function GET() {
-  const now = new Date();
-  try {
-<<<<<<< HEAD
->>>>>>> parent of a6987c8 (0)
-=======
->>>>>>> parent of a6987c8 (0)
-=======
->>>>>>> parent of 0d8acd2 (01)
     const liveWindowStart = new Date(now.getTime() - 3 * 60 * 60 * 1000);
     const upcomingUntil = new Date(now.getTime() + 24 * 60 * 60 * 1000);
     const recentSince = new Date(now.getTime() - 6 * 60 * 60 * 1000);
@@ -266,30 +255,11 @@ export async function GET() {
     const filler = [...decoratedFinished, ...other].filter((match) => !primary || match.id !== primary.id).filter((match) => !nextTwo.some((next) => next.id === match.id));
     const matches = uniqueById([...(primary ? [primary] : []), ...nextTwo, ...filler]).slice(0, 3);
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> parent of 0d8acd2 (01)
     const payload = { ok: true, dataSource: 'database', updatedAt: now.toISOString(), matches };
     liveCardCache = { createdAt: cacheNow, payload };
     return json(payload);
   } catch (error: any) {
     console.error('Error in live-card GET api:', error);
     return json({ ok: false, error: error?.message || 'Internal Server Error', matches: [] }, 500);
-<<<<<<< HEAD
-=======
-=======
->>>>>>> parent of a6987c8 (0)
-    return NextResponse.json({ ok: true, dataSource: 'database', updatedAt: now.toISOString(), matches }, { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } });
-  } catch (error) {
-    console.error('Error in live-card GET api:', error);
-    return NextResponse.json({ ok: false, dataSource: 'fallback', updatedAt: now.toISOString(), matches: [] }, { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } });
-<<<<<<< HEAD
->>>>>>> parent of a6987c8 (0)
-=======
->>>>>>> parent of a6987c8 (0)
-=======
->>>>>>> parent of 0d8acd2 (01)
   }
 }
