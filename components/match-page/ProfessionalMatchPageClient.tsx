@@ -151,9 +151,101 @@ function LiveEventPitch({ data, activeIndex }: { data: MatchPageData; activeInde
 }
 function EventsPanel({ data }: { data: MatchPageData }) { const [activeIndex, setActiveIndex] = useState(0); const [playing, setPlaying] = useState(false); const total = data.events.length; useEffect(() => { setActiveIndex((current) => Math.min(current, Math.max(0, total - 1))); }, [total]); useEffect(() => { if (!playing || total <= 1) return; const timer = window.setInterval(() => setActiveIndex((current) => (current + 1) % total), 2200); return () => window.clearInterval(timer); }, [playing, total]); return <Section id="events" title="أحداث المباراة" icon={<Radio size={22} />} hint="الملعب يعرض حدثًا واحدًا في كل مرة بدل تكديس كل الأحداث"><div className="grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,.65fr)]"><LiveEventPitch data={data} activeIndex={activeIndex} /><div className="rounded-[1.4rem] border border-white/10 bg-black/25 p-3"><div className="mb-3 flex items-center justify-between gap-2"><h3 className="font-black text-white">تسلسل الأحداث</h3><button onClick={() => setPlaying((v) => !v)} className="rounded-full border border-[#18E58F]/30 bg-[#18E58F]/10 px-3 py-1 text-[11px] font-black text-[#18E58F]">{playing ? 'إيقاف العرض' : 'تشغيل العرض'}</button></div>{data.events.length ? <div className="max-h-[520px] space-y-2 overflow-y-auto pr-1">{data.events.map((event, index) => <button key={event.id} onClick={() => setActiveIndex(index)} className={`w-full rounded-2xl border p-3 text-right transition ${index === activeIndex ? 'border-[#F8C846]/50 bg-[#F8C846]/10' : 'border-white/10 bg-white/[0.045] hover:bg-white/[0.07]'}`}><div className="flex items-center gap-3"><span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-black/35 text-lg">{event.icon}</span><div className="min-w-0 flex-1"><p className="text-xs font-black text-[#F8C846]">{event.minuteLabel} · {eventArabic(event.type)}</p><p className="mt-1 line-clamp-2 text-sm font-bold leading-6 text-white">{event.playerName ? `${event.playerName} — ` : ''}{event.detail || eventArabic(event.type)}</p></div></div></button>)}</div> : <Empty title="لا توجد أحداث" body="ستظهر الأحداث عند وصولها من TheStats أو iSports." />}</div></div></Section>; }
 
-function TeamMetricLine({ metric, side }: { metric: MatchStatMetric; side: PitchSide }) { const value = side === 'home' ? metric.home : metric.away; const other = side === 'home' ? metric.away : metric.home; const width = side === 'home' ? pct(metric.home, metric.away).home : pct(metric.home, metric.away).away; return <div className="rounded-2xl border border-white/10 bg-black/25 p-3"><div className="flex items-center justify-between gap-3"><span className="text-xs font-black text-slate-400">{metric.label}</span><b className="text-lg font-black text-white tabular-nums">{fmt(value, metric.suffix)}</b></div><div className="mt-2 h-2 overflow-hidden rounded-full bg-white/10"><div className="h-full bg-[#18E58F]" style={{ width: `${Math.max(6, Math.min(100, width))}%` }} /></div><p className="mt-1 text-[10px] font-bold text-slate-500">مقابل {fmt(other, metric.suffix)}</p></div>; }
-function TeamStatsCard({ team, side, metrics }: { team: MatchPageData['homeTeam']; side: PitchSide; metrics: MatchStatMetric[] }) { const accent = side === 'home' ? 'border-[#F8C846]/25 bg-[#F8C846]/10 text-[#F8C846]' : 'border-[#18E58F]/25 bg-[#18E58F]/10 text-[#18E58F]'; return <article className="rounded-[1.35rem] border border-white/10 bg-black/20 p-3"><div className="mb-4 flex items-center justify-between gap-3"><div className="flex min-w-0 items-center gap-3"><FlagImg team={team} small /><div className="min-w-0"><h3 className="truncate text-lg font-black text-white">{team.name}</h3><p className="mt-1 text-[10px] font-bold text-slate-500">إحصائيات المنتخب</p></div></div><span className={`rounded-full border px-3 py-1 text-[10px] font-black ${accent}`}>{ar.format(metrics.filter((m) => m.available).length)} مؤشر</span></div><div className="grid gap-2 sm:grid-cols-2">{metrics.map((metric) => <TeamMetricLine key={`${team.id}-${metric.key}`} metric={metric} side={side} />)}</div></article>; }
-function StatsPanel({ data }: { data: MatchPageData }) { const available = data.stats.filter((m) => m.available); return <Section id="stats" title="إحصائيات المباراة" icon={<BarChart3 size={22} />} hint={`${ar.format(available.length)} من ${ar.format(data.stats.length)} مؤشر متوفر · عرض المنتخبين جنب بعض`}><div className="grid gap-4 xl:grid-cols-2"><TeamStatsCard team={data.homeTeam} side="home" metrics={data.stats} /><TeamStatsCard team={data.awayTeam} side="away" metrics={data.stats} /></div></Section>; }
+function StatComparisonRow({ metric }: { metric: MatchStatMetric }) {
+  const pcts = pct(metric.home, metric.away);
+  const homeVal = Number(metric.home || 0);
+  const awayVal = Number(metric.away || 0);
+  const isHomeHigher = homeVal > awayVal;
+  const isAwayHigher = awayVal > homeVal;
+
+  return (
+    <div className="rounded-2xl border border-white/10 bg-black/25 p-3 transition hover:border-white/20">
+      {/* Values & Label row */}
+      <div className="grid grid-cols-[64px_1fr_64px] items-center gap-3 text-center sm:grid-cols-[80px_1fr_80px]">
+        {/* Home Team Value (Right side in RTL) */}
+        <b className={`text-base font-black tabular-nums sm:text-lg ${isHomeHigher ? 'text-[#F8C846]' : 'text-white/70'}`}>
+          {fmt(metric.home, metric.suffix)}
+        </b>
+
+        {/* Metric Label (Center) */}
+        <div className="min-w-0">
+          <p className="text-xs font-black text-white sm:text-sm">{metric.label}</p>
+          {metric.source ? (
+            <p className="mt-0.5 text-[9px] font-bold text-slate-500 sm:text-[10px]">{metric.source}</p>
+          ) : null}
+        </div>
+
+        {/* Away Team Value (Left side in RTL) */}
+        <b className={`text-base font-black tabular-nums sm:text-lg ${isAwayHigher ? 'text-[#18E58F]' : 'text-white/70'}`}>
+          {fmt(metric.away, metric.suffix)}
+        </b>
+      </div>
+
+      {/* Progress Bars comparison */}
+      <div className="mt-2.5 flex items-center gap-2" dir="ltr">
+        {/* Left Bar (Away) - grows from center (right edge) to left */}
+        <div className="h-2 flex-1 rounded-full bg-white/10 overflow-hidden flex justify-end">
+          {metric.available && (
+            <div
+              className="h-full rounded-full bg-[#18E58F] transition-all duration-500"
+              style={{ width: `${pcts.away}%` }}
+            />
+          )}
+        </div>
+        {/* Right Bar (Home) - grows from center (left edge) to right */}
+        <div className="h-2 flex-1 rounded-full bg-white/10 overflow-hidden flex justify-start">
+          {metric.available && (
+            <div
+              className="h-full rounded-full bg-[#F8C846] transition-all duration-500"
+              style={{ width: `${pcts.home}%` }}
+            />
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function StatsPanel({ data }: { data: MatchPageData }) {
+  const available = data.stats.filter((m) => m.available);
+  return (
+    <Section
+      id="stats"
+      title="إحصائيات المباراة"
+      icon={<BarChart3 size={22} />}
+      hint={`${ar.format(available.length)} من ${ar.format(data.stats.length)} مؤشر متوفر · مقارنة مباشرة بين المنتخبين`}
+    >
+      <div className="rounded-[1.35rem] border border-white/10 bg-black/20 p-3 sm:p-4">
+        {/* Header showing teams */}
+        <div className="mb-4 grid grid-cols-[1fr_auto_1fr] items-center gap-3 border-b border-white/5 pb-4">
+          {/* Home Team (Right side in RTL) */}
+          <div className="flex items-center gap-2 justify-start min-w-0">
+            <span className="truncate text-sm font-black text-white sm:text-base">{data.homeTeam.name}</span>
+            <FlagImg team={data.homeTeam} small />
+          </div>
+
+          {/* Center separator */}
+          <span className="rounded-full border border-white/10 bg-black/35 px-3 py-1 text-[10px] font-black text-slate-400">
+            المقارنة
+          </span>
+
+          {/* Away Team (Left side in RTL) */}
+          <div className="flex items-center gap-2 justify-end min-w-0">
+            <FlagImg team={data.awayTeam} small />
+            <span className="truncate text-sm font-black text-white sm:text-base">{data.awayTeam.name}</span>
+          </div>
+        </div>
+
+        {/* Stats Rows */}
+        <div className="grid gap-3 lg:grid-cols-2">
+          {data.stats.map((metric) => (
+            <StatComparisonRow key={metric.key} metric={metric} />
+          ))}
+        </div>
+      </div>
+    </Section>
+  );
+}
 
 function formationLines(formation: string | null | undefined, count: number) { const raw = String(formation || '').match(/\d+/g)?.map((value) => Number(value)).filter((value) => Number.isFinite(value) && value > 0) || []; if (raw.length && raw.reduce((sum, value) => sum + value, 1) <= Math.max(count, 11) + 1) return [1, ...raw]; if (count >= 11) return [1, 4, 3, 3]; if (count >= 7) return [1, 3, 2, count - 6]; if (count >= 4) return [1, 2, count - 3]; return [Math.max(1, count)]; }
 function slotsFor(players: PitchPlayer[], formation: string | null | undefined, side: PitchSide): PitchSlot[] { const starters = players.slice(0, 11); const lines = formationLines(formation, starters.length); const slots: PitchSlot[] = []; let cursor = 0; const totalLines = Math.max(1, lines.length - 1); lines.forEach((lineCount, lineIndex) => { const actual = Math.max(1, Math.min(lineCount, starters.length - cursor)); for (let i = 0; i < actual; i += 1) { const player = starters[cursor++]; if (!player) continue; const progress = totalLines ? lineIndex / totalLines : 0; const x = side === 'home' ? 86 - progress * 30 : 14 + progress * 30; const y = actual === 1 ? 50 : 14 + (72 * (i + 0.5)) / actual; slots.push({ player, x, y, side }); } }); return slots; }
