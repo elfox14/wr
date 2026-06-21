@@ -357,7 +357,7 @@ function MatchPulse({ match, demo }: { match?: Match | null; demo?: DemoData | n
         <div className="space-y-3">
           <div className="rounded-[1.4rem] border border-[#FFD700]/20 bg-[radial-gradient(circle_at_top,rgba(255,215,0,0.14),transparent_36%),rgba(0,0,0,0.26)] p-3">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-[10px] font-black text-gray-400">
-              <span>{formatDateTime(match.matchDate)}</span>
+              <span suppressHydrationWarning>{formatDateTime(match.matchDate)}</span>
               <span>المصدر: {match.scoreSource || match.dataSource || snapshot?.provider || 'قاعدة البيانات'}</span>
             </div>
             <div className="grid grid-cols-1 items-center gap-2 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
@@ -523,7 +523,7 @@ function TacticalSnapshot({ demo, match }: { demo?: DemoData | null; match?: Mat
               <div className="mt-1 text-xs font-bold text-white">{report.weaknesses?.length ? report.weaknesses.map((x: string) => short(x, 34)).join(' • ') : 'غير متوفر في المصادر'}</div>
             </div>
           </div>
-          <div className="text-[9px] font-bold text-gray-500">المصدر: {report.sourceName || 'مصدر تحريري'} • {timeAgo(report.publishedAt)}</div>
+          <div suppressHydrationWarning className="text-[9px] font-bold text-gray-500">المصدر: {report.sourceName || 'مصدر تحريري'} • {timeAgo(report.publishedAt)}</div>
         </div>
       ) : <EmptyState text="لا توجد تقارير تكتيكية منشورة بعد." />}
     </Card>
@@ -565,7 +565,7 @@ function TurningPoints({ demo }: { demo?: DemoData | null }) {
           <Link key={event.id} href={event.match?.id ? `/match-center/${encodeURIComponent(String(event.match.id))}` : '/matches'} className="block rounded-2xl border border-white/10 bg-black/25 p-3 transition hover:border-[#FFD700]/30">
             <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
               <span className="rounded-lg border border-[#FFD700]/20 bg-[#FFD700]/10 px-2 py-0.5 text-[9px] font-black text-[#FFD700]">{event.minute != null ? `د${ar(event.minute)}` : event.impactType}</span>
-              <span className="text-[9px] font-bold text-gray-500">{event.sourceName || 'قاعدة البيانات'} • {timeAgo(event.updatedAt)}</span>
+              <span suppressHydrationWarning className="text-[9px] font-bold text-gray-500">{event.sourceName || 'قاعدة البيانات'} • {timeAgo(event.updatedAt)}</span>
             </div>
             <div className="text-sm font-black text-white">{event.match ? `${teamName(event.match.homeTeam)} ${event.match.score} ${teamName(event.match.awayTeam)}` : 'حدث عام'}</div>
             <div className="mt-1 text-xs font-bold leading-5 text-gray-300">{event.playerName ? `${event.playerName}: ` : ''}{event.detail}</div>
@@ -717,7 +717,7 @@ export default function HomeDemoCommandCenter() {
             <div className="flex flex-wrap gap-2 text-[10px] font-black">
               <Link href="/" className="rounded-full border border-white/10 bg-white/5 px-3 py-2 text-gray-300 transition hover:text-white">الرئيسية الحالية</Link>
               <Link href="/statistics" className="rounded-full border border-[#0FF0FC]/25 bg-[#0FF0FC]/10 px-3 py-2 text-[#0FF0FC] transition hover:bg-[#0FF0FC]/15">الإحصائيات</Link>
-              <span className="rounded-full border border-white/10 bg-black/25 px-3 py-2 text-gray-400">آخر تحديث: {loading ? 'جاري التحميل' : timeAgo(lastLoadedAt)}</span>
+              <span suppressHydrationWarning className="rounded-full border border-white/10 bg-black/25 px-3 py-2 text-gray-400">آخر تحديث: {loading ? 'جاري التحميل' : timeAgo(lastLoadedAt)}</span>
             </div>
           </div>
         </section>

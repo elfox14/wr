@@ -96,7 +96,7 @@ export default function HomeHeroCountdown({ nextMatch }: Props) {
           <h1 className="text-2xl md:text-4xl font-black leading-tight text-white">
             {nextMatch.homeTeam?.name} ضد {nextMatch.awayTeam?.name}
           </h1>
-          <p className="text-xs md:text-sm text-gray-400 font-bold">
+          <p suppressHydrationWarning className="text-xs md:text-sm text-gray-400 font-bold">
             {nextMatch.groupPhase ? nextMatch.groupPhase.replace('Group ', 'المجموعة ') : 'كأس العالم'} • {nextMatch.matchDate ? new Intl.DateTimeFormat('ar-EG', {
               weekday: 'long',
               day: 'numeric',

@@ -139,7 +139,7 @@ export default function HomeLiveMatchTicker({ matches = [] }: Props) {
                 <div className="flex min-w-0 flex-1 flex-col gap-1">
                   <div className="flex items-center gap-1.5">
                     <span className={`h-1.5 w-1.5 rounded-full ${live ? 'animate-pulse bg-[#00FF88]' : finished ? 'bg-gray-500' : 'bg-[#0FF0FC]'}`} />
-                    <span className={`truncate text-[10px] font-black ${live ? 'text-[#00FF88]' : finished ? 'text-gray-400' : 'text-[#0FF0FC]'}`}>{statusBadge(match)}</span>
+                    <span suppressHydrationWarning className={`truncate text-[10px] font-black ${live ? 'text-[#00FF88]' : finished ? 'text-gray-400' : 'text-[#0FF0FC]'}`}>{statusBadge(match)}</span>
                   </div>
                   <div className="flex items-center justify-between gap-2 text-xs font-black text-white">
                     <span className="flex min-w-0 items-center gap-1.5"><img src={homeFlag || undefined} alt="" className="h-5 w-5 rounded-md object-cover" /><span className="truncate">{match.homeTeam?.name || 'Home'}</span></span>
