@@ -156,15 +156,17 @@ function teamFlag(team?: Team | null, size = 64) {
   return team?.image?.startsWith('http') ? team.image : getTeamFlagUrl({ code: team?.code, name: team?.name, image: team?.image }, size);
 }
 
-function formatDateTime(value?: string | Date | null) {
+function formatDateTime(value?: string | Date | null, mounted?: boolean) {
   if (!value) return 'موعد غير متوفر';
+  if (mounted === false) return '—';
   const date = new Date(value);
   if (!Number.isFinite(date.getTime())) return 'موعد غير متوفر';
   return new Intl.DateTimeFormat('ar-EG', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).format(date);
 }
 
-function timeAgo(value?: string | Date | null) {
+function timeAgo(value?: string | Date | null, mounted?: boolean) {
   if (!value) return 'غير متوفر';
+  if (mounted === false) return '—';
   const date = new Date(value);
   if (!Number.isFinite(date.getTime())) return 'غير متوفر';
   const diffMs = Date.now() - date.getTime();
@@ -344,7 +346,7 @@ function TournamentRadar({ summary, demo }: { summary: any; demo?: DemoData | nu
   );
 }
 
-function MatchPulse({ match, demo }: { match?: Match | null; demo?: DemoData | null }) {
+function MatchPulse({ match, demo, mounted }: { match?: Match | null; demo?: DemoData | null; mounted: boolean }) {
   const snapshot = currentMatchSnapshot(match, demo);
   const homeScore = pickNumber(match?.homeScore, snapshot?.homeScore) ?? 0;
   const awayScore = pickNumber(match?.awayScore, snapshot?.awayScore) ?? 0;
@@ -361,7 +363,7 @@ function MatchPulse({ match, demo }: { match?: Match | null; demo?: DemoData | n
         <div className="space-y-3">
           <div className="rounded-[1.4rem] border border-[#FFD700]/20 bg-[radial-gradient(circle_at_top,rgba(255,215,0,0.14),transparent_36%),rgba(0,0,0,0.26)] p-3">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-[10px] font-black text-gray-400">
-              <span suppressHydrationWarning>{formatDateTime(match.matchDate)}</span>
+              <span suppressHydrationWarning>{formatDateTime(match.matchDate, mounted)}</span>
               <span>المصدر: {match.scoreSource || match.dataSource || snapshot?.provider || 'قاعدة البيانات'}</span>
             </div>
             <div className="grid grid-cols-1 items-center gap-2 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
@@ -500,7 +502,7 @@ function DramaIndex({ summary, demo }: { summary: any; demo?: DemoData | null })
   );
 }
 
-function TacticalSnapshot({ demo, match }: { demo?: DemoData | null; match?: Match | null }) {
+function TacticalSnapshot({ demo, match, mounted }: { demo?: DemoData | null; match?: Match | null; mounted: boolean }) {
   const reports = demo?.tacticalSnapshots || [];
   const byMatchTeam = reports.find((report: any) => [match?.homeTeam?.id, match?.awayTeam?.id].filter(Boolean).map(String).includes(String(report.team?.id || '')));
   const report = byMatchTeam || reports[0];
@@ -527,7 +529,7 @@ function TacticalSnapshot({ demo, match }: { demo?: DemoData | null; match?: Mat
               <div className="mt-1 text-xs font-bold text-white">{report.weaknesses?.length ? report.weaknesses.map((x: string) => short(x, 34)).join(' • ') : 'غير متوفر في المصادر'}</div>
             </div>
           </div>
-          <div suppressHydrationWarning className="text-[9px] font-bold text-gray-500">المصدر: {report.sourceName || 'مصدر تحريري'} • {timeAgo(report.publishedAt)}</div>
+          <div suppressHydrationWarning className="text-[9px] font-bold text-gray-500">المصدر: {report.sourceName || 'مصدر تحريري'} • {timeAgo(report.publishedAt, mounted)}</div>
         </div>
       ) : <EmptyState text="لا توجد تقارير تكتيكية منشورة بعد." />}
     </Card>
@@ -557,7 +559,7 @@ function DataTrustPanel({ summary, demo, liveMatches }: { summary: any; demo?: D
   );
 }
 
-function TurningPoints({ demo }: { demo?: DemoData | null }) {
+function TurningPoints({ demo, mounted }: { demo?: DemoData | null; mounted: boolean }) {
   const events = demo?.turningPoints || [];
   const priority = ['goal', 'red_card', 'penalty', 'var', 'yellow_card'];
   const rows = [...events].sort((a: any, b: any) => priority.indexOf(a.impactType) - priority.indexOf(b.impactType)).slice(0, 6);
@@ -569,7 +571,7 @@ function TurningPoints({ demo }: { demo?: DemoData | null }) {
           <Link key={event.id} href={event.match?.id ? `/match-center/${encodeURIComponent(String(event.match.id))}` : '/matches'} className="block rounded-2xl border border-white/10 bg-black/25 p-3 transition hover:border-[#FFD700]/30">
             <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
               <span className="rounded-lg border border-[#FFD700]/20 bg-[#FFD700]/10 px-2 py-0.5 text-[9px] font-black text-[#FFD700]">{event.minute != null ? `د${ar(event.minute)}` : event.impactType}</span>
-              <span suppressHydrationWarning className="text-[9px] font-bold text-gray-500">{event.sourceName || 'قاعدة البيانات'} • {timeAgo(event.updatedAt)}</span>
+              <span suppressHydrationWarning className="text-[9px] font-bold text-gray-500">{event.sourceName || 'قاعدة البيانات'} • {timeAgo(event.updatedAt, mounted)}</span>
             </div>
             <div className="text-sm font-black text-white">{event.match ? `${teamName(event.match.homeTeam)} ${event.match.score} ${teamName(event.match.awayTeam)}` : 'حدث عام'}</div>
             <div className="mt-1 text-xs font-bold leading-5 text-gray-300">{event.playerName ? `${event.playerName}: ` : ''}{event.detail}</div>
@@ -652,6 +654,7 @@ function ApprovalNotes() {
 }
 
 export default function HomeDemoCommandCenter() {
+  const [mounted, setMounted] = useState(false);
   const [liveMatches, setLiveMatches] = useState<Match[]>([]);
   const [groups, setGroups] = useState<GroupData[]>([]);
   const [providerSummary, setProviderSummary] = useState<any>(null);
@@ -660,6 +663,10 @@ export default function HomeDemoCommandCenter() {
   const [demo, setDemo] = useState<DemoData | null>(null);
   const [loading, setLoading] = useState(true);
   const [lastLoadedAt, setLastLoadedAt] = useState<string | null>(null);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -721,7 +728,7 @@ export default function HomeDemoCommandCenter() {
             <div className="flex flex-wrap gap-2 text-[10px] font-black">
               <Link href="/" className="rounded-full border border-white/10 bg-white/5 px-3 py-2 text-gray-300 transition hover:text-white">الرئيسية الحالية</Link>
               <Link href="/statistics" className="rounded-full border border-[#0FF0FC]/25 bg-[#0FF0FC]/10 px-3 py-2 text-[#0FF0FC] transition hover:bg-[#0FF0FC]/15">الإحصائيات</Link>
-              <span suppressHydrationWarning className="rounded-full border border-white/10 bg-black/25 px-3 py-2 text-gray-400">آخر تحديث: {loading ? 'جاري التحميل' : timeAgo(lastLoadedAt)}</span>
+              <span suppressHydrationWarning className="rounded-full border border-white/10 bg-black/25 px-3 py-2 text-gray-400">آخر تحديث: {loading ? 'جاري التحميل' : timeAgo(lastLoadedAt, mounted)}</span>
             </div>
           </div>
         </section>
@@ -732,7 +739,7 @@ export default function HomeDemoCommandCenter() {
 
         <LayoutBlock id="live" number="١" title="المباشر أولًا" subtitle="الجزء الأهم في أعلى الصفحة: النتيجة، الضغط، آخر حدث، والإحصائيات الحية.">
           <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)] lg:items-start">
-            <MatchPulse match={primaryMatch} demo={demo} />
+            <MatchPulse match={primaryMatch} demo={demo} mounted={mounted} />
             <DataTrustPanel summary={summary} demo={demo} liveMatches={liveMatches} />
           </div>
         </LayoutBlock>
@@ -746,8 +753,8 @@ export default function HomeDemoCommandCenter() {
 
         <LayoutBlock id="intelligence" number="٣" title="التحليل والتحولات" subtitle="تفسير ما وراء الأرقام: لقطة تكتيكية، نقاط تحول، ومؤشر دراما البطولة.">
           <div className="grid gap-4 lg:grid-cols-3 lg:items-start">
-            <TacticalSnapshot demo={demo} match={primaryMatch} />
-            <TurningPoints demo={demo} />
+            <TacticalSnapshot demo={demo} match={primaryMatch} mounted={mounted} />
+            <TurningPoints demo={demo} mounted={mounted} />
             <DramaIndex summary={summary} demo={demo} />
           </div>
         </LayoutBlock>

@@ -153,15 +153,17 @@ function groupNumberLabel(match: HomeMatch) {
   return 'كأس العالم 2026';
 }
 
-function formatMatchDate(value?: string | Date | null) {
+function formatMatchDate(value?: string | Date | null, mounted?: boolean) {
   if (!value) return 'موعد غير متوفر';
+  if (mounted === false) return '—';
   const date = new Date(value);
   if (!Number.isFinite(date.getTime())) return 'موعد غير متوفر';
   return new Intl.DateTimeFormat('ar-EG', { weekday: 'short', day: 'numeric', month: 'short' }).format(date);
 }
 
-function formatKickoffTime(value?: string | Date | null) {
+function formatKickoffTime(value?: string | Date | null, mounted?: boolean) {
   if (!value) return '—';
+  if (mounted === false) return '—';
   const date = new Date(value);
   if (!Number.isFinite(date.getTime())) return '—';
   return new Intl.DateTimeFormat('ar-EG', { hour: '2-digit', minute: '2-digit' }).format(date);
@@ -210,7 +212,7 @@ function MatchScore({ match }: { match: HomeMatch }) {
   );
 }
 
-function MatchStatePill({ match, now }: { match: HomeMatch; now: Date }) {
+function MatchStatePill({ match, now, mounted }: { match: HomeMatch; now: Date; mounted: boolean }) {
   if (isFinished(match)) return <span className="rounded-xl border border-white/10 bg-white/[0.06] px-2.5 py-1.5 text-[11px] font-black text-gray-300">انتهت</span>;
   if (isHalfTime(match)) return <span className="rounded-xl border border-[#FFD700]/20 bg-[#FFD700]/10 px-2.5 py-1.5 text-[11px] font-black text-[#FFD700]">استراحة</span>;
   if (isConfirmedLive(match)) {
@@ -220,6 +222,8 @@ function MatchStatePill({ match, now }: { match: HomeMatch; now: Date }) {
     return <span className="rounded-xl border border-[#00FF88]/25 bg-[#00FF88]/10 px-2.5 py-1.5 text-[11px] font-black text-[#00FF88]">{label}</span>;
   }
   if (isWaitingForStartConfirmation(match, now)) return <span className="rounded-xl border border-[#FFD700]/20 bg-[#FFD700]/10 px-2.5 py-1.5 text-[11px] font-black text-[#FFD700]">بانتظار تأكيد البداية</span>;
+
+  if (!mounted) return <span className="rounded-xl border border-[#FFD700]/20 bg-[#FFD700]/10 px-2.5 py-1.5 text-[11px] font-black text-[#FFD700]">قريباً</span>;
 
   const parts = countdownParts(match, now);
   if (!parts.active) return <span className="rounded-xl border border-[#FFD700]/20 bg-[#FFD700]/10 px-2.5 py-1.5 text-[11px] font-black text-[#FFD700]">بانتظار المصدر</span>;
@@ -236,7 +240,7 @@ function MatchStatePill({ match, now }: { match: HomeMatch; now: Date }) {
   );
 }
 
-function MatchRow({ match, now, variant = 'normal' }: { match: HomeMatch; now: Date; variant?: 'live' | 'primary' | 'normal' }) {
+function MatchRow({ match, now, mounted, variant = 'normal' }: { match: HomeMatch; now: Date; mounted: boolean; variant?: 'live' | 'primary' | 'normal' }) {
   const isPrimary = variant === 'primary' || variant === 'live';
   const shell = variant === 'live'
     ? 'border-[#00FF88]/25 bg-[radial-gradient(circle_at_top,rgba(0,255,136,0.12),transparent_34%),rgba(0,0,0,0.30)]'
@@ -249,9 +253,9 @@ function MatchRow({ match, now, variant = 'normal' }: { match: HomeMatch; now: D
       {isPrimary ? <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#FFD700]/60 to-transparent" /> : null}
       <div className="mb-3 grid grid-cols-2 gap-1.5 sm:flex sm:flex-wrap sm:items-center sm:justify-between">
         <span className="rounded-full border border-[#FFD700]/20 bg-[#FFD700]/10 px-2.5 py-1 text-center text-[10px] font-black text-[#FFD700]">{groupNumberLabel(match)}</span>
-        <span className="rounded-full border border-white/10 bg-white/[0.06] px-2.5 py-1 text-center text-[10px] font-black text-gray-200">{formatMatchDate(match.matchDate)}</span>
-        <span className="rounded-full border border-[#0FF0FC]/20 bg-[#0FF0FC]/10 px-2.5 py-1 text-center text-[11px] font-black text-[#0FF0FC]">{formatKickoffTime(match.matchDate)}</span>
-        <span className="flex justify-center sm:block"><MatchStatePill match={match} now={now} /></span>
+        <span className="rounded-full border border-white/10 bg-white/[0.06] px-2.5 py-1 text-center text-[10px] font-black text-gray-200">{formatMatchDate(match.matchDate, mounted)}</span>
+        <span className="rounded-full border border-[#0FF0FC]/20 bg-[#0FF0FC]/10 px-2.5 py-1 text-center text-[11px] font-black text-[#0FF0FC]">{formatKickoffTime(match.matchDate, mounted)}</span>
+        <span className="flex justify-center sm:block"><MatchStatePill match={match} now={now} mounted={mounted} /></span>
       </div>
 
       <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-1.5 sm:gap-2.5">
@@ -268,8 +272,13 @@ function MatchRow({ match, now, variant = 'normal' }: { match: HomeMatch; now: D
 }
 
 function MatchCenter({ fallbackMatches = [], nextMatch = null }: { fallbackMatches?: HomeMatch[]; nextMatch?: HomeMatch | null }) {
+  const [mounted, setMounted] = useState(false);
   const [matches, setMatches] = useState<HomeMatch[]>([]);
   const [now, setNow] = useState(() => new Date());
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(new Date()), 1000);
@@ -315,7 +324,7 @@ function MatchCenter({ fallbackMatches = [], nextMatch = null }: { fallbackMatch
       <div className="flex flex-col gap-4">
         <div>
           {primaryMatch ? (
-            <MatchRow match={primaryMatch} now={now} variant={isConfirmedLive(primaryMatch) || isHalfTime(primaryMatch) ? 'live' : 'primary'} />
+            <MatchRow match={primaryMatch} now={now} mounted={mounted} variant={isConfirmedLive(primaryMatch) || isHalfTime(primaryMatch) ? 'live' : 'primary'} />
           ) : (
             <div className="rounded-2xl border border-dashed border-white/10 bg-black/20 p-4 text-sm font-bold text-gray-400">لا توجد مباراة رئيسية جاهزة للعرض الآن.</div>
           )}
@@ -324,7 +333,7 @@ function MatchCenter({ fallbackMatches = [], nextMatch = null }: { fallbackMatch
         <div>
           <div className="mb-2 text-[10px] font-black uppercase tracking-[0.14em] text-gray-400">المباراتان القادمتان</div>
           <div className="grid gap-3 md:grid-cols-2">
-            {secondaryMatches.map((match) => <MatchRow key={matchKey(match)} match={match} now={now} />)}
+            {secondaryMatches.map((match) => <MatchRow key={matchKey(match)} match={match} now={now} mounted={mounted} />)}
             {!secondaryMatches.length ? <div className="rounded-2xl border border-dashed border-white/10 bg-black/20 p-4 text-sm font-bold text-gray-400 md:col-span-2">لا توجد مباريات قادمة إضافية جاهزة للعرض الآن.</div> : null}
           </div>
         </div>
