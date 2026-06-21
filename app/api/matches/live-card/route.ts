@@ -240,6 +240,9 @@ export async function GET() {
 export async function GET() {
   const now = new Date();
   try {
+<<<<<<< HEAD
+>>>>>>> parent of a6987c8 (0)
+=======
 >>>>>>> parent of a6987c8 (0)
     const liveWindowStart = new Date(now.getTime() - 3 * 60 * 60 * 1000);
     const upcomingUntil = new Date(now.getTime() + 24 * 60 * 60 * 1000);
@@ -278,6 +281,7 @@ export async function GET() {
     const matches = uniqueById([...(primary ? [primary] : []), ...nextTwo, ...filler]).slice(0, 3);
 
 <<<<<<< HEAD
+<<<<<<< HEAD
     const payload = { ok: true, dataSource: 'database', updatedAt: now.toISOString(), matches };
     liveCardCache = { createdAt: cacheNow, payload };
     return json(payload);
@@ -285,10 +289,15 @@ export async function GET() {
     console.error('Error in live-card GET api:', error);
     return json({ ok: false, error: error?.message || 'Internal Server Error', matches: [] }, 500);
 =======
+=======
+>>>>>>> parent of a6987c8 (0)
     return NextResponse.json({ ok: true, dataSource: 'database', updatedAt: now.toISOString(), matches }, { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } });
   } catch (error) {
     console.error('Error in live-card GET api:', error);
     return NextResponse.json({ ok: false, dataSource: 'fallback', updatedAt: now.toISOString(), matches: [] }, { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } });
+<<<<<<< HEAD
+>>>>>>> parent of a6987c8 (0)
+=======
 >>>>>>> parent of a6987c8 (0)
   }
 }
