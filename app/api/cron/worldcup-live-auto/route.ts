@@ -9,6 +9,10 @@ type StageResult = { name: string; ok: boolean; skipped?: boolean; status?: numb
 
 const DEFAULT_PUBLIC_ORIGIN = 'https://worldcup.mcprim.com';
 const LIVE_STAGE_TIMEOUT_MS = 27_000;
+const LARGE_RESPONSE_KEYS = new Set([
+  'normalizedPreview', 'cachedTimeline', 'events', 'eventsDetailed', 'playerStats', 'shotmap', 'lineups',
+  'raw', 'rawData', 'html', 'text', 'content', 'snapshot', 'eventsPreview', 'preview', 'resultsPreview',
+]);
 
 function json(value: unknown, status = 200) { return NextResponse.json(value, { status, headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } }); }
 function int(value: string | null, fallback: number, min: number, max: number) { const parsed = Number(value ?? fallback); return Number.isFinite(parsed) ? Math.max(min, Math.min(max, Math.floor(parsed))) : fallback; }
@@ -20,6 +24,69 @@ function maskUrl(value: string) { return value.replace(/(key=|adminSecret=|cronS
 function cleanOrigin(value: string | null | undefined) { const raw = String(value || '').trim(); if (!raw) return null; try { return new URL(/^https?:\/\//i.test(raw) ? raw : `https://${raw}`).origin; } catch { return null; } }
 function publicOrigin(req: Request, currentUrl: URL) { const explicit = cleanOrigin(process.env.LIVE_SYNC_PUBLIC_ORIGIN || process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXTAUTH_URL || process.env.APP_URL || process.env.PUBLIC_SITE_URL); if (explicit) return explicit; const forwardedHost = String(req.headers.get('x-forwarded-host') || '').split(',')[0].trim(); const host = forwardedHost || String(req.headers.get('host') || '').split(',')[0].trim(); const forwardedProto = String(req.headers.get('x-forwarded-proto') || '').split(',')[0].trim() || 'https'; const headerOrigin = cleanOrigin(host ? `${forwardedProto}://${host}` : null); if (headerOrigin && !headerOrigin.includes('localhost') && !headerOrigin.includes('127.0.0.1')) return headerOrigin; if (!currentUrl.origin.includes('localhost') && !currentUrl.origin.includes('127.0.0.1')) return currentUrl.origin; return DEFAULT_PUBLIC_ORIGIN; }
 function remainingMs(startedAt: number, budgetMs: number) { return Math.max(0, budgetMs - (Date.now() - startedAt)); }
+function compactPrimitive(value: any) { return typeof value === 'string' && value.length > 260 ? `${value.slice(0, 260)}…` : value; }
+function compactBody(value: any, depth = 0): any {
+  if (value === null || value === undefined) return value;
+  if (typeof value !== 'object') return compactPrimitive(value);
+  if (depth > 4) return '[trimmed_depth]';
+  if (Array.isArray(value)) {
+    const sample = value.slice(0, 3).map((item) => compactBody(item, depth + 1));
+    return value.length > 3 ? { count: value.length, sample } : sample;
+  }
+  const out: Record<string, any> = {};
+  for (const [key, item] of Object.entries(value)) {
+    if (LARGE_RESPONSE_KEYS.has(key)) {
+      if (Array.isArray(item)) out[`${key}Count`] = item.length;
+      else if (item && typeof item === 'object') out[`${key}Summary`] = Object.fromEntries(Object.entries(item as Record<string, any>).slice(0, 8).map(([k, v]) => [k, Array.isArray(v) ? { count: v.length } : typeof v === 'object' && v !== null ? '[object_trimmed]' : compactPrimitive(v)]));
+      else out[key] = compactPrimitive(item);
+      continue;
+    }
+    out[key] = compactBody(item, depth + 1);
+  }
+  return out;
+}
+function compactStageBody(name: string, body: any) {
+  if (!body || typeof body !== 'object') return compactBody(body);
+  if (name === 'the_stats_full_sync' && Array.isArray(body.perMatch)) {
+    return {
+      ok: body.ok,
+      mode: body.mode,
+      matchesFound: body.matchesFound,
+      policy: body.policy ? { selection: body.policy.selection, theStats: body.policy.theStats, pageData: body.policy.pageData, database: body.policy.database } : undefined,
+      perMatch: body.perMatch.map((item: any) => ({
+        matchId: item.matchId,
+        teams: item.teams,
+        previousStatus: item.previousStatus,
+        resolvedTheStatsMatchId: item.resolvedTheStatsMatchId,
+        officialTheStatsTimelineAvailable: item.officialTheStatsTimelineAvailable,
+        theStatsLive: compactBody(item.theStatsLive),
+        theStatsPostmatchEvents: compactBody(item.theStatsPostmatchEvents),
+        theStatsPostmatchFinal: compactBody(item.theStatsPostmatchFinal),
+        theStatsPageData: compactBody(item.theStatsPageData),
+        dedupe: compactBody(item.dedupe),
+      })),
+    };
+  }
+  if (name === 'isports_timeline_core' && Array.isArray(body.results)) {
+    return {
+      ok: body.ok,
+      mode: body.mode,
+      processed: body.processed,
+      durationMs: body.durationMs,
+      browserlessPrimary: body.browserlessPrimary,
+      results: body.results.map((item: any) => ({
+        dbMatchId: item.dbMatchId,
+        providerMatchId: item.providerMatchId,
+        local: item.local,
+        status: item.status,
+        dataMode: item.dataMode,
+        timelineHttpStatus: item.timelineHttpStatus,
+        timeline: item.timeline ? { ok: item.timeline.ok, eventsCount: item.timeline.eventsCount, save: item.timeline.save ? { events: item.timeline.save.events, snapshot: item.timeline.save.snapshot ? { counts: item.timeline.save.snapshot.counts, snapshotId: item.timeline.save.snapshot.snapshotId } : null } : null, loader: item.timeline.loader, remoteBrowser: item.timeline.remoteBrowser ? { used: item.timeline.remoteBrowser.used, ok: item.timeline.remoteBrowser.ok, status: item.timeline.remoteBrowser.status } : null } : null,
+      })),
+    };
+  }
+  return compactBody(body);
+}
 
 async function callJson(name: string, url: URL, timeoutMs: number, startedAt: number, budgetMs: number): Promise<StageResult> {
   const timeLeft = remainingMs(startedAt, budgetMs);
@@ -33,7 +100,7 @@ async function callJson(name: string, url: URL, timeoutMs: number, startedAt: nu
     const text = await res.text();
     let body: any = text;
     try { body = JSON.parse(text); } catch {}
-    return { name, ok: res.ok, status: res.status, durationMs: Date.now() - stageStartedAt, url: maskUrl(url.toString()), body };
+    return { name, ok: res.ok, status: res.status, durationMs: Date.now() - stageStartedAt, url: maskUrl(url.toString()), body: compactStageBody(name, body) };
   } catch (error: any) {
     return { name, ok: false, status: null, durationMs: Date.now() - stageStartedAt, url: maskUrl(url.toString()), error: String(error?.message || error).slice(0, 1000) };
   } finally { clearTimeout(timer); }
@@ -92,8 +159,9 @@ export async function GET(req: Request) {
     durationMs: Date.now() - startedAt,
     summary: { stages: stages.length, ok: stages.filter((stage) => stage.ok).length, skipped: stages.filter((stage) => stage.skipped).length, degraded: hardFailures.length },
     stages,
+    compactOutput: true,
     note: hardFailures.length
-      ? 'Cron completed in degraded mode before the external timeout. After-match events prefer TheStats timeline when available; iSports remains fallback.'
-      : 'Cron completed within the external timeout budget. After-match events prefer TheStats timeline, with final dedupe after iSports fallback.',
+      ? 'Cron completed in degraded mode before the external timeout. Output is compact to avoid external cron output-size failures.'
+      : 'Cron completed within the external timeout budget. Output is compact to avoid external cron output-size failures.',
   });
 }
