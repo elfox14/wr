@@ -210,6 +210,15 @@ function buildStaleGuardUrl(origin: string, key: string) {
 function buildStatusUrl(origin: string, key: string) {
   return withSecret(new URL('/api/admin/live-sources/status', origin), key);
 }
+function buildTheStatsPostmatchFinalSyncUrl(origin: string, key: string, url: URL) {
+  const next = new URL('/api/cron/the-stats-postmatch-final-sync', origin);
+  next.searchParams.set('limit', String(int(url.searchParams.get('theStatsPostmatchLimit'), 4, 1, 12)));
+  next.searchParams.set('minutesBack', String(int(url.searchParams.get('theStatsPostmatchMinutesBack'), 720, 30, 2880)));
+  next.searchParams.set('minutesForward', String(int(url.searchParams.get('theStatsPostmatchMinutesForward'), 15, 0, 120)));
+  next.searchParams.set('delayMs', String(int(url.searchParams.get('theStatsPostmatchDelayMs'), 1000, 0, 5000)));
+  next.searchParams.set('dryRun', 'false');
+  return withSecret(next, key);
+}
 
 async function ensureCronRunLogTable() {
   await prisma.$executeRawUnsafe(`
@@ -277,6 +286,9 @@ export async function GET(req: Request) {
   if (mode === 'all' || mode === 'secondary') {
     if (cadence(url.searchParams.get('footballData'), 5, minuteBucket)) stages.push(await callJson('football_data_sync', buildFootballDataUrl(origin, key, url), 4_000, startedAt, budgetMs));
     if (cadence(url.searchParams.get('postmatch'), 5, minuteBucket)) stages.push(await callJson('postmatch_timeline_safe', buildPostmatchUrl(origin, key, url, target), 4_000, startedAt, budgetMs));
+    if (cadence(url.searchParams.get('theStatsPostmatch'), 5, minuteBucket)) {
+      stages.push(await callJson('the_stats_postmatch_final_sync', buildTheStatsPostmatchFinalSyncUrl(origin, key, url), 12_000, startedAt, budgetMs));
+    }
     if (bool(url.searchParams.get('isportsVisual'), false)) stages.push(await callJson('isports_visual_async', buildISportsVisualUrl(origin, key, url, target), 3_000, startedAt, budgetMs));
     if (cadence(url.searchParams.get('staleGuard'), 10, minuteBucket)) stages.push(await callJson('expire_stale_matches_guard', buildStaleGuardUrl(origin, key), 2_000, startedAt, budgetMs));
     if (cadence(url.searchParams.get('status'), 5, minuteBucket)) stages.push(await callJson('live_sources_status', buildStatusUrl(origin, key), 2_000, startedAt, budgetMs));
