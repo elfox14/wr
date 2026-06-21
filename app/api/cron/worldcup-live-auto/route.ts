@@ -146,6 +146,9 @@ function buildFullSyncUrl(origin: string, key: string, url: URL) {
   const next = new URL('/api/cron/live-match-full-sync', origin);
   next.searchParams.set('dryRun', 'false');
   next.searchParams.set('theStats', 'true');
+  next.searchParams.set('theStatsExtras', 'false');
+  next.searchParams.set('theStatsExtrasRaw', 'false');
+  next.searchParams.set('forceExtras', 'false');
   next.searchParams.set('isports', 'false');
   next.searchParams.set('isportStats', 'false');
   next.searchParams.set('dedupe', 'true');
@@ -274,7 +277,7 @@ export async function GET(req: Request) {
     },
     stages,
     note: hardFailures.length
-      ? 'Cron completed in degraded mode. TheStats, iSports timeline/flash, postmatch confirmation, stale-match guard, and status monitoring are automated from this single endpoint.'
-      : 'Cron completed. This single endpoint automatically runs football-data, TheStats, iSports timeline/flash, postmatch confirmation, stale-match guard, and status monitoring.',
+      ? 'Cron completed in degraded mode. TheStats, iSports timeline/flash, postmatch confirmation, stale-match guard, and status monitoring are automated from this single endpoint. TheStats extras are explicitly disabled in the automatic cycle.'
+      : 'Cron completed. This single endpoint automatically runs football-data, TheStats, iSports timeline/flash, postmatch confirmation, stale-match guard, and status monitoring. TheStats extras are explicitly disabled in the automatic cycle.',
   });
 }
