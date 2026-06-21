@@ -10,6 +10,7 @@ function withCronDefaults(req: Request) {
     url.searchParams.set('phase', 'auto');
   }
   if (!url.searchParams.get('limit')) url.searchParams.set('limit', '1');
+  if (!url.searchParams.get('candidateWindow')) url.searchParams.set('candidateWindow', '120');
   if (!url.searchParams.get('skipExisting')) url.searchParams.set('skipExisting', 'true');
   if (!url.searchParams.get('endpointDelayMs') && !url.searchParams.get('delayMs')) url.searchParams.set('endpointDelayMs', '7000');
   if (!url.searchParams.get('matchDelayMs')) url.searchParams.set('matchDelayMs', '30000');
