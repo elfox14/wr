@@ -1,0 +1,17 @@
+/* Match page overrides
+   Keep the player stat tables usable while placing the two team cards side by side on wide screens. */
+
+main[dir="rtl"] #lineups > div.mt-4 > div.grid.gap-4 > div {
+  min-width: 0 !important;
+}
+
+main[dir="rtl"] #lineups > div.mt-4 div.overflow-x-auto {
+  max-width: 100% !important;
+}
+
+@media (min-width: 1280px) {
+  main[dir="rtl"] #lineups > div.mt-4 > div.grid.gap-4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    align-items: start !important;
+  }
+}
