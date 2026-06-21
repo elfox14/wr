@@ -31,6 +31,12 @@ function flagUrl(row: StandingRow) {
   return getTeamFlagUrl({ code: row.code, name: row.teamName, image: row.image }, 40);
 }
 
+function fallbackText(value?: string | null) {
+  const text = String(value || '').trim();
+  if (!text || text === '—' || text === '-' || text === 'null' || text === 'undefined') return 'غير متوفر في المصادر';
+  return text;
+}
+
 function matchClockText(data: MatchPageData) {
   if (data.status.isScheduled) return fullDate(data.matchDate);
   if (data.status.isFinished) return 'نهاية المباراة';
@@ -43,6 +49,13 @@ function matchClockCardLabel(data: MatchPageData) {
 
 function cardLabel(card: Element) {
   return String(card.querySelector('span')?.textContent || '').trim();
+}
+
+function setCardValue(card: HTMLElement | null, value?: string | null) {
+  if (!card) return;
+  const valueNode = card.querySelector('p');
+  if (!valueNode) return;
+  valueNode.textContent = fallbackText(valueNode.textContent || value);
 }
 
 function makeText(tag: string, className: string, text: string) {
@@ -70,7 +83,7 @@ function makeDateCard(value: string, labelText = 'موعد المباراة') {
 
   const body = document.createElement('p');
   body.className = 'line-clamp-2 min-h-[2.35rem] text-[10px] font-black leading-5 text-white sm:min-h-0 sm:text-sm sm:font-bold sm:leading-6';
-  body.textContent = value || '—';
+  body.textContent = fallbackText(value);
 
   header.append(icon, label);
   card.append(header, body);
@@ -104,7 +117,7 @@ function hideScoreClock(header: Element) {
   if (clockPill) clockPill.style.display = 'none';
 }
 
-function arrangeInfoCards(clockText: string, labelText: string) {
+function arrangeInfoCards(data: MatchPageData, clockText: string, labelText: string) {
   const header = document.querySelector('header');
   if (!header) return;
 
@@ -129,7 +142,12 @@ function arrangeInfoCards(clockText: string, labelText: string) {
   const labelNode = dateCard.querySelector('span:nth-of-type(2)') || dateCard.querySelector('div span:last-child');
   if (labelNode) labelNode.textContent = labelText;
   const valueNode = dateCard.querySelector('p');
-  if (valueNode) valueNode.textContent = clockText || '—';
+  if (valueNode) valueNode.textContent = fallbackText(clockText);
+
+  setCardValue(venue, data.venue);
+  setCardValue(city, data.city);
+  setCardValue(referee, data.referee);
+  setCardValue(group, data.groupLabel || data.stageLabel);
 
   const ordered = [venue, dateCard, referee, city, group].filter(Boolean) as HTMLElement[];
   ordered.forEach((card) => infoGrid.appendChild(card));
@@ -293,11 +311,62 @@ function makeTablesResponsive(data: MatchPageData) {
   renderStandingTable(thirdsPanel, data.thirdPlaceTable, 'thirds', isDesktop, isDesktop);
 }
 
+function restoreTeamStatsLayout() {
+  const statsSection = document.getElementById('stats') as HTMLElement | null;
+  if (!statsSection) return;
+  const grids = Array.from(statsSection.querySelectorAll('div.grid')) as HTMLElement[];
+  grids.forEach((grid) => {
+    const text = String(grid.textContent || '');
+    if (text.includes('إحصائيات المنتخب') && text.includes('مؤشر')) {
+      grid.classList.remove('lg:grid-cols-2');
+      grid.classList.add('xl:grid-cols-2');
+    }
+  });
+}
+
+function findPitchFieldByTitle(title: string) {
+  const titleNode = Array.from(document.querySelectorAll('span')).find((node) => String(node.textContent || '').includes(title)) as HTMLElement | undefined;
+  const container = titleNode?.closest('div.relative.overflow-hidden') as HTMLElement | null;
+  if (!container) return null;
+  const fields = Array.from(container.querySelectorAll('div')) as HTMLElement[];
+  return fields.find((field) => {
+    const className = String(field.getAttribute('class') || '');
+    return className.includes('border-2') && className.includes('bg-[linear-gradient') && (className.includes('aspect-[16/9]') || className.includes('h-[620px]'));
+  }) || null;
+}
+
+function setPitchMobilePortrait(field: HTMLElement | null, height: string) {
+  if (!field) return;
+  const isMobile = window.matchMedia('(max-width: 639px)').matches;
+  if (isMobile) {
+    field.dataset.mobilePortraitPitch = 'true';
+    field.style.setProperty('aspect-ratio', '9 / 16', 'important');
+    field.style.setProperty('height', height, 'important');
+    field.style.setProperty('min-height', height, 'important');
+    field.style.setProperty('width', '100%', 'important');
+    return;
+  }
+  if (field.dataset.mobilePortraitPitch) {
+    field.style.removeProperty('aspect-ratio');
+    field.style.removeProperty('height');
+    field.style.removeProperty('min-height');
+    field.style.removeProperty('width');
+    delete field.dataset.mobilePortraitPitch;
+  }
+}
+
+function makeMobilePitchesPortrait() {
+  setPitchMobilePortrait(findPitchFieldByTitle('ملعب البث التفاعلي'), '620px');
+  setPitchMobilePortrait(findPitchFieldByTitle('التشكيلة الرسمية على الملعب'), '720px');
+}
+
 function enhanceMatchPage(data: MatchPageData) {
-  arrangeInfoCards(matchClockText(data), matchClockCardLabel(data));
+  arrangeInfoCards(data, matchClockText(data), matchClockCardLabel(data));
   compactEmptyGap();
   addPlayerStatsNotice(data);
   makeTablesResponsive(data);
+  restoreTeamStatsLayout();
+  makeMobilePitchesPortrait();
 }
 
 export default function ProfessionalMatchPageWithDateCard({ data }: { data: MatchPageData }) {
