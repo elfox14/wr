@@ -69,10 +69,48 @@ export function scoreForDisplay(match: any, sources: any[]): MatchScore { const 
 
 function statusKind(status: string): MatchStatusKind { const value = normalizeStatusValue(status); if (FINISHED_STATUSES.includes(value)) return 'finished'; if (HALF_TIME_STATUSES.includes(value)) return 'halftime'; if (LIVE_STATUSES.includes(value)) return 'live'; if (SCHEDULED_STATUSES.includes(value)) return 'scheduled'; return 'delayed'; }
 function elapsedMinuteFromKickoff(match: any) { const startMs = new Date(match.matchDate || '').getTime(); if (!Number.isFinite(startMs)) return null; const elapsed = Math.floor((Date.now() - startMs) / 60_000); if (!Number.isFinite(elapsed) || elapsed < 0) return null; return Math.max(1, Math.min(FINAL_MINUTE_FALLBACK + 10, elapsed)); }
-function safeLiveMinute(match: any, rawStatus: string, rawMinute: number | null) { const minute = rawMinute === null || rawMinute === undefined ? null : Math.floor(rawMinute); const elapsed = elapsedMinuteFromKickoff(match); if (minute === null) return elapsed && elapsed <= 130 ? elapsed : null; if (elapsed !== null && elapsed < 15 && minute > elapsed + 6) return elapsed; if (elapsed !== null && minute > elapsed + 12 && minute >= 30) return elapsed; const status = normalizeStatusValue(rawStatus); if ((status === '1H' || status.includes('FIRST')) && minute > 55) return elapsed && elapsed < 55 ? elapsed : null; if ((status === '2H' || status.includes('SECOND')) && minute < 40) return elapsed && elapsed >= 40 ? elapsed : null; return minute; }
-function kickoffFallbackStatus(match: any): MatchStatusView | null { const startMs = new Date(match.matchDate || '').getTime(); if (!Number.isFinite(startMs)) return null; const elapsed = Math.floor((Date.now() - startMs) / 60_000); if (!Number.isFinite(elapsed) || elapsed < 0) return null; if (elapsed <= 55) { const minute = Math.max(1, elapsed); return { raw: 'KICKOFF_FALLBACK', kind: 'live', label: `الشوط الأول — د${minute.toLocaleString('ar-EG')}`, shortLabel: `الشوط الأول د${minute.toLocaleString('ar-EG')}`, minute, isLive: true, isFinished: false, isScheduled: false }; } if (elapsed <= 70) return { raw: 'KICKOFF_FALLBACK_HT', kind: 'halftime', label: 'استراحة بين الشوطين', shortLabel: 'استراحة', minute: null, isLive: false, isFinished: false, isScheduled: false }; if (elapsed <= 125) { const minute = Math.min(90, Math.max(46, elapsed - 15)); return { raw: 'KICKOFF_FALLBACK', kind: 'live', label: `الشوط الثاني — د${minute.toLocaleString('ar-EG')}`, shortLabel: `الشوط الثاني د${minute.toLocaleString('ar-EG')}`, minute, isLive: true, isFinished: false, isScheduled: false }; } return { raw: 'KICKOFF_FALLBACK_PENDING_END', kind: 'delayed', label: 'بانتظار تأكيد النهاية', shortLabel: 'تأكيد النهاية', minute: null, isLive: false, isFinished: false, isScheduled: false }; }
+function safeLiveMinute(match: any, rawStatus: string, rawMinute: number | null) {
+  return null;
+}
+function kickoffFallbackStatus(match: any): MatchStatusView | null { const startMs = new Date(match.matchDate || '').getTime(); if (!Number.isFinite(startMs)) return null; const elapsed = Math.floor((Date.now() - startMs) / 60_000); if (!Number.isFinite(elapsed) || elapsed < 0) return null; if (elapsed <= 55) { return { raw: 'KICKOFF_FALLBACK', kind: 'live', label: 'الشوط الأول', shortLabel: 'الشوط الأول', minute: null, isLive: true, isFinished: false, isScheduled: false }; } if (elapsed <= 70) return { raw: 'KICKOFF_FALLBACK_HT', kind: 'halftime', label: 'استراحة بين الشوطين', shortLabel: 'استراحة', minute: null, isLive: false, isFinished: false, isScheduled: false }; if (elapsed <= 125) { return { raw: 'KICKOFF_FALLBACK', kind: 'live', label: 'الشوط الثاني', shortLabel: 'الشوط الثاني', minute: null, isLive: true, isFinished: false, isScheduled: false }; } return { raw: 'KICKOFF_FALLBACK_PENDING_END', kind: 'delayed', label: 'بانتظار تأكيد النهاية', shortLabel: 'تأكيد النهاية', minute: null, isLive: false, isFinished: false, isScheduled: false }; }
 
-export function buildStatusView(match: any, sources: any[]): MatchStatusView { const matchStatus = normalizeStatusValue(match.status || ''); if (FINISHED_STATUSES.includes(matchStatus)) return { raw: matchStatus, kind: 'finished', label: 'انتهت المباراة', shortLabel: 'انتهت', minute: null, isLive: false, isFinished: true, isScheduled: false }; const fromSource = statusFromSnapshots(sources); const raw = fromSource?.status || normalizeStatusValue(match.status || 'SCHEDULED'); const rawMinute = fromSource?.minute ?? sources.map(snapshotMinute).find((value) => value !== null) ?? null; const kind = statusKind(raw); if (kind === 'finished') return { raw, kind, label: 'انتهت المباراة', shortLabel: 'انتهت', minute: null, isLive: false, isFinished: true, isScheduled: false }; if (kind === 'halftime') return { raw, kind, label: 'استراحة بين الشوطين', shortLabel: 'استراحة', minute: null, isLive: false, isFinished: false, isScheduled: false }; if (kind === 'live') { const phase = raw === '1H' ? 'الشوط الأول' : raw === '2H' ? 'الشوط الثاني' : raw === 'ET' ? 'وقت إضافي' : 'مباشرة الآن'; const minute = safeLiveMinute(match, raw, rawMinute); const minuteLabel = minute ? `د${Math.floor(minute).toLocaleString('ar-EG')}` : ''; return { raw, kind, label: minute ? `${phase} — ${minuteLabel}` : phase, shortLabel: minute ? `${phase} ${minuteLabel}` : phase, minute: minute ? Math.floor(minute) : null, isLive: true, isFinished: false, isScheduled: false }; } const fallback = kickoffFallbackStatus(match); if ((kind === 'scheduled' || kind === 'delayed') && fallback) return fallback; return { raw, kind: 'scheduled', label: 'لم تبدأ', shortLabel: 'لم تبدأ', minute: null, isLive: false, isFinished: false, isScheduled: true }; }
+export function buildStatusView(match: any, sources: any[]): MatchStatusView {
+  const matchStatus = normalizeStatusValue(match.status || '');
+  if (FINISHED_STATUSES.includes(matchStatus)) return { raw: matchStatus, kind: 'finished', label: 'انتهت المباراة', shortLabel: 'انتهت', minute: null, isLive: false, isFinished: true, isScheduled: false };
+
+  const fromSource = statusFromSnapshots(sources);
+  const raw = fromSource?.status || normalizeStatusValue(match.status || 'SCHEDULED');
+  const kind = statusKind(raw);
+
+  if (kind === 'finished') return { raw, kind, label: 'انتهت المباراة', shortLabel: 'انتهت', minute: null, isLive: false, isFinished: true, isScheduled: false };
+
+  const elapsed = elapsedMinuteFromKickoff(match);
+  let adjustedRaw = raw;
+  let adjustedKind = kind;
+
+  if (kind === 'live' && (raw === '1H' || raw === 'LIVE' || raw === 'IN_PLAY')) {
+    if (elapsed !== null) {
+      if (elapsed > 48 && elapsed <= 63) {
+        adjustedRaw = 'HT';
+        adjustedKind = 'halftime';
+      } else if (elapsed > 63) {
+        adjustedRaw = '2H';
+        adjustedKind = 'live';
+      }
+    }
+  }
+
+  if (adjustedKind === 'halftime') return { raw: adjustedRaw, kind: adjustedKind, label: 'استراحة بين الشوطين', shortLabel: 'استراحة', minute: null, isLive: false, isFinished: false, isScheduled: false };
+
+  if (adjustedKind === 'live') {
+    const phase = adjustedRaw === '1H' ? 'الشوط الأول' : adjustedRaw === '2H' ? 'الشوط الثاني' : adjustedRaw === 'ET' ? 'وقت إضافي' : 'مباشرة الآن';
+    return { raw: adjustedRaw, kind: adjustedKind, label: phase, shortLabel: phase, minute: null, isLive: true, isFinished: false, isScheduled: false };
+  }
+
+  const fallback = kickoffFallbackStatus(match);
+  if ((adjustedKind === 'scheduled' || adjustedKind === 'delayed') && fallback) return fallback;
+  return { raw: adjustedRaw, kind: 'scheduled', label: 'لم تبدأ', shortLabel: 'لم تبدأ', minute: null, isLive: false, isFinished: false, isScheduled: true };
+}
 
 export function eventMinuteLabel(event: any) { const detail = String(event?.detail || ''); const stoppage = detail.match(/(?:د|minute|min)?\s*(45|90|105)\s*\+\s*(\d+)/i); if (stoppage) return `د${Number(stoppage[1]).toLocaleString('ar-EG')}+${Number(stoppage[2]).toLocaleString('ar-EG')}`; return event.minute !== null && event.minute !== undefined ? `د${Number(event.minute).toLocaleString('ar-EG')}` : '—'; }
 export function eventIcon(type?: string | null) { const value = normalizeStatusValue(type); if (value.includes('GOAL')) return '⚽'; if (value.includes('YELLOW')) return '🟨'; if (value.includes('RED')) return '🟥'; if (value.includes('SUB')) return '🔁'; if (value.includes('VAR')) return '📺'; if (value.includes('PEN')) return '🎯'; if (value.includes('SAVE')) return '🧤'; if (value.includes('CORNER')) return '🚩'; if (value.includes('SHOT') || value.includes('CHANCE')) return '🎯'; return '•'; }

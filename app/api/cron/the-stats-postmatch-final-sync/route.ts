@@ -76,10 +76,21 @@ export async function GET(req: Request) {
 
   const matches = await prisma.match.findMany({
     where: {
-      OR: [
-        { status: { in: FINISHED } },
-        { matchDate: { gte: new Date(now - minutesBack * 60_000), lte: new Date(now + minutesForward * 60_000) } },
-      ],
+      AND: [
+        {
+          OR: [
+            { status: { in: FINISHED } },
+            { matchDate: { gte: new Date(now - minutesBack * 60_000), lte: new Date(now + minutesForward * 60_000) } },
+          ]
+        },
+        {
+          statsSnapshots: {
+            none: {
+              provider: 'THE_STATS_API_EXTRAS'
+            }
+          }
+        }
+      ]
     },
     include: { homeTeam: { select: { name: true } }, awayTeam: { select: { name: true } } },
     orderBy: { matchDate: 'desc' },

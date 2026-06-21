@@ -46,16 +46,15 @@ function matchStatus(match: TickerMatch) { return normalizeStatus(match.displayS
 function isHalfTime(match: TickerMatch) { return ['HT', 'HALFTIME', 'HALF_TIME', 'HALF-TIME'].includes(matchStatus(match)) || Boolean(match.isHalfTime); }
 function isFinished(match: TickerMatch) { return ['FINISHED', 'FT', 'AET', 'PEN', 'FULL_TIME', 'ENDED'].includes(matchStatus(match)) || Boolean(match.isStaleAutoFinished); }
 function isLive(match: TickerMatch) { if (isFinished(match)) return false; const status = matchStatus(match); return ['1H', '2H', 'ET', 'BT', 'P', 'IN_PLAY', 'LIVE'].includes(status) || Boolean(match.isLiveNow) || isHalfTime(match); }
-function minuteLabel(match: TickerMatch) { const minute = Number(match.minute); return Number.isFinite(minute) && minute > 0 ? formatCount(Math.floor(minute)) : null; }
+function minuteLabel(match: TickerMatch) { return null; }
 function liveStatusText(match: TickerMatch) {
   if (isHalfTime(match)) return 'استراحة';
-  const minute = minuteLabel(match);
   const status = matchStatus(match);
-  if (status === '1H') return minute ? `الشوط الأول — د${minute}` : 'الشوط الأول';
-  if (status === '2H') return minute ? `الشوط الثاني — د${minute}` : 'الشوط الثاني';
-  if (status === 'ET') return minute ? `وقت إضافي — د${minute}` : 'وقت إضافي';
+  if (status === '1H') return 'الشوط الأول';
+  if (status === '2H') return 'الشوط الثاني';
+  if (status === 'ET') return 'وقت إضافي';
   if (status === 'P' || status === 'PEN') return 'ركلات الترجيح';
-  return minute ? `جارية الآن — د${minute}` : 'جارية';
+  return 'جارية الآن';
 }
 function matchKey(match?: TickerMatch | null) { return String(match?.id || match?.animationMatchId || `${match?.homeTeam?.name || ''}-${match?.awayTeam?.name || ''}-${match?.matchDate || ''}`); }
 function mergeById(baseMatches: TickerMatch[], updates: TickerMatch[]) {

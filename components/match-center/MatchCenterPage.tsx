@@ -136,11 +136,13 @@ function matchClockLabel(match: any, ...snapshots: any[]) {
   if (FINISHED_STATUSES.includes(status)) return 'انتهت';
   if (HALF_TIME_STATUSES.includes(status)) return 'استراحة';
 
-  const minute = firstNumber(match?.minute, match?.elapsed, match?.currentMinute, ...snapshots.map(snapshotMinute));
   const isSecondHalf = status === '2H' || status === 'SECOND_HALF';
   if (LIVE_STATUSES.includes(status) || isSecondHalf) {
-    const liveMinute = isSecondHalf ? Math.max(45, minute ?? 45) : minute;
-    return liveMinute !== null && liveMinute !== undefined ? `د${fmt(Math.floor(liveMinute))}` : 'مباشرة الآن';
+    if (status === '1H') return 'الشوط الأول';
+    if (status === '2H' || isSecondHalf) return 'الشوط الثاني';
+    if (status === 'ET') return 'وقت إضافي';
+    if (status === 'P' || status === 'PEN') return 'ركلات الترجيح';
+    return 'مباشرة الآن';
   }
 
   if (SCHEDULED_STATUSES.includes(status) || !status) {

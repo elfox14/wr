@@ -161,8 +161,7 @@ function decorateMatch(match: any, now: Date, providerState?: any, snapshotState
   const providerHasScore = hasAnyNumber(providerState?.homeScore, providerState?.awayScore);
   const snapshotHasScore = hasAnyNumber(snapshotState?.homeScore, snapshotState?.awayScore);
   const useSnapshotScore = !providerHasScore && snapshotHasScore && (isLiveNow || isHalfTime || isFinished);
-  const scoreSource = providerHasScore ? 'provider' : useSnapshotScore ? 'database_snapshot' : 'database_match';
-  const minute = isLiveNow ? liveMinuteForStatus(effectiveStatus, providerState, snapshotState, freshSnapshot) : null;
+  const minute = null;
   const currentLiveStatus = isLiveNow ? phaseStatus(effectiveStatus) : match.status;
 
   return {
