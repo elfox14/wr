@@ -183,13 +183,29 @@ async function runSingleMode(req: Request, mode: TheStatsExtrasEndpointMode) {
   const lastProcessed = results[results.length - 1] || null;
   return { mode, dryRun, saveRequested: save, skipExisting, limit, candidateWindow, selected: selected.length, processed: results.length, saved: results.filter((item: any) => item.saved).length, successful: results.filter((item: any) => item.ok).length, failed: results.filter((item: any) => !item.ok).length, rateLimited, cooldownActive: Boolean(cooldown), blockedUntil: cooldown?.blockedUntil || null, next: lastProcessed?.matchDate ? { before: order === 'desc' ? lastProcessed.matchDate : undefined, after: order === 'asc' ? lastProcessed.matchDate : undefined, order } : null, advice: rateLimited ? '429/rate limit detected. Cooldown was saved; stop now and retry after blockedUntil. Use limit=1 with higher endpointDelayMs/matchDelayMs when retrying.' : selected.length === 0 ? 'No eligible finished matches found for this mode. Try another phase or set skipExisting=false for verification.' : 'Safe batch complete. Run the same URL again to continue, or move to the next mode after this mode finishes.', results };
 }
+async function runAutoMode(req: Request) {
+  const phaseResults = [];
+  for (const phase of MODE_SEQUENCE) {
+    const result = await runSingleMode(req, phase);
+    phaseResults.push(result);
+    if (result.rateLimited || result.cooldownActive || result.processed > 0 || result.selected > 0) {
+      return { auto: true, selectedPhase: phase, phaseResults, ...result };
+    }
+  }
+  return { auto: true, selectedPhase: null, phaseResults, mode: 'auto', selected: 0, processed: 0, saved: 0, successful: 0, failed: 0, rateLimited: false, cooldownActive: false, advice: 'All safe phases appear complete for the current filters.', results: [] };
+}
 export async function GET(req: Request) {
   const auth = await requireAdmin(req);
   if (!auth.authorized) return auth.error;
   const url = new URL(req.url);
+  const phaseRaw = String(url.searchParams.get('mode') || url.searchParams.get('phase') || '').toLowerCase().trim();
   const mode = modeParam(url.searchParams.get('mode') || url.searchParams.get('phase'));
   const sequence = phaseSequenceFromParam(url.searchParams.get('sequence'));
   try {
+    if (phaseRaw === 'auto') {
+      const result = await runAutoMode(req);
+      return json({ ok: true, provider: PROVIDER, mode: 'safe_old_backfill_auto', ...result, config: getTheStatsApiConfigStatus() });
+    }
     if (sequence?.length) {
       const phaseResults = [];
       for (const phase of sequence) {
