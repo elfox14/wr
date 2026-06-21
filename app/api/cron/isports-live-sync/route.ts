@@ -21,7 +21,7 @@ function requestOrigin(req: Request) { const fallback = new URL(req.url).origin;
 async function routeJson(response: Response | undefined) { if (!response) return { status: 500, ok: false, result: { ok: false, error: 'route returned no response' } }; const text = await response.text(); let parsed: any = null; try { parsed = JSON.parse(text); } catch {} return { status: response.status, ok: response.ok, result: parsed || { rawSample: text.slice(0, 1000) } }; }
 async function callRoute(handler: RouteHandler, url: URL, adminSecret: string) { const response = await handler(new Request(url.toString(), { method: 'GET', headers: adminSecret ? { 'x-admin-secret': adminSecret } : {} })); return routeJson(response); }
 function compactFlash(result: any) { return { ok: Boolean(result?.ok), hasStats: Boolean(result?.hasStats), stats: result?.stats || null, save: result?.save || null, flash: result?.flash || null, error: result?.error || null }; }
-function compactTimeline(result: any) { return { ok: Boolean(result?.ok), eventsCount: result?.timeline?.eventsCount || 0, save: result?.timeline?.save || null, statsSave: result?.timeline?.statsSave || null, eventsPreview: Array.isArray(result?.timeline?.events) ? result.timeline.events.slice(0, 4) : [], error: result?.error || null, loader: result?.loader || null, remoteBrowser: result?.remoteBrowser || null, directFrame: result?.directFrame || null }; }
+function compactTimeline(result: any) { return { ok: Boolean(result?.ok), eventsCount: result?.timeline?.eventsCount || 0, save: result?.timeline?.save || null, statsSave: result?.timeline?.statsSave || null, eventsPreview: Array.isArray(result?.timeline?.events) ? result.timeline.events.slice(0, 4) : [], error: result?.error || null, loader: result?.loader || null, remoteBrowser: result?.remoteBrowser || null, directFrame: result?.directFrame || null, cachedTimeline: result?.cachedTimeline || null }; }
 function compactLive(result: any) { return { ok: Boolean(result?.ok), hasStats: Boolean(result?.hasStats), stats: result?.stats || null, validation: result?.validation || null, save: result?.save || null, textSample: result?.textSample || null, error: result?.error || null }; }
 function buildFlashUrl(origin: string, match: any, providerMatchId: number, save: boolean, replace: boolean, timeoutMs: number, waitMs: number) {
   const flashUrl = new URL('/api/internal/live-ingest/isports/remote-flash-pull', origin);
@@ -50,9 +50,13 @@ export async function GET(req: Request) {
   try {
     const startedAt = Date.now();
     const url = new URL(req.url);
-    const take = clampInt(url.searchParams.get('take'), 2, 1, 5);
+    const explicitDbMatchId = url.searchParams.get('dbMatchId') || url.searchParams.get('id');
+    const take = clampInt(url.searchParams.get('take'), explicitDbMatchId ? 1 : 2, 1, 5);
     const timeoutMs = clampInt(url.searchParams.get('timeoutMs'), 35000, 5000, 70000);
     const waitMs = clampInt(url.searchParams.get('waitMs'), 12000, 1000, 30000);
+    const directTimeoutMs = clampInt(url.searchParams.get('directTimeoutMs'), explicitDbMatchId ? 6000 : 12000, 2000, 30000);
+    const wrapperTimeoutMs = clampInt(url.searchParams.get('wrapperTimeoutMs'), explicitDbMatchId ? 6000 : 10000, 2000, 15000);
+    const skipBrowserFallback = boolParam(url.searchParams.get('skipBrowserFallback'), Boolean(explicitDbMatchId));
     const windowBeforeMinutes = clampInt(url.searchParams.get('windowBeforeMinutes'), 240, 15, 720);
     const windowAfterMinutes = clampInt(url.searchParams.get('windowAfterMinutes'), 20, 0, 240);
     const includeFlash = boolParam(url.searchParams.get('includeFlash'), true);
@@ -62,7 +66,6 @@ export async function GET(req: Request) {
     const asyncLive = boolParam(url.searchParams.get('asyncLive'), false);
     const save = boolParam(url.searchParams.get('save'), true);
     const replace = boolParam(url.searchParams.get('replace'), true);
-    const explicitDbMatchId = url.searchParams.get('dbMatchId') || url.searchParams.get('id');
     const explicitProviderMatchId = Number(url.searchParams.get('matchId') || url.searchParams.get('providerMatchId') || 0);
     const start = new Date(Date.now() - windowBeforeMinutes * 60_000);
     const end = new Date(Date.now() + windowAfterMinutes * 60_000);
@@ -92,6 +95,9 @@ export async function GET(req: Request) {
           timelineUrl.searchParams.set('replace', replace ? 'true' : 'false');
           timelineUrl.searchParams.set('timeoutMs', String(timeoutMs));
           timelineUrl.searchParams.set('waitMs', String(waitMs));
+          timelineUrl.searchParams.set('directTimeoutMs', String(directTimeoutMs));
+          timelineUrl.searchParams.set('wrapperTimeoutMs', String(wrapperTimeoutMs));
+          timelineUrl.searchParams.set('skipBrowserFallback', skipBrowserFallback ? 'true' : 'false');
           const timeline = await callRoute(remoteTimelinePullGET, timelineUrl, adminSecret);
           item.timelineHttpStatus = timeline.status; item.timeline = compactTimeline(timeline.result);
         }
@@ -122,7 +128,7 @@ export async function GET(req: Request) {
     }
 
     const queued = results.some((item) => item.flash?.queued || item.live?.queued);
-    return json({ ok: true, mode: 'cron_isports_live_sync', save, includeFlash, includeTimeline, includeLive, asyncFlash, asyncLive, processed: results.length, durationMs: Date.now() - startedAt, window: { start: start.toISOString(), end: end.toISOString() }, results, note: queued ? 'Some heavy iSports pulls were queued in the background to avoid external cron timeout.' : 'Cron-safe route. Timeline uses v4 direct-first with Browserless/Render fallback, flash saves event-derived details, and visual stats run last for possession/shots/visible attack totals.' });
+    return json({ ok: true, mode: 'cron_isports_live_sync', save, includeFlash, includeTimeline, includeLive, asyncFlash, asyncLive, skipBrowserFallback, directTimeoutMs, wrapperTimeoutMs, processed: results.length, durationMs: Date.now() - startedAt, window: { start: start.toISOString(), end: end.toISOString() }, results, note: queued ? 'Some heavy iSports pulls were queued in the background to avoid external cron timeout.' : 'Cron-safe route. Targeted matches use fast direct timeline by default; Browserless fallback can be enabled manually with skipBrowserFallback=false.' });
   } catch (error: any) {
     return json({ ok: false, error: error?.message || 'Internal Server Error' }, 500);
   }
