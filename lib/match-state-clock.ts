@@ -15,6 +15,20 @@ type SnapshotLike = {
   rawData?: unknown;
 };
 
+type MatchClockKind = 'scheduled' | 'finished' | 'halftime' | 'live' | 'delayed';
+
+type MatchClockView = {
+  raw: string;
+  state: string;
+  kind: MatchClockKind;
+  label: string;
+  shortLabel: string;
+  minute: number | null;
+  isLive: boolean;
+  isFinished: boolean;
+  isScheduled: boolean;
+};
+
 function asObject(value: unknown): Record<string, any> {
   return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, any>) : {};
 }
@@ -62,12 +76,12 @@ function providerPriority(snapshot: SnapshotLike) {
   return 9;
 }
 
-function view(state: string, rest: Omit<ReturnType<typeof baseView>, 'state' | 'raw'>) {
+function view(state: string, rest: Omit<MatchClockView, 'state' | 'raw'>): MatchClockView {
   return { raw: state, state, ...rest };
 }
 
-function baseView() {
-  return { raw: '', state: '', kind: 'scheduled' as const, label: '', shortLabel: '', minute: null as number | null, isLive: false, isFinished: false, isScheduled: false };
+function baseView(): MatchClockView {
+  return { raw: '', state: '', kind: 'scheduled', label: '', shortLabel: '', minute: null, isLive: false, isFinished: false, isScheduled: false };
 }
 
 export function getProviderMatchClock(match: MatchLike, snapshots: SnapshotLike[] = []) {
