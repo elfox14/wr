@@ -13,10 +13,8 @@ import { getProviderQuotaBlock } from '@/lib/provider-quota-guard';
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-const LIVE_STATUSES = ['IN_PLAY', 'LIVE', '1H', '2H', 'HT'];
-const FINISHED_STATUSES = ['FINISHED', 'FT', 'AET', 'PEN'];
-const GROUP_STAGE_MAX_LIVE_MINUTES = 115;
-const KNOCKOUT_MAX_LIVE_MINUTES = 150;
+const AUTO_SYNC_STATUSES = ['IN_PLAY', 'LIVE', '1H', '2H', 'HT', 'ET', 'PAUSED'];
+const FINISHED_STATUSES = ['FINISHED', 'FT', 'AET', 'PEN', 'COMPLETED'];
 const MERGE_HISTORY_LIMIT = 80;
 const PUBLIC_HISTORY_LIMIT = 25;
 const SNAPSHOT_FIELDS = [
@@ -38,23 +36,21 @@ function isAuthorized(req: Request, searchParams: URLSearchParams) {
   return candidates.some((value) => value && valid.includes(value));
 }
 function normalizeStatus(status?: string | null) { return String(status || '').toUpperCase(); }
-function isLiveLike(status?: string | null) { return LIVE_STATUSES.includes(normalizeStatus(status)); }
+function isProviderLiveStatus(status?: string | null) { return AUTO_SYNC_STATUSES.includes(normalizeStatus(status)); }
 function isFinishedStatus(status?: string | null) { return FINISHED_STATUSES.includes(normalizeStatus(status)); }
-function isGroupStage(match: any) { return String(match?.groupPhase || match?.group || match?.stage || '').toUpperCase().includes('GROUP'); }
-function maxLiveMinutes(match: any) { return isGroupStage(match) ? GROUP_STAGE_MAX_LIVE_MINUTES : KNOCKOUT_MAX_LIVE_MINUTES; }
-function elapsedMinutes(match: any) { if (!match?.matchDate) return null; const start = new Date(match.matchDate).getTime(); if (!Number.isFinite(start)) return null; return Math.floor((Date.now() - start) / 60_000); }
-function isStaleLive(match: any) { if (!isLiveLike(match?.status)) return false; const elapsed = elapsedMinutes(match); if (elapsed === null) return false; return elapsed >= maxLiveMinutes(match); }
-function isScheduledButProbablyLive(match: any) { if (normalizeStatus(match?.status) !== 'SCHEDULED') return false; const diffMinutes = elapsedMinutes(match); return diffMinutes !== null && diffMinutes >= -10 && diffMinutes < maxLiveMinutes(match); }
-function isFinishedMatch(match: any) { return isFinishedStatus(match?.status) || isStaleLive(match); }
-function isAutoSyncCandidate(match: any, force: boolean) { if (force) return true; if (!match?.animationMatchId) return false; if (isFinishedMatch(match)) return false; return isLiveLike(match.status) || isScheduledButProbablyLive(match); }
-function shouldSync(match: any, latest: any, force: boolean) {
-  if (force) return true;
+function isAutoSyncCandidate(match: any, force: boolean) {
+  if (force) return Boolean(match?.animationMatchId);
   if (!match?.animationMatchId) return false;
+  if (isFinishedStatus(match?.status)) return false;
+  return isProviderLiveStatus(match?.status);
+}
+function shouldSync(match: any, latest: any, force: boolean) {
+  if (force) return Boolean(match?.animationMatchId);
   if (!isAutoSyncCandidate(match, force)) return false;
   if (!latest) return true;
   const capturedAt = new Date(latest.capturedAt).getTime();
   if (!Number.isFinite(capturedAt)) return true;
-  return Date.now() - capturedAt >= 300_000;
+  return Date.now() - capturedAt >= 60_000;
 }
 function hasAnyStat(snapshot: any) {
   if (!snapshot) return false;
@@ -63,8 +59,7 @@ function hasAnyStat(snapshot: any) {
 function nullableNumber(value: unknown) { if (value === null || value === undefined || value === '') return null; const n = Number(value); return Number.isFinite(n) ? n : null; }
 function snapshotMinute(snapshot: any) { const minute = nullableNumber(snapshot?.minute); return minute !== null && minute > 0 ? minute : null; }
 function snapshotHasScore(snapshot: any) { return nullableNumber(snapshot?.homeScore) !== null || nullableNumber(snapshot?.awayScore) !== null; }
-function cleanPublicSnapshot(match: any, snapshot: any) { if (!snapshot) return null; if (snapshotMinute(snapshot) !== null) return snapshot; return { ...snapshot, minute: null }; }
-function hasPrematureFinishedMinute(match: any, snapshot: any) { const minute = snapshotMinute(snapshot); return isFinishedMatch(match) && minute !== null && minute < 90; }
+function cleanPublicSnapshot(snapshot: any) { if (!snapshot) return null; if (snapshotMinute(snapshot) !== null) return snapshot; return { ...snapshot, minute: null }; }
 function byCapturedDesc(a: any, b: any) {
   const at = new Date(a?.capturedAt || 0).getTime();
   const bt = new Date(b?.capturedAt || 0).getTime();
@@ -99,10 +94,10 @@ function mergeSnapshots(rows: any[]) {
   for (const field of SNAPSHOT_FIELDS) merged[field] = firstWithValue(ordered, field);
   return merged;
 }
-function publicHistoryRows(match: any, rows: any[]) {
+function publicHistoryRows(rows: any[]) {
   return rows
     .filter(plausibleSnapshot)
-    .map((row) => cleanPublicSnapshot(match, publicSnapshot(row)))
+    .map((row) => cleanPublicSnapshot(publicSnapshot(row)))
     .filter((row) => hasAnyStat(row))
     .slice(0, PUBLIC_HISTORY_LIMIT)
     .reverse();
@@ -145,30 +140,29 @@ export async function GET(request: Request) {
     const historyRows = await getSnapshotHistory(match.id, MERGE_HISTORY_LIMIT);
     const mergedSnapshot = mergeSnapshots([latest, ...historyRows]);
     const rawLatestPublic = publicSnapshot(mergedSnapshot || latest);
-    const latestPublic = cleanPublicSnapshot(match, rawLatestPublic);
+    const latestPublic = cleanPublicSnapshot(rawLatestPublic);
     const ignoredSnapshotScore = Boolean(latestPublic && snapshotHasScore(latestPublic));
-    const prematureFinishedMinute = hasPrematureFinishedMinute(match, latestPublic);
-    const effectiveStatus = prematureFinishedMinute ? 'LIVE' : isFinishedMatch(match) ? 'FINISHED' : match.status;
+    const effectiveStatus = match.status;
     const hasStats = hasAnyStat(latestPublic);
     const sourceStatus = quotaBlock ? {
-      primary: 'FOOTBALL_DATA', statsProvider: latestPublic?.provider || 'ISPORTS', mode: 'fallback_due_to_isports_quota', isportsBlocked: true,
+      primary: 'DATABASE', statsProvider: latestPublic?.provider || 'DATABASE', mode: 'database_first_provider_blocked', isportsBlocked: true,
       blockedUntil: quotaBlock.blockedUntil instanceof Date ? quotaBlock.blockedUntil.toISOString() : quotaBlock.blockedUntil, reason: quotaBlock.reason,
-    } : { primary: latestPublic?.provider || 'DATABASE', statsProvider: latestPublic?.provider || 'DATABASE', mode: prematureFinishedMinute ? 'database_first_public_endpoint_finished_status_ignored_before_90' : 'database_first_public_endpoint', isportsBlocked: false };
+    } : { primary: latestPublic?.provider || 'DATABASE', statsProvider: latestPublic?.provider || 'DATABASE', mode: 'database_first_no_time_inference', isportsBlocked: false };
 
     return NextResponse.json({
       ok: true,
       updatedAt: now.toISOString(),
-      pollingSeconds: 60,
+      pollingSeconds: 30,
       providerSyncEnabled: allowProviderSync,
       autoSyncCandidate,
       hasStats,
       sourceStatus,
       sync: syncResult,
-      scorePolicy: { source: 'match', ignoredSnapshotScore, ignoredPrematureFinishedStatus: prematureFinishedMinute, ignoredMinuteZeroSnapshot: Boolean(latestPublic && snapshotHasScore(latestPublic) && snapshotMinute(latestPublic) === null) },
+      scorePolicy: { source: 'match', ignoredSnapshotScore, timeInferenceDisabled: true, statusSource: 'database_provider_state', note: 'The public endpoint never turns SCHEDULED/LIVE/FINISHED based on elapsed clock time.' },
       match: { id: match.id, animationMatchId: match.animationMatchId, status: effectiveStatus, matchDate: toIso(match.matchDate), homeScore: match.homeScore ?? 0, awayScore: match.awayScore ?? 0, homeTeam: match.homeTeam, awayTeam: match.awayTeam },
       latest: latestPublic,
-      history: publicHistoryRows(match, historyRows),
-      historyMeta: { returned: Math.min(publicHistoryRows(match, historyRows).length, PUBLIC_HISTORY_LIMIT), limit: PUBLIC_HISTORY_LIMIT, filteredEmptyRows: true },
+      history: publicHistoryRows(historyRows),
+      historyMeta: { returned: Math.min(publicHistoryRows(historyRows).length, PUBLIC_HISTORY_LIMIT), limit: PUBLIC_HISTORY_LIMIT, filteredEmptyRows: true },
     }, { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } });
   } catch (error: any) {
     console.error('live-stats endpoint error:', error);
