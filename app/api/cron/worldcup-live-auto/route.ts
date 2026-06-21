@@ -192,7 +192,7 @@ function buildISportsTimelineUrl(origin: string, key: string, url: URL, target: 
 }
 
 function buildISportsFlashStateUrl(origin: string, key: string, url: URL, target: { dbMatchId?: string | null; providerMatchId?: string | null }) {
-  const next = new URL('/api/internal/live-ingest/isports/remote-flash-state-pull', origin);
+  const next = new URL('/api/cron/isports-flash-state', origin);
   next.searchParams.set('save', 'true');
   next.searchParams.set('replace', 'true');
   next.searchParams.set('mode', 'timeline');
