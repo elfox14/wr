@@ -17,7 +17,7 @@ type StageResult = {
 };
 
 const DEFAULT_PUBLIC_ORIGIN = 'https://worldcup.mcprim.com';
-const LIVE_STAGE_TIMEOUT_MS = 45_000;
+const LIVE_STAGE_TIMEOUT_MS = 25_000;
 
 function json(value: unknown, status = 200) {
   return NextResponse.json(value, {
@@ -34,6 +34,11 @@ function int(value: string | null, fallback: number, min: number, max: number) {
 function bool(value: string | null, fallback = true) {
   if (value === null) return fallback;
   return ['1', 'true', 'yes', 'on'].includes(String(value).toLowerCase());
+}
+
+function cadence(value: string | null, defaultEveryMinutes: number, minuteBucket: number) {
+  if (value !== null) return bool(value, true);
+  return minuteBucket % Math.max(1, defaultEveryMinutes) === 0;
 }
 
 function secret() {
@@ -83,11 +88,11 @@ function remainingMs(startedAt: number, budgetMs: number) {
 
 async function callJson(name: string, url: URL, timeoutMs: number, startedAt: number, budgetMs: number): Promise<StageResult> {
   const timeLeft = remainingMs(startedAt, budgetMs);
-  if (timeLeft < 1_000) {
+  if (timeLeft < 1_250) {
     return { name, ok: false, skipped: true, url: maskUrl(url.toString()), error: 'time_budget_exhausted_before_stage' };
   }
 
-  const effectiveTimeout = Math.max(800, Math.min(timeoutMs, timeLeft - 250));
+  const effectiveTimeout = Math.max(750, Math.min(timeoutMs, timeLeft - 350));
   const stageStartedAt = Date.now();
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), effectiveTimeout);
@@ -156,7 +161,7 @@ function buildFullSyncUrl(origin: string, key: string, url: URL) {
   next.searchParams.set('dedupe', 'true');
   next.searchParams.set('wakeFallback', 'false');
   next.searchParams.set('mapISports', 'false');
-  next.searchParams.set('limit', String(int(url.searchParams.get('limit'), 8, 1, 20)));
+  next.searchParams.set('limit', String(int(url.searchParams.get('limit'), 3, 1, 8)));
   next.searchParams.set('minutesBack', String(int(url.searchParams.get('minutesBack'), 240, 15, 480)));
   next.searchParams.set('minutesForward', String(int(url.searchParams.get('minutesForward'), 300, 0, 360)));
   return withSecret(next, key);
@@ -169,10 +174,10 @@ function buildISportsTimelineUrl(origin: string, key: string, url: URL, target: 
   next.searchParams.set('replace', 'true');
   next.searchParams.set('includeTimeline', 'true');
   next.searchParams.set('includeFlash', 'true');
-  next.searchParams.set('asyncFlash', bool(url.searchParams.get('asyncFlash'), false) ? 'true' : 'false');
+  next.searchParams.set('asyncFlash', bool(url.searchParams.get('asyncFlash'), true) ? 'true' : 'false');
   next.searchParams.set('includeLive', 'false');
-  next.searchParams.set('timeoutMs', String(int(url.searchParams.get('isportsTimeoutMs'), 45_000, 5_000, 70_000)));
-  next.searchParams.set('waitMs', String(int(url.searchParams.get('isportsWaitMs'), 8_000, 1_000, 30_000)));
+  next.searchParams.set('timeoutMs', String(int(url.searchParams.get('isportsTimeoutMs'), 18_000, 5_000, 45_000)));
+  next.searchParams.set('waitMs', String(int(url.searchParams.get('isportsWaitMs'), 4_000, 1_000, 15_000)));
   return withSecret(optionalTarget(next, target), key);
 }
 
@@ -185,8 +190,8 @@ function buildISportsVisualUrl(origin: string, key: string, url: URL, target: { 
   next.searchParams.set('includeFlash', 'false');
   next.searchParams.set('includeLive', 'true');
   next.searchParams.set('asyncLive', 'true');
-  next.searchParams.set('timeoutMs', String(int(url.searchParams.get('visualTimeoutMs'), 45_000, 5_000, 80_000)));
-  next.searchParams.set('waitMs', String(int(url.searchParams.get('visualWaitMs'), 15_000, 1_000, 35_000)));
+  next.searchParams.set('timeoutMs', String(int(url.searchParams.get('visualTimeoutMs'), 25_000, 5_000, 45_000)));
+  next.searchParams.set('waitMs', String(int(url.searchParams.get('visualWaitMs'), 8_000, 1_000, 15_000)));
   return withSecret(optionalTarget(next, target), key);
 }
 
@@ -202,8 +207,8 @@ function buildPostmatchUrl(origin: string, key: string, url: URL, target: { dbMa
   next.searchParams.set('windowBeforeMinutes', String(int(url.searchParams.get('postmatchWindowBeforeMinutes'), 720, 30, 1440)));
   next.searchParams.set('minConfirmIntervalMinutes', String(int(url.searchParams.get('postmatchMinConfirmIntervalMinutes'), 120, 0, 1440)));
   next.searchParams.set('order', 'desc');
-  next.searchParams.set('timeoutMs', String(int(url.searchParams.get('postmatchTimeoutMs'), 18_000, 5_000, 45_000)));
-  next.searchParams.set('waitMs', String(int(url.searchParams.get('postmatchWaitMs'), 3_000, 1_000, 15_000)));
+  next.searchParams.set('timeoutMs', String(int(url.searchParams.get('postmatchTimeoutMs'), 12_000, 5_000, 25_000)));
+  next.searchParams.set('waitMs', String(int(url.searchParams.get('postmatchWaitMs'), 2_000, 1_000, 10_000)));
   return withSecret(optionalTarget(next, target), key);
 }
 
@@ -225,7 +230,8 @@ export async function GET(req: Request) {
   const startedAt = Date.now();
   const url = new URL(req.url);
   const origin = publicOrigin(req, url);
-  const budgetMs = int(url.searchParams.get('budgetMs'), LIVE_STAGE_TIMEOUT_MS, 5_000, 55_000);
+  const budgetMs = int(url.searchParams.get('budgetMs'), LIVE_STAGE_TIMEOUT_MS, 5_000, 28_000);
+  const minuteBucket = Math.floor(startedAt / 60_000);
   const dbMatchId = url.searchParams.get('dbMatchId') || url.searchParams.get('id');
   const providerMatchId = url.searchParams.get('matchId') || url.searchParams.get('providerMatchId');
   const target = { dbMatchId, providerMatchId };
@@ -234,32 +240,35 @@ export async function GET(req: Request) {
 
   const stages: StageResult[] = [];
 
-  if (bool(url.searchParams.get('footballData'), true)) {
-    stages.push(await callJson('football_data_sync', buildFootballDataUrl(origin, key, url), 8_000, startedAt, budgetMs));
-  }
-
+  // Critical live writes first: events, stats, score, venue/referee snapshot.
   if (runTheStats) {
-    stages.push(await callJson('the_stats_full_sync', buildFullSyncUrl(origin, key, url), 12_000, startedAt, budgetMs));
+    stages.push(await callJson('the_stats_full_sync', buildFullSyncUrl(origin, key, url), 14_000, startedAt, budgetMs));
   }
 
+  // iSports is a live fallback/complement, but it must not make the whole cron exceed external 30s limits.
   if (runISportsTimeline) {
-    stages.push(await callJson('isports_timeline_flash_core', buildISportsTimelineUrl(origin, key, url, target), 18_000, startedAt, budgetMs));
+    stages.push(await callJson('isports_timeline_flash_core', buildISportsTimelineUrl(origin, key, url, target), 9_000, startedAt, budgetMs));
+  }
+
+  // Lower-priority confirmation/monitoring stages run on a cadence and only when time remains.
+  if (cadence(url.searchParams.get('footballData'), 5, minuteBucket)) {
+    stages.push(await callJson('football_data_sync', buildFootballDataUrl(origin, key, url), 4_000, startedAt, budgetMs));
+  }
+
+  if (cadence(url.searchParams.get('postmatch'), 5, minuteBucket)) {
+    stages.push(await callJson('postmatch_timeline_safe', buildPostmatchUrl(origin, key, url, target), 4_000, startedAt, budgetMs));
   }
 
   if (bool(url.searchParams.get('isportsVisual'), false)) {
-    stages.push(await callJson('isports_visual_async', buildISportsVisualUrl(origin, key, url, target), 4_000, startedAt, budgetMs));
+    stages.push(await callJson('isports_visual_async', buildISportsVisualUrl(origin, key, url, target), 3_000, startedAt, budgetMs));
   }
 
-  if (bool(url.searchParams.get('postmatch'), true)) {
-    stages.push(await callJson('postmatch_timeline_safe', buildPostmatchUrl(origin, key, url, target), 6_000, startedAt, budgetMs));
+  if (cadence(url.searchParams.get('staleGuard'), 10, minuteBucket)) {
+    stages.push(await callJson('expire_stale_matches_guard', buildStaleGuardUrl(origin, key), 2_000, startedAt, budgetMs));
   }
 
-  if (bool(url.searchParams.get('staleGuard'), true)) {
-    stages.push(await callJson('expire_stale_matches_guard', buildStaleGuardUrl(origin, key), 3_000, startedAt, budgetMs));
-  }
-
-  if (bool(url.searchParams.get('status'), true)) {
-    stages.push(await callJson('live_sources_status', buildStatusUrl(origin, key), 3_000, startedAt, budgetMs));
+  if (cadence(url.searchParams.get('status'), 5, minuteBucket)) {
+    stages.push(await callJson('live_sources_status', buildStatusUrl(origin, key), 2_000, startedAt, budgetMs));
   }
 
   const hardFailures = stages.filter((stage) => !stage.ok && !stage.skipped);
@@ -279,7 +288,7 @@ export async function GET(req: Request) {
     },
     stages,
     note: hardFailures.length
-      ? 'Cron completed in degraded mode. TheStats, lightweight match info, iSports timeline/flash, postmatch confirmation, stale-match guard, and status monitoring are automated from this single endpoint. TheStats extras are explicitly disabled in the automatic cycle.'
-      : 'Cron completed. This single endpoint automatically runs football-data, TheStats, lightweight match info, iSports timeline/flash, postmatch confirmation, stale-match guard, and status monitoring. TheStats extras are explicitly disabled in the automatic cycle.',
+      ? 'Cron completed in degraded mode before the external timeout. Critical TheStats live writes run first; iSports and secondary confirmations run only within the time budget. TheStats extras remain disabled.'
+      : 'Cron completed within the external timeout budget. Critical live events/stats/match-info run first; iSports fallback and secondary checks are time-boxed. TheStats extras remain disabled.',
   });
 }
