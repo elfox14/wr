@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { footballFetchFromProvider } from '@/lib/apiFootball';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -26,10 +25,6 @@ const HALF_TIME_STATUSES = ['HT', 'HALFTIME', 'HALF_TIME', 'HALF-TIME', 'PAUSED'
 const SCHEDULED_STATUSES = ['SCHEDULED', 'TIMED', 'NOT_STARTED', 'NS'];
 const FINISHED_STATUSES = ['FT', 'AET', 'PEN', 'FINISHED', 'FULL_TIME', 'ENDED'];
 const FRESH_LIVE_SNAPSHOT_MS = 8 * 60 * 1000;
-
-function dateKey(date = new Date()) {
-  return date.toISOString().slice(0, 10);
-}
 
 function normalizeStatus(value?: string | null) {
   return String(value || '').toUpperCase();
@@ -87,12 +82,6 @@ function hasAnyNumber(...values: unknown[]) {
   return values.some((value) => nullableNumber(value) !== null);
 }
 
-function providerMinute(value: any) {
-  const raw = value?.fixture?.status?.elapsed ?? value?.fixture?.status?.minute ?? value?.minute ?? value?.elapsed;
-  const n = Number(raw);
-  return Number.isFinite(n) ? Math.max(1, Math.min(150, Math.round(n))) : null;
-}
-
 function pickLiveScore(providerValue: unknown, snapshotValue: unknown, matchValue: unknown) {
   const provider = nullableNumber(providerValue);
   if (provider !== null) return provider;
@@ -145,7 +134,7 @@ async function fetchLatestScoreSnapshots(matchIds: string[]) {
     for (const row of rows) {
       if (!latestByMatch.has(row.matchId)) latestByMatch.set(row.matchId, row);
       const provider = String(row.provider || '').toUpperCase();
-      if (!preferredByMatch.has(row.matchId) && (provider.includes('ISPORTS_FLASH') || row.rawData?.flashMeta?.matchState)) preferredByMatch.set(row.matchId, row);
+      if (!preferredByMatch.has(row.matchId) && (provider.includes('THE_STATS_API_LIVE') || provider.includes('ISPORTS_FLASH') || row.rawData?.flashMeta?.matchState)) preferredByMatch.set(row.matchId, row);
     }
     for (const [matchId, row] of preferredByMatch) latestByMatch.set(matchId, row);
     return latestByMatch;
@@ -154,29 +143,6 @@ async function fetchLatestScoreSnapshots(matchIds: string[]) {
       console.warn('live-card score snapshot lookup failed:', error?.message || error);
     }
     return new Map<string, any>();
-  }
-}
-
-async function fetchAnimationLiveState() {
-  try {
-    const data: any = await footballFetchFromProvider('ISPORTS', '/livescores', { date: dateKey(), live: 'all' });
-    const fixtures = Array.isArray(data?.response) ? data.response : Array.isArray(data) ? data : [];
-    const map = new Map<number, any>();
-    for (const fixture of fixtures) {
-      const id = Number(fixture?.fixture?.id);
-      if (Number.isFinite(id)) {
-        map.set(id, {
-          status: rawStatus(fixture),
-          minute: providerMinute(fixture),
-          homeScore: nullableNumber(fixture?.goals?.home ?? fixture?.score?.fulltime?.home ?? fixture?.score?.halftime?.home),
-          awayScore: nullableNumber(fixture?.goals?.away ?? fixture?.score?.fulltime?.away ?? fixture?.score?.halftime?.away),
-        });
-      }
-    }
-    return map;
-  } catch (error: any) {
-    console.warn('live-card provider status failed:', error?.message || error);
-    return new Map<number, any>();
   }
 }
 
@@ -195,7 +161,7 @@ function decorateMatch(match: any, now: Date, providerState?: any, snapshotState
   const providerHasScore = hasAnyNumber(providerState?.homeScore, providerState?.awayScore);
   const snapshotHasScore = hasAnyNumber(snapshotState?.homeScore, snapshotState?.awayScore);
   const useSnapshotScore = !providerHasScore && snapshotHasScore && (isLiveNow || isHalfTime || isFinished);
-  const scoreSource = providerHasScore ? 'provider' : useSnapshotScore ? 'snapshot' : 'match';
+  const scoreSource = providerHasScore ? 'provider' : useSnapshotScore ? 'database_snapshot' : 'database_match';
   const minute = isLiveNow ? liveMinuteForStatus(effectiveStatus, providerState, snapshotState, freshSnapshot) : null;
   const currentLiveStatus = isLiveNow ? phaseStatus(effectiveStatus) : match.status;
 
@@ -205,12 +171,14 @@ function decorateMatch(match: any, now: Date, providerState?: any, snapshotState
     homeScore: pickLiveScore(providerState?.homeScore, useSnapshotScore ? snapshotState?.homeScore : null, match.homeScore),
     awayScore: pickLiveScore(providerState?.awayScore, useSnapshotScore ? snapshotState?.awayScore : null, match.awayScore),
     scoreSource,
+    dataSource: 'database',
     isLiveNow,
     isHalfTime,
     isLikelyLiveByTime: isLikelyLiveByFreshSnapshot,
     isStaleAutoFinished: false,
     displayStatus: isFinished ? 'FINISHED' : isHalfTime ? 'HT' : currentLiveStatus,
     minute,
+    snapshotCapturedAt: snapshotState?.capturedAt || null,
   };
 }
 
@@ -230,7 +198,7 @@ export async function GET() {
   const upcomingUntil = new Date(now.getTime() + 24 * 60 * 60 * 1000);
   const recentSince = new Date(now.getTime() - 6 * 60 * 60 * 1000);
 
-  const [windowMatches, recentlyFinished, providerStates] = await Promise.all([
+  const [windowMatches, recentlyFinished] = await Promise.all([
     prisma.match.findMany({
       where: {
         status: { in: ['SCHEDULED', 'TIMED', 'NOT_STARTED', 'NS', 'IN_PLAY', 'LIVE', 'HT', '1H', '2H'] },
@@ -246,12 +214,11 @@ export async function GET() {
       take: 4,
       select: MATCH_SELECT,
     }),
-    fetchAnimationLiveState(),
   ]);
 
   const scoreSnapshots = await fetchLatestScoreSnapshots([...windowMatches, ...recentlyFinished].map((match) => match.id));
-  const decoratedWindow = windowMatches.map((match) => decorateMatch(match, now, match.animationMatchId ? providerStates.get(Number(match.animationMatchId)) : null, scoreSnapshots.get(match.id)));
-  const decoratedFinished = recentlyFinished.map((match) => decorateMatch(match, now, match.animationMatchId ? providerStates.get(Number(match.animationMatchId)) : null, scoreSnapshots.get(match.id)));
+  const decoratedWindow = windowMatches.map((match) => decorateMatch(match, now, null, scoreSnapshots.get(match.id)));
+  const decoratedFinished = recentlyFinished.map((match) => decorateMatch(match, now, null, scoreSnapshots.get(match.id)));
 
   const live = decoratedWindow.filter((match) => match.isLiveNow || match.isHalfTime);
   const waitingForStart = decoratedWindow.filter((match) => !match.isLiveNow && !match.isHalfTime && SCHEDULED_STATUSES.includes(String(match.status || '').toUpperCase()) && new Date(match.matchDate).getTime() <= now.getTime());
@@ -263,5 +230,5 @@ export async function GET() {
   const filler = [...decoratedFinished, ...other].filter((match) => !primary || match.id !== primary.id).filter((match) => !nextTwo.some((next) => next.id === match.id));
   const matches = uniqueById([...(primary ? [primary] : []), ...nextTwo, ...filler]).slice(0, 3);
 
-  return NextResponse.json({ ok: true, updatedAt: now.toISOString(), matches }, { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } });
+  return NextResponse.json({ ok: true, dataSource: 'database', updatedAt: now.toISOString(), matches }, { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } });
 }
