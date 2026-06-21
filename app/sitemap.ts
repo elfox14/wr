@@ -1,23 +1,10 @@
 import { MetadataRoute } from 'next';
 import prisma from '@/lib/prisma';
 
+export const revalidate = 3600;
+
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://worldcup.mcprim.com';
-
-  const matches = await prisma.match.findMany({
-    select: { id: true, matchDate: true, status: true },
-    orderBy: { matchDate: 'asc' },
-  });
-  const matchCenterUrls = matches.map((match) => {
-    const status = String(match.status || '').toUpperCase();
-    const isLiveOrUpcoming = status === 'SCHEDULED' || status === 'IN_PLAY' || status === 'LIVE' || status === 'HT';
-    return {
-      url: `${baseUrl}/match-center/${match.id}`,
-      lastModified: new Date(match.matchDate),
-      changeFrequency: isLiveOrUpcoming ? 'hourly' as const : 'weekly' as const,
-      priority: isLiveOrUpcoming ? 0.9 : 0.7,
-    };
-  });
 
   const staticPages = [
     { route: '', freq: 'always', prio: 1 },
@@ -39,7 +26,27 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: page.prio,
   }));
 
-  let newsUrls: any[] = [];
+  let matchCenterUrls: MetadataRoute.Sitemap = [];
+  try {
+    const matches = await prisma.match.findMany({
+      select: { id: true, matchDate: true, status: true },
+      orderBy: { matchDate: 'asc' },
+    });
+    matchCenterUrls = matches.map((match) => {
+      const status = String(match.status || '').toUpperCase();
+      const isLiveOrUpcoming = status === 'SCHEDULED' || status === 'IN_PLAY' || status === 'LIVE' || status === 'HT';
+      return {
+        url: `${baseUrl}/match-center/${match.id}`,
+        lastModified: new Date(match.matchDate),
+        changeFrequency: isLiveOrUpcoming ? 'hourly' as const : 'weekly' as const,
+        priority: isLiveOrUpcoming ? 0.9 : 0.7,
+      };
+    });
+  } catch (err) {
+    console.error('Sitemap match generation skipped because database is unavailable:', err);
+  }
+
+  let newsUrls: MetadataRoute.Sitemap = [];
   try {
     await prisma.$executeRawUnsafe(`
       CREATE TABLE IF NOT EXISTS "PressNews" (
