@@ -2,6 +2,8 @@ import { randomUUID } from 'crypto';
 import prisma from '@/lib/prisma';
 import { theStatsApiFetch } from '@/lib/theStatsApi';
 
+export type TheStatsExtrasEndpointMode = 'essential' | 'full' | 'events' | 'shots' | 'players' | 'lineups' | 'info' | 'stats';
+
 function str(...values: any[]): string | null {
   for (const value of values) {
     if (value === undefined || value === null || value === '') continue;
@@ -34,7 +36,7 @@ function normalizeProviderId(value: any) {
   if (!raw) return null;
   const id = raw.startsWith('mt_') ? raw : `mt_${raw.replace(/^mt_/i, '').replace(/\D/g, '')}`;
   const digits = id.replace(/\D/g, '');
-  if (digits.length < 8) return null; // Reject short iSports IDs like 537354
+  if (digits.length < 8) return null;
   return id && id !== 'mt_' && id !== 'mt_12345' ? id : null;
 }
 function isPageOutOfRange(error: any) { const code = String(error?.payload?.error?.code || error?.code || '').toUpperCase(); const message = String(error?.payload?.error?.message || error?.message || '').toLowerCase(); return code === 'PAGE_OUT_OF_RANGE' || message.includes('out of range'); }
@@ -74,9 +76,7 @@ export async function resolveTheStatsProviderId(match: any, query: Record<string
   const external = String(match.externalId || '').trim();
   if (external.startsWith('mt_') && external !== 'mt_12345') {
     const digits = external.replace(/\D/g, '');
-    if (digits.length >= 8) {
-      return { id: external, by: 'local_external_id' };
-    }
+    if (digits.length >= 8) return { id: external, by: 'local_external_id' };
   }
   const cached = await existingProviderId(match.id);
   if (cached) return { id: cached, by: 'cached_the_stats_snapshot' };
@@ -94,15 +94,38 @@ function compactStats(payload: any) {
   return { meta: { source: 'match-stats' }, stats: out };
 }
 function compactMatchInfo(matchInfoPayload: any, statsPayload: any) { const data = dataOf(matchInfoPayload); const stats = dataOf(statsPayload); const venue = data?.venue || data?.fixture?.venue || data?.match?.venue || {}; const referee = data?.referee || data?.fixture?.referee || data?.match?.referee || {}; return { status: str(data?.status, stats?.status), venue: str(venue?.name, venue), city: str(venue?.city, data?.city), referee: str(referee?.name, referee), finalScore: data?.score?.final_score || data?.score || null, xgAvailable: Boolean(data?.xg_available || stats?.overview?.expected_goals) }; }
-function compactEvent(row: any) { const team = row?.team || {}; const player = row?.player || row?.athlete || row?.scorer || {}; return { type: str(row?.type, row?.event_type, row?.incident_type, row?.name) || 'event', minute: n(row?.minute ?? row?.time?.minute ?? row?.elapsed ?? row?.match_minute ?? row?.event_minute), teamId: str(team?.id, row?.team_id, row?.teamId), teamName: str(team?.name, row?.team_name, row?.teamName), playerId: str(player?.id, row?.player_id, row?.playerId), playerName: str(player?.name, row?.player_name, row?.playerName, row?.scorer?.name), detail: str(row?.detail, row?.description, row?.comment, row?.text, row?.message) };
-}
-function compactShot(row: any) { const player = row?.player || row?.athlete || row?.shooter || {}; const team = row?.team || {}; const outcome = str(row?.outcome, row?.result, row?.shot_outcome, row?.status, row?.type); return { minute: n(row?.minute ?? row?.time?.minute ?? row?.elapsed), playerName: str(player?.name, row?.player_name, row?.playerName), teamName: str(team?.name, row?.team_name, row?.teamName), x: n(row?.x ?? row?.pitchX ?? row?.location?.x), y: n(row?.y ?? row?.pitchY ?? row?.location?.y), xg: n(row?.xg ?? row?.expected_goals ?? row?.expectedGoals), npxg: n(row?.npxg ?? row?.non_penalty_xg ?? row?.nonPenaltyXg), outcome, isOnTarget: /on target|saved|goal/i.test(String(outcome || '')), isGoal: /goal|scored/i.test(String(outcome || row?.type || '')) };
-}
-function compactPlayerStat(row: any) { const player = row?.player || row?.athlete || row; const team = row?.team || {}; const stats = row?.stats || row?.statistics || row; const passing = row?.passing || stats?.passing || {}; const shooting = row?.shooting || stats?.shooting || {}; const defending = row?.defending || stats?.defending || {}; const goalkeeping = row?.goalkeeping || stats?.goalkeeping || {}; return { playerId: str(player?.id, row?.player_id, row?.playerId, row?.id), playerName: str(player?.name, row?.player_name, row?.playerName, row?.name), teamId: str(team?.id, row?.team_id, row?.teamId), teamName: str(team?.name, row?.team_name, row?.teamName), position: str(player?.position, row?.position), rating: n(stats?.rating ?? row?.rating), minutes: n(stats?.minutes ?? stats?.minutes_played ?? row?.minutes), goals: n(shooting?.goals ?? stats?.goals ?? row?.goals), assists: n(passing?.assists ?? stats?.assists ?? row?.assists), shots: n(shooting?.total_shots ?? stats?.shots ?? row?.shots), shotsOnTarget: n(shooting?.shots_on_target ?? stats?.shots_on_target ?? row?.shots_on_target), passes: n(passing?.total_passes ?? stats?.passes ?? row?.passes), accuratePasses: n(passing?.accurate_passes ?? stats?.accurate_passes ?? row?.accurate_passes), keyPasses: n(passing?.key_passes ?? stats?.key_passes ?? row?.key_passes), tackles: n(defending?.tackles ?? stats?.tackles ?? row?.tackles), interceptions: n(defending?.interceptions ?? stats?.interceptions ?? row?.interceptions), clearances: n(defending?.clearances ?? stats?.clearances ?? row?.clearances), saves: n(goalkeeping?.saves ?? stats?.saves ?? row?.saves) };
-}
+function compactEvent(row: any) { const team = row?.team || {}; const player = row?.player || row?.athlete || row?.scorer || {}; return { type: str(row?.type, row?.event_type, row?.incident_type, row?.name) || 'event', minute: n(row?.minute ?? row?.time?.minute ?? row?.elapsed ?? row?.match_minute ?? row?.event_minute), teamId: str(team?.id, row?.team_id, row?.teamId), teamName: str(team?.name, row?.team_name, row?.teamName), playerId: str(player?.id, row?.player_id, row?.playerId), playerName: str(player?.name, row?.player_name, row?.playerName, row?.scorer?.name), detail: str(row?.detail, row?.description, row?.comment, row?.text, row?.message) }; }
+function compactShot(row: any) { const player = row?.player || row?.athlete || row?.shooter || {}; const team = row?.team || {}; const outcome = str(row?.outcome, row?.result, row?.shot_outcome, row?.status, row?.type); return { minute: n(row?.minute ?? row?.time?.minute ?? row?.elapsed), playerName: str(player?.name, row?.player_name, row?.playerName), teamName: str(team?.name, row?.team_name, row?.teamName), x: n(row?.x ?? row?.pitchX ?? row?.location?.x), y: n(row?.y ?? row?.pitchY ?? row?.location?.y), xg: n(row?.xg ?? row?.expected_goals ?? row?.expectedGoals), npxg: n(row?.npxg ?? row?.non_penalty_xg ?? row?.nonPenaltyXg), outcome, isOnTarget: /on target|saved|goal/i.test(String(outcome || '')), isGoal: /goal|scored/i.test(String(outcome || row?.type || '')) }; }
+function compactPlayerStat(row: any) { const player = row?.player || row?.athlete || row; const team = row?.team || {}; const stats = row?.stats || row?.statistics || row; const passing = row?.passing || stats?.passing || {}; const shooting = row?.shooting || stats?.shooting || {}; const defending = row?.defending || stats?.defending || {}; const goalkeeping = row?.goalkeeping || stats?.goalkeeping || {}; return { playerId: str(player?.id, row?.player_id, row?.playerId, row?.id), playerName: str(player?.name, row?.player_name, row?.playerName, row?.name), teamId: str(team?.id, row?.team_id, row?.teamId), teamName: str(team?.name, row?.team_name, row?.teamName), position: str(player?.position, row?.position), rating: n(stats?.rating ?? row?.rating), minutes: n(stats?.minutes ?? stats?.minutes_played ?? row?.minutes), goals: n(shooting?.goals ?? stats?.goals ?? row?.goals), assists: n(passing?.assists ?? stats?.assists ?? row?.assists), shots: n(shooting?.total_shots ?? stats?.shots ?? row?.shots), shotsOnTarget: n(shooting?.shots_on_target ?? stats?.shots_on_target ?? row?.shots_on_target), passes: n(passing?.total_passes ?? stats?.passes ?? row?.passes), accuratePasses: n(passing?.accurate_passes ?? stats?.accurate_passes ?? row?.accurate_passes), keyPasses: n(passing?.key_passes ?? stats?.key_passes ?? row?.key_passes), tackles: n(defending?.tackles ?? stats?.tackles ?? row?.tackles), interceptions: n(defending?.interceptions ?? stats?.interceptions ?? row?.interceptions), clearances: n(defending?.clearances ?? stats?.clearances ?? row?.clearances), saves: n(goalkeeping?.saves ?? stats?.saves ?? row?.saves) }; }
 async function fetchEndpoint(keyName: string, path: string, timeoutMs: number) { try { return { key: keyName, path, ok: true, payload: await theStatsApiFetch(path, {}, { timeoutMs }) }; } catch (error: any) { return { key: keyName, path, ok: false, error: safeError(error) }; } }
 
-export async function collectTheStatsMatchExtras(match: any, options: { dryRun?: boolean; save?: boolean; includeRaw?: boolean; timeoutMs?: number; query?: Record<string, string | number>; endpointMode?: 'essential' | 'full' | string; delayMs?: number } = {}) {
+function normalizeEndpointMode(value: any): TheStatsExtrasEndpointMode {
+  const mode = String(value || 'essential').toLowerCase().trim();
+  if (mode === 'all') return 'full';
+  if (mode === 'timeline' || mode === 'events') return 'events';
+  if (mode === 'shotmap' || mode === 'shots') return 'shots';
+  if (mode === 'player-stats' || mode === 'playerstats' || mode === 'players') return 'players';
+  if (mode === 'lineup' || mode === 'lineups') return 'lineups';
+  if (mode === 'match-info' || mode === 'matchinfo' || mode === 'info') return 'info';
+  if (mode === 'match-stats' || mode === 'stats') return 'stats';
+  return mode === 'full' ? 'full' : 'essential';
+}
+
+function endpointsForMode(mode: TheStatsExtrasEndpointMode, id: string) {
+  const endpoints: [string, string][] = {
+    info: [['matchInfo', `/api/football/matches/${id}`]],
+    stats: [['stats', `/api/football/matches/${id}/stats`]],
+    lineups: [['lineups', `/api/football/matches/${id}/lineups`]],
+    events: [['timeline', `/api/football/matches/${id}/timeline`]],
+    shots: [['shotmap', `/api/football/matches/${id}/shotmap`]],
+    players: [['playerStats', `/api/football/matches/${id}/player-stats`]],
+    essential: [['matchInfo', `/api/football/matches/${id}`], ['stats', `/api/football/matches/${id}/stats`], ['lineups', `/api/football/matches/${id}/lineups`]],
+    full: [['matchInfo', `/api/football/matches/${id}`], ['stats', `/api/football/matches/${id}/stats`], ['lineups', `/api/football/matches/${id}/lineups`], ['timeline', `/api/football/matches/${id}/timeline`], ['shotmap', `/api/football/matches/${id}/shotmap`], ['playerStats', `/api/football/matches/${id}/player-stats`]],
+  }[mode];
+  return endpoints;
+}
+
+export async function collectTheStatsMatchExtras(match: any, options: { dryRun?: boolean; save?: boolean; includeRaw?: boolean; timeoutMs?: number; query?: Record<string, string | number>; endpointMode?: TheStatsExtrasEndpointMode | 'all' | 'timeline' | 'shotmap' | 'player-stats' | string; delayMs?: number } = {}) {
   const dryRun = Boolean(options.dryRun);
   const save = options.save !== false;
   const includeRaw = Boolean(options.includeRaw);
@@ -111,13 +134,8 @@ export async function collectTheStatsMatchExtras(match: any, options: { dryRun?:
   const resolved = await resolveTheStatsProviderId(match, options.query || {});
   if (!resolved.id) return { ok: false, matchId: match.id, error: 'Could not resolve provider match id', resolved };
   const id = encodeURIComponent(String(resolved.id));
-  const mode = options.endpointMode === 'full' || options.endpointMode === 'all' ? 'full' : 'essential';
-  const endpoints = [
-    ['matchInfo', `/api/football/matches/${id}`],
-    ['stats', `/api/football/matches/${id}/stats`],
-    ['lineups', `/api/football/matches/${id}/lineups`],
-    ...(mode === 'full' ? [['timeline', `/api/football/matches/${id}/timeline`], ['shotmap', `/api/football/matches/${id}/shotmap`], ['playerStats', `/api/football/matches/${id}/player-stats`]] : []),
-  ];
+  const mode = normalizeEndpointMode(options.endpointMode);
+  const endpoints = endpointsForMode(mode, id);
   const results: any[] = [];
   for (const [keyName, path] of endpoints) { results.push(await fetchEndpoint(String(keyName), String(path), timeoutMs)); if (delayMs > 0) await sleep(delayMs); }
   const byKey: Record<string, any> = Object.fromEntries(results.map((item) => [item.key, item]));
