@@ -311,70 +311,17 @@ function makeTablesResponsive(data: MatchPageData) {
   renderStandingTable(thirdsPanel, data.thirdPlaceTable, 'thirds', isDesktop, isDesktop);
 }
 
-function statValue(value: number | null | undefined, suffix = '') {
-  if (value === null || value === undefined || Number.isNaN(value)) return '—';
-  const rounded = Number.isInteger(value) ? num(value) : value.toLocaleString('ar-EG', { maximumFractionDigits: 2 });
-  return `${rounded}${suffix}`;
-}
-
-function findTeamStatsGrid(statsSection: HTMLElement) {
-  return Array.from(statsSection.querySelectorAll('div.grid')).find((grid) => {
-    const text = String(grid.textContent || '');
-    return text.includes('إحصائيات المنتخب') && text.includes('مؤشر');
-  }) as HTMLElement | null;
-}
-
-function renderCombinedMobileStats(data: MatchPageData) {
+function restoreTeamStatsLayout() {
   const statsSection = document.getElementById('stats') as HTMLElement | null;
   if (!statsSection) return;
-
-  const teamStatsGrid = findTeamStatsGrid(statsSection);
-  const oldCombined = statsSection.querySelector('[data-mobile-combined-match-stats="true"]') as HTMLElement | null;
-  const isMobile = window.matchMedia('(max-width: 767px)').matches;
-
-  if (!isMobile) {
-    oldCombined?.remove();
-    if (teamStatsGrid) {
-      teamStatsGrid.style.removeProperty('display');
-      teamStatsGrid.classList.remove('lg:grid-cols-2');
-      teamStatsGrid.classList.add('xl:grid-cols-2');
+  const grids = Array.from(statsSection.querySelectorAll('div.grid')) as HTMLElement[];
+  grids.forEach((grid) => {
+    const text = String(grid.textContent || '');
+    if (text.includes('إحصائيات المنتخب') && text.includes('مؤشر')) {
+      grid.classList.remove('lg:grid-cols-2');
+      grid.classList.add('xl:grid-cols-2');
     }
-    return;
-  }
-
-  if (!teamStatsGrid) return;
-  teamStatsGrid.style.setProperty('display', 'none', 'important');
-  oldCombined?.remove();
-
-  const wrapper = document.createElement('div');
-  wrapper.setAttribute('data-mobile-combined-match-stats', 'true');
-  wrapper.className = 'mt-3 grid gap-2';
-
-  const header = document.createElement('div');
-  header.className = 'grid items-center gap-2 rounded-2xl border border-white/10 bg-black/35 px-2 py-2 text-center text-[10px] font-black text-slate-300';
-  header.dir = 'ltr';
-  header.style.gridTemplateColumns = 'minmax(58px,.8fr) minmax(96px,1.35fr) minmax(58px,.8fr)';
-  header.append(
-    makeText('span', 'truncate text-left text-[#F8C846]', data.homeTeam.name),
-    makeText('span', 'truncate text-center text-slate-400', 'الإحصائية'),
-    makeText('span', 'truncate text-right text-[#18E58F]', data.awayTeam.name),
-  );
-  wrapper.appendChild(header);
-
-  data.stats.forEach((metric) => {
-    const row = document.createElement('div');
-    row.className = 'grid min-w-0 items-center gap-2 rounded-2xl border border-white/10 bg-black/25 px-2 py-2 text-center shadow-inner';
-    row.dir = 'ltr';
-    row.style.gridTemplateColumns = 'minmax(58px,.8fr) minmax(96px,1.35fr) minmax(58px,.8fr)';
-
-    const home = makeText('b', 'truncate text-left text-base font-black tabular-nums text-[#F8C846]', statValue(metric.home, metric.suffix));
-    const label = makeText('span', 'min-w-0 text-center text-[11px] font-black leading-4 text-white', metric.label);
-    const away = makeText('b', 'truncate text-right text-base font-black tabular-nums text-[#18E58F]', statValue(metric.away, metric.suffix));
-    row.append(home, label, away);
-    wrapper.appendChild(row);
   });
-
-  teamStatsGrid.insertAdjacentElement('afterend', wrapper);
 }
 
 function findPitchFieldByTitle(title: string) {
@@ -418,7 +365,7 @@ function enhanceMatchPage(data: MatchPageData) {
   compactEmptyGap();
   addPlayerStatsNotice(data);
   makeTablesResponsive(data);
-  renderCombinedMobileStats(data);
+  restoreTeamStatsLayout();
   makeMobilePitchesPortrait();
 }
 
