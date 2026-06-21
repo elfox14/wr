@@ -25,6 +25,10 @@ const HALF_TIME_STATUSES = ['HT', 'HALFTIME', 'HALF_TIME', 'HALF-TIME', 'PAUSED'
 const SCHEDULED_STATUSES = ['SCHEDULED', 'TIMED', 'NOT_STARTED', 'NS'];
 const FINISHED_STATUSES = ['FT', 'AET', 'PEN', 'FINISHED', 'FULL_TIME', 'ENDED'];
 const FRESH_LIVE_SNAPSHOT_MS = 8 * 60 * 1000;
+const CACHE_TTL_MS = 10_000;
+
+type CacheEntry = { createdAt: number; payload: any };
+let liveCardCache: CacheEntry | null = null;
 
 function normalizeStatus(value?: string | null) {
   return String(value || '').toUpperCase();
@@ -121,23 +125,31 @@ function phaseStatus(status: string) {
   return 'IN_PLAY';
 }
 
+function quoteSql(value: string) {
+  return `'${String(value).replace(/'/g, "''")}'`;
+}
+
 async function fetchLatestScoreSnapshots(matchIds: string[]) {
-  if (!matchIds.length) return new Map<string, any>();
+  const uniqueMatchIds = Array.from(new Set(matchIds.filter(Boolean)));
+  if (!uniqueMatchIds.length) return new Map<string, any>();
   try {
-    const rows = await prisma.matchStatsSnapshot.findMany({
-      where: { matchId: { in: matchIds } },
-      select: { matchId: true, provider: true, minute: true, homeScore: true, awayScore: true, capturedAt: true, rawData: true },
-      orderBy: { capturedAt: 'desc' },
-    });
-    const latestByMatch = new Map<string, any>();
-    const preferredByMatch = new Map<string, any>();
-    for (const row of rows) {
-      if (!latestByMatch.has(row.matchId)) latestByMatch.set(row.matchId, row);
-      const provider = String(row.provider || '').toUpperCase();
-      if (!preferredByMatch.has(row.matchId) && (provider.includes('THE_STATS_API_LIVE') || provider.includes('ISPORTS_FLASH') || row.rawData?.flashMeta?.matchState)) preferredByMatch.set(row.matchId, row);
-    }
-    for (const [matchId, row] of preferredByMatch) latestByMatch.set(matchId, row);
-    return latestByMatch;
+    const idList = uniqueMatchIds.map(quoteSql).join(',');
+    const rows = await prisma.$queryRawUnsafe<any[]>(`
+      SELECT DISTINCT ON ("matchId")
+        "matchId", "provider", "minute", "homeScore", "awayScore", "capturedAt", "rawData"
+      FROM "MatchStatsSnapshot"
+      WHERE "matchId" IN (${idList})
+      ORDER BY
+        "matchId",
+        CASE
+          WHEN UPPER(COALESCE("provider", '')) LIKE '%THE_STATS_API_LIVE%' THEN 0
+          WHEN UPPER(COALESCE("provider", '')) LIKE '%ISPORTS_FLASH%' THEN 1
+          WHEN "rawData"->'flashMeta'->>'matchState' IS NOT NULL THEN 1
+          ELSE 2
+        END,
+        "capturedAt" DESC
+    `);
+    return new Map(rows.map((row) => [row.matchId, row]));
   } catch (error: any) {
     if (!String(error?.message || '').includes('MatchStatsSnapshot')) {
       console.warn('live-card score snapshot lookup failed:', error?.message || error);
@@ -192,43 +204,62 @@ function uniqueById(matches: any[]) {
   });
 }
 
+function json(payload: any, status = 200) {
+  return NextResponse.json(payload, {
+    status,
+    headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' },
+  });
+}
+
 export async function GET() {
-  const now = new Date();
-  const liveWindowStart = new Date(now.getTime() - 3 * 60 * 60 * 1000);
-  const upcomingUntil = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-  const recentSince = new Date(now.getTime() - 6 * 60 * 60 * 1000);
+  try {
+    const cacheNow = Date.now();
+    if (liveCardCache && cacheNow - liveCardCache.createdAt < CACHE_TTL_MS) {
+      return json({ ...liveCardCache.payload, fromCache: true });
+    }
 
-  const [windowMatches, recentlyFinished] = await Promise.all([
-    prisma.match.findMany({
-      where: {
-        status: { in: ['SCHEDULED', 'TIMED', 'NOT_STARTED', 'NS', 'IN_PLAY', 'LIVE', 'HT', '1H', '2H'] },
-        matchDate: { gte: liveWindowStart, lte: upcomingUntil },
-      },
-      orderBy: { matchDate: 'asc' },
-      take: 20,
-      select: MATCH_SELECT,
-    }),
-    prisma.match.findMany({
-      where: { status: { in: ['FINISHED', 'FT', 'AET', 'PEN'] }, matchDate: { gte: recentSince, lte: now } },
-      orderBy: { matchDate: 'desc' },
-      take: 4,
-      select: MATCH_SELECT,
-    }),
-  ]);
+    const now = new Date();
+    const liveWindowStart = new Date(now.getTime() - 3 * 60 * 60 * 1000);
+    const upcomingUntil = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+    const recentSince = new Date(now.getTime() - 6 * 60 * 60 * 1000);
 
-  const scoreSnapshots = await fetchLatestScoreSnapshots([...windowMatches, ...recentlyFinished].map((match) => match.id));
-  const decoratedWindow = windowMatches.map((match) => decorateMatch(match, now, null, scoreSnapshots.get(match.id)));
-  const decoratedFinished = recentlyFinished.map((match) => decorateMatch(match, now, null, scoreSnapshots.get(match.id)));
+    const [windowMatches, recentlyFinished] = await Promise.all([
+      prisma.match.findMany({
+        where: {
+          status: { in: ['SCHEDULED', 'TIMED', 'NOT_STARTED', 'NS', 'IN_PLAY', 'LIVE', 'HT', '1H', '2H'] },
+          matchDate: { gte: liveWindowStart, lte: upcomingUntil },
+        },
+        orderBy: { matchDate: 'asc' },
+        take: 20,
+        select: MATCH_SELECT,
+      }),
+      prisma.match.findMany({
+        where: { status: { in: ['FINISHED', 'FT', 'AET', 'PEN'] }, matchDate: { gte: recentSince, lte: now } },
+        orderBy: { matchDate: 'desc' },
+        take: 4,
+        select: MATCH_SELECT,
+      }),
+    ]);
 
-  const live = decoratedWindow.filter((match) => match.isLiveNow || match.isHalfTime);
-  const waitingForStart = decoratedWindow.filter((match) => !match.isLiveNow && !match.isHalfTime && SCHEDULED_STATUSES.includes(String(match.status || '').toUpperCase()) && new Date(match.matchDate).getTime() <= now.getTime());
-  const upcoming = decoratedWindow.filter((match) => !match.isLiveNow && !match.isHalfTime && SCHEDULED_STATUSES.includes(String(match.status || '').toUpperCase()) && new Date(match.matchDate).getTime() > now.getTime());
-  const other = decoratedWindow.filter((match) => !live.includes(match) && !waitingForStart.includes(match) && !upcoming.includes(match));
+    const scoreSnapshots = await fetchLatestScoreSnapshots([...windowMatches, ...recentlyFinished].map((match) => match.id));
+    const decoratedWindow = windowMatches.map((match) => decorateMatch(match, now, null, scoreSnapshots.get(match.id)));
+    const decoratedFinished = recentlyFinished.map((match) => decorateMatch(match, now, null, scoreSnapshots.get(match.id)));
 
-  const primary = live[0] || waitingForStart[0] || upcoming[0] || decoratedFinished[0] || other[0];
-  const nextTwo = upcoming.filter((match) => !primary || match.id !== primary.id).slice(0, 2);
-  const filler = [...decoratedFinished, ...other].filter((match) => !primary || match.id !== primary.id).filter((match) => !nextTwo.some((next) => next.id === match.id));
-  const matches = uniqueById([...(primary ? [primary] : []), ...nextTwo, ...filler]).slice(0, 3);
+    const live = decoratedWindow.filter((match) => match.isLiveNow || match.isHalfTime);
+    const waitingForStart = decoratedWindow.filter((match) => !match.isLiveNow && !match.isHalfTime && SCHEDULED_STATUSES.includes(String(match.status || '').toUpperCase()) && new Date(match.matchDate).getTime() <= now.getTime());
+    const upcoming = decoratedWindow.filter((match) => !match.isLiveNow && !match.isHalfTime && SCHEDULED_STATUSES.includes(String(match.status || '').toUpperCase()) && new Date(match.matchDate).getTime() > now.getTime());
+    const other = decoratedWindow.filter((match) => !live.includes(match) && !waitingForStart.includes(match) && !upcoming.includes(match));
 
-  return NextResponse.json({ ok: true, dataSource: 'database', updatedAt: now.toISOString(), matches }, { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } });
+    const primary = live[0] || waitingForStart[0] || upcoming[0] || decoratedFinished[0] || other[0];
+    const nextTwo = upcoming.filter((match) => !primary || match.id !== primary.id).slice(0, 2);
+    const filler = [...decoratedFinished, ...other].filter((match) => !primary || match.id !== primary.id).filter((match) => !nextTwo.some((next) => next.id === match.id));
+    const matches = uniqueById([...(primary ? [primary] : []), ...nextTwo, ...filler]).slice(0, 3);
+
+    const payload = { ok: true, dataSource: 'database', updatedAt: now.toISOString(), matches };
+    liveCardCache = { createdAt: cacheNow, payload };
+    return json(payload);
+  } catch (error: any) {
+    console.error('Error in live-card GET api:', error);
+    return json({ ok: false, error: error?.message || 'Internal Server Error', matches: [] }, 500);
+  }
 }
