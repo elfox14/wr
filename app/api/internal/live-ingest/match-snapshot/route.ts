@@ -91,6 +91,12 @@ function nullableInt(value: unknown, min?: number, max?: number) {
   return Math.max(min ?? rounded, Math.min(max ?? rounded, rounded));
 }
 
+function positiveInt(value: unknown) {
+  const number = Number(value);
+  if (!Number.isFinite(number) || number <= 0) return null;
+  return Math.floor(number);
+}
+
 function normalizeStatus(value: unknown) {
   const raw = text(value).toUpperCase().replace(/[\s-]+/g, '_');
   return STATUS_MAP[raw] || null;
@@ -103,7 +109,7 @@ function valueFromStats(payload: Record<string, any>, stats: Record<string, any>
 function matchWhere(payload: Record<string, any>) {
   const matchId = text(payload.matchId || payload.dbMatchId || payload.id);
   if (matchId) return { id: matchId };
-  const animationMatchId = nullableInt(payload.animationMatchId ?? payload.providerMatchId ?? payload.matchProviderId, 1);
+  const animationMatchId = positiveInt(payload.animationMatchId ?? payload.providerMatchId ?? payload.matchProviderId);
   if (animationMatchId) return { animationMatchId };
   return null;
 }
@@ -190,7 +196,7 @@ export async function POST(req: Request) {
   const providerMatchId = nullableInt(payload.providerMatchId ?? payload.animationMatchId ?? match.animationMatchId, 0);
   if (providerMatchId === null) return NextResponse.json({ ok: false, error: 'providerMatchId is required when the matched row has no animationMatchId' }, { status: 400, headers: { 'Cache-Control': 'no-store' } });
 
-  const snapshotData: Record<string, any> = {
+  const snapshotData: any = {
     id: randomUUID(),
     matchId: match.id,
     provider,
@@ -208,7 +214,7 @@ export async function POST(req: Request) {
   };
   for (const field of STAT_FIELDS) snapshotData[field] = valueFromStats(payload, stats, field);
 
-  const matchUpdate: Record<string, any> = {};
+  const matchUpdate: any = {};
   if (status) matchUpdate.status = status;
   if (snapshotData.homeScore !== null) matchUpdate.homeScore = snapshotData.homeScore;
   if (snapshotData.awayScore !== null) matchUpdate.awayScore = snapshotData.awayScore;
