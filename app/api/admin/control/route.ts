@@ -35,6 +35,32 @@ function getOrigin(req: Request) {
   return new URL(req.url).origin;
 }
 
+const DISABLED_PROVIDER_ACTIONS = new Set([
+  'provider-fixtures',
+  'provider-live',
+  'provider-player-stats',
+  'data-hub-sync',
+  'fixtures',
+  'auto-sync',
+  'sync-performance',
+]);
+
+function disabledProviderAction(action: string) {
+  return NextResponse.json({
+    ok: false,
+    error: 'external_ingestion_disabled',
+    action,
+    message: 'External provider sync/fetch actions are disabled in the web service. Use database-only reads until the new worker plan is implemented.',
+  }, {
+    status: 410,
+    headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' },
+  });
+}
+
+function isExternalIngestionEnabled() {
+  return ['1', 'true', 'yes', 'on'].includes(String(process.env.EXTERNAL_INGESTION_ENABLED || '').toLowerCase());
+}
+
 async function callInternal(req: Request, path: string, init: RequestInit = {}) {
   const origin = getOrigin(req);
   const secret = process.env.ADMIN_API_SECRET || process.env.CRON_SECRET || '';
@@ -283,6 +309,8 @@ export async function GET(req: Request) {
   const limit = Number(searchParams.get('limit') || 30);
 
   try {
+    if (!isExternalIngestionEnabled() && DISABLED_PROVIDER_ACTIONS.has(action)) return disabledProviderAction(action);
+
     if (action === 'health') return NextResponse.json(await healthCheck());
     if (action === 'recent-matches') return NextResponse.json(await recentMatches(limit));
     if (action === 'invalid-matches') return NextResponse.json(await invalidMatches());

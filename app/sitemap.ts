@@ -3,6 +3,15 @@ import prisma from '@/lib/prisma';
 
 export const revalidate = 3600;
 
+function logSitemapDataError(scope: string, error: unknown) {
+  if (process.env.SITEMAP_DEBUG !== 'true') return;
+  console.warn(`Sitemap ${scope} URLs skipped because database data is unavailable.`, error);
+}
+
+function shouldIncludeDynamicSitemapUrls() {
+  return ['1', 'true', 'yes', 'on'].includes(String(process.env.SITEMAP_INCLUDE_DYNAMIC || '').toLowerCase());
+}
+
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://worldcup.mcprim.com';
 
@@ -26,6 +35,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: page.prio,
   }));
 
+  if (!shouldIncludeDynamicSitemapUrls()) return staticPages;
+
   let matchCenterUrls: MetadataRoute.Sitemap = [];
   try {
     const matches = await prisma.match.findMany({
@@ -43,30 +54,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       };
     });
   } catch (err) {
-    console.error('Sitemap match generation skipped because database is unavailable:', err);
+    logSitemapDataError('match', err);
   }
 
   let newsUrls: MetadataRoute.Sitemap = [];
   try {
-    await prisma.$executeRawUnsafe(`
-      CREATE TABLE IF NOT EXISTS "PressNews" (
-        "id" TEXT PRIMARY KEY,
-        "title" TEXT NOT NULL,
-        "body" TEXT NOT NULL,
-        "category" TEXT NOT NULL DEFAULT 'رصد صحفي',
-        "sourceName" TEXT NOT NULL,
-        "sourceUrl" TEXT,
-        "sourceType" TEXT NOT NULL DEFAULT 'newsletter',
-        "language" TEXT NOT NULL DEFAULT 'ar',
-        "status" TEXT NOT NULL DEFAULT 'published',
-        "importance" INTEGER NOT NULL DEFAULT 50,
-        "tags" JSONB,
-        "publishedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-
     const newsItems = await prisma.$queryRawUnsafe<any[]>(`
       SELECT "id", "publishedAt", "updatedAt" FROM "PressNews"
       WHERE "status" = 'published'
@@ -80,7 +72,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.8,
     }));
   } catch (err) {
-    console.error('Sitemap news generation error:', err);
+    logSitemapDataError('news', err);
   }
 
   return [

@@ -38,6 +38,7 @@ function fallbackText(value?: string | null) {
 }
 
 function matchClockText(data: MatchPageData) {
+  if (data.clock?.displayLabel && !data.status.isScheduled) return data.clock.displayLabel;
   if (data.status.isScheduled) return fullDate(data.matchDate);
   if (data.status.isFinished) return 'نهاية المباراة';
   return data.status.label || data.status.shortLabel || 'زمن المباراة';
@@ -128,14 +129,16 @@ function arrangeInfoCards(data: MatchPageData, clockText: string, labelText: str
   });
   if (!infoGrid) return;
 
-  infoGrid.classList.remove('lg:grid-cols-4');
-  infoGrid.classList.add('lg:grid-cols-5');
+  infoGrid.classList.remove('lg:grid-cols-4', 'lg:grid-cols-5');
+  infoGrid.classList.add('lg:grid-cols-7');
 
   const cards = Array.from(infoGrid.children).filter((child) => child instanceof HTMLElement) as HTMLElement[];
   const venue = cards.find((card) => cardLabel(card) === 'الملعب') || null;
   const city = cards.find((card) => cardLabel(card) === 'المدينة') || null;
   const referee = cards.find((card) => cardLabel(card) === 'الحكم') || null;
   const group = cards.find((card) => cardLabel(card) === 'المجموعة') || null;
+  const homeCoach = cards.find((card) => cardLabel(card).startsWith('مدرب') && cardLabel(card).includes(data.homeTeam.name)) || null;
+  const awayCoach = cards.find((card) => cardLabel(card).startsWith('مدرب') && cardLabel(card).includes(data.awayTeam.name)) || null;
   let dateCard = infoGrid.querySelector('[data-match-date-card="true"]') as HTMLElement | null;
   if (!dateCard) dateCard = makeDateCard(clockText, labelText);
 
@@ -149,7 +152,7 @@ function arrangeInfoCards(data: MatchPageData, clockText: string, labelText: str
   setCardValue(referee, data.referee);
   setCardValue(group, data.groupLabel || data.stageLabel);
 
-  const ordered = [venue, dateCard, referee, city, group].filter(Boolean) as HTMLElement[];
+  const ordered = [venue, dateCard, referee, city, homeCoach, awayCoach, group].filter(Boolean) as HTMLElement[];
   ordered.forEach((card) => infoGrid.appendChild(card));
   hideScoreClock(header);
 }

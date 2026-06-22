@@ -9,6 +9,43 @@ const OFFICIAL_SQUAD_MAINTENANCE_PATHS = [
   '/api/admin/official-squads/repair-images',
 ];
 
+const DISABLED_INGESTION_PREFIXES = [
+  '/api/cron/',
+  '/api/internal/live-ingest/',
+  '/api/admin/isports',
+  '/api/admin/api-football',
+  '/api/admin/the-stats',
+  '/api/admin/match-extra-data',
+  '/api/admin/match-extra-debug',
+  '/api/admin/match-postmatch-extras',
+  '/api/admin/sync-player-clubs',
+  '/api/admin/sync-player-images',
+  '/api/admin/sync-player-performance',
+  '/api/admin/thesportsdb',
+  '/api/matches/the-stats-summary-stats',
+  '/api/matches/cached-the-stats-summary',
+];
+
+function disabledIngestionResponse(pathname: string) {
+  return NextResponse.json({
+    ok: false,
+    error: 'external_ingestion_disabled',
+    message: 'External data ingestion is disabled in the web service. Read-only pages should use database snapshots only.',
+    path: pathname,
+  }, {
+    status: 410,
+    headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' },
+  });
+}
+
+function isDisabledIngestionPath(pathname: string) {
+  return DISABLED_INGESTION_PREFIXES.some((prefix) => pathname === prefix.replace(/\/$/, '') || pathname.startsWith(prefix));
+}
+
+function isExternalIngestionEnabled() {
+  return ['1', 'true', 'yes', 'on'].includes(String(process.env.EXTERNAL_INGESTION_ENABLED || '').toLowerCase());
+}
+
 function isOfficialSquadMutation(pathname: string, method: string) {
   if (method.toUpperCase() !== 'POST') return false;
   if (!pathname.startsWith('/api/admin/official-squads')) return false;
@@ -25,7 +62,11 @@ function hasExplicitOfficialPlayerRewriteApproval(request: NextRequest) {
   return headerValue === OFFICIAL_PLAYER_REWRITE_CONFIRMATION || queryValue === OFFICIAL_PLAYER_REWRITE_CONFIRMATION;
 }
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
+  if (!isExternalIngestionEnabled() && isDisabledIngestionPath(request.nextUrl.pathname)) {
+    return disabledIngestionResponse(request.nextUrl.pathname);
+  }
+
   if (!isOfficialSquadMutation(request.nextUrl.pathname, request.method)) {
     return NextResponse.next();
   }
@@ -44,5 +85,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/api/admin/official-squads/:path*'],
+  matcher: ['/api/:path*'],
 };
