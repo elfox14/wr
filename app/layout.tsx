@@ -10,6 +10,9 @@ import { Navbar } from "@/components/ui/Navbar";
 import { Footer } from "@/components/ui/Footer";
 import { HardNavigationGuard } from "@/components/ui/HardNavigationGuard";
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 const cairo = Cairo({
   variable: "--font-cairo",
   subsets: ["arabic", "latin"],
@@ -64,3 +67,4 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     </html>
   );
 }
+
