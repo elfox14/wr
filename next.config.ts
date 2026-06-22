@@ -20,6 +20,7 @@ const nextConfig: NextConfig = {
       config.resolve.alias = {
         ...(config.resolve.alias || {}),
         'framer-motion': path.resolve(__dirname, 'lib/build-stubs/framer-motion.tsx'),
+        'lucide-react': path.resolve(__dirname, 'lib/build-stubs/lucide-react.tsx'),
         recharts: path.resolve(__dirname, 'lib/build-stubs/recharts.tsx'),
       };
     }
