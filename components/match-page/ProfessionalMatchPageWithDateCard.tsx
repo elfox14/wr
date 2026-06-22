@@ -324,49 +324,12 @@ function restoreTeamStatsLayout() {
   });
 }
 
-function findPitchFieldByTitle(title: string) {
-  const titleNode = Array.from(document.querySelectorAll('span')).find((node) => String(node.textContent || '').includes(title)) as HTMLElement | undefined;
-  const container = titleNode?.closest('div.relative.overflow-hidden') as HTMLElement | null;
-  if (!container) return null;
-  const fields = Array.from(container.querySelectorAll('div')) as HTMLElement[];
-  return fields.find((field) => {
-    const className = String(field.getAttribute('class') || '');
-    return className.includes('border-2') && className.includes('bg-[linear-gradient') && (className.includes('aspect-[16/9]') || className.includes('h-[620px]'));
-  }) || null;
-}
-
-function setPitchMobilePortrait(field: HTMLElement | null, height: string) {
-  if (!field) return;
-  const isMobile = window.matchMedia('(max-width: 639px)').matches;
-  if (isMobile) {
-    field.dataset.mobilePortraitPitch = 'true';
-    field.style.setProperty('aspect-ratio', '9 / 16', 'important');
-    field.style.setProperty('height', height, 'important');
-    field.style.setProperty('min-height', height, 'important');
-    field.style.setProperty('width', '100%', 'important');
-    return;
-  }
-  if (field.dataset.mobilePortraitPitch) {
-    field.style.removeProperty('aspect-ratio');
-    field.style.removeProperty('height');
-    field.style.removeProperty('min-height');
-    field.style.removeProperty('width');
-    delete field.dataset.mobilePortraitPitch;
-  }
-}
-
-function makeMobilePitchesPortrait() {
-  setPitchMobilePortrait(findPitchFieldByTitle('ملعب البث التفاعلي'), '620px');
-  setPitchMobilePortrait(findPitchFieldByTitle('التشكيلة الرسمية على الملعب'), '720px');
-}
-
 function enhanceMatchPage(data: MatchPageData) {
   arrangeInfoCards(data, matchClockText(data), matchClockCardLabel(data));
   compactEmptyGap();
   addPlayerStatsNotice(data);
   makeTablesResponsive(data);
   restoreTeamStatsLayout();
-  makeMobilePitchesPortrait();
 }
 
 export default function ProfessionalMatchPageWithDateCard({ data }: { data: MatchPageData }) {
