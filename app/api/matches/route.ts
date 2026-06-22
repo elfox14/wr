@@ -1,5 +1,5 @@
 import { unstable_cache } from 'next/cache';
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 
 export const dynamic = 'force-dynamic';
@@ -14,7 +14,9 @@ const KNOCKOUT_MAX_LIVE_MINUTES = 150;
 const DEFAULT_PROVIDER_SNAPSHOT_TTL_SECONDS = 5 * 60;
 const SNAPSHOT_LOOKBACK_MS = 4 * 60 * 60 * 1000;
 const SNAPSHOT_LOOKAHEAD_MS = 24 * 60 * 60 * 1000;
+const GROUP_KEYS = 'ABCDEFGHIJKL'.split('');
 
+type MatchFilter = 'today' | 'finished' | 'group';
 type SnapshotState = { minute: number | null; capturedAt: Date; providerStatus?: string | null };
 
 type PublicMatch = {
@@ -29,9 +31,25 @@ type PublicMatch = {
   awayScore: number;
   groupPhase: string | null;
   stage: string;
-  homeTeam: { id: string; name: string; code: string | null; image: string | null };
-  awayTeam: { id: string; name: string; code: string | null; image: string | null };
+  homeTeam: { id: string; name: string; code: string | null; image: string | null; group: string | null };
+  awayTeam: { id: string; name: string; code: string | null; image: string | null; group: string | null };
 };
+
+const matchSelect = {
+  id: true,
+  externalId: true,
+  animationMatchId: true,
+  homeTeamId: true,
+  awayTeamId: true,
+  matchDate: true,
+  status: true,
+  homeScore: true,
+  awayScore: true,
+  groupPhase: true,
+  stage: true,
+  homeTeam: { select: { id: true, name: true, code: true, image: true, group: true } },
+  awayTeam: { select: { id: true, name: true, code: true, image: true, group: true } },
+} as const;
 
 function providerSnapshotTtlMs() {
   const seconds = Number(process.env.MATCH_PROVIDER_SNAPSHOT_TTL_SECONDS || DEFAULT_PROVIDER_SNAPSHOT_TTL_SECONDS);
@@ -140,22 +158,16 @@ function needsSnapshot(match: PublicMatch, now = Date.now()) {
 
 async function latestDocumentedSnapshots(matchIds: string[]) {
   if (!matchIds.length) return new Map<string, SnapshotState>();
-
   const snapshots = await prisma.matchStatsSnapshot.findMany({
     where: { matchId: { in: matchIds } },
     select: { matchId: true, minute: true, capturedAt: true, rawData: true },
     orderBy: { capturedAt: 'desc' },
-    take: Math.max(80, matchIds.length * 4),
+    take: Math.max(40, matchIds.length * 3),
   });
-
   const latestByMatch = new Map<string, SnapshotState>();
   for (const snapshot of snapshots) {
     if (latestByMatch.has(snapshot.matchId)) continue;
-    latestByMatch.set(snapshot.matchId, {
-      minute: validMinute(snapshot.minute),
-      capturedAt: snapshot.capturedAt,
-      providerStatus: snapshotProviderStatus(snapshot.rawData),
-    });
+    latestByMatch.set(snapshot.matchId, { minute: validMinute(snapshot.minute), capturedAt: snapshot.capturedAt, providerStatus: snapshotProviderStatus(snapshot.rawData) });
   }
   return latestByMatch;
 }
@@ -167,65 +179,91 @@ function normalizeMatchForDisplay(match: PublicMatch, now = Date.now(), snapshot
   const snapshotMinute = freshSnapshot?.minute || null;
   const snapshotConfirmsLive = Boolean(snapshotMinute && snapshotMinute > 0 && snapshotMinute < maxLiveMinutes(match));
 
-  if (isFinishedStatus(status) || isFinishedStatus(providerStatus)) {
-    return { ...match, displayStatus: 'FINISHED', isLiveNow: false, isLikelyLiveByTime: false, minute: null, liveLabel: null };
-  }
-
-  if (isHalfTimeStatus(providerStatus)) {
-    return { ...match, displayStatus: 'HT', isLiveNow: true, isHalfTime: true, isLikelyLiveByTime: false, minute: null, liveLabel: 'استراحة' };
-  }
-
+  if (isFinishedStatus(status) || isFinishedStatus(providerStatus)) return { ...match, displayStatus: 'FINISHED', isLiveNow: false, isLikelyLiveByTime: false, minute: null, liveLabel: null };
+  if (isHalfTimeStatus(providerStatus)) return { ...match, displayStatus: 'HT', isLiveNow: true, isHalfTime: true, isLikelyLiveByTime: false, minute: null, liveLabel: 'استراحة' };
   if (isLiveStatus(providerStatus) || snapshotConfirmsLive) {
     const displayStatus = isSecondHalfStatus(providerStatus) || Number(snapshotMinute || 0) >= 46 ? '2H' : '1H';
     return { ...match, displayStatus, isLiveNow: true, isHalfTime: false, isLikelyLiveByTime: false, minute: null, liveLabel: 'جارية الآن' };
   }
-
-  if (isScheduledStatus(status) && minutesFromKickoff(match, now) !== null && (minutesFromKickoff(match, now) || 0) >= 1) {
-    return { ...match, displayStatus: 'SCHEDULED', isLiveNow: false, isLikelyLiveByTime: false, minute: null, liveLabel: 'بانتظار تأكيد البداية' };
-  }
-
+  if (isScheduledStatus(status) && minutesFromKickoff(match, now) !== null && (minutesFromKickoff(match, now) || 0) >= 1) return { ...match, displayStatus: 'SCHEDULED', isLiveNow: false, isLikelyLiveByTime: false, minute: null, liveLabel: 'بانتظار تأكيد البداية' };
   return { ...match, isLiveNow: false, isLikelyLiveByTime: false, minute: null, liveLabel: null };
 }
 
-const getPublicMatches = unstable_cache(
-  async () => {
+function startOfToday() {
+  const date = new Date();
+  date.setHours(0, 0, 0, 0);
+  return date;
+}
+
+function endOfToday() {
+  const date = startOfToday();
+  date.setDate(date.getDate() + 1);
+  return date;
+}
+
+function normalizeFilter(value: string | null): MatchFilter {
+  return value === 'finished' || value === 'group' ? value : 'today';
+}
+
+function normalizeGroup(value: string | null) {
+  const key = String(value || 'A').trim().toUpperCase().replace(/[^A-Z]/g, '').slice(0, 1) || 'A';
+  return GROUP_KEYS.includes(key) ? key : 'A';
+}
+
+function groupWhere(group: string) {
+  const labels = [group, `Group ${group}`, `GROUP ${group}`, `GROUP_${group}`, `المجموعة ${group}`];
+  return {
+    OR: [
+      { homeTeam: { group } },
+      { awayTeam: { group } },
+      { groupPhase: { in: labels } },
+      { stage: { in: labels } },
+    ],
+  };
+}
+
+function matchWhere(filter: MatchFilter, group: string) {
+  if (filter === 'finished') return { status: { in: FINISHED_STATUSES } };
+  if (filter === 'group') return groupWhere(group);
+  return { matchDate: { gte: startOfToday(), lt: endOfToday() } };
+}
+
+function orderByFor(filter: MatchFilter) {
+  return filter === 'finished' ? { matchDate: 'desc' as const } : { matchDate: 'asc' as const };
+}
+
+function takeFor(filter: MatchFilter) {
+  if (filter === 'finished') return 40;
+  if (filter === 'group') return 24;
+  return 24;
+}
+
+const getScopedMatches = unstable_cache(
+  async (filter: MatchFilter, group: string) => {
     const matches = await prisma.match.findMany({
-      select: {
-        id: true,
-        externalId: true,
-        animationMatchId: true,
-        homeTeamId: true,
-        awayTeamId: true,
-        matchDate: true,
-        status: true,
-        homeScore: true,
-        awayScore: true,
-        groupPhase: true,
-        stage: true,
-        homeTeam: { select: { id: true, name: true, code: true, image: true } },
-        awayTeam: { select: { id: true, name: true, code: true, image: true } },
-      },
-      orderBy: { matchDate: 'asc' },
+      where: matchWhere(filter, group),
+      select: matchSelect,
+      orderBy: orderByFor(filter),
+      take: takeFor(filter),
     });
 
     const now = Date.now();
-    const snapshotIds = matches.filter((match) => needsSnapshot(match, now)).map((match) => match.id);
+    const snapshotIds = matches.filter((match) => needsSnapshot(match as PublicMatch, now)).map((match) => match.id);
     const documentedSnapshots = await latestDocumentedSnapshots(snapshotIds);
-    const enrichedMatches = matches.map((match) => normalizeMatchForDisplay(match, now, documentedSnapshots.get(match.id)));
-    return dedupeMatches(enrichedMatches);
+    const enrichedMatches = matches.map((match) => normalizeMatchForDisplay(match as PublicMatch, now, documentedSnapshots.get(match.id)));
+    const deduped = dedupeMatches(enrichedMatches);
+    return filter === 'finished' ? deduped.reverse() : deduped;
   },
-  ['public-matches-v5'],
+  ['public-matches-scoped-v1'],
   { revalidate: 30 },
 );
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const matches = await getPublicMatches();
-    return NextResponse.json(matches, {
-      headers: {
-        'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=60',
-      },
-    });
+    const filter = normalizeFilter(request.nextUrl.searchParams.get('filter'));
+    const group = normalizeGroup(request.nextUrl.searchParams.get('group'));
+    const matches = await getScopedMatches(filter, group);
+    return NextResponse.json(matches, { headers: { 'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=60' } });
   } catch (error) {
     console.error('Error fetching matches:', error);
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500, headers: { 'Cache-Control': 'no-store' } });
