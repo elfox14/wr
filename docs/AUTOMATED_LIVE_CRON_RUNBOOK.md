@@ -57,6 +57,62 @@ https://worldcup.mcprim.com/api/cron/live-autopilot?key={CRON_SECRET}
 | TheStats enrichment | كل 15 دقيقة | إثراء بعدي وتدقيق |
 | live sources status | كل 5 دقائق | مراقبة صحة المصادر |
 
+## Provider Retry + Resume Guard
+
+تمت إضافة طبقة حماية جديدة داخل `live-autopilot` باسم `resumeGuard`.
+
+تنشئ تلقائيًا جدولين عند أول تشغيل، بدون migration يدوي:
+
+```text
+LiveSyncCheckpoint
+ProviderRetryQueue
+```
+
+ما الذي يحدث الآن؟
+
+- كل مرحلة تنجح تُحفظ في `LiveSyncCheckpoint` مع آخر وقت نجاح وعدد النجاحات.
+- كل مرحلة تفشل تُحفظ في `ProviderRetryQueue` مع عدد المحاولات ووقت المحاولة القادمة.
+- لو الفشل بسبب limit أو quota أو HTTP 429، ينتظر النظام قبل إعادة المحاولة بدل استهلاك API.
+- لو الفشل timeout أو abort، يعيد المحاولة أسرع.
+- لو الفشل HTTP 500 من المصدر، يعمل backoff متوسط.
+- لو مرحلة فشلت، باقي المراحل يمكن أن تكمل بدل إيقاف كل الكرون.
+- عند نجاح المرحلة لاحقًا، يتم إغلاق retry القديم تلقائيًا كـ `SUCCEEDED`.
+
+سيظهر في رد `live-autopilot`:
+
+```json
+{
+  "resumeGuardEnabled": true,
+  "summary": {
+    "retryBackoff": 0
+  },
+  "resumeGuard": {
+    "targetKind": "GLOBAL",
+    "targetId": "autopilot",
+    "checkpoints": [],
+    "retries": []
+  }
+}
+```
+
+لإيقافه مؤقتًا عند الاختبار فقط:
+
+```text
+https://worldcup.mcprim.com/api/cron/live-autopilot?key={CRON_SECRET}&resumeGuard=false
+```
+
+ولفحص حالة الـ checkpoint والـ retry يدويًا:
+
+```text
+https://worldcup.mcprim.com/api/admin/live-sync-resume/status?key={CRON_SECRET}
+```
+
+ولفحص مباراة محددة:
+
+```text
+https://worldcup.mcprim.com/api/admin/live-sync-resume/status?key={CRON_SECRET}&dbMatchId={LOCAL_MATCH_ID}
+```
+
 ## كرون مباراة مهمة
 
 لو تريد إعطاء مباراة معينة أولوية أعلى، شغّل رابطًا ثانيًا كل دقيقة:
@@ -117,8 +173,11 @@ https://worldcup.mcprim.com/api/cron/live-autopilot?key={CRON_SECRET}&limit=1
 ```json
 {
   "ok": true,
-  "mode": "live_autopilot_no_time_inference"
+  "mode": "live_autopilot_no_time_inference",
+  "resumeGuardEnabled": true
 }
 ```
 
 قد يظهر degraded أكبر من 0 لو TheStats أو Browserless غير مفعّل، وهذا لا يمنع iSports وfootball-data من العمل.
+
+لو ظهرت `retryBackoff` أكبر من 0 فهذا ليس خطأ في الموقع؛ معناه أن مرحلة فشلت سابقًا والنظام ينتظر وقت المحاولة القادمة لحماية الليمِت.
