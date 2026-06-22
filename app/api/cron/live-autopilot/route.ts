@@ -1,5 +1,14 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/adminAuth';
+import {
+  ensureLiveSyncResumeGuardTables,
+  getLiveSyncResumeSummary,
+  recordLiveSyncStageFailure,
+  recordLiveSyncStageStart,
+  recordLiveSyncStageSuccess,
+  shouldRunLiveSyncStage,
+  type LiveSyncTarget,
+} from '@/lib/live-sync-resume-guard';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -14,6 +23,8 @@ type StageResult = {
   url?: string;
   bodyBytes?: number;
   error?: string;
+  retry?: unknown;
+  retryGuardError?: string;
 };
 
 const DEFAULT_PUBLIC_ORIGIN = 'https://worldcup.mcprim.com';
@@ -65,7 +76,7 @@ function withSecret(url: URL, key: string) {
   url.searchParams.set('cronSecret', key);
   return url;
 }
-function optionalTarget(url: URL, target: { dbMatchId?: string | null; providerMatchId?: string | null }) {
+function optionalTarget(url: URL, target: LiveSyncTarget) {
   if (target.dbMatchId) url.searchParams.set('dbMatchId', target.dbMatchId);
   if (target.providerMatchId) url.searchParams.set('matchId', target.providerMatchId);
   return url;
@@ -87,7 +98,38 @@ async function callJson(name: string, url: URL, timeoutMs: number, startedAt: nu
     clearTimeout(timer);
   }
 }
-function buildSafeLiveUrl(origin: string, key: string, url: URL, target: { dbMatchId?: string | null; providerMatchId?: string | null }) {
+async function guardedCallJson(name: string, target: LiveSyncTarget, url: URL, timeoutMs: number, startedAt: number, budgetMs: number): Promise<StageResult> {
+  try {
+    const gate = await shouldRunLiveSyncStage(target, name);
+    if (!gate.run) {
+      return {
+        name,
+        ok: false,
+        skipped: true,
+        url: maskUrl(url.toString()),
+        error: `retry_backoff_active_until_${gate.retry?.nextRunAt || 'unknown'}`,
+        retry: gate.retry,
+      };
+    }
+    await recordLiveSyncStageStart(target, name);
+  } catch (error: any) {
+    const result = await callJson(name, url, timeoutMs, startedAt, budgetMs);
+    return { ...result, retryGuardError: String(error?.message || error).slice(0, 300) };
+  }
+
+  const result = await callJson(name, url, timeoutMs, startedAt, budgetMs);
+  try {
+    if (result.ok) await recordLiveSyncStageSuccess(target, result);
+    else {
+      const retry = await recordLiveSyncStageFailure(target, result);
+      return { ...result, retry };
+    }
+  } catch (error: any) {
+    return { ...result, retryGuardError: String(error?.message || error).slice(0, 300) };
+  }
+  return result;
+}
+function buildSafeLiveUrl(origin: string, key: string, url: URL, target: LiveSyncTarget) {
   const next = new URL('/api/cron/worldcup-live-auto', origin);
   next.searchParams.set('theStats', 'false');
   next.searchParams.set('isportsTimeline', 'true');
@@ -110,7 +152,7 @@ function buildFootballDataUrl(origin: string, key: string, url: URL) {
   next.searchParams.set('createMissing', bool(url.searchParams.get('createMissing'), false) ? 'true' : 'false');
   return withSecret(next, key);
 }
-function buildPostmatchUrl(origin: string, key: string, url: URL, target: { dbMatchId?: string | null; providerMatchId?: string | null }) {
+function buildPostmatchUrl(origin: string, key: string, url: URL, target: LiveSyncTarget) {
   const next = new URL('/api/cron/isports-postmatch-confirm', origin);
   next.searchParams.set('take', String(int(url.searchParams.get('postmatchTake'), target.dbMatchId || target.providerMatchId ? 1 : 3, 1, 5)));
   next.searchParams.set('save', 'true');
@@ -126,7 +168,7 @@ function buildPostmatchUrl(origin: string, key: string, url: URL, target: { dbMa
   next.searchParams.set('waitMs', String(int(url.searchParams.get('postmatchWaitMs'), 2_000, 1_000, 10_000)));
   return withSecret(optionalTarget(next, target), key);
 }
-function buildTheStatsEnrichmentUrl(origin: string, key: string, url: URL, target: { dbMatchId?: string | null; providerMatchId?: string | null }) {
+function buildTheStatsEnrichmentUrl(origin: string, key: string, url: URL, target: LiveSyncTarget) {
   const next = new URL('/api/cron/live-match-full-sync', origin);
   next.searchParams.set('dryRun', 'false');
   next.searchParams.set('theStats', 'true');
@@ -160,16 +202,22 @@ export async function GET(req: Request) {
   const minuteBucket = Math.floor(startedAt / 60_000);
   const dbMatchId = url.searchParams.get('dbMatchId') || url.searchParams.get('id');
   const providerMatchId = url.searchParams.get('matchId') || url.searchParams.get('providerMatchId');
-  const target = { dbMatchId, providerMatchId };
+  const target: LiveSyncTarget = { dbMatchId, providerMatchId };
   const stages: StageResult[] = [];
+  const resumeGuardEnabled = bool(url.searchParams.get('resumeGuard'), true);
 
-  if (bool(url.searchParams.get('live'), true)) stages.push(await callJson('safe_isports_live_timeline', buildSafeLiveUrl(origin, key, url, target), 20_000, startedAt, budgetMs));
-  if (cadence(url.searchParams.get('footballData'), 5, minuteBucket)) stages.push(await callJson('football_data_confirmation', buildFootballDataUrl(origin, key, url), 5_000, startedAt, budgetMs));
-  if (cadence(url.searchParams.get('postmatch'), 10, minuteBucket)) stages.push(await callJson('isports_postmatch_confirm', buildPostmatchUrl(origin, key, url, target), 5_000, startedAt, budgetMs));
-  if (cadence(url.searchParams.get('theStatsEnrichment'), 15, minuteBucket)) stages.push(await callJson('the_stats_provider_status_enrichment', buildTheStatsEnrichmentUrl(origin, key, url, target), 12_000, startedAt, budgetMs));
-  if (cadence(url.searchParams.get('status'), 5, minuteBucket)) stages.push(await callJson('live_sources_status', buildStatusUrl(origin, key), 2_000, startedAt, budgetMs));
+  try { if (resumeGuardEnabled) await ensureLiveSyncResumeGuardTables(); } catch (error) { console.error('[live-autopilot] resume guard ensure failed', error); }
+  const runStage = resumeGuardEnabled ? guardedCallJson : async (name: string, _target: LiveSyncTarget, stageUrl: URL, timeoutMs: number, runStartedAt: number, runBudgetMs: number) => callJson(name, stageUrl, timeoutMs, runStartedAt, runBudgetMs);
+
+  if (bool(url.searchParams.get('live'), true)) stages.push(await runStage('safe_isports_live_timeline', target, buildSafeLiveUrl(origin, key, url, target), 20_000, startedAt, budgetMs));
+  if (cadence(url.searchParams.get('footballData'), 5, minuteBucket)) stages.push(await runStage('football_data_confirmation', target, buildFootballDataUrl(origin, key, url), 5_000, startedAt, budgetMs));
+  if (cadence(url.searchParams.get('postmatch'), 10, minuteBucket)) stages.push(await runStage('isports_postmatch_confirm', target, buildPostmatchUrl(origin, key, url, target), 5_000, startedAt, budgetMs));
+  if (cadence(url.searchParams.get('theStatsEnrichment'), 15, minuteBucket)) stages.push(await runStage('the_stats_provider_status_enrichment', target, buildTheStatsEnrichmentUrl(origin, key, url, target), 12_000, startedAt, budgetMs));
+  if (cadence(url.searchParams.get('status'), 5, minuteBucket)) stages.push(await runStage('live_sources_status', target, buildStatusUrl(origin, key), 2_000, startedAt, budgetMs));
 
   const hardFailures = stages.filter((stage) => !stage.ok && !stage.skipped);
+  let resumeGuard: any = null;
+  try { if (resumeGuardEnabled) resumeGuard = await getLiveSyncResumeSummary(target); } catch (error: any) { resumeGuard = { ok: false, error: String(error?.message || error).slice(0, 300) }; }
   return json({
     ok: true,
     mode: 'live_autopilot_no_time_inference',
@@ -178,20 +226,24 @@ export async function GET(req: Request) {
     target,
     budgetMs,
     durationMs: Date.now() - startedAt,
+    resumeGuardEnabled,
     policy: {
       live: 'iSports timeline/state is used for live updates. TheStats live stage is not used to force FINISHED from elapsed minutes.',
       confirmation: 'football-data confirms fixture status and final scores every 5 minutes by default.',
       enrichment: 'TheStats enrichment runs on a slower cadence and the patched full-sync only finishes matches from explicit provider status.',
       publicUi: 'The public match page reads database snapshots/events only.',
+      retry: 'Failed provider stages are checkpointed and retried with backoff instead of hammering APIs after quota/timeouts.',
     },
     summary: {
       stages: stages.length,
       ok: stages.filter((stage) => stage.ok).length,
       skipped: stages.filter((stage) => stage.skipped).length,
       degraded: hardFailures.length,
+      retryBackoff: stages.filter((stage) => stage.skipped && String(stage.error || '').startsWith('retry_backoff_active')).length,
     },
     stages,
-    note: hardFailures.length ? 'Autopilot completed in degraded mode. Check the failed stage URLs and provider keys.' : 'Autopilot completed.',
+    resumeGuard,
+    note: hardFailures.length ? 'Autopilot completed in degraded mode. Failed provider stages were stored for retry/backoff.' : 'Autopilot completed.',
   });
 }
 
