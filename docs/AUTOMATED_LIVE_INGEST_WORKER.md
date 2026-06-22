@@ -13,7 +13,98 @@ Automated Live Ingest Worker
   -> match page and /api/matches/live-stats read the database only
 ```
 
-## Script
+There are two supported run modes:
+
+1. A CLI script for Render Cron / Background Worker.
+2. A URL-triggered cron route for cron-job.org or any webcron service.
+
+## Recommended for this project: cron-job.org URL trigger
+
+cron-job.org and similar webcron services call a URL on a schedule. The website then runs a protected server-side route.
+
+Route:
+
+```text
+GET /api/cron/live-ingest-worker
+POST /api/cron/live-ingest-worker
+```
+
+Production URL:
+
+```text
+https://worldcup.mcprim.com/api/cron/live-ingest-worker
+```
+
+Preferred auth header:
+
+```text
+Authorization: Bearer <LIVE_INGEST_SECRET>
+```
+
+Alternative headers:
+
+```text
+x-live-ingest-secret: <LIVE_INGEST_SECRET>
+x-cron-secret: <CRON_SECRET>
+x-admin-secret: <ADMIN_API_SECRET>
+```
+
+Fallback query-token URL, only if your cron service cannot send headers:
+
+```text
+https://worldcup.mcprim.com/api/cron/live-ingest-worker?secret=<LIVE_INGEST_SECRET>
+```
+
+Prefer headers over query strings because query strings can appear in logs and browser history.
+
+### cron-job.org settings
+
+Recommended job settings:
+
+```text
+Title: worldcup-live-ingest-worker
+URL: https://worldcup.mcprim.com/api/cron/live-ingest-worker
+Request method: GET
+Schedule: every 3 minutes during live match windows
+Timeout: 60 seconds
+```
+
+If custom headers are available, add:
+
+```text
+Authorization: Bearer <LIVE_INGEST_SECRET>
+```
+
+If custom headers are not available, use the fallback URL with `?secret=...`.
+
+### Test URL manually
+
+With header:
+
+```bash
+curl -H "Authorization: Bearer $LIVE_INGEST_SECRET" "https://worldcup.mcprim.com/api/cron/live-ingest-worker"
+```
+
+Fallback query-token test:
+
+```text
+https://worldcup.mcprim.com/api/cron/live-ingest-worker?secret=YOUR_SECRET_HERE
+```
+
+Expected response:
+
+```json
+{
+  "ok": true,
+  "jobName": "live-ingest-worker",
+  "mode": "url_triggered_cron",
+  "candidates": 2,
+  "externalRequests": 2,
+  "processed": []
+}
+```
+
+## CLI script
 
 ```bash
 npm run worker:live-ingest
@@ -25,7 +116,7 @@ This runs:
 node scripts/automated-live-ingest-worker.mjs
 ```
 
-By default it runs once and exits. That mode is best for Render Cron Jobs.
+By default it runs once and exits. That mode is suitable for Render Cron Jobs.
 
 ## Required environment variables
 
@@ -39,9 +130,9 @@ LIVE_INGEST_SECRET=...
 LIVE_INGEST_TARGET_ORIGIN=https://worldcup.mcprim.com
 ```
 
-`LIVE_INGEST_SECRET` must match the web service environment because the worker sends this value to the internal ingest endpoint as `x-live-ingest-secret`.
+`LIVE_INGEST_SECRET` must match the web service environment because both the CLI worker and the URL route send this value to the internal ingest endpoint as `x-live-ingest-secret`.
 
-## Recommended Render Cron Job
+## Optional Render Cron Job
 
 Create a Render Cron Job using the same GitHub repo.
 
@@ -110,7 +201,7 @@ The worker only processes matches with `animationMatchId` and one of these condi
 
 ## Output
 
-The worker logs a JSON summary:
+The worker returns/logs a JSON summary:
 
 ```json
 {
@@ -149,4 +240,4 @@ Expected signs:
 "hasStats": true
 ```
 
-This confirms the public endpoint is still database-only while the worker is doing the provider work separately.
+This confirms the public endpoint is still database-only while the worker/cron route is doing the provider work separately.
