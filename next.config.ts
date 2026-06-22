@@ -9,6 +9,9 @@ const nextConfig: NextConfig = {
   experimental: {
     workerThreads: false,
     cpus: 1,
+    webpackMemoryOptimizations: true,
+    staticGenerationMaxConcurrency: 1,
+    staticGenerationMinPagesPerWorker: 1,
   },
   async redirects() {
     return [
