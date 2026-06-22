@@ -71,4 +71,4 @@ export function useSpring(value: any) {
   return value;
 }
 
-export type HTMLMotionProps<T extends keyof JSX.IntrinsicElements> = React.ComponentPropsWithoutRef<T>;
+export type HTMLMotionProps<T extends React.ElementType = 'div'> = React.ComponentPropsWithoutRef<T> & Record<string, any>;
