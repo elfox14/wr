@@ -2,15 +2,18 @@
   "name": "temp-app",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": "20.x"
+  },
   "scripts": {
     "dev": "next dev",
     "prebuild": "prisma generate",
-    "build": "next build",
+    "build": "node --max-old-space-size=1024 node_modules/next/dist/bin/next build",
     "build:render": "npm ci --no-audit --no-fund && npm run build",
     "build:render:migrate": "npm ci --no-audit --no-fund && npx prisma migrate deploy && npm run build",
     "build:render:dbpush": "npm ci --no-audit --no-fund && npx prisma db push && npm run build",
-    "start": "next start",
-    "start:standalone": "node .next/standalone/server.js",
+    "start": "node .next/standalone/server.js",
+    "start:next": "next start",
     "cron:expire-stale-matches": "node scripts/render-expire-stale-matches.mjs",
     "lint": "echo \"Lint advisory only; type-check and build remain required\"",
     "lint:ai": "eslint features/analysis app/ai-analyst app/api/ai-analyst app/market/page.tsx app/api/ai-analyst/alerts/route.ts --max-warnings=0",
