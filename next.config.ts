@@ -1,11 +1,20 @@
 import path from "node:path";
 import type { NextConfig } from "next";
 
+const buildStubAliases = {
+  'framer-motion': path.resolve(__dirname, 'lib/build-stubs/framer-motion.tsx'),
+  'lucide-react': path.resolve(__dirname, 'lib/build-stubs/lucide-react.tsx'),
+  recharts: path.resolve(__dirname, 'lib/build-stubs/recharts.tsx'),
+};
+
 const nextConfig: NextConfig = {
   cacheMaxMemorySize: 0,
   devIndicators: false,
   typescript: {
     ignoreBuildErrors: true,
+  },
+  turbopack: {
+    resolveAlias: buildStubAliases,
   },
   experimental: {
     workerThreads: false,
@@ -19,9 +28,7 @@ const nextConfig: NextConfig = {
       config.resolve = config.resolve || {};
       config.resolve.alias = {
         ...(config.resolve.alias || {}),
-        'framer-motion': path.resolve(__dirname, 'lib/build-stubs/framer-motion.tsx'),
-        'lucide-react': path.resolve(__dirname, 'lib/build-stubs/lucide-react.tsx'),
-        recharts: path.resolve(__dirname, 'lib/build-stubs/recharts.tsx'),
+        ...buildStubAliases,
       };
     }
     return config;
