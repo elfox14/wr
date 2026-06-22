@@ -204,7 +204,7 @@ export async function GET(req: Request) {
   try {
     if (phaseRaw === 'auto') {
       const result = await runAutoMode(req);
-      return json({ ok: true, provider: PROVIDER, mode: 'safe_old_backfill_auto', ...result, config: getTheStatsApiConfigStatus() });
+      return json({ ok: true, provider: PROVIDER, ...result, mode: 'safe_old_backfill_auto', config: getTheStatsApiConfigStatus() });
     }
     if (sequence?.length) {
       const phaseResults = [];
@@ -218,7 +218,7 @@ export async function GET(req: Request) {
       return json({ ok: true, provider: PROVIDER, mode: 'safe_old_backfill_sequence', sequence, phaseResults, config: getTheStatsApiConfigStatus() });
     }
     const result = await runSingleMode(req, mode);
-    return json({ ok: true, provider: PROVIDER, mode: 'safe_old_backfill', ...result, config: getTheStatsApiConfigStatus() });
+    return json({ ok: true, provider: PROVIDER, ...result, mode: 'safe_old_backfill', config: getTheStatsApiConfigStatus() });
   } catch (error: any) {
     return json({ ok: false, provider: PROVIDER, mode: 'safe_old_backfill', error: safeTheStatsApiError(error), config: getTheStatsApiConfigStatus() }, Number(error?.status) || 500);
   }

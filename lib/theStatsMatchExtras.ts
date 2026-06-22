@@ -2,6 +2,8 @@ import { randomUUID } from 'crypto';
 import prisma from '@/lib/prisma';
 import { theStatsApiFetch } from '@/lib/theStatsApi';
 
+export type TheStatsExtrasEndpointMode = 'essential' | 'full' | 'events' | 'shots' | 'players' | 'lineups' | 'info' | 'stats' | string;
+
 function str(...values: any[]) {
   for (const value of values) {
     if (value === undefined || value === null || value === '') continue;
@@ -90,7 +92,7 @@ function compactPlayerStat(row: any) { const player = row?.player || row?.athlet
 }
 async function fetchEndpoint(keyName: string, path: string, timeoutMs: number) { try { return { key: keyName, path, ok: true, payload: await theStatsApiFetch(path, {}, { timeoutMs }) }; } catch (error: any) { return { key: keyName, path, ok: false, error: safeError(error) }; } }
 
-export async function collectTheStatsMatchExtras(match: any, options: { dryRun?: boolean; save?: boolean; includeRaw?: boolean; timeoutMs?: number; query?: Record<string, string | number>; endpointMode?: 'essential' | 'full' | string; delayMs?: number } = {}) {
+export async function collectTheStatsMatchExtras(match: any, options: { dryRun?: boolean; save?: boolean; includeRaw?: boolean; timeoutMs?: number; query?: Record<string, string | number>; endpointMode?: TheStatsExtrasEndpointMode; delayMs?: number } = {}) {
   const dryRun = Boolean(options.dryRun);
   const save = options.save !== false;
   const includeRaw = Boolean(options.includeRaw);
