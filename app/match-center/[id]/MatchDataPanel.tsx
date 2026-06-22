@@ -9,6 +9,7 @@ type Snapshot = Record<string, any> | null;
 type EventItem = {
   id: string;
   minute?: number | null;
+  minuteLabel?: string | null;
   type: string;
   detail: string;
   teamId?: string | null;
@@ -22,6 +23,8 @@ type StatsResponse = {
   ok: boolean;
   updatedAt?: string;
   hasStats?: boolean;
+  sourceStatus?: { mode?: string; statsProvider?: string; isportsBlocked?: boolean; reason?: string };
+  scorePolicy?: { timeInferenceDisabled?: boolean; statusSource?: string };
   match?: {
     id: string;
     status: string;
@@ -35,18 +38,23 @@ type StatsResponse = {
 };
 
 type EventsResponse = { ok: boolean; updatedAt?: string; events?: EventItem[]; error?: string };
-
 type Props = { matchId?: string | number | null; dbMatchId?: string | number | null };
 
-const STATS_POLL_MS = 60_000;
-const EVENTS_POLL_MS = 30_000;
+const STATS_POLL_MS = 30_000;
+const EVENTS_POLL_MS = 15_000;
 
-function n(value: number | null | undefined) {
+function valueLabel(value: number | null | undefined) {
+  return typeof value === 'number' && Number.isFinite(value) ? value.toLocaleString('ar-EG') : '—';
+}
+
+function scoreLabel(value: number | null | undefined) {
   return typeof value === 'number' && Number.isFinite(value) ? value.toLocaleString('ar-EG') : '٠';
 }
 
 function stat(snapshot: Snapshot, key: string) {
-  const value = Number(snapshot?.[key]);
+  const raw = snapshot?.[key];
+  if (raw === null || raw === undefined || raw === '') return null;
+  const value = Number(raw);
   return Number.isFinite(value) ? value : null;
 }
 
@@ -70,6 +78,8 @@ function icon(type: string) {
   if (t.includes('substitution')) return '🔁';
   if (t.includes('danger')) return '🔥';
   if (t.includes('shot')) return '🎯';
+  if (t.includes('var')) return '📺';
+  if (t.includes('penalty')) return '🥅';
   return '•';
 }
 
@@ -79,6 +89,7 @@ function sourceLabel(source?: string | null) {
   if (value === 'ISPORTS_TIMELINE') return 'iSports Timeline';
   if (value === 'ISPORTS_REMOTE_LIVE') return 'iSports Live';
   if (value === 'ISPORTS_PAGE') return 'iSports';
+  if (value === 'THE_STATS_API') return 'TheStats';
   return value.replace(/_/g, ' ');
 }
 
@@ -100,16 +111,17 @@ function MiniStat({ label, home, away, children }: { label: string; home: number
     <div className="rounded-2xl border border-white/10 bg-black/30 p-3 text-center">
       <div className="mb-2 flex justify-center text-[#FFD700]">{children}</div>
       <div className="text-[11px] font-bold text-gray-500">{label}</div>
-      <div className="mt-1 text-base font-black text-white tabular-nums">{n(home)} - {n(away)}</div>
+      <div className="mt-1 text-base font-black text-white tabular-nums">{valueLabel(home)} - {valueLabel(away)}</div>
     </div>
   );
 }
 
 function percent(home: number | null, away: number | null) {
+  if (home === null && away === null) return { h: 50, a: 50, placeholder: true };
   const h = home ?? 0;
   const a = away ?? 0;
   const total = h + a;
-  if (total <= 0) return { h: 50, a: 50, placeholder: true };
+  if (total <= 0) return { h: 50, a: 50, placeholder: false };
   return { h: Math.max(5, Math.round((h / total) * 100)), a: Math.max(5, Math.round((a / total) * 100)), placeholder: false };
 }
 
@@ -118,9 +130,9 @@ function StatRow({ label, home, away, accent = false }: { label: string; home: n
   return (
     <div className="rounded-2xl border border-white/10 bg-black/25 p-3">
       <div className="mb-2 grid grid-cols-[42px_1fr_42px] items-center gap-3 text-xs font-black">
-        <span className={accent ? 'text-[#FFD700]' : 'text-white'}>{n(home)}</span>
+        <span className={accent ? 'text-[#FFD700]' : 'text-white'}>{valueLabel(home)}</span>
         <span className="text-center text-gray-400">{label}</span>
-        <span className={accent ? 'text-[#FFD700]' : 'text-white'}>{n(away)}</span>
+        <span className={accent ? 'text-[#FFD700]' : 'text-white'}>{valueLabel(away)}</span>
       </div>
       <div className="grid grid-cols-2 gap-2">
         <div className="h-2 overflow-hidden rounded-full bg-white/10" dir="rtl">
@@ -153,6 +165,20 @@ function EventAvatar({ event, data }: { event: EventItem; data: StatsResponse | 
     <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-black/30">
       {src ? <img src={src} alt={alt} className="h-full w-full object-cover" loading="lazy" /> : <span>{icon(event.type)}</span>}
     </span>
+  );
+}
+
+function StatusBadge({ data }: { data: StatsResponse | null }) {
+  const mode = data?.sourceStatus?.mode || 'database_first';
+  const disabled = data?.scorePolicy?.timeInferenceDisabled;
+  return (
+    <div className="flex flex-wrap gap-2 text-[11px] font-black">
+      <span className="rounded-full border border-white/10 bg-black/30 px-3 py-1 text-gray-300">المصدر: {(data?.sourceStatus?.statsProvider || 'DATABASE').replace(/_/g, ' ')}</span>
+      <span className="rounded-full border border-emerald-400/20 bg-emerald-500/10 px-3 py-1 text-emerald-200">الحالة من المصدر فقط</span>
+      {disabled ? <span className="rounded-full border border-[#FFD700]/20 bg-[#FFD700]/10 px-3 py-1 text-[#FFD700]">بدون استنتاج زمني</span> : null}
+      {data?.sourceStatus?.isportsBlocked ? <span className="rounded-full border border-red-400/20 bg-red-500/10 px-3 py-1 text-red-200">iSports محجوب مؤقتًا</span> : null}
+      <span className="sr-only">{mode}</span>
+    </div>
   );
 }
 
@@ -204,22 +230,24 @@ export default function MatchDataPanel({ matchId, dbMatchId }: Props) {
 
   const latest = data?.latest || null;
   const match = data?.match;
-  const provider = String(latest?.provider || 'DATABASE').replace(/_/g, ' ');
   const minute = stat(latest, 'minute');
 
   if (!qs) return null;
 
   return (
     <section className="rounded-2xl border border-white/10 bg-white/[0.035] p-4 shadow-card">
-      <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+      <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <p className="inline-flex items-center gap-2 rounded-full border border-[#0FF0FC]/25 bg-[#0FF0FC]/10 px-3 py-1 text-[10px] font-black text-[#0FF0FC]"><Activity size={13} /> Match Data Recorder</p>
-          <h2 className="mt-2 text-xl font-black text-white">بيانات المباراة</h2>
-          <p className="mt-1 text-xs leading-5 text-gray-400">الخانات غير المتاحة تظهر ٠ مؤقتًا، وأي رقم فعلي يصل من مصدر موثوق يستبدلها تلقائيًا.</p>
+          <p className="inline-flex items-center gap-2 rounded-full border border-[#0FF0FC]/25 bg-[#0FF0FC]/10 px-3 py-1 text-[10px] font-black text-[#0FF0FC]"><Activity size={13} /> Live Match Center</p>
+          <h2 className="mt-2 text-xl font-black text-white">بيانات المباراة الحية</h2>
+          <p className="mt-1 text-xs leading-5 text-gray-400">الخانات غير المتاحة تظهر بعلامة — ولا يتم تحويل حالة المباراة بناءً على الوقت فقط.</p>
         </div>
-        <div className="flex flex-wrap items-center gap-2 text-xs font-black">
-          <span className="rounded-full border border-white/10 bg-black/30 px-3 py-1 text-gray-300"><Clock size={13} className="inline" /> بيانات: {data?.updatedAt ? new Date(data.updatedAt).toLocaleTimeString('ar-EG') : '—'}</span>
-          <span className="rounded-full border border-white/10 bg-black/30 px-3 py-1 text-gray-300"><Target size={13} className="inline" /> أحداث: {eventsUpdatedAt ? new Date(eventsUpdatedAt).toLocaleTimeString('ar-EG') : '—'}</span>
+        <div className="flex flex-col gap-2">
+          <div className="flex flex-wrap items-center gap-2 text-xs font-black">
+            <span className="rounded-full border border-white/10 bg-black/30 px-3 py-1 text-gray-300"><Clock size={13} className="inline" /> بيانات: {data?.updatedAt ? new Date(data.updatedAt).toLocaleTimeString('ar-EG') : '—'}</span>
+            <span className="rounded-full border border-white/10 bg-black/30 px-3 py-1 text-gray-300"><Target size={13} className="inline" /> أحداث: {eventsUpdatedAt ? new Date(eventsUpdatedAt).toLocaleTimeString('ar-EG') : '—'}</span>
+          </div>
+          <StatusBadge data={data} />
         </div>
       </div>
 
@@ -233,11 +261,11 @@ export default function MatchDataPanel({ matchId, dbMatchId }: Props) {
             <div className="rounded-2xl border border-white/10 bg-black/30 p-4 text-center">
               <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
                 <div className="min-w-0 text-right"><div className="truncate text-lg font-black text-white"><TeamName team={match?.homeTeam || null} fallback="الفريق الأول" align="right" /></div></div>
-                <div className="rounded-2xl border border-[#FFD700]/25 bg-[#FFD700]/10 px-5 py-3 text-3xl font-black text-[#FFD700] tabular-nums">{n(match?.homeScore)} - {n(match?.awayScore)}</div>
+                <div className="rounded-2xl border border-[#FFD700]/25 bg-[#FFD700]/10 px-5 py-3 text-3xl font-black text-[#FFD700] tabular-nums">{scoreLabel(match?.homeScore)} - {scoreLabel(match?.awayScore)}</div>
                 <div className="min-w-0 text-left"><div className="truncate text-lg font-black text-white"><TeamName team={match?.awayTeam || null} fallback="الفريق الثاني" align="left" /></div></div>
               </div>
-              <div className="mt-3 text-xs font-bold text-gray-500">الدقيقة: {minute ? n(minute) : 'غير موثقة من المصدر'}</div>
-              <div className="mt-1 text-[11px] font-bold text-gray-600">آخر مصدر محفوظ: {provider}</div>
+              <div className="mt-3 text-xs font-bold text-gray-500">الدقيقة: {minute ? valueLabel(minute) : 'غير موثقة من المصدر'}</div>
+              <div className="mt-1 text-[11px] font-bold text-gray-600">الحالة الحالية: {match?.status || '—'}</div>
             </div>
 
             <div className="grid grid-cols-3 gap-3">
@@ -258,7 +286,7 @@ export default function MatchDataPanel({ matchId, dbMatchId }: Props) {
             <div className="mb-3 flex items-center justify-between gap-2">
               <div>
                 <h3 className="font-black text-white">الأحداث والحالة</h3>
-                <p className="text-xs text-gray-500">الأهداف والركنيات والكروت والتبديلات من Timeline.</p>
+                <p className="text-xs text-gray-500">الأهداف والركنيات والكروت والتبديلات من Timeline أو مصدر مؤكد.</p>
               </div>
               <Target className="text-[#FFD700]" size={22} />
             </div>
@@ -270,7 +298,7 @@ export default function MatchDataPanel({ matchId, dbMatchId }: Props) {
                     <div className="flex items-start gap-3">
                       <EventAvatar event={event} data={data} />
                       <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2 text-xs font-black text-[#FFD700]"><span>{icon(event.type)}</span>{event.minute ? `د${event.minute}` : 'حدث'}{src ? <><span className="text-gray-600">•</span><span>{src}</span></> : null}</div>
+                        <div className="flex flex-wrap items-center gap-2 text-xs font-black text-[#FFD700]"><span>{icon(event.type)}</span>{event.minuteLabel || (event.minute ? `د${event.minute}` : 'حدث')}{src ? <><span className="text-gray-600">•</span><span>{src}</span></> : null}</div>
                         {event.playerName ? <p className="mt-1 text-xs font-black text-white">{event.playerName}</p> : null}
                         <p className="mt-1 text-sm leading-6 text-gray-200">{event.detail}</p>
                       </div>

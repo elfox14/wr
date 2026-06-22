@@ -25,7 +25,12 @@ type Props = {
 };
 
 export default function HomeHeroCountdown({ nextMatch }: Props) {
+  const [mounted, setMounted] = useState(false);
   const [timeLeft, setTimeLeft] = useState<{ days: number; hours: number; minutes: number; seconds: number } | null>(null);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     if (!nextMatch?.matchDate) return;
@@ -96,8 +101,8 @@ export default function HomeHeroCountdown({ nextMatch }: Props) {
           <h1 className="text-2xl md:text-4xl font-black leading-tight text-white">
             {nextMatch.homeTeam?.name} ضد {nextMatch.awayTeam?.name}
           </h1>
-          <p className="text-xs md:text-sm text-gray-400 font-bold">
-            {nextMatch.groupPhase ? nextMatch.groupPhase.replace('Group ', 'المجموعة ') : 'كأس العالم'} • {nextMatch.matchDate ? new Intl.DateTimeFormat('ar-EG', {
+          <p suppressHydrationWarning className="text-xs md:text-sm text-gray-400 font-bold">
+            {nextMatch.groupPhase ? nextMatch.groupPhase.replace('Group ', 'المجموعة ') : 'كأس العالم'} • {mounted && nextMatch.matchDate ? new Intl.DateTimeFormat('ar-EG', {
               weekday: 'long',
               day: 'numeric',
               month: 'long',

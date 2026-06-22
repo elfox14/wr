@@ -15,6 +15,9 @@ const STAT_ALIASES: Record<string, string[]> = {
   shots: ['shots', 'total_shots', 'totalShots'],
   shotsOnTarget: ['shotsOnTarget', 'shots_on_target', 'on_target_shots', 'shotsOnGoal'],
   shotsOffTarget: ['shotsOffTarget', 'shots_off_target', 'off_target_shots', 'shotsOffGoal', 'shots_wide'],
+  blockedShots: ['blockedShots', 'blocked_shots', 'shots_blocked'],
+  shotsInsideBox: ['shotsInsideBox', 'shots_inside_box'],
+  shotsOutsideBox: ['shotsOutsideBox', 'shots_outside_box'],
   corners: ['corners', 'corner_kicks', 'cornerKicks'],
   yellowCards: ['yellowCards', 'yellow_cards'],
   redCards: ['redCards', 'red_cards'],
@@ -25,6 +28,14 @@ const STAT_ALIASES: Record<string, string[]> = {
   xg: ['xg', 'expected_goals', 'expectedGoals'],
   npxg: ['npxg', 'non_penalty_xg', 'nonPenaltyXg', 'non_penalty_expected_goals', 'expected_goals_without_penalties', 'np_expected_goals'],
   bigChances: ['bigChances', 'big_chances'],
+  passes: ['passes', 'total_passes'],
+  accuratePasses: ['accuratePasses', 'accurate_passes'],
+  tackles: ['tackles'],
+  saves: ['saves', 'goalkeeper_saves', 'goalkeeperSaves'],
+  goalkeeperSaves: ['goalkeeperSaves', 'goalkeeper_saves', 'saves'],
+  interceptions: ['interceptions'],
+  clearances: ['clearances'],
+  ballRecoveries: ['ballRecoveries', 'ball_recoveries'],
 };
 
 export function toNumber(value: unknown) {
@@ -47,7 +58,7 @@ export function rawStats(snapshot: any) { const data = rawData(snapshot); const 
 function pairFromValue(value: any, source: string): Pair { const stat = asObject(value); const all = asObject(stat.all); const home = toNumber(stat.home ?? stat.home_value ?? stat.homeValue ?? all.home); const away = toNumber(stat.away ?? stat.away_value ?? stat.awayValue ?? all.away); return home === null && away === null ? null : { home, away, source }; }
 function statPair(snapshot: any, homeKey: string, awayKey: string, statKey: string): Pair { const stats = rawStats(snapshot); const aliases = STAT_ALIASES[statKey] || [statKey]; for (const alias of aliases) { const direct = pairFromValue(stats[alias], providerName(snapshot)); if (direct) return direct; } const home = aliases.map((alias) => toNumber(stats[homeKey] ?? stats[`home_${alias}`] ?? stats[`${alias}_home`] ?? stats[`${alias}Home`])).find((v) => v !== null) ?? null; const away = aliases.map((alias) => toNumber(stats[awayKey] ?? stats[`away_${alias}`] ?? stats[`${alias}_away`] ?? stats[`${alias}Away`])).find((v) => v !== null) ?? null; return home === null && away === null ? null : { home, away, source: providerName(snapshot) }; }
 export function buildStatMetric(sources: any[], key: string, label: string, homeKey: string, awayKey: string, suffix = ''): MatchStatMetric { const pair = sources.map((snapshot) => statPair(snapshot, homeKey, awayKey, key)).find(Boolean) as Pair; return { key, label, home: pair?.home ?? null, away: pair?.away ?? null, suffix, source: pair?.source || '', available: pair !== null }; }
-export function metricDefinitions(): Array<[string, string, string, string, string?]> { return [['possession', 'الاستحواذ', 'homePossession', 'awayPossession', '%'], ['shots', 'التسديدات', 'homeShots', 'awayShots'], ['shotsOnTarget', 'على المرمى', 'homeShotsOnTarget', 'awayShotsOnTarget'], ['shotsOffTarget', 'خارج المرمى', 'homeShotsOffTarget', 'awayShotsOffTarget'], ['corners', 'الركنيات', 'homeCorners', 'awayCorners'], ['yellowCards', 'بطاقات صفراء', 'homeYellowCards', 'awayYellowCards'], ['redCards', 'بطاقات حمراء', 'homeRedCards', 'awayRedCards'], ['xg', 'الأهداف المتوقعة xG', 'homeXg', 'awayXg'], ['npxg', 'الأهداف المتوقعة بدون ركلات جزاء npxG', 'homeNpxg', 'awayNpxg'], ['bigChances', 'فرص كبيرة', 'homeBigChances', 'awayBigChances'], ['fouls', 'الأخطاء', 'homeFouls', 'awayFouls'], ['offsides', 'التسللات', 'homeOffsides', 'awayOffsides'], ['attacks', 'الهجمات', 'homeAttacks', 'awayAttacks'], ['dangerousAttacks', 'هجمات خطيرة', 'homeDangerousAttacks', 'awayDangerousAttacks']]; }
+export function metricDefinitions(): Array<[string, string, string, string, string?]> { return [ ['possession', 'الاستحواذ', 'homePossession', 'awayPossession', '%'], ['xg', 'الأهداف المتوقعة xG', 'homeXg', 'awayXg'], ['npxg', 'xG بدون ركلات جزاء', 'homeNpxg', 'awayNpxg'], ['bigChances', 'فرص كبيرة', 'homeBigChances', 'awayBigChances'], ['shots', 'التسديدات', 'homeShots', 'awayShots'], ['shotsOnTarget', 'على المرمى', 'homeShotsOnTarget', 'awayShotsOnTarget'], ['shotsOffTarget', 'خارج المرمى', 'homeShotsOffTarget', 'awayShotsOffTarget'], ['blockedShots', 'تسديدات محجوبة', 'homeBlockedShots', 'awayBlockedShots'], ['shotsInsideBox', 'تسديدات داخل المنطقة', 'homeShotsInsideBox', 'awayShotsInsideBox'], ['shotsOutsideBox', 'تسديدات خارج المنطقة', 'homeShotsOutsideBox', 'awayShotsOutsideBox'], ['corners', 'الركنيات', 'homeCorners', 'awayCorners'], ['fouls', 'الأخطاء', 'homeFouls', 'awayFouls'], ['offsides', 'التسللات', 'homeOffsides', 'awayOffsides'], ['yellowCards', 'بطاقات صفراء', 'homeYellowCards', 'awayYellowCards'], ['redCards', 'بطاقات حمراء', 'homeRedCards', 'awayRedCards'], ['passes', 'التمريرات', 'homePasses', 'awayPasses'], ['accuratePasses', 'تمريرات صحيحة', 'homeAccuratePasses', 'awayAccuratePasses'], ['tackles', 'تدخلات', 'homeTackles', 'awayTackles'], ['interceptions', 'اعتراضات', 'homeInterceptions', 'awayInterceptions'], ['clearances', 'تشتيت الكرة', 'homeClearances', 'awayClearances'], ['ballRecoveries', 'استرجاع الكرة', 'homeBallRecoveries', 'awayBallRecoveries'], ['saves', 'تصديات الحارس', 'homeSaves', 'awaySaves'], ['attacks', 'الهجمات', 'homeAttacks', 'awayAttacks'], ['dangerousAttacks', 'هجمات خطيرة', 'homeDangerousAttacks', 'awayDangerousAttacks'] ]; }
 
 function snapshotMinute(snapshot: any) { const data = rawData(snapshot); const flashMeta = asObject(data.flashMeta); const nestedFlashMeta = asObject(data.flash?.meta); const meta = asObject(data.meta); return toNumber(snapshot?.minute ?? data.minute ?? flashMeta.elapsed ?? flashMeta.minute ?? nestedFlashMeta.elapsed ?? meta.elapsed ?? meta.minute); }
 function statusFromProviderValue(value: unknown, minute: number | null) { const raw = normalizeStatusValue(String(value || '')); if (!raw && minute !== null) return minute >= 46 ? '2H' : '1H'; if (['FIRST_HALF', 'FIRST', '1ST_HALF'].includes(raw)) return '1H'; if (['SECOND_HALF', 'SECOND', '2ND_HALF'].includes(raw)) return '2H'; if (raw.includes('HALF') && raw.includes('TIME')) return 'HT'; if (raw.includes('FINISH') || raw === 'FT' || raw === 'ENDED' || raw === 'COMPLETED') return 'FINISHED'; if (raw === 'LIVE' || raw === 'IN_PLAY') return minute && minute >= 46 ? '2H' : '1H'; return raw || null; }
@@ -58,10 +69,48 @@ export function scoreForDisplay(match: any, sources: any[]): MatchScore { const 
 
 function statusKind(status: string): MatchStatusKind { const value = normalizeStatusValue(status); if (FINISHED_STATUSES.includes(value)) return 'finished'; if (HALF_TIME_STATUSES.includes(value)) return 'halftime'; if (LIVE_STATUSES.includes(value)) return 'live'; if (SCHEDULED_STATUSES.includes(value)) return 'scheduled'; return 'delayed'; }
 function elapsedMinuteFromKickoff(match: any) { const startMs = new Date(match.matchDate || '').getTime(); if (!Number.isFinite(startMs)) return null; const elapsed = Math.floor((Date.now() - startMs) / 60_000); if (!Number.isFinite(elapsed) || elapsed < 0) return null; return Math.max(1, Math.min(FINAL_MINUTE_FALLBACK + 10, elapsed)); }
-function safeLiveMinute(match: any, rawStatus: string, rawMinute: number | null) { const minute = rawMinute === null || rawMinute === undefined ? null : Math.floor(rawMinute); const elapsed = elapsedMinuteFromKickoff(match); if (minute === null) return elapsed && elapsed <= 130 ? elapsed : null; if (elapsed !== null && elapsed < 15 && minute > elapsed + 6) return elapsed; if (elapsed !== null && minute > elapsed + 12 && minute >= 30) return elapsed; const status = normalizeStatusValue(rawStatus); if ((status === '1H' || status.includes('FIRST')) && minute > 55) return elapsed && elapsed < 55 ? elapsed : null; if ((status === '2H' || status.includes('SECOND')) && minute < 40) return elapsed && elapsed >= 40 ? elapsed : null; return minute; }
-function kickoffFallbackStatus(match: any): MatchStatusView | null { const startMs = new Date(match.matchDate || '').getTime(); if (!Number.isFinite(startMs)) return null; const elapsed = Math.floor((Date.now() - startMs) / 60_000); if (!Number.isFinite(elapsed) || elapsed < 0) return null; if (elapsed <= 55) { const minute = Math.max(1, elapsed); return { raw: 'KICKOFF_FALLBACK', kind: 'live', label: `الشوط الأول — د${minute.toLocaleString('ar-EG')}`, shortLabel: `الشوط الأول د${minute.toLocaleString('ar-EG')}`, minute, isLive: true, isFinished: false, isScheduled: false }; } if (elapsed <= 70) return { raw: 'KICKOFF_FALLBACK_HT', kind: 'halftime', label: 'استراحة بين الشوطين', shortLabel: 'استراحة', minute: null, isLive: false, isFinished: false, isScheduled: false }; if (elapsed <= 125) { const minute = Math.min(90, Math.max(46, elapsed - 15)); return { raw: 'KICKOFF_FALLBACK', kind: 'live', label: `الشوط الثاني — د${minute.toLocaleString('ar-EG')}`, shortLabel: `الشوط الثاني د${minute.toLocaleString('ar-EG')}`, minute, isLive: true, isFinished: false, isScheduled: false }; } return { raw: 'KICKOFF_FALLBACK_PENDING_END', kind: 'delayed', label: 'بانتظار تأكيد النهاية', shortLabel: 'تأكيد النهاية', minute: null, isLive: false, isFinished: false, isScheduled: false }; }
+function safeLiveMinute(match: any, rawStatus: string, rawMinute: number | null) {
+  return null;
+}
+function kickoffFallbackStatus(match: any): MatchStatusView | null { const startMs = new Date(match.matchDate || '').getTime(); if (!Number.isFinite(startMs)) return null; const elapsed = Math.floor((Date.now() - startMs) / 60_000); if (!Number.isFinite(elapsed) || elapsed < 0) return null; if (elapsed <= 55) { return { raw: 'KICKOFF_FALLBACK', kind: 'live', label: 'الشوط الأول', shortLabel: 'الشوط الأول', minute: null, isLive: true, isFinished: false, isScheduled: false }; } if (elapsed <= 70) return { raw: 'KICKOFF_FALLBACK_HT', kind: 'halftime', label: 'استراحة بين الشوطين', shortLabel: 'استراحة', minute: null, isLive: false, isFinished: false, isScheduled: false }; if (elapsed <= 125) { return { raw: 'KICKOFF_FALLBACK', kind: 'live', label: 'الشوط الثاني', shortLabel: 'الشوط الثاني', minute: null, isLive: true, isFinished: false, isScheduled: false }; } return { raw: 'KICKOFF_FALLBACK_PENDING_END', kind: 'delayed', label: 'بانتظار تأكيد النهاية', shortLabel: 'تأكيد النهاية', minute: null, isLive: false, isFinished: false, isScheduled: false }; }
 
-export function buildStatusView(match: any, sources: any[]): MatchStatusView { const matchStatus = normalizeStatusValue(match.status || ''); if (FINISHED_STATUSES.includes(matchStatus)) return { raw: matchStatus, kind: 'finished', label: 'انتهت المباراة', shortLabel: 'انتهت', minute: null, isLive: false, isFinished: true, isScheduled: false }; const fromSource = statusFromSnapshots(sources); const raw = fromSource?.status || normalizeStatusValue(match.status || 'SCHEDULED'); const rawMinute = fromSource?.minute ?? sources.map(snapshotMinute).find((value) => value !== null) ?? null; const kind = statusKind(raw); if (kind === 'finished') return { raw, kind, label: 'انتهت المباراة', shortLabel: 'انتهت', minute: null, isLive: false, isFinished: true, isScheduled: false }; if (kind === 'halftime') return { raw, kind, label: 'استراحة بين الشوطين', shortLabel: 'استراحة', minute: null, isLive: false, isFinished: false, isScheduled: false }; if (kind === 'live') { const phase = raw === '1H' ? 'الشوط الأول' : raw === '2H' ? 'الشوط الثاني' : raw === 'ET' ? 'وقت إضافي' : 'مباشرة الآن'; const minute = safeLiveMinute(match, raw, rawMinute); const minuteLabel = minute ? `د${Math.floor(minute).toLocaleString('ar-EG')}` : ''; return { raw, kind, label: minute ? `${phase} — ${minuteLabel}` : phase, shortLabel: minute ? `${phase} ${minuteLabel}` : phase, minute: minute ? Math.floor(minute) : null, isLive: true, isFinished: false, isScheduled: false }; } const fallback = kickoffFallbackStatus(match); if ((kind === 'scheduled' || kind === 'delayed') && fallback) return fallback; return { raw, kind: 'scheduled', label: 'لم تبدأ', shortLabel: 'لم تبدأ', minute: null, isLive: false, isFinished: false, isScheduled: true }; }
+export function buildStatusView(match: any, sources: any[]): MatchStatusView {
+  const matchStatus = normalizeStatusValue(match.status || '');
+  if (FINISHED_STATUSES.includes(matchStatus)) return { raw: matchStatus, kind: 'finished', label: 'انتهت المباراة', shortLabel: 'انتهت', minute: null, isLive: false, isFinished: true, isScheduled: false };
+
+  const fromSource = statusFromSnapshots(sources);
+  const raw = fromSource?.status || normalizeStatusValue(match.status || 'SCHEDULED');
+  const kind = statusKind(raw);
+
+  if (kind === 'finished') return { raw, kind, label: 'انتهت المباراة', shortLabel: 'انتهت', minute: null, isLive: false, isFinished: true, isScheduled: false };
+
+  const elapsed = elapsedMinuteFromKickoff(match);
+  let adjustedRaw = raw;
+  let adjustedKind = kind;
+
+  if (kind === 'live' && (raw === '1H' || raw === 'LIVE' || raw === 'IN_PLAY')) {
+    if (elapsed !== null) {
+      if (elapsed > 48 && elapsed <= 63) {
+        adjustedRaw = 'HT';
+        adjustedKind = 'halftime';
+      } else if (elapsed > 63) {
+        adjustedRaw = '2H';
+        adjustedKind = 'live';
+      }
+    }
+  }
+
+  if (adjustedKind === 'halftime') return { raw: adjustedRaw, kind: adjustedKind, label: 'استراحة بين الشوطين', shortLabel: 'استراحة', minute: null, isLive: false, isFinished: false, isScheduled: false };
+
+  if (adjustedKind === 'live') {
+    const phase = adjustedRaw === '1H' ? 'الشوط الأول' : adjustedRaw === '2H' ? 'الشوط الثاني' : adjustedRaw === 'ET' ? 'وقت إضافي' : 'مباشرة الآن';
+    return { raw: adjustedRaw, kind: adjustedKind, label: phase, shortLabel: phase, minute: null, isLive: true, isFinished: false, isScheduled: false };
+  }
+
+  const fallback = kickoffFallbackStatus(match);
+  if ((adjustedKind === 'scheduled' || adjustedKind === 'delayed') && fallback) return fallback;
+  return { raw: adjustedRaw, kind: 'scheduled', label: 'لم تبدأ', shortLabel: 'لم تبدأ', minute: null, isLive: false, isFinished: false, isScheduled: true };
+}
 
 export function eventMinuteLabel(event: any) { const detail = String(event?.detail || ''); const stoppage = detail.match(/(?:د|minute|min)?\s*(45|90|105)\s*\+\s*(\d+)/i); if (stoppage) return `د${Number(stoppage[1]).toLocaleString('ar-EG')}+${Number(stoppage[2]).toLocaleString('ar-EG')}`; return event.minute !== null && event.minute !== undefined ? `د${Number(event.minute).toLocaleString('ar-EG')}` : '—'; }
 export function eventIcon(type?: string | null) { const value = normalizeStatusValue(type); if (value.includes('GOAL')) return '⚽'; if (value.includes('YELLOW')) return '🟨'; if (value.includes('RED')) return '🟥'; if (value.includes('SUB')) return '🔁'; if (value.includes('VAR')) return '📺'; if (value.includes('PEN')) return '🎯'; if (value.includes('SAVE')) return '🧤'; if (value.includes('CORNER')) return '🚩'; if (value.includes('SHOT') || value.includes('CHANCE')) return '🎯'; return '•'; }

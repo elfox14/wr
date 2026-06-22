@@ -46,16 +46,15 @@ function matchStatus(match: TickerMatch) { return normalizeStatus(match.displayS
 function isHalfTime(match: TickerMatch) { return ['HT', 'HALFTIME', 'HALF_TIME', 'HALF-TIME'].includes(matchStatus(match)) || Boolean(match.isHalfTime); }
 function isFinished(match: TickerMatch) { return ['FINISHED', 'FT', 'AET', 'PEN', 'FULL_TIME', 'ENDED'].includes(matchStatus(match)) || Boolean(match.isStaleAutoFinished); }
 function isLive(match: TickerMatch) { if (isFinished(match)) return false; const status = matchStatus(match); return ['1H', '2H', 'ET', 'BT', 'P', 'IN_PLAY', 'LIVE'].includes(status) || Boolean(match.isLiveNow) || isHalfTime(match); }
-function minuteLabel(match: TickerMatch) { const minute = Number(match.minute); return Number.isFinite(minute) && minute > 0 ? formatCount(Math.floor(minute)) : null; }
+function minuteLabel(match: TickerMatch) { return null; }
 function liveStatusText(match: TickerMatch) {
   if (isHalfTime(match)) return 'استراحة';
-  const minute = minuteLabel(match);
   const status = matchStatus(match);
-  if (status === '1H') return minute ? `الشوط الأول — د${minute}` : 'الشوط الأول';
-  if (status === '2H') return minute ? `الشوط الثاني — د${minute}` : 'الشوط الثاني';
-  if (status === 'ET') return minute ? `وقت إضافي — د${minute}` : 'وقت إضافي';
+  if (status === '1H') return 'الشوط الأول';
+  if (status === '2H') return 'الشوط الثاني';
+  if (status === 'ET') return 'وقت إضافي';
   if (status === 'P' || status === 'PEN') return 'ركلات الترجيح';
-  return minute ? `جارية الآن — د${minute}` : 'جارية';
+  return 'جارية الآن';
 }
 function matchKey(match?: TickerMatch | null) { return String(match?.id || match?.animationMatchId || `${match?.homeTeam?.name || ''}-${match?.awayTeam?.name || ''}-${match?.matchDate || ''}`); }
 function mergeById(baseMatches: TickerMatch[], updates: TickerMatch[]) {
@@ -71,22 +70,28 @@ function mergeById(baseMatches: TickerMatch[], updates: TickerMatch[]) {
   for (const update of updates) if (!merged.some((match) => matchKey(match) === matchKey(update))) merged.unshift(update);
   return merged;
 }
-function timeLabel(match: TickerMatch) {
+function timeLabel(match: TickerMatch, mounted: boolean) {
   if (!match.matchDate) return 'قريبًا';
+  if (!mounted) return 'قريبًا';
   const date = new Date(match.matchDate);
   if (!Number.isFinite(date.getTime())) return 'قريبًا';
   return new Intl.DateTimeFormat('ar-EG', { hour: '2-digit', minute: '2-digit' }).format(date);
 }
-function statusBadge(match: TickerMatch) {
+function statusBadge(match: TickerMatch, mounted: boolean) {
   if (isFinished(match)) return 'انتهت';
   if (isLive(match)) return liveStatusText(match);
-  return timeLabel(match);
+  return timeLabel(match, mounted);
 }
 
 export default function HomeLiveMatchTicker({ matches = [] }: Props) {
+  const [mounted, setMounted] = useState(false);
   const safeMatches = Array.isArray(matches) ? (matches as TickerMatch[]) : [];
   const [apiMatches, setApiMatches] = useState<TickerMatch[]>([]);
   const [activeKey, setActiveKey] = useState<string>('');
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -140,7 +145,7 @@ export default function HomeLiveMatchTicker({ matches = [] }: Props) {
                 <div className="flex min-w-0 flex-1 flex-col gap-1">
                   <div className="flex items-center gap-1.5">
                     <span className={`h-1.5 w-1.5 rounded-full ${live ? 'animate-pulse bg-[#00FF88]' : finished ? 'bg-gray-500' : 'bg-[#0FF0FC]'}`} />
-                    <span className={`truncate text-[10px] font-black ${live ? 'text-[#00FF88]' : finished ? 'text-gray-400' : 'text-[#0FF0FC]'}`}>{statusBadge(match)}</span>
+                    <span suppressHydrationWarning className={`truncate text-[10px] font-black ${live ? 'text-[#00FF88]' : finished ? 'text-gray-400' : 'text-[#0FF0FC]'}`}>{statusBadge(match, mounted)}</span>
                   </div>
                   <div className="flex items-center justify-between gap-2 text-xs font-black text-white">
                     <span className="flex min-w-0 items-center gap-1.5"><img src={homeFlag || undefined} alt="" className="h-5 w-5 rounded-md object-cover" /><span className="truncate">{match.homeTeam?.name || 'Home'}</span></span>

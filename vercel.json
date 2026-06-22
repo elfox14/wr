@@ -2,27 +2,7 @@
   "crons": [
     {
       "path": "/api/cron/worldcup-live-auto",
-      "schedule": "*/5 * * * *"
-    },
-    {
-      "path": "/api/cron/live-market-sync",
-      "schedule": "*/5 * * * *"
-    },
-    {
-      "path": "/api/cron/isports-safe-sync",
-      "schedule": "*/5 * * * *"
-    },
-    {
-      "path": "/api/cron/football-auto-sync",
-      "schedule": "*/5 * * * *"
-    },
-    {
-      "path": "/api/cron/expire-stale-matches",
-      "schedule": "*/15 * * * *"
-    },
-    {
-      "path": "/api/admin/auto-import-sports-reference",
-      "schedule": "0 4 * * *"
+      "schedule": "* * * * *"
     }
   ]
 }
