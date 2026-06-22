@@ -10,7 +10,7 @@ const LIVE_STAT_FIELDS = [
   'homeScore', 'awayScore',
 ];
 
-const LIVE_STATUSES = ['IN_PLAY', 'LIVE', '1H', '2H', 'HT', 'ET', 'PAUSED'];
+const LIVE_STATUSES = ['IN_PLAY', 'LIVE', '1H', '2H', 'HT', 'HALFTIME', 'HALF_TIME', 'ET', 'BT', 'P', 'PAUSED'];
 const FINISHED_STATUSES = ['FINISHED', 'FT', 'AET', 'PEN', 'COMPLETED', 'ENDED'];
 
 function envNumber(name, fallback, min, max) {
@@ -263,7 +263,8 @@ function teamName(match, side) {
 }
 
 function deltaEvent(previous, stats, field, side, type, label, minDelta = 1) {
-  const before = previous ? n(previous[field]) : 0;
+  if (!previous) return null;
+  const before = n(previous[field]);
   const after = n(stats[field]);
   if (after === null || before === null || after - before < minDelta) return null;
   const diff = after - before;
@@ -360,14 +361,14 @@ async function postIngest(payload) {
   return data;
 }
 
-async function processMatch(match) {
+function recentSnapshotSkip(match, latest) {
   const minIntervalSeconds = envNumber('LIVE_INGEST_MIN_INTERVAL_SECONDS', 180, 30, 3600);
-  const latest = await latestWorkerSnapshot(match.id);
   const ageSeconds = latestSnapshotAgeSeconds(latest);
-  if (ageSeconds < minIntervalSeconds) {
-    return { matchId: match.id, providerMatchId: match.animationMatchId, status: 'skipped_recent_snapshot', ageSeconds: Math.round(ageSeconds), minIntervalSeconds };
-  }
+  if (ageSeconds >= minIntervalSeconds) return null;
+  return { matchId: match.id, providerMatchId: match.animationMatchId, status: 'skipped_recent_snapshot', ageSeconds: Math.round(ageSeconds), minIntervalSeconds };
+}
 
+async function processMatch(match, latest) {
   const raw = await fetchIsportsAnalysis(match.animationMatchId);
   const stats = normalizeStats(raw);
   if (stats.homeScore === null) stats.homeScore = match.homeScore;
@@ -414,13 +415,19 @@ async function runOnce() {
 
   console.log(`[live-ingest-worker] candidates=${matches.length} maxExternalRequests=${maxRequests}`);
   for (const match of matches) {
+    const latest = await latestWorkerSnapshot(match.id);
+    const skip = recentSnapshotSkip(match, latest);
+    if (skip) {
+      processed.push(skip);
+      continue;
+    }
     if (externalRequests >= maxRequests) {
       processed.push({ matchId: match.id, providerMatchId: match.animationMatchId, status: 'skipped_run_request_limit' });
       continue;
     }
     try {
       externalRequests += 1;
-      processed.push(await processMatch(match));
+      processed.push(await processMatch(match, latest));
     } catch (error) {
       processed.push({ matchId: match.id, providerMatchId: match.animationMatchId, status: 'failed', error: error?.message || String(error) });
     }
