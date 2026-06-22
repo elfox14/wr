@@ -101,6 +101,18 @@ ProviderRetryQueue
 https://worldcup.mcprim.com/api/cron/live-autopilot?key={CRON_SECRET}&resumeGuard=false
 ```
 
+ولفحص حالة الـ checkpoint والـ retry يدويًا:
+
+```text
+https://worldcup.mcprim.com/api/admin/live-sync-resume/status?key={CRON_SECRET}
+```
+
+ولفحص مباراة محددة:
+
+```text
+https://worldcup.mcprim.com/api/admin/live-sync-resume/status?key={CRON_SECRET}&dbMatchId={LOCAL_MATCH_ID}
+```
+
 ## كرون مباراة مهمة
 
 لو تريد إعطاء مباراة معينة أولوية أعلى، شغّل رابطًا ثانيًا كل دقيقة:
