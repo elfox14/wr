@@ -25,7 +25,7 @@ type Match = {
 
 type TabKey = 'today' | 'finished' | 'group';
 
-const GROUPS = 'ABCDEFGHIJKL'.split('').map((key, index) => ({ key, label: String(index + 1).toLocaleString('ar-EG') }));
+const GROUPS = 'ABCDEFGHIJKL'.split('').map((key, index) => ({ key, label: (index + 1).toLocaleString('ar-EG') }));
 const FINISHED_STATUSES = ['FINISHED', 'FT', 'AET', 'PEN'];
 const LIVE_STATUSES = ['IN_PLAY', 'LIVE', 'HT', '1H', '2H', 'ET', 'BT', 'P'];
 
