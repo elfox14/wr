@@ -41,6 +41,7 @@ const nextConfig: NextConfig = {
       { protocol: 'https', hostname: 'images.unsplash.com' },
       { protocol: 'https', hostname: 'flagcdn.com' },
       { protocol: 'https', hostname: 'media.api-sports.io' },
+      { protocol: 'https', hostname: 'media.mcprim.com' },
       { protocol: 'https', hostname: 'ui-avatars.com' }
     ],
   },
