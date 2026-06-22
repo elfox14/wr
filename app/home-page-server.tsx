@@ -1,8 +1,9 @@
+import { unstable_cache } from 'next/cache';
 import HomeClientSportsLiveFocus from '@/components/HomeClientSportsLiveFocus';
 import prisma from '@/lib/prisma';
 
 export const dynamic = 'force-dynamic';
-export const revalidate = 0;
+export const revalidate = 60;
 
 const LIVE_STATUSES = ['LIVE', 'IN_PLAY', '1H', '2H', 'ET', 'HT'];
 const SCHEDULED_STATUSES = ['SCHEDULED', 'TIMED', 'NOT_STARTED', 'NS'];
@@ -20,6 +21,14 @@ type MatchCandidate = {
   groupPhase?: string | null;
   stage?: string | null;
 };
+
+const teamSelect = {
+  id: true,
+  name: true,
+  code: true,
+  image: true,
+  group: true,
+} as const;
 
 function validMinute(value: unknown) {
   const minute = Number(value);
@@ -102,6 +111,7 @@ async function findFreshLiveCandidate<T extends MatchCandidate>(candidates: T[],
       capturedAt: true,
     },
     orderBy: { capturedAt: 'desc' },
+    take: Math.max(12, candidates.length * 3),
   });
 
   const latestByMatch = new Map<string, { minute: number; capturedAt: Date }>();
@@ -126,30 +136,15 @@ async function findFreshLiveCandidate<T extends MatchCandidate>(candidates: T[],
   return candidate ? decorateLiveCandidateWithSnapshot(candidate, latestByMatch.get(candidate.id)) : null;
 }
 
-export default async function Home() {
-  const now = new Date();
-  const tickerStart = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-  const tickerEnd = new Date(now.getTime() + 48 * 60 * 60 * 1000);
-  const liveWindowStart = new Date(now.getTime() - 3 * 60 * 60 * 1000);
-  const upcomingUntil = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+const getHomeData = unstable_cache(
+  async () => {
+    const now = new Date();
+    const tickerStart = new Date(now.getTime() - 12 * 60 * 60 * 1000);
+    const tickerEnd = new Date(now.getTime() + 36 * 60 * 60 * 1000);
+    const liveWindowStart = new Date(now.getTime() - 3 * 60 * 60 * 1000);
+    const upcomingUntil = new Date(now.getTime() + 24 * 60 * 60 * 1000);
 
-  let playersCount = 0;
-  let teamsCount = 0;
-  let upcomingMatchesCount = 0;
-  let upcomingMatches: unknown[] = [];
-  let tickerMatches: unknown[] = [];
-  let nextMarqueeMatch: any = null;
-
-  try {
-    const [
-      totalPlayers,
-      totalTeams,
-      totalUpcomingMatches,
-      upcomingMatchesRaw,
-      tickerMatchesRaw,
-      liveCandidatesRaw,
-      nextMatchRaw,
-    ] = await Promise.all([
+    const [totalPlayers, totalTeams, totalUpcomingMatches, upcomingMatchesRaw, tickerMatchesRaw, liveCandidatesRaw, nextMatchRaw] = await Promise.all([
       prisma.asset.count({ where: { type: 'PLAYER' } }),
       prisma.asset.count({ where: { type: 'TEAM' } }),
       prisma.match.count({
@@ -164,14 +159,36 @@ export default async function Home() {
           matchDate: { gte: liveWindowStart, lte: upcomingUntil },
         },
         orderBy: { matchDate: 'asc' },
-        take: 5,
-        include: { homeTeam: true, awayTeam: true },
+        take: 4,
+        select: {
+          id: true,
+          matchDate: true,
+          status: true,
+          groupPhase: true,
+          stage: true,
+          homeScore: true,
+          awayScore: true,
+          animationMatchId: true,
+          homeTeam: { select: teamSelect },
+          awayTeam: { select: teamSelect },
+        },
       }),
       prisma.match.findMany({
         where: { matchDate: { gte: tickerStart, lte: tickerEnd } },
         orderBy: { matchDate: 'asc' },
-        take: 15,
-        include: { homeTeam: true, awayTeam: true },
+        take: 8,
+        select: {
+          id: true,
+          matchDate: true,
+          status: true,
+          groupPhase: true,
+          stage: true,
+          homeScore: true,
+          awayScore: true,
+          animationMatchId: true,
+          homeTeam: { select: teamSelect },
+          awayTeam: { select: teamSelect },
+        },
       }),
       prisma.match.findMany({
         where: {
@@ -179,8 +196,19 @@ export default async function Home() {
           matchDate: { gte: liveWindowStart, lte: upcomingUntil },
         },
         orderBy: { matchDate: 'desc' },
-        take: 4,
-        include: { homeTeam: true, awayTeam: true },
+        take: 3,
+        select: {
+          id: true,
+          matchDate: true,
+          status: true,
+          groupPhase: true,
+          stage: true,
+          homeScore: true,
+          awayScore: true,
+          animationMatchId: true,
+          homeTeam: { select: teamSelect },
+          awayTeam: { select: teamSelect },
+        },
       }),
       prisma.match.findFirst({
         where: {
@@ -188,31 +216,59 @@ export default async function Home() {
           matchDate: { gte: liveWindowStart, lte: upcomingUntil },
         },
         orderBy: { matchDate: 'asc' },
-        include: { homeTeam: true, awayTeam: true },
+        select: {
+          id: true,
+          matchDate: true,
+          status: true,
+          groupPhase: true,
+          stage: true,
+          homeScore: true,
+          awayScore: true,
+          animationMatchId: true,
+          homeTeam: { select: teamSelect },
+          awayTeam: { select: teamSelect },
+        },
       }),
     ]);
 
     const freshLiveMatch = await findFreshLiveCandidate(liveCandidatesRaw, now);
-    playersCount = totalPlayers;
-    teamsCount = totalTeams;
-    upcomingMatchesCount = totalUpcomingMatches;
-    upcomingMatches = JSON.parse(JSON.stringify(upcomingMatchesRaw));
-    tickerMatches = JSON.parse(JSON.stringify(tickerMatchesRaw));
-    nextMarqueeMatch = freshLiveMatch || nextMatchRaw ? JSON.parse(JSON.stringify(freshLiveMatch || nextMatchRaw)) : null;
+    return {
+      playersCount: totalPlayers,
+      teamsCount: totalTeams,
+      upcomingMatchesCount: totalUpcomingMatches,
+      upcomingMatches: JSON.parse(JSON.stringify(upcomingMatchesRaw)),
+      tickerMatches: JSON.parse(JSON.stringify(tickerMatchesRaw)),
+      nextMarqueeMatch: freshLiveMatch || nextMatchRaw ? JSON.parse(JSON.stringify(freshLiveMatch || nextMatchRaw)) : null,
+    };
+  },
+  ['home-dashboard-v4'],
+  { revalidate: 60 },
+);
+
+export default async function Home() {
+  let data = {
+    playersCount: 0,
+    teamsCount: 0,
+    upcomingMatchesCount: 0,
+    upcomingMatches: [] as unknown[],
+    tickerMatches: [] as unknown[],
+    nextMarqueeMatch: null as any,
+  };
+
+  try {
+    data = await getHomeData();
   } catch (error) {
     console.error('Error fetching dashboard data:', error);
-    upcomingMatches = [];
-    tickerMatches = [];
   }
 
   return (
     <HomeClientSportsLiveFocus
-      upcomingMatches={upcomingMatches}
-      tickerMatches={tickerMatches}
-      nextMarqueeMatch={nextMarqueeMatch}
-      playersCount={playersCount}
-      teamsCount={teamsCount}
-      upcomingMatchesCount={upcomingMatchesCount}
+      upcomingMatches={data.upcomingMatches}
+      tickerMatches={data.tickerMatches}
+      nextMarqueeMatch={data.nextMarqueeMatch}
+      playersCount={data.playersCount}
+      teamsCount={data.teamsCount}
+      upcomingMatchesCount={data.upcomingMatchesCount}
     />
   );
 }
