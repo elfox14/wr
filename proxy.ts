@@ -25,7 +25,7 @@ function hasExplicitOfficialPlayerRewriteApproval(request: NextRequest) {
   return headerValue === OFFICIAL_PLAYER_REWRITE_CONFIRMATION || queryValue === OFFICIAL_PLAYER_REWRITE_CONFIRMATION;
 }
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   if (!isOfficialSquadMutation(request.nextUrl.pathname, request.method)) {
     return NextResponse.next();
   }

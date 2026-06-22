@@ -3,7 +3,6 @@ FROM node:20-bookworm-slim AS base
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV LIVE_STATS_DISABLE_BROWSER=true
-ENV NODE_OPTIONS=--max-old-space-size=384
 
 RUN apt-get update \
   && apt-get install -y --no-install-recommends \
@@ -18,6 +17,7 @@ COPY package.json package-lock.json* ./
 RUN npm ci --no-audit --no-fund
 
 FROM deps AS builder
+ENV NODE_OPTIONS=--max-old-space-size=1536
 COPY . .
 RUN npx prisma generate
 RUN npm run build
@@ -33,5 +33,6 @@ COPY --from=builder /app/.next/static ./.next/static
 EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
+ENV NODE_OPTIONS=--max-old-space-size=384
 
 CMD ["node", "server.js"]
