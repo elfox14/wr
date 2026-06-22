@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "prebuild": "prisma generate",
-    "build": "next build --webpack",
+    "build": "node --max-old-space-size=640 node_modules/next/dist/bin/next build --webpack",
     "build:render": "npm ci --no-audit --no-fund && npm run build",
     "build:render:migrate": "npm ci --no-audit --no-fund && npx prisma migrate deploy && npm run build",
     "build:render:dbpush": "npm ci --no-audit --no-fund && npx prisma db push && npm run build",
