@@ -5,6 +5,17 @@ import { fetchISportsAnimationBrowserlessText } from '@/scripts/isports-animatio
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
+function isDebugCaptureEnabled() {
+  return process.env.ENABLE_ISPORTS_DEBUG_CAPTURE === 'true';
+}
+
+function disabledResponse() {
+  return NextResponse.json(
+    { ok: false, error: 'Not Found' },
+    { status: 404, headers: { 'Cache-Control': 'no-store' } }
+  );
+}
+
 function allowedSecrets() {
   return [process.env.LIVE_INGEST_SECRET, process.env.CRON_SECRET, process.env.ADMIN_API_SECRET]
     .map((value) => String(value || '').trim())
@@ -49,8 +60,12 @@ function cleanUrl(urlStr: string | null | undefined): string {
 }
 
 async function handle(request: Request) {
+  if (!isDebugCaptureEnabled()) {
+    return disabledResponse();
+  }
+
   if (!isAuthorized(request)) {
-    return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
+    return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401, headers: { 'Cache-Control': 'no-store' } });
   }
 
   const { searchParams } = new URL(request.url);
@@ -81,7 +96,7 @@ async function handle(request: Request) {
   if (!providerMatchId) {
     return NextResponse.json(
       { ok: false, error: 'Missing or unresolved providerMatchId (animationMatchId)' },
-      { status: 400 }
+      { status: 400, headers: { 'Cache-Control': 'no-store' } }
     );
   }
 
@@ -168,7 +183,7 @@ async function handle(request: Request) {
   }
 
   const sanitizedObj = JSON.parse(responseJson);
-  return NextResponse.json(sanitizedObj);
+  return NextResponse.json(sanitizedObj, { headers: { 'Cache-Control': 'no-store' } });
 }
 
 export async function GET(request: Request) {

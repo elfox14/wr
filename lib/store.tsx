@@ -6,14 +6,14 @@ export interface Asset {
   name: string;
   code: string;
   image: string;
-  current_price: number;
+  current_price?: number;
   fairValue?: number;
   marketPrice?: number;
-  high_price: number;
-  low_price: number;
-  market_cap: string;
-  volume: string;
-  change: number;
+  high_price?: number;
+  low_price?: number;
+  market_cap?: string;
+  volume?: string;
+  change?: number;
   priceHistory?: { price: number; timestamp: string }[];
   group?: string | null;
   continent?: string | null;
@@ -115,6 +115,8 @@ export interface Match {
   groupPhase: string;
 }
 
+type AssetFetchView = 'full' | 'groups' | 'market';
+
 interface AppState {
   assets: Asset[];
   matches: Match[];
@@ -126,7 +128,7 @@ interface AppState {
   loading: boolean;
   notifications: string[];
   
-  fetchAssets: () => Promise<void>;
+  fetchAssets: (view?: AssetFetchView) => Promise<void>;
   fetchMatches: () => Promise<void>;
   fetchPortfolio: () => Promise<void>;
   fetchPortfolioAnalytics: () => Promise<void>;
@@ -152,9 +154,10 @@ export const useStore = create<AppState>((set, get) => ({
   showInsufficientFundsModal: false,
   setShowInsufficientFundsModal: (show) => set({ showInsufficientFundsModal: show }),
 
-  fetchAssets: async () => {
+  fetchAssets: async (view = 'groups') => {
     try {
-      const res = await fetch('/api/assets');
+      const query = view === 'full' ? '' : `?view=${encodeURIComponent(view)}`;
+      const res = await fetch(`/api/assets${query}`);
       const data = await res.json();
       set({ assets: data });
     } catch (err) {
