@@ -195,7 +195,7 @@ const FUNCTION_CAPTURE_CODE = `export default async function ({ page, context })
     } catch {}
   });
   await page.goto(url, { waitUntil: 'domcontentloaded', timeout: timeoutMs });
-  await page.waitForTimeout(waitMs);
+  await new Promise((resolve) => setTimeout(resolve, waitMs));
   const text = await page.evaluate(() => document.body ? document.body.innerText : '');
   return { data: { url, text, responses }, type: 'application/json' };
 }`;
@@ -223,7 +223,7 @@ function inlineFunctionCaptureCode(sourceUrl, waitMs, timeoutMs) {
       } catch {}
     });
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: timeoutMs });
-    await page.waitForTimeout(waitMs);
+    await new Promise((resolve) => setTimeout(resolve, waitMs));
     const text = await page.evaluate(() => document.body ? document.body.innerText : '');
     return { data: { url, text, responses }, type: 'application/json' };
   }`;
