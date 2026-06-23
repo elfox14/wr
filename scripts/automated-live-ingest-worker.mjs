@@ -1,7 +1,11 @@
 import { PrismaClient } from '@prisma/client';
 import { fetchISportsAnimationBrowserlessText } from './isports-animation-browserless-fallback.mjs';
 
-const prisma = new PrismaClient();
+let prisma = new PrismaClient();
+
+export function setPrisma(customPrisma) {
+  prisma = customPrisma;
+}
 
 const LIVE_STAT_FIELDS = [
   'homePossession', 'awayPossession', 'homeAttacks', 'awayAttacks',
@@ -462,7 +466,7 @@ async function processMatch(match, latest) {
   return { matchId: match.id, providerMatchId: match.animationMatchId, status: 'saved', sourceProvider, providerStatus, minute: stats.minute, hasUsefulStats: hasUsefulStats(stats), savedEventsCount: saved.savedEventsCount ?? 0, snapshotId: saved.snapshot?.id, fallbackStatus };
 }
 
-async function runOnce() {
+export async function runOnce() {
   const maxRequests = envNumber('LIVE_INGEST_MAX_EXTERNAL_REQUESTS', 4, 1, 25);
   const matches = await candidateMatches();
   const processed = [];
@@ -504,8 +508,15 @@ async function main() {
   }
 }
 
-main().catch(async (error) => {
-  console.error('[live-ingest-worker] fatal:', error);
-  await prisma.$disconnect();
-  process.exit(1);
-});
+const isMain = process.argv[1] && (
+  process.argv[1].endsWith('automated-live-ingest-worker.mjs') || 
+  process.argv[1].endsWith('automated-live-ingest-worker')
+);
+
+if (isMain) {
+  main().catch(async (error) => {
+    console.error('[live-ingest-worker] fatal:', error);
+    await prisma.$disconnect();
+    process.exit(1);
+  });
+}
