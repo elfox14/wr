@@ -149,7 +149,7 @@ export async function GET(req: Request) {
     const [liveStats, timeline] = await Promise.all([
       theStatsApiFetch(liveStatsPath, {}, { timeoutMs: 15000 }).then((payload) => ({ ok: true, payload })).catch((error) => ({ ok: false, error: safeTheStatsApiError(error) })),
       theStatsApiFetch(timelinePath, {}, { timeoutMs: 15000 }).then((payload) => ({ ok: true, payload })).catch((error) => ({ ok: false, error: safeTheStatsApiError(error) })),
-    ]);
+    ]) as [any, any];
 
     return NextResponse.json({
       ok: true,
