@@ -154,7 +154,7 @@ export const useStore = create<AppState>((set, get) => ({
   showInsufficientFundsModal: false,
   setShowInsufficientFundsModal: (show) => set({ showInsufficientFundsModal: show }),
 
-  fetchAssets: async (view = 'full') => {
+  fetchAssets: async (view = 'groups') => {
     try {
       const query = view === 'full' ? '' : `?view=${encodeURIComponent(view)}`;
       const res = await fetch(`/api/assets${query}`);
