@@ -25,18 +25,44 @@ function canonicalAnimationUrl(providerMatchId) {
   return url.toString();
 }
 
-function browserlessContentUrl() {
-  const explicit = String(process.env.BROWSERLESS_CONTENT_URL || process.env.BROWSERLESS_FALLBACK_CONTENT_URL || '').trim();
-  if (explicit) return explicit;
-
-  const endpoint = String(process.env.BROWSERLESS_ENDPOINT || process.env.BROWSERLESS_FALLBACK_ENDPOINT || '').trim().replace(/\/$/, '');
-  const token = String(process.env.BROWSERLESS_TOKEN || process.env.BROWSERLESS_FALLBACK_TOKEN || '').trim();
+function endpointToContentUrl(endpointValue, tokenValue) {
+  const endpoint = String(endpointValue || '').trim().replace(/\/$/, '');
+  const token = String(tokenValue || '').trim();
   if (!endpoint) return '';
-
   const finalEndpoint = endpoint.endsWith('/content') || endpoint.endsWith('/chromium/content') ? endpoint : `${endpoint}/content`;
   const url = new URL(finalEndpoint);
   if (token && !url.searchParams.has('token')) url.searchParams.set('token', token);
   return url.toString();
+}
+
+function browserlessContentCandidates() {
+  const primaryExplicit = String(process.env.BROWSERLESS_CONTENT_URL || '').trim();
+  const fallbackExplicit = String(process.env.BROWSERLESS_FALLBACK_CONTENT_URL || '').trim();
+  const primaryEndpoint = endpointToContentUrl(process.env.BROWSERLESS_ENDPOINT, process.env.BROWSERLESS_TOKEN);
+  const fallbackEndpoint = endpointToContentUrl(process.env.BROWSERLESS_FALLBACK_ENDPOINT, process.env.BROWSERLESS_FALLBACK_TOKEN);
+  const preferFallback = envBool('BROWSERLESS_PREFER_FALLBACK', false);
+  const entries = preferFallback
+    ? [
+        ['fallback_explicit', fallbackExplicit],
+        ['fallback_endpoint', fallbackEndpoint],
+        ['primary_explicit', primaryExplicit],
+        ['primary_endpoint', primaryEndpoint],
+      ]
+    : [
+        ['primary_explicit', primaryExplicit],
+        ['primary_endpoint', primaryEndpoint],
+        ['fallback_explicit', fallbackExplicit],
+        ['fallback_endpoint', fallbackEndpoint],
+      ];
+  const seen = new Set();
+  return entries
+    .filter(([, url]) => Boolean(url))
+    .filter(([, url]) => {
+      if (seen.has(url)) return false;
+      seen.add(url);
+      return true;
+    })
+    .map(([name, url]) => ({ name, url }));
 }
 
 function htmlToText(html) {
@@ -58,10 +84,7 @@ function htmlToText(html) {
     .trim();
 }
 
-async function fetchRenderedHtml(sourceUrl) {
-  const contentUrl = browserlessContentUrl();
-  if (!contentUrl) throw new Error('BROWSERLESS_CONTENT_URL or BROWSERLESS_ENDPOINT is missing');
-
+async function fetchRenderedHtmlFrom(contentUrl, sourceUrl) {
   const timeoutMs = envNumber('BROWSERLESS_FALLBACK_TIMEOUT_MS', 25000, 5000, 55000);
   const waitForTimeout = envNumber('BROWSERLESS_FALLBACK_WAIT_MS', 8000, 1000, 20000);
   const response = await fetch(contentUrl, {
@@ -85,14 +108,29 @@ async function fetchRenderedHtml(sourceUrl) {
   }
 }
 
+async function fetchRenderedHtml(sourceUrl) {
+  const candidates = browserlessContentCandidates();
+  if (!candidates.length) throw new Error('BROWSERLESS_CONTENT_URL or BROWSERLESS_ENDPOINT is missing');
+  const errors = [];
+  for (const candidate of candidates) {
+    try {
+      const html = await fetchRenderedHtmlFrom(candidate.url, sourceUrl);
+      return { html, loader: `browserless_content:${candidate.name}` };
+    } catch (error) {
+      errors.push(`${candidate.name}: ${error?.message || String(error)}`);
+    }
+  }
+  throw new Error(errors.join(' | ') || 'Browserless failed');
+}
+
 export async function fetchISportsAnimationBrowserlessText(providerMatchId) {
   if (!envBool('LIVE_INGEST_USE_BROWSERLESS_FALLBACK', false)) {
     return { enabled: false, hasText: false, skipped: true, reason: 'LIVE_INGEST_USE_BROWSERLESS_FALLBACK is false' };
   }
 
   const sourceUrl = canonicalAnimationUrl(providerMatchId);
-  const html = await fetchRenderedHtml(sourceUrl);
-  const text = htmlToText(html);
+  const rendered = await fetchRenderedHtml(sourceUrl);
+  const text = htmlToText(rendered.html);
   return {
     enabled: true,
     source: 'ISPORTS_ANIMATION_BROWSERLESS',
@@ -101,8 +139,8 @@ export async function fetchISportsAnimationBrowserlessText(providerMatchId) {
     text,
     rawData: {
       sourceUrl,
-      loader: 'browserless_content',
-      htmlLength: html.length,
+      loader: rendered.loader,
+      htmlLength: rendered.html.length,
       textSample: truncate(text),
     },
   };
