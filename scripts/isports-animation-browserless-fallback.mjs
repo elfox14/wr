@@ -1,5 +1,7 @@
 const DEFAULT_ANIMATION_BASE_URL = 'https://www.isportslive8.com/football/pc.html';
 
+let browserlessRequestsThisRun = 0;
+
 function envBool(name, fallback = false) {
   const value = String(process.env[name] || '').trim().toLowerCase();
   if (!value) return fallback;
@@ -85,8 +87,8 @@ function htmlToText(html) {
 }
 
 async function fetchRenderedHtmlFrom(contentUrl, sourceUrl) {
-  const timeoutMs = envNumber('BROWSERLESS_FALLBACK_TIMEOUT_MS', 25000, 5000, 55000);
-  const waitForTimeout = envNumber('BROWSERLESS_FALLBACK_WAIT_MS', 8000, 1000, 20000);
+  const timeoutMs = envNumber('BROWSERLESS_FALLBACK_TIMEOUT_MS', 18000, 5000, 55000);
+  const waitForTimeout = envNumber('BROWSERLESS_FALLBACK_WAIT_MS', 4000, 1000, 20000);
   const response = await fetch(contentUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', accept: 'text/html,application/json' },
@@ -127,6 +129,19 @@ export async function fetchISportsAnimationBrowserlessText(providerMatchId) {
   if (!envBool('LIVE_INGEST_USE_BROWSERLESS_FALLBACK', false)) {
     return { enabled: false, hasText: false, skipped: true, reason: 'LIVE_INGEST_USE_BROWSERLESS_FALLBACK is false' };
   }
+
+  const maxBrowserlessRequests = envNumber('LIVE_INGEST_MAX_BROWSERLESS_REQUESTS', 1, 0, 10);
+  if (browserlessRequestsThisRun >= maxBrowserlessRequests) {
+    return {
+      enabled: true,
+      hasText: false,
+      skipped: true,
+      reason: 'skipped_browserless_run_limit',
+      browserlessRequestsThisRun,
+      maxBrowserlessRequests,
+    };
+  }
+  browserlessRequestsThisRun += 1;
 
   const sourceUrl = canonicalAnimationUrl(providerMatchId);
   const rendered = await fetchRenderedHtml(sourceUrl);
