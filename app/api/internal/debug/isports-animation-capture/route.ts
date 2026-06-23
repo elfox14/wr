@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
+import prisma from '@/lib/prisma';
 import { fetchISportsAnimationBrowserlessText } from '@/scripts/isports-animation-browserless-fallback.mjs';
 
 export const dynamic = 'force-dynamic';
@@ -68,7 +68,6 @@ async function handle(request: Request) {
   }
 
   if (!providerMatchId && matchId) {
-    const prisma = new PrismaClient();
     try {
       const match = await prisma.match.findUnique({
         where: { id: matchId },
@@ -76,8 +75,6 @@ async function handle(request: Request) {
       providerMatchId = match?.animationMatchId ? String(match.animationMatchId) : '';
     } catch (dbError) {
       console.error('[debug-capture] Prisma lookup failed:', dbError);
-    } finally {
-      await prisma.$disconnect();
     }
   }
 
