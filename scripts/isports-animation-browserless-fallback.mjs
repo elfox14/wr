@@ -2,6 +2,25 @@ const DEFAULT_ANIMATION_BASE_URL = 'https://www.isportslive8.com/football/pc.htm
 
 let browserlessRequestsThisRun = 0;
 
+async function fetchWithTimeout(url, options = {}, timeoutMs = 8000) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    });
+    return response;
+  } catch (error) {
+    if (error.name === 'AbortError') {
+      throw new Error(`Request timed out after ${timeoutMs}ms`);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
 function envBool(name, fallback = false) {
   const value = String(process.env[name] || '').trim().toLowerCase();
   if (!value) return fallback;
@@ -217,45 +236,57 @@ function unwrapFunctionResponse(body) {
 }
 
 async function postFunctionRequest(functionUrl, mode, body) {
-  const response = await fetch(functionUrl, {
+  const httpTimeout = envNumber('BROWSERLESS_HTTP_TIMEOUT_MS', 8000, 1000, 30000);
+  const response = await fetchWithTimeout(functionUrl, {
     method: 'POST',
     headers: {
       'Content-Type': mode === 'javascript' ? 'application/javascript' : 'application/json',
       accept: 'application/json,text/plain,*/*',
     },
     body,
-  });
+  }, httpTimeout);
   const text = await response.text();
   if (!response.ok) throw new Error(`${mode} ${response.status}: ${truncate(text, 600)}`);
   return unwrapFunctionResponse(text);
 }
 
 async function fetchFunctionCaptureFrom(functionUrl, sourceUrl) {
-  const timeoutMs = envNumber('BROWSERLESS_FALLBACK_TIMEOUT_MS', 18000, 5000, 55000);
-  const waitMs = envNumber('BROWSERLESS_FALLBACK_WAIT_MS', 4000, 1000, 20000);
+  const timeoutMs = envNumber('BROWSERLESS_FALLBACK_TIMEOUT_MS', 8000, 5000, 55000);
+  const waitMs = envNumber('BROWSERLESS_FALLBACK_WAIT_MS', 2000, 1000, 20000);
+  const payloadMode = String(process.env.BROWSERLESS_FUNCTION_PAYLOAD_MODE || 'javascript').trim().toLowerCase();
   const errors = [];
 
-  try {
-    return await postFunctionRequest(
-      functionUrl,
-      'json',
-      JSON.stringify({ code: FUNCTION_CAPTURE_CODE, context: { url: sourceUrl, waitMs, timeoutMs } }),
-    );
-  } catch (error) {
-    errors.push(error?.message || String(error));
+  if (payloadMode === 'json' || payloadMode === 'both') {
+    try {
+      return await postFunctionRequest(
+        functionUrl,
+        'json',
+        JSON.stringify({ code: FUNCTION_CAPTURE_CODE, context: { url: sourceUrl, waitMs, timeoutMs } }),
+      );
+    } catch (error) {
+      errors.push(error?.message || String(error));
+    }
   }
 
-  try {
-    return await postFunctionRequest(functionUrl, 'javascript', inlineFunctionCaptureCode(sourceUrl, waitMs, timeoutMs));
-  } catch (error) {
-    errors.push(error?.message || String(error));
+  if (payloadMode === 'javascript' || payloadMode === 'both') {
+    try {
+      return await postFunctionRequest(functionUrl, 'javascript', inlineFunctionCaptureCode(sourceUrl, waitMs, timeoutMs));
+    } catch (error) {
+      errors.push(error?.message || String(error));
+    }
   }
 
-  throw new Error(`Browserless function failed: ${errors.join(' | ')}`);
+  if (errors.length) {
+    throw new Error(`Browserless function failed: ${errors.join(' | ')}`);
+  } else {
+    throw new Error(`Browserless function failed: no payload modes matching ${payloadMode}`);
+  }
 }
 
 async function fetchFunctionCapture(sourceUrl) {
-  const candidates = browserlessFunctionCandidates();
+  const allCandidates = browserlessFunctionCandidates();
+  const maxCandidates = envNumber('BROWSERLESS_FUNCTION_MAX_CANDIDATES', 1, 1, 10);
+  const candidates = allCandidates.slice(0, maxCandidates);
   if (!candidates.length) return null;
   const errors = [];
   for (const candidate of candidates) {
@@ -270,13 +301,14 @@ async function fetchFunctionCapture(sourceUrl) {
 }
 
 async function fetchRenderedHtmlFrom(contentUrl, sourceUrl) {
-  const timeoutMs = envNumber('BROWSERLESS_FALLBACK_TIMEOUT_MS', 18000, 5000, 55000);
-  const waitForTimeout = envNumber('BROWSERLESS_FALLBACK_WAIT_MS', 4000, 1000, 20000);
-  const response = await fetch(contentUrl, {
+  const httpTimeout = envNumber('BROWSERLESS_HTTP_TIMEOUT_MS', 8000, 1000, 30000);
+  const timeoutMs = envNumber('BROWSERLESS_FALLBACK_TIMEOUT_MS', 8000, 5000, 55000);
+  const waitForTimeout = envNumber('BROWSERLESS_FALLBACK_WAIT_MS', 2000, 1000, 20000);
+  const response = await fetchWithTimeout(contentUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', accept: 'text/html,application/json' },
     body: JSON.stringify({ url: sourceUrl, gotoOptions: { waitUntil: 'networkidle2', timeout: timeoutMs }, waitForTimeout }),
-  });
+  }, httpTimeout);
   const contentType = response.headers.get('content-type') || '';
   const body = await response.text();
   if (!response.ok) throw new Error(`Browserless content failed ${response.status}: ${truncate(body, 600)}`);
@@ -322,7 +354,7 @@ export async function fetchISportsAnimationBrowserlessText(providerMatchId) {
   const functionFirst = envBool('LIVE_INGEST_BROWSERLESS_FUNCTION_FIRST', true);
   if (functionFirst) {
     const capture = await fetchFunctionCapture(sourceUrl).catch((error) => ({ error: error?.message || String(error) }));
-    if (!capture?.error) {
+    if (capture && !capture.error) {
       loader = capture.loader || 'browserless_function';
       text = String(capture.text || '');
       for (const response of Array.isArray(capture.responses) ? capture.responses : []) {
@@ -338,15 +370,24 @@ export async function fetchISportsAnimationBrowserlessText(providerMatchId) {
     }
   }
 
-  if (!loader) {
-    const content = await fetchContentText(sourceUrl);
-    loader = content.loader;
-    text = content.text;
-    htmlLength = content.htmlLength;
+  const contentAfterError = envBool('LIVE_INGEST_CONTENT_AFTER_FUNCTION_ERROR', false);
+  const shouldTryContent = !loader && (!functionFirst || !functionError || contentAfterError);
+
+  if (shouldTryContent) {
+    try {
+      const content = await fetchContentText(sourceUrl);
+      loader = content.loader;
+      text = content.text;
+      htmlLength = content.htmlLength;
+    } catch (error) {
+      functionError = functionError
+        ? `${functionError} | content_fallback_error: ${error?.message || String(error)}`
+        : error?.message || String(error);
+    }
   }
 
   const debug = envBool('LIVE_INGEST_FALLBACK_DEBUG', false);
-  const debugParts = [`loader:${loader}`, `text:${truncate(text, 1200)}`];
+  const debugParts = [`loader:${loader || 'none'}`, `text:${truncate(text, 1200)}`];
   if (functionError) debugParts.unshift(`function_error:${truncate(functionError, 500)}`);
 
   return {
@@ -356,7 +397,7 @@ export async function fetchISportsAnimationBrowserlessText(providerMatchId) {
     hasText: text.length > 0,
     hasStats: false,
     text,
-    error: debug ? `debug_${debugParts.join(' | ')}` : null,
+    error: debug ? `debug_${debugParts.join(' | ')}` : (functionError || null),
     rawData: { sourceUrl, loader, functionError, htmlLength, textSample: truncate(text), jsonPayloads: jsonPayloads.slice(0, 5), networkSamples: networkSamples.slice(0, 10) },
   };
 }
