@@ -127,16 +127,27 @@ async function fetchRenderedHtml(sourceUrl) {
 
 export async function fetchISportsAnimationBrowserlessText(providerMatchId) {
   if (!envBool('LIVE_INGEST_USE_BROWSERLESS_FALLBACK', false)) {
-    return { enabled: false, hasText: false, skipped: true, reason: 'LIVE_INGEST_USE_BROWSERLESS_FALLBACK is false' };
+    return {
+      enabled: false,
+      source: 'ISPORTS_ANIMATION_BROWSERLESS',
+      hasText: false,
+      hasStats: false,
+      skipped: true,
+      reason: 'LIVE_INGEST_USE_BROWSERLESS_FALLBACK is false',
+      error: 'LIVE_INGEST_USE_BROWSERLESS_FALLBACK is false',
+    };
   }
 
   const maxBrowserlessRequests = envNumber('LIVE_INGEST_MAX_BROWSERLESS_REQUESTS', 1, 0, 10);
   if (browserlessRequestsThisRun >= maxBrowserlessRequests) {
     return {
       enabled: true,
+      source: 'ISPORTS_ANIMATION_BROWSERLESS',
       hasText: false,
+      hasStats: false,
       skipped: true,
       reason: 'skipped_browserless_run_limit',
+      error: 'skipped_browserless_run_limit',
       browserlessRequestsThisRun,
       maxBrowserlessRequests,
     };
@@ -146,12 +157,15 @@ export async function fetchISportsAnimationBrowserlessText(providerMatchId) {
   const sourceUrl = canonicalAnimationUrl(providerMatchId);
   const rendered = await fetchRenderedHtml(sourceUrl);
   const text = htmlToText(rendered.html);
+  const debug = envBool('LIVE_INGEST_FALLBACK_DEBUG', false);
   return {
     enabled: true,
     source: 'ISPORTS_ANIMATION_BROWSERLESS',
     sourceUrl,
     hasText: text.length > 0,
+    hasStats: false,
     text,
+    error: debug ? `debug_text_sample:${truncate(text, 1200)}` : null,
     rawData: {
       sourceUrl,
       loader: rendered.loader,
