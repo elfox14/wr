@@ -21,7 +21,8 @@
     "lint:team-intelligence": "eslint app/team-intelligence/page.tsx lib/teamIntelligenceSources.ts lib/seedTeamIntelligenceReports.ts prisma/seedTeamIntelligenceReports.ts --max-warnings=0",
     "lint:navbar": "eslint components/ui/Navbar.tsx --max-warnings=0",
     "lint:team-overview": "eslint components/TeamOverviewPanel.tsx --max-warnings=0",
-    "lint:team-intelligence-admin": "echo Admin routes removed from slim production build"
+    "lint:team-intelligence-admin": "echo Admin routes removed from slim production build",
+"pretype-check": "prisma generate",
     "pretype-check": "prisma generate",
     "type-check": "tsc --noEmit",
     "db:migrate:deploy": "prisma migrate deploy",
