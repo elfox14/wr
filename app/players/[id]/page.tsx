@@ -7,7 +7,7 @@ import { hasUsablePlayerImage } from '@/lib/playerDedupe';
 
 export const dynamic = 'force-dynamic';
 
-type Props = { params: Promise<{ id: string }> | { id: string } };
+type Props = { params: Promise<{ id: string }> };
 
 function formatCount(value?: number | null, fallback = '٠') {
   return typeof value === 'number' && Number.isFinite(value) ? value.toLocaleString('ar-EG') : fallback;
@@ -130,122 +130,98 @@ export default async function PlayerDetailPage({ params }: Props) {
   if (!player) notFound();
 
   const performances = player.performances || [];
-  const totals = performances.reduce((acc, row) => {
-    acc.minutes += safeNumber(row.minutes);
-    acc.starts += row.started ? 1 : 0;
-    acc.goals += safeNumber(row.goals);
-    acc.assists += safeNumber(row.assists);
-    acc.shots += safeNumber(row.shotsTotal);
-    acc.shotsOnTarget += safeNumber(row.shotsOnTarget);
-    acc.passes += safeNumber(row.passes);
-    acc.keyPasses += safeNumber(row.keyPasses);
-    acc.tackles += safeNumber(row.tackles);
-    acc.interceptions += safeNumber(row.interceptions);
-    acc.saves += safeNumber(row.saves);
-    acc.yellowCards += safeNumber(row.yellowCards);
-    acc.redCards += safeNumber(row.redCards);
-    return acc;
-  }, { minutes: 0, starts: 0, goals: 0, assists: 0, shots: 0, shotsOnTarget: 0, passes: 0, keyPasses: 0, tackles: 0, interceptions: 0, saves: 0, yellowCards: 0, redCards: 0 });
-
-  const inferredClub = cleanText(player.club) || performances.map((row) => clubFromRawData(row.rawData)).find(Boolean) || '';
-  const hasImage = hasUsablePlayerImage(player.image);
-  const initials = player.code || player.name.slice(0, 2);
-  const sourceRows = performances
-    .map((row) => ({ provider: cleanText(row.provider), sourceUrl: sourceUrlFromRawData(row.rawData), updatedAt: row.updatedAt }))
-    .filter((row, index, list) => (row.provider || row.sourceUrl) && list.findIndex((item) => item.provider === row.provider && item.sourceUrl === row.sourceUrl) === index)
-    .slice(0, 5);
+  const latest = performances[0];
+  const avgRating = performances.length
+    ? performances.reduce((sum, row) => sum + safeNumber(row.internalRating || row.apiRating), 0) / performances.length
+    : null;
+  const goals = performances.reduce((sum, row) => sum + safeNumber(row.goals), 0);
+  const assists = performances.reduce((sum, row) => sum + safeNumber(row.assists), 0);
+  const minutes = performances.reduce((sum, row) => sum + safeNumber(row.minutes), 0);
+  const rawClub = latest?.rawData ? clubFromRawData(latest.rawData) : '';
+  const rawSource = latest?.rawData ? sourceUrlFromRawData(latest.rawData) : '';
+  const imageUsable = hasUsablePlayerImage(player.image, player.name);
 
   return (
-    <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 xl:py-12">
-      <div className="mb-5 flex items-center justify-between gap-3">
-        <Link href="/players" className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-2 text-sm font-black text-gray-200 transition hover:border-[#0FF0FC]/30 hover:bg-white/[0.07] hover:text-white">
-          <ArrowRight size={16} /> العودة للاعبين
-        </Link>
-        {player.teamId ? <Link href={`/teams/${encodeURIComponent(player.teamId)}`} className="rounded-2xl border border-[#0FF0FC]/20 bg-[#0FF0FC]/10 px-4 py-2 text-sm font-black text-[#0FF0FC]">صفحة المنتخب</Link> : null}
-      </div>
+    <main className="min-h-screen bg-background px-4 py-8 text-white sm:px-6 lg:px-8" dir="rtl">
+      <section className="mx-auto max-w-7xl space-y-6">
+        <Link href="/players" className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-2 text-sm font-black text-gray-300 transition hover:border-[#0FF0FC]/40 hover:text-white"><ArrowRight size={16} /> كل اللاعبين</Link>
 
-      <section className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-[#0a0a0a] p-5 shadow-2xl sm:p-8">
-        <div className="pointer-events-none absolute -right-40 -top-40 h-[520px] w-[520px] rounded-full bg-[#0FF0FC]/10 blur-[120px]" />
-        <div className="relative z-10 grid gap-6 lg:grid-cols-[320px_1fr]">
-          <div className="rounded-[1.7rem] border border-white/10 bg-black/35 p-5 text-center">
-            <div className="mx-auto flex h-52 w-52 items-center justify-center overflow-hidden rounded-[2rem] border border-white/10 bg-[#111]">
-              {hasImage ? <img src={player.image as string} alt={player.name} className="h-full w-full object-cover" /> : <span className="text-5xl font-black text-white/35">{initials}</span>}
+        <section className="overflow-hidden rounded-[2rem] border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(15,240,252,0.18),transparent_34%),linear-gradient(135deg,rgba(255,255,255,0.07),rgba(255,255,255,0.025))] p-6 shadow-card sm:p-8">
+          <div className="grid gap-6 lg:grid-cols-[220px_1fr] lg:items-center">
+            <div className="mx-auto flex h-48 w-48 items-center justify-center overflow-hidden rounded-[2rem] border border-white/10 bg-black/35">
+              {imageUsable ? <img src={player.image || ''} alt={player.name} className="h-full w-full object-cover" /> : <User size={72} className="text-gray-600" />}
             </div>
-            <h1 className="mt-5 text-3xl font-black text-white">{player.name}</h1>
-            <p className="mt-2 text-sm font-bold text-gray-400">{player.position || 'غير متوفر'} • {teamName(player.team)}</p>
-          </div>
-
-          <div className="flex flex-col justify-between gap-5">
             <div>
-              <div className="inline-flex items-center gap-2 rounded-full border border-[#FFD700]/25 bg-[#FFD700]/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-[#FFD700]">Player Profile</div>
-              <h2 className="mt-4 text-2xl font-black text-white sm:text-4xl">صفحة اللاعب</h2>
-              <p className="mt-3 max-w-3xl text-sm leading-7 text-gray-400">تعرض هذه الصفحة البيانات المتاحة حاليًا في قاعدة بيانات المنصة ومصادر الأداء المخزنة. أي خانة غير موجودة تظهر كـ “غير متوفر”.</p>
-            </div>
-
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              <InfoCard title="المنتخب" value={teamName(player.team)} icon={<Trophy size={13} />} />
-              <InfoCard title="المركز" value={player.position || 'غير متوفر'} icon={<Shield size={13} />} />
-              <InfoCard title="العمر" value={player.age ?? 'غير متوفر'} icon={<User size={13} />} />
-              <InfoCard title="النادي الحالي" value={inferredClub || 'غير متوفر في المصادر'} icon={<Building2 size={13} />} />
-              <InfoCard title="المجموعة" value={player.team?.group || 'غير متوفر'} icon={<Target size={13} />} />
-              <InfoCard title="كود اللاعب" value={player.code || 'غير متوفر'} icon={<Shield size={13} />} />
-              <InfoCard title="آخر تحديث أداء" value={formatDate(player.lastPerformanceSyncAt || performances[0]?.updatedAt)} icon={<CalendarDays size={13} />} />
-              <InfoCard title="تقييم داخلي" value={formatDecimal(player.lastPerformanceRating ?? player.score)} icon={<Target size={13} />} />
+              <span className="inline-flex rounded-full border border-[#0FF0FC]/25 bg-[#0FF0FC]/10 px-4 py-2 text-xs font-black text-[#0FF0FC]">ملف لاعب</span>
+              <h1 className="mt-4 text-3xl font-black leading-tight sm:text-5xl">{player.name}</h1>
+              <p className="mt-3 text-sm font-bold text-gray-400">{player.position || 'مركز غير متوفر'} · {teamName(player.team)} · {rawClub || player.club || 'النادي غير متوفر'}</p>
+              <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <InfoCard title="المنتخب" value={teamName(player.team)} icon={<Shield size={15} />} />
+                <InfoCard title="المجموعة" value={player.team?.group} icon={<Trophy size={15} />} />
+                <InfoCard title="العمر" value={player.age} icon={<CalendarDays size={15} />} />
+                <InfoCard title="النادي" value={rawClub || player.club} icon={<Building2 size={15} />} />
+              </div>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      <section className="mt-8 rounded-[2rem] border border-white/10 bg-[#111111]/70 p-5 backdrop-blur-xl sm:p-6">
-        <div className="mb-4 flex items-center gap-2 text-lg font-black text-white"><Trophy className="text-[#FFD700]" size={20} /> ملخص الأداء المتاح</div>
-        <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-4 xl:grid-cols-7">
-          <MetricBox title="سجلات" value={performances.length} />
-          <MetricBox title="دقائق" value={totals.minutes} />
-          <MetricBox title="أساسي" value={totals.starts} />
-          <MetricBox title="أهداف" value={totals.goals} accent />
-          <MetricBox title="أسيست" value={totals.assists} />
-          <MetricBox title="تسديدات" value={totals.shots} />
-          <MetricBox title="على المرمى" value={totals.shotsOnTarget} accent />
-          <MetricBox title="تمريرات" value={totals.passes} />
-          <MetricBox title="مفتاحية" value={totals.keyPasses} />
-          <MetricBox title="افتكاكات" value={totals.tackles} />
-          <MetricBox title="اعتراضات" value={totals.interceptions} />
-          <MetricBox title="تصديات" value={totals.saves} />
-          <MetricBox title="صفراء" value={totals.yellowCards} accent />
-          <MetricBox title="حمراء" value={totals.redCards} />
-        </div>
-      </section>
+        <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+          <MetricBox title="تقييم عام" value={player.score} accent />
+          <MetricBox title="متوسط آخر تقييم" value={avgRating ? Number(avgRating.toFixed(1)) : null} />
+          <MetricBox title="أهداف" value={goals} />
+          <MetricBox title="أسيست" value={assists} />
+          <MetricBox title="دقائق" value={minutes} />
+        </section>
 
-      <section className="mt-8 grid gap-6 lg:grid-cols-[1fr_340px]">
-        <div className="rounded-[2rem] border border-white/10 bg-[#111111]/70 p-5 backdrop-blur-xl sm:p-6">
-          <h2 className="mb-4 text-lg font-black text-white">سجلات الأداء</h2>
-          {performances.length ? (
+        <section className="rounded-3xl border border-white/10 bg-white/[0.035] p-5">
+          <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-2xl font-black">آخر الأداءات المسجلة</h2>
+              <p className="mt-1 text-sm text-gray-500">مصدر البيانات: {latest?.provider || 'غير متوفر'} · آخر تحديث {formatDate(player.lastPerformanceSyncAt)}</p>
+            </div>
+            {rawSource ? <a href={rawSource} target="_blank" rel="noreferrer" className="rounded-xl border border-white/10 bg-black/30 px-4 py-2 text-xs font-black text-[#0FF0FC]">فتح المصدر</a> : null}
+          </div>
+
+          {performances.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-white/10 p-8 text-center text-sm font-bold text-gray-500">لا توجد إحصائيات أداء محفوظة لهذا اللاعب بعد.</div>
+          ) : (
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[760px] text-right text-sm">
-                <thead className="text-xs text-gray-500"><tr className="border-b border-white/10"><th className="py-3 pl-3">المصدر</th><th className="py-3 pl-3">البطولة</th><th className="py-3 pl-3">الخصم</th><th className="py-3 pl-3">دقائق</th><th className="py-3 pl-3">أهداف</th><th className="py-3 pl-3">أسيست</th><th className="py-3 pl-3">تقييم</th><th className="py-3">تاريخ</th></tr></thead>
+              <table className="min-w-full text-sm">
+                <thead className="text-xs text-gray-500">
+                  <tr className="border-b border-white/10">
+                    <th className="px-3 py-3 text-right">التاريخ</th>
+                    <th className="px-3 py-3 text-right">المنافس</th>
+                    <th className="px-3 py-3 text-center">دقائق</th>
+                    <th className="px-3 py-3 text-center">أهداف</th>
+                    <th className="px-3 py-3 text-center">أسيست</th>
+                    <th className="px-3 py-3 text-center">تقييم</th>
+                  </tr>
+                </thead>
                 <tbody>
                   {performances.map((row) => (
-                    <tr key={row.id} className="border-b border-white/5 text-gray-300">
-                      <td className="py-3 pl-3 font-bold text-[#0FF0FC]">{row.provider || 'DB'}</td>
-                      <td className="py-3 pl-3">{row.competition || 'غير متوفر'}</td>
-                      <td className="py-3 pl-3">{row.opponentName || 'غير متوفر'}</td>
-                      <td className="py-3 pl-3 font-black text-white">{formatCount(row.minutes)}</td>
-                      <td className="py-3 pl-3 font-black text-[#FFD700]">{formatCount(row.goals)}</td>
-                      <td className="py-3 pl-3 font-black text-[#0FF0FC]">{formatCount(row.assists)}</td>
-                      <td className="py-3 pl-3">{formatDecimal(row.apiRating ?? row.internalRating)}</td>
-                      <td className="py-3">{formatDate(row.matchDate || row.updatedAt)}</td>
+                    <tr key={row.id} className="border-b border-white/5 last:border-0">
+                      <td className="px-3 py-3 text-gray-300">{formatDate(row.matchDate)}</td>
+                      <td className="px-3 py-3 font-bold text-white">{row.opponentName || 'غير متوفر'}</td>
+                      <td className="px-3 py-3 text-center text-gray-300">{formatCount(row.minutes)}</td>
+                      <td className="px-3 py-3 text-center text-gray-300">{formatCount(row.goals)}</td>
+                      <td className="px-3 py-3 text-center text-gray-300">{formatCount(row.assists)}</td>
+                      <td className="px-3 py-3 text-center font-black text-[#FFD700]">{formatDecimal(row.internalRating || row.apiRating)}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-          ) : <div className="rounded-2xl border border-dashed border-white/10 bg-black/20 p-8 text-center text-sm font-bold text-gray-400">لا توجد سجلات أداء موثقة لهذا اللاعب حتى الآن.</div>}
-        </div>
+          )}
+        </section>
 
-        <aside className="rounded-[2rem] border border-white/10 bg-[#111111]/70 p-5 backdrop-blur-xl sm:p-6">
-          <h2 className="mb-4 text-lg font-black text-white">مصادر البيانات المتاحة</h2>
-          {sourceRows.length ? <div className="space-y-3">{sourceRows.map((source, index) => <div key={`${source.provider}-${index}`} className="rounded-2xl border border-white/10 bg-black/25 p-4"><div className="text-xs font-black text-[#FFD700]">{source.provider || 'مصدر محفوظ'}</div>{source.sourceUrl ? <a href={source.sourceUrl} target="_blank" rel="noreferrer" className="mt-2 block truncate text-xs font-bold text-[#0FF0FC] hover:underline">فتح المصدر</a> : <div className="mt-2 text-xs font-bold text-gray-500">رابط المصدر غير متوفر</div>}<div className="mt-2 text-[10px] font-bold text-gray-600">آخر تحديث: {formatDate(source.updatedAt)}</div></div>)}</div> : <div className="rounded-2xl border border-dashed border-white/10 bg-black/20 p-6 text-center text-sm font-bold text-gray-400">غير متوفر في المصادر.</div>}
-        </aside>
+        <section className="rounded-3xl border border-white/10 bg-black/20 p-5">
+          <h2 className="mb-3 flex items-center gap-2 text-xl font-black"><Target size={18} className="text-[#0FF0FC]" /> ملاحظات جودة البيانات</h2>
+          <ul className="space-y-2 text-sm leading-7 text-gray-400">
+            <li>• صورة اللاعب تُعرض فقط إذا كانت صالحة وليست صورة وهمية أو Placeholder.</li>
+            <li>• النادي قد يأتي من حقل اللاعب أو من آخر Raw Data محفوظة حسب المصدر.</li>
+            <li>• إذا لم تظهر أرقام، فهذا يعني أن مصدر الأداء لم يتم ربطه أو مزامنته لهذا اللاعب بعد.</li>
+          </ul>
+        </section>
       </section>
     </main>
   );
