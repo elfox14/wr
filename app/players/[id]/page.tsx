@@ -139,7 +139,7 @@ export default async function PlayerDetailPage({ params }: Props) {
   const minutes = performances.reduce((sum, row) => sum + safeNumber(row.minutes), 0);
   const rawClub = latest?.rawData ? clubFromRawData(latest.rawData) : '';
   const rawSource = latest?.rawData ? sourceUrlFromRawData(latest.rawData) : '';
-  const imageUsable = hasUsablePlayerImage(player.image, player.name);
+  const imageUsable = hasUsablePlayerImage(player.image);
 
   return (
     <main className="min-h-screen bg-background px-4 py-8 text-white sm:px-6 lg:px-8" dir="rtl">
