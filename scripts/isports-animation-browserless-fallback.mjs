@@ -32,39 +32,58 @@ function canonicalAnimationUrl(providerMatchId) {
 }
 
 function endpointToUrl(endpointValue, tokenValue, suffix) {
-  const endpoint = String(endpointValue || '').trim().replace(/\/$/, '');
+  const raw = String(endpointValue || '').trim();
   const token = String(tokenValue || '').trim();
-  if (!endpoint) return '';
-  const finalEndpoint = endpoint.endsWith(suffix) || endpoint.endsWith(`/chromium${suffix}`) ? endpoint : `${endpoint}${suffix}`;
-  const url = new URL(finalEndpoint);
+  if (!raw) return '';
+
+  const url = new URL(raw);
+  let pathname = url.pathname.replace(/\/$/, '');
+  if (pathname.endsWith('/content') || pathname.endsWith('/function')) {
+    pathname = pathname.replace(/\/(content|function)$/, suffix);
+  } else if (pathname.endsWith('/chromium/content') || pathname.endsWith('/chromium/function')) {
+    pathname = pathname.replace(/\/chromium\/(content|function)$/, `/chromium${suffix}`);
+  } else if (!pathname.endsWith(suffix) && !pathname.endsWith(`/chromium${suffix}`)) {
+    pathname = `${pathname}${suffix}`;
+  }
+  url.pathname = pathname;
   if (token && !url.searchParams.has('token')) url.searchParams.set('token', token);
   return url.toString();
 }
 
+function uniqueCandidates(entries) {
+  const seen = new Set();
+  return entries
+    .filter(([, url]) => Boolean(url))
+    .filter(([, url]) => {
+      if (seen.has(url)) return false;
+      seen.add(url);
+      return true;
+    })
+    .map(([name, url]) => ({ name, url }));
+}
+
 function browserlessFunctionCandidates() {
-  const primaryExplicit = String(process.env.BROWSERLESS_FUNCTION_URL || process.env.BROWSERLESS_FUNCTION_ENDPOINT || '').trim();
-  const fallbackExplicit = String(process.env.BROWSERLESS_FALLBACK_FUNCTION_URL || process.env.BROWSERLESS_FALLBACK_FUNCTION_ENDPOINT || '').trim();
+  const primaryExplicit = endpointToUrl(process.env.BROWSERLESS_FUNCTION_URL || process.env.BROWSERLESS_FUNCTION_ENDPOINT, '', '/function');
+  const fallbackExplicit = endpointToUrl(process.env.BROWSERLESS_FALLBACK_FUNCTION_URL || process.env.BROWSERLESS_FALLBACK_FUNCTION_ENDPOINT, '', '/function');
   const primaryEndpoint = endpointToUrl(process.env.BROWSERLESS_ENDPOINT, process.env.BROWSERLESS_TOKEN, '/function');
   const fallbackEndpoint = endpointToUrl(process.env.BROWSERLESS_FALLBACK_ENDPOINT, process.env.BROWSERLESS_FALLBACK_TOKEN, '/function');
   const preferFallback = envBool('BROWSERLESS_PREFER_FALLBACK', false);
   const entries = preferFallback
     ? [['fallback_explicit', fallbackExplicit], ['fallback_endpoint', fallbackEndpoint], ['primary_explicit', primaryExplicit], ['primary_endpoint', primaryEndpoint]]
     : [['primary_explicit', primaryExplicit], ['primary_endpoint', primaryEndpoint], ['fallback_explicit', fallbackExplicit], ['fallback_endpoint', fallbackEndpoint]];
-  const seen = new Set();
-  return entries.filter(([, url]) => Boolean(url)).filter(([, url]) => { if (seen.has(url)) return false; seen.add(url); return true; }).map(([name, url]) => ({ name, url }));
+  return uniqueCandidates(entries);
 }
 
 function browserlessContentCandidates() {
-  const primaryExplicit = String(process.env.BROWSERLESS_CONTENT_URL || '').trim();
-  const fallbackExplicit = String(process.env.BROWSERLESS_FALLBACK_CONTENT_URL || '').trim();
+  const primaryExplicit = endpointToUrl(process.env.BROWSERLESS_CONTENT_URL, '', '/content');
+  const fallbackExplicit = endpointToUrl(process.env.BROWSERLESS_FALLBACK_CONTENT_URL, '', '/content');
   const primaryEndpoint = endpointToUrl(process.env.BROWSERLESS_ENDPOINT, process.env.BROWSERLESS_TOKEN, '/content');
   const fallbackEndpoint = endpointToUrl(process.env.BROWSERLESS_FALLBACK_ENDPOINT, process.env.BROWSERLESS_FALLBACK_TOKEN, '/content');
   const preferFallback = envBool('BROWSERLESS_PREFER_FALLBACK', false);
   const entries = preferFallback
     ? [['fallback_explicit', fallbackExplicit], ['fallback_endpoint', fallbackEndpoint], ['primary_explicit', primaryExplicit], ['primary_endpoint', primaryEndpoint]]
     : [['primary_explicit', primaryExplicit], ['primary_endpoint', primaryEndpoint], ['fallback_explicit', fallbackExplicit], ['fallback_endpoint', fallbackEndpoint]];
-  const seen = new Set();
-  return entries.filter(([, url]) => Boolean(url)).filter(([, url]) => { if (seen.has(url)) return false; seen.add(url); return true; }).map(([name, url]) => ({ name, url }));
+  return uniqueCandidates(entries);
 }
 
 function htmlToText(html) {
@@ -237,6 +256,7 @@ export async function fetchISportsAnimationBrowserlessText(providerMatchId) {
   let loader = '';
   let text = '';
   let htmlLength = 0;
+  let functionError = '';
   const jsonPayloads = [];
   const networkSamples = [];
 
@@ -254,6 +274,8 @@ export async function fetchISportsAnimationBrowserlessText(providerMatchId) {
           text += `\n${statLinesFromJsonPayload(parsed).join('\n')}`;
         }
       }
+    } else {
+      functionError = capture.error;
     }
   }
 
@@ -265,6 +287,9 @@ export async function fetchISportsAnimationBrowserlessText(providerMatchId) {
   }
 
   const debug = envBool('LIVE_INGEST_FALLBACK_DEBUG', false);
+  const debugParts = [`loader:${loader}`, `text:${truncate(text, 1200)}`];
+  if (functionError) debugParts.unshift(`function_error:${truncate(functionError, 500)}`);
+
   return {
     enabled: true,
     source: 'ISPORTS_ANIMATION_BROWSERLESS',
@@ -272,7 +297,7 @@ export async function fetchISportsAnimationBrowserlessText(providerMatchId) {
     hasText: text.length > 0,
     hasStats: false,
     text,
-    error: debug ? `debug_text_sample:${truncate(text, 1200)}` : null,
-    rawData: { sourceUrl, loader, htmlLength, textSample: truncate(text), jsonPayloads: jsonPayloads.slice(0, 5), networkSamples: networkSamples.slice(0, 10) },
+    error: debug ? `debug_${debugParts.join(' | ')}` : null,
+    rawData: { sourceUrl, loader, functionError, htmlLength, textSample: truncate(text), jsonPayloads: jsonPayloads.slice(0, 5), networkSamples: networkSamples.slice(0, 10) },
   };
 }
