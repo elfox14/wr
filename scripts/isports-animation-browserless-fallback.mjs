@@ -178,21 +178,80 @@ const FUNCTION_CAPTURE_CODE = `export default async function ({ page, context })
   await page.goto(url, { waitUntil: 'domcontentloaded', timeout: timeoutMs });
   await page.waitForTimeout(waitMs);
   const text = await page.evaluate(() => document.body ? document.body.innerText : '');
-  return { url, text, responses };
+  return { data: { url, text, responses }, type: 'application/json' };
 }`;
+
+function inlineFunctionCaptureCode(sourceUrl, waitMs, timeoutMs) {
+  const urlLiteral = JSON.stringify(sourceUrl);
+  const waitLiteral = Number(waitMs);
+  const timeoutLiteral = Number(timeoutMs);
+  return `export default async function ({ page }) {
+    const url = ${urlLiteral};
+    const waitMs = ${waitLiteral};
+    const timeoutMs = ${timeoutLiteral};
+    const responses = [];
+    const maxResponses = 20;
+    page.on('response', async (response) => {
+      if (responses.length >= maxResponses) return;
+      const responseUrl = response.url();
+      const contentType = response.headers()['content-type'] || '';
+      const interesting = /json|javascript|text|event-stream/i.test(contentType) || /match|stats|stat|event|live|animation|football|score|timeline|socket|analysis/i.test(responseUrl);
+      if (!interesting) return;
+      try {
+        const text = await response.text();
+        if (!text || text.length > 250000) return;
+        responses.push({ url: responseUrl, status: response.status(), contentType, text: text.slice(0, 12000) });
+      } catch {}
+    });
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: timeoutMs });
+    await page.waitForTimeout(waitMs);
+    const text = await page.evaluate(() => document.body ? document.body.innerText : '');
+    return { data: { url, text, responses }, type: 'application/json' };
+  }`;
+}
+
+function unwrapFunctionResponse(body) {
+  const parsed = tryJson(body);
+  const value = parsed?.data || parsed?.result || parsed;
+  return value || { text: body, responses: [] };
+}
+
+async function postFunctionRequest(functionUrl, mode, body) {
+  const response = await fetch(functionUrl, {
+    method: 'POST',
+    headers: {
+      'Content-Type': mode === 'javascript' ? 'application/javascript' : 'application/json',
+      accept: 'application/json,text/plain,*/*',
+    },
+    body,
+  });
+  const text = await response.text();
+  if (!response.ok) throw new Error(`${mode} ${response.status}: ${truncate(text, 600)}`);
+  return unwrapFunctionResponse(text);
+}
 
 async function fetchFunctionCaptureFrom(functionUrl, sourceUrl) {
   const timeoutMs = envNumber('BROWSERLESS_FALLBACK_TIMEOUT_MS', 18000, 5000, 55000);
   const waitMs = envNumber('BROWSERLESS_FALLBACK_WAIT_MS', 4000, 1000, 20000);
-  const response = await fetch(functionUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', accept: 'application/json,text/plain' },
-    body: JSON.stringify({ code: FUNCTION_CAPTURE_CODE, context: { url: sourceUrl, waitMs, timeoutMs } }),
-  });
-  const body = await response.text();
-  if (!response.ok) throw new Error(`Browserless function failed ${response.status}: ${truncate(body, 600)}`);
-  const parsed = tryJson(body);
-  return parsed?.data || parsed?.result || parsed || { text: body, responses: [] };
+  const errors = [];
+
+  try {
+    return await postFunctionRequest(
+      functionUrl,
+      'json',
+      JSON.stringify({ code: FUNCTION_CAPTURE_CODE, context: { url: sourceUrl, waitMs, timeoutMs } }),
+    );
+  } catch (error) {
+    errors.push(error?.message || String(error));
+  }
+
+  try {
+    return await postFunctionRequest(functionUrl, 'javascript', inlineFunctionCaptureCode(sourceUrl, waitMs, timeoutMs));
+  } catch (error) {
+    errors.push(error?.message || String(error));
+  }
+
+  throw new Error(`Browserless function failed: ${errors.join(' | ')}`);
 }
 
 async function fetchFunctionCapture(sourceUrl) {
