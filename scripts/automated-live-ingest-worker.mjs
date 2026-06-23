@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import { fetchISportsAnimationBrowserlessText } from './isports-animation-browserless-fallback.mjs';
 
 const prisma = new PrismaClient();
 
@@ -60,7 +61,7 @@ function iSportsBaseUrl() {
 
 function num(value) {
   if (value === null || value === undefined || value === '') return null;
-  const n = Number(typeof value === 'string' ? value.replace('%', '').trim() : value);
+  const n = Number(typeof value === 'string' ? value.replace('%', '').replace(/[^0-9.-]/g, '').trim() : value);
   return Number.isFinite(n) ? Math.round(n) : null;
 }
 
@@ -70,6 +71,10 @@ function firstNumber(...values) {
     if (n !== null) return n;
   }
   return null;
+}
+
+function emptyStats() {
+  return Object.fromEntries(LIVE_STAT_FIELDS.map((field) => [field, null]));
 }
 
 function asObject(value) {
@@ -139,7 +144,7 @@ function applyStatLabel(stats, rawLabel, homeValue, awayValue) {
 }
 
 function normalizeStats(payload) {
-  const stats = Object.fromEntries(LIVE_STAT_FIELDS.map((field) => [field, null]));
+  const stats = emptyStats();
   stats.minute = null;
   const roots = [
     payload,
@@ -192,6 +197,86 @@ function hasUsefulStats(stats) {
   return LIVE_STAT_FIELDS.some((field) => field !== 'homeScore' && field !== 'awayScore' && stats[field] !== null && stats[field] !== undefined);
 }
 
+function textLines(text) {
+  return String(text || '').split(/\n|\r|\t/).map((line) => line.trim()).filter(Boolean);
+}
+
+function isNumberToken(value) {
+  return /^-?\d{1,4}%?$/.test(String(value || '').trim());
+}
+
+function isStatBlocker(value) {
+  const line = String(value || '').trim().toLowerCase();
+  return !line || ['undefined', 'no data', 'vs', 'ended', 'kick-off', 'statistics', 'days', 'hrs', 'hours', 'mins', 'secs', 'possession'].includes(line) || line.includes('upgrade your plan');
+}
+
+function escapeRegExp(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function numberBefore(lines, index) {
+  for (let i = index - 1; i >= Math.max(0, index - 4); i -= 1) {
+    if (isStatBlocker(lines[i])) break;
+    if (isNumberToken(lines[i])) return num(lines[i]);
+  }
+  return null;
+}
+
+function numberAfter(lines, index) {
+  for (let i = index + 1; i <= Math.min(lines.length - 1, index + 4); i += 1) {
+    if (isStatBlocker(lines[i])) break;
+    if (isNumberToken(lines[i])) return num(lines[i]);
+  }
+  return null;
+}
+
+function findTextStatPair(text, labels) {
+  const compact = String(text || '').replace(/[\t\r\n]+/g, ' ');
+  for (const label of labels) {
+    const inline = compact.match(new RegExp(`(?:^|\\s)(-?\\d{1,4}%?)\\s+${escapeRegExp(label)}\\s+(-?\\d{1,4}%?)(?:\\s|$)`, 'i'));
+    if (inline) return { home: num(inline[1]), away: num(inline[2]) };
+  }
+  const lines = textLines(text);
+  for (const label of labels) {
+    const idx = lines.findIndex((line) => line.toLowerCase() === label.toLowerCase());
+    if (idx >= 0) {
+      if (isStatBlocker(lines[idx - 1]) || isStatBlocker(lines[idx + 1])) return null;
+      const home = numberBefore(lines, idx);
+      const away = numberAfter(lines, idx);
+      if (home !== null || away !== null) return { home, away };
+    }
+  }
+  return null;
+}
+
+function normalizeAnimationTextStats(text, match) {
+  const stats = emptyStats();
+  stats.minute = firstNumber(String(text || '').match(/(?:^|\s)(\d{1,3})\s*[`'′]\s*(?:\n|\s|$)/)?.[1], String(text || '').match(/(?:minute|min|time)\D{0,8}(\d{1,3})/i)?.[1]);
+  const score = String(text || '').match(/(?:^|\s)(\d{1,2})\s*[:]\s*(\d{1,2})(?:\s|$)/);
+  stats.homeScore = firstNumber(score?.[1], match?.homeScore);
+  stats.awayScore = firstNumber(score?.[2], match?.awayScore);
+
+  const mapping = [
+    ['homePossession', 'awayPossession', ['Poss', 'Possession', 'Ball Possession']],
+    ['homeAttacks', 'awayAttacks', ['ATT', 'Attack', 'Attacks']],
+    ['homeDangerousAttacks', 'awayDangerousAttacks', ['D-ATT', 'D ATT', 'Dangerous Attack', 'Dangerous Attacks']],
+    ['homeShots', 'awayShots', ['Shots', 'Shot']],
+    ['homeShotsOnTarget', 'awayShotsOnTarget', ['On-TGT', 'On TGT', 'On Target', 'Shots on Target']],
+    ['homeShotsOffTarget', 'awayShotsOffTarget', ['Off-TGT', 'Off TGT', 'Off Target']],
+    ['homeCorners', 'awayCorners', ['Corner', 'Corners', 'CK']],
+    ['homeYellowCards', 'awayYellowCards', ['Yellow', 'Yellow Cards']],
+    ['homeRedCards', 'awayRedCards', ['Red', 'Red Cards']],
+  ];
+  for (const [homeField, awayField, labels] of mapping) {
+    const pair = findTextStatPair(text, labels);
+    if (pair) {
+      stats[homeField] = pair.home;
+      stats[awayField] = pair.away;
+    }
+  }
+  return stats;
+}
+
 function providerError(payload) {
   const code = payload?.code ?? payload?.status_code ?? payload?.status;
   if (code === undefined || code === null) return Boolean(payload?.error || payload?.errors);
@@ -227,18 +312,7 @@ async function fetchIsportsAnalysis(providerMatchId) {
 
 function statusFromRaw(payload, stats, match) {
   const root = asObject(payload);
-  const candidates = [
-    root.status,
-    root.providerStatus,
-    root.matchState,
-    root.match_status,
-    root.fixture?.status?.short,
-    root.fixture?.status?.long,
-    root.data?.status,
-    root.response?.[0]?.fixture?.status?.short,
-    root.response?.[0]?.fixture?.status?.long,
-  ].filter((value) => value !== undefined && value !== null && value !== '');
-
+  const candidates = [root.status, root.providerStatus, root.matchState, root.match_status, root.fixture?.status?.short, root.fixture?.status?.long, root.data?.status, root.response?.[0]?.fixture?.status?.short, root.response?.[0]?.fixture?.status?.long].filter((value) => value !== undefined && value !== null && value !== '');
   for (const candidate of candidates) {
     const value = String(candidate).trim().toUpperCase().replace(/[\s-]+/g, '_');
     if (['FINISHED', 'FT', 'COMPLETED', 'ENDED', '-1'].includes(value)) return 'FINISHED';
@@ -247,7 +321,6 @@ function statusFromRaw(payload, stats, match) {
     if (['1H', 'FIRST_HALF', 'LIVE', 'IN_PLAY'].includes(value)) return Number(stats.minute || 0) >= 46 ? '2H' : '1H';
     if (['SCHEDULED', 'TIMED', 'NOT_STARTED', 'NS', '0'].includes(value)) return 'SCHEDULED';
   }
-
   if (Number(stats.minute || 0) > 0) return Number(stats.minute || 0) >= 46 ? '2H' : '1H';
   return match.status;
 }
@@ -268,25 +341,15 @@ function deltaEvent(previous, stats, field, side, type, label, minDelta = 1) {
   const after = n(stats[field]);
   if (after === null || before === null || after - before < minDelta) return null;
   const diff = after - before;
-  return {
-    minute: stats.minute,
-    type,
-    teamSide: side,
-    detail: `${label}${diff > 1 ? ` +${diff}` : ''} (الإجمالي ${after})`,
-    sourceName: 'Automated Live Ingest Worker',
-  };
+  return { minute: stats.minute, type, teamSide: side, detail: `${label}${diff > 1 ? ` +${diff}` : ''} (الإجمالي ${after})`, sourceName: 'Automated Live Ingest Worker' };
 }
 
 function generateEvents(match, previous, stats) {
   const events = [];
   const prevHomeScore = previous ? n(previous.homeScore) : n(match.homeScore);
   const prevAwayScore = previous ? n(previous.awayScore) : n(match.awayScore);
-  if (prevHomeScore !== null && stats.homeScore !== null && stats.homeScore > prevHomeScore) {
-    events.push({ minute: stats.minute, type: 'goal', teamSide: 'home', detail: `هدف لـ ${teamName(match, 'home')} — النتيجة ${stats.homeScore}-${stats.awayScore ?? prevAwayScore ?? 0}`, sourceName: 'Automated Live Ingest Worker' });
-  }
-  if (prevAwayScore !== null && stats.awayScore !== null && stats.awayScore > prevAwayScore) {
-    events.push({ minute: stats.minute, type: 'goal', teamSide: 'away', detail: `هدف لـ ${teamName(match, 'away')} — النتيجة ${stats.homeScore ?? prevHomeScore ?? 0}-${stats.awayScore}`, sourceName: 'Automated Live Ingest Worker' });
-  }
+  if (prevHomeScore !== null && stats.homeScore !== null && stats.homeScore > prevHomeScore) events.push({ minute: stats.minute, type: 'goal', teamSide: 'home', detail: `هدف لـ ${teamName(match, 'home')} — النتيجة ${stats.homeScore}-${stats.awayScore ?? prevAwayScore ?? 0}`, sourceName: 'Automated Live Ingest Worker' });
+  if (prevAwayScore !== null && stats.awayScore !== null && stats.awayScore > prevAwayScore) events.push({ minute: stats.minute, type: 'goal', teamSide: 'away', detail: `هدف لـ ${teamName(match, 'away')} — النتيجة ${stats.homeScore ?? prevHomeScore ?? 0}-${stats.awayScore}`, sourceName: 'Automated Live Ingest Worker' });
   const candidates = [
     deltaEvent(previous, stats, 'homeShotsOnTarget', 'home', 'shot_on_target', `تسديدة على المرمى لـ ${teamName(match, 'home')}`),
     deltaEvent(previous, stats, 'awayShotsOnTarget', 'away', 'shot_on_target', `تسديدة على المرمى لـ ${teamName(match, 'away')}`),
@@ -321,39 +384,22 @@ async function candidateMatches() {
   const finishedSince = new Date(now - finishedHours * 60 * 60 * 1000);
 
   return prisma.match.findMany({
-    where: {
-      animationMatchId: { not: null },
-      OR: [
-        { status: { in: LIVE_STATUSES } },
-        { status: 'SCHEDULED', matchDate: { gte: liveStart, lte: liveEnd } },
-        ...(finishedHours > 0 ? [{ status: { in: FINISHED_STATUSES }, matchDate: { gte: finishedSince } }] : []),
-      ],
-    },
-    include: {
-      homeTeam: { select: { id: true, name: true, code: true } },
-      awayTeam: { select: { id: true, name: true, code: true } },
-    },
+    where: { animationMatchId: { not: null }, OR: [{ status: { in: LIVE_STATUSES } }, { status: 'SCHEDULED', matchDate: { gte: liveStart, lte: liveEnd } }, ...(finishedHours > 0 ? [{ status: { in: FINISHED_STATUSES }, matchDate: { gte: finishedSince } }] : [])] },
+    include: { homeTeam: { select: { id: true, name: true, code: true } }, awayTeam: { select: { id: true, name: true, code: true } } },
     orderBy: { matchDate: 'asc' },
     take: limit,
   });
 }
 
 async function latestWorkerSnapshot(matchId) {
-  return prisma.matchStatsSnapshot.findFirst({
-    where: { matchId, provider: { in: ['WORKER_ISPORTS', 'AUTOMATED_LIVE_INGEST'] } },
-    orderBy: { capturedAt: 'desc' },
-  });
+  return prisma.matchStatsSnapshot.findFirst({ where: { matchId, provider: { in: ['WORKER_ISPORTS', 'ISPORTS_ANIMATION_BROWSERLESS', 'AUTOMATED_LIVE_INGEST'] } }, orderBy: { capturedAt: 'desc' } });
 }
 
 async function postIngest(payload) {
   const secret = ingestSecret();
   if (!secret) throw new Error('LIVE_INGEST_SECRET/ADMIN_API_SECRET/CRON_SECRET is missing');
   const url = `${appBaseUrl()}/api/internal/live-ingest/match-snapshot`;
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-live-ingest-secret': secret },
-    body: JSON.stringify(payload),
-  });
+  const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-live-ingest-secret': secret }, body: JSON.stringify(payload) });
   const text = await response.text();
   let data = null;
   try { data = JSON.parse(text); } catch { data = { raw: text }; }
@@ -368,43 +414,52 @@ function recentSnapshotSkip(match, latest) {
   return { matchId: match.id, providerMatchId: match.animationMatchId, status: 'skipped_recent_snapshot', ageSeconds: Math.round(ageSeconds), minIntervalSeconds };
 }
 
+async function maybeAnimationBrowserlessFallback(match, currentStats) {
+  if (hasUsefulStats(currentStats)) return null;
+  const fallback = await fetchISportsAnimationBrowserlessText(match.animationMatchId);
+  if (!fallback?.enabled) return fallback;
+  const fallbackStats = normalizeAnimationTextStats(fallback.text || '', match);
+  return { ...fallback, stats: fallbackStats, hasStats: hasUsefulStats(fallbackStats) };
+}
+
 async function processMatch(match, latest) {
   const raw = await fetchIsportsAnalysis(match.animationMatchId);
-  const stats = normalizeStats(raw);
+  let stats = normalizeStats(raw);
   if (stats.homeScore === null) stats.homeScore = match.homeScore;
   if (stats.awayScore === null) stats.awayScore = match.awayScore;
 
-  const saveEmpty = envBool('LIVE_INGEST_SAVE_EMPTY', false);
-  if (!hasUsefulStats(stats) && !saveEmpty) {
-    return { matchId: match.id, providerMatchId: match.animationMatchId, status: 'skipped_no_useful_stats', stats };
+  let sourceProvider = 'WORKER_ISPORTS';
+  let rawData = raw;
+  let fallbackStatus = null;
+
+  if (!hasUsefulStats(stats) && envBool('LIVE_INGEST_USE_BROWSERLESS_FALLBACK', false)) {
+    try {
+      const fallback = await maybeAnimationBrowserlessFallback(match, stats);
+      fallbackStatus = fallback ? { enabled: fallback.enabled, source: fallback.source, hasStats: fallback.hasStats, hasText: fallback.hasText, sourceUrl: fallback.sourceUrl, error: fallback.error || null } : null;
+      if (fallback?.hasStats) {
+        stats = fallback.stats;
+        if (stats.homeScore === null) stats.homeScore = match.homeScore;
+        if (stats.awayScore === null) stats.awayScore = match.awayScore;
+        sourceProvider = 'ISPORTS_ANIMATION_BROWSERLESS';
+        rawData = fallback.rawData;
+      }
+    } catch (error) {
+      fallbackStatus = { enabled: true, source: 'ISPORTS_ANIMATION_BROWSERLESS', hasStats: false, error: error?.message || String(error) };
+    }
   }
 
-  const providerStatus = statusFromRaw(raw, stats, match);
+  const saveEmpty = envBool('LIVE_INGEST_SAVE_EMPTY', false);
+  if (!hasUsefulStats(stats) && !saveEmpty) {
+    return { matchId: match.id, providerMatchId: match.animationMatchId, status: 'skipped_no_useful_stats', stats, fallbackStatus };
+  }
+
+  const providerStatus = statusFromRaw(rawData, stats, match);
   const events = generateEvents(match, latest, stats);
   const includeRaw = envBool('LIVE_INGEST_INCLUDE_RAW', false);
-  const ingestPayload = {
-    matchId: match.id,
-    animationMatchId: match.animationMatchId,
-    provider: 'WORKER_ISPORTS',
-    providerMatchId: match.animationMatchId,
-    status: providerStatus,
-    minute: stats.minute,
-    stats,
-    events,
-    ...(includeRaw ? { rawData: raw } : {}),
-  };
+  const ingestPayload = { matchId: match.id, animationMatchId: match.animationMatchId, provider: sourceProvider, providerMatchId: match.animationMatchId, status: providerStatus, minute: stats.minute, stats, events, ...(includeRaw ? { rawData } : {}) };
 
   const saved = await postIngest(ingestPayload);
-  return {
-    matchId: match.id,
-    providerMatchId: match.animationMatchId,
-    status: 'saved',
-    providerStatus,
-    minute: stats.minute,
-    hasUsefulStats: hasUsefulStats(stats),
-    savedEventsCount: saved.savedEventsCount ?? 0,
-    snapshotId: saved.snapshot?.id,
-  };
+  return { matchId: match.id, providerMatchId: match.animationMatchId, status: 'saved', sourceProvider, providerStatus, minute: stats.minute, hasUsefulStats: hasUsefulStats(stats), savedEventsCount: saved.savedEventsCount ?? 0, snapshotId: saved.snapshot?.id, fallbackStatus };
 }
 
 async function runOnce() {
@@ -417,14 +472,8 @@ async function runOnce() {
   for (const match of matches) {
     const latest = await latestWorkerSnapshot(match.id);
     const skip = recentSnapshotSkip(match, latest);
-    if (skip) {
-      processed.push(skip);
-      continue;
-    }
-    if (externalRequests >= maxRequests) {
-      processed.push({ matchId: match.id, providerMatchId: match.animationMatchId, status: 'skipped_run_request_limit' });
-      continue;
-    }
+    if (skip) { processed.push(skip); continue; }
+    if (externalRequests >= maxRequests) { processed.push({ matchId: match.id, providerMatchId: match.animationMatchId, status: 'skipped_run_request_limit' }); continue; }
     try {
       externalRequests += 1;
       processed.push(await processMatch(match, latest));
