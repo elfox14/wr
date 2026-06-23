@@ -117,6 +117,19 @@ function statusLabel(status: string) {
   return 'منشور';
 }
 
+function newsTags(value: unknown) {
+  if (Array.isArray(value)) return value.map(String).filter(Boolean);
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value);
+      if (Array.isArray(parsed)) return parsed.map(String).filter(Boolean);
+    } catch {
+      return value.split(',').map((tag) => tag.trim()).filter(Boolean);
+    }
+  }
+  return [];
+}
+
 type NewsPageProps = {
   searchParams: Promise<{ category?: string; status?: string }>;
 };
@@ -168,6 +181,7 @@ export default async function NewsPage({ searchParams }: NewsPageProps) {
 
   const heroItem = newsItems[0];
   const heroMeta = heroItem ? getPressNewsMeta(heroItem.tags, heroItem.title) : null;
+  const heroTags = newsTags(heroItem?.tags);
   const heroMatchUrl = heroItem ? matchCenterUrl(heroItem) : '';
   const listItems = newsItems.slice(1);
   const isMatchCenterCategory = currentCategory === MATCH_CENTER_ANALYSIS_CATEGORY;
@@ -267,7 +281,7 @@ export default async function NewsPage({ searchParams }: NewsPageProps) {
               <h2 className="text-3xl font-black leading-tight text-white transition group-hover:text-[#0FF0FC] md:text-4xl">{heroItem.title}</h2>
               <p className="mt-4 line-clamp-4 text-sm leading-7 text-gray-400">{heroItem.body}</p>
               <div className="mt-5 flex flex-wrap gap-2">
-                {(heroMeta?.tags || []).slice(0, 5).map((tag: string) => <span key={tag} className="rounded-xl bg-black/30 px-3 py-1.5 text-xs font-bold text-gray-400">#{tag}</span>)}
+                {heroTags.slice(0, 5).map((tag: string) => <span key={tag} className="rounded-xl bg-black/30 px-3 py-1.5 text-xs font-bold text-gray-400">#{tag}</span>)}
               </div>
             </Link>
 
@@ -286,6 +300,7 @@ export default async function NewsPage({ searchParams }: NewsPageProps) {
         <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {listItems.map((item) => {
             const meta = getPressNewsMeta(item.tags, item.title);
+            const tags = newsTags(item.tags);
             const matchUrl = matchCenterUrl(item);
             return (
               <article key={item.id} className="rounded-3xl border border-white/10 bg-white/[0.035] p-5 transition hover:border-white/20 hover:bg-white/[0.055]">
@@ -299,12 +314,12 @@ export default async function NewsPage({ searchParams }: NewsPageProps) {
                 </Link>
                 <p className="mt-3 line-clamp-3 text-sm leading-7 text-gray-500">{item.body}</p>
                 <div className="mt-4 flex flex-wrap gap-2">
-                  {(meta?.tags || []).slice(0, 3).map((tag: string) => <span key={tag} className="rounded-lg bg-black/25 px-2 py-1 text-[10px] font-bold text-gray-500">#{tag}</span>)}
+                  {tags.slice(0, 3).map((tag: string) => <span key={tag} className="rounded-lg bg-black/25 px-2 py-1 text-[10px] font-bold text-gray-500">#{tag}</span>)}
                 </div>
                 <div className="mt-5 flex items-center justify-between gap-3 border-t border-white/10 pt-4">
                   <Link href={`/news/${item.id}`} className="text-xs font-black text-[#0FF0FC]">قراءة التفاصيل</Link>
                   <div className="flex items-center gap-2">
-                    <NewsStatusButton id={item.id} status={item.status || 'published'} canManage={canViewAdminStatus} />
+                    {canViewAdminStatus && <NewsStatusButton id={item.id} currentStatus={item.status || 'published'} targetStatus={item.status === 'published' ? 'archived' : 'published'} compact />}
                     {matchUrl && <Link href={matchUrl} className="rounded-xl bg-[#FFD700]/10 px-3 py-2 text-[11px] font-black text-[#FFD700]">مركز المباراة</Link>}
                     {item.sourceUrl && !matchUrl && <a href={item.sourceUrl} target="_blank" rel="noreferrer" className="text-gray-500 hover:text-white"><ExternalLink size={15} /></a>}
                   </div>
