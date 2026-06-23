@@ -6,6 +6,7 @@ import prisma from '@/lib/prisma';
 import { authOptions } from '@/lib/auth';
 import AdSenseBanner from '@/components/ads/AdSenseBanner';
 import NewsStatusButton from '@/components/news/NewsStatusButton';
+import { MATCH_CENTER_ANALYSIS_CATEGORY } from '@/lib/press-news/constants';
 import { ensureWorldCup2026OpeningNews, getPressNewsMeta } from '@/lib/press-news/world-cup-2026-opening-news';
 
 export const dynamic = 'force-dynamic';
@@ -16,8 +17,6 @@ export const metadata: Metadata = {
   description: 'متابعة حية وشاملة لآخر أخبار مباريات كأس العالم، تحليلات المنتخبات واللاعبين، وتقارير موثقة قابلة للمشاركة.',
   keywords: ['أخبار كأس العالم', 'تحليل مباريات المونديال', 'كأس العالم 2026', 'ميسي', 'هالاند', 'مبابي', 'بورصة المونديال'],
 };
-
-export const MATCH_CENTER_ANALYSIS_CATEGORY = 'تحليل صفحة المباراة';
 
 const CATEGORIES = [
   { key: 'all', label: 'كل الأخبار' },
@@ -249,182 +248,81 @@ export default async function NewsPage({ searchParams }: NewsPageProps) {
         )}
 
         {isMatchCenterCategory && (
-          <section className="rounded-2xl border border-[#FFD700]/15 bg-[#FFD700]/5 p-5 text-sm font-bold leading-7 text-gray-300">
-            هذا تصنيف مؤقت للمقالات الحصرية المولّدة من صفحة المباراة. المقال هنا يجب أن يعتمد على النتيجة، الأحداث بالدقيقة، الإحصائيات، مؤشر الضغط، والزخم؛ وليس على نصوص عامة أو شرح طريقة كتابة المقال.
-          </section>
-        )}
-
-        {heroItem ? (
-          <article className="group relative overflow-hidden rounded-[2rem] border border-white/10 bg-gradient-to-br from-white/[0.06] to-white/[0.01] transition-all hover:border-[#0FF0FC]/30">
-            <div className="grid gap-6 p-6 md:grid-cols-2 md:p-8 lg:gap-10">
-              <div className="flex flex-col justify-between space-y-4">
-                <div className="space-y-3">
-                  <div className="flex flex-wrap items-center gap-3">
-                    <span className="rounded-xl bg-[#FFD700]/10 border border-[#FFD700]/25 px-3 py-1 text-[11px] font-black text-[#FFD700]">
-                      {heroItem.category}
-                    </span>
-                    {canViewAdminStatus && heroItem.status !== 'published' && (
-                      <span className="rounded-xl border border-[#FFD700]/25 bg-[#FFD700]/10 px-3 py-1 text-[11px] font-black text-[#FFD700]">
-                        {statusLabel(heroItem.status)}
-                      </span>
-                    )}
-                    <span className="text-xs font-bold text-gray-500 flex items-center gap-1">
-                      <Clock size={12} /> {formatDate(heroItem.publishedAt)}
-                    </span>
-                    {heroMatchUrl && (
-                      <span className="rounded-xl border border-[#0FF0FC]/20 bg-[#0FF0FC]/10 px-3 py-1 text-[11px] font-black text-[#0FF0FC]">
-                        مرتبط بصفحة مباراة
-                      </span>
-                    )}
-                  </div>
-                  <h2 className="text-2xl font-black leading-tight text-white transition-colors group-hover:text-[#0FF0FC] md:text-4xl">
-                    <Link href={`/news/${heroItem.id}`}>{heroItem.title}</Link>
-                  </h2>
-                  <p className="line-clamp-4 text-sm font-bold leading-7 text-gray-400">
-                    {heroItem.body}
-                  </p>
-                </div>
-                <div className="flex flex-wrap items-center justify-between gap-3 border-t border-white/5 pt-4">
-                  <span className="text-xs font-bold text-gray-500">
-                    المصدر: <span className="text-gray-300">{heroItem.sourceName}</span>
-                  </span>
-                  <div className="flex flex-wrap gap-2">
-                    {canViewAdminStatus && heroItem.status !== 'published' && (
-                      <NewsStatusButton id={heroItem.id} currentStatus={heroItem.status} targetStatus="published" />
-                    )}
-                    {canViewAdminStatus && heroItem.status === 'published' && (
-                      <NewsStatusButton id={heroItem.id} currentStatus={heroItem.status} targetStatus="archived" />
-                    )}
-                    {heroMatchUrl && (
-                      <Link
-                        href={heroMatchUrl}
-                        className="inline-flex items-center gap-2 rounded-xl border border-[#FFD700]/25 bg-[#FFD700]/10 px-4 py-2.5 text-xs font-black text-[#FFD700] transition-all hover:bg-[#FFD700] hover:text-black"
-                      >
-                        <ExternalLink size={14} /> فتح المباراة
-                      </Link>
-                    )}
-                    <Link
-                      href={`/news/${heroItem.id}`}
-                      className="inline-flex items-center gap-2 rounded-xl bg-white/10 px-4 py-2.5 text-xs font-black text-white transition-all hover:bg-[#0FF0FC] hover:text-black"
-                    >
-                      <BookOpen size={14} /> قراءة التحليل بالكامل
-                    </Link>
-                  </div>
-                </div>
-              </div>
-
-              <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-black/40 md:min-h-full">
-                {heroMeta?.image ? (
-                  <img
-                    src={heroMeta.image}
-                    alt={heroMeta.imageAlt || heroItem.title}
-                    className="h-full min-h-[240px] w-full object-cover transition-transform duration-500 group-hover:scale-105"
-                    loading="eager"
-                  />
-                ) : (
-                  <div className="flex min-h-[240px] items-center justify-center p-6 text-center">
-                    <div className="space-y-2">
-                      <Newspaper size={48} className="mx-auto text-[#0FF0FC] opacity-40" />
-                      <p className="text-xs font-black text-[#0FF0FC] tracking-widest">MC PRIME ANALYSIS</p>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          </article>
-        ) : (
-          <div className="rounded-2xl border border-dashed border-white/10 bg-black/20 p-12 text-center">
-            <Newspaper size={48} className="mx-auto text-gray-500 opacity-30 mb-3" />
-            <h3 className="text-lg font-black text-white">لا توجد أخبار منشورة</h3>
-            <p className="mt-2 text-sm font-bold text-gray-500">
-              {isDraftView
-                ? 'لا توجد مسودات مطابقة لهذا التصنيف حاليًا.'
-                : isArchiveView
-                  ? 'لا توجد مقالات مؤرشفة مطابقة لهذا التصنيف حاليًا.'
-                  : isMatchCenterCategory
-                    ? 'سيظهر هنا أي مقال يتم إنشاؤه من صفحة المباراة عند حفظه تحت تصنيف تحليل صفحة المباراة.'
-                    : 'اختر تصنيفًا آخر أو تصفح في وقت لاحق.'}
+          <section className="rounded-2xl border border-[#FFD700]/20 bg-[#FFD700]/5 p-4">
+            <h2 className="mb-2 text-lg font-black text-[#FFD700] flex items-center gap-2"><BookOpen size={18} /> تحليلات صفحة المباراة</h2>
+            <p className="text-sm leading-7 text-gray-300">
+              هذه المقالات مبنية على بيانات صفحة المباراة: الإحصائيات، الأحداث، الزخم، ترتيب المجموعة، وأفضل الثوالث. يتم نشرها بعد مراجعة المصادر.
             </p>
-          </div>
-        )}
-
-        {heroItem && currentStatus === 'published' && (
-          <AdSenseBanner slot="1234567890" format="horizontal" className="my-4" />
-        )}
-
-        {listItems.length > 0 && (
-          <section className="space-y-6">
-            <h2 className="text-xl font-black text-white flex items-center gap-2 border-r-4 border-[#0FF0FC] pr-3">
-              آخر التحليلات والمستجدات
-            </h2>
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-              {listItems.map((item) => {
-                const itemMeta = getPressNewsMeta(item.tags, item.title);
-                const itemMatchUrl = matchCenterUrl(item);
-                return (
-                  <article
-                    key={item.id}
-                    className="flex flex-col overflow-hidden rounded-2xl border border-white/8 bg-white/[0.02] transition-all hover:border-[#FFD700]/30 hover:bg-white/[0.04]"
-                  >
-                    {itemMeta.image && (
-                      <Link href={`/news/${item.id}`} className="block overflow-hidden border-b border-white/5 bg-black/30">
-                        <img
-                          src={itemMeta.image}
-                          alt={itemMeta.imageAlt || item.title}
-                          className="h-44 w-full object-cover transition-transform duration-500 hover:scale-105"
-                          loading="lazy"
-                        />
-                      </Link>
-                    )}
-                    <div className="flex flex-1 flex-col justify-between p-5">
-                      <div className="space-y-3">
-                        <div className="flex items-center justify-between text-[10px] font-black text-gray-500">
-                          <span className="rounded-lg bg-white/5 border border-white/10 px-2 py-0.5 text-gray-300">
-                            {item.category}
-                          </span>
-                          <span>{formatDate(item.publishedAt)}</span>
-                        </div>
-                        {canViewAdminStatus && item.status !== 'published' && (
-                          <span className="inline-flex rounded-lg border border-[#FFD700]/20 bg-[#FFD700]/10 px-2 py-1 text-[10px] font-black text-[#FFD700]">
-                            {statusLabel(item.status)}
-                          </span>
-                        )}
-                        {itemMatchUrl && (
-                          <Link
-                            href={itemMatchUrl}
-                            className="inline-flex items-center gap-1 rounded-lg border border-[#FFD700]/20 bg-[#FFD700]/10 px-2 py-1 text-[10px] font-black text-[#FFD700] hover:bg-[#FFD700] hover:text-black"
-                          >
-                            <ExternalLink size={12} /> فتح المباراة
-                          </Link>
-                        )}
-                        <h3 className="line-clamp-2 font-black leading-7 text-white transition-colors hover:text-[#FFD700]">
-                          <Link href={`/news/${item.id}`}>{item.title}</Link>
-                        </h3>
-                        <p className="line-clamp-3 text-xs font-bold leading-6 text-gray-400">
-                          {item.body}
-                        </p>
-                      </div>
-                      <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-white/5 pt-3 text-xs font-bold text-gray-500">
-                        <span>{item.sourceName}</span>
-                        <div className="flex flex-wrap items-center gap-2">
-                          {canViewAdminStatus && item.status !== 'published' && (
-                            <NewsStatusButton id={item.id} currentStatus={item.status} targetStatus="published" compact />
-                          )}
-                          {canViewAdminStatus && item.status === 'published' && (
-                            <NewsStatusButton id={item.id} currentStatus={item.status} targetStatus="archived" compact />
-                          )}
-                          <Link href={`/news/${item.id}`} className="text-[#0FF0FC] hover:underline flex items-center gap-1">
-                            التفاصيل ←
-                          </Link>
-                        </div>
-                      </div>
-                    </div>
-                  </article>
-                );
-              })}
-            </div>
           </section>
         )}
+
+        {heroItem && (
+          <section className="grid gap-5 lg:grid-cols-[1.15fr_0.85fr]">
+            <Link href={`/news/${heroItem.id}`} className="group rounded-[2rem] border border-white/10 bg-white/[0.04] p-6 transition hover:border-[#0FF0FC]/40 hover:bg-white/[0.06]">
+              <div className="mb-4 flex flex-wrap items-center gap-2 text-xs font-black">
+                <span className="rounded-full bg-[#FFD700]/15 px-3 py-1.5 text-[#FFD700]">{heroItem.category}</span>
+                <span className="rounded-full bg-white/5 px-3 py-1.5 text-gray-400"><Clock size={12} className="inline" /> {formatDate(heroItem.publishedAt)}</span>
+                {heroItem.status !== 'published' && <span className="rounded-full border border-[#FFD700]/20 px-3 py-1.5 text-[#FFD700]">{statusLabel(heroItem.status)}</span>}
+              </div>
+              <h2 className="text-3xl font-black leading-tight text-white transition group-hover:text-[#0FF0FC] md:text-4xl">{heroItem.title}</h2>
+              <p className="mt-4 line-clamp-4 text-sm leading-7 text-gray-400">{heroItem.body}</p>
+              <div className="mt-5 flex flex-wrap gap-2">
+                {(heroMeta?.tags || []).slice(0, 5).map((tag: string) => <span key={tag} className="rounded-xl bg-black/30 px-3 py-1.5 text-xs font-bold text-gray-400">#{tag}</span>)}
+              </div>
+            </Link>
+
+            <aside className="rounded-[2rem] border border-white/10 bg-black/25 p-5">
+              <h3 className="mb-4 text-xl font-black text-white">روابط سريعة</h3>
+              <div className="space-y-3">
+                {heroMatchUrl && <Link href={heroMatchUrl} className="flex items-center justify-between rounded-2xl border border-[#0FF0FC]/20 bg-[#0FF0FC]/10 px-4 py-3 text-sm font-black text-[#0FF0FC]">فتح مركز المباراة <ExternalLink size={15} /></Link>}
+                {heroItem.sourceUrl && !heroMatchUrl && <a href={heroItem.sourceUrl} target="_blank" rel="noreferrer" className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm font-black text-gray-300">المصدر الأصلي <ExternalLink size={15} /></a>}
+                <Link href="/matches" className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm font-black text-gray-300">كل المباريات <ExternalLink size={15} /></Link>
+                <Link href="/groups" className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm font-black text-gray-300">ترتيب المجموعات <ExternalLink size={15} /></Link>
+              </div>
+            </aside>
+          </section>
+        )}
+
+        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {listItems.map((item) => {
+            const meta = getPressNewsMeta(item.tags, item.title);
+            const matchUrl = matchCenterUrl(item);
+            return (
+              <article key={item.id} className="rounded-3xl border border-white/10 bg-white/[0.035] p-5 transition hover:border-white/20 hover:bg-white/[0.055]">
+                <div className="mb-3 flex flex-wrap items-center gap-2 text-[11px] font-black">
+                  <span className="rounded-full bg-white/5 px-3 py-1 text-gray-400">{item.category}</span>
+                  <span className="rounded-full bg-black/30 px-3 py-1 text-gray-500">{formatDate(item.publishedAt)}</span>
+                  {item.status !== 'published' && <span className="rounded-full border border-[#FFD700]/20 px-3 py-1 text-[#FFD700]">{statusLabel(item.status)}</span>}
+                </div>
+                <Link href={`/news/${item.id}`} className="block">
+                  <h3 className="line-clamp-2 text-xl font-black leading-7 text-white hover:text-[#0FF0FC]">{item.title}</h3>
+                </Link>
+                <p className="mt-3 line-clamp-3 text-sm leading-7 text-gray-500">{item.body}</p>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {(meta?.tags || []).slice(0, 3).map((tag: string) => <span key={tag} className="rounded-lg bg-black/25 px-2 py-1 text-[10px] font-bold text-gray-500">#{tag}</span>)}
+                </div>
+                <div className="mt-5 flex items-center justify-between gap-3 border-t border-white/10 pt-4">
+                  <Link href={`/news/${item.id}`} className="text-xs font-black text-[#0FF0FC]">قراءة التفاصيل</Link>
+                  <div className="flex items-center gap-2">
+                    <NewsStatusButton id={item.id} status={item.status || 'published'} canManage={canViewAdminStatus} />
+                    {matchUrl && <Link href={matchUrl} className="rounded-xl bg-[#FFD700]/10 px-3 py-2 text-[11px] font-black text-[#FFD700]">مركز المباراة</Link>}
+                    {item.sourceUrl && !matchUrl && <a href={item.sourceUrl} target="_blank" rel="noreferrer" className="text-gray-500 hover:text-white"><ExternalLink size={15} /></a>}
+                  </div>
+                </div>
+              </article>
+            );
+          })}
+        </section>
+
+        {!newsItems.length && (
+          <section className="rounded-[2rem] border border-dashed border-white/10 bg-black/20 p-10 text-center">
+            <Newspaper size={42} className="mx-auto mb-3 text-gray-600" />
+            <h2 className="text-2xl font-black text-white">لا توجد أخبار في هذا التصنيف</h2>
+            <p className="mt-2 text-sm text-gray-500">جرّب تصنيفًا آخر أو ارجع لاحقًا بعد تحديث غرفة الأخبار.</p>
+          </section>
+        )}
+
+        <AdSenseBanner slot="news-list-bottom" format="auto" />
       </div>
     </main>
   );

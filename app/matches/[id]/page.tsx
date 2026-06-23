@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 
-export default async function MatchDetailRedirect({ params }: { params: Promise<{ id: string }> | { id: string } }) {
+export default async function MatchDetailRedirect({ params }: { params: Promise<{ id: string }> }) {
   const resolved = await params;
-  redirect(`/match-center/${resolved.id}`);
+  const safeId = encodeURIComponent(resolved.id);
+  redirect(`/match-center/${safeId}`);
 }

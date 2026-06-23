@@ -6,6 +6,7 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 type Choice = 'home' | 'draw' | 'away';
+type RouteContext = { params: Promise<{ id: string }> };
 const choices: Choice[] = ['home', 'draw', 'away'];
 
 function key(req: Request) {
@@ -32,13 +33,13 @@ async function mine(matchId: string, voterKey: string) {
   return rows[0]?.choice || null;
 }
 
-export async function GET(req: Request, { params }: { params: Promise<{ id: string }> | { id: string } }) {
+export async function GET(req: Request, { params }: RouteContext) {
   const { id } = await params;
   if (!id) return NextResponse.json({ ok: false }, { status: 400 });
   return NextResponse.json({ ok: true, matchId: id, totals: await totals(id), myVote: await mine(id, key(req)) }, { headers: { 'Cache-Control': 'no-store' } });
 }
 
-export async function POST(req: Request, { params }: { params: Promise<{ id: string }> | { id: string } }) {
+export async function POST(req: Request, { params }: RouteContext) {
   const { id } = await params;
   const body = await req.json().catch(() => ({}));
   const choice = String(body?.choice || '').toLowerCase() as Choice;
