@@ -35,6 +35,11 @@ function snapshotHasFullExtras(snapshot: any) {
   return shots > 0 || playerStats > 0 || lineups > 0;
 }
 
+function isRateLimitError(error: any) {
+  const text = `${error?.message || ''} ${error?.status || ''} ${error?.code || ''} ${JSON.stringify(error?.payload || {})}`.toLowerCase();
+  return text.includes('429') || text.includes('rate limit') || text.includes('too many requests');
+}
+
 async function alreadyHasRecentFullExtras(matchId: string, freshnessHours: number) {
   const since = new Date(Date.now() - freshnessHours * 60 * 60 * 1000);
   const snapshots = await prisma.matchStatsSnapshot.findMany({
@@ -65,6 +70,7 @@ async function run(req: Request) {
   const force = boolFrom(url.searchParams.get('force') || process.env.MATCH_EXTRAS_SYNC_FORCE, false);
   const dryRun = boolFrom(url.searchParams.get('dryRun') || process.env.MATCH_EXTRAS_SYNC_DRY_RUN, false);
   const includeRaw = boolFrom(url.searchParams.get('includeRaw') || process.env.MATCH_EXTRAS_INCLUDE_RAW, false);
+  const stopOnRateLimit = boolFrom(url.searchParams.get('stopOnRateLimit') || process.env.MATCH_EXTRAS_SYNC_STOP_ON_RATE_LIMIT, true);
 
   const since = new Date(Date.now() - lookbackDays * 24 * 60 * 60 * 1000);
   const candidates = await prisma.match.findMany({
@@ -79,9 +85,11 @@ async function run(req: Request) {
 
   const generated: any[] = [];
   const skipped: any[] = [];
+  let stoppedEarly: null | string = null;
 
   for (const match of candidates) {
     if (generated.length >= limit) break;
+    if (stoppedEarly) break;
 
     if (!force) {
       const hasRecent = await alreadyHasRecentFullExtras(match.id, freshnessHours);
@@ -110,8 +118,18 @@ async function run(req: Request) {
         endpointsFailed: result.endpointsFailed,
         rateLimited: result.rateLimited,
       });
+
+      if (stopOnRateLimit && result.rateLimited) {
+        stoppedEarly = 'rate_limited';
+        break;
+      }
     } catch (error: any) {
-      generated.push({ matchId: match.id, ok: false, error: String(error?.message || error) });
+      const rateLimited = isRateLimitError(error);
+      generated.push({ matchId: match.id, ok: false, rateLimited, error: String(error?.message || error) });
+      if (stopOnRateLimit && rateLimited) {
+        stoppedEarly = 'rate_limited_exception';
+        break;
+      }
     }
   }
 
@@ -124,6 +142,8 @@ async function run(req: Request) {
     allowLive,
     force,
     dryRun,
+    stopOnRateLimit,
+    stoppedEarly,
     candidates: candidates.length,
     generated,
     skipped,
