@@ -12,15 +12,16 @@ export const revalidate = 15;
 type PageProps = { params: Promise<{ matchId: string }> };
 
 type WatchTeam = { id: string; name: string; code?: string | null; image?: string | null };
-type WatchEmbedResult = { url: string; host: string } | null;
+type WatchEmbedMode = 'iframe' | 'link';
+type WatchEmbedResult = { url: string; host: string; mode: WatchEmbedMode } | null;
 
 const LIVE_STATUSES = ['LIVE', 'IN_PLAY', '1H', '2H', 'HT', 'ET', 'BREAK'];
 const FINISHED_STATUSES = ['FINISHED', 'FT', 'AET', 'PEN', 'COMPLETED', 'ENDED', 'FINAL_VERIFIED'];
 
 function statusKind(status?: string | null) {
   const raw = String(status || '').toUpperCase();
-  if (LIVE_STATUSES.includes(raw)) return 'live';
   if (raw === 'HT') return 'halftime';
+  if (LIVE_STATUSES.includes(raw)) return 'live';
   if (FINISHED_STATUSES.includes(raw)) return 'finished';
   return 'scheduled';
 }
@@ -87,6 +88,13 @@ function hostAllowed(hostname: string, allowedHosts: string[]) {
   });
 }
 
+function watchEmbedMode(): WatchEmbedMode {
+  const raw = String(process.env.WATCH_EMBED_MODE || '').trim().toLowerCase();
+  if (raw === 'iframe') return 'iframe';
+  if (raw === 'link') return 'link';
+  return boolEnv(process.env.WATCH_EMBED_FORCE_IFRAME) ? 'iframe' : 'link';
+}
+
 function resolveWatchEmbed(match: { id: string; homeTeam: WatchTeam; awayTeam: WatchTeam }): WatchEmbedResult {
   if (!boolEnv(process.env.WATCH_EMBED_ENABLED)) return null;
 
@@ -105,7 +113,7 @@ function resolveWatchEmbed(match: { id: string; homeTeam: WatchTeam; awayTeam: W
     const isLocalhost = url.hostname === 'localhost' || url.hostname === '127.0.0.1';
     if (url.protocol !== 'https:' && !isLocalhost) return null;
     if (!hostAllowed(url.hostname, allowedHosts)) return null;
-    return { url: url.toString(), host: url.hostname };
+    return { url: url.toString(), host: url.hostname, mode: watchEmbedMode() };
   } catch {
     return null;
   }
@@ -158,17 +166,54 @@ async function getWatchData(matchId: string) {
 }
 
 function PlayerFrame({ embed, title, matchId }: { embed: WatchEmbedResult; title: string; matchId: string }) {
-  if (embed) {
+  if (embed?.mode === 'iframe') {
     return (
-      <iframe
-        src={embed.url}
-        title={`بث ${title}`}
-        className="absolute inset-0 h-full w-full border-0 bg-black"
-        allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
-        allowFullScreen
-        referrerPolicy="strict-origin-when-cross-origin"
-        sandbox="allow-scripts allow-same-origin allow-presentation allow-forms allow-popups"
-      />
+      <div className="absolute inset-0">
+        <iframe
+          src={embed.url}
+          title={`بث ${title}`}
+          className="absolute inset-0 h-full w-full border-0 bg-black"
+          allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
+          allowFullScreen
+          referrerPolicy="strict-origin-when-cross-origin"
+          sandbox="allow-scripts allow-same-origin allow-presentation allow-forms allow-popups"
+        />
+        <div className="pointer-events-none absolute inset-x-4 bottom-4 flex justify-center">
+          <a
+            href={embed.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="pointer-events-auto rounded-2xl border border-white/20 bg-black/70 px-4 py-2 text-xs font-black text-white backdrop-blur transition hover:bg-white hover:text-black"
+          >
+            فتح البث في نافذة خارجية
+          </a>
+        </div>
+      </div>
+    );
+  }
+
+  if (embed?.mode === 'link') {
+    return (
+      <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center">
+        <div className="mb-4 rounded-full border border-[#18E58F]/20 bg-[#18E58F]/10 px-4 py-2 text-xs font-black text-[#18E58F]">
+          رابط بث جاهز
+        </div>
+        <h2 className="text-2xl font-black md:text-4xl">{title}</h2>
+        <p className="mt-3 max-w-xl text-sm font-bold leading-7 text-slate-400">
+          هذا الرابط لا يتم عرضه داخل iframe لتجنب شاشة التحميل المكسورة إذا كان مزود البث يمنع التضمين. افتح البث في نافذة جديدة وسيبقى مركز المباراة هنا للمتابعة.
+        </p>
+        <div className="mt-5 flex flex-wrap justify-center gap-3">
+          <a href={embed.url} target="_blank" rel="noopener noreferrer" className="rounded-2xl bg-[#18E58F] px-5 py-3 text-sm font-black text-black transition hover:bg-white">
+            فتح البث الآن
+          </a>
+          <Link href={`/live-animation/${matchId}`} className="rounded-2xl border border-[#F8C846]/30 bg-[#F8C846]/10 px-5 py-3 text-sm font-black text-[#F8C846] transition hover:bg-[#F8C846] hover:text-black">
+            الملعب التفاعلي
+          </Link>
+          <Link href={`/match-center/${matchId}`} className="rounded-2xl border border-white/10 px-5 py-3 text-sm font-black text-white transition hover:bg-white hover:text-black">
+            الإحصائيات الحية
+          </Link>
+        </div>
+      </div>
     );
   }
 
@@ -179,12 +224,15 @@ function PlayerFrame({ embed, title, matchId }: { embed: WatchEmbedResult; title
       </div>
       <h2 className="text-2xl font-black md:text-4xl">{title}</h2>
       <p className="mt-3 max-w-xl text-sm font-bold leading-7 text-slate-400">
-        لم يتم تفعيل رابط بث مصرح به لهذه المباراة بعد. أضف إعدادات WATCH_EMBED في Render وسيظهر المشغل هنا تلقائيًا.
+        لم يتم تفعيل رابط بث مصرح به لهذه المباراة بعد. أضف إعدادات WATCH_EMBED في Render وسيظهر رابط المشاهدة هنا تلقائيًا.
       </p>
       <div className="mt-4 rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-xs font-bold text-slate-400">
         Match ID: {matchId}
       </div>
       <div className="mt-5 flex flex-wrap justify-center gap-3">
+        <Link href={`/live-animation/${matchId}`} className="rounded-2xl border border-[#F8C846]/30 bg-[#F8C846]/10 px-5 py-3 text-sm font-black text-[#F8C846] transition hover:bg-[#F8C846] hover:text-black">
+          الملعب التفاعلي
+        </Link>
         <Link href={`/match-center/${matchId}`} className="rounded-2xl bg-white px-5 py-3 text-sm font-black text-black transition hover:bg-[#18E58F]">
           افتح الإحصائيات الحية
         </Link>
@@ -216,13 +264,16 @@ export default async function WatchPage({ params }: PageProps) {
               <Pill tone={data.isLive ? 'live' : data.isFinished ? 'neutral' : 'warn'}>{statusLabel(data.status)}</Pill>
               {data.minute !== null && <Pill>الدقيقة {data.minute}</Pill>}
               {data.latestSnapshotAt && <Pill>آخر تحديث: {formatEgyptDateTime(data.latestSnapshotAt)}</Pill>}
-              {embed && <Pill tone="live">مشغل مفعل: {embed.host}</Pill>}
+              {embed && <Pill tone="live">{embed.mode === 'iframe' ? `مشغل iframe: ${embed.host}` : `رابط بث: ${embed.host}`}</Pill>}
             </div>
             <h1 className="text-2xl font-black md:text-3xl">غرفة مشاهدة المباراة</h1>
             <p className="mt-1 text-sm font-bold text-slate-400">صفحة بث خفيفة تقرأ الحالة والنتيجة من قاعدة البيانات فقط.</p>
           </div>
 
           <div className="flex flex-wrap gap-2">
+            <Link href={`/live-animation/${data.id}`} className="rounded-2xl border border-[#F8C846]/30 bg-[#F8C846]/10 px-4 py-2 text-sm font-black text-[#F8C846] transition hover:bg-[#F8C846] hover:text-black">
+              الملعب التفاعلي
+            </Link>
             <Link href={`/match-center/${data.id}`} className="rounded-2xl border border-[#18E58F]/30 bg-[#18E58F]/10 px-4 py-2 text-sm font-black text-[#18E58F] transition hover:bg-[#18E58F] hover:text-black">
               مركز المباراة والتحليل
             </Link>
@@ -268,9 +319,9 @@ export default async function WatchPage({ params }: PageProps) {
 
             <div className="rounded-3xl border border-white/10 bg-black/25 p-4">
               <p className="text-xs font-black text-slate-500">حالة المشغل</p>
-              <b className="mt-2 block text-sm text-white">{embed ? `مفعل عبر ${embed.host}` : 'غير مفعل بعد'}</b>
+              <b className="mt-2 block text-sm text-white">{embed ? (embed.mode === 'iframe' ? `iframe مفعل عبر ${embed.host}` : `رابط خارجي عبر ${embed.host}`) : 'غير مفعل بعد'}</b>
               <p className="mt-2 text-xs font-bold leading-6 text-slate-400">
-                استخدم Embed رسمي أو مصرح به فقط. لا تضع مفاتيح سرية داخل رابط iframe لأنه سيظهر للمتصفح.
+                إذا كان مزود البث يمنع التضمين، استخدم وضع الرابط الخارجي لتجنب شاشة “This page couldn’t load”.
               </p>
             </div>
 
