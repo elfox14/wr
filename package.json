@@ -16,6 +16,7 @@
     "worker:match-extras-snapshot": "node scripts/match-extras-snapshot-worker.mjs",
     "worker:match-extras-sync": "node scripts/match-extras-sync-worker.mjs",
     "worker:live-animation-sync": "node scripts/live-animation-sync-worker.mjs",
+    "worker:finished-matches-backfill": "node scripts/finished-matches-backfill-worker.mjs",
     "lint": "echo \"Lint advisory only; type-check and build remain required\"",
     "lint:ai": "eslint features/analysis app/ai-analyst app/api/ai-analyst app/api/ai-analyst/alerts/route.ts --max-warnings=0",
     "lint:asset-page": "echo Asset page removed from slim production build",
