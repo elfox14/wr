@@ -13,6 +13,7 @@
     "cron:expire-stale-matches": "node scripts/render-expire-stale-matches.mjs",
     "worker:live-ingest": "node scripts/automated-live-ingest-worker.mjs",
     "worker:post-match-content": "node scripts/post-match-content-worker.mjs",
+    "worker:match-extras-snapshot": "node scripts/match-extras-snapshot-worker.mjs",
     "lint": "echo \"Lint advisory only; type-check and build remain required\"",
     "lint:ai": "eslint features/analysis app/ai-analyst app/api/ai-analyst app/api/ai-analyst/alerts/route.ts --max-warnings=0",
     "lint:asset-page": "echo Asset page removed from slim production build",
