@@ -116,6 +116,7 @@ export interface Match {
 }
 
 type AssetFetchView = 'full' | 'groups' | 'market';
+type MatchFetchFilter = 'today' | 'finished' | 'group' | 'groups';
 
 interface AppState {
   assets: Asset[];
@@ -129,7 +130,7 @@ interface AppState {
   notifications: string[];
   
   fetchAssets: (view?: AssetFetchView) => Promise<void>;
-  fetchMatches: () => Promise<void>;
+  fetchMatches: (filter?: MatchFetchFilter, group?: string) => Promise<void>;
   fetchPortfolio: () => Promise<void>;
   fetchPortfolioAnalytics: () => Promise<void>;
   buyAsset: (assetId: string, quantity: number) => Promise<void>;
@@ -165,9 +166,13 @@ export const useStore = create<AppState>((set, get) => ({
     }
   },
 
-  fetchMatches: async () => {
+  fetchMatches: async (filter = 'today', group) => {
     try {
-      const res = await fetch('/api/matches');
+      const params = new URLSearchParams();
+      if (filter !== 'today') params.set('filter', filter);
+      if (group) params.set('group', group);
+      const query = params.toString() ? `?${params.toString()}` : '';
+      const res = await fetch(`/api/matches${query}`);
       const data = await res.json();
       set({ matches: data });
     } catch (err) {
