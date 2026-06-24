@@ -26,6 +26,12 @@ export default async function MatchCenterPageLivePriority({ matchId }: { matchId
           مشاهدة البث
         </a>
         <a
+          href={`/live-animation/${data.id}`}
+          className="inline-flex items-center justify-center rounded-2xl border border-sky-300/30 bg-[#06140F]/95 px-4 py-3 text-xs font-black text-sky-200 shadow-2xl shadow-black/40 backdrop-blur transition hover:bg-sky-300 hover:text-black md:text-sm"
+        >
+          الملعب التفاعلي
+        </a>
+        <a
           href={`/match-center/${data.id}/advanced`}
           className="inline-flex items-center justify-center rounded-2xl border border-[#18E58F]/30 bg-[#06140F]/95 px-4 py-3 text-xs font-black text-[#18E58F] shadow-2xl shadow-black/40 backdrop-blur transition hover:bg-[#18E58F] hover:text-black md:text-sm"
         >
