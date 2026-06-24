@@ -224,7 +224,7 @@ export default function GroupsClient() {
   useEffect(() => {
     Promise.all([
       assets.length === 0 ? fetchAssets() : Promise.resolve(),
-      matches.length === 0 ? fetchMatches() : Promise.resolve(),
+      matches.length === 0 ? fetchMatches('groups') : Promise.resolve(),
     ]).finally(() => setLoading(false));
   }, [assets.length, matches.length, fetchAssets, fetchMatches]);
 
@@ -505,8 +505,7 @@ function MiniMetric({ label, value }: { label: string; value: string }) {
       <div className="mt-1 truncate text-sm font-black text-white">{value}</div>
     </div>
   );
-}
-
+}\n
 function StatCard({ icon, label, value, hint, accent = 'text-primary' }: { icon: React.ReactNode; label: string; value: number; hint: string; accent?: string }) {
   return (
     <div className="rounded-2xl border border-white/5 bg-background/40 p-4">
