@@ -2,6 +2,13 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import prisma from '@/lib/prisma';
 import LiveAnimationPitch from '@/components/live-animation/LiveAnimationPitch';
+import { getTeamVisualTheme } from '@/lib/teamVisualThemes';
+import {
+  animationEventLabel,
+  inferLiveAnimationSpatial,
+  normalizeAnimationEventType,
+  type AnimationTeamSide,
+} from '@/lib/liveAnimationSpatial';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -33,6 +40,7 @@ function icon(type: string) {
   if (key.includes('sub')) return '🔁';
   if (key.includes('shot')) return '🎯';
   if (key.includes('corner')) return '🚩';
+  if (key.includes('penalty')) return '🥅';
   return '●';
 }
 
@@ -42,33 +50,32 @@ function color(type: string) {
   if (key.includes('red')) return '#FF5C5C';
   if (key.includes('yellow')) return '#F8C846';
   if (key.includes('shot')) return '#18E58F';
+  if (key.includes('corner')) return '#A78BFA';
   return '#E5E7EB';
 }
 
-function eventLabel(type: string, detail?: string | null) {
-  const key = String(type || '').toLowerCase();
-  if (key.includes('goal')) return 'هدف';
-  if (key.includes('yellow')) return 'بطاقة صفراء';
-  if (key.includes('red')) return 'بطاقة حمراء';
-  if (key.includes('sub')) return 'تبديل';
-  if (key.includes('shot')) return 'تسديدة';
-  if (key.includes('corner')) return 'ركنية';
-  return detail ? 'حدث' : 'ملاحظة';
-}
-
-function fallbackPoint(index: number, side: 'home' | 'away' | 'unknown') {
-  const baseX = side === 'home' ? 34 : side === 'away' ? 66 : 50;
-  const offsets = [0, -16, 16, -8, 8, -24, 24];
-  return {
-    x: Math.max(12, Math.min(88, baseX + offsets[index % offsets.length])),
-    y: Math.max(14, Math.min(86, 22 + ((index * 17) % 60))),
-  };
+function sideFromTeam(teamId: string | null | undefined, homeTeamId: string, awayTeamId: string): AnimationTeamSide {
+  if (teamId === homeTeamId) return 'home';
+  if (teamId === awayTeamId) return 'away';
+  return 'unknown';
 }
 
 function normalizeEvent(row: any, index: number, homeTeamId: string, awayTeamId: string) {
   const eventType = String(row.eventType || row.type || 'note');
-  const side = row.teamId === homeTeamId ? 'home' : row.teamId === awayTeamId ? 'away' : 'unknown';
-  const point = fallbackPoint(index, side);
+  const teamSide = sideFromTeam(row.teamId, homeTeamId, awayTeamId);
+  const spatial = inferLiveAnimationSpatial({
+    id: String(row.id || `event-${index}`),
+    type: eventType,
+    detail: row.detail || row.eventLabel,
+    minute: row.minute,
+    teamSide,
+    index,
+    explicitX: row.x,
+    explicitY: row.y,
+    explicitEndX: row.endX,
+    explicitEndY: row.endY,
+  });
+
   return {
     id: String(row.id || `event-${index}`),
     sequenceNumber: safeNumber(row.sequenceNumber, safeNumber(row.minute, index + 1) * 100 + index + 1),
@@ -79,13 +86,19 @@ function normalizeEvent(row: any, index: number, homeTeamId: string, awayTeamId:
     playerName: row.playerName || null,
     jerseyNumber: row.jerseyNumber || null,
     eventType,
-    eventLabel: row.eventLabel || eventLabel(eventType, row.detail),
-    detail: row.detail || row.eventLabel || eventLabel(eventType),
-    x: row.x ?? point.x,
-    y: row.y ?? point.y,
-    endX: row.endX ?? null,
-    endY: row.endY ?? null,
-    zone: row.zone || null,
+    eventLabel: row.eventLabel || animationEventLabel(eventType),
+    detail: row.detail || row.eventLabel || animationEventLabel(eventType),
+    x: row.x ?? spatial.x,
+    y: row.y ?? spatial.y,
+    endX: row.endX ?? spatial.endX,
+    endY: row.endY ?? spatial.endY,
+    zone: row.zone || spatial.zone,
+    coordinateSource: row.coordinateSource || spatial.coordinateSource,
+    coordinateConfidence: row.coordinateConfidence || spatial.coordinateConfidence,
+    eventSide: row.eventSide || spatial.eventSide,
+    isInferred: row.isInferred === null || row.isInferred === undefined ? spatial.isInferred : Boolean(row.isInferred),
+    anchorZone: row.anchorZone || spatial.anchorZone,
+    displayPriority: safeNumber(row.displayPriority, spatial.displayPriority),
     provider: row.provider || row.sourceName || 'MATCH_EVENT_FALLBACK',
     icon: icon(eventType),
     color: color(eventType),
@@ -112,6 +125,12 @@ async function readLiveAnimationRows(matchId: string, homeTeamId: string, awayTe
         "endX",
         "endY",
         "zone",
+        "coordinateSource",
+        "coordinateConfidence",
+        "eventSide",
+        "isInferred",
+        "anchorZone",
+        "displayPriority",
         "provider",
         "createdAt"
       FROM "LiveAnimationEvent"
@@ -130,7 +149,10 @@ async function readLiveAnimationRows(matchId: string, homeTeamId: string, awayTe
     take: 80,
   }).catch(() => [] as any[]);
 
-  return events.map((event, index) => normalizeEvent(event, index, homeTeamId, awayTeamId));
+  return events.map((event, index) => {
+    const eventType = normalizeAnimationEventType(event.type, event.detail);
+    return normalizeEvent({ ...event, eventType, eventLabel: animationEventLabel(eventType) }, index, homeTeamId, awayTeamId);
+  });
 }
 
 async function getInitialState(matchId: string) {
@@ -147,6 +169,8 @@ async function getInitialState(matchId: string) {
   const latestSnapshot = match.statsSnapshots?.[0] || null;
   const events = await readLiveAnimationRows(match.id, match.homeTeam.id, match.awayTeam.id);
   const lastSequence = events.reduce((max, event) => Math.max(max, Number(event.sequenceNumber || 0)), 0);
+  const homeTheme = getTeamVisualTheme(match.homeTeam.code, match.homeTeam.name);
+  const awayTheme = getTeamVisualTheme(match.awayTeam.code, match.awayTeam.name);
 
   return {
     ok: true,
@@ -160,7 +184,11 @@ async function getInitialState(matchId: string) {
       home: safeNumber(latestSnapshot?.homeScore ?? match.homeScore, 0),
       away: safeNumber(latestSnapshot?.awayScore ?? match.awayScore, 0),
     },
-    teams: { home: match.homeTeam, away: match.awayTeam },
+    teams: {
+      home: { ...match.homeTeam, theme: homeTheme },
+      away: { ...match.awayTeam, theme: awayTheme },
+    },
+    visualTheme: { home: homeTheme, away: awayTheme },
     lastSequence,
     events,
     source: events.some((event) => event.provider !== 'MATCH_EVENT_FALLBACK') ? 'LiveAnimationEvent' : 'MatchEvent fallback',

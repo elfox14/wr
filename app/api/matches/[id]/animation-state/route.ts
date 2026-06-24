@@ -1,5 +1,12 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { getTeamVisualTheme } from '@/lib/teamVisualThemes';
+import {
+  animationEventLabel,
+  inferLiveAnimationSpatial,
+  normalizeAnimationEventType,
+  type AnimationTeamSide,
+} from '@/lib/liveAnimationSpatial';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -48,35 +55,29 @@ function eventColor(type: string) {
   return '#E5E7EB';
 }
 
-function inferEventLabel(type: string, detail?: string | null) {
-  const key = String(type || '').toLowerCase();
-  if (key.includes('goal')) return 'هدف';
-  if (key.includes('yellow')) return 'بطاقة صفراء';
-  if (key.includes('red')) return 'بطاقة حمراء';
-  if (key.includes('sub')) return 'تبديل';
-  if (key.includes('shot')) return 'تسديدة';
-  if (key.includes('corner')) return 'ركنية';
-  if (key.includes('penalty')) return 'ركلة جزاء';
-  if (key.includes('var')) return 'VAR';
-  if (key.includes('foul')) return 'خطأ';
-  return detail ? 'حدث' : 'ملاحظة';
-}
-
-function fallbackPoint(index: number, teamSide: 'home' | 'away' | 'unknown') {
-  const baseX = teamSide === 'home' ? 34 : teamSide === 'away' ? 66 : 50;
-  const offsets = [0, -18, 18, -9, 9, -25, 25];
-  return {
-    x: Math.max(12, Math.min(88, baseX + offsets[index % offsets.length])),
-    y: Math.max(14, Math.min(86, 24 + ((index * 13) % 58))),
-  };
+function sideFromTeam(teamId: string | null | undefined, homeTeamId: string, awayTeamId: string): AnimationTeamSide {
+  if (teamId === homeTeamId) return 'home';
+  if (teamId === awayTeamId) return 'away';
+  return 'unknown';
 }
 
 function normalizeLiveRow(row: any, index: number, homeTeamId: string, awayTeamId: string) {
-  const teamSide = row?.teamId === homeTeamId ? 'home' : row?.teamId === awayTeamId ? 'away' : 'unknown';
-  const fallback = fallbackPoint(index, teamSide);
   const eventType = String(row?.eventType || row?.type || 'note');
-  const x = row?.x === null || row?.x === undefined ? fallback.x : safeNumber(row.x, fallback.x);
-  const y = row?.y === null || row?.y === undefined ? fallback.y : safeNumber(row.y, fallback.y);
+  const teamSide = sideFromTeam(row?.teamId, homeTeamId, awayTeamId);
+  const spatial = inferLiveAnimationSpatial({
+    id: String(row?.id || `event-${index}`),
+    type: eventType,
+    detail: row?.detail || row?.eventLabel,
+    minute: row?.minute,
+    teamSide,
+    index,
+    explicitX: row?.x,
+    explicitY: row?.y,
+    explicitEndX: row?.endX,
+    explicitEndY: row?.endY,
+  });
+  const x = row?.x === null || row?.x === undefined ? spatial.x : safeNumber(row.x, spatial.x);
+  const y = row?.y === null || row?.y === undefined ? spatial.y : safeNumber(row.y, spatial.y);
 
   return {
     id: String(row?.id || `event-${index}`),
@@ -88,13 +89,19 @@ function normalizeLiveRow(row: any, index: number, homeTeamId: string, awayTeamI
     playerName: row?.playerName || null,
     jerseyNumber: row?.jerseyNumber || null,
     eventType,
-    eventLabel: row?.eventLabel || inferEventLabel(eventType, row?.detail),
-    detail: row?.detail || row?.eventLabel || inferEventLabel(eventType),
+    eventLabel: row?.eventLabel || animationEventLabel(eventType),
+    detail: row?.detail || row?.eventLabel || animationEventLabel(eventType),
     x: Math.max(0, Math.min(100, x)),
     y: Math.max(0, Math.min(100, y)),
-    endX: row?.endX === null || row?.endX === undefined ? null : Math.max(0, Math.min(100, safeNumber(row.endX, x))),
-    endY: row?.endY === null || row?.endY === undefined ? null : Math.max(0, Math.min(100, safeNumber(row.endY, y))),
-    zone: row?.zone || null,
+    endX: row?.endX === null || row?.endX === undefined ? spatial.endX : Math.max(0, Math.min(100, safeNumber(row.endX, x))),
+    endY: row?.endY === null || row?.endY === undefined ? spatial.endY : Math.max(0, Math.min(100, safeNumber(row.endY, y))),
+    zone: row?.zone || spatial.zone,
+    coordinateSource: row?.coordinateSource || spatial.coordinateSource,
+    coordinateConfidence: row?.coordinateConfidence || spatial.coordinateConfidence,
+    eventSide: row?.eventSide || spatial.eventSide,
+    isInferred: row?.isInferred === null || row?.isInferred === undefined ? spatial.isInferred : Boolean(row.isInferred),
+    anchorZone: row?.anchorZone || spatial.anchorZone,
+    displayPriority: safeNumber(row?.displayPriority, spatial.displayPriority),
     provider: row?.provider || 'MATCH_EVENT_FALLBACK',
     icon: eventIcon(eventType),
     color: eventColor(eventType),
@@ -121,6 +128,12 @@ async function readAnimationEvents(matchId: string, afterSeq: number, limit: num
         "endX",
         "endY",
         "zone",
+        "coordinateSource",
+        "coordinateConfidence",
+        "eventSide",
+        "isInferred",
+        "anchorZone",
+        "displayPriority",
         "provider",
         "createdAt"
       FROM "LiveAnimationEvent"
@@ -133,7 +146,7 @@ async function readAnimationEvents(matchId: string, afterSeq: number, limit: num
       return rows.map((row, index) => normalizeLiveRow(row, index, homeTeamId, awayTeamId));
     }
   } catch {
-    // The migration may not be applied yet. Fallback to MatchEvent keeps the UI useful.
+    // The spatial migration may not be applied yet. Fallback to MatchEvent keeps the UI useful.
   }
 
   const matchEvents = await prisma.matchEvent.findMany({
@@ -143,19 +156,22 @@ async function readAnimationEvents(matchId: string, afterSeq: number, limit: num
   }).catch(() => [] as any[]);
 
   return matchEvents
-    .map((event, index) => normalizeLiveRow({
-      id: event.id,
-      sequenceNumber: safeNumber(event.minute, index + 1) * 100 + index + 1,
-      minute: event.minute,
-      teamId: event.teamId,
-      playerId: event.playerId,
-      playerName: event.playerName,
-      eventType: event.type,
-      eventLabel: inferEventLabel(event.type, event.detail),
-      detail: event.detail,
-      provider: event.sourceName || 'MATCH_EVENT_FALLBACK',
-      createdAt: event.createdAt,
-    }, index, homeTeamId, awayTeamId))
+    .map((event, index) => {
+      const eventType = normalizeAnimationEventType(event.type, event.detail);
+      return normalizeLiveRow({
+        id: event.id,
+        sequenceNumber: safeNumber(event.minute, index + 1) * 100 + index + 1,
+        minute: event.minute,
+        teamId: event.teamId,
+        playerId: event.playerId,
+        playerName: event.playerName,
+        eventType,
+        eventLabel: animationEventLabel(eventType),
+        detail: event.detail,
+        provider: event.sourceName || 'MATCH_EVENT_FALLBACK',
+        createdAt: event.createdAt,
+      }, index, homeTeamId, awayTeamId);
+    })
     .filter((event) => event.sequenceNumber > afterSeq);
 }
 
@@ -184,6 +200,8 @@ export async function GET(req: Request, context: RouteContext) {
   const minute = latestSnapshot?.minute ?? null;
   const events = await readAnimationEvents(match.id, afterSeq, limit, match.homeTeam.id, match.awayTeam.id);
   const lastSequence = events.reduce((max, event) => Math.max(max, Number(event.sequenceNumber || 0)), afterSeq);
+  const homeTheme = getTeamVisualTheme(match.homeTeam.code, match.homeTeam.name);
+  const awayTheme = getTeamVisualTheme(match.awayTeam.code, match.awayTeam.name);
 
   return NextResponse.json({
     ok: true,
@@ -198,8 +216,12 @@ export async function GET(req: Request, context: RouteContext) {
       away: safeNumber(awayScore, 0),
     },
     teams: {
-      home: match.homeTeam,
-      away: match.awayTeam,
+      home: { ...match.homeTeam, theme: homeTheme },
+      away: { ...match.awayTeam, theme: awayTheme },
+    },
+    visualTheme: {
+      home: homeTheme,
+      away: awayTheme,
     },
     lastSequence,
     events,
