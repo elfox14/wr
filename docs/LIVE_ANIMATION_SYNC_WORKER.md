@@ -50,6 +50,8 @@ curl -X POST \
   "https://worldcup.mcprim.com/api/cron/live-animation-sync?matchId=cmq6vhgfh0128g7g4ntiqi8hf&allowFinished=true"
 ```
 
+The worker also creates the animation tables if they are missing, so a dry run can still validate table availability.
+
 ## Render Cron
 
 Command:
