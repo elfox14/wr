@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 type TeamVisualTheme = {
   code: string;
@@ -99,21 +99,21 @@ function sourceLabel(value?: string) {
 
 function eventTone(type: string) {
   const key = String(type || '').toLowerCase();
-  if (key.includes('goal')) return 'from-[#F8C846]/25 to-[#F8C846]/5 border-[#F8C846]/30';
-  if (key.includes('red')) return 'from-red-500/25 to-red-500/5 border-red-400/30';
-  if (key.includes('yellow')) return 'from-[#F8C846]/20 to-[#F8C846]/5 border-[#F8C846]/25';
-  if (key.includes('sub')) return 'from-sky-400/20 to-sky-400/5 border-sky-300/25';
-  return 'from-[#18E58F]/20 to-[#18E58F]/5 border-[#18E58F]/25';
+  if (key.includes('goal')) return 'border-[#F8C846]/30 bg-[#F8C846]/10';
+  if (key.includes('red')) return 'border-red-400/30 bg-red-500/10';
+  if (key.includes('yellow')) return 'border-[#F8C846]/25 bg-[#F8C846]/10';
+  if (key.includes('sub')) return 'border-sky-300/25 bg-sky-400/10';
+  return 'border-[#18E58F]/25 bg-[#18E58F]/10';
 }
 
 function pitchPlayerPositions(team: 'home' | 'away') {
   const home = [
-    [10, 50, 'GK'], [23, 22, '2'], [24, 42, '4'], [24, 58, '5'], [23, 78, '3'],
-    [39, 30, '6'], [42, 50, '8'], [39, 70, '10'],
-    [57, 26, '7'], [61, 50, '9'], [57, 74, '11'],
+    [10, 50], [23, 22], [24, 42], [24, 58], [23, 78],
+    [39, 30], [42, 50], [39, 70],
+    [57, 26], [61, 50], [57, 74],
   ];
-  const away = home.map(([x, y, n]) => [100 - Number(x), Number(y), n] as [number, number, string]);
-  return (team === 'home' ? home : away) as [number, number, string][];
+  const away = home.map(([x, y]) => [100 - Number(x), Number(y)] as [number, number]);
+  return (team === 'home' ? home : away) as [number, number][];
 }
 
 function CrowdStand({ side, theme, active }: { side: 'top' | 'bottom'; theme: TeamVisualTheme; active: boolean }) {
@@ -153,34 +153,42 @@ function FlagWatermark({ team, side }: { team: Team; side: 'left' | 'right' }) {
   );
 }
 
-function EventOverlay({ event, teams, isPlaying }: { event: AnimationEvent | null; teams: AnimationState['teams']; isPlaying: boolean }) {
-  if (!event) return null;
+function ActiveEventBar({ event, teams, isPlaying }: { event: AnimationEvent | null; teams: AnimationState['teams']; isPlaying: boolean }) {
+  if (!event) {
+    return (
+      <div className="rounded-[1.5rem] border border-white/10 bg-white/[0.04] px-4 py-3 text-sm font-bold text-slate-400">
+        لا يوجد حدث محدد بعد.
+      </div>
+    );
+  }
+
   const team = event.teamId === teams.home.id ? teams.home : event.teamId === teams.away.id ? teams.away : null;
   const theme = team ? teamTheme(team) : fallbackTheme;
+
   return (
-    <div className={`absolute right-4 top-4 z-30 max-w-[78%] rounded-3xl border bg-gradient-to-br p-4 shadow-2xl backdrop-blur ${eventTone(event.eventType)}`}>
-      <div className="flex items-center gap-3">
-        <span className="text-4xl">{event.icon}</span>
-        <div>
-          <p className="text-xs font-black text-slate-300">
-            {isPlaying ? 'تشغيل تلقائي' : 'حدث محدد'} · {event.minute !== null ? `${event.minute}'` : '—'} · {team?.name || 'حدث عام'} {team ? teamTheme(team).flagEmoji : ''}
-          </p>
-          <h2 className="text-2xl font-black text-white">{event.eventLabel}</h2>
-          <p className="mt-1 text-sm font-bold text-slate-200">
-            {event.playerName ? `${event.playerName}${event.jerseyNumber ? ` #${event.jerseyNumber}` : ''}` : event.detail}
-          </p>
-          <div className="mt-2 flex flex-wrap gap-2 text-[10px] font-black">
-            <span className="rounded-full border border-white/10 bg-black/25 px-2 py-1 text-slate-200">{sourceLabel(event.coordinateSource)}</span>
-            <span className="rounded-full border border-white/10 bg-black/25 px-2 py-1 text-slate-200">{confidenceLabel(event.coordinateConfidence)}</span>
-            {event.anchorZone && <span className="rounded-full border border-white/10 bg-black/25 px-2 py-1 text-slate-200">{event.anchorZone}</span>}
+    <div className={`rounded-[1.5rem] border px-4 py-3 shadow-xl ${eventTone(event.eventType)}`}>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-3">
+          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-white/20 bg-black/40 text-3xl" style={{ boxShadow: `0 0 22px ${event.color}55` }}>
+            {event.icon}
+          </span>
+          <div className="min-w-0">
+            <p className="text-xs font-black text-slate-300">
+              {isPlaying ? 'تشغيل تلقائي' : 'حدث محدد'} · {event.minute !== null ? `${event.minute}'` : '—'} · {team?.name || 'حدث عام'} {team ? teamTheme(team).flagEmoji : ''}
+            </p>
+            <h2 className="truncate text-2xl font-black text-white">{event.eventLabel}</h2>
+            <p className="truncate text-sm font-bold text-slate-200">
+              {event.playerName ? `${event.playerName}${event.jerseyNumber ? ` #${event.jerseyNumber}` : ''}` : event.detail}
+            </p>
           </div>
         </div>
-      </div>
-      {event.eventType.includes('goal') && (
-        <div className="mt-3 rounded-2xl px-3 py-2 text-xs font-black text-black" style={{ backgroundColor: theme.crowdPrimary }}>
-          تفاعل جماهير {team?.name || 'الفريق'}
+        <div className="flex flex-wrap gap-2 text-[10px] font-black">
+          <span className="rounded-full border border-white/10 bg-black/25 px-2 py-1 text-slate-200">{sourceLabel(event.coordinateSource)}</span>
+          <span className="rounded-full border border-white/10 bg-black/25 px-2 py-1 text-slate-200">{confidenceLabel(event.coordinateConfidence)}</span>
+          {event.anchorZone && <span className="rounded-full border border-white/10 bg-black/25 px-2 py-1 text-slate-200">{event.anchorZone}</span>}
+          {event.eventType.includes('goal') && <span className="rounded-full px-2 py-1 text-black" style={{ backgroundColor: theme.crowdPrimary }}>تفاعل جماهير {team?.name || 'الفريق'}</span>}
         </div>
-      )}
+      </div>
     </div>
   );
 }
@@ -213,11 +221,11 @@ function VirtualPitch({ state, activeEvent, isPlaying }: { state: AnimationState
         <div className="absolute left-4 top-[42%] z-[2] h-[16%] w-[5%] rounded-r-xl border-2 border-white/20" />
         <div className="absolute right-4 top-[42%] z-[2] h-[16%] w-[5%] rounded-l-xl border-2 border-white/20" />
 
-        {pitchPlayerPositions('home').map(([x, y, n], index) => (
-          <div key={`h-${index}`} className="absolute z-10 flex h-8 w-8 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-white/60 text-[10px] font-black shadow-lg" style={{ left: `${x}%`, top: `${y}%`, backgroundColor: homeTheme.shirtPrimary, color: homeTheme.shirtSecondary }}>{n}</div>
+        {pitchPlayerPositions('home').map(([x, y], index) => (
+          <div key={`h-${index}`} aria-label="home player" className="absolute z-10 h-7 w-7 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/60 shadow-lg" style={{ left: `${x}%`, top: `${y}%`, backgroundColor: homeTheme.shirtPrimary }} />
         ))}
-        {pitchPlayerPositions('away').map(([x, y, n], index) => (
-          <div key={`a-${index}`} className="absolute z-10 flex h-8 w-8 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-white/60 text-[10px] font-black shadow-lg" style={{ left: `${x}%`, top: `${y}%`, backgroundColor: awayTheme.shirtPrimary, color: awayTheme.shirtSecondary }}>{n}</div>
+        {pitchPlayerPositions('away').map(([x, y], index) => (
+          <div key={`a-${index}`} aria-label="away player" className="absolute z-10 h-7 w-7 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/60 shadow-lg" style={{ left: `${x}%`, top: `${y}%`, backgroundColor: awayTheme.shirtPrimary }} />
         ))}
 
         {activeEvent?.endX !== null && activeEvent?.endY !== null && activeEvent && (
@@ -236,8 +244,6 @@ function VirtualPitch({ state, activeEvent, isPlaying }: { state: AnimationState
         <div className="absolute z-30 -translate-x-1/2 -translate-y-1/2 transition-all duration-700" style={{ left: `${ballX}%`, top: `${ballY}%` }}>
           <div className="h-4 w-4 rounded-full border border-white bg-white shadow-[0_0_24px_rgba(255,255,255,0.85)]" />
         </div>
-
-        <EventOverlay event={activeEvent} teams={state.teams} isPlaying={isPlaying} />
       </div>
     </div>
   );
@@ -321,7 +327,7 @@ export default function LiveAnimationPitch({ initialState }: { initialState: Ani
 
   return (
     <div className="grid gap-4 lg:grid-cols-[1fr_380px]">
-      <section className="space-y-4">
+      <section className="space-y-3">
         <div className="rounded-[2rem] border border-white/10 bg-white/[0.04] p-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
@@ -338,6 +344,8 @@ export default function LiveAnimationPitch({ initialState }: { initialState: Ani
             </div>
           </div>
         </div>
+
+        <ActiveEventBar event={activeEvent} teams={state.teams} isPlaying={isPlaying} />
         <VirtualPitch state={{ ...state, events }} activeEvent={activeEvent} isPlaying={isPlaying} />
       </section>
 
