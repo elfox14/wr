@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 
 type TeamVisualTheme = {
   code: string;
@@ -15,6 +15,7 @@ type TeamVisualTheme = {
 };
 
 type Team = { id: string; name: string; code?: string | null; image?: string | null; theme?: TeamVisualTheme };
+
 type AnimationEvent = {
   id: string;
   sequenceNumber: number;
@@ -93,7 +94,7 @@ function confidenceLabel(value?: string) {
 function sourceLabel(value?: string) {
   if (value === 'EXACT_PROVIDER') return 'إحداثيات حقيقية';
   if (value === 'INFERRED_ZONE') return 'منطقة مستنتجة';
-  return 'Heuristic';
+  return 'تقدير بصري';
 }
 
 function eventTone(type: string) {
@@ -116,14 +117,13 @@ function pitchPlayerPositions(team: 'home' | 'away') {
 }
 
 function CrowdStand({ side, theme, active }: { side: 'top' | 'bottom'; theme: TeamVisualTheme; active: boolean }) {
-  const rows = Array.from({ length: 6 });
   return (
     <div
       className={`absolute left-2 right-2 z-0 overflow-hidden rounded-[1.5rem] border border-white/10 bg-black/40 ${side === 'top' ? 'top-2 h-[11%]' : 'bottom-2 h-[11%]'} ${active ? 'animate-pulse' : ''}`}
       style={{ boxShadow: active ? `0 0 42px ${theme.crowdPrimary}66` : undefined }}
     >
       <div className="absolute inset-0 opacity-70" style={{ background: `linear-gradient(90deg, ${theme.crowdPrimary}, ${theme.crowdSecondary}, ${theme.crowdPrimary})` }} />
-      <div className="absolute inset-0 grid grid-cols-24 gap-px opacity-60">
+      <div className="absolute inset-0 grid grid-cols-12 gap-px opacity-60 md:grid-cols-24">
         {Array.from({ length: 96 }).map((_, index) => (
           <span
             key={index}
@@ -131,7 +131,7 @@ function CrowdStand({ side, theme, active }: { side: 'top' | 'bottom'; theme: Te
             style={{
               backgroundColor: index % 3 === 0 ? theme.crowdSecondary : theme.crowdPrimary,
               opacity: 0.35 + ((index % 5) * 0.11),
-              transform: `translateY(${(index % rows.length) * 2}px)`,
+              transform: `translateY(${(index % 6) * 2}px)`,
             }}
           />
         ))}
@@ -153,7 +153,7 @@ function FlagWatermark({ team, side }: { team: Team; side: 'left' | 'right' }) {
   );
 }
 
-function EventOverlay({ event, teams }: { event: AnimationEvent | null; teams: AnimationState['teams'] }) {
+function EventOverlay({ event, teams, isPlaying }: { event: AnimationEvent | null; teams: AnimationState['teams']; isPlaying: boolean }) {
   if (!event) return null;
   const team = event.teamId === teams.home.id ? teams.home : event.teamId === teams.away.id ? teams.away : null;
   const theme = team ? teamTheme(team) : fallbackTheme;
@@ -162,7 +162,9 @@ function EventOverlay({ event, teams }: { event: AnimationEvent | null; teams: A
       <div className="flex items-center gap-3">
         <span className="text-4xl">{event.icon}</span>
         <div>
-          <p className="text-xs font-black text-slate-300">{event.minute !== null ? `${event.minute}'` : '—'} · {team?.name || 'حدث عام'} {team ? teamTheme(team).flagEmoji : ''}</p>
+          <p className="text-xs font-black text-slate-300">
+            {isPlaying ? 'تشغيل تلقائي' : 'حدث محدد'} · {event.minute !== null ? `${event.minute}'` : '—'} · {team?.name || 'حدث عام'} {team ? teamTheme(team).flagEmoji : ''}
+          </p>
           <h2 className="text-2xl font-black text-white">{event.eventLabel}</h2>
           <p className="mt-1 text-sm font-bold text-slate-200">
             {event.playerName ? `${event.playerName}${event.jerseyNumber ? ` #${event.jerseyNumber}` : ''}` : event.detail}
@@ -183,8 +185,7 @@ function EventOverlay({ event, teams }: { event: AnimationEvent | null; teams: A
   );
 }
 
-function VirtualPitch({ state, activeEvent }: { state: AnimationState; activeEvent: AnimationEvent | null }) {
-  const visibleEvents = state.events.slice(-32).sort((a, b) => Number(a.displayPriority || 0) - Number(b.displayPriority || 0));
+function VirtualPitch({ state, activeEvent, isPlaying }: { state: AnimationState; activeEvent: AnimationEvent | null; isPlaying: boolean }) {
   const ballX = activeEvent?.endX ?? activeEvent?.x ?? 50;
   const ballY = activeEvent?.endY ?? activeEvent?.y ?? 50;
   const homeTheme = teamTheme(state.teams.home);
@@ -219,26 +220,39 @@ function VirtualPitch({ state, activeEvent }: { state: AnimationState; activeEve
           <div key={`a-${index}`} className="absolute z-10 flex h-8 w-8 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-white/60 text-[10px] font-black shadow-lg" style={{ left: `${x}%`, top: `${y}%`, backgroundColor: awayTheme.shirtPrimary, color: awayTheme.shirtSecondary }}>{n}</div>
         ))}
 
-        {visibleEvents.map((event, index) => (
-          <div key={`${event.id}-${index}`} className="absolute z-20 -translate-x-1/2 -translate-y-1/2" style={{ left: `${event.x}%`, top: `${event.y}%` }} title={`${event.eventLabel} · ${event.playerName || event.detail} · ${sourceLabel(event.coordinateSource)}`}>
-            <div className="flex h-9 w-9 items-center justify-center rounded-full border border-white/40 bg-black/75 text-lg shadow-2xl" style={{ boxShadow: `0 0 24px ${event.color}66` }}>{event.icon}</div>
-            <div className="mx-auto mt-1 h-1.5 w-1.5 rounded-full" style={{ backgroundColor: event.coordinateConfidence === 'HIGH' ? '#18E58F' : event.coordinateConfidence === 'MEDIUM' ? '#F8C846' : '#94A3B8' }} />
-          </div>
-        ))}
-
-        {activeEvent?.endX !== null && activeEvent?.endY !== null && (
+        {activeEvent?.endX !== null && activeEvent?.endY !== null && activeEvent && (
           <svg className="pointer-events-none absolute inset-0 z-20 h-full w-full" viewBox="0 0 100 100" preserveAspectRatio="none">
             <line x1={activeEvent.x} y1={activeEvent.y} x2={activeEvent.endX || activeEvent.x} y2={activeEvent.endY || activeEvent.y} stroke={activeEvent.color} strokeWidth="0.65" strokeDasharray="2 1.5" />
           </svg>
+        )}
+
+        {activeEvent && (
+          <div className="absolute z-30 -translate-x-1/2 -translate-y-1/2 transition-all duration-700" style={{ left: `${activeEvent.x}%`, top: `${activeEvent.y}%` }} title={`${activeEvent.eventLabel} · ${activeEvent.playerName || activeEvent.detail} · ${sourceLabel(activeEvent.coordinateSource)}`}>
+            <div className={`flex h-12 w-12 items-center justify-center rounded-full border border-white/50 bg-black/80 text-2xl shadow-2xl ${isPlaying ? 'animate-pulse' : ''}`} style={{ boxShadow: `0 0 34px ${activeEvent.color}88` }}>{activeEvent.icon}</div>
+            <div className="mx-auto mt-1 h-2 w-2 rounded-full" style={{ backgroundColor: activeEvent.coordinateConfidence === 'HIGH' ? '#18E58F' : activeEvent.coordinateConfidence === 'MEDIUM' ? '#F8C846' : '#94A3B8' }} />
+          </div>
         )}
 
         <div className="absolute z-30 -translate-x-1/2 -translate-y-1/2 transition-all duration-700" style={{ left: `${ballX}%`, top: `${ballY}%` }}>
           <div className="h-4 w-4 rounded-full border border-white bg-white shadow-[0_0_24px_rgba(255,255,255,0.85)]" />
         </div>
 
-        <EventOverlay event={activeEvent} teams={state.teams} />
+        <EventOverlay event={activeEvent} teams={state.teams} isPlaying={isPlaying} />
       </div>
     </div>
+  );
+}
+
+function PlaybackButton({ isPlaying, disabled, onClick }: { isPlaying: boolean; disabled: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onClick}
+      className={`rounded-full border px-3 py-1 text-xs font-black transition ${isPlaying ? 'border-red-400/30 bg-red-400/10 text-red-200 hover:bg-red-400 hover:text-black' : 'border-[#18E58F]/30 bg-[#18E58F]/10 text-[#18E58F] hover:bg-[#18E58F] hover:text-black'} disabled:cursor-not-allowed disabled:opacity-50`}
+    >
+      {isPlaying ? 'إيقاف الأحداث' : 'تشغيل الأحداث'}
+    </button>
   );
 }
 
@@ -246,10 +260,28 @@ export default function LiveAnimationPitch({ initialState }: { initialState: Ani
   const [state, setState] = useState<AnimationState>(initialState);
   const [events, setEvents] = useState<AnimationEvent[]>(initialState.events || []);
   const [activeIndex, setActiveIndex] = useState(Math.max(0, (initialState.events || []).length - 1));
+  const [isPlaying, setIsPlaying] = useState(false);
   const lastSeqRef = useRef(initialState.lastSequence || 0);
 
   const activeEvent = useMemo(() => events[activeIndex] || events[events.length - 1] || null, [events, activeIndex]);
   const shouldPoll = state.phase === 'live' || state.phase === 'halftime';
+
+  useEffect(() => {
+    if (!events.length) {
+      setIsPlaying(false);
+      setActiveIndex(0);
+      return;
+    }
+    if (activeIndex > events.length - 1) setActiveIndex(events.length - 1);
+  }, [activeIndex, events.length]);
+
+  useEffect(() => {
+    if (!isPlaying || events.length <= 1) return;
+    const timer = window.setInterval(() => {
+      setActiveIndex((current) => (current >= events.length - 1 ? 0 : current + 1));
+    }, 2600);
+    return () => window.clearInterval(timer);
+  }, [events.length, isPlaying]);
 
   useEffect(() => {
     if (!shouldPoll) return;
@@ -260,19 +292,32 @@ export default function LiveAnimationPitch({ initialState }: { initialState: Ani
         if (!payload?.ok) return;
         setState(payload);
         if (payload.events?.length) {
-          setEvents((prev) => [...prev, ...payload.events].slice(-80));
+          setEvents((prev) => [...prev, ...payload.events].slice(-160));
           lastSeqRef.current = Math.max(lastSeqRef.current, Number(payload.lastSequence || 0));
-          setActiveIndex(events.length + payload.events.length - 1);
+          if (!isPlaying) setActiveIndex((current) => Math.max(current, events.length + payload.events.length - 1));
         }
       } catch {
         // Keep existing state; the next polling tick can recover.
       }
     }, 5000);
     return () => window.clearInterval(timer);
-  }, [events.length, shouldPoll, state.matchId]);
+  }, [events.length, isPlaying, shouldPoll, state.matchId]);
 
   const homeTheme = teamTheme(state.teams.home);
   const awayTheme = teamTheme(state.teams.away);
+
+  function togglePlayback() {
+    if (!events.length) return;
+    setIsPlaying((current) => {
+      if (!current && activeIndex >= events.length - 1) setActiveIndex(0);
+      return !current;
+    });
+  }
+
+  function selectEvent(index: number) {
+    setIsPlaying(false);
+    setActiveIndex(index);
+  }
 
   return (
     <div className="grid gap-4 lg:grid-cols-[1fr_380px]">
@@ -285,6 +330,7 @@ export default function LiveAnimationPitch({ initialState }: { initialState: Ani
               <div className="mt-3 flex flex-wrap gap-2 text-xs font-black">
                 <span className="rounded-full border border-white/10 bg-black/25 px-3 py-1">{homeTheme.flagEmoji} {state.teams.home.name}</span>
                 <span className="rounded-full border border-white/10 bg-black/25 px-3 py-1">{awayTheme.flagEmoji} {state.teams.away.name}</span>
+                <span className="rounded-full border border-white/10 bg-black/25 px-3 py-1">يعرض حدثًا واحدًا فقط على الملعب</span>
               </div>
             </div>
             <div className="rounded-2xl border border-white/10 bg-black/30 px-5 py-3 text-3xl font-black">
@@ -292,13 +338,19 @@ export default function LiveAnimationPitch({ initialState }: { initialState: Ani
             </div>
           </div>
         </div>
-        <VirtualPitch state={{ ...state, events }} activeEvent={activeEvent} />
+        <VirtualPitch state={{ ...state, events }} activeEvent={activeEvent} isPlaying={isPlaying} />
       </section>
 
       <aside className="rounded-[2rem] border border-white/10 bg-white/[0.04] p-4">
-        <div className="mb-4 flex items-center justify-between gap-3">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-xl font-black">الأحداث</h2>
-          <span className="rounded-full border border-white/10 bg-black/25 px-3 py-1 text-xs font-black text-slate-300">{events.length} حدث</span>
+          <div className="flex items-center gap-2">
+            <PlaybackButton isPlaying={isPlaying} disabled={!events.length} onClick={togglePlayback} />
+            <span className="rounded-full border border-white/10 bg-black/25 px-3 py-1 text-xs font-black text-slate-300">{events.length} حدث</span>
+          </div>
+        </div>
+        <div className="mb-3 rounded-2xl border border-white/10 bg-black/25 px-3 py-2 text-xs font-bold leading-6 text-slate-400">
+          اضغط على أي حدث لعرضه وحده على الملعب. زر التشغيل يعرض الأحداث بالتتابع حدثًا بعد حدث.
         </div>
         <div className="max-h-[72vh] space-y-3 overflow-y-auto pr-1">
           {events.slice().reverse().map((event, reverseIndex) => {
@@ -306,7 +358,7 @@ export default function LiveAnimationPitch({ initialState }: { initialState: Ani
             const active = originalIndex === activeIndex;
             const team = event.teamId === state.teams.home.id ? state.teams.home : event.teamId === state.teams.away.id ? state.teams.away : null;
             return (
-              <button key={`${event.id}-${reverseIndex}`} onClick={() => setActiveIndex(originalIndex)} className={`w-full rounded-2xl border p-3 text-right transition ${active ? 'border-[#18E58F]/40 bg-[#18E58F]/10' : 'border-white/10 bg-black/20 hover:bg-white/[0.06]'}`}>
+              <button key={`${event.id}-${reverseIndex}`} onClick={() => selectEvent(originalIndex)} className={`w-full rounded-2xl border p-3 text-right transition ${active ? 'border-[#18E58F]/40 bg-[#18E58F]/10' : 'border-white/10 bg-black/20 hover:bg-white/[0.06]'}`}>
                 <div className="flex items-start gap-3">
                   <span className="text-2xl">{event.icon}</span>
                   <div>
