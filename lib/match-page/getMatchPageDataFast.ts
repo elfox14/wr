@@ -30,6 +30,13 @@ import {
 const FINISHED = ['FINISHED', 'FT', 'AET', 'PEN', 'COMPLETED', 'ENDED'];
 const BAD_GROUP_KEYS = ['STAGE', 'GROUP', 'GROUPS', 'GROUP STAGE', 'GROUP_STAGE', 'NULL', 'UNKNOWN', 'N/A'];
 
+function usableImage(value: any) {
+  const text = String(value || '').trim();
+  if (!text) return null;
+  if (text.startsWith('http://') || text.startsWith('https://') || text.startsWith('/')) return text;
+  return null;
+}
+
 function cleanText(value: any): string | null {
   if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
     const text = String(value).trim();
@@ -62,11 +69,12 @@ function cleanVenue(value: any): string | null {
 }
 
 function teamLite(team: any): MatchTeamLite {
+  const flag = getTeamFlagUrl({ code: team.code, name: team.name, image: team.image }, 160);
   return {
     id: team.id,
     name: team.name || team.code || 'منتخب غير معروف',
     code: team.code || null,
-    image: getTeamFlagUrl({ code: team.code, name: team.name, image: team.image }, 160) || team.image || null,
+    image: usableImage(flag) || usableImage(team.image),
     coach: team.coach || null,
     fifaRank: team.fifaRank ?? null,
     group: team.group || null,
@@ -78,7 +86,7 @@ function playerLite(player: any): MatchPlayerLite {
     id: player.id,
     name: player.name || player.code || 'لاعب غير معروف',
     code: player.code || null,
-    image: player.image || null,
+    image: usableImage(player.image),
     position: player.position || null,
     teamId: player.teamId || null,
   };
@@ -251,7 +259,7 @@ export async function getMatchPageDataFast(matchId: string): Promise<MatchPageDa
   const status = forceFinishedStatus(match, buildStatusView(match, snapshots));
   const stats = metricDefinitions().map(([key, label, homeKey, awayKey, suffix]) => buildStatMetric(snapshots, key, label, homeKey, awayKey, suffix));
   const statsAvailable = stats.some((metric: MatchStatMetric) => metric.available);
- const groupKey = normalizeGoodGroup(match.groupPhase) || normalizeGoodGroup(homeTeam.group) || normalizeGoodGroup(awayTeam.group);
+  const groupKey = normalizeGoodGroup(match.groupPhase) || normalizeGoodGroup(homeTeam.group) || normalizeGoodGroup(awayTeam.group);
   const groupStandings = groupKey ? buildGroupStandings(allMatches as any[], groupKey) : [];
   const thirdPlaceTable = buildBestThirdsTable(allMatches as any[]);
   const dbEvents: MatchEventView[] = (match.events || []).map(buildEventView);
