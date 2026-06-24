@@ -433,8 +433,11 @@ export default function ProfessionalMatchPageClient({ data }: { data: MatchPageD
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<TabId>('events');
   const lockRef = useRef<number | null>(null);
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
   const refreshMs = data.status.kind === 'live' ? 25000 : 90000;
   const pageTitle = useMemo(() => `${data.homeTeam.name} ${fmt(data.score.home)} - ${fmt(data.score.away)} ${data.awayTeam.name}`, [data]);
+  if (!mounted) return <main className="min-h-screen bg-[#04110D] p-6 text-center text-white" dir="rtl">Loading match page...</main>;
   function refresh() { router.refresh(); }
   function selectTab(id: TabId) { setActiveTab(id); const target = document.getElementById(id); if (!target || typeof window === 'undefined') return; if (lockRef.current) window.clearTimeout(lockRef.current); const offset = window.innerWidth < 1024 ? 126 : 150; const top = target.getBoundingClientRect().top + window.scrollY - offset; window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' }); lockRef.current = window.setTimeout(() => { lockRef.current = null; }, 900); }
   useEffect(() => { const observer = new IntersectionObserver((entries) => { if (lockRef.current) return; const visible = entries.filter((entry) => entry.isIntersecting).sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0]; if (visible?.target?.id) setActiveTab(visible.target.id as TabId); }, { rootMargin: '-34% 0px -55% 0px', threshold: [0.1, 0.35, 0.6] }); tabs.forEach(([id]) => { const el = document.getElementById(id); if (el) observer.observe(el); }); return () => observer.disconnect(); }, []);
