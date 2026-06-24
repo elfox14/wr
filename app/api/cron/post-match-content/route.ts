@@ -14,6 +14,10 @@ function configuredSecrets() {
   ].map((value) => String(value || '').trim()).filter(Boolean);
 }
 
+function isEnabled(value: string | undefined) {
+  return ['1', 'true', 'yes', 'on'].includes(String(value || '').trim().toLowerCase());
+}
+
 function isAuthorized(req: Request) {
   const valid = configuredSecrets();
   if (!valid.length) {
@@ -22,11 +26,17 @@ function isAuthorized(req: Request) {
 
   const auth = req.headers.get('authorization') || '';
   const bearer = auth.startsWith('Bearer ') ? auth.slice(7).trim() : '';
+  const url = new URL(req.url);
+  const urlKey = isEnabled(process.env.POST_MATCH_CONTENT_ALLOW_URL_KEY)
+    ? (url.searchParams.get('key') || '').trim()
+    : '';
+
   const candidates = [
     bearer,
     req.headers.get('x-post-match-content-secret')?.trim() || '',
     req.headers.get('x-cron-secret')?.trim() || '',
     req.headers.get('x-admin-secret')?.trim() || '',
+    urlKey,
   ];
 
   return candidates.some((value) => value && valid.includes(value))
