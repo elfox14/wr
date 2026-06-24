@@ -106,16 +106,6 @@ function eventTone(type: string) {
   return 'border-[#18E58F]/25 bg-[#18E58F]/10';
 }
 
-function pitchPlayerPositions(team: 'home' | 'away') {
-  const home = [
-    [10, 50], [23, 22], [24, 42], [24, 58], [23, 78],
-    [39, 30], [42, 50], [39, 70],
-    [57, 26], [61, 50], [57, 74],
-  ];
-  const away = home.map(([x, y]) => [100 - Number(x), Number(y)] as [number, number]);
-  return (team === 'home' ? home : away) as [number, number][];
-}
-
 function CrowdStand({ side, theme, active }: { side: 'top' | 'bottom'; theme: TeamVisualTheme; active: boolean }) {
   return (
     <div
@@ -220,13 +210,6 @@ function VirtualPitch({ state, activeEvent, isPlaying }: { state: AnimationState
         <div className="absolute right-4 top-[31%] z-[2] h-[38%] w-[14%] rounded-l-2xl border-2 border-white/25" />
         <div className="absolute left-4 top-[42%] z-[2] h-[16%] w-[5%] rounded-r-xl border-2 border-white/20" />
         <div className="absolute right-4 top-[42%] z-[2] h-[16%] w-[5%] rounded-l-xl border-2 border-white/20" />
-
-        {pitchPlayerPositions('home').map(([x, y], index) => (
-          <div key={`h-${index}`} aria-label="home player" className="absolute z-10 h-7 w-7 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/60 shadow-lg" style={{ left: `${x}%`, top: `${y}%`, backgroundColor: homeTheme.shirtPrimary }} />
-        ))}
-        {pitchPlayerPositions('away').map(([x, y], index) => (
-          <div key={`a-${index}`} aria-label="away player" className="absolute z-10 h-7 w-7 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/60 shadow-lg" style={{ left: `${x}%`, top: `${y}%`, backgroundColor: awayTheme.shirtPrimary }} />
-        ))}
 
         {activeEvent?.endX !== null && activeEvent?.endY !== null && activeEvent && (
           <svg className="pointer-events-none absolute inset-0 z-20 h-full w-full" viewBox="0 0 100 100" preserveAspectRatio="none">
@@ -336,7 +319,7 @@ export default function LiveAnimationPitch({ initialState }: { initialState: Ani
               <div className="mt-3 flex flex-wrap gap-2 text-xs font-black">
                 <span className="rounded-full border border-white/10 bg-black/25 px-3 py-1">{homeTheme.flagEmoji} {state.teams.home.name}</span>
                 <span className="rounded-full border border-white/10 bg-black/25 px-3 py-1">{awayTheme.flagEmoji} {state.teams.away.name}</span>
-                <span className="rounded-full border border-white/10 bg-black/25 px-3 py-1">يعرض حدثًا واحدًا فقط على الملعب</span>
+                <span className="rounded-full border border-white/10 bg-black/25 px-3 py-1">يعرض الحدث النشط فقط بدون دوائر لاعبين ثابتة</span>
               </div>
             </div>
             <div className="rounded-2xl border border-white/10 bg-black/30 px-5 py-3 text-3xl font-black">
