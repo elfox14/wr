@@ -5,10 +5,14 @@ import type {
   MatchEventView,
   MatchPageData,
   MatchPlayerLite,
+  MatchPlayerStatItem,
   MatchSourceView,
   MatchStatMetric,
   MatchStatusView,
   MatchTeamLite,
+  OfficialLineupPlayer,
+  OfficialLineupTeam,
+  OfficialLineupView,
   RelatedArticle,
   SourceChecklistItem,
 } from './types';
@@ -27,7 +31,7 @@ import {
   toNumber,
 } from './normalizers';
 
-const FINISHED = ['FINISHED', 'FT', 'AET', 'PEN', 'COMPLETED', 'ENDED'];
+const FINISHED = ['FINISHED', 'FT', 'AET', 'PEN', 'COMPLETED', 'ENDED', 'FINAL_VERIFIED'];
 const BAD_GROUP_KEYS = ['STAGE', 'GROUP', 'GROUPS', 'GROUP STAGE', 'GROUP_STAGE', 'NULL', 'UNKNOWN', 'N/A'];
 
 function usableImage(value: any) {
@@ -111,6 +115,169 @@ function findDeep(value: any, keys: string[], depth = 0): any {
   return null;
 }
 
+function asList(value: any): any[] {
+  if (Array.isArray(value)) return value;
+  if (!value || typeof value !== 'object') return [];
+  for (const key of ['players', 'lineup', 'startingXi', 'startingXI', 'starting_xi', 'starters', 'substitutes', 'subs', 'bench', 'items', 'data', 'results']) {
+    if (Array.isArray(value[key])) return value[key];
+  }
+  return [];
+}
+
+function firstList(value: any, keys: string[]): any[] {
+  if (Array.isArray(value)) return value;
+  if (!value || typeof value !== 'object') return [];
+  for (const key of keys) {
+    if (Array.isArray(value[key])) return value[key];
+  }
+  return [];
+}
+
+function teamKey(value: any) {
+  return String(value || '').toLowerCase().replace(/[^a-z0-9\u0600-\u06ff]+/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+function looksLikeTeam(row: any, team: MatchTeamLite) {
+  const text = teamKey(`${cleanText(row?.teamName || row?.team?.name || row?.team || row?.country || row?.side)} ${row?.teamId || row?.team_id || ''}`);
+  const name = teamKey(team.name);
+  const code = teamKey(team.code);
+  if (row?.teamId && row.teamId === team.id) return true;
+  if (text && name && (text.includes(name) || name.includes(text))) return true;
+  if (text && code && text.includes(code)) return true;
+  return false;
+}
+
+function lineupPlayer(row: any): OfficialLineupPlayer | null {
+  const player = row?.player || row?.athlete || row;
+  const name = cleanText(player?.name || row?.playerName || row?.player_name || row?.name);
+  if (!name) return null;
+
+  return {
+    id: cleanText(player?.id || row?.playerId || row?.player_id || row?.id),
+    name,
+    number: row?.number ?? row?.shirtNumber ?? row?.shirt_number ?? player?.number ?? null,
+    image: usableImage(player?.image || row?.image || row?.photo),
+    position: cleanText(player?.position || row?.position || row?.role),
+    rating: toNumber(row?.rating || player?.rating),
+    isCaptain: Boolean(row?.isCaptain || row?.captain || player?.captain),
+  };
+}
+
+function buildLineupTeam(rawTeam: any, fallbackName: string): OfficialLineupTeam | null {
+  if (!rawTeam) return null;
+  const startingRaw = firstList(rawTeam, ['startingXi', 'startingXI', 'starting_xi', 'starters', 'lineup', 'players']).filter(Boolean);
+  const substitutesRaw = firstList(rawTeam, ['substitutes', 'subs', 'bench']).filter(Boolean);
+  const startingXi = startingRaw.map(lineupPlayer).filter(Boolean).slice(0, 16) as OfficialLineupPlayer[];
+  const substitutes = substitutesRaw.map(lineupPlayer).filter(Boolean).slice(0, 16) as OfficialLineupPlayer[];
+  if (!startingXi.length && !substitutes.length) return null;
+
+  return {
+    teamName: cleanText(rawTeam.teamName || rawTeam.team_name || rawTeam.name || rawTeam.team?.name) || fallbackName,
+    formation: cleanText(rawTeam.formation || rawTeam.tacticalFormation || rawTeam.tactical_formation),
+    startingXi,
+    substitutes,
+  };
+}
+
+function extractLineupSide(lineups: any, team: MatchTeamLite) {
+  const direct = lineups?.home && looksLikeTeam(lineups.home, team) ? lineups.home : lineups?.away && looksLikeTeam(lineups.away, team) ? lineups.away : null;
+  if (direct) return direct;
+
+  const bySide = lineups?.homeTeam || lineups?.awayTeam || lineups?.home_team || lineups?.away_team;
+  if (bySide && looksLikeTeam(bySide, team)) return bySide;
+
+  const candidates = [
+    ...asList(lineups),
+    ...firstList(lineups, ['teams', 'lineups', 'participants']),
+  ];
+  return candidates.find((item) => looksLikeTeam(item, team)) || null;
+}
+
+function extractOfficialLineup(snapshots: any[], homeTeam: MatchTeamLite, awayTeam: MatchTeamLite): OfficialLineupView {
+  for (const snapshot of snapshots) {
+    const data = rawData(snapshot);
+    const normalized = data.normalized || {};
+    const lineups = normalized.lineups || data.lineups || data.lineup;
+    if (!lineups) continue;
+
+    const homeRaw = lineups.home || lineups.homeTeam || lineups.home_team || extractLineupSide(lineups, homeTeam);
+    const awayRaw = lineups.away || lineups.awayTeam || lineups.away_team || extractLineupSide(lineups, awayTeam);
+    const home = buildLineupTeam(homeRaw, homeTeam.name);
+    const away = buildLineupTeam(awayRaw, awayTeam.name);
+
+    if (home || away) {
+      return {
+        confirmed: Boolean(normalized.lineups?.confirmed || data.confirmed || data.lineupsConfirmed || data.lineups_confirmed || home?.startingXi?.length || away?.startingXi?.length),
+        source: cleanText(snapshot.provider) || 'Snapshot محفوظ',
+        home,
+        away,
+      };
+    }
+  }
+
+  return null;
+}
+
+function normalizePlayerStat(row: any, homeTeam: MatchTeamLite, awayTeam: MatchTeamLite): MatchPlayerStatItem | null {
+  const player = row?.player || row?.athlete || row;
+  const playerName = cleanText(player?.name || row?.playerName || row?.player_name || row?.name);
+  if (!playerName) return null;
+  const rawTeamName = cleanText(row?.teamName || row?.team_name || row?.team?.name || row?.team);
+  const teamId = row?.teamId === homeTeam.id || looksLikeTeam(row, homeTeam) ? homeTeam.id : row?.teamId === awayTeam.id || looksLikeTeam(row, awayTeam) ? awayTeam.id : cleanText(row?.teamId || row?.team_id);
+  const teamName = teamId === homeTeam.id ? homeTeam.name : teamId === awayTeam.id ? awayTeam.name : rawTeamName;
+
+  return {
+    playerId: cleanText(player?.id || row?.playerId || row?.player_id || row?.id),
+    playerName,
+    teamId,
+    teamName,
+    position: cleanText(player?.position || row?.position),
+    rating: toNumber(row?.rating || row?.score),
+    started: typeof row?.started === 'boolean' ? row.started : Boolean(row?.starting || row?.isStarter || row?.starter),
+    played: row?.played === false ? false : true,
+    minutes: toNumber(row?.minutes || row?.minutesPlayed || row?.minutes_played),
+    goals: toNumber(row?.goals),
+    assists: toNumber(row?.assists),
+    shots: toNumber(row?.shots),
+    shotsOnTarget: toNumber(row?.shotsOnTarget || row?.shots_on_target),
+    passes: toNumber(row?.passes),
+    accuratePasses: toNumber(row?.accuratePasses || row?.accurate_passes),
+    keyPasses: toNumber(row?.keyPasses || row?.key_passes),
+    tackles: toNumber(row?.tackles),
+    interceptions: toNumber(row?.interceptions),
+    clearances: toNumber(row?.clearances),
+    saves: toNumber(row?.saves),
+  };
+}
+
+function extractPlayerStats(snapshots: any[], homeTeam: MatchTeamLite, awayTeam: MatchTeamLite): MatchPlayerStatItem[] {
+  const rows: MatchPlayerStatItem[] = [];
+  const seen = new Set<string>();
+
+  for (const snapshot of snapshots) {
+    const data = rawData(snapshot);
+    const normalized = data.normalized || {};
+    const list = [
+      ...asList(normalized.playerStats),
+      ...asList(data.playerStats),
+      ...asList(data.players),
+    ];
+
+    for (const item of list) {
+      const parsed = normalizePlayerStat(item, homeTeam, awayTeam);
+      if (!parsed?.playerName) continue;
+      const key = `${parsed.playerId || ''}:${parsed.playerName}:${parsed.teamId || parsed.teamName || ''}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      rows.push(parsed);
+    }
+
+    if (rows.length >= 60) break;
+  }
+
+  return rows.sort((a, b) => (Number(b.rating || 0) - Number(a.rating || 0)) || (Number(b.goals || 0) - Number(a.goals || 0))).slice(0, 60);
+}
+
 function extractBasicInfo(match: any, snapshots: any[]) {
   const directVenue = cleanVenue(match.venue) || cleanVenue(match.stadium) || cleanVenue(match.location);
   const directCity = cleanText(match.city);
@@ -132,7 +299,7 @@ function extractBasicInfo(match: any, snapshots: any[]) {
   return { venue, city, referee };
 }
 
-function extractAdvancedData(snapshots: any[]): MatchAdvancedData {
+function extractAdvancedData(snapshots: any[], homeTeam: MatchTeamLite, awayTeam: MatchTeamLite): MatchAdvancedData {
   const extras = snapshots.find((snapshot) => String(snapshot.provider || '').toUpperCase() === 'THE_STATS_API_EXTRAS');
   const normalized = extras?.rawData && typeof extras.rawData === 'object' ? (extras.rawData as any).normalized || {} : {};
   const matchInfo = normalized.matchInfo || {};
@@ -147,7 +314,7 @@ function extractAdvancedData(snapshots: any[]): MatchAdvancedData {
     npxg: npxgRaw ? { home: toNumber(npxgRaw.home_team ?? npxgRaw.home), away: toNumber(npxgRaw.away_team ?? npxgRaw.away) } : null,
     events: [],
     shotmap: [],
-    playerStats: [],
+    playerStats: extractPlayerStats(snapshots, homeTeam, awayTeam),
   };
 }
 
@@ -159,11 +326,13 @@ function forceFinishedStatus(match: any, current: MatchStatusView): MatchStatusV
   return current;
 }
 
-function sourceChecklist(match: any, statsAvailable: boolean, eventsCount: number): SourceChecklistItem[] {
+function sourceChecklist(match: any, statsAvailable: boolean, eventsCount: number, lineupAvailable: boolean, playerStatsCount: number): SourceChecklistItem[] {
   return [
     { label: 'بيانات المباراة والمنتخبين', status: match ? 'ready' : 'missing', note: 'الفرق، الموعد، الحالة والنتيجة الأساسية.' },
     { label: 'الإحصائيات الحية والنهائية', status: statsAvailable ? 'ready' : 'missing', note: statsAvailable ? 'تم حفظ Snapshot إحصائي من مزود البيانات.' : 'سيتم تحديثها تلقائيًا عند وصول Snapshot جديد.' },
     { label: 'أحداث المباراة', status: eventsCount > 0 ? 'ready' : 'missing', note: eventsCount > 0 ? 'الأحداث محفوظة في قاعدة البيانات.' : 'تظهر الأحداث عند توفر مصدر موثق.' },
+    { label: 'التشكيلات', status: lineupAvailable ? 'ready' : 'optional', note: lineupAvailable ? 'تم العثور على تشكيل محفوظ في Snapshot.' : 'ستظهر التشكيلات عند حفظها من مزود موثق أو إدخالها يدويًا.' },
+    { label: 'تقييمات اللاعبين', status: playerStatsCount > 0 ? 'ready' : 'optional', note: playerStatsCount > 0 ? 'تقييمات وإحصائيات اللاعبين محفوظة.' : 'تظهر تقييمات اللاعبين بعد توفر player stats محفوظة.' },
   ];
 }
 
@@ -254,7 +423,8 @@ export async function getMatchPageDataFast(matchId: string): Promise<MatchPageDa
   const snapshots = [...(match.statsSnapshots || [])].sort((a, b) => providerPriority(a) - providerPriority(b) || new Date(b.capturedAt).getTime() - new Date(a.capturedAt).getTime());
   const homeTeam = teamLite(match.homeTeam);
   const awayTeam = teamLite(match.awayTeam);
-  const advanced = extractAdvancedData(snapshots);
+  const advanced = extractAdvancedData(snapshots, homeTeam, awayTeam);
+  const officialLineup = extractOfficialLineup(snapshots, homeTeam, awayTeam);
   const score = scoreForDisplay(match, snapshots);
   const status = forceFinishedStatus(match, buildStatusView(match, snapshots));
   const stats = metricDefinitions().map(([key, label, homeKey, awayKey, suffix]) => buildStatMetric(snapshots, key, label, homeKey, awayKey, suffix));
@@ -289,7 +459,7 @@ export async function getMatchPageDataFast(matchId: string): Promise<MatchPageDa
     events: dbEvents,
     homePlayers: players.filter((player) => player.teamId === match.homeTeamId).map(playerLite),
     awayPlayers: players.filter((player) => player.teamId === match.awayTeamId).map(playerLite),
-    officialLineup: null,
+    officialLineup,
     advanced,
     voteEndpoint: `/api/matches/${match.id}/votes`,
     groupStandings,
@@ -299,7 +469,7 @@ export async function getMatchPageDataFast(matchId: string): Promise<MatchPageDa
     digest: digest ? { summary: digest.summary, turningPoint: digest.turningPoint, scoreLine: digest.scoreLine, href: `/match-digests/${match.id}` } : null,
     relatedArticles: relatedArticlesFrom(relatedNews, digest, match.id),
     sources,
-    sourceChecklist: sourceChecklist(match, statsAvailable, dbEvents.length),
+    sourceChecklist: sourceChecklist(match, statsAvailable, dbEvents.length, Boolean(officialLineup), advanced.playerStats.length),
     lastUpdatedAt: maxDateIso([...(match.statsSnapshots || []).map((snapshot) => snapshot.capturedAt), ...(match.events || []).map((event) => event.updatedAt), match.matchDate]),
   };
 }
