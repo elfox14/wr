@@ -84,9 +84,52 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     console.error('Sitemap news generation error:', err);
   }
 
+  let articleUrls: MetadataRoute.Sitemap = [];
+  try {
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "MatchArticle" (
+        "id" TEXT PRIMARY KEY,
+        "matchId" TEXT NOT NULL,
+        "title" TEXT NOT NULL,
+        "slug" TEXT NOT NULL UNIQUE,
+        "metaTitle" TEXT NOT NULL,
+        "metaDescription" TEXT NOT NULL,
+        "excerpt" TEXT NOT NULL,
+        "body" TEXT NOT NULL,
+        "sections" JSONB,
+        "statsSummary" JSONB,
+        "status" TEXT NOT NULL DEFAULT 'DRAFT_READY',
+        "language" TEXT NOT NULL DEFAULT 'ar',
+        "seoScore" INTEGER NOT NULL DEFAULT 0,
+        "sourceSnapshotId" TEXT,
+        "heroImageUrl" TEXT,
+        "infographicImageUrl" TEXT,
+        "publishedAt" TIMESTAMP(3),
+        "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    const articles = await prisma.$queryRawUnsafe<any[]>(`
+      SELECT "slug", "publishedAt", "updatedAt" FROM "MatchArticle"
+      WHERE "status" = 'PUBLISHED'
+      ORDER BY "publishedAt" DESC NULLS LAST, "updatedAt" DESC
+    `);
+
+    articleUrls = articles.map((article) => ({
+      url: `${baseUrl}/articles/${article.slug}`,
+      lastModified: new Date(article.updatedAt || article.publishedAt || new Date()),
+      changeFrequency: 'weekly' as const,
+      priority: 0.82,
+    }));
+  } catch (err) {
+    console.error('Sitemap article generation error:', err);
+  }
+
   return [
     ...staticPages,
     ...matchCenterUrls,
     ...newsUrls,
+    ...articleUrls,
   ];
 }
