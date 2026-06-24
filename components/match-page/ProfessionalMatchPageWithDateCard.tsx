@@ -1,10 +1,61 @@
-import type { MatchPageData, MatchStatMetric, SourceChecklistItem } from '@/lib/match-page/types';
+import type { MatchEventView, MatchPageData, MatchStatMetric, SourceChecklistItem } from '@/lib/match-page/types';
 import { EGYPT_TIME_ZONE_LABEL, formatEgyptDateTime } from '@/lib/match-page/egyptTime';
 import { publicSourceViews } from '@/lib/match-page/publicSourceLabels';
+
+const QUICK_STAT_KEYS = ['possession', 'shots', 'shotsOnTarget', 'corners'];
+const FEATURED_STAT_KEYS = ['possession', 'xg', 'shots', 'shotsOnTarget', 'corners', 'bigChances', 'yellowCards', 'redCards'];
 
 function value(value: number | null | undefined, suffix = '') {
   if (value === null || value === undefined || Number.isNaN(Number(value))) return '—';
   return `${value}${suffix}`;
+}
+
+function safeNumber(value: number | null | undefined) {
+  return value === null || value === undefined || Number.isNaN(Number(value)) ? null : Number(value);
+}
+
+function statShare(metric: MatchStatMetric) {
+  const home = safeNumber(metric.home);
+  const away = safeNumber(metric.away);
+  if (home === null || away === null) return { home: 0, away: 0, available: false };
+  const total = Math.abs(home) + Math.abs(away);
+  if (!total) return { home: 50, away: 50, available: true };
+  return { home: Math.max(6, Math.round((Math.abs(home) / total) * 100)), away: Math.max(6, Math.round((Math.abs(away) / total) * 100)), available: true };
+}
+
+function eventKind(event: MatchEventView) {
+  const text = `${event.type || ''} ${event.detail || ''}`.toLowerCase();
+  if (text.includes('goal') || text.includes('هدف')) return 'goal';
+  if (text.includes('red') || text.includes('حمراء')) return 'red';
+  if (text.includes('yellow') || text.includes('صفراء')) return 'yellow';
+  if (text.includes('sub') || text.includes('تبديل')) return 'substitution';
+  if (text.includes('penalty') || text.includes('ركلة')) return 'penalty';
+  return 'event';
+}
+
+function eventIcon(event: MatchEventView) {
+  const kind = eventKind(event);
+  if (kind === 'goal') return '⚽';
+  if (kind === 'red') return '🟥';
+  if (kind === 'yellow') return '🟨';
+  if (kind === 'substitution') return '🔁';
+  if (kind === 'penalty') return '🎯';
+  return event.icon || '•';
+}
+
+function eventTone(event: MatchEventView) {
+  const kind = eventKind(event);
+  if (kind === 'goal') return 'border-[#18E58F]/30 bg-[#18E58F]/10';
+  if (kind === 'red') return 'border-red-400/30 bg-red-400/10';
+  if (kind === 'yellow') return 'border-[#F8C846]/30 bg-[#F8C846]/10';
+  if (kind === 'substitution') return 'border-sky-300/25 bg-sky-300/10';
+  return 'border-white/10 bg-black/25';
+}
+
+function teamNameForEvent(event: MatchEventView, data: MatchPageData) {
+  if (event.teamId === data.homeTeam.id) return data.homeTeam.name;
+  if (event.teamId === data.awayTeam.id) return data.awayTeam.name;
+  return 'المباراة';
 }
 
 function TeamCard({ team }: { team: MatchPageData['homeTeam'] }) {
@@ -19,12 +70,69 @@ function TeamCard({ team }: { team: MatchPageData['homeTeam'] }) {
   );
 }
 
-function StatRow({ metric }: { metric: MatchStatMetric }) {
+function QuickStatCard({ metric, homeName, awayName }: { metric: MatchStatMetric; homeName: string; awayName: string }) {
   return (
-    <div className="grid grid-cols-[70px_1fr_70px] items-center gap-3 rounded-2xl border border-white/10 bg-black/25 p-3 text-center">
-      <b className="text-[#F8C846]">{value(metric.home, metric.suffix)}</b>
-      <span className="text-sm font-black text-white">{metric.label}</span>
-      <b className="text-[#18E58F]">{value(metric.away, metric.suffix)}</b>
+    <div className="rounded-2xl border border-white/10 bg-black/25 p-3">
+      <p className="text-xs font-black text-slate-400">{metric.label}</p>
+      <div className="mt-2 flex items-center justify-between gap-3">
+        <div>
+          <b className="block text-xl text-[#F8C846]">{value(metric.home, metric.suffix)}</b>
+          <span className="text-[11px] font-bold text-slate-500">{homeName}</span>
+        </div>
+        <span className="text-xs font-black text-slate-500">ضد</span>
+        <div className="text-left">
+          <b className="block text-xl text-[#18E58F]">{value(metric.away, metric.suffix)}</b>
+          <span className="text-[11px] font-bold text-slate-500">{awayName}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function StatRow({ metric, homeName, awayName }: { metric: MatchStatMetric; homeName: string; awayName: string }) {
+  const share = statShare(metric);
+
+  return (
+    <div className="rounded-2xl border border-white/10 bg-black/25 p-4">
+      <div className="mb-3 flex items-center justify-between gap-3 text-center">
+        <div className="min-w-16 text-right">
+          <b className="block text-lg text-[#F8C846]">{value(metric.home, metric.suffix)}</b>
+          <span className="text-[11px] font-bold text-slate-500">{homeName}</span>
+        </div>
+        <span className="text-sm font-black text-white">{metric.label}</span>
+        <div className="min-w-16 text-left">
+          <b className="block text-lg text-[#18E58F]">{value(metric.away, metric.suffix)}</b>
+          <span className="text-[11px] font-bold text-slate-500">{awayName}</span>
+        </div>
+      </div>
+      {share.available && (
+        <div className="grid grid-cols-2 overflow-hidden rounded-full bg-white/10">
+          <div className="h-2 bg-[#F8C846]" style={{ width: `${share.home}%` }} />
+          <div className="ml-auto h-2 bg-[#18E58F]" style={{ width: `${share.away}%` }} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function EventTimelineItem({ event, data }: { event: MatchEventView; data: MatchPageData }) {
+  const kind = eventKind(event);
+  const isMajor = ['goal', 'red', 'penalty'].includes(kind);
+
+  return (
+    <div className="relative grid grid-cols-[70px_1fr] gap-3 md:grid-cols-[90px_1fr]">
+      <div className="text-left">
+        <span className="inline-flex rounded-full border border-white/10 bg-black/35 px-3 py-1 text-xs font-black text-[#F8C846]">{event.minuteLabel || '—'}</span>
+      </div>
+      <div className={`rounded-2xl border p-3 ${eventTone(event)} ${isMajor ? 'shadow-lg shadow-black/20' : ''}`}>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-lg">{eventIcon(event)}</span>
+          <b className="text-sm text-white">{event.type || 'حدث'}</b>
+          <span className="rounded-full border border-white/10 bg-black/20 px-2 py-1 text-[11px] font-black text-slate-300">{teamNameForEvent(event, data)}</span>
+        </div>
+        <p className="mt-2 text-sm font-bold leading-6 text-slate-300">{event.detail || event.playerName || 'حدث محفوظ في قاعدة البيانات.'}</p>
+        {event.sourceName && <p className="mt-1 text-[11px] font-bold text-slate-500">المصدر المحفوظ: {event.sourceName}</p>}
+      </div>
     </div>
   );
 }
@@ -49,8 +157,13 @@ function ChecklistBadge({ item }: { item: SourceChecklistItem }) {
 }
 
 export default function ProfessionalMatchPageWithDateCard({ data }: { data: MatchPageData }) {
-  const availableStats = data.stats.filter((metric) => metric.available).slice(0, 10);
-  const latestEvents = data.events.slice(-12).reverse();
+  const availableStats = data.stats.filter((metric) => metric.available);
+  const quickStats = QUICK_STAT_KEYS.map((key) => availableStats.find((metric) => metric.key === key)).filter(Boolean) as MatchStatMetric[];
+  const featuredStats = [
+    ...FEATURED_STAT_KEYS.map((key) => availableStats.find((metric) => metric.key === key)).filter(Boolean),
+    ...availableStats.filter((metric) => !FEATURED_STAT_KEYS.includes(metric.key)),
+  ].slice(0, 16) as MatchStatMetric[];
+  const timelineEvents = [...data.events].sort((a, b) => (a.minute ?? 999) - (b.minute ?? 999)).slice(0, 45);
   const shouldShowArticleCta = data.status.isFinished || String(data.status.raw || '').toUpperCase() === 'FINAL_VERIFIED';
   const matchDateEgypt = formatEgyptDateTime(data.matchDate);
   const lastUpdatedEgypt = data.lastUpdatedAt ? formatEgyptDateTime(data.lastUpdatedAt) : 'غير متوفر';
@@ -87,6 +200,18 @@ export default function ProfessionalMatchPageWithDateCard({ data }: { data: Matc
           <div><b className="text-[#18E58F]">الحكم:</b> {data.referee || 'غير متوفر'}</div>
           <div><b className="text-[#18E58F]">آخر تحديث:</b> {lastUpdatedEgypt} <span className="text-slate-400">({EGYPT_TIME_ZONE_LABEL})</span></div>
         </section>
+
+        {quickStats.length > 0 && (
+          <section className="rounded-[1.5rem] border border-white/10 bg-white/[0.04] p-4">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <h2 className="text-2xl font-black text-white">لوحة أرقام سريعة</h2>
+              <span className="rounded-full border border-[#18E58F]/20 px-3 py-1 text-[11px] font-black text-[#18E58F]">من Snapshot محفوظ</span>
+            </div>
+            <div className="grid gap-3 md:grid-cols-4">
+              {quickStats.map((metric) => <QuickStatCard key={metric.key} metric={metric} homeName={data.homeTeam.name} awayName={data.awayTeam.name} />)}
+            </div>
+          </section>
+        )}
 
         <section className="rounded-[1.5rem] border border-white/10 bg-white/[0.04] p-4">
           <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
@@ -126,13 +251,19 @@ export default function ProfessionalMatchPageWithDateCard({ data }: { data: Matc
         )}
 
         <section className="rounded-[1.5rem] border border-white/10 bg-white/[0.04] p-4">
-          <h2 className="mb-4 text-2xl font-black text-white">إحصائيات المباراة</h2>
-          {availableStats.length ? <div className="grid gap-3 md:grid-cols-2">{availableStats.map((metric) => <StatRow key={metric.key} metric={metric} />)}</div> : <p className="rounded-2xl border border-dashed border-white/15 bg-black/20 p-5 text-center font-bold text-slate-400">الإحصائيات التفصيلية غير متوفرة حاليًا.</p>}
+          <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+            <h2 className="text-2xl font-black text-white">إحصائيات المباراة</h2>
+            <span className="text-xs font-bold text-slate-500">مقارنة مباشرة بين الفريقين</span>
+          </div>
+          {featuredStats.length ? <div className="grid gap-3 md:grid-cols-2">{featuredStats.map((metric) => <StatRow key={metric.key} metric={metric} homeName={data.homeTeam.name} awayName={data.awayTeam.name} />)}</div> : <p className="rounded-2xl border border-dashed border-white/15 bg-black/20 p-5 text-center font-bold text-slate-400">الإحصائيات التفصيلية غير متوفرة حاليًا.</p>}
         </section>
 
         <section className="rounded-[1.5rem] border border-white/10 bg-white/[0.04] p-4">
-          <h2 className="mb-4 text-2xl font-black text-white">أحداث المباراة</h2>
-          {latestEvents.length ? <div className="space-y-2">{latestEvents.map((event) => <div key={event.id} className="rounded-2xl border border-white/10 bg-black/25 p-3"><b className="text-[#F8C846]">{event.minuteLabel || ''}</b> <span className="font-bold">{event.type}</span> <span className="text-slate-300">{event.detail || event.playerName || ''}</span></div>)}</div> : <p className="rounded-2xl border border-dashed border-white/15 bg-black/20 p-5 text-center font-bold text-slate-400">لا توجد أحداث محفوظة لهذه المباراة حتى الآن.</p>}
+          <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+            <h2 className="text-2xl font-black text-white">Timeline أحداث المباراة</h2>
+            <span className="text-xs font-bold text-slate-500">{timelineEvents.length} حدث محفوظ</span>
+          </div>
+          {timelineEvents.length ? <div className="space-y-3">{timelineEvents.map((event) => <EventTimelineItem key={event.id} event={event} data={data} />)}</div> : <p className="rounded-2xl border border-dashed border-white/15 bg-black/20 p-5 text-center font-bold text-slate-400">لا توجد أحداث محفوظة لهذه المباراة حتى الآن.</p>}
         </section>
 
         {data.relatedArticles.length > 0 && (
