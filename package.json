@@ -13,7 +13,7 @@
     "cron:expire-stale-matches": "node scripts/render-expire-stale-matches.mjs",
     "worker:live-ingest": "node scripts/automated-live-ingest-worker.mjs",
     "lint": "echo \"Lint advisory only; type-check and build remain required\"",
-    "lint:ai": "eslint features/analysis app/ai-analyst app/api/ai-analyst app/market/page.tsx app/api/ai-analyst/alerts/route.ts --max-warnings=0",
+    "lint:ai": "eslint features/analysis app/ai-analyst app/api/ai-analyst app/api/ai-analyst/alerts/route.ts --max-warnings=0",
     "lint:asset-page": "eslint app/asset/[id]/page.tsx --max-warnings=0",
     "lint:market-lite": "eslint app/market/page.tsx components/market/MarketClientClean.tsx components/market/market-client-types.ts features/analysis/components/AIMarketHighlights.tsx features/analysis/components/MarketAnalysisBadge.tsx features/analysis/components/FootballTechnicalAnalysis.tsx features/analysis/components/SmartTradeAlerts.tsx --max-warnings=0",
     "lint:market-client": "eslint components/market/MarketClientClean.tsx components/market/market-client-types.ts --max-warnings=0",
