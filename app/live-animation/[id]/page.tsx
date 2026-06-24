@@ -1,0 +1,193 @@
+import Link from 'next/link';
+import { notFound } from 'next/navigation';
+import prisma from '@/lib/prisma';
+import LiveAnimationPitch from '@/components/live-animation/LiveAnimationPitch';
+
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
+type PageProps = { params: Promise<{ id: string }> };
+
+const LIVE_STATUSES = ['LIVE', 'IN_PLAY', '1H', '2H', 'HT', 'ET', 'BREAK'];
+const FINISHED_STATUSES = ['FINISHED', 'FT', 'AET', 'PEN', 'COMPLETED', 'ENDED', 'FINAL_VERIFIED'];
+
+function statusKind(status?: string | null) {
+  const raw = String(status || '').toUpperCase();
+  if (LIVE_STATUSES.includes(raw)) return 'live';
+  if (raw === 'HT') return 'halftime';
+  if (FINISHED_STATUSES.includes(raw)) return 'finished';
+  return 'scheduled';
+}
+
+function safeNumber(value: any, fallback = 0) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : fallback;
+}
+
+function icon(type: string) {
+  const key = String(type || '').toLowerCase();
+  if (key.includes('goal')) return '⚽';
+  if (key.includes('yellow')) return '🟨';
+  if (key.includes('red')) return '🟥';
+  if (key.includes('sub')) return '🔁';
+  if (key.includes('shot')) return '🎯';
+  if (key.includes('corner')) return '🚩';
+  return '●';
+}
+
+function color(type: string) {
+  const key = String(type || '').toLowerCase();
+  if (key.includes('goal')) return '#F8C846';
+  if (key.includes('red')) return '#FF5C5C';
+  if (key.includes('yellow')) return '#F8C846';
+  if (key.includes('shot')) return '#18E58F';
+  return '#E5E7EB';
+}
+
+function eventLabel(type: string, detail?: string | null) {
+  const key = String(type || '').toLowerCase();
+  if (key.includes('goal')) return 'هدف';
+  if (key.includes('yellow')) return 'بطاقة صفراء';
+  if (key.includes('red')) return 'بطاقة حمراء';
+  if (key.includes('sub')) return 'تبديل';
+  if (key.includes('shot')) return 'تسديدة';
+  if (key.includes('corner')) return 'ركنية';
+  return detail ? 'حدث' : 'ملاحظة';
+}
+
+function fallbackPoint(index: number, side: 'home' | 'away' | 'unknown') {
+  const baseX = side === 'home' ? 34 : side === 'away' ? 66 : 50;
+  const offsets = [0, -16, 16, -8, 8, -24, 24];
+  return {
+    x: Math.max(12, Math.min(88, baseX + offsets[index % offsets.length])),
+    y: Math.max(14, Math.min(86, 22 + ((index * 17) % 60))),
+  };
+}
+
+function normalizeEvent(row: any, index: number, homeTeamId: string, awayTeamId: string) {
+  const eventType = String(row.eventType || row.type || 'note');
+  const side = row.teamId === homeTeamId ? 'home' : row.teamId === awayTeamId ? 'away' : 'unknown';
+  const point = fallbackPoint(index, side);
+  return {
+    id: String(row.id || `event-${index}`),
+    sequenceNumber: safeNumber(row.sequenceNumber, safeNumber(row.minute, index + 1) * 100 + index + 1),
+    minute: row.minute ?? null,
+    second: row.second ?? null,
+    teamId: row.teamId || null,
+    playerId: row.playerId || null,
+    playerName: row.playerName || null,
+    jerseyNumber: row.jerseyNumber || null,
+    eventType,
+    eventLabel: row.eventLabel || eventLabel(eventType, row.detail),
+    detail: row.detail || row.eventLabel || eventLabel(eventType),
+    x: row.x ?? point.x,
+    y: row.y ?? point.y,
+    endX: row.endX ?? null,
+    endY: row.endY ?? null,
+    zone: row.zone || null,
+    provider: row.provider || row.sourceName || 'MATCH_EVENT_FALLBACK',
+    icon: icon(eventType),
+    color: color(eventType),
+    createdAt: row.createdAt ? new Date(row.createdAt).toISOString() : new Date().toISOString(),
+  };
+}
+
+async function readLiveAnimationRows(matchId: string, homeTeamId: string, awayTeamId: string) {
+  try {
+    const rows = await prisma.$queryRawUnsafe<any[]>(`
+      SELECT
+        "id",
+        "sequenceNumber",
+        "minute",
+        "second",
+        "teamId",
+        "playerId",
+        "playerName",
+        "jerseyNumber",
+        "eventType",
+        "eventLabel",
+        "x",
+        "y",
+        "endX",
+        "endY",
+        "zone",
+        "provider",
+        "createdAt"
+      FROM "LiveAnimationEvent"
+      WHERE "matchId" = $1
+      ORDER BY "sequenceNumber" ASC
+      LIMIT 80
+    `, matchId);
+    if (rows.length) return rows.map((row, index) => normalizeEvent(row, index, homeTeamId, awayTeamId));
+  } catch {
+    // Migration may not be applied yet. Fallback below.
+  }
+
+  const events = await prisma.matchEvent.findMany({
+    where: { matchId },
+    orderBy: [{ minute: 'asc' }, { createdAt: 'asc' }],
+    take: 80,
+  }).catch(() => [] as any[]);
+
+  return events.map((event, index) => normalizeEvent(event, index, homeTeamId, awayTeamId));
+}
+
+async function getInitialState(matchId: string) {
+  const match = await prisma.match.findUnique({
+    where: { id: matchId },
+    include: {
+      homeTeam: { select: { id: true, name: true, code: true, image: true } },
+      awayTeam: { select: { id: true, name: true, code: true, image: true } },
+      statsSnapshots: { orderBy: { capturedAt: 'desc' }, take: 1 },
+    },
+  });
+
+  if (!match) return null;
+  const latestSnapshot = match.statsSnapshots?.[0] || null;
+  const events = await readLiveAnimationRows(match.id, match.homeTeam.id, match.awayTeam.id);
+  const lastSequence = events.reduce((max, event) => Math.max(max, Number(event.sequenceNumber || 0)), 0);
+
+  return {
+    ok: true,
+    mode: 'db_only_live_animation_state',
+    matchId: match.id,
+    title: `${match.homeTeam.name} ضد ${match.awayTeam.name}`,
+    phase: statusKind(match.status),
+    status: match.status,
+    minute: latestSnapshot?.minute ?? null,
+    score: {
+      home: safeNumber(latestSnapshot?.homeScore ?? match.homeScore, 0),
+      away: safeNumber(latestSnapshot?.awayScore ?? match.awayScore, 0),
+    },
+    teams: { home: match.homeTeam, away: match.awayTeam },
+    lastSequence,
+    events,
+    source: events.some((event) => event.provider !== 'MATCH_EVENT_FALLBACK') ? 'LiveAnimationEvent' : 'MatchEvent fallback',
+    lastUpdatedAt: latestSnapshot?.capturedAt ? latestSnapshot.capturedAt.toISOString() : new Date().toISOString(),
+  };
+}
+
+export default async function LiveAnimationPage({ params }: PageProps) {
+  const { id } = await params;
+  const initialState = await getInitialState(id);
+  if (!initialState) notFound();
+
+  return (
+    <main className="min-h-screen bg-[#04110D] px-3 py-5 text-white" dir="rtl">
+      <div className="mx-auto max-w-7xl space-y-4">
+        <header className="flex flex-col gap-3 rounded-[2rem] border border-white/10 bg-white/[0.04] p-4 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h1 className="text-3xl font-black">Live Animation Center</h1>
+            <p className="mt-1 text-sm font-bold text-slate-400">ملعب افتراضي تفاعلي يقرأ من قاعدة البيانات فقط.</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Link href={`/watch/${id}`} className="rounded-2xl border border-[#F8C846]/30 bg-[#F8C846]/10 px-4 py-2 text-sm font-black text-[#F8C846] transition hover:bg-[#F8C846] hover:text-black">صفحة البث</Link>
+            <Link href={`/match-center/${id}`} className="rounded-2xl border border-[#18E58F]/30 bg-[#18E58F]/10 px-4 py-2 text-sm font-black text-[#18E58F] transition hover:bg-[#18E58F] hover:text-black">مركز المباراة</Link>
+          </div>
+        </header>
+        <LiveAnimationPitch initialState={initialState as any} />
+      </div>
+    </main>
+  );
+}
