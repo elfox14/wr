@@ -30,6 +30,7 @@ function StatRow({ metric }: { metric: MatchStatMetric }) {
 export default function ProfessionalMatchPageWithDateCard({ data }: { data: MatchPageData }) {
   const availableStats = data.stats.filter((metric) => metric.available).slice(0, 10);
   const latestEvents = data.events.slice(-12).reverse();
+  const shouldShowArticleCta = data.status.isFinished;
 
   return (
     <main className="min-h-screen bg-[#04110D] px-3 py-5 text-white" dir="rtl">
@@ -61,6 +62,20 @@ export default function ProfessionalMatchPageWithDateCard({ data }: { data: Matc
           <div><b className="text-[#18E58F]">آخر تحديث:</b> {data.lastUpdatedAt ? new Date(data.lastUpdatedAt).toISOString().replace('T', ' ').slice(0, 16) : 'غير متوفر'} UTC</div>
         </section>
 
+        {shouldShowArticleCta && (
+          <section className="rounded-[1.5rem] border border-[#F8C846]/20 bg-[#F8C846]/[0.055] p-4">
+            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <div>
+                <h2 className="text-2xl font-black text-white">التحليل النهائي للمباراة</h2>
+                <p className="mt-1 text-sm font-bold leading-6 text-slate-300">بعد تأكيد الإحصائيات النهائية، يتم إنشاء مقال SEO احترافي مع صورة رئيسية وإنفوجرافيك من بيانات المباراة المحفوظة.</p>
+              </div>
+              <a href={`/articles/match/${data.id}`} className="inline-flex items-center justify-center rounded-2xl border border-[#F8C846]/30 bg-[#F8C846]/10 px-5 py-3 text-sm font-black text-[#F8C846] transition hover:bg-[#F8C846] hover:text-black">
+                فتح المقال التحليلي
+              </a>
+            </div>
+          </section>
+        )}
+
         <section className="rounded-[1.5rem] border border-white/10 bg-white/[0.04] p-4">
           <h2 className="mb-4 text-2xl font-black text-white">إحصائيات المباراة</h2>
           {availableStats.length ? <div className="grid gap-3 md:grid-cols-2">{availableStats.map((metric) => <StatRow key={metric.key} metric={metric} />)}</div> : <p className="rounded-2xl border border-dashed border-white/15 bg-black/20 p-5 text-center font-bold text-slate-400">الإحصائيات التفصيلية غير متوفرة حاليًا.</p>}
@@ -70,6 +85,21 @@ export default function ProfessionalMatchPageWithDateCard({ data }: { data: Matc
           <h2 className="mb-4 text-2xl font-black text-white">أحداث المباراة</h2>
           {latestEvents.length ? <div className="space-y-2">{latestEvents.map((event) => <div key={event.id} className="rounded-2xl border border-white/10 bg-black/25 p-3"><b className="text-[#F8C846]">{event.minuteLabel || ''}</b> <span className="font-bold">{event.type}</span> <span className="text-slate-300">{event.detail || event.playerName || ''}</span></div>)}</div> : <p className="rounded-2xl border border-dashed border-white/15 bg-black/20 p-5 text-center font-bold text-slate-400">لا توجد أحداث محفوظة لهذه المباراة حتى الآن.</p>}
         </section>
+
+        {data.relatedArticles.length > 0 && (
+          <section className="rounded-[1.5rem] border border-white/10 bg-white/[0.04] p-4">
+            <h2 className="mb-4 text-2xl font-black text-white">محتوى مرتبط</h2>
+            <div className="grid gap-3 md:grid-cols-2">
+              {data.relatedArticles.map((article) => (
+                <a key={article.id} href={article.href} className="rounded-2xl border border-white/10 bg-black/25 p-4 transition hover:border-[#18E58F]/30 hover:bg-[#18E58F]/10">
+                  <span className="mb-2 inline-flex rounded-full border border-[#18E58F]/20 px-3 py-1 text-[11px] font-black text-[#18E58F]">{article.label}</span>
+                  <h3 className="font-black text-white">{article.title}</h3>
+                  <p className="mt-2 text-xs font-bold leading-6 text-slate-400">{article.summary}</p>
+                </a>
+              ))}
+            </div>
+          </section>
+        )}
       </div>
     </main>
   );
