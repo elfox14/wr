@@ -9,6 +9,10 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 function asNumber(value: unknown) {
   const n = Number(value);
   return Number.isFinite(n) ? n : null;
@@ -156,12 +160,12 @@ function compactPlayerStat(row: any) {
   };
 }
 
-async function fetchEndpoint(providerMatchId: string, key: string, path: string, timeoutMs: number) {
+async function fetchEndpoint(key: string, path: string, timeoutMs: number) {
   try {
     const payload = await theStatsApiFetch(path, {}, { timeoutMs });
-    return { key, ok: true, payload };
+    return { key, path, ok: true, payload };
   } catch (error: any) {
-    return { key, ok: false, error: { message: String(error?.message || error), status: error?.status || null, code: error?.code || null } };
+    return { key, path, ok: false, error: { message: String(error?.message || error), status: error?.status || null, code: error?.code || null } };
   }
 }
 
@@ -184,7 +188,10 @@ async function run(req: Request) {
   const dryRun = ['1', 'true', 'yes'].includes(String(url.searchParams.get('dryRun') || '').toLowerCase());
   const includeRaw = ['1', 'true', 'yes'].includes(String(url.searchParams.get('includeRaw') || '').toLowerCase());
   const syncAnimation = !['0', 'false', 'no'].includes(String(url.searchParams.get('syncAnimation') || '').toLowerCase());
+  const stopOnRateLimit = !['0', 'false', 'no'].includes(String(url.searchParams.get('stopOnRateLimit') || 'true').toLowerCase());
   const timeoutMs = Math.max(3000, Math.min(60000, Number(url.searchParams.get('timeoutMs') || 30000)));
+  const delayMs = Math.max(0, Math.min(10000, Number(url.searchParams.get('delayMs') || 1500)));
+  const scope = String(url.searchParams.get('scope') || 'full').toLowerCase();
 
   if (!matchId || !providerMatchId) {
     return NextResponse.json({ ok: false, error: 'matchId and providerMatchId are required' }, { status: 400, headers: { 'Cache-Control': 'no-store' } });
@@ -194,14 +201,30 @@ async function run(req: Request) {
   if (!match) return NextResponse.json({ ok: false, error: 'match not found', matchId }, { status: 404, headers: { 'Cache-Control': 'no-store' } });
 
   const id = encodeURIComponent(providerMatchId);
-  const endpoints = await Promise.all([
-    fetchEndpoint(providerMatchId, 'matchInfo', `/api/football/matches/${id}`, timeoutMs),
-    fetchEndpoint(providerMatchId, 'stats', `/api/football/matches/${id}/stats`, timeoutMs),
-    fetchEndpoint(providerMatchId, 'lineups', `/api/football/matches/${id}/lineups`, timeoutMs),
-    fetchEndpoint(providerMatchId, 'timeline', `/api/football/matches/${id}/timeline`, timeoutMs),
-    fetchEndpoint(providerMatchId, 'shotmap', `/api/football/matches/${id}/shotmap`, timeoutMs),
-    fetchEndpoint(providerMatchId, 'playerStats', `/api/football/matches/${id}/player-stats`, timeoutMs),
-  ]);
+  const basicEndpoints = [
+    ['matchInfo', `/api/football/matches/${id}`],
+    ['stats', `/api/football/matches/${id}/stats`],
+    ['lineups', `/api/football/matches/${id}/lineups`],
+  ];
+  const fullEndpoints = [
+    ...basicEndpoints,
+    ['timeline', `/api/football/matches/${id}/timeline`],
+    ['shotmap', `/api/football/matches/${id}/shotmap`],
+    ['playerStats', `/api/football/matches/${id}/player-stats`],
+  ];
+  const selectedEndpoints = scope === 'basic' ? basicEndpoints : fullEndpoints;
+
+  const endpoints: any[] = [];
+  let stoppedEarly: string | null = null;
+  for (const [key, path] of selectedEndpoints) {
+    const result = await fetchEndpoint(String(key), String(path), timeoutMs);
+    endpoints.push(result);
+    if (!result.ok && Number(result.error?.status) === 429 && stopOnRateLimit) {
+      stoppedEarly = 'rate_limited';
+      break;
+    }
+    if (delayMs > 0) await sleep(delayMs);
+  }
 
   const byKey: Record<string, any> = Object.fromEntries(endpoints.map((item) => [item.key, item]));
   const stats = byKey.stats?.ok ? compactStats(byKey.stats.payload) : {};
@@ -209,21 +232,23 @@ async function run(req: Request) {
   const shots = byKey.shotmap?.ok ? listFrom(byKey.shotmap.payload, ['data', 'shotmap', 'shots', 'events', 'items', 'results']).map(compactShot) : [];
   const players = byKey.playerStats?.ok ? listFrom(byKey.playerStats.payload, ['data', 'players', 'player_stats', 'items', 'results']).map(compactPlayerStat) : [];
   const lineups = byKey.lineups?.ok ? dataOf(byKey.lineups.payload) : null;
+  const hasUsefulData = Object.keys(stats).length > 0 || Boolean(lineups) || events.length > 0 || shots.length > 0 || players.length > 0;
 
   let snapshotId: string | null = null;
   let insertedEvents = 0;
 
-  if (!dryRun) {
+  if (!dryRun && hasUsefulData) {
     const snapshot = await prisma.matchStatsSnapshot.create({
       data: {
         id: randomUUID(),
         matchId,
-        provider: 'THE_STATS_API_MANUAL_FINAL',
+        provider: scope === 'basic' ? 'THE_STATS_API_MANUAL_BASIC' : 'THE_STATS_API_MANUAL_FINAL',
         providerMatchId: idNumber(providerMatchId),
         homeScore: match.homeScore,
         awayScore: match.awayScore,
         rawData: {
           providerMatchId,
+          scope,
           importedAt: new Date().toISOString(),
           endpoints: endpoints.map((item) => ({ key: item.key, ok: item.ok, error: item.ok ? null : item.error })),
           normalized: { stats, lineups, eventsDetailed: { all: events }, shotmap: shots, playerStats: players },
@@ -258,19 +283,23 @@ async function run(req: Request) {
   }
 
   let animationSync: any = null;
-  if (!dryRun && syncAnimation) {
+  if (!dryRun && hasUsefulData && syncAnimation && events.length > 0) {
     animationSync = await runLiveAnimationSync({ matchId, allowFinished: true, dryRun: false, limit: 1 });
   }
 
   return NextResponse.json({
     ok: true,
-    mode: 'manual_final_import_v1',
+    mode: 'manual_final_import_v2_throttled',
     matchId,
     providerMatchId,
+    scope,
     dryRun,
+    delayMs,
+    stoppedEarly,
     endpointsOk: endpoints.filter((item) => item.ok).map((item) => item.key),
     endpointsFailed: endpoints.filter((item) => !item.ok).map((item) => ({ key: item.key, error: item.error })),
     counts: { stats: Object.keys(stats).length, events: events.length, shots: shots.length, players: players.length, lineups: lineups ? 1 : 0 },
+    hasUsefulData,
     snapshotId,
     insertedEvents,
     animationSync: animationSync ? { ok: animationSync.ok, results: animationSync.results } : null,
