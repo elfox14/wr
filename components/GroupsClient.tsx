@@ -9,7 +9,6 @@ import {
   BarChart3,
   CalendarDays,
   ChevronRight,
-  History,
   LayoutGrid,
   ListOrdered,
   ShieldCheck,
@@ -407,7 +406,7 @@ function GroupSection({ group }: { group: GroupData }) {
 
       <div className="mb-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         <StatCard icon={<Trophy size={18} />} label="المنتخبات" value={group.teams.length} hint="داخل المجموعة" />
-        <StatCard icon={<History size={18} />} label="نتائج سابقة" value={group.finishedMatches} hint="مباريات انتهت بالفعل" accent="text-success" />
+        <StatCard icon={<CalendarDays size={18} />} label="نتائج سابقة" value={group.finishedMatches} hint="مباريات انتهت بالفعل" accent="text-success" />
         <StatCard icon={<Target size={18} />} label="متوسط القوة" value={group.avgScore} hint="تقييم رياضي مبدئي" accent="text-accent" />
       </div>
 
@@ -459,7 +458,7 @@ function PreviousResultsPanel({ group }: { group: GroupData }) {
     <div className="rounded-3xl border border-success/10 bg-success/[0.04] p-4">
       <div className="mb-4 flex items-center justify-between gap-3">
         <div>
-          <h3 className="flex items-center gap-2 text-xl font-black text-white"><History size={20} className="text-success" /> النتائج السابقة</h3>
+          <h3 className="flex items-center gap-2 text-xl font-black text-white"><CalendarDays size={20} className="text-success" /> النتائج السابقة</h3>
           <p className="mt-1 text-xs text-gray-500">آخر المباريات المنتهية داخل {group.name}</p>
         </div>
         <span className="rounded-lg bg-success/10 px-2 py-1 text-xs font-black text-success">{group.results.length} نتيجة</span>
