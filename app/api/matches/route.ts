@@ -7,7 +7,7 @@ export const revalidate = 30;
 
 const LIVE_STATUSES = ['1H', '2H', 'ET', 'BT', 'P', 'IN_PLAY', 'LIVE'];
 const SCHEDULED_STATUSES = ['SCHEDULED', 'TIMED', 'NOT_STARTED', 'NS'];
-const FINISHED_STATUSES = ['FINISHED', 'FT', 'AET', 'PEN'];
+const FINISHED_STATUSES = ['FINISHED', 'FT', 'AET', 'PEN', 'COMPLETED', 'ENDED', 'FINAL_VERIFIED'];
 const HALF_TIME_STATUSES = ['HT', 'HALFTIME', 'HALF_TIME', 'HALF-TIME', 'PAUSED'];
 const GROUP_STAGE_MAX_LIVE_MINUTES = 115;
 const KNOCKOUT_MAX_LIVE_MINUTES = 150;
@@ -16,7 +16,7 @@ const SNAPSHOT_LOOKBACK_MS = 4 * 60 * 60 * 1000;
 const SNAPSHOT_LOOKAHEAD_MS = 24 * 60 * 60 * 1000;
 const GROUP_KEYS = 'ABCDEFGHIJKL'.split('');
 
-type MatchFilter = 'today' | 'finished' | 'group';
+type MatchFilter = 'today' | 'finished' | 'group' | 'groups';
 type SnapshotState = { minute: number | null; capturedAt: Date; providerStatus?: string | null };
 
 type PublicMatch = {
@@ -202,7 +202,7 @@ function endOfToday() {
 }
 
 function normalizeFilter(value: string | null): MatchFilter {
-  return value === 'finished' || value === 'group' ? value : 'today';
+  return value === 'finished' || value === 'group' || value === 'groups' ? value : 'today';
 }
 
 function normalizeGroup(value: string | null) {
@@ -210,8 +210,12 @@ function normalizeGroup(value: string | null) {
   return GROUP_KEYS.includes(key) ? key : 'A';
 }
 
+function groupLabels(group: string) {
+  return [group, `Group ${group}`, `GROUP ${group}`, `GROUP_${group}`, `المجموعة ${group}`];
+}
+
 function groupWhere(group: string) {
-  const labels = [group, `Group ${group}`, `GROUP ${group}`, `GROUP_${group}`, `المجموعة ${group}`];
+  const labels = groupLabels(group);
   return {
     OR: [
       { homeTeam: { group } },
@@ -222,9 +226,22 @@ function groupWhere(group: string) {
   };
 }
 
+function allGroupsWhere() {
+  const labels = GROUP_KEYS.flatMap(groupLabels);
+  return {
+    OR: [
+      { homeTeam: { group: { in: GROUP_KEYS } } },
+      { awayTeam: { group: { in: GROUP_KEYS } } },
+      { groupPhase: { in: labels } },
+      { stage: { in: ['group_stage', 'GROUP_STAGE', 'Group Stage', 'دور المجموعات', ...labels] } },
+    ],
+  };
+}
+
 function matchWhere(filter: MatchFilter, group: string) {
   if (filter === 'finished') return { status: { in: FINISHED_STATUSES } };
   if (filter === 'group') return groupWhere(group);
+  if (filter === 'groups') return allGroupsWhere();
   return { matchDate: { gte: startOfToday(), lt: endOfToday() } };
 }
 
@@ -235,6 +252,7 @@ function orderByFor(filter: MatchFilter) {
 function takeFor(filter: MatchFilter) {
   if (filter === 'finished') return 40;
   if (filter === 'group') return 24;
+  if (filter === 'groups') return 180;
   return 24;
 }
 
@@ -254,7 +272,7 @@ const getScopedMatches = unstable_cache(
     const deduped = dedupeMatches(enrichedMatches);
     return filter === 'finished' ? deduped.reverse() : deduped;
   },
-  ['public-matches-scoped-v1'],
+  ['public-matches-scoped-v2'],
   { revalidate: 30 },
 );
 
