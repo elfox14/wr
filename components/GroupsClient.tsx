@@ -9,6 +9,7 @@ import {
   BarChart3,
   CalendarDays,
   ChevronRight,
+  History,
   LayoutGrid,
   ListOrdered,
   ShieldCheck,
@@ -34,6 +35,8 @@ type GroupData = {
   name: string;
   teams: Asset[];
   matches: Match[];
+  results: Match[];
+  upcoming: Match[];
   standings: StandingRow[];
   players: (Asset & { team?: Asset })[];
   finishedMatches: number;
@@ -43,6 +46,10 @@ type GroupData = {
 };
 
 type ThirdCandidate = StandingRow & { groupKey: string; groupName: string; rank: number };
+
+const FINISHED_STATUSES = ['FINISHED', 'FT', 'AET', 'PEN', 'COMPLETED', 'ENDED', 'FINAL_VERIFIED'];
+const LIVE_STATUSES = ['IN_PLAY', 'LIVE', 'HT', '1H', '2H', 'ET', 'BREAK'];
+const SCHEDULED_STATUSES = ['SCHEDULED', 'TIMED', 'NOT_STARTED', 'NS'];
 
 function normalizeGroupKey(value?: string | null): string {
   if (!value) return 'غير محددة';
@@ -60,6 +67,31 @@ function groupDisplayName(groupKey: string) {
 
 function groupDomId(groupKey: string) {
   return `group-${encodeURIComponent(groupKey)}`;
+}
+
+function normalizedStatus(status?: string | null) {
+  return String(status || '').toUpperCase();
+}
+
+function isFinishedMatch(match: Match) {
+  return FINISHED_STATUSES.includes(normalizedStatus(match.status));
+}
+
+function isLiveMatch(match: Match) {
+  return LIVE_STATUSES.includes(normalizedStatus(match.status));
+}
+
+function isScheduledMatch(match: Match) {
+  const status = normalizedStatus(match.status);
+  return SCHEDULED_STATUSES.includes(status) || (!isFinishedMatch(match) && !isLiveMatch(match));
+}
+
+function statusRank(status?: string | null) {
+  const value = normalizedStatus(status);
+  if (FINISHED_STATUSES.includes(value)) return 4;
+  if (LIVE_STATUSES.includes(value)) return 3;
+  if (SCHEDULED_STATUSES.includes(value)) return 2;
+  return 1;
 }
 
 function getTeamPower(team: Asset) {
@@ -85,14 +117,6 @@ function matchPairKey(match: Match) {
   const home = match.homeTeam?.id || match.homeTeam?.code || 'home';
   const away = match.awayTeam?.id || match.awayTeam?.code || 'away';
   return [home, away].sort().join('|');
-}
-
-function statusRank(status?: string | null) {
-  const value = String(status || '').toUpperCase();
-  if (value === 'FINISHED' || value === 'FT') return 4;
-  if (value === 'IN_PLAY' || value === 'LIVE' || value === 'HT') return 3;
-  if (value === 'SCHEDULED' || value === 'TIMED' || value === 'NOT_STARTED') return 2;
-  return 1;
 }
 
 function matchScoreTotal(match: Match) {
@@ -136,7 +160,7 @@ function buildStandings(teams: Asset[], matches: Match[]): StandingRow[] {
 
   const byId = new Map(table.map((row) => [row.team.id, row]));
 
-  dedupeMatchesByPair(matches).filter((match) => match.status === 'FINISHED').forEach((match) => {
+  dedupeMatchesByPair(matches).filter(isFinishedMatch).forEach((match) => {
     const home = byId.get(match.homeTeam.id);
     const away = byId.get(match.awayTeam.id);
     if (!home || !away) return;
@@ -220,11 +244,14 @@ export default function GroupsClient() {
       const rawGroupMatches = matches
         .filter((match) => {
           const sameGroup = normalizeGroupKey(match.groupPhase) === key;
-          const sameTeams = teamIds.has(match.homeTeam?.id) || teamIds.has(match.awayTeam?.id);
-          return sameGroup || sameTeams;
+          const bothTeamsInGroup = teamIds.has(match.homeTeam?.id) && teamIds.has(match.awayTeam?.id);
+          const oneTeamInGroup = teamIds.has(match.homeTeam?.id) || teamIds.has(match.awayTeam?.id);
+          return sameGroup || bothTeamsInGroup || oneTeamInGroup;
         })
         .sort((a, b) => new Date(a.matchDate).getTime() - new Date(b.matchDate).getTime());
       const groupMatches = dedupeMatchesByPair(rawGroupMatches);
+      const results = groupMatches.filter(isFinishedMatch).sort((a, b) => new Date(b.matchDate).getTime() - new Date(a.matchDate).getTime());
+      const upcoming = groupMatches.filter((match) => !isFinishedMatch(match)).sort((a, b) => new Date(a.matchDate).getTime() - new Date(b.matchDate).getTime());
 
       const players = groupTeams
         .flatMap((team) => (team.players || []).map((player) => ({ ...player, team })))
@@ -235,11 +262,13 @@ export default function GroupsClient() {
         name: groupDisplayName(key),
         teams: groupTeams,
         matches: groupMatches,
+        results,
+        upcoming,
         standings: buildStandings(groupTeams, groupMatches),
         players,
-        finishedMatches: groupMatches.filter((match) => match.status === 'FINISHED').length,
-        scheduledMatches: groupMatches.filter((match) => match.status === 'SCHEDULED').length,
-        liveMatches: groupMatches.filter((match) => ['IN_PLAY', 'LIVE'].includes(match.status)).length,
+        finishedMatches: results.length,
+        scheduledMatches: groupMatches.filter(isScheduledMatch).length,
+        liveMatches: groupMatches.filter(isLiveMatch).length,
         avgScore: groupTeams.length ? Math.round(groupTeams.reduce((sum, team) => sum + (team.score || 0), 0) / groupTeams.length) : 0,
       };
     });
@@ -270,12 +299,12 @@ export default function GroupsClient() {
                 <h1 className="text-2xl font-black tracking-tight text-white md:text-3xl">المجموعات والتصفيات</h1>
               </div>
               <p className="max-w-2xl text-sm leading-relaxed text-gray-400 md:text-base">
-                اضغط على رقم المجموعة للانتقال مباشرة إلى جدولها، مبارياتها، وإحصائيات منتخباتها ولاعبيها.
+                اضغط على رقم المجموعة للانتقال مباشرة إلى جدولها، نتائجها السابقة، مبارياتها القادمة، وإحصائيات منتخباتها.
               </p>
             </div>
             <div className="flex w-fit items-center gap-2 rounded-xl border border-white/5 bg-black/30 px-3 py-2 text-xs text-gray-400">
               <AlertCircle size={14} className="text-primary" />
-              النتائج تظهر بعد بداية المباريات فقط
+              النتائج تُقرأ من المباريات المحفوظة في قاعدة البيانات
             </div>
           </div>
         </section>
@@ -366,42 +395,45 @@ function GroupSection({ group }: { group: GroupData }) {
           </div>
           <div>
             <h2 className="text-2xl font-black text-white">{group.name}</h2>
-            <p className="text-sm text-gray-500">{group.teams.length} منتخبات · {group.players.length} لاعب · {group.matches.length} مباريات</p>
+            <p className="text-sm text-gray-500">{group.teams.length} منتخبات · {group.finishedMatches} نتائج سابقة · {group.matches.length} مباريات</p>
           </div>
         </div>
         {group.finishedMatches === 0 && (
           <span className="rounded-xl border border-yellow-400/20 bg-yellow-400/10 px-3 py-2 text-xs font-bold text-yellow-300">
-            البطولة لم تبدأ بعد — لا توجد نتائج فعلية
+            لا توجد نتائج محفوظة لهذه المجموعة بعد
           </span>
         )}
       </div>
 
       <div className="mb-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         <StatCard icon={<Trophy size={18} />} label="المنتخبات" value={group.teams.length} hint="داخل المجموعة" />
+        <StatCard icon={<History size={18} />} label="نتائج سابقة" value={group.finishedMatches} hint="مباريات انتهت بالفعل" accent="text-success" />
         <StatCard icon={<Target size={18} />} label="متوسط القوة" value={group.avgScore} hint="تقييم رياضي مبدئي" accent="text-accent" />
-        <StatCard icon={<Users size={18} />} label="اللاعبون" value={group.players.length} hint="مرتبطون بالمنتخبات" accent="text-yellow-300" />
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
         <div className="rounded-3xl border border-white/5 bg-background/40 p-4">
           <div className="mb-4 flex items-center justify-between">
             <h3 className="flex items-center gap-2 text-xl font-black text-white"><ListOrdered size={20} className="text-primary" /> جدول المجموعة</h3>
-            <span className="rounded-lg bg-white/5 px-2 py-1 text-xs text-gray-400">نتائج حقيقية فقط</span>
+            <span className="rounded-lg bg-white/5 px-2 py-1 text-xs text-gray-400">يشمل النتائج السابقة</span>
           </div>
           <StandingsTable standings={group.standings} finishedMatchesCount={group.finishedMatches} />
           <GroupStatsPanel group={group} />
         </div>
 
-        <div className="rounded-3xl border border-white/5 bg-background/40 p-4">
-          <div className="mb-4 flex items-center justify-between">
-            <h3 className="flex items-center gap-2 text-xl font-black text-white"><CalendarDays size={20} className="text-primary" /> مباريات المجموعة</h3>
-            <div className="flex gap-2 text-xs">
-              <span className="rounded-lg bg-white/5 px-2 py-1 text-gray-400">قادمة {group.scheduledMatches}</span>
-              <span className="rounded-lg bg-primary/10 px-2 py-1 text-primary">مباشرة {group.liveMatches}</span>
-              <span className="rounded-lg bg-success/10 px-2 py-1 text-success">منتهية {group.finishedMatches}</span>
+        <div className="space-y-6">
+          <PreviousResultsPanel group={group} />
+          <div className="rounded-3xl border border-white/5 bg-background/40 p-4">
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="flex items-center gap-2 text-xl font-black text-white"><CalendarDays size={20} className="text-primary" /> مباريات المجموعة</h3>
+              <div className="flex gap-2 text-xs">
+                <span className="rounded-lg bg-white/5 px-2 py-1 text-gray-400">قادمة {group.scheduledMatches}</span>
+                <span className="rounded-lg bg-primary/10 px-2 py-1 text-primary">مباشرة {group.liveMatches}</span>
+                <span className="rounded-lg bg-success/10 px-2 py-1 text-success">منتهية {group.finishedMatches}</span>
+              </div>
             </div>
+            {group.upcoming.length === 0 ? <EmptyState title="لا توجد مباريات قادمة" text="كل مباريات هذه المجموعة المنتهية تظهر في قسم النتائج السابقة." /> : <div className="space-y-3">{group.upcoming.slice(0, 6).map((match) => <MatchCard key={match.id} match={match} />)}</div>}
           </div>
-          {group.matches.length === 0 ? <EmptyState title="لا توجد مباريات" text="لم يتم ربط مباريات بهذه المجموعة حتى الآن." /> : <div className="space-y-3">{group.matches.slice(0, 6).map((match) => <MatchCard key={match.id} match={match} />)}</div>}
         </div>
       </div>
 
@@ -422,8 +454,29 @@ function GroupSection({ group }: { group: GroupData }) {
   );
 }
 
+function PreviousResultsPanel({ group }: { group: GroupData }) {
+  return (
+    <div className="rounded-3xl border border-success/10 bg-success/[0.04] p-4">
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <div>
+          <h3 className="flex items-center gap-2 text-xl font-black text-white"><History size={20} className="text-success" /> النتائج السابقة</h3>
+          <p className="mt-1 text-xs text-gray-500">آخر المباريات المنتهية داخل {group.name}</p>
+        </div>
+        <span className="rounded-lg bg-success/10 px-2 py-1 text-xs font-black text-success">{group.results.length} نتيجة</span>
+      </div>
+      {group.results.length === 0 ? (
+        <EmptyState title="لا توجد نتائج سابقة" text="عند انتهاء أول مباراة في هذه المجموعة ستظهر النتيجة هنا مباشرة." />
+      ) : (
+        <div className="space-y-3">
+          {group.results.slice(0, 6).map((match) => <ResultCard key={match.id} match={match} />)}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function GroupStatsPanel({ group }: { group: GroupData }) {
-  const finished = group.matches.filter((match) => match.status === 'FINISHED');
+  const finished = group.results;
   const totalGoals = finished.reduce((sum, match) => sum + Number(match.homeScore || 0) + Number(match.awayScore || 0), 0);
   const avgGoals = finished.length ? (totalGoals / finished.length).toFixed(1) : '0.0';
   const topAttack = [...group.standings].sort((a, b) => b.goalsFor - a.goalsFor)[0];
@@ -520,8 +573,8 @@ function StandingsTable({ standings, finishedMatchesCount }: { standings: Standi
 
 function MatchCard({ match }: { match: Match }) {
   const date = new Date(match.matchDate);
-  const isLive = ['IN_PLAY', 'LIVE'].includes(match.status);
-  const isFinished = match.status === 'FINISHED';
+  const isLive = isLiveMatch(match);
+  const isFinished = isFinishedMatch(match);
   return (
     <Link href={`/match-center/${match.id}`} className="block rounded-2xl border border-white/5 bg-black/20 p-4 transition-colors hover:border-primary/30">
       <div className="mb-3 flex items-center justify-between text-xs text-gray-500">
@@ -534,6 +587,41 @@ function MatchCard({ match }: { match: Match }) {
         <TeamMini team={match.awayTeam} score={isFinished || isLive ? match.awayScore : undefined} align="left" />
       </div>
     </Link>
+  );
+}
+
+function ResultCard({ match }: { match: Match }) {
+  const date = new Date(match.matchDate);
+  const homeScore = Number(match.homeScore || 0);
+  const awayScore = Number(match.awayScore || 0);
+  const homeWon = homeScore > awayScore;
+  const awayWon = awayScore > homeScore;
+  return (
+    <Link href={`/match-center/${match.id}`} className="block rounded-2xl border border-success/10 bg-black/25 p-4 transition hover:border-success/30 hover:bg-white/[0.04]">
+      <div className="mb-3 flex items-center justify-between text-xs text-gray-500">
+        <span>{date.toLocaleDateString('ar-EG')} · {date.toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}</span>
+        <span className="rounded-lg bg-success/10 px-2 py-1 font-black text-success">نتيجة نهائية</span>
+      </div>
+      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
+        <ResultTeam team={match.homeTeam} score={homeScore} winner={homeWon} />
+        <div className="rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-2 text-2xl font-black text-white tabular-nums">
+          {homeScore} - {awayScore}
+        </div>
+        <ResultTeam team={match.awayTeam} score={awayScore} winner={awayWon} align="left" />
+      </div>
+    </Link>
+  );
+}
+
+function ResultTeam({ team, score, winner, align = 'right' }: { team: Asset; score: number; winner: boolean; align?: 'right' | 'left' }) {
+  return (
+    <div className={`flex items-center gap-3 ${align === 'left' ? 'justify-end text-left' : ''}`}>
+      <AssetImage image={team.image} type="TEAM" name={team.name} width={34} height={34} className="h-10 w-10 rounded-xl border border-white/10 object-cover" />
+      <div className="min-w-0">
+        <div className={`truncate font-black ${winner ? 'text-success' : 'text-white'}`}>{team.name}</div>
+        <div className="text-xs text-gray-500">{winner ? 'فاز' : score !== undefined ? '—' : ''}</div>
+      </div>
+    </div>
   );
 }
 
