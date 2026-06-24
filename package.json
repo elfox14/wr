@@ -15,7 +15,7 @@
     "lint": "echo \"Lint advisory only; type-check and build remain required\"",
 "lint:ai": "eslint features/analysis app/ai-analyst app/api/ai-analyst app/api/ai-analyst/alerts/route.ts --max-warnings=0",
     "lint:asset-page": "echo Asset page removed from slim production build",
-    "lint:asset-page": "echo Asset page removed from slim production build"
+    "lint:asset-page": "echo Asset page removed from slim production build",
    "lint:market-lite": "echo Market page removed from slim production build",
    "lint:market-client": "echo Market client removed from slim production build",
     "lint:portfolio-ai": "echo Portfolio page removed from slim production build",
