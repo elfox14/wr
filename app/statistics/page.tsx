@@ -1,362 +1,140 @@
-'use client';
-
-import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import prisma from '@/lib/prisma';
 
-type ApiState = {
-  providerSummary: any;
-  databaseSummary: any;
-  playerLeaders: any;
-  penaltiesSummary: any;
-  loading: boolean;
-  error: string | null;
-};
+export const revalidate = 600;
 
-const unavailable = 'غير متوفر';
+const finishedStatuses = ['FINISHED', 'FT', 'AET', 'PEN', 'COMPLETED', 'ENDED'];
+const liveStatuses = ['LIVE', 'IN_PLAY', '1H', '2H', 'HT', 'ET', 'PEN_LIVE'];
 
-function finiteNumber(value: unknown) {
-  const number = Number(value);
-  return Number.isFinite(number) ? number : null;
-}
-
-function pickNumber(...values: unknown[]) {
-  for (const value of values) {
-    const number = finiteNumber(value);
-    if (number !== null && number > 0) return number;
-  }
-  for (const value of values) {
-    const number = finiteNumber(value);
-    if (number !== null) return number;
-  }
-  return null;
-}
-
-function formatNumber(value?: number | null, fallback = unavailable) {
-  if (typeof value !== 'number' || !Number.isFinite(value)) return fallback;
+function fmt(value: number | null | undefined) {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return '?';
   return new Intl.NumberFormat('ar-EG').format(value);
 }
 
-function formatDecimal(value?: number | null, fallback = unavailable) {
-  if (typeof value !== 'number' || !Number.isFinite(value)) return fallback;
+function dec(value: number | null | undefined) {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return '?';
   return new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 2 }).format(value);
 }
 
-function formatPercent(value?: number | null, fallback = unavailable) {
-  if (typeof value !== 'number' || !Number.isFinite(value)) return fallback;
-  return `${formatDecimal(value)}%`;
+function statusKind(status?: string | null) {
+  const raw = String(status || '').toUpperCase();
+  if (finishedStatuses.includes(raw)) return 'finished';
+  if (liveStatuses.includes(raw)) return 'live';
+  return 'scheduled';
 }
 
-function percent(numerator?: number | null, denominator?: number | null) {
-  if (typeof numerator !== 'number' || typeof denominator !== 'number' || !Number.isFinite(numerator) || !Number.isFinite(denominator) || denominator <= 0) return null;
-  return Math.max(0, Math.min(100, (numerator / denominator) * 100));
-}
-
-function sourceName(summary: any, databaseSummary: any) {
-  if (summary?.provider === 'THE_STATS_API' || summary?.source === 'thestatsapi_server_side_summary') return 'TheStatsAPI';
-  if (summary?.provider === 'DATABASE_SUMMARY' || databaseSummary?.ok) return 'DB/Snapshots';
-  return '—';
-}
-
-function teamLabel(team: any) {
-  return team?.name || team?.code || unavailable;
-}
-
-function dateLabel(value?: string | null) {
-  if (!value) return unavailable;
-  const date = new Date(value);
-  if (!Number.isFinite(date.getTime())) return unavailable;
-  return new Intl.DateTimeFormat('ar-EG', { dateStyle: 'medium', timeStyle: 'short' }).format(date);
-}
-
-function StatCard({ title, value, subtitle, source, tone = 'cyan' }: { title: string; value: string; subtitle?: string; source?: string; tone?: 'gold' | 'cyan' | 'green' | 'red' | 'neutral' }) {
-  const toneClass = {
-    gold: 'text-[#FFD700] border-[#FFD700]/18 bg-[#FFD700]/10',
-    cyan: 'text-[#0FF0FC] border-[#0FF0FC]/16 bg-[#0FF0FC]/10',
-    green: 'text-[#00FF88] border-[#00FF88]/16 bg-[#00FF88]/10',
-    red: 'text-red-100 border-red-300/16 bg-red-400/10',
-    neutral: 'text-white border-white/10 bg-white/[0.04]',
-  }[tone];
-
+function Card({ title, value, note }: { title: string; value: string; note?: string }) {
   return (
-    <article className={`flex h-full min-h-[128px] flex-col justify-between gap-3 rounded-2xl border p-4 shadow-[0_12px_32px_rgba(0,0,0,0.2)] ${toneClass}`}>
-      <div className="flex items-start justify-between gap-2">
-        <h3 className="text-xs font-black text-gray-300">{title}</h3>
-        {source && source !== '—' ? <span className="shrink-0 rounded-full border border-white/10 bg-black/25 px-2 py-0.5 text-[9px] font-black text-gray-300">{source}</span> : null}
-      </div>
-      <div>
-        <div className="truncate text-3xl font-black leading-none">{value}</div>
-        {subtitle ? <p className="mt-2 text-xs font-bold leading-5 text-gray-400">{subtitle}</p> : null}
-      </div>
+    <article className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+      <p className="text-xs font-black text-slate-400">{title}</p>
+      <b className="mt-3 block truncate text-3xl font-black text-white">{value}</b>
+      {note ? <p className="mt-2 text-xs font-bold text-slate-500">{note}</p> : null}
     </article>
   );
 }
 
-function DetailRow({ label, value, source }: { label: string; value: string; source?: string }) {
-  return (
-    <div className="grid grid-cols-[1fr_auto] items-center gap-3 border-b border-white/8 px-3 py-2 last:border-0">
-      <span className="text-sm font-bold text-gray-300">{label}</span>
-      <span className="text-left text-sm font-black text-white">{value}</span>
-      {source ? <span className="col-span-2 text-[10px] font-bold text-gray-500">المصدر: {source}</span> : null}
-    </div>
-  );
-}
+async function getStats() {
+  const [matches, teams, players, snapshots, events] = await Promise.all([
+    prisma.match.findMany({
+      select: {
+        status: true,
+        homeScore: true,
+        awayScore: true,
+        homeTeam: { select: { id: true, name: true, code: true } },
+        awayTeam: { select: { id: true, name: true, code: true } },
+      },
+    }),
+    prisma.asset.count({ where: { type: 'TEAM' } }),
+    prisma.asset.count({ where: { type: 'PLAYER' } }),
+    prisma.matchStatsSnapshot.count(),
+    prisma.matchEvent.count(),
+  ]);
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <section className="rounded-3xl border border-white/10 bg-white/[0.035] p-4 shadow-[0_14px_38px_rgba(0,0,0,0.18)]">
-      <h2 className="mb-4 text-lg font-black text-white">{title}</h2>
-      {children}
-    </section>
-  );
-}
+  const finished = matches.filter((m) => statusKind(m.status) === 'finished');
+  const live = matches.filter((m) => statusKind(m.status) === 'live');
+  const scheduled = matches.filter((m) => statusKind(m.status) === 'scheduled');
+  const goals = finished.reduce((sum, m) => sum + Number(m.homeScore || 0) + Number(m.awayScore || 0), 0);
 
-function playerName(leader: any) {
-  return leader?.name || unavailable;
-}
+  const teamStats = new Map<string, { name: string; goalsFor: number; goalsAgainst: number; cleanSheets: number }>();
 
-function playerSubtitle(leader: any, label: string) {
-  if (!leader?.value) return 'بانتظار بيانات موثقة';
-  const team = leader?.team?.name || leader?.team?.code || '';
-  return `${formatNumber(Number(leader.value))} ${label}${team ? ` • ${team}` : ''}`;
-}
-
-export default function StatisticsPage() {
-  const [state, setState] = useState<ApiState>({
-    providerSummary: null,
-    databaseSummary: null,
-    playerLeaders: null,
-    penaltiesSummary: null,
-    loading: true,
-    error: null,
-  });
-
-  useEffect(() => {
-    let cancelled = false;
-    async function load() {
-      try {
-        const [providerResponse, databaseResponse, leadersResponse, penaltiesResponse] = await Promise.all([
-          fetch('/api/matches/cached-the-stats-summary', { cache: 'no-store' }),
-          fetch('/api/matches/summary-stats', { cache: 'no-store' }),
-          fetch('/api/players/leaders', { cache: 'no-store' }),
-          fetch('/api/matches/penalties-summary', { cache: 'no-store' }),
-        ]);
-
-        const [providerSummary, databaseSummary, playerLeaders, penaltiesSummary] = await Promise.all([
-          providerResponse.ok ? providerResponse.json() : null,
-          databaseResponse.ok ? databaseResponse.json() : null,
-          leadersResponse.ok ? leadersResponse.json() : null,
-          penaltiesResponse.ok ? penaltiesResponse.json() : null,
-        ]);
-
-        if (!cancelled) {
-          setState({
-            providerSummary: providerSummary?.ok ? providerSummary : null,
-            databaseSummary: databaseSummary?.ok ? databaseSummary : null,
-            playerLeaders: playerLeaders?.ok ? playerLeaders : null,
-            penaltiesSummary: penaltiesSummary?.ok ? penaltiesSummary : null,
-            loading: false,
-            error: null,
-          });
-        }
-      } catch (error: any) {
-        if (!cancelled) setState((current) => ({ ...current, loading: false, error: error?.message || 'تعذر تحميل الإحصائيات' }));
-      }
+  function team(row: { id: string; name: string; code: string }) {
+    if (!teamStats.has(row.id)) {
+      teamStats.set(row.id, { name: row.name || row.code, goalsFor: 0, goalsAgainst: 0, cleanSheets: 0 });
     }
-    load();
-    const timer = window.setInterval(load, 60_000);
-    return () => {
-      cancelled = true;
-      window.clearInterval(timer);
-    };
-  }, []);
+    return teamStats.get(row.id)!;
+  }
 
-  const data = useMemo(() => {
-    const summary = state.providerSummary || state.databaseSummary || {};
-    const database = state.databaseSummary || {};
-    const finalStats = summary.finalStats || database.finalStats || {};
-    const teamLeaders = summary.teamLeaders || database.teamLeaders || {};
-    const penalties = state.penaltiesSummary?.penalties?.available ? state.penaltiesSummary.penalties : database.penalties || summary.penalties || null;
-    const source = sourceName(summary, database);
-    const totalMatches = pickNumber(summary.totalMatches, database.totalMatches);
-    const finishedMatches = pickNumber(summary.finishedMatches, database.finishedMatches);
-    const liveMatches = pickNumber(summary.liveMatches, database.liveMatches);
-    const scheduledMatches = pickNumber(summary.scheduledMatches, database.scheduledMatches);
-    const totalGoals = pickNumber(summary.totalGoals, database.totalGoals);
-    const averageGoals = pickNumber(summary.averageGoalsPerFinishedMatch, database.averageGoalsPerFinishedMatch);
-    const totalShots = pickNumber(finalStats.totalShots, finalStats.shots);
-    const totalShotsOnTarget = pickNumber(finalStats.totalShotsOnTarget, finalStats.shotsOnTarget);
-    const shotAccuracy = percent(totalShotsOnTarget, totalShots);
-    const cleanSheets = pickNumber(summary.cleanSheets, database.cleanSheets);
-    const cleanSheetRate = finishedMatches ? percent(cleanSheets, finishedMatches * 2) : null;
+  for (const m of finished) {
+    const home = team(m.homeTeam);
+    const away = team(m.awayTeam);
+    const hs = Number(m.homeScore || 0);
+    const as = Number(m.awayScore || 0);
 
-    return {
-      summary,
-      database,
-      finalStats,
-      teamLeaders,
-      penalties,
-      source,
-      totalMatches,
-      finishedMatches,
-      liveMatches,
-      scheduledMatches,
-      totalGoals,
-      averageGoals,
-      totalShots,
-      totalShotsOnTarget,
-      shotAccuracy,
-      cleanSheets,
-      cleanSheetRate,
-    };
-  }, [state]);
+    home.goalsFor += hs;
+    home.goalsAgainst += as;
+    away.goalsFor += as;
+    away.goalsAgainst += hs;
 
-  const topScorer = state.playerLeaders?.leaders?.topScorer || null;
-  const topAssister = state.playerLeaders?.leaders?.topAssister || null;
-  const cardsSource = data.summary?.yellowCards !== undefined || data.database?.yellowCards !== undefined ? data.source : '—';
-  const yellowCards = pickNumber(data.summary?.yellowCards, data.database?.yellowCards);
-  const redCards = pickNumber(data.summary?.redCards, data.database?.redCards);
-  const xg = pickNumber(data.finalStats?.totalXg, data.finalStats?.xg, data.summary?.powerStats?.totalXg, data.summary?.powerStats?.xg);
-  const npxg = pickNumber(data.finalStats?.totalNpxg, data.summary?.powerStats?.totalNpxg);
-  const xa = pickNumber(data.finalStats?.totalXa, data.summary?.powerStats?.totalXa);
-  const highXgChances = pickNumber(data.finalStats?.totalHighXgChances, data.summary?.powerStats?.bigChances);
-  const averageShots = pickNumber(data.finalStats?.averageShotsPerFinishedMatch, data.summary?.powerStats?.averageShotsPerFinishedMatch);
-  const averagePossession = pickNumber(data.finalStats?.averagePossessionSample, data.summary?.powerStats?.averagePossessionSample);
-  const corners = pickNumber(data.finalStats?.totalCorners, data.finalStats?.corners, data.summary?.powerStats?.totalCorners, data.summary?.powerStats?.corners);
-  const attacks = pickNumber(data.finalStats?.totalAttacks, data.summary?.powerStats?.totalAttacks, data.summary?.powerStats?.attacks);
-  const dangerousAttacks = pickNumber(data.finalStats?.totalDangerousAttacks, data.summary?.powerStats?.totalDangerousAttacks, data.summary?.powerStats?.dangerousAttacks);
-  const passes = pickNumber(data.finalStats?.totalPasses);
-  const accuratePasses = pickNumber(data.finalStats?.totalAccuratePasses);
-  const passAccuracy = pickNumber(data.finalStats?.passAccuracyPercent, percent(accuratePasses, passes));
-  const keyPasses = pickNumber(data.finalStats?.totalKeyPasses);
-  const crosses = pickNumber(data.finalStats?.totalCrosses);
-  const accurateCrosses = pickNumber(data.finalStats?.totalAccurateCrosses);
-  const crossAccuracy = pickNumber(data.finalStats?.crossAccuracyPercent, percent(accurateCrosses, crosses));
-  const tackles = pickNumber(data.finalStats?.totalTackles);
-  const interceptions = pickNumber(data.finalStats?.totalInterceptions);
-  const clearances = pickNumber(data.finalStats?.totalClearances);
-  const blocks = pickNumber(data.finalStats?.totalBlocks);
-  const saves = pickNumber(data.finalStats?.totalSaves);
-  const goalsPrevented = pickNumber(data.finalStats?.totalGoalsPrevented);
-  const touches = pickNumber(data.finalStats?.totalTouches);
-  const foulsCommitted = pickNumber(data.finalStats?.totalFoulsCommitted, data.summary?.powerStats?.fouls, data.summary?.powerStats?.totalFouls);
-  const foulsWon = pickNumber(data.finalStats?.totalFoulsWon);
-  const duelsWon = pickNumber(data.finalStats?.totalDuelsWon);
-  const duelsLost = pickNumber(data.finalStats?.totalDuelsLost);
-  const duelWinPercent = pickNumber(data.finalStats?.duelWinPercent, percent(duelsWon, (duelsWon || 0) + (duelsLost || 0)));
-  const aerialWon = pickNumber(data.finalStats?.totalAerialWon);
-  const detailedEvents = pickNumber(data.finalStats?.totalDetailedEvents);
-  const substitutions = pickNumber(data.finalStats?.totalSubstitutions);
-  const varReviews = pickNumber(data.finalStats?.totalVarReviews);
-  const playerStatsRows = pickNumber(data.finalStats?.totalPlayerStatsRows);
-  const theStatsMatches = pickNumber(data.finalStats?.matchesWithTheStatsExtras);
+    if (as === 0) home.cleanSheets += 1;
+    if (hs === 0) away.cleanSheets += 1;
+  }
+
+  const table = [...teamStats.values()];
+  const topAttack = [...table].sort((a, b) => b.goalsFor - a.goalsFor)[0];
+  const bestDefense = [...table].sort((a, b) => a.goalsAgainst - b.goalsAgainst)[0];
+  const cleanSheets = table.reduce((sum, t) => sum + t.cleanSheets, 0);
+
+  return {
+    total: matches.length,
+    finished: finished.length,
+    live: live.length,
+    scheduled: scheduled.length,
+    goals,
+    averageGoals: finished.length ? goals / finished.length : null,
+    teams,
+    players,
+    snapshots,
+    events,
+    topAttack,
+    bestDefense,
+    cleanSheets,
+  };
+}
+
+export default async function StatisticsPage() {
+  const data = await getStats();
 
   return (
-    <main dir="rtl" className="mx-auto max-w-7xl space-y-5 px-3 py-6 text-white sm:px-4 lg:px-6">
-      <div className="rounded-3xl border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(255,215,0,0.13),transparent_28%),linear-gradient(135deg,rgba(7,24,18,0.95),rgba(3,12,11,0.99))] p-5 shadow-[0_18px_48px_rgba(0,0,0,0.28)]">
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+    <main dir="rtl" className="mx-auto max-w-6xl space-y-5 px-3 py-6 text-white sm:px-4 lg:px-6">
+      <section className="rounded-3xl border border-white/10 bg-white/[0.04] p-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="inline-flex rounded-full border border-[#FFD700]/25 bg-[#FFD700]/10 px-3 py-1 text-[10px] font-black text-[#FFD700]">DATA CENTER</p>
-            <h1 className="mt-3 text-2xl font-black sm:text-3xl">كل إحصائيات البطولة</h1>
+            <h1 className="mt-3 text-2xl font-black sm:text-3xl">???????? ???????</h1>
+            <p className="mt-2 text-sm font-bold text-slate-400">???? ????? ?????? ????? ??? ????? ???????? ???.</p>
           </div>
-          <Link href="/" className="rounded-full border border-white/10 bg-white/[0.06] px-4 py-2 text-xs font-black text-gray-200 transition hover:border-[#FFD700]/25 hover:text-[#FFD700]">العودة للرئيسية</Link>
+          <Link href="/" className="rounded-full border border-white/10 bg-white/[0.06] px-4 py-2 text-xs font-black text-gray-200">?????? ????????</Link>
         </div>
-        {state.loading ? <div className="rounded-2xl border border-dashed border-white/10 p-5 text-center text-sm font-bold text-gray-400">جاري تحميل الإحصائيات...</div> : null}
-        {state.error ? <div className="rounded-2xl border border-red-300/20 bg-red-500/10 p-4 text-sm font-bold text-red-100">{state.error}</div> : null}
-      </div>
+      </section>
 
-      {!state.loading ? (
-        <>
-          <section className="grid items-stretch gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <StatCard title="المباريات" value={data.totalMatches !== null && data.finishedMatches !== null ? `${formatNumber(data.finishedMatches)} / ${formatNumber(data.totalMatches)}` : formatNumber(data.totalMatches)} subtitle={`${formatNumber(data.liveMatches)} مباشرة • ${formatNumber(data.scheduledMatches)} قادمة`} source={data.source} tone="neutral" />
-            <StatCard title="أهداف البطولة" value={formatNumber(data.totalGoals)} subtitle={`${formatNumber(data.finishedMatches)} مباراة منتهية`} source={data.source} tone="gold" />
-            <StatCard title="متوسط الأهداف" value={formatDecimal(data.averageGoals)} subtitle="هدف لكل مباراة منتهية" source={data.source} tone="cyan" />
-            <StatCard title="التسديدات" value={`${formatNumber(data.totalShots)} / ${formatNumber(data.totalShotsOnTarget)}`} subtitle={`دقة التسديد: ${formatPercent(data.shotAccuracy)}`} source={data.source} tone="cyan" />
-          </section>
+      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <Card title="?????????" value={`${fmt(data.finished)} / ${fmt(data.total)}`} note={`${fmt(data.live)} ?????? ? ${fmt(data.scheduled)} ?????`} />
+        <Card title="????? ???????" value={fmt(data.goals)} note={`${fmt(data.finished)} ?????? ??????`} />
+        <Card title="????? ???????" value={dec(data.averageGoals)} note="??? ??? ?????? ??????" />
+        <Card title="?????? ???????" value={fmt(data.cleanSheets)} note="??? ??????? ????????" />
+      </section>
 
-          <Section title="اللاعبون">
-            <div className="grid items-stretch gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <StatCard title="الهداف" value={playerName(topScorer)} subtitle={playerSubtitle(topScorer, 'هدف')} source={topScorer?.sourceName || state.playerLeaders?.sources?.topScorer?.provider || '—'} tone="gold" />
-              <StatCard title="صانع الأهداف" value={playerName(topAssister)} subtitle={playerSubtitle(topAssister, 'أسيست')} source={topAssister?.sourceName || state.playerLeaders?.sources?.topAssister?.provider || '—'} tone="cyan" />
-              <StatCard title="عدد اللاعبين" value={formatNumber(data.database?.playerCount)} subtitle={`${formatNumber(data.database?.teamCount)} منتخب`} source="DB/Snapshots" tone="green" />
-              <StatCard title="صفوف أداء اللاعبين" value={formatNumber(playerStatsRows)} source="TheStats" tone="neutral" />
-            </div>
-          </Section>
+      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <Card title="??? ?????????" value={fmt(data.teams)} />
+        <Card title="??? ????????" value={fmt(data.players)} />
+        <Card title="???? ????" value={data.topAttack?.name || '?'} note={data.topAttack ? `${fmt(data.topAttack.goalsFor)} ???` : '?'} />
+        <Card title="???? ????" value={data.bestDefense?.name || '?'} note={data.bestDefense ? `${fmt(data.bestDefense.goalsAgainst)} ??? ???????` : '?'} />
+      </section>
 
-          <Section title="المنتخبات">
-            <div className="grid items-stretch gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <StatCard title="أفضل هجوم" value={teamLabel(data.teamLeaders?.topScoringTeam)} subtitle={`${formatNumber(data.teamLeaders?.topScoringTeam?.goalsFor)} هدف`} source={data.source} tone="green" />
-              <StatCard title="الأكثر استقبالًا" value={teamLabel(data.teamLeaders?.mostConcedingTeam)} subtitle={`${formatNumber(data.teamLeaders?.mostConcedingTeam?.goalsAgainst)} هدف مستقبَل`} source={data.source} tone="red" />
-              <StatCard title="أفضل شباك نظيفة" value={teamLabel(data.teamLeaders?.bestCleanSheetTeam)} subtitle={`${formatNumber(data.teamLeaders?.bestCleanSheetTeam?.cleanSheets)} شباك نظيفة`} source={data.source} tone="green" />
-              <StatCard title="نسبة الشباك النظيفة" value={formatPercent(data.cleanSheetRate)} subtitle={`${formatNumber(data.cleanSheets)} شباك نظيفة`} source={data.source} tone="green" />
-            </div>
-          </Section>
-
-          <Section title="اللعب والهجوم">
-            <div className="grid items-stretch gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <StatCard title="xG" value={formatDecimal(xg)} source={data.source} tone="cyan" />
-              <StatCard title="npxG" value={formatDecimal(npxg)} source={data.source} tone="cyan" />
-              <StatCard title="xA" value={formatDecimal(xa)} source={data.source} tone="cyan" />
-              <StatCard title="فرص xG عالية" value={formatNumber(highXgChances)} source={data.source} tone="cyan" />
-              <StatCard title="متوسط التسديدات" value={formatDecimal(averageShots)} source={data.source} tone="cyan" />
-              <StatCard title="متوسط الاستحواذ" value={formatPercent(averagePossession)} source={data.source} tone="cyan" />
-              <StatCard title="ركنيات" value={formatNumber(corners)} source={data.source} tone="cyan" />
-              <StatCard title="هجمات خطيرة" value={formatNumber(dangerousAttacks)} source={data.source} tone="cyan" />
-            </div>
-          </Section>
-
-          <Section title="التمرير وصناعة اللعب">
-            <div className="grid items-stretch gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <StatCard title="تمريرات" value={formatNumber(passes)} source="TheStats" tone="cyan" />
-              <StatCard title="تمريرات صحيحة" value={formatNumber(accuratePasses)} source="TheStats" tone="green" />
-              <StatCard title="دقة التمرير" value={formatPercent(passAccuracy)} source="TheStats" tone="green" />
-              <StatCard title="تمريرات مفتاحية" value={formatNumber(keyPasses)} source="TheStats" tone="gold" />
-              <StatCard title="عرضيات" value={formatNumber(crosses)} source="TheStats" tone="cyan" />
-              <StatCard title="عرضيات صحيحة" value={formatNumber(accurateCrosses)} source="TheStats" tone="green" />
-              <StatCard title="دقة العرضيات" value={formatPercent(crossAccuracy)} source="TheStats" tone="green" />
-              <StatCard title="لمسات" value={formatNumber(touches)} source="TheStats" tone="neutral" />
-            </div>
-          </Section>
-
-          <Section title="الدفاع والحراسة">
-            <div className="grid items-stretch gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <StatCard title="تدخلات" value={formatNumber(tackles)} source="TheStats" tone="green" />
-              <StatCard title="اعتراضات" value={formatNumber(interceptions)} source="TheStats" tone="green" />
-              <StatCard title="تشتيت" value={formatNumber(clearances)} source="TheStats" tone="green" />
-              <StatCard title="بلوكات" value={formatNumber(blocks)} source="TheStats" tone="green" />
-              <StatCard title="تصديات" value={formatNumber(saves)} source="TheStats" tone="cyan" />
-              <StatCard title="أهداف مُنعت" value={formatDecimal(goalsPrevented)} source="TheStats" tone="cyan" />
-              <StatCard title="التحامات فائزة" value={formatNumber(duelsWon)} source="TheStats" tone="neutral" />
-              <StatCard title="نسبة الالتحامات" value={formatPercent(duelWinPercent)} source="TheStats" tone="neutral" />
-            </div>
-          </Section>
-
-          <Section title="الانضباط والأحداث">
-            <div className="grid items-stretch gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <StatCard title="البطاقات الصفراء" value={formatNumber(yellowCards)} source={cardsSource} tone="gold" />
-              <StatCard title="البطاقات الحمراء" value={formatNumber(redCards)} source={cardsSource} tone="red" />
-              <StatCard title="أخطاء مرتكبة" value={formatNumber(foulsCommitted)} source="TheStats" tone="red" />
-              <StatCard title="أخطاء مكتسبة" value={formatNumber(foulsWon)} source="TheStats" tone="green" />
-              <StatCard title="تبديلات" value={formatNumber(substitutions)} source="TheStats" tone="neutral" />
-              <StatCard title="VAR" value={formatNumber(varReviews)} source="TheStats" tone="neutral" />
-              <StatCard title="الأحداث التفصيلية" value={formatNumber(detailedEvents)} source="TheStats" tone="neutral" />
-              <StatCard title="ركلات الجزاء" value={formatNumber(data.penalties?.total)} subtitle={`${formatNumber(data.penalties?.scored)} مسجلة • ${formatNumber(data.penalties?.missed)} ضائعة`} source={state.penaltiesSummary?.provider || data.penalties?.source || '—'} tone="gold" />
-            </div>
-          </Section>
-
-          <Section title="جودة وتغطية البيانات">
-            <div className="rounded-2xl border border-white/10 bg-black/20">
-              <DetailRow label="المصدر الأساسي المعروض" value={data.source} />
-              <DetailRow label="مباريات لها لقطات إحصائية نهائية" value={formatNumber(data.finalStats?.matchesWithFinalSnapshots)} />
-              <DetailRow label="مباريات لها بيانات TheStats" value={formatNumber(theStatsMatches)} />
-              <DetailRow label="عدد اللقطات المحفوظة" value={formatNumber(data.database?.snapshotsCount)} />
-              <DetailRow label="مباريات لها بيانات كروت" value={formatNumber(data.database?.matchesWithCardSnapshots)} />
-              <DetailRow label="مباريات لها بيانات جزاءات" value={formatNumber(data.database?.penaltySource?.matchesWithPenaltySnapshots)} />
-              <DetailRow label="آخر تحديث للإحصائيات التفصيلية" value={dateLabel(data.database?.latestFinalStatsUpdatedAt)} />
-              <DetailRow label="آخر تحديث عام" value={dateLabel(data.summary?.latestUpdatedAt || data.database?.latestUpdatedAt)} />
-            </div>
-          </Section>
-        </>
-      ) : null}
+      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <Card title="????? ??????????" value={fmt(data.snapshots)} note="Snapshots ??????" />
+        <Card title="????? ????????" value={fmt(data.events)} note="Timeline events ??????" />
+      </section>
     </main>
   );
 }
