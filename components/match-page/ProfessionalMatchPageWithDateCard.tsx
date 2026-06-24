@@ -1,4 +1,4 @@
-import type { MatchEventView, MatchPageData, MatchStatMetric, SourceChecklistItem } from '@/lib/match-page/types';
+import type { MatchEventView, MatchPageData, MatchPlayerLite, MatchPlayerStatItem, MatchStatMetric, OfficialLineupTeam, SourceChecklistItem } from '@/lib/match-page/types';
 import { EGYPT_TIME_ZONE_LABEL, formatEgyptDateTime } from '@/lib/match-page/egyptTime';
 import { publicSourceViews } from '@/lib/match-page/publicSourceLabels';
 
@@ -12,6 +12,11 @@ function value(value: number | null | undefined, suffix = '') {
 
 function safeNumber(value: number | null | undefined) {
   return value === null || value === undefined || Number.isNaN(Number(value)) ? null : Number(value);
+}
+
+function ratingValue(value: number | null | undefined) {
+  const number = safeNumber(value);
+  return number === null ? '—' : number.toFixed(1);
 }
 
 function statShare(metric: MatchStatMetric) {
@@ -156,6 +161,78 @@ function ChecklistBadge({ item }: { item: SourceChecklistItem }) {
   );
 }
 
+function LineupPlayerRow({ player, index }: { player: OfficialLineupTeam['startingXi'][number]; index: number }) {
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-black/25 p-3">
+      <div className="flex min-w-0 items-center gap-3">
+        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white/10 text-[11px] font-black text-slate-300">{player.number || index + 1}</span>
+        <div className="min-w-0">
+          <b className="block truncate text-sm text-white">{player.name}{player.isCaptain ? ' ©' : ''}</b>
+          <span className="text-[11px] font-bold text-slate-500">{player.position || '—'}</span>
+        </div>
+      </div>
+      {player.rating !== null && player.rating !== undefined && <span className="rounded-full border border-[#18E58F]/20 bg-[#18E58F]/10 px-2 py-1 text-xs font-black text-[#18E58F]">{ratingValue(player.rating)}</span>}
+    </div>
+  );
+}
+
+function LineupColumn({ team, fallbackPlayers }: { team: OfficialLineupTeam | null; fallbackPlayers: MatchPlayerLite[] }) {
+  const players = team?.startingXi?.length ? team.startingXi : [];
+  const subs = team?.substitutes || [];
+
+  return (
+    <div className="rounded-3xl border border-white/10 bg-black/20 p-4">
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <div>
+          <h3 className="text-lg font-black text-white">{team?.teamName || 'قائمة اللاعبين'}</h3>
+          <p className="text-xs font-bold text-slate-500">{team?.formation ? `الخطة: ${team.formation}` : team ? 'تشكيل محفوظ' : 'تشكيل غير متوفر'}</p>
+        </div>
+        {team && <span className="rounded-full border border-[#18E58F]/20 px-3 py-1 text-[11px] font-black text-[#18E58F]">Lineup</span>}
+      </div>
+
+      {players.length ? (
+        <div className="space-y-2">{players.slice(0, 11).map((player, index) => <LineupPlayerRow key={`${player.id || player.name}-${index}`} player={player} index={index} />)}</div>
+      ) : (
+        <div className="grid gap-2">
+          {fallbackPlayers.slice(0, 12).map((player) => (
+            <div key={player.id} className="rounded-2xl border border-dashed border-white/10 bg-black/20 p-3">
+              <b className="text-sm text-white">{player.name}</b>
+              <span className="mr-2 text-[11px] font-bold text-slate-500">{player.position || 'لاعب'}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {subs.length > 0 && (
+        <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.03] p-3">
+          <b className="text-xs text-[#F8C846]">البدلاء</b>
+          <p className="mt-2 text-xs font-bold leading-6 text-slate-400">{subs.slice(0, 8).map((player) => player.name).join(' · ')}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PlayerRatingCard({ player, rank }: { player: MatchPlayerStatItem; rank: number }) {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-black/25 p-4">
+      <div className="mb-3 flex items-start justify-between gap-3">
+        <div>
+          <span className="mb-2 inline-flex rounded-full border border-white/10 px-2 py-1 text-[10px] font-black text-slate-400">#{rank}</span>
+          <h3 className="font-black text-white">{player.playerName}</h3>
+          <p className="text-xs font-bold text-slate-500">{player.teamName || '—'}{player.position ? ` · ${player.position}` : ''}</p>
+        </div>
+        <span className="rounded-2xl border border-[#18E58F]/25 bg-[#18E58F]/10 px-3 py-2 text-lg font-black text-[#18E58F]">{ratingValue(player.rating)}</span>
+      </div>
+      <div className="grid grid-cols-3 gap-2 text-center text-xs font-bold text-slate-400">
+        <div className="rounded-xl bg-white/[0.04] p-2"><b className="block text-white">{value(player.goals)}</b>أهداف</div>
+        <div className="rounded-xl bg-white/[0.04] p-2"><b className="block text-white">{value(player.assists)}</b>أسيست</div>
+        <div className="rounded-xl bg-white/[0.04] p-2"><b className="block text-white">{value(player.minutes)}</b>دقائق</div>
+      </div>
+    </div>
+  );
+}
+
 export default function ProfessionalMatchPageWithDateCard({ data }: { data: MatchPageData }) {
   const availableStats = data.stats.filter((metric) => metric.available);
   const quickStats = QUICK_STAT_KEYS.map((key) => availableStats.find((metric) => metric.key === key)).filter(Boolean) as MatchStatMetric[];
@@ -164,6 +241,8 @@ export default function ProfessionalMatchPageWithDateCard({ data }: { data: Matc
     ...availableStats.filter((metric) => !FEATURED_STAT_KEYS.includes(metric.key)),
   ].slice(0, 16) as MatchStatMetric[];
   const timelineEvents = [...data.events].sort((a, b) => (a.minute ?? 999) - (b.minute ?? 999)).slice(0, 45);
+  const playerRatings = [...(data.advanced.playerStats || [])].filter((player) => player.playerName).sort((a, b) => Number(b.rating || 0) - Number(a.rating || 0)).slice(0, 10);
+  const bestPlayer = playerRatings.find((player) => player.rating !== null && player.rating !== undefined) || playerRatings[0] || null;
   const shouldShowArticleCta = data.status.isFinished || String(data.status.raw || '').toUpperCase() === 'FINAL_VERIFIED';
   const matchDateEgypt = formatEgyptDateTime(data.matchDate);
   const lastUpdatedEgypt = data.lastUpdatedAt ? formatEgyptDateTime(data.lastUpdatedAt) : 'غير متوفر';
@@ -235,6 +314,35 @@ export default function ProfessionalMatchPageWithDateCard({ data }: { data: Matc
             </div>
           )}
         </section>
+
+        <section className="rounded-[1.5rem] border border-white/10 bg-white/[0.04] p-4">
+          <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+            <div>
+              <h2 className="text-2xl font-black text-white">التشكيلات واللاعبون</h2>
+              <p className="mt-1 text-sm font-bold text-slate-400">تعرض التشكيلات الرسمية عند توفرها في Snapshot محفوظ، وإلا تظهر قائمة اللاعبين المحفوظة.</p>
+            </div>
+            <span className="rounded-full border border-[#F8C846]/20 px-3 py-1 text-[11px] font-black text-[#F8C846]">DB-only</span>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            <LineupColumn team={data.officialLineup?.home || null} fallbackPlayers={data.homePlayers} />
+            <LineupColumn team={data.officialLineup?.away || null} fallbackPlayers={data.awayPlayers} />
+          </div>
+        </section>
+
+        {playerRatings.length > 0 && (
+          <section className="rounded-[1.5rem] border border-white/10 bg-white/[0.04] p-4">
+            <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+              <div>
+                <h2 className="text-2xl font-black text-white">تقييمات اللاعبين</h2>
+                <p className="mt-1 text-sm font-bold text-slate-400">مرتبة حسب أعلى تقييم محفوظ في Player Stats Snapshot.</p>
+              </div>
+              {bestPlayer && <span className="rounded-full border border-[#18E58F]/20 bg-[#18E58F]/10 px-3 py-1 text-[11px] font-black text-[#18E58F]">الأفضل: {bestPlayer.playerName}</span>}
+            </div>
+            <div className="grid gap-3 md:grid-cols-2">
+              {playerRatings.slice(0, 8).map((player, index) => <PlayerRatingCard key={`${player.playerId || player.playerName}-${index}`} player={player} rank={index + 1} />)}
+            </div>
+          </section>
+        )}
 
         {shouldShowArticleCta && (
           <section className="rounded-[1.5rem] border border-[#F8C846]/20 bg-[#F8C846]/[0.055] p-4">
