@@ -13,6 +13,16 @@ function cleanText(value: any): string | null {
   return null;
 }
 
+function compactKey(value: any) {
+  return String(value || '').toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9\u0600-\u06ff]+/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+function rounded(value: any, digits = 1) {
+  const number = toNumber(value);
+  if (number === null || number === undefined || Number.isNaN(Number(number))) return 'na';
+  return Number(number).toFixed(digits);
+}
+
 function clampPercent(value: any) {
   const number = toNumber(value);
   if (number === null || number === undefined || Number.isNaN(Number(number))) return null;
@@ -46,6 +56,7 @@ function normalizeShot(row: any, homeTeam: any, awayTeam: any, index: number): M
   const playerName = cleanText(player?.name || row?.player_name || row?.playerName);
   const teamName = cleanText(team?.name || row?.team_name || row?.teamName || row?.team);
   const teamId = cleanText(team?.id || row?.team_id || row?.teamId) || (teamMatch(row, homeTeam) ? homeTeam.id : teamMatch(row, awayTeam) ? awayTeam.id : null);
+  const outcomeText = String(outcome || row?.type || '').toLowerCase();
 
   if (x === null && y === null && xg === null && !playerName) return null;
 
@@ -62,16 +73,29 @@ function normalizeShot(row: any, homeTeam: any, awayTeam: any, index: number): M
     outcome,
     situation: cleanText(row?.situation || row?.play_pattern || row?.phase),
     bodyPart: cleanText(row?.bodyPart || row?.body_part),
-    isGoal: /goal|scored|هدف/i.test(String(outcome || row?.type || '')),
-    isOnTarget: /on target|saved|goal|scored|على المرمى/i.test(String(outcome || '')),
-    isBlocked: /block/i.test(String(outcome || '')),
+    isGoal: /goal|scored|هدف/i.test(outcomeText),
+    isOnTarget: /on target|saved|save|goal|scored|على المرمى/i.test(outcomeText),
+    isBlocked: /block/i.test(outcomeText),
     isPenalty: /penalty|ركلة جزاء/i.test(String(row?.situation || row?.type || outcome || '')),
   };
+}
+
+function semanticShotKey(shot: MatchShotMapItem) {
+  return [
+    shot.minute ?? 'na',
+    compactKey(shot.playerName),
+    compactKey(shot.teamId || shot.teamName),
+    rounded(shot.x, 1),
+    rounded(shot.y, 1),
+    rounded(shot.xg, 3),
+    compactKey(shot.outcome),
+  ].join('|');
 }
 
 function extractShotmapFromSnapshots(snapshots: any[], homeTeam: any, awayTeam: any) {
   const shots: MatchShotMapItem[] = [];
   const seen = new Set<string>();
+  let duplicatesRemoved = 0;
 
   for (const snapshot of snapshots) {
     const data = rawData(snapshot);
@@ -87,16 +111,23 @@ function extractShotmapFromSnapshots(snapshots: any[], homeTeam: any, awayTeam: 
     for (const item of candidates) {
       const shot = normalizeShot(item, homeTeam, awayTeam, shots.length + 1);
       if (!shot) continue;
-      const key = `${shot.id}:${shot.minute}:${shot.playerName}:${shot.x}:${shot.y}:${shot.xg}`;
-      if (seen.has(key)) continue;
+      const key = semanticShotKey(shot);
+      if (seen.has(key)) {
+        duplicatesRemoved += 1;
+        continue;
+      }
       seen.add(key);
+      shot.id = `shot-${shots.length + 1}`;
       shots.push(shot);
     }
 
     if (shots.length >= 80) break;
   }
 
-  return shots.sort((a, b) => Number(a.minute || 999) - Number(b.minute || 999));
+  return {
+    shots: shots.sort((a, b) => Number(a.minute || 999) - Number(b.minute || 999)),
+    duplicatesRemoved,
+  };
 }
 
 function sumXg(shots: MatchShotMapItem[], teamId: string) {
@@ -117,7 +148,7 @@ export async function getMatchAdvancedVisualsData(matchId: string) {
   if (!match) return null;
 
   const snapshots = [...(match.statsSnapshots || [])];
-  const shots = extractShotmapFromSnapshots(snapshots, match.homeTeam, match.awayTeam);
+  const { shots, duplicatesRemoved } = extractShotmapFromSnapshots(snapshots, match.homeTeam, match.awayTeam);
   const topChances = [...shots].sort((a, b) => Number(b.xg || 0) - Number(a.xg || 0)).slice(0, 8);
 
   return {
@@ -136,6 +167,7 @@ export async function getMatchAdvancedVisualsData(matchId: string) {
       awayXg: sumXg(shots, match.awayTeam.id),
       goals: shots.filter((shot) => shot.isGoal).length,
       onTarget: shots.filter((shot) => shot.isOnTarget).length,
+      duplicatesRemoved,
     },
     source: snapshots.find((snapshot) => shots.length && rawData(snapshot)?.normalized?.shotmap)?.provider || 'Snapshot محفوظ',
     lastUpdatedAt: new Date(Math.max(...snapshots.map((snapshot) => new Date(snapshot.capturedAt).getTime()).filter(Number.isFinite), match.matchDate.getTime())).toISOString(),
