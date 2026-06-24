@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import ProfessionalMatchPageWithDateCard from '@/components/match-page/ProfessionalMatchPageWithDateCard';
-import { getMatchPageData } from '@/lib/match-page/getMatchPageData';
+import { getMatchPageDataFast } from '@/lib/match-page/getMatchPageDataFast';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 };
 
 export default async function MatchCenterPageLivePriority({ matchId }: { matchId: string }) {
-  const data = await getMatchPageData(matchId);
+  const data = await getMatchPageDataFast(matchId);
   if (!data) notFound();
   return <ProfessionalMatchPageWithDateCard data={data} />;
 }
