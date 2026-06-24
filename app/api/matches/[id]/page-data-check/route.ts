@@ -25,6 +25,7 @@ export async function GET(
     const readyChecklist = data.sourceChecklist.filter((item) => item.status === 'ready').length;
     const missingChecklist = data.sourceChecklist.filter((item) => item.status === 'missing');
     const hasRequiredBaseData = Boolean(data.homeTeam?.id && data.awayTeam?.id && data.matchDate && data.status?.raw);
+    const lineupPlayers = Number(data.officialLineup?.home?.startingXi?.length || 0) + Number(data.officialLineup?.away?.startingXi?.length || 0);
 
     return NextResponse.json({
       ok: true,
@@ -41,6 +42,9 @@ export async function GET(
         missing: missingChecklist.map((item) => item.label),
         statsAvailable,
         eventsCount: data.events.length,
+        lineupAvailable: Boolean(data.officialLineup),
+        lineupPlayers,
+        playerStatsCount: data.advanced.playerStats.length,
         sourcesCount: publicSources.length,
         sourceKeys: publicSources.map((source) => source.key),
       },
