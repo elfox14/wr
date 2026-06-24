@@ -325,7 +325,7 @@ export async function runLiveAnimationSync(options: SyncOptions = {}) {
   const allowFinished = Boolean(options.allowFinished);
   const dryRun = Boolean(options.dryRun);
 
-  if (!dryRun) await ensureLiveAnimationTables();
+  await ensureLiveAnimationTables();
 
   const since = new Date(Date.now() - lookbackHours * 60 * 60 * 1000);
   const matches = await prisma.match.findMany({
