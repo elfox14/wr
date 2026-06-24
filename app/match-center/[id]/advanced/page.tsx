@@ -8,6 +8,8 @@ export const revalidate = 0;
 
 type PageProps = { params: Promise<{ id: string }> };
 
+type AdvancedVisualsData = NonNullable<Awaited<ReturnType<typeof getMatchAdvancedVisualsData>>>;
+
 function number(value: number | null | undefined, digits = 0) {
   if (value === null || value === undefined || Number.isNaN(Number(value))) return '—';
   return Number(value).toFixed(digits);
@@ -23,7 +25,58 @@ function StatCard({ label, value, hint }: { label: string; value: string | numbe
   );
 }
 
-function ShotMap({ data }: { data: NonNullable<Awaited<ReturnType<typeof getMatchAdvancedVisualsData>>> }) {
+function QualityPill({ label, value, tone = 'neutral' }: { label: string; value: string | number; tone?: 'good' | 'warn' | 'neutral' }) {
+  const toneClass = tone === 'good'
+    ? 'border-[#18E58F]/25 bg-[#18E58F]/10 text-[#18E58F]'
+    : tone === 'warn'
+      ? 'border-[#F8C846]/25 bg-[#F8C846]/10 text-[#F8C846]'
+      : 'border-white/10 bg-black/25 text-slate-300';
+
+  return (
+    <div className={`rounded-2xl border p-3 ${toneClass}`}>
+      <p className="text-[11px] font-black opacity-80">{label}</p>
+      <b className="mt-1 block text-sm text-white">{value}</b>
+    </div>
+  );
+}
+
+function DataQualityPanel({ data }: { data: AdvancedVisualsData }) {
+  const duplicatesRemoved = Number((data.summary as any).duplicatesRemoved || 0);
+  const hasShotmap = data.shotmap.length > 0;
+  const qualityLabel = hasShotmap ? 'Verified Snapshot' : 'Waiting Snapshot';
+
+  return (
+    <section className="rounded-[2rem] border border-[#18E58F]/15 bg-[#18E58F]/[0.045] p-5">
+      <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+        <div>
+          <h2 className="text-2xl font-black text-white">جودة بيانات التحليل المتقدم</h2>
+          <p className="mt-1 text-sm font-bold leading-6 text-slate-300">
+            هذه البطاقة تشرح حالة الـ Snapshot المستخدم في خريطة التسديدات، حتى لا تحتاج لفتح JSON للتأكد من جودة البيانات.
+          </p>
+        </div>
+        <span className={`rounded-full border px-4 py-2 text-xs font-black ${hasShotmap ? 'border-[#18E58F]/25 bg-[#18E58F]/10 text-[#18E58F]' : 'border-[#F8C846]/25 bg-[#F8C846]/10 text-[#F8C846]'}`}>
+          {qualityLabel}
+        </span>
+      </div>
+
+      <div className="grid gap-3 md:grid-cols-5">
+        <QualityPill label="مصدر البيانات" value={data.source || 'Snapshot محفوظ'} tone={hasShotmap ? 'good' : 'warn'} />
+        <QualityPill label="آخر تحديث" value={formatEgyptDateTime(data.lastUpdatedAt)} />
+        <QualityPill label="تسديدات بعد التنظيف" value={data.shotmap.length} tone={hasShotmap ? 'good' : 'warn'} />
+        <QualityPill label="تكرارات محذوفة" value={duplicatesRemoved} tone={duplicatesRemoved > 0 ? 'warn' : 'neutral'} />
+        <QualityPill label="DB-only" value="لا يوجد جلب مباشر" tone="good" />
+      </div>
+
+      {duplicatesRemoved > 0 && (
+        <p className="mt-3 rounded-2xl border border-[#F8C846]/20 bg-[#F8C846]/10 p-3 text-xs font-bold leading-6 text-[#F8C846]">
+          تم حذف {duplicatesRemoved} تسديدة مكررة من العرض والملخص حتى لا تتضاعف أرقام xG أو إجمالي التسديدات بسبب تكرار نفس اللقطة في أكثر من Snapshot.
+        </p>
+      )}
+    </section>
+  );
+}
+
+function ShotMap({ data }: { data: AdvancedVisualsData }) {
   const shots = data.shotmap.slice(0, 80);
 
   return (
@@ -83,6 +136,8 @@ export default async function MatchAdvancedVisualsPage({ params }: PageProps) {
           <p className="mt-2 text-sm font-bold text-slate-400">{data.title} · {formatEgyptDateTime(data.matchDate)} · مصدر محفوظ: {data.source}</p>
           <p className="mt-2 text-xs font-bold text-[#18E58F]">هذه الصفحة تقرأ من قاعدة البيانات فقط ولا تجلب من أي API خارجي أثناء فتحها.</p>
         </section>
+
+        <DataQualityPanel data={data} />
 
         <section className="grid gap-3 md:grid-cols-6">
           <StatCard label="إجمالي التسديدات" value={data.summary.shots} />
