@@ -85,6 +85,22 @@ upsert LiveAnimationEvent
 /live-animation/[id] reads DB only
 ```
 
+## v1 sync worker
+
+This repo includes a first worker stage:
+
+```text
+npm run worker:live-animation-sync
+```
+
+It reads existing saved `MatchEvent` rows and writes normalized `LiveAnimationEvent` rows. This makes the virtual pitch useful immediately before a provider animation feed is connected.
+
+See:
+
+```text
+docs/LIVE_ANIMATION_SYNC_WORKER.md
+```
+
 ## Fallback behavior
 
 If the migration is not applied yet or no `LiveAnimationEvent` rows exist, the API and page fall back to the existing `MatchEvent` table.
@@ -101,13 +117,15 @@ The UI supports three levels:
 
 ## Next step
 
-Build the worker that converts provider animation/timeline payloads into `LiveAnimationEvent` rows.
+Connect a real provider animation feed to the normalizer.
 
-Recommended first target:
+Recommended target:
 
 ```text
-scripts/live-animation-sync-worker.mjs
-/api/cron/live-animation-sync
+hSport/iSports animation feed
++ TheStats lineups/player identity
+↓
+LiveAnimationEvent
 ```
 
 Keep the same architecture rule: workers fetch providers; pages read DB only.
