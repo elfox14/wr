@@ -1,5 +1,11 @@
 import { randomUUID } from 'crypto';
 import prisma from '@/lib/prisma';
+import {
+  animationEventLabel,
+  inferLiveAnimationSpatial,
+  normalizeAnimationEventType,
+  type AnimationTeamSide,
+} from '@/lib/liveAnimationSpatial';
 
 const FINISHED_STATUSES = ['FINISHED', 'FT', 'AET', 'PEN', 'COMPLETED', 'ENDED', 'FINAL_VERIFIED'];
 const LIVE_STATUSES = ['LIVE', 'IN_PLAY', '1H', '2H', 'HT', 'ET', 'BREAK'];
@@ -24,41 +30,6 @@ type MatchEventRow = {
   createdAt: Date;
 };
 
-function clampNumber(value: number, min = 0, max = 100) {
-  if (!Number.isFinite(value)) return min;
-  return Math.max(min, Math.min(max, value));
-}
-
-function normalizeEventType(type?: string | null, detail?: string | null) {
-  const text = `${type || ''} ${detail || ''}`.toLowerCase();
-  if (/goal|هدف/.test(text)) return 'goal';
-  if (/yellow|صفراء|انذار|إنذار/.test(text)) return 'yellow_card';
-  if (/red|حمراء|طرد/.test(text)) return 'red_card';
-  if (/sub|تبديل/.test(text)) return 'substitution';
-  if (/shot|تسديدة|save|blocked|on target/.test(text)) return 'shot';
-  if (/corner|ركنية/.test(text)) return 'corner';
-  if (/penalty|جزاء/.test(text)) return 'penalty';
-  if (/var/.test(text)) return 'var';
-  if (/foul|خطأ/.test(text)) return 'foul';
-  if (/offside|تسلل/.test(text)) return 'offside';
-  return type || 'note';
-}
-
-function eventLabel(eventType: string) {
-  const key = eventType.toLowerCase();
-  if (key.includes('goal')) return 'هدف';
-  if (key.includes('yellow')) return 'بطاقة صفراء';
-  if (key.includes('red')) return 'بطاقة حمراء';
-  if (key.includes('sub')) return 'تبديل';
-  if (key.includes('shot')) return 'تسديدة';
-  if (key.includes('corner')) return 'ركنية';
-  if (key.includes('penalty')) return 'ركلة جزاء';
-  if (key.includes('var')) return 'VAR';
-  if (key.includes('foul')) return 'خطأ';
-  if (key.includes('offside')) return 'تسلل';
-  return 'حدث';
-}
-
 function extractJerseyNumber(detail?: string | null, playerName?: string | null) {
   const text = `${playerName || ''} ${detail || ''}`;
   const hash = text.match(/#\s?(\d{1,2})\b/);
@@ -68,49 +39,10 @@ function extractJerseyNumber(detail?: string | null, playerName?: string | null)
   return null;
 }
 
-function teamSide(teamId: string | null | undefined, homeTeamId: string, awayTeamId: string): 'home' | 'away' | 'unknown' {
+function teamSide(teamId: string | null | undefined, homeTeamId: string, awayTeamId: string): AnimationTeamSide {
   if (teamId === homeTeamId) return 'home';
   if (teamId === awayTeamId) return 'away';
   return 'unknown';
-}
-
-function deterministicNoise(seed: string, max = 12) {
-  let hash = 0;
-  for (let i = 0; i < seed.length; i += 1) hash = ((hash << 5) - hash + seed.charCodeAt(i)) | 0;
-  return Math.abs(hash % max);
-}
-
-function inferCoordinates(event: MatchEventRow, homeTeamId: string, awayTeamId: string, index: number) {
-  const type = normalizeEventType(event.type, event.detail);
-  const side = teamSide(event.teamId, homeTeamId, awayTeamId);
-  const homeAttacksRight = side === 'home';
-  const awayAttacksLeft = side === 'away';
-  const noise = deterministicNoise(`${event.id}-${event.minute}-${event.detail}`, 18) - 9;
-  const lane = 22 + ((index * 17) % 56);
-
-  if (type === 'goal' || type === 'shot' || type === 'penalty') {
-    const x = homeAttacksRight ? 82 : awayAttacksLeft ? 18 : 50;
-    const endX = homeAttacksRight ? 96 : awayAttacksLeft ? 4 : null;
-    return { x: clampNumber(x + noise / 2), y: clampNumber(50 + noise), endX, endY: 50, zone: 'attacking_third' };
-  }
-
-  if (type === 'corner') {
-    const x = homeAttacksRight ? 94 : awayAttacksLeft ? 6 : 50;
-    const y = index % 2 === 0 ? 8 : 92;
-    return { x, y, endX: homeAttacksRight ? 82 : awayAttacksLeft ? 18 : null, endY: 50, zone: 'corner' };
-  }
-
-  if (type === 'substitution') {
-    return { x: 50, y: side === 'home' ? 94 : side === 'away' ? 6 : 50, endX: null, endY: null, zone: 'touchline' };
-  }
-
-  if (type === 'yellow_card' || type === 'red_card' || type === 'foul') {
-    const baseX = side === 'home' ? 42 : side === 'away' ? 58 : 50;
-    return { x: clampNumber(baseX + noise), y: lane, endX: null, endY: null, zone: 'middle_third' };
-  }
-
-  const baseX = side === 'home' ? 35 : side === 'away' ? 65 : 50;
-  return { x: clampNumber(baseX + noise), y: lane, endX: null, endY: null, zone: 'general' };
 }
 
 function statusList(allowFinished: boolean) {
@@ -145,15 +77,29 @@ export async function ensureLiveAnimationTables() {
       "provider" TEXT NOT NULL DEFAULT 'NORMALIZED_ANIMATION',
       "rawProviderEventId" TEXT,
       "payload" JSONB,
+      "coordinateSource" TEXT NOT NULL DEFAULT 'HEURISTIC',
+      "coordinateConfidence" TEXT NOT NULL DEFAULT 'LOW',
+      "eventSide" TEXT NOT NULL DEFAULT 'NEUTRAL',
+      "isInferred" BOOLEAN NOT NULL DEFAULT TRUE,
+      "anchorZone" TEXT,
+      "displayPriority" INTEGER NOT NULL DEFAULT 50,
       "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
       "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
       CONSTRAINT "LiveAnimationEvent_matchId_fkey" FOREIGN KEY ("matchId") REFERENCES "Match"("id") ON DELETE CASCADE ON UPDATE CASCADE
     );
   `);
+  await prisma.$executeRawUnsafe(`ALTER TABLE "LiveAnimationEvent" ADD COLUMN IF NOT EXISTS "coordinateSource" TEXT NOT NULL DEFAULT 'HEURISTIC';`);
+  await prisma.$executeRawUnsafe(`ALTER TABLE "LiveAnimationEvent" ADD COLUMN IF NOT EXISTS "coordinateConfidence" TEXT NOT NULL DEFAULT 'LOW';`);
+  await prisma.$executeRawUnsafe(`ALTER TABLE "LiveAnimationEvent" ADD COLUMN IF NOT EXISTS "eventSide" TEXT NOT NULL DEFAULT 'NEUTRAL';`);
+  await prisma.$executeRawUnsafe(`ALTER TABLE "LiveAnimationEvent" ADD COLUMN IF NOT EXISTS "isInferred" BOOLEAN NOT NULL DEFAULT TRUE;`);
+  await prisma.$executeRawUnsafe(`ALTER TABLE "LiveAnimationEvent" ADD COLUMN IF NOT EXISTS "anchorZone" TEXT;`);
+  await prisma.$executeRawUnsafe(`ALTER TABLE "LiveAnimationEvent" ADD COLUMN IF NOT EXISTS "displayPriority" INTEGER NOT NULL DEFAULT 50;`);
   await prisma.$executeRawUnsafe(`CREATE UNIQUE INDEX IF NOT EXISTS "LiveAnimationEvent_matchId_sequenceNumber_key" ON "LiveAnimationEvent"("matchId", "sequenceNumber");`);
   await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "LiveAnimationEvent_matchId_createdAt_idx" ON "LiveAnimationEvent"("matchId", "createdAt");`);
   await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "LiveAnimationEvent_matchId_eventType_idx" ON "LiveAnimationEvent"("matchId", "eventType");`);
   await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "LiveAnimationEvent_rawProviderEventId_idx" ON "LiveAnimationEvent"("rawProviderEventId");`);
+  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "LiveAnimationEvent_matchId_coordinateSource_idx" ON "LiveAnimationEvent"("matchId", "coordinateSource");`);
+  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "LiveAnimationEvent_matchId_displayPriority_idx" ON "LiveAnimationEvent"("matchId", "displayPriority");`);
   await prisma.$executeRawUnsafe(`
     CREATE TABLE IF NOT EXISTS "LiveAnimationState" (
       "matchId" TEXT NOT NULL PRIMARY KEY,
@@ -190,23 +136,39 @@ async function upsertAnimationEvent(input: {
   index: number;
 }) {
   const { event, matchId, sequenceNumber, homeTeamId, awayTeamId, index } = input;
-  const eventType = normalizeEventType(event.type, event.detail);
-  const coords = inferCoordinates(event, homeTeamId, awayTeamId, index);
+  const eventType = normalizeAnimationEventType(event.type, event.detail);
+  const side = teamSide(event.teamId, homeTeamId, awayTeamId);
+  const spatial = inferLiveAnimationSpatial({
+    id: event.id,
+    type: event.type,
+    detail: event.detail,
+    minute: event.minute,
+    teamSide: side,
+    index,
+  });
   const payload = JSON.stringify({
-    source: 'match_event_normalizer',
+    source: 'match_event_normalizer_v2',
     matchEventId: event.id,
     originalType: event.type,
     detail: event.detail,
+    spatial: {
+      coordinateSource: spatial.coordinateSource,
+      coordinateConfidence: spatial.coordinateConfidence,
+      eventSide: spatial.eventSide,
+      anchorZone: spatial.anchorZone,
+    },
   });
 
   await prisma.$executeRawUnsafe(
     `
       INSERT INTO "LiveAnimationEvent" (
         "id", "matchId", "sequenceNumber", "minute", "second", "teamId", "playerId", "playerName", "jerseyNumber",
-        "eventType", "eventLabel", "x", "y", "endX", "endY", "zone", "provider", "rawProviderEventId", "payload", "createdAt", "updatedAt"
+        "eventType", "eventLabel", "x", "y", "endX", "endY", "zone", "provider", "rawProviderEventId", "payload",
+        "coordinateSource", "coordinateConfidence", "eventSide", "isInferred", "anchorZone", "displayPriority", "createdAt", "updatedAt"
       ) VALUES (
         $1, $2, $3, $4, NULL, $5, $6, $7, $8,
-        $9, $10, $11, $12, $13, $14, $15, $16, $17, $18::jsonb, $19, CURRENT_TIMESTAMP
+        $9, $10, $11, $12, $13, $14, $15, $16, $17, $18::jsonb,
+        $19, $20, $21, $22, $23, $24, $25, CURRENT_TIMESTAMP
       )
       ON CONFLICT ("matchId", "sequenceNumber") DO UPDATE SET
         "minute" = EXCLUDED."minute",
@@ -224,6 +186,12 @@ async function upsertAnimationEvent(input: {
         "provider" = EXCLUDED."provider",
         "rawProviderEventId" = EXCLUDED."rawProviderEventId",
         "payload" = EXCLUDED."payload",
+        "coordinateSource" = EXCLUDED."coordinateSource",
+        "coordinateConfidence" = EXCLUDED."coordinateConfidence",
+        "eventSide" = EXCLUDED."eventSide",
+        "isInferred" = EXCLUDED."isInferred",
+        "anchorZone" = EXCLUDED."anchorZone",
+        "displayPriority" = EXCLUDED."displayPriority",
         "updatedAt" = CURRENT_TIMESTAMP
     `,
     randomUUID(),
@@ -235,15 +203,21 @@ async function upsertAnimationEvent(input: {
     event.playerName,
     extractJerseyNumber(event.detail, event.playerName),
     eventType,
-    eventLabel(eventType),
-    coords.x,
-    coords.y,
-    coords.endX,
-    coords.endY,
-    coords.zone,
-    event.sourceName || 'MATCH_EVENT_NORMALIZER',
+    animationEventLabel(eventType),
+    spatial.x,
+    spatial.y,
+    spatial.endX,
+    spatial.endY,
+    spatial.zone,
+    event.sourceName || 'MATCH_EVENT_NORMALIZER_V2',
     event.id,
     payload,
+    spatial.coordinateSource,
+    spatial.coordinateConfidence,
+    spatial.eventSide,
+    spatial.isInferred,
+    spatial.anchorZone,
+    spatial.displayPriority,
     event.createdAt,
   );
 }
@@ -351,14 +325,14 @@ export async function runLiveAnimationSync(options: SyncOptions = {}) {
 
   return {
     ok: true,
-    mode: 'live_animation_sync_worker_v1',
-    source: 'MatchEvent -> LiveAnimationEvent',
+    mode: 'live_animation_sync_worker_v2',
+    source: 'MatchEvent -> LiveAnimationEvent spatial intelligence v2',
     limit,
     lookbackHours,
     allowFinished,
     dryRun,
     candidates: matches.length,
     results,
-    note: 'This worker reads saved DB MatchEvent rows and writes normalized LiveAnimationEvent rows. It does not fetch external providers yet.',
+    note: 'This worker reads saved DB MatchEvent rows and writes normalized LiveAnimationEvent rows with deterministic spatial metadata. It does not fetch external providers yet.',
   };
 }
