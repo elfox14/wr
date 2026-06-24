@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getMatchPageDataFast } from '@/lib/match-page/getMatchPageDataFast';
 import { egyptTimePayload } from '@/lib/match-page/egyptTime';
+import { publicSourceViews } from '@/lib/match-page/publicSourceLabels';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -19,6 +20,7 @@ export async function GET(
       return NextResponse.json({ ok: false, error: 'Match not found', matchId }, { status: 404, headers: { 'Cache-Control': 'no-store' } });
     }
 
+    const publicSources = publicSourceViews(data.sources);
     const statsAvailable = data.stats.some((metric) => metric.available);
     const readyChecklist = data.sourceChecklist.filter((item) => item.status === 'ready').length;
     const missingChecklist = data.sourceChecklist.filter((item) => item.status === 'missing');
@@ -39,11 +41,11 @@ export async function GET(
         missing: missingChecklist.map((item) => item.label),
         statsAvailable,
         eventsCount: data.events.length,
-        sourcesCount: data.sources.length,
-        sourceKeys: data.sources.map((source) => source.key),
+        sourcesCount: publicSources.length,
+        sourceKeys: publicSources.map((source) => source.key),
       },
       checklist: data.sourceChecklist,
-      sources: data.sources,
+      sources: publicSources,
       note: 'This endpoint verifies the saved database data used by the match page. It never fetches external providers.',
     }, { headers: { 'Cache-Control': 'no-store' } });
   } catch (error: any) {
