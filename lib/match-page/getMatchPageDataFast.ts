@@ -251,7 +251,7 @@ export async function getMatchPageDataFast(matchId: string): Promise<MatchPageDa
   const status = forceFinishedStatus(match, buildStatusView(match, snapshots));
   const stats = metricDefinitions().map(([key, label, homeKey, awayKey, suffix]) => buildStatMetric(snapshots, key, label, homeKey, awayKey, suffix));
   const statsAvailable = stats.some((metric: MatchStatMetric) => metric.available);
-  const groupKey = normalizeGoodGroup(match.groupPhase) || normalizeGoodGroup(match.group) || normalizeGoodGroup(homeTeam.group) || normalizeGoodGroup(awayTeam.group);
+  const groupKey = normalizeGoodGroup(match.groupPhase) || normalizeGoodGroup(homeTeam.group) || normalizeGoodGroup(awayTeam.group);|| normalizeGoodGroup(awayTeam.group);
   const groupStandings = groupKey ? buildGroupStandings(allMatches as any[], groupKey) : [];
   const thirdPlaceTable = buildBestThirdsTable(allMatches as any[]);
   const dbEvents: MatchEventView[] = (match.events || []).map(buildEventView);
