@@ -1,5 +1,6 @@
 import type { MatchPageData, MatchStatMetric, SourceChecklistItem } from '@/lib/match-page/types';
 import { EGYPT_TIME_ZONE_LABEL, formatEgyptDateTime } from '@/lib/match-page/egyptTime';
+import { publicSourceViews } from '@/lib/match-page/publicSourceLabels';
 
 function value(value: number | null | undefined, suffix = '') {
   if (value === null || value === undefined || Number.isNaN(Number(value))) return '—';
@@ -54,6 +55,7 @@ export default function ProfessionalMatchPageWithDateCard({ data }: { data: Matc
   const matchDateEgypt = formatEgyptDateTime(data.matchDate);
   const lastUpdatedEgypt = data.lastUpdatedAt ? formatEgyptDateTime(data.lastUpdatedAt) : 'غير متوفر';
   const readyChecks = data.sourceChecklist.filter((item) => item.status === 'ready').length;
+  const publicSources = publicSourceViews(data.sources);
 
   return (
     <main className="min-h-screen bg-[#04110D] px-3 py-5 text-white" dir="rtl">
@@ -99,11 +101,11 @@ export default function ProfessionalMatchPageWithDateCard({ data }: { data: Matc
           <div className="grid gap-3 md:grid-cols-3">
             {data.sourceChecklist.map((item) => <ChecklistBadge key={item.label} item={item} />)}
           </div>
-          {data.sources.length > 0 && (
+          {publicSources.length > 0 && (
             <div className="mt-4 rounded-2xl border border-white/10 bg-black/25 p-3">
               <b className="text-sm text-[#F8C846]">مصادر البيانات المحفوظة:</b>
               <p className="mt-2 text-xs font-bold leading-6 text-slate-400">
-                {data.sources.map((source) => `${source.name}${source.lastCheckedAt ? ` (${formatEgyptDateTime(source.lastCheckedAt)})` : ''}`).join(' · ')}
+                {publicSources.map((source) => `${source.name}${source.lastCheckedAt ? ` (${formatEgyptDateTime(source.lastCheckedAt)})` : ''}`).join(' · ')}
               </p>
             </div>
           )}
