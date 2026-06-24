@@ -11,6 +11,9 @@ export const revalidate = 15;
 
 type PageProps = { params: Promise<{ matchId: string }> };
 
+type WatchTeam = { id: string; name: string; code?: string | null; image?: string | null };
+type WatchEmbedResult = { url: string; host: string } | null;
+
 const LIVE_STATUSES = ['LIVE', 'IN_PLAY', '1H', '2H', 'HT', 'ET', 'BREAK'];
 const FINISHED_STATUSES = ['FINISHED', 'FT', 'AET', 'PEN', 'COMPLETED', 'ENDED', 'FINAL_VERIFIED'];
 
@@ -36,6 +39,76 @@ function scoreValue(value: number | null | undefined) {
 
 function flagUrl(team: any) {
   return getTeamFlagUrl({ code: team?.code, name: team?.name, image: team?.image }, 160) || team?.image || null;
+}
+
+function boolEnv(value?: string | null) {
+  return ['1', 'true', 'yes', 'on'].includes(String(value || '').trim().toLowerCase());
+}
+
+function csvEnv(value?: string | null) {
+  return String(value || '').split(',').map((item) => item.trim().toLowerCase()).filter(Boolean);
+}
+
+function parseEmbedMap() {
+  const raw = String(process.env.WATCH_EMBED_MAP_JSON || '').trim();
+  if (!raw) return {} as Record<string, string>;
+  try {
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed as Record<string, string> : {};
+  } catch {
+    return {} as Record<string, string>;
+  }
+}
+
+function replaceTemplate(template: string, match: { id: string; homeTeam: WatchTeam; awayTeam: WatchTeam }) {
+  const values: Record<string, string> = {
+    matchId: match.id,
+    homeId: match.homeTeam.id,
+    awayId: match.awayTeam.id,
+    homeCode: match.homeTeam.code || '',
+    awayCode: match.awayTeam.code || '',
+    homeName: match.homeTeam.name || '',
+    awayName: match.awayTeam.name || '',
+  };
+
+  return template.replace(/\{(matchId|homeId|awayId|homeCode|awayCode|homeName|awayName)\}/g, (_, key) => encodeURIComponent(values[key] || ''));
+}
+
+function hostAllowed(hostname: string, allowedHosts: string[]) {
+  const host = hostname.toLowerCase();
+  return allowedHosts.some((allowed) => {
+    const item = allowed.replace(/^https?:\/\//, '').replace(/\/.*$/, '').toLowerCase();
+    if (!item) return false;
+    if (item.startsWith('*.')) {
+      const root = item.slice(2);
+      return host === root || host.endsWith(`.${root}`);
+    }
+    return host === item;
+  });
+}
+
+function resolveWatchEmbed(match: { id: string; homeTeam: WatchTeam; awayTeam: WatchTeam }): WatchEmbedResult {
+  if (!boolEnv(process.env.WATCH_EMBED_ENABLED)) return null;
+
+  const allowedHosts = csvEnv(process.env.WATCH_EMBED_ALLOWED_HOSTS);
+  if (!allowedHosts.length) return null;
+
+  const map = parseEmbedMap();
+  const mapped = map[match.id] || map[match.homeTeam.code || ''] || map[`${match.homeTeam.code || ''}-${match.awayTeam.code || ''}`];
+  const template = String(mapped || process.env.WATCH_EMBED_URL_TEMPLATE || '').trim();
+  if (!template) return null;
+
+  const candidate = replaceTemplate(template, match);
+
+  try {
+    const url = new URL(candidate);
+    const isLocalhost = url.hostname === 'localhost' || url.hostname === '127.0.0.1';
+    if (url.protocol !== 'https:' && !isLocalhost) return null;
+    if (!hostAllowed(url.hostname, allowedHosts)) return null;
+    return { url: url.toString(), host: url.hostname };
+  } catch {
+    return null;
+  }
 }
 
 function Pill({ children, tone = 'neutral' }: { children: React.ReactNode; tone?: 'live' | 'warn' | 'neutral' }) {
@@ -84,6 +157,45 @@ async function getWatchData(matchId: string) {
   };
 }
 
+function PlayerFrame({ embed, title, matchId }: { embed: WatchEmbedResult; title: string; matchId: string }) {
+  if (embed) {
+    return (
+      <iframe
+        src={embed.url}
+        title={`بث ${title}`}
+        className="absolute inset-0 h-full w-full border-0 bg-black"
+        allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
+        allowFullScreen
+        referrerPolicy="strict-origin-when-cross-origin"
+        sandbox="allow-scripts allow-same-origin allow-presentation allow-forms allow-popups"
+      />
+    );
+  }
+
+  return (
+    <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center">
+      <div className="mb-4 rounded-full border border-white/10 bg-white/[0.06] px-4 py-2 text-xs font-black text-slate-300">
+        مشغل البث
+      </div>
+      <h2 className="text-2xl font-black md:text-4xl">{title}</h2>
+      <p className="mt-3 max-w-xl text-sm font-bold leading-7 text-slate-400">
+        لم يتم تفعيل رابط بث مصرح به لهذه المباراة بعد. أضف إعدادات WATCH_EMBED في Render وسيظهر المشغل هنا تلقائيًا.
+      </p>
+      <div className="mt-4 rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-xs font-bold text-slate-400">
+        Match ID: {matchId}
+      </div>
+      <div className="mt-5 flex flex-wrap justify-center gap-3">
+        <Link href={`/match-center/${matchId}`} className="rounded-2xl bg-white px-5 py-3 text-sm font-black text-black transition hover:bg-[#18E58F]">
+          افتح الإحصائيات الحية
+        </Link>
+        <a href="#watch-status" className="rounded-2xl border border-white/10 px-5 py-3 text-sm font-black text-white transition hover:bg-white hover:text-black">
+          حالة البث
+        </a>
+      </div>
+    </div>
+  );
+}
+
 export default async function WatchPage({ params }: PageProps) {
   const { matchId } = await params;
   const data = await getWatchData(matchId);
@@ -91,6 +203,7 @@ export default async function WatchPage({ params }: PageProps) {
 
   const homeFlag = flagUrl(data.homeTeam);
   const awayFlag = flagUrl(data.awayTeam);
+  const embed = resolveWatchEmbed(data);
 
   return (
     <main className="min-h-screen bg-[#020806] text-white" dir="rtl">
@@ -103,6 +216,7 @@ export default async function WatchPage({ params }: PageProps) {
               <Pill tone={data.isLive ? 'live' : data.isFinished ? 'neutral' : 'warn'}>{statusLabel(data.status)}</Pill>
               {data.minute !== null && <Pill>الدقيقة {data.minute}</Pill>}
               {data.latestSnapshotAt && <Pill>آخر تحديث: {formatEgyptDateTime(data.latestSnapshotAt)}</Pill>}
+              {embed && <Pill tone="live">مشغل مفعل: {embed.host}</Pill>}
             </div>
             <h1 className="text-2xl font-black md:text-3xl">غرفة مشاهدة المباراة</h1>
             <p className="mt-1 text-sm font-bold text-slate-400">صفحة بث خفيفة تقرأ الحالة والنتيجة من قاعدة البيانات فقط.</p>
@@ -121,23 +235,7 @@ export default async function WatchPage({ params }: PageProps) {
         <section className="grid gap-4 lg:grid-cols-[1fr_320px]">
           <div className="overflow-hidden rounded-[2rem] border border-white/10 bg-black shadow-2xl shadow-black/50">
             <div className="relative aspect-video w-full bg-[radial-gradient(circle_at_center,rgba(24,229,143,0.16),transparent_35%),linear-gradient(135deg,#06140F,#020806)]">
-              <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center">
-                <div className="mb-4 rounded-full border border-white/10 bg-white/[0.06] px-4 py-2 text-xs font-black text-slate-300">
-                  مشغل البث
-                </div>
-                <h2 className="text-2xl font-black md:text-4xl">{data.title}</h2>
-                <p className="mt-3 max-w-xl text-sm font-bold leading-7 text-slate-400">
-                  هذا المكان مخصص لمشغل الفيديو فقط. عند ربط مزود البث لاحقًا سيبقى مركز المباراة منفصلًا، وستظل هذه الصفحة خفيفة ومستقرة.
-                </p>
-                <div className="mt-5 flex flex-wrap justify-center gap-3">
-                  <Link href={`/match-center/${data.id}`} className="rounded-2xl bg-white px-5 py-3 text-sm font-black text-black transition hover:bg-[#18E58F]">
-                    افتح الإحصائيات الحية
-                  </Link>
-                  <a href="#watch-status" className="rounded-2xl border border-white/10 px-5 py-3 text-sm font-black text-white transition hover:bg-white hover:text-black">
-                    حالة البث
-                  </a>
-                </div>
-              </div>
+              <PlayerFrame embed={embed} title={data.title} matchId={data.id} />
             </div>
           </div>
 
@@ -165,6 +263,14 @@ export default async function WatchPage({ params }: PageProps) {
               <b className="mt-2 block text-lg text-white">{statusLabel(data.status)}</b>
               <p className="mt-2 text-xs font-bold text-slate-400">
                 {data.isLive ? 'سيتم تحديث هذه الصفحة تلقائيًا كل 30 ثانية من قاعدة البيانات.' : 'عند بداية المباراة ستتحول هذه الصفحة إلى متابعة خفيفة للبث.'}
+              </p>
+            </div>
+
+            <div className="rounded-3xl border border-white/10 bg-black/25 p-4">
+              <p className="text-xs font-black text-slate-500">حالة المشغل</p>
+              <b className="mt-2 block text-sm text-white">{embed ? `مفعل عبر ${embed.host}` : 'غير مفعل بعد'}</b>
+              <p className="mt-2 text-xs font-bold leading-6 text-slate-400">
+                استخدم Embed رسمي أو مصرح به فقط. لا تضع مفاتيح سرية داخل رابط iframe لأنه سيظهر للمتصفح.
               </p>
             </div>
 
