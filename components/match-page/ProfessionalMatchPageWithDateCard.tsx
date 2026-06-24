@@ -1,4 +1,5 @@
-import type { MatchPageData, MatchStatMetric } from '@/lib/match-page/types';
+import type { MatchPageData, MatchStatMetric, SourceChecklistItem } from '@/lib/match-page/types';
+import { EGYPT_TIME_ZONE_LABEL, formatEgyptDateTime } from '@/lib/match-page/egyptTime';
 
 function value(value: number | null | undefined, suffix = '') {
   if (value === null || value === undefined || Number.isNaN(Number(value))) return '—';
@@ -27,10 +28,32 @@ function StatRow({ metric }: { metric: MatchStatMetric }) {
   );
 }
 
+function ChecklistBadge({ item }: { item: SourceChecklistItem }) {
+  const label = item.status === 'ready' ? 'جاهز' : item.status === 'optional' ? 'اختياري' : 'ناقص';
+  const tone = item.status === 'ready'
+    ? 'border-[#18E58F]/25 bg-[#18E58F]/10 text-[#18E58F]'
+    : item.status === 'optional'
+      ? 'border-[#F8C846]/25 bg-[#F8C846]/10 text-[#F8C846]'
+      : 'border-red-400/25 bg-red-400/10 text-red-200';
+
+  return (
+    <div className="rounded-2xl border border-white/10 bg-black/25 p-3">
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <b className="text-sm text-white">{item.label}</b>
+        <span className={`rounded-full border px-3 py-1 text-[11px] font-black ${tone}`}>{label}</span>
+      </div>
+      <p className="text-xs font-bold leading-6 text-slate-400">{item.note}</p>
+    </div>
+  );
+}
+
 export default function ProfessionalMatchPageWithDateCard({ data }: { data: MatchPageData }) {
   const availableStats = data.stats.filter((metric) => metric.available).slice(0, 10);
   const latestEvents = data.events.slice(-12).reverse();
-  const shouldShowArticleCta = data.status.isFinished;
+  const shouldShowArticleCta = data.status.isFinished || String(data.status.raw || '').toUpperCase() === 'FINAL_VERIFIED';
+  const matchDateEgypt = formatEgyptDateTime(data.matchDate);
+  const lastUpdatedEgypt = data.lastUpdatedAt ? formatEgyptDateTime(data.lastUpdatedAt) : 'غير متوفر';
+  const readyChecks = data.sourceChecklist.filter((item) => item.status === 'ready').length;
 
   return (
     <main className="min-h-screen bg-[#04110D] px-3 py-5 text-white" dir="rtl">
@@ -49,7 +72,8 @@ export default function ProfessionalMatchPageWithDateCard({ data }: { data: Matc
               <div className="text-5xl font-black text-white">
                 {value(data.score.home)} <span className="text-[#18E58F]">-</span> {value(data.score.away)}
               </div>
-              <p className="mt-3 text-sm font-bold text-slate-400">{new Date(data.matchDate).toISOString().replace('T', ' ').slice(0, 16)} UTC</p>
+              <p className="mt-3 text-sm font-black text-[#F8C846]">{matchDateEgypt}</p>
+              <p className="mt-1 text-xs font-bold text-slate-400">الموعد معتمد على {EGYPT_TIME_ZONE_LABEL}</p>
             </div>
             <TeamCard team={data.awayTeam} />
           </div>
@@ -59,7 +83,30 @@ export default function ProfessionalMatchPageWithDateCard({ data }: { data: Matc
           <div><b className="text-[#18E58F]">الملعب:</b> {data.venue || 'غير متوفر'}</div>
           <div><b className="text-[#18E58F]">المدينة:</b> {data.city || 'غير متوفر'}</div>
           <div><b className="text-[#18E58F]">الحكم:</b> {data.referee || 'غير متوفر'}</div>
-          <div><b className="text-[#18E58F]">آخر تحديث:</b> {data.lastUpdatedAt ? new Date(data.lastUpdatedAt).toISOString().replace('T', ' ').slice(0, 16) : 'غير متوفر'} UTC</div>
+          <div><b className="text-[#18E58F]">آخر تحديث:</b> {lastUpdatedEgypt} <span className="text-slate-400">({EGYPT_TIME_ZONE_LABEL})</span></div>
+        </section>
+
+        <section className="rounded-[1.5rem] border border-white/10 bg-white/[0.04] p-4">
+          <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+            <div>
+              <h2 className="text-2xl font-black text-white">فحص بيانات صفحة المباراة</h2>
+              <p className="mt-1 text-sm font-bold text-slate-400">الصفحة تقرأ البيانات المحفوظة في قاعدة البيانات فقط، بدون جلب مباشر من مزود خارجي أثناء فتح الصفحة.</p>
+            </div>
+            <span className="rounded-full border border-[#18E58F]/25 bg-[#18E58F]/10 px-4 py-2 text-xs font-black text-[#18E58F]">
+              {readyChecks}/{data.sourceChecklist.length} عناصر جاهزة
+            </span>
+          </div>
+          <div className="grid gap-3 md:grid-cols-3">
+            {data.sourceChecklist.map((item) => <ChecklistBadge key={item.label} item={item} />)}
+          </div>
+          {data.sources.length > 0 && (
+            <div className="mt-4 rounded-2xl border border-white/10 bg-black/25 p-3">
+              <b className="text-sm text-[#F8C846]">مصادر البيانات المحفوظة:</b>
+              <p className="mt-2 text-xs font-bold leading-6 text-slate-400">
+                {data.sources.map((source) => `${source.name}${source.lastCheckedAt ? ` (${formatEgyptDateTime(source.lastCheckedAt)})` : ''}`).join(' · ')}
+              </p>
+            </div>
+          )}
         </section>
 
         {shouldShowArticleCta && (
