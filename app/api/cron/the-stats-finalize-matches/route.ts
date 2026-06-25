@@ -75,7 +75,7 @@ async function deleteOldProviderData(matchId: string, options: { purgeISports: b
     const stats = await prisma.matchStatsSnapshot.deleteMany({
       where: {
         matchId,
-        provider: { in: ['THE_STATS_API_FINAL_CANONICAL', 'THE_STATS_API_MANUAL_FINAL'] },
+        provider: { in: ['THE_STATS_API_EXTRAS', 'THE_STATS_API_FINAL_CANONICAL', 'THE_STATS_API_MANUAL_FINAL'] },
       },
     });
     deleted.snapshots += stats.count;
@@ -222,7 +222,7 @@ async function run(req: Request) {
           data: {
             id: randomUUID(),
             matchId: match.id,
-            provider: 'THE_STATS_API_FINAL_CANONICAL',
+            provider: 'THE_STATS_API_EXTRAS',
             providerMatchId: providerMatchNumber(providerMatchId),
             homeScore: match.homeScore,
             awayScore: match.awayScore,
@@ -241,8 +241,6 @@ async function run(req: Request) {
           select: { id: true },
         });
         snapshotId = snapshot.id;
-        // IMPORTANT: keep TheStats final timeline snapshot-only by default. The match page can read
-        // normalized.eventsDetailed from the snapshot; writing the same events into MatchEvent causes duplicates.
         insertedEvents = 0;
       }
 
@@ -269,7 +267,7 @@ async function run(req: Request) {
     ok: true,
     mode: 'the_stats_finalize_matches_v2_snapshot_only',
     dryRun,
-    note: dryRun ? 'Add apply=true or dryRun=false to write final canonical TheStats snapshot.' : 'Final TheStats snapshot was written. TheStats events are snapshot-only by default; duplicate MatchEvent rows from iSports/old final imports are purged.',
+    note: dryRun ? 'Add apply=true or dryRun=false to write final canonical TheStats snapshot.' : 'Final TheStats snapshot was written as THE_STATS_API_EXTRAS. TheStats events are snapshot-only by default; duplicate MatchEvent rows from iSports/old final imports are purged.',
     policy: {
       sourceOfTruth: 'THE_STATS_API for final post-match events and statistics',
       resultsSource: 'Football-Data may remain source of score/status unless you explicitly replace it elsewhere.',
