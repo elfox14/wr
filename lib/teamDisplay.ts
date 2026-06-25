@@ -1,3 +1,5 @@
+import { getTeamFlagUrl } from '@/lib/teamFlags';
+
 export type TeamLike = {
   code?: string | null;
   name?: string | null;
@@ -105,13 +107,16 @@ export function formatTeamDisplay(team: TeamLike) {
   return display.arabicName;
 }
 
-export function withTeamDisplay<T extends TeamLike>(team: T): T & { arabicName: string; flagEmoji: string; displayName: string; originalName: string | null | undefined } {
+export function withTeamDisplay<T extends TeamLike>(team: T): T & { arabicName: string; flagEmoji: string; flagUrl: string | null; displayName: string; originalName: string | null | undefined } {
   const display = getTeamDisplay(team.code, team.name);
+  const flagUrl = getTeamFlagUrl({ code: display.code, name: display.arabicName, image: null }, 160);
   return {
     ...team,
     name: display.arabicName,
+    image: flagUrl || team.image,
     arabicName: display.arabicName,
     flagEmoji: display.flag,
+    flagUrl,
     displayName: display.arabicName,
     originalName: team.name,
   };
