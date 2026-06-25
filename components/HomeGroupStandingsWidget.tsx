@@ -20,7 +20,7 @@ type TableRow = {
 
 type GroupData = { key: string; arName: string; standings: TableRow[] };
 type ThirdPlaceRow = TableRow & { groupKey: string; groupNumber: number };
-type Props = { compact?: boolean };
+type Props = { compact?: boolean; initialGroups?: GroupData[] | unknown[] };
 
 function formatCount(value?: number | null, fallback = 0) {
   return new Intl.NumberFormat('ar-EG').format(typeof value === 'number' && Number.isFinite(value) ? value : fallback);
@@ -44,6 +44,10 @@ function rankThirdPlaced(groups: GroupData[]) {
     .slice(0, 8);
 }
 
+function isGroupDataList(value: unknown): value is GroupData[] {
+  return Array.isArray(value) && value.every((group) => group && typeof (group as GroupData).key === 'string' && Array.isArray((group as GroupData).standings));
+}
+
 function ThirdPlacedCard({ rows, compact }: { rows: ThirdPlaceRow[]; compact: boolean }) {
   return (
     <section className={`rounded-[1.2rem] border border-[#FFD700]/15 bg-black/25 ${compact ? 'p-2.5' : 'p-3'} shadow-[0_14px_38px_rgba(0,0,0,0.16)]`}>
@@ -54,29 +58,33 @@ function ThirdPlacedCard({ rows, compact }: { rows: ThirdPlaceRow[]; compact: bo
   );
 }
 
-export default function HomeGroupStandingsWidget({ compact = false }: Props = {}) {
-  const [groups, setGroups] = useState<GroupData[]>([]);
-  const [selectedGroupKey, setSelectedGroupKey] = useState<string>('A');
-  const [loading, setLoading] = useState(true);
+export default function HomeGroupStandingsWidget({ compact = false, initialGroups = [] }: Props = {}) {
+  const serverGroups = isGroupDataList(initialGroups) ? initialGroups : [];
+  const [groups, setGroups] = useState<GroupData[]>(serverGroups);
+  const [selectedGroupKey, setSelectedGroupKey] = useState<string>(serverGroups[0]?.key || 'A');
+  const [loading, setLoading] = useState(serverGroups.length === 0);
 
   useEffect(() => {
+    if (serverGroups.length > 0) return;
+    let cancelled = false;
     async function loadStandings() {
       try {
         const res = await fetch('/api/groups/standings');
         if (!res.ok) return;
         const data = await res.json();
-        if (data.ok && Array.isArray(data.groups)) {
+        if (!cancelled && data.ok && isGroupDataList(data.groups)) {
           setGroups(data.groups);
           if (data.groups.length > 0) setSelectedGroupKey(data.groups[0].key);
         }
       } catch (err) {
         console.error('Failed to load standings', err);
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     }
     loadStandings();
-  }, []);
+    return () => { cancelled = true; };
+  }, [serverGroups.length]);
 
   const selectedGroup = groups.find((g) => g.key === selectedGroupKey);
   const thirdPlacedRows = useMemo(() => rankThirdPlaced(groups), [groups]);
