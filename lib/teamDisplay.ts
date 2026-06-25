@@ -102,18 +102,17 @@ export function getTeamFlag(code?: string | null, name?: string | null) {
 
 export function formatTeamDisplay(team: TeamLike) {
   const display = getTeamDisplay(team.code, team.name);
-  return `${display.flag} ${display.arabicName}`;
+  return display.arabicName;
 }
 
 export function withTeamDisplay<T extends TeamLike>(team: T): T & { arabicName: string; flagEmoji: string; displayName: string; originalName: string | null | undefined } {
   const display = getTeamDisplay(team.code, team.name);
-  const displayName = `${display.flag} ${display.arabicName}`;
   return {
     ...team,
-    name: displayName,
+    name: display.arabicName,
     arabicName: display.arabicName,
     flagEmoji: display.flag,
-    displayName,
+    displayName: display.arabicName,
     originalName: team.name,
   };
 }
