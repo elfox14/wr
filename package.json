@@ -13,6 +13,7 @@
     "cron:expire-stale-matches": "node scripts/render-expire-stale-matches.mjs",
     "worker:live-ingest": "node scripts/automated-live-ingest-worker.mjs",
     "worker:post-match-content": "node scripts/post-match-content-worker.mjs",
+    "worker:post-match-stats-sync": "node scripts/post-match-stats-sync-worker.mjs",
     "worker:match-extras-snapshot": "node scripts/match-extras-snapshot-worker.mjs",
     "worker:match-extras-sync": "node scripts/match-extras-sync-worker.mjs",
     "worker:live-animation-sync": "node scripts/live-animation-sync-worker.mjs",
