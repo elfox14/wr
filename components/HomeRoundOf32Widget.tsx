@@ -24,6 +24,7 @@ type Qualifier = { groupKey: GroupKey; groupNumber: number; rank: 1 | 2 | 3; bes
 type Slot =
   | { kind: 'rank'; group: GroupKey; rank: 1 | 2 }
   | { kind: 'third'; allowedGroups: GroupKey[] };
+type ThirdSlot = Extract<Slot, { kind: 'third' }>;
 
 type RoundMatch = { matchNo: number; home: Slot; away: Slot };
 
@@ -123,14 +124,16 @@ function buildQualifiers(groups: GroupData[]) {
   };
 }
 
+function thirdSlotFor(match: RoundMatch): ThirdSlot | null {
+  if (match.home.kind === 'third') return match.home;
+  if (match.away.kind === 'third') return match.away;
+  return null;
+}
+
 function assignThirdSlots(bestThirds: Qualifier[]) {
   const thirdSlotIndexes = ROUND_OF_32
-    .map((match, index) => ({ match, index }))
-    .filter(({ match }) => match.home.kind === 'third' || match.away.kind === 'third')
-    .map(({ match, index }) => {
-      const slot = match.home.kind === 'third' ? match.home : match.away;
-      return { index, slot };
-    });
+    .map((match, index) => ({ index, slot: thirdSlotFor(match) }))
+    .filter((item): item is { index: number; slot: ThirdSlot } => Boolean(item.slot));
 
   const assignments = new Map<number, Qualifier>();
   const orderedSlots = [...thirdSlotIndexes].sort((a, b) => {
