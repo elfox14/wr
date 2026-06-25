@@ -68,7 +68,7 @@ function providerMatchNumber(value: unknown) {
   return Number.isFinite(n) ? n : 0;
 }
 
-async function deleteOldProviderData(matchId: string, options: { purgeISports: boolean; purgeFootballDataEvents: boolean; replaceTheStatsFinal: boolean; purgeTheStatsMatchEvents: boolean }) {
+async function deleteOldProviderData(matchId: string, options: { purgeISportsEvents: boolean; purgeISportsSnapshots: boolean; purgeFootballDataEvents: boolean; replaceTheStatsFinal: boolean; purgeTheStatsMatchEvents: boolean }) {
   const deleted: Record<string, number> = { snapshots: 0, events: 0 };
 
   if (options.replaceTheStatsFinal) {
@@ -99,7 +99,7 @@ async function deleteOldProviderData(matchId: string, options: { purgeISports: b
     deleted.events += events.count;
   }
 
-  if (options.purgeISports) {
+  if (options.purgeISportsSnapshots) {
     const stats = await prisma.matchStatsSnapshot.deleteMany({
       where: {
         matchId,
@@ -111,7 +111,9 @@ async function deleteOldProviderData(matchId: string, options: { purgeISports: b
       },
     });
     deleted.snapshots += stats.count;
+  }
 
+  if (options.purgeISportsEvents) {
     const events = await prisma.matchEvent.deleteMany({
       where: {
         matchId,
@@ -163,7 +165,9 @@ async function run(req: Request) {
   const requestsPerMinute = numberParam(url, 'requestsPerMinute', 90, 10, 120);
   const delayMs = Math.max(numberParam(url, 'delayMs', 0, 0, 10000), Math.ceil(60000 / requestsPerMinute));
   const includeRaw = boolParam(url, 'includeRaw', false);
-  const purgeISports = boolParam(url, 'purgeISports', true);
+  // Keep iSports stat snapshots by default, because they can supply fallback-only metrics such as attacks/dangerous attacks.
+  const purgeISportsEvents = boolParam(url, 'purgeISportsEvents', true);
+  const purgeISportsSnapshots = boolParam(url, 'purgeISportsSnapshots', false);
   const purgeFootballDataEvents = boolParam(url, 'purgeFootballDataEvents', true);
   const purgeTheStatsMatchEvents = boolParam(url, 'purgeTheStatsMatchEvents', true);
   const replaceTheStatsFinal = boolParam(url, 'replaceTheStatsFinal', true);
@@ -217,7 +221,7 @@ async function run(req: Request) {
       let insertedEvents = 0;
 
       if (!dryRun) {
-        deleted = await deleteOldProviderData(match.id, { purgeISports, purgeFootballDataEvents, replaceTheStatsFinal, purgeTheStatsMatchEvents });
+        deleted = await deleteOldProviderData(match.id, { purgeISportsEvents, purgeISportsSnapshots, purgeFootballDataEvents, replaceTheStatsFinal, purgeTheStatsMatchEvents });
         const snapshot = await prisma.matchStatsSnapshot.create({
           data: {
             id: randomUUID(),
@@ -234,7 +238,7 @@ async function run(req: Request) {
               resolvedProviderMatchId: providerMatchId,
               resolvedBy: (collected as any).resolvedBy,
               rateLimitPolicy: { requestsPerMinute, delayMs, note: 'Throttled to stay at or below TheStatsAPI request limit.' },
-              displayPolicy: { eventsSource: 'snapshot.normalized.eventsDetailed.all', writeMatchEvents, note: 'Final TheStats events are kept in the snapshot by default to avoid duplicating MatchEvent rows.' },
+              displayPolicy: { eventsSource: 'snapshot.normalized.eventsDetailed.all', writeMatchEvents, fallbackMetrics: 'iSports snapshots may be kept for attacks/dangerous attacks only.', note: 'Final TheStats events are kept in the snapshot by default to avoid duplicating MatchEvent rows.' },
               normalized,
             },
           },
@@ -267,16 +271,17 @@ async function run(req: Request) {
     ok: true,
     mode: 'the_stats_finalize_matches_v2_snapshot_only',
     dryRun,
-    note: dryRun ? 'Add apply=true or dryRun=false to write final canonical TheStats snapshot.' : 'Final TheStats snapshot was written as THE_STATS_API_EXTRAS. TheStats events are snapshot-only by default; duplicate MatchEvent rows from iSports/old final imports are purged.',
+    note: dryRun ? 'Add apply=true or dryRun=false to write final canonical TheStats snapshot.' : 'Final TheStats snapshot was written as THE_STATS_API_EXTRAS. TheStats events are snapshot-only by default; iSports stat snapshots can remain for fallback attack metrics.',
     policy: {
       sourceOfTruth: 'THE_STATS_API for final post-match events and statistics',
+      fallbackStats: 'iSports snapshots may be used only for metrics TheStats does not provide, such as attacks/dangerous attacks.',
       resultsSource: 'Football-Data may remain source of score/status unless you explicitly replace it elsewhere.',
       eventsStorage: writeMatchEvents ? 'MatchEvent rows enabled by query param' : 'snapshot-only to avoid duplicates',
       requestsPerMinute,
       delayMs,
       theStatsLimitSafety: requestsPerMinute <= 120,
     },
-    cleanup: { purgeISports, purgeFootballDataEvents, purgeTheStatsMatchEvents, replaceTheStatsFinal },
+    cleanup: { purgeISportsEvents, purgeISportsSnapshots, purgeFootballDataEvents, purgeTheStatsMatchEvents, replaceTheStatsFinal },
     scope: { matchId, limit: matchId ? 1 : limit, days, localMatches: matches.length },
     providerRequestsBudgetApprox,
     processed,
