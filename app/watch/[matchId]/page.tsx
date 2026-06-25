@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import prisma from '@/lib/prisma';
 import { getTeamFlagUrl } from '@/lib/teamFlags';
+import { withTeamDisplay } from '@/lib/teamDisplay';
 import { formatEgyptDateTime } from '@/lib/match-page/egyptTime';
 import WatchAutoRefresh from '@/components/watch/WatchAutoRefresh';
 
@@ -11,7 +12,7 @@ export const revalidate = 15;
 
 type PageProps = { params: Promise<{ matchId: string }> };
 
-type WatchTeam = { id: string; name: string; code?: string | null; image?: string | null };
+type WatchTeam = { id: string; name: string; code?: string | null; image?: string | null; originalName?: string | null; flagUrl?: string | null };
 type WatchEmbedMode = 'iframe' | 'link';
 type WatchEmbedResult = { url: string; host: string; mode: WatchEmbedMode } | null;
 
@@ -39,7 +40,7 @@ function scoreValue(value: number | null | undefined) {
 }
 
 function flagUrl(team: any) {
-  return getTeamFlagUrl({ code: team?.code, name: team?.name, image: team?.image }, 160) || team?.image || null;
+  return getTeamFlagUrl({ code: team?.code, name: team?.name, image: team?.flagUrl || team?.image }, 160) || team?.image || null;
 }
 
 function boolEnv(value?: string | null) {
@@ -68,8 +69,8 @@ function replaceTemplate(template: string, match: { id: string; homeTeam: WatchT
     awayId: match.awayTeam.id,
     homeCode: match.homeTeam.code || '',
     awayCode: match.awayTeam.code || '',
-    homeName: match.homeTeam.name || '',
-    awayName: match.awayTeam.name || '',
+    homeName: match.homeTeam.originalName || match.homeTeam.name || '',
+    awayName: match.awayTeam.originalName || match.awayTeam.name || '',
   };
 
   return template.replace(/\{(matchId|homeId|awayId|homeCode|awayCode|homeName|awayName)\}/g, (_, key) => encodeURIComponent(values[key] || ''));
@@ -146,17 +147,19 @@ async function getWatchData(matchId: string) {
   const awayScore = latestSnapshot?.awayScore ?? match.awayScore;
   const minute = latestSnapshot?.minute ?? latestEvent?.minute ?? null;
   const kind = statusKind(match.status);
+  const homeTeam = withTeamDisplay(match.homeTeam);
+  const awayTeam = withTeamDisplay(match.awayTeam);
 
   return {
     id: match.id,
-    title: `${match.homeTeam.name} ضد ${match.awayTeam.name}`,
+    title: `${homeTeam.name} ضد ${awayTeam.name}`,
     matchDate: match.matchDate,
     status: match.status,
     kind,
     isLive: kind === 'live' || kind === 'halftime',
     isFinished: kind === 'finished',
-    homeTeam: match.homeTeam,
-    awayTeam: match.awayTeam,
+    homeTeam,
+    awayTeam,
     homeScore: scoreValue(homeScore),
     awayScore: scoreValue(awayScore),
     minute,
@@ -179,14 +182,7 @@ function PlayerFrame({ embed, title, matchId }: { embed: WatchEmbedResult; title
           sandbox="allow-scripts allow-same-origin allow-presentation allow-forms allow-popups"
         />
         <div className="pointer-events-none absolute inset-x-4 bottom-4 flex justify-center">
-          <a
-            href={embed.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="pointer-events-auto rounded-2xl border border-white/20 bg-black/70 px-4 py-2 text-xs font-black text-white backdrop-blur transition hover:bg-white hover:text-black"
-          >
-            فتح البث في نافذة خارجية
-          </a>
+          <a href={embed.url} target="_blank" rel="noopener noreferrer" className="pointer-events-auto rounded-2xl border border-white/20 bg-black/70 px-4 py-2 text-xs font-black text-white backdrop-blur transition hover:bg-white hover:text-black">فتح البث في نافذة خارجية</a>
         </div>
       </div>
     );
@@ -195,23 +191,13 @@ function PlayerFrame({ embed, title, matchId }: { embed: WatchEmbedResult; title
   if (embed?.mode === 'link') {
     return (
       <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center">
-        <div className="mb-4 rounded-full border border-[#18E58F]/20 bg-[#18E58F]/10 px-4 py-2 text-xs font-black text-[#18E58F]">
-          رابط بث جاهز
-        </div>
-        <h2 className="text-2xl font-black md:text-4xl">{title}</h2>
-        <p className="mt-3 max-w-xl text-sm font-bold leading-7 text-slate-400">
-          هذا الرابط لا يتم عرضه داخل iframe لتجنب شاشة التحميل المكسورة إذا كان مزود البث يمنع التضمين. افتح البث في نافذة جديدة وسيبقى مركز المباراة هنا للمتابعة.
-        </p>
+        <div className="mb-4 rounded-full border border-[#18E58F]/20 bg-[#18E58F]/10 px-4 py-2 text-xs font-black text-[#18E58F]">رابط بث جاهز</div>
+        <h2 className="team-name-full text-2xl font-black md:text-4xl">{title}</h2>
+        <p className="mt-3 max-w-xl text-sm font-bold leading-7 text-slate-400">هذا الرابط لا يتم عرضه داخل iframe لتجنب شاشة التحميل المكسورة إذا كان مزود البث يمنع التضمين. افتح البث في نافذة جديدة وسيبقى مركز المباراة هنا للمتابعة.</p>
         <div className="mt-5 flex flex-wrap justify-center gap-3">
-          <a href={embed.url} target="_blank" rel="noopener noreferrer" className="rounded-2xl bg-[#18E58F] px-5 py-3 text-sm font-black text-black transition hover:bg-white">
-            فتح البث الآن
-          </a>
-          <Link href={`/live-animation/${matchId}`} className="rounded-2xl border border-[#F8C846]/30 bg-[#F8C846]/10 px-5 py-3 text-sm font-black text-[#F8C846] transition hover:bg-[#F8C846] hover:text-black">
-            الملعب التفاعلي
-          </Link>
-          <Link href={`/match-center/${matchId}`} className="rounded-2xl border border-white/10 px-5 py-3 text-sm font-black text-white transition hover:bg-white hover:text-black">
-            الإحصائيات الحية
-          </Link>
+          <a href={embed.url} target="_blank" rel="noopener noreferrer" className="rounded-2xl bg-[#18E58F] px-5 py-3 text-sm font-black text-black transition hover:bg-white">فتح البث الآن</a>
+          <Link href={`/live-animation/${matchId}`} className="rounded-2xl border border-[#F8C846]/30 bg-[#F8C846]/10 px-5 py-3 text-sm font-black text-[#F8C846] transition hover:bg-[#F8C846] hover:text-black">الملعب التفاعلي</Link>
+          <Link href={`/match-center/${matchId}`} className="rounded-2xl border border-white/10 px-5 py-3 text-sm font-black text-white transition hover:bg-white hover:text-black">الإحصائيات الحية</Link>
         </div>
       </div>
     );
@@ -219,26 +205,14 @@ function PlayerFrame({ embed, title, matchId }: { embed: WatchEmbedResult; title
 
   return (
     <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center">
-      <div className="mb-4 rounded-full border border-white/10 bg-white/[0.06] px-4 py-2 text-xs font-black text-slate-300">
-        مشغل البث
-      </div>
-      <h2 className="text-2xl font-black md:text-4xl">{title}</h2>
-      <p className="mt-3 max-w-xl text-sm font-bold leading-7 text-slate-400">
-        لم يتم تفعيل رابط بث مصرح به لهذه المباراة بعد. أضف إعدادات WATCH_EMBED في Render وسيظهر رابط المشاهدة هنا تلقائيًا.
-      </p>
-      <div className="mt-4 rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-xs font-bold text-slate-400">
-        Match ID: {matchId}
-      </div>
+      <div className="mb-4 rounded-full border border-white/10 bg-white/[0.06] px-4 py-2 text-xs font-black text-slate-300">مشغل البث</div>
+      <h2 className="team-name-full text-2xl font-black md:text-4xl">{title}</h2>
+      <p className="mt-3 max-w-xl text-sm font-bold leading-7 text-slate-400">لم يتم تفعيل رابط بث مصرح به لهذه المباراة بعد. أضف إعدادات WATCH_EMBED في Render وسيظهر رابط المشاهدة هنا تلقائيًا.</p>
+      <div className="mt-4 rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-xs font-bold text-slate-400">Match ID: {matchId}</div>
       <div className="mt-5 flex flex-wrap justify-center gap-3">
-        <Link href={`/live-animation/${matchId}`} className="rounded-2xl border border-[#F8C846]/30 bg-[#F8C846]/10 px-5 py-3 text-sm font-black text-[#F8C846] transition hover:bg-[#F8C846] hover:text-black">
-          الملعب التفاعلي
-        </Link>
-        <Link href={`/match-center/${matchId}`} className="rounded-2xl bg-white px-5 py-3 text-sm font-black text-black transition hover:bg-[#18E58F]">
-          افتح الإحصائيات الحية
-        </Link>
-        <a href="#watch-status" className="rounded-2xl border border-white/10 px-5 py-3 text-sm font-black text-white transition hover:bg-white hover:text-black">
-          حالة البث
-        </a>
+        <Link href={`/live-animation/${matchId}`} className="rounded-2xl border border-[#F8C846]/30 bg-[#F8C846]/10 px-5 py-3 text-sm font-black text-[#F8C846] transition hover:bg-[#F8C846] hover:text-black">الملعب التفاعلي</Link>
+        <Link href={`/match-center/${matchId}`} className="rounded-2xl bg-white px-5 py-3 text-sm font-black text-black transition hover:bg-[#18E58F]">افتح الإحصائيات الحية</Link>
+        <a href="#watch-status" className="rounded-2xl border border-white/10 px-5 py-3 text-sm font-black text-white transition hover:bg-white hover:text-black">حالة البث</a>
       </div>
     </div>
   );
@@ -271,15 +245,9 @@ export default async function WatchPage({ params }: PageProps) {
           </div>
 
           <div className="flex flex-wrap gap-2">
-            <Link href={`/live-animation/${data.id}`} className="rounded-2xl border border-[#F8C846]/30 bg-[#F8C846]/10 px-4 py-2 text-sm font-black text-[#F8C846] transition hover:bg-[#F8C846] hover:text-black">
-              الملعب التفاعلي
-            </Link>
-            <Link href={`/match-center/${data.id}`} className="rounded-2xl border border-[#18E58F]/30 bg-[#18E58F]/10 px-4 py-2 text-sm font-black text-[#18E58F] transition hover:bg-[#18E58F] hover:text-black">
-              مركز المباراة والتحليل
-            </Link>
-            <Link href={`/match-center/${data.id}/advanced`} className="rounded-2xl border border-white/10 bg-white/[0.05] px-4 py-2 text-sm font-black text-slate-200 transition hover:bg-white hover:text-black">
-              xG وخريطة التسديدات
-            </Link>
+            <Link href={`/live-animation/${data.id}`} className="rounded-2xl border border-[#F8C846]/30 bg-[#F8C846]/10 px-4 py-2 text-sm font-black text-[#F8C846] transition hover:bg-[#F8C846] hover:text-black">الملعب التفاعلي</Link>
+            <Link href={`/match-center/${data.id}`} className="rounded-2xl border border-[#18E58F]/30 bg-[#18E58F]/10 px-4 py-2 text-sm font-black text-[#18E58F] transition hover:bg-[#18E58F] hover:text-black">مركز المباراة والتحليل</Link>
+            <Link href={`/match-center/${data.id}/advanced`} className="rounded-2xl border border-white/10 bg-white/[0.05] px-4 py-2 text-sm font-black text-slate-200 transition hover:bg-white hover:text-black">xG وخريطة التسديدات</Link>
           </div>
         </header>
 
@@ -296,47 +264,21 @@ export default async function WatchPage({ params }: PageProps) {
             <div className="rounded-3xl border border-white/10 bg-black/30 p-4">
               <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 text-center">
                 <div>
-                  {homeFlag && <img src={homeFlag} alt="" className="mx-auto mb-2 h-12 w-12 rounded-full object-cover" />}
-                  <p className="text-sm font-black">{data.homeTeam.name}</p>
+                  {homeFlag && <img src={homeFlag} alt={`علم ${data.homeTeam.name}`} className="mx-auto mb-2 h-10 w-14 rounded-lg border border-white/10 object-cover" />}
+                  <p className="team-name-full text-sm font-black">{data.homeTeam.name}</p>
                 </div>
-                <div className="rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-3 text-3xl font-black">
-                  {data.homeScore} - {data.awayScore}
-                </div>
+                <div className="rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-3 text-3xl font-black">{data.homeScore} - {data.awayScore}</div>
                 <div>
-                  {awayFlag && <img src={awayFlag} alt="" className="mx-auto mb-2 h-12 w-12 rounded-full object-cover" />}
-                  <p className="text-sm font-black">{data.awayTeam.name}</p>
+                  {awayFlag && <img src={awayFlag} alt={`علم ${data.awayTeam.name}`} className="mx-auto mb-2 h-10 w-14 rounded-lg border border-white/10 object-cover" />}
+                  <p className="team-name-full text-sm font-black">{data.awayTeam.name}</p>
                 </div>
               </div>
             </div>
 
-            <div className="rounded-3xl border border-white/10 bg-black/25 p-4">
-              <p className="text-xs font-black text-slate-500">حالة المباراة</p>
-              <b className="mt-2 block text-lg text-white">{statusLabel(data.status)}</b>
-              <p className="mt-2 text-xs font-bold text-slate-400">
-                {data.isLive ? 'سيتم تحديث هذه الصفحة تلقائيًا كل 30 ثانية من قاعدة البيانات.' : 'عند بداية المباراة ستتحول هذه الصفحة إلى متابعة خفيفة للبث.'}
-              </p>
-            </div>
-
-            <div className="rounded-3xl border border-white/10 bg-black/25 p-4">
-              <p className="text-xs font-black text-slate-500">حالة المشغل</p>
-              <b className="mt-2 block text-sm text-white">{embed ? (embed.mode === 'iframe' ? `iframe مفعل عبر ${embed.host}` : `رابط خارجي عبر ${embed.host}`) : 'غير مفعل بعد'}</b>
-              <p className="mt-2 text-xs font-bold leading-6 text-slate-400">
-                إذا كان مزود البث يمنع التضمين، استخدم وضع الرابط الخارجي لتجنب شاشة “This page couldn’t load”.
-              </p>
-            </div>
-
-            {data.latestEvent && (
-              <div className="rounded-3xl border border-[#18E58F]/20 bg-[#18E58F]/10 p-4">
-                <p className="text-xs font-black text-[#18E58F]">آخر حدث محفوظ</p>
-                <b className="mt-2 block text-sm leading-6 text-white">{data.latestEvent.detail}</b>
-                {data.latestEvent.minute !== null && <p className="mt-1 text-xs font-bold text-slate-300">الدقيقة {data.latestEvent.minute}</p>}
-              </div>
-            )}
-
-            <div className="rounded-3xl border border-white/10 bg-black/25 p-4">
-              <p className="text-xs font-black text-slate-500">موعد المباراة</p>
-              <b className="mt-2 block text-sm text-white">{formatEgyptDateTime(data.matchDate)}</b>
-            </div>
+            <div className="rounded-3xl border border-white/10 bg-black/25 p-4"><p className="text-xs font-black text-slate-500">حالة المباراة</p><b className="mt-2 block text-lg text-white">{statusLabel(data.status)}</b><p className="mt-2 text-xs font-bold text-slate-400">{data.isLive ? 'سيتم تحديث هذه الصفحة تلقائيًا كل 30 ثانية من قاعدة البيانات.' : 'عند بداية المباراة ستتحول هذه الصفحة إلى متابعة خفيفة للبث.'}</p></div>
+            <div className="rounded-3xl border border-white/10 bg-black/25 p-4"><p className="text-xs font-black text-slate-500">حالة المشغل</p><b className="mt-2 block text-sm text-white">{embed ? (embed.mode === 'iframe' ? `iframe مفعل عبر ${embed.host}` : `رابط خارجي عبر ${embed.host}`) : 'غير مفعل بعد'}</b><p className="mt-2 text-xs font-bold leading-6 text-slate-400">إذا كان مزود البث يمنع التضمين، استخدم وضع الرابط الخارجي لتجنب شاشة “This page couldn’t load”.</p></div>
+            {data.latestEvent && <div className="rounded-3xl border border-[#18E58F]/20 bg-[#18E58F]/10 p-4"><p className="text-xs font-black text-[#18E58F]">آخر حدث محفوظ</p><b className="mt-2 block text-sm leading-6 text-white">{data.latestEvent.detail}</b>{data.latestEvent.minute !== null && <p className="mt-1 text-xs font-bold text-slate-300">الدقيقة {data.latestEvent.minute}</p>}</div>}
+            <div className="rounded-3xl border border-white/10 bg-black/25 p-4"><p className="text-xs font-black text-slate-500">موعد المباراة</p><b className="mt-2 block text-sm text-white">{formatEgyptDateTime(data.matchDate)}</b></div>
           </aside>
         </section>
       </section>
