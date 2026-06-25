@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import prisma from '@/lib/prisma';
 import { getTeamFlagUrl } from '@/lib/teamFlags';
+import { withTeamDisplay } from '@/lib/teamDisplay';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,6 +22,8 @@ type GoalLeader = {
     code: string | null;
     image: string | null;
     group?: string | null;
+    arabicName?: string | null;
+    flagUrl?: string | null;
   } | null;
   goalsFor: number;
   goalsAgainst: number;
@@ -45,11 +48,11 @@ function formatCount(value?: number | null, fallback = '٠') {
 
 function compactTeam(team: any) {
   if (!team) return null;
-  return { id: team.id, name: team.name, code: team.code, image: team.image, group: team.group };
+  return withTeamDisplay({ id: team.id, name: team.name, code: team.code, image: team.image, group: team.group });
 }
 
 function flagNode(team: GoalLeader['team']) {
-  const flagUrl = team ? getTeamFlagUrl(team, 80) : null;
+  const flagUrl = team ? getTeamFlagUrl({ code: team.code, name: team.name, image: team.flagUrl || team.image }, 80) : null;
   return flagUrl ? (
     <img src={flagUrl} alt={`علم ${team?.name || 'منتخب'}`} className="h-full w-full object-cover" loading="lazy" />
   ) : (
@@ -67,7 +70,7 @@ function GoalLeaderCard({ title, leader, valueLabel, value }: { title: string; l
             {flagNode(leader.team)}
           </span>
           <span className="min-w-0 flex-1">
-            <span className="block truncate text-base font-black text-white">{leader.team.name}</span>
+            <span className="team-name-full block text-base font-black text-white">{leader.team.name}</span>
             <span className="mt-1 block text-xs font-bold text-gray-500">{leader.team.code || 'N/A'} · {leader.team.group || 'Group N/A'}</span>
           </span>
           <span className="text-left">
@@ -88,7 +91,7 @@ export default async function TeamsPage({ searchParams }: Props) {
   const selectedGroup = cleanParam(firstParam(resolvedSearchParams.group));
   const selectedContinent = cleanParam(firstParam(resolvedSearchParams.continent));
 
-  const [allTeams, scoredMatches] = await Promise.all([
+  const [rawTeams, scoredMatches] = await Promise.all([
     prisma.asset.findMany({
       where: { type: 'TEAM' },
       orderBy: [{ group: 'asc' }, { name: 'asc' }],
@@ -114,6 +117,7 @@ export default async function TeamsPage({ searchParams }: Props) {
     }),
   ]);
 
+  const allTeams = rawTeams.map((team) => withTeamDisplay(team));
   const goalLeaders = new Map<string, GoalLeader>();
   const addTeamScore = (team: any, goalsFor: number, goalsAgainst: number) => {
     if (!team?.id) return;
@@ -138,7 +142,7 @@ export default async function TeamsPage({ searchParams }: Props) {
   const continents = Array.from(new Set(allTeams.map((team) => team.continent).filter(Boolean))).sort();
 
   const filteredTeams = allTeams.filter((team) => {
-    const matchesQuery = !query || toSearchable(team.name).includes(toSearchable(query)) || toSearchable(team.code).includes(toSearchable(query));
+    const matchesQuery = !query || toSearchable(team.name).includes(toSearchable(query)) || toSearchable(team.originalName).includes(toSearchable(query)) || toSearchable(team.code).includes(toSearchable(query));
     const matchesGroup = !selectedGroup || team.group === selectedGroup;
     const matchesContinent = !selectedContinent || team.continent === selectedContinent;
     return matchesQuery && matchesGroup && matchesContinent;
@@ -191,7 +195,7 @@ export default async function TeamsPage({ searchParams }: Props) {
                   {flagNode(team)}
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-lg font-black text-white">{team.name}</span>
+                  <span className="team-name-full block text-lg font-black text-white">{team.name}</span>
                   <span className="mt-1 block text-xs font-bold text-gray-500">{team.code || 'N/A'} · {team.group || 'Group N/A'}</span>
                 </span>
               </div>
