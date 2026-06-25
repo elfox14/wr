@@ -5,6 +5,7 @@ import Link from 'next/link';
 import HomeTournamentStatsCard from '@/components/HomeTournamentStatsCard';
 import HomeLiveMatchTicker from '@/components/HomeLiveMatchTicker';
 import HomeGroupStandingsWidget from '@/components/HomeGroupStandingsWidget';
+import HomeRoundOf32Widget from '@/components/HomeRoundOf32Widget';
 import { getTeamFlagUrl } from '@/lib/teamFlags';
 import { getArabicTeamName } from '@/lib/teamDisplay';
 
@@ -370,6 +371,7 @@ export default function HomeClientSportsLiveFocus({ upcomingMatches = [], ticker
         <div className="lg:col-span-2"><MatchCenter fallbackMatches={safeUpcomingMatches} nextMatch={safeNextMatch} liveMatches={liveCardMatches} /></div>
         <div className="lg:col-span-1"><HomeGroupStandingsWidget compact initialGroups={safeGroupStandings} /></div>
       </div>
+      <HomeRoundOf32Widget groups={safeGroupStandings} />
       <HomeTournamentStatsCard playersCount={playersCount} teamsCount={teamsCount} upcomingMatchesCount={upcomingMatchesCount} />
     </main>
   );
