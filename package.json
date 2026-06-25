@@ -12,6 +12,7 @@
     "start": "next start",
     "cron:expire-stale-matches": "node scripts/render-expire-stale-matches.mjs",
     "worker:live-ingest": "node scripts/automated-live-ingest-worker.mjs",
+    "worker:football-data-results-sync": "node scripts/football-data-results-sync-worker.mjs",
     "worker:post-match-content": "node scripts/post-match-content-worker.mjs",
     "worker:post-match-stats-sync": "node scripts/post-match-stats-sync-worker.mjs",
     "worker:match-extras-snapshot": "node scripts/match-extras-snapshot-worker.mjs",
