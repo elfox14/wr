@@ -133,7 +133,7 @@ function findLocalPlayer(player: AnyPlayer | { id?: string | null; name?: string
   });
 }
 
-function playerWithImage(player: AnyPlayer, localPlayers: MatchPlayerLite[]) {
+function playerWithImage(player: AnyPlayer, localPlayers: MatchPlayerLite[]): AnyPlayer {
   const local = findLocalPlayer(player, localPlayers) as AnyPlayer | undefined;
   return { ...player, image: player.image || local?.image || null, position: player.position || local?.position || null, number: playerNumber(player) || playerNumber(local || {}) || null };
 }

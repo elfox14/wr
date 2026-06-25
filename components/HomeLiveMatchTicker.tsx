@@ -30,7 +30,6 @@ type TickerMatch = {
 type Props = { matches: TickerMatch[] | unknown[] };
 
 const GROUP_LETTERS = 'ABCDEFGHIJKL'.split('');
-const TICKER_REFRESH_MS = 15_000;
 const FINISHED_STATUSES = ['FINISHED', 'FT', 'AET', 'PEN', 'FULL_TIME', 'ENDED', 'COMPLETED', 'FINAL_VERIFIED'];
 
 function normalizeStatus(status?: string | null) { return String(status || '').toUpperCase(); }
@@ -59,19 +58,6 @@ function liveStatusText(match: TickerMatch) {
   return 'جارية الآن';
 }
 function matchKey(match?: TickerMatch | null) { return String(match?.id || match?.animationMatchId || `${teamName(match?.homeTeam)}-${teamName(match?.awayTeam)}-${match?.matchDate || ''}`); }
-function mergeById(baseMatches: TickerMatch[], updates: TickerMatch[]) {
-  const updateMap = new Map<string, TickerMatch>();
-  for (const update of updates) {
-    if (update.id) updateMap.set(`id:${update.id}`, update);
-    if (update.animationMatchId) updateMap.set(`animation:${update.animationMatchId}`, update);
-  }
-  const merged = baseMatches.map((match) => {
-    const update = (match.id && updateMap.get(`id:${match.id}`)) || (match.animationMatchId && updateMap.get(`animation:${match.animationMatchId}`));
-    return update ? { ...match, ...update } : match;
-  });
-  for (const update of updates) if (!merged.some((match) => matchKey(match) === matchKey(update))) merged.unshift(update);
-  return merged;
-}
 function timeLabel(match: TickerMatch, mounted: boolean) {
   if (!match.matchDate) return 'قريبًا';
   if (!mounted) return 'قريبًا';
@@ -88,29 +74,11 @@ function statusBadge(match: TickerMatch, mounted: boolean) {
 export default function HomeLiveMatchTicker({ matches = [] }: Props) {
   const [mounted, setMounted] = useState(false);
   const safeMatches = Array.isArray(matches) ? (matches as TickerMatch[]) : [];
-  const [apiMatches, setApiMatches] = useState<TickerMatch[]>([]);
   const [activeKey, setActiveKey] = useState<string>('');
 
   useEffect(() => { setMounted(true); }, []);
 
-  useEffect(() => {
-    let cancelled = false;
-    async function refreshTickerState() {
-      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
-      try {
-        const response = await fetch('/api/matches/live-card', { cache: 'no-store' });
-        if (!response.ok) return;
-        const data = await response.json();
-        const list = Array.isArray(data?.matches) ? data.matches : Array.isArray(data) ? data : [];
-        if (!cancelled) setApiMatches(list);
-      } catch {}
-    }
-    refreshTickerState();
-    const timer = window.setInterval(refreshTickerState, TICKER_REFRESH_MS);
-    return () => { cancelled = true; window.clearInterval(timer); };
-  }, []);
-
-  const displayMatches = useMemo(() => mergeById(safeMatches, apiMatches).slice(0, 8), [safeMatches, apiMatches]);
+  const displayMatches = useMemo(() => safeMatches.slice(0, 8), [safeMatches]);
 
   useEffect(() => {
     if (!displayMatches.length) return;

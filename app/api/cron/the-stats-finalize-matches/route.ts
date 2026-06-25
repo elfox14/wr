@@ -10,6 +10,8 @@ export const revalidate = 0;
 
 const FINISHED_STATUSES = ['FINISHED', 'FT', 'AET', 'PEN', 'COMPLETED', 'ENDED', 'FINAL_VERIFIED', 'FULL_TIME'];
 
+type DeletedProviderData = { snapshots: number; events: number };
+
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -68,8 +70,8 @@ function providerMatchNumber(value: unknown) {
   return Number.isFinite(n) ? n : 0;
 }
 
-async function deleteOldProviderData(matchId: string, options: { purgeISportsEvents: boolean; purgeISportsSnapshots: boolean; purgeFootballDataEvents: boolean; replaceTheStatsFinal: boolean; purgeTheStatsMatchEvents: boolean }) {
-  const deleted: Record<string, number> = { snapshots: 0, events: 0 };
+async function deleteOldProviderData(matchId: string, options: { purgeISportsEvents: boolean; purgeISportsSnapshots: boolean; purgeFootballDataEvents: boolean; replaceTheStatsFinal: boolean; purgeTheStatsMatchEvents: boolean }): Promise<DeletedProviderData> {
+  const deleted: DeletedProviderData = { snapshots: 0, events: 0 };
 
   if (options.replaceTheStatsFinal) {
     const stats = await prisma.matchStatsSnapshot.deleteMany({
@@ -216,7 +218,7 @@ async function run(req: Request) {
       }
 
       const providerMatchId = (collected as any).resolvedProviderMatchId;
-      let deleted = { snapshots: 0, events: 0 };
+      let deleted: DeletedProviderData = { snapshots: 0, events: 0 };
       let snapshotId: string | null = null;
       let insertedEvents = 0;
 
