@@ -4,6 +4,7 @@ import { Cairo } from "next/font/google";
 import "./globals.css";
 import "./brand-logo.css";
 import "./match-page-overrides.css";
+import "./team-display.css";
 import { Providers } from "@/components/Providers";
 import { NotificationProvider } from "@/components/ui/NotificationProvider";
 import { Navbar } from "@/components/ui/Navbar";
@@ -67,4 +68,3 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     </html>
   );
 }
-
