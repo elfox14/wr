@@ -41,6 +41,7 @@ type Props = {
   upcomingMatches?: HomeMatch[] | unknown[];
   tickerMatches?: HomeMatch[] | unknown[];
   nextMarqueeMatch?: HomeMatch | null | unknown;
+  groupStandings?: unknown[];
   playersCount?: number;
   teamsCount?: number;
   upcomingMatchesCount?: number;
@@ -326,9 +327,10 @@ function MatchCenter({ fallbackMatches = [], nextMatch = null, liveMatches = [] 
   );
 }
 
-export default function HomeClientSportsLiveFocus({ upcomingMatches = [], tickerMatches = [], nextMarqueeMatch = null, playersCount = 0, teamsCount = 0, upcomingMatchesCount = 0 }: Props) {
+export default function HomeClientSportsLiveFocus({ upcomingMatches = [], tickerMatches = [], nextMarqueeMatch = null, groupStandings = [], playersCount = 0, teamsCount = 0, upcomingMatchesCount = 0 }: Props) {
   const safeUpcomingMatches = Array.isArray(upcomingMatches) ? (upcomingMatches as HomeMatch[]) : [];
   const safeTickerMatches = Array.isArray(tickerMatches) ? (tickerMatches as HomeMatch[]) : [];
+  const safeGroupStandings = Array.isArray(groupStandings) ? groupStandings : [];
   const safeNextMatch = nextMarqueeMatch as HomeMatch | null;
   const pollSeedMatches = useMemo(() => uniqueMatches([...safeUpcomingMatches, ...safeTickerMatches, ...(safeNextMatch ? [safeNextMatch] : [])]), [safeUpcomingMatches, safeTickerMatches, safeNextMatch]);
   const livePollingEnabled = useMemo(() => shouldPollLiveCard(pollSeedMatches), [pollSeedMatches]);
@@ -366,7 +368,7 @@ export default function HomeClientSportsLiveFocus({ upcomingMatches = [], ticker
       <HomeLiveMatchTicker matches={tickerDisplayMatches} />
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3 lg:items-start lg:gap-5">
         <div className="lg:col-span-2"><MatchCenter fallbackMatches={safeUpcomingMatches} nextMatch={safeNextMatch} liveMatches={liveCardMatches} /></div>
-        <div className="lg:col-span-1"><HomeGroupStandingsWidget compact /></div>
+        <div className="lg:col-span-1"><HomeGroupStandingsWidget compact initialGroups={safeGroupStandings} /></div>
       </div>
       <HomeTournamentStatsCard playersCount={playersCount} teamsCount={teamsCount} upcomingMatchesCount={upcomingMatchesCount} />
     </main>

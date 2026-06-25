@@ -1,6 +1,7 @@
 import { unstable_cache } from 'next/cache';
 import HomeClientSportsLiveFocus from '@/components/HomeClientSportsLiveFocus';
 import prisma from '@/lib/prisma';
+import { getHomeGroupStandings } from '@/lib/homeGroupStandings';
 
 export const revalidate = 60;
 
@@ -143,7 +144,7 @@ const getHomeData = unstable_cache(
     const liveWindowStart = new Date(now.getTime() - 3 * 60 * 60 * 1000);
     const upcomingUntil = new Date(now.getTime() + 24 * 60 * 60 * 1000);
 
-    const [totalPlayers, totalTeams, totalUpcomingMatches, upcomingMatchesRaw, tickerMatchesRaw, liveCandidatesRaw, nextMatchRaw] = await Promise.all([
+    const [totalPlayers, totalTeams, totalUpcomingMatches, upcomingMatchesRaw, tickerMatchesRaw, liveCandidatesRaw, nextMatchRaw, groupStandingsRaw] = await Promise.all([
       prisma.asset.count({ where: { type: 'PLAYER' } }),
       prisma.asset.count({ where: { type: 'TEAM' } }),
       prisma.match.count({
@@ -228,6 +229,7 @@ const getHomeData = unstable_cache(
           awayTeam: { select: teamSelect },
         },
       }),
+      getHomeGroupStandings().catch(() => []),
     ]);
 
     const freshLiveMatch = await findFreshLiveCandidate(liveCandidatesRaw, now);
@@ -238,9 +240,10 @@ const getHomeData = unstable_cache(
       upcomingMatches: JSON.parse(JSON.stringify(upcomingMatchesRaw)),
       tickerMatches: JSON.parse(JSON.stringify(tickerMatchesRaw)),
       nextMarqueeMatch: freshLiveMatch || nextMatchRaw ? JSON.parse(JSON.stringify(freshLiveMatch || nextMatchRaw)) : null,
+      groupStandings: JSON.parse(JSON.stringify(groupStandingsRaw)),
     };
   },
-  ['home-dashboard-v4'],
+  ['home-dashboard-v5'],
   { revalidate: 60 },
 );
 
@@ -252,6 +255,7 @@ export default async function Home() {
     upcomingMatches: [] as unknown[],
     tickerMatches: [] as unknown[],
     nextMarqueeMatch: null as any,
+    groupStandings: [] as unknown[],
   };
 
   try {
@@ -265,6 +269,7 @@ export default async function Home() {
       upcomingMatches={data.upcomingMatches}
       tickerMatches={data.tickerMatches}
       nextMarqueeMatch={data.nextMarqueeMatch}
+      groupStandings={data.groupStandings}
       playersCount={data.playersCount}
       teamsCount={data.teamsCount}
       upcomingMatchesCount={data.upcomingMatchesCount}
