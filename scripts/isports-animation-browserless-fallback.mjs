@@ -80,10 +80,9 @@ function browserlessFunctionCandidates() {
   const primaryEndpoint = endpointToUrl(process.env.BROWSERLESS_ENDPOINT, process.env.BROWSERLESS_TOKEN, '/function');
   const fallbackEndpoint = endpointToUrl(process.env.BROWSERLESS_FALLBACK_ENDPOINT, process.env.BROWSERLESS_FALLBACK_TOKEN, '/function');
   const preferFallback = envBool('BROWSERLESS_PREFER_FALLBACK', false);
-  const entries = preferFallback
+  return uniqueCandidates(preferFallback
     ? [['fallback_explicit', fallbackExplicit], ['fallback_endpoint', fallbackEndpoint], ['primary_explicit', primaryExplicit], ['primary_endpoint', primaryEndpoint]]
-    : [['primary_explicit', primaryExplicit], ['primary_endpoint', primaryEndpoint], ['fallback_explicit', fallbackExplicit], ['fallback_endpoint', fallbackEndpoint]];
-  return uniqueCandidates(entries);
+    : [['primary_explicit', primaryExplicit], ['primary_endpoint', primaryEndpoint], ['fallback_explicit', fallbackExplicit], ['fallback_endpoint', fallbackEndpoint]]);
 }
 
 function browserlessContentCandidates() {
@@ -92,10 +91,9 @@ function browserlessContentCandidates() {
   const primaryEndpoint = endpointToUrl(process.env.BROWSERLESS_ENDPOINT, process.env.BROWSERLESS_TOKEN, '/content');
   const fallbackEndpoint = endpointToUrl(process.env.BROWSERLESS_FALLBACK_ENDPOINT, process.env.BROWSERLESS_FALLBACK_TOKEN, '/content');
   const preferFallback = envBool('BROWSERLESS_PREFER_FALLBACK', false);
-  const entries = preferFallback
+  return uniqueCandidates(preferFallback
     ? [['fallback_explicit', fallbackExplicit], ['fallback_endpoint', fallbackEndpoint], ['primary_explicit', primaryExplicit], ['primary_endpoint', primaryEndpoint]]
-    : [['primary_explicit', primaryExplicit], ['primary_endpoint', primaryEndpoint], ['fallback_explicit', fallbackExplicit], ['fallback_endpoint', fallbackEndpoint]];
-  return uniqueCandidates(entries);
+    : [['primary_explicit', primaryExplicit], ['primary_endpoint', primaryEndpoint], ['fallback_explicit', fallbackExplicit], ['fallback_endpoint', fallbackEndpoint]]);
 }
 
 function htmlToText(html) {
@@ -190,15 +188,15 @@ const FUNCTION_CAPTURE_CODE = `export default async function ({ page, context })
     } catch {}
   }
   const iframeSrcs = await page.evaluate(() => Array.from(document.querySelectorAll('iframe')).map((iframe) => iframe.src).filter(Boolean)).catch(() => []);
-  return { data: { url, text: [mainText, ...frameTexts].filter(Boolean).join('\n'), mainText, frameTexts, frameUrls, iframeSrcs, responses }, type: 'application/json' };
+  const newline = String.fromCharCode(10);
+  return { data: { url, text: [mainText, ...frameTexts].filter(Boolean).join(newline), mainText, frameTexts, frameUrls, iframeSrcs, responses }, type: 'application/json' };
 }`;
 
 function inlineFunctionCaptureCode(sourceUrl, waitMs, timeoutMs) {
-  const code = FUNCTION_CAPTURE_CODE
+  return FUNCTION_CAPTURE_CODE
     .replace('const url = context.url;', `const url = ${JSON.stringify(sourceUrl)};`)
     .replace('const waitMs = context.waitMs || 6000;', `const waitMs = ${Number(waitMs)};`)
     .replace('const timeoutMs = context.timeoutMs || 25000;', `const timeoutMs = ${Number(timeoutMs)};`);
-  return code;
 }
 
 function unwrapFunctionResponse(body) {
