@@ -5,11 +5,11 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-const LINKABLE_STATUSES = [
+const ACTIVE_LINKABLE_STATUSES = [
   'SCHEDULED', 'TIMED', 'NOT_STARTED', 'NS', 'TBD',
   'LIVE', 'IN_PLAY', '1H', '2H', 'HT', 'HALFTIME', 'HALF_TIME', 'BREAK', 'ET', 'P', 'PAUSED',
-  'FINISHED', 'FT', 'AET', 'PEN', 'COMPLETED', 'ENDED', 'FINAL_VERIFIED',
 ];
+const FINISHED_LINKABLE_STATUSES = ['FINISHED', 'FT', 'AET', 'PEN', 'COMPLETED', 'ENDED', 'FINAL_VERIFIED'];
 
 function isAuthorized(req: Request) {
   const secret = process.env.CRON_SECRET || process.env.ADMIN_API_SECRET || '';
@@ -19,6 +19,12 @@ function isAuthorized(req: Request) {
   const auth = req.headers.get('authorization') || '';
   const bearerToken = auth.replace(/^Bearer\s+/i, '').trim();
   return bearerToken === secret || queryToken === secret;
+}
+
+function boolParam(params: URLSearchParams, name: string, fallback = false) {
+  const raw = params.get(name);
+  if (raw === null || raw === '') return fallback;
+  return ['1', 'true', 'yes', 'on'].includes(raw.trim().toLowerCase());
 }
 
 function splitKeys(value?: string) {
@@ -123,20 +129,22 @@ export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
     const threshold = Number(searchParams.get('threshold') || 70);
-    const limit = Math.min(Math.max(Number(searchParams.get('limit') || 80), 1), 150);
+    const limit = Math.min(Math.max(Number(searchParams.get('limit') || 30), 1), 150);
     const dryRun = searchParams.get('dryRun') === 'true';
-    const lookbackHours = intParam(searchParams, 'lookbackHours', 12, 1, 24 * 14);
-    const lookaheadHours = intParam(searchParams, 'lookaheadHours', 48, 1, 24 * 14);
+    const lookbackHours = intParam(searchParams, 'lookbackHours', 6, 1, 24 * 14);
+    const lookaheadHours = intParam(searchParams, 'lookaheadHours', 72, 1, 24 * 14);
+    const includeFinished = boolParam(searchParams, 'includeFinished', false);
+    const includeAlreadyLinked = boolParam(searchParams, 'includeAlreadyLinked', false);
     const now = Date.now();
     const from = new Date(now - lookbackHours * 60 * 60 * 1000);
     const to = new Date(now + lookaheadHours * 60 * 60 * 1000);
+    const statuses = includeFinished ? [...ACTIVE_LINKABLE_STATUSES, ...FINISHED_LINKABLE_STATUSES] : ACTIVE_LINKABLE_STATUSES;
 
     const localMatches = await prisma.match.findMany({
       where: {
-        OR: [
-          { status: { in: LINKABLE_STATUSES } },
-          { matchDate: { gte: from, lte: to } },
-        ],
+        ...(includeAlreadyLinked ? {} : { animationMatchId: null }),
+        matchDate: { gte: from, lte: to },
+        status: { in: statuses },
       },
       orderBy: { matchDate: 'asc' },
       take: limit,
@@ -181,7 +189,7 @@ export async function GET(req: Request) {
       updated = result.length;
     }
 
-    return NextResponse.json({ ok: true, mode: 'sync_animation_matches_v3_query_secret', dryRun, scanned: localMatches.length, matched: matched.length, updated, threshold, lookbackHours, lookaheadHours, providerDates: uniqueDates, providerErrors, matches: matched, skipped: skipped.slice(0, 40) });
+    return NextResponse.json({ ok: true, mode: 'sync_animation_matches_v4_unlinked_window_only', dryRun, scanned: localMatches.length, matched: matched.length, updated, threshold, lookbackHours, lookaheadHours, includeFinished, includeAlreadyLinked, providerDates: uniqueDates, providerErrors, matches: matched, skipped: skipped.slice(0, 60) });
   } catch (error: any) {
     return NextResponse.json({ error: error.message || 'sync-animation-matches failed' }, { status: 500 });
   }
