@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { withTeamDisplay } from '@/lib/teamDisplay';
 
 export interface Asset {
   id: string;
@@ -43,6 +44,11 @@ export interface Asset {
   players?: Asset[];
   news?: any[];
   marketNews?: any[];
+  arabicName?: string | null;
+  flagEmoji?: string | null;
+  flagUrl?: string | null;
+  displayName?: string | null;
+  originalName?: string | null;
 }
 
 export interface Holding {
@@ -142,6 +148,20 @@ interface AppState {
   setShowInsufficientFundsModal: (show: boolean) => void;
 }
 
+function localizeAsset(asset: any) {
+  if (asset?.type === 'TEAM' || asset?.group || asset?.fifaRank) return withTeamDisplay(asset);
+  return asset;
+}
+
+function localizeMatch(match: any) {
+  if (!match) return match;
+  return {
+    ...match,
+    homeTeam: localizeAsset(match.homeTeam),
+    awayTeam: localizeAsset(match.awayTeam),
+  };
+}
+
 export const useStore = create<AppState>((set, get) => ({
   assets: [],
   matches: [],
@@ -160,7 +180,7 @@ export const useStore = create<AppState>((set, get) => ({
       const query = view === 'full' ? '' : `?view=${encodeURIComponent(view)}`;
       const res = await fetch(`/api/assets${query}`);
       const data = await res.json();
-      set({ assets: data });
+      set({ assets: Array.isArray(data) ? data.map(localizeAsset) : data });
     } catch (err) {
       console.error(err);
     }
@@ -174,7 +194,7 @@ export const useStore = create<AppState>((set, get) => ({
       const query = params.toString() ? `?${params.toString()}` : '';
       const res = await fetch(`/api/matches${query}`);
       const data = await res.json();
-      set({ matches: data });
+      set({ matches: Array.isArray(data) ? data.map(localizeMatch) : data });
     } catch (err) {
       console.error(err);
     }
@@ -219,23 +239,19 @@ export const useStore = create<AppState>((set, get) => ({
     try {
       const res = await fetch('/api/trade', {
         method: 'POST',
-        body: JSON.stringify({ assetId, type: 'BUY', quantity }),
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ assetId, quantity, type: 'BUY' })
       });
-      const data = await res.json();
-      
-      if (data.success) {
-        get().addNotification(data.message);
-        await get().fetchPortfolio();
-      } else {
-        if (data.error && data.error.includes('رصيد')) {
-          get().setShowInsufficientFundsModal(true);
-        } else {
-          get().addNotification(`Error: ${data.error}`);
-        }
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        if (data?.error === 'Insufficient funds') set({ showInsufficientFundsModal: true });
+        throw new Error(data?.error || 'Trade failed');
       }
+      await get().fetchPortfolio();
+      get().addNotification('تم تنفيذ الشراء بنجاح');
     } catch (err) {
       console.error(err);
+      get().addNotification('فشل تنفيذ الشراء');
     }
   },
 
@@ -243,48 +259,34 @@ export const useStore = create<AppState>((set, get) => ({
     try {
       const res = await fetch('/api/trade', {
         method: 'POST',
-        body: JSON.stringify({ assetId, type: 'SELL', quantity }),
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ assetId, quantity, type: 'SELL' })
       });
-      const data = await res.json();
-      
-      if (data.success) {
-        get().addNotification(data.message);
-        await get().fetchPortfolio();
-      } else {
-        get().addNotification(`Error: ${data.error}`);
-      }
+      if (!res.ok) throw new Error('Trade failed');
+      await get().fetchPortfolio();
+      get().addNotification('تم تنفيذ البيع بنجاح');
     } catch (err) {
       console.error(err);
+      get().addNotification('فشل تنفيذ البيع');
     }
   },
 
   setCaptain: async (assetId: string) => {
     try {
-      const res = await fetch('/api/portfolio/captain', {
+      const res = await fetch('/api/captain', {
         method: 'POST',
-        body: JSON.stringify({ assetId }),
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ assetId })
       });
-      const data = await res.json();
-      
-      if (data.success) {
-        get().addNotification(data.message);
-        await get().fetchPortfolio(); // Refresh state
-      } else {
-        get().addNotification(`Error: ${data.error}`);
-      }
+      if (!res.ok) throw new Error('Captain update failed');
+      set({ captainId: assetId });
+      get().addNotification('تم تعيين القائد بنجاح');
     } catch (err) {
       console.error(err);
+      get().addNotification('فشل تعيين القائد');
     }
   },
 
-  addNotification: (msg: string) => {
-    set(state => ({ notifications: [...state.notifications, msg] }));
-    setTimeout(() => {
-      set(state => ({ notifications: state.notifications.slice(1) }));
-    }, 5000);
-  },
-
+  addNotification: (msg) => set((state) => ({ notifications: [...state.notifications, msg] })),
   clearNotifications: () => set({ notifications: [] }),
 }));
