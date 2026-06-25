@@ -105,14 +105,21 @@ export function formatTeamDisplay(team: TeamLike) {
   return `${display.flag} ${display.arabicName}`;
 }
 
-export function withTeamDisplay<T extends TeamLike>(team: T): T & { arabicName: string; flagEmoji: string; displayName: string } {
+export function withTeamDisplay<T extends TeamLike>(team: T): T & { arabicName: string; flagEmoji: string; displayName: string; originalName: string | null | undefined } {
   const display = getTeamDisplay(team.code, team.name);
+  const displayName = `${display.flag} ${display.arabicName}`;
   return {
     ...team,
+    name: displayName,
     arabicName: display.arabicName,
     flagEmoji: display.flag,
-    displayName: `${display.flag} ${display.arabicName}`,
+    displayName,
+    originalName: team.name,
   };
+}
+
+export function withTeamDisplays<T extends TeamLike>(teams: T[]) {
+  return teams.map((team) => withTeamDisplay(team));
 }
 
 export function publicTeamName(team: TeamLike) {
