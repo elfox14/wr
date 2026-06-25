@@ -224,30 +224,17 @@ export default function HomeTournamentStatsCard({ playersCount: serverPlayersCou
     async function loadStats() {
       if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
       try {
-        const [providerResponse, databaseResponse, playerLeadersResponse, penaltiesResponse] = await Promise.all([
-          fetch('/api/matches/cached-the-stats-summary', { cache: 'no-store' }),
-          fetch('/api/matches/summary-stats', { cache: 'no-store' }),
-          fetch('/api/players/leaders', { cache: 'no-store' }),
-          fetch('/api/matches/penalties-summary', { cache: 'no-store' }),
-        ]);
-        if (providerResponse.ok) {
-          const data = await providerResponse.json();
-          if (!cancelled && data?.ok) setProviderSummary(data);
-        }
-        if (databaseResponse.ok) {
-          const data = await databaseResponse.json();
-          if (!cancelled && data?.ok) setDatabaseSummary(data);
-        }
-        if (playerLeadersResponse.ok) {
-          const data = await playerLeadersResponse.json();
-          if (!cancelled && data?.ok) setPlayerLeaders(data);
-        }
-        if (penaltiesResponse.ok) {
-          const data = await penaltiesResponse.json();
-          if (!cancelled && data?.ok) setPenaltiesSummary(data);
+        const response = await fetch('/api/home/tournament-stats', { cache: 'no-store' });
+        if (!response.ok) return;
+        const data = await response.json();
+        if (!cancelled && data?.ok) {
+          setProviderSummary(data.providerSummary || null);
+          setDatabaseSummary(data.databaseSummary || null);
+          setPlayerLeaders(data.playerLeaders || null);
+          setPenaltiesSummary(data.penaltiesSummary || null);
         }
       } catch {
-        // Keep the card readable if one endpoint is temporarily unavailable.
+        // Keep the card readable if the aggregate endpoint is temporarily unavailable.
       } finally {
         if (!cancelled) setIsLoading(false);
       }
