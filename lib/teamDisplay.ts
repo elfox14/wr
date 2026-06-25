@@ -59,7 +59,7 @@ const TEAMS: Record<string, TeamDisplay> = {
   DRC: { code: 'DRC', flag: '🇨🇩', arabicName: 'الكونغو الديمقراطية' },
   UZB: { code: 'UZB', flag: '🇺🇿', arabicName: 'أوزبكستان' },
   COL: { code: 'COL', flag: '🇨🇴', arabicName: 'كولومبيا' },
-  ENG: { code: 'ENG', flag: '🏴', arabicName: 'إنجلترا' },
+  ENG: { code: 'ENG', flag: '🏴󠁧󠁢󠁥󠁮󠁧󠁿', arabicName: 'إنجلترا' },
   CRO: { code: 'CRO', flag: '🇭🇷', arabicName: 'كرواتيا' },
   GHA: { code: 'GHA', flag: '🇬🇭', arabicName: 'غانا' },
   PAN: { code: 'PAN', flag: '🇵🇦', arabicName: 'بنما' },
