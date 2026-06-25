@@ -7,7 +7,8 @@ export default function WatchAutoRefresh({ enabled, intervalMs = 30000 }: { enab
   const router = useRouter();
 
   useEffect(() => {
-    if (!enabled) return;
+    // The watch page may be opened before kickoff. Keep refreshing it so it can
+    // switch automatically from waiting state to live state when the API/DB status changes.
     const timer = window.setInterval(() => router.refresh(), Math.max(15000, intervalMs));
     return () => window.clearInterval(timer);
   }, [enabled, intervalMs, router]);
