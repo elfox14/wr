@@ -1,0 +1,347 @@
+import { randomUUID } from 'crypto';
+import { NextResponse } from 'next/server';
+import prisma from '@/lib/prisma';
+import { hasValidAdminSecret } from '@/lib/adminAuth';
+import { collectTheStatsMatchExtras, defaultTheStatsQuery } from '@/lib/theStatsMatchExtras';
+
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
+const FINISHED_STATUSES = ['FINISHED', 'FT', 'AET', 'PEN', 'COMPLETED', 'ENDED', 'FINAL_VERIFIED', 'FULL_TIME'];
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function boolParam(url: URL, name: string, fallback = false) {
+  const raw = url.searchParams.get(name);
+  if (raw === null) return fallback;
+  return ['1', 'true', 'yes', 'on'].includes(raw.trim().toLowerCase());
+}
+
+function numberParam(url: URL, name: string, fallback: number, min: number, max: number) {
+  const value = Number(url.searchParams.get(name) ?? fallback);
+  if (!Number.isFinite(value)) return fallback;
+  return Math.max(min, Math.min(max, Math.floor(value)));
+}
+
+function statPair(stats: Record<string, any>, key: string) {
+  const pair = stats?.[key] || {};
+  const home = Number(pair.home);
+  const away = Number(pair.away);
+  return {
+    home: Number.isFinite(home) ? Math.round(home) : null,
+    away: Number.isFinite(away) ? Math.round(away) : null,
+  };
+}
+
+function snapshotStatColumns(normalized: any) {
+  const stats = normalized?.liveStats?.stats || {};
+  const possession = statPair(stats, 'possession');
+  const shots = statPair(stats, 'shots');
+  const shotsOnTarget = statPair(stats, 'shotsOnTarget');
+  const shotsOffTarget = statPair(stats, 'shotsOffTarget');
+  const corners = statPair(stats, 'corners');
+  const yellowCards = statPair(stats, 'yellowCards');
+  const redCards = statPair(stats, 'redCards');
+  return {
+    homePossession: possession.home,
+    awayPossession: possession.away,
+    homeShots: shots.home,
+    awayShots: shots.away,
+    homeShotsOnTarget: shotsOnTarget.home,
+    awayShotsOnTarget: shotsOnTarget.away,
+    homeShotsOffTarget: shotsOffTarget.home,
+    awayShotsOffTarget: shotsOffTarget.away,
+    homeCorners: corners.home,
+    awayCorners: corners.away,
+    homeYellowCards: yellowCards.home,
+    awayYellowCards: yellowCards.away,
+    homeRedCards: redCards.home,
+    awayRedCards: redCards.away,
+  };
+}
+
+function providerMatchNumber(value: unknown) {
+  const n = Number(String(value || '').replace(/\D/g, ''));
+  return Number.isFinite(n) ? n : 0;
+}
+
+function text(value: unknown) {
+  return String(value ?? '').trim();
+}
+
+function norm(value: unknown) {
+  return text(value).toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9\u0600-\u06ff]+/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+function teamIdFromEvent(match: any, event: any) {
+  const providerTeamId = text(event?.teamId);
+  if (providerTeamId && (providerTeamId === match.homeTeamId || providerTeamId === match.awayTeamId)) return providerTeamId;
+  const name = norm(event?.teamName);
+  if (!name) return null;
+  const home = [match.homeTeam?.name, match.homeTeam?.code].map(norm).filter(Boolean);
+  const away = [match.awayTeam?.name, match.awayTeam?.code].map(norm).filter(Boolean);
+  if (home.some((value) => value && (name.includes(value) || value.includes(name)))) return match.homeTeamId;
+  if (away.some((value) => value && (name.includes(value) || value.includes(name)))) return match.awayTeamId;
+  return null;
+}
+
+function eventMinute(value: unknown) {
+  if (value === null || value === undefined || value === '') return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? Math.round(n) : null;
+}
+
+function eventType(value: unknown) {
+  return text(value || 'event').toLowerCase().replace(/[^a-z0-9_:-]+/g, '_').slice(0, 48) || 'event';
+}
+
+function eventDetail(event: any) {
+  const player = text(event?.playerName);
+  const team = text(event?.teamName);
+  const type = text(event?.type || 'event');
+  return text(event?.detail || [type, player, team].filter(Boolean).join(' - ')).slice(0, 240) || type;
+}
+
+async function deleteOldProviderData(matchId: string, options: { purgeISports: boolean; purgeFootballDataEvents: boolean; replaceTheStatsFinal: boolean }) {
+  const deleted: Record<string, number> = { snapshots: 0, events: 0 };
+
+  if (options.replaceTheStatsFinal) {
+    const stats = await prisma.matchStatsSnapshot.deleteMany({
+      where: {
+        matchId,
+        provider: { in: ['THE_STATS_API_FINAL_CANONICAL', 'THE_STATS_API_MANUAL_FINAL'] },
+      },
+    });
+    deleted.snapshots += stats.count;
+
+    const events = await prisma.matchEvent.deleteMany({
+      where: {
+        matchId,
+        OR: [
+          { sourceName: { startsWith: 'THE_STATS_API_FINAL' } },
+          { sourceName: 'THE_STATS_API_MANUAL_FINAL' },
+        ],
+      },
+    });
+    deleted.events += events.count;
+  }
+
+  if (options.purgeISports) {
+    const stats = await prisma.matchStatsSnapshot.deleteMany({
+      where: {
+        matchId,
+        OR: [
+          { provider: { contains: 'ISPORTS' } },
+          { provider: { contains: 'WORKER_ISPORTS' } },
+          { provider: { contains: 'AUTOMATED_LIVE_INGEST' } },
+        ],
+      },
+    });
+    deleted.snapshots += stats.count;
+
+    const events = await prisma.matchEvent.deleteMany({
+      where: {
+        matchId,
+        OR: [
+          { sourceName: { contains: 'iSports' } },
+          { sourceName: { contains: 'ISPORTS' } },
+          { sourceName: { contains: 'Automated Live Ingest' } },
+        ],
+      },
+    });
+    deleted.events += events.count;
+  }
+
+  if (options.purgeFootballDataEvents) {
+    const events = await prisma.matchEvent.deleteMany({
+      where: {
+        matchId,
+        OR: [
+          { sourceName: { contains: 'Football-Data' } },
+          { sourceName: { contains: 'FOOTBALL_DATA' } },
+        ],
+      },
+    });
+    deleted.events += events.count;
+  }
+
+  return deleted;
+}
+
+async function insertCanonicalEvents(match: any, events: any[]) {
+  let inserted = 0;
+  for (const event of events) {
+    const minute = eventMinute(event?.minute);
+    const type = eventType(event?.type);
+    const detail = eventDetail(event);
+    const playerName = text(event?.playerName).slice(0, 120) || null;
+    const exists = await prisma.matchEvent.findFirst({
+      where: {
+        matchId: match.id,
+        minute,
+        type,
+        playerName,
+        sourceName: 'THE_STATS_API_FINAL_CANONICAL',
+      },
+      select: { id: true },
+    });
+    if (exists) continue;
+    await prisma.matchEvent.create({
+      data: {
+        id: randomUUID(),
+        matchId: match.id,
+        minute,
+        type,
+        teamId: teamIdFromEvent(match, event),
+        playerId: text(event?.playerId).slice(0, 120) || null,
+        playerName,
+        detail,
+        sourceName: 'THE_STATS_API_FINAL_CANONICAL',
+        sourceUrl: event?.sourceUrl ? text(event.sourceUrl).slice(0, 500) : null,
+      },
+    });
+    inserted += 1;
+  }
+  return inserted;
+}
+
+function localMatchWhere(url: URL, since: Date, matchId?: string | null) {
+  if (matchId) return { id: matchId } as any;
+  return {
+    status: { in: FINISHED_STATUSES },
+    matchDate: { gte: since },
+  } as any;
+}
+
+async function run(req: Request) {
+  if (!hasValidAdminSecret(req)) {
+    return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401, headers: { 'Cache-Control': 'no-store' } });
+  }
+
+  const url = new URL(req.url);
+  const dryRun = boolParam(url, 'dryRun', true) && !boolParam(url, 'apply', false);
+  const limit = numberParam(url, 'limit', 2, 1, 12);
+  const days = numberParam(url, 'days', 3, 1, 60);
+  const timeoutMs = numberParam(url, 'timeoutMs', 30000, 3000, 60000);
+  const requestsPerMinute = numberParam(url, 'requestsPerMinute', 90, 10, 120);
+  const delayMs = Math.max(numberParam(url, 'delayMs', 0, 0, 10000), Math.ceil(60000 / requestsPerMinute));
+  const includeRaw = boolParam(url, 'includeRaw', false);
+  const purgeISports = boolParam(url, 'purgeISports', true);
+  const purgeFootballDataEvents = boolParam(url, 'purgeFootballDataEvents', true);
+  const replaceTheStatsFinal = boolParam(url, 'replaceTheStatsFinal', true);
+  const matchId = url.searchParams.get('matchId');
+  const since = new Date(Date.now() - days * 864e5);
+  const providerQuery = defaultTheStatsQuery(url.searchParams);
+
+  const matches = await prisma.match.findMany({
+    where: localMatchWhere(url, since, matchId),
+    include: {
+      homeTeam: true,
+      awayTeam: true,
+    },
+    orderBy: { matchDate: 'desc' },
+    take: matchId ? 1 : limit,
+  });
+
+  const processed = [];
+  let providerRequestsBudgetApprox = 0;
+
+  for (const match of matches) {
+    try {
+      const collected = await collectTheStatsMatchExtras(match, {
+        dryRun: true,
+        save: false,
+        includeRaw,
+        endpointMode: 'full',
+        timeoutMs,
+        delayMs,
+        query: providerQuery,
+      });
+      providerRequestsBudgetApprox += 6;
+
+      const normalized = (collected as any)?.debug?.normalizedPreview;
+      const events = Array.isArray(normalized?.eventsDetailed?.all) ? normalized.eventsDetailed.all : [];
+      const shots = Array.isArray(normalized?.shotmap) ? normalized.shotmap : [];
+      const players = Array.isArray(normalized?.playerStats) ? normalized.playerStats : [];
+      const statsCount = Object.keys(normalized?.liveStats?.stats || {}).length;
+      const hasUsefulData = Boolean(normalized) && (statsCount > 0 || events.length > 0 || shots.length > 0 || players.length > 0 || Boolean(normalized?.lineups));
+
+      if (!collected.ok || !hasUsefulData) {
+        processed.push({ matchId: match.id, status: 'skipped_no_final_the_stats_data', collected });
+        if (delayMs > 0) await sleep(delayMs);
+        continue;
+      }
+
+      const providerMatchId = (collected as any).resolvedProviderMatchId;
+      let deleted = { snapshots: 0, events: 0 };
+      let snapshotId: string | null = null;
+      let insertedEvents = 0;
+
+      if (!dryRun) {
+        deleted = await deleteOldProviderData(match.id, { purgeISports, purgeFootballDataEvents, replaceTheStatsFinal });
+        const snapshot = await prisma.matchStatsSnapshot.create({
+          data: {
+            id: randomUUID(),
+            matchId: match.id,
+            provider: 'THE_STATS_API_FINAL_CANONICAL',
+            providerMatchId: providerMatchNumber(providerMatchId),
+            homeScore: match.homeScore,
+            awayScore: match.awayScore,
+            ...snapshotStatColumns(normalized),
+            rawData: {
+              provider: 'THE_STATS_API',
+              mode: 'final_canonical_after_match',
+              importedAt: new Date().toISOString(),
+              resolvedProviderMatchId: providerMatchId,
+              resolvedBy: (collected as any).resolvedBy,
+              rateLimitPolicy: { requestsPerMinute, delayMs, note: 'Throttled to stay at or below TheStatsAPI request limit.' },
+              normalized,
+            },
+          },
+          select: { id: true },
+        });
+        snapshotId = snapshot.id;
+        insertedEvents = await insertCanonicalEvents(match, events);
+      }
+
+      processed.push({
+        matchId: match.id,
+        teams: `${match.homeTeam?.name || match.homeTeamId} vs ${match.awayTeam?.name || match.awayTeamId}`,
+        status: dryRun ? 'dry_run_ok' : 'finalized_from_the_stats',
+        providerMatchId,
+        resolvedBy: (collected as any).resolvedBy,
+        counts: { stats: statsCount, events: events.length, shots: shots.length, playerStats: players.length, lineups: normalized?.lineups ? 1 : 0 },
+        deleted,
+        snapshotId,
+        insertedEvents,
+      });
+    } catch (error: any) {
+      processed.push({ matchId: match.id, status: 'failed', error: error?.message || String(error), code: error?.code || null, providerStatus: error?.status || null });
+    }
+
+    if (delayMs > 0) await sleep(delayMs);
+  }
+
+  return NextResponse.json({
+    ok: true,
+    mode: 'the_stats_finalize_matches_v1',
+    dryRun,
+    note: dryRun ? 'Add apply=true or dryRun=false to write final canonical TheStats data.' : 'Final canonical TheStats data was written and selected duplicate iSports/Football-Data events were purged.',
+    policy: {
+      sourceOfTruth: 'THE_STATS_API for final post-match events and statistics',
+      resultsSource: 'Football-Data may remain source of score/status unless you explicitly replace it elsewhere.',
+      requestsPerMinute,
+      delayMs,
+      theStatsLimitSafety: requestsPerMinute <= 120,
+    },
+    scope: { matchId, limit: matchId ? 1 : limit, days, localMatches: matches.length },
+    providerRequestsBudgetApprox,
+    processed,
+  }, { headers: { 'Cache-Control': 'no-store' } });
+}
+
+export async function GET(req: Request) { return run(req); }
+export async function POST(req: Request) { return run(req); }
