@@ -1,0 +1,11 @@
+main[dir="rtl"] b.truncate,
+main[dir="rtl"] .team-name-full {
+  overflow: visible !important;
+  text-overflow: clip !important;
+  white-space: normal !important;
+  line-height: 1.45 !important;
+}
+
+main[dir="rtl"] img[alt^="علم "] {
+  object-fit: cover;
+}
