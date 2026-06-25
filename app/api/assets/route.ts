@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { withTeamDisplay } from '@/lib/teamDisplay';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 60;
@@ -16,6 +17,15 @@ const baseOrderBy = [
   { score: 'desc' as const },
   { marketPrice: 'desc' as const },
 ];
+
+function localizeAsset(asset: any) {
+  if (asset?.type !== 'TEAM') return asset;
+  return withTeamDisplay(asset);
+}
+
+function localizeAssets(assets: any[]) {
+  return assets.map(localizeAsset);
+}
 
 async function getGroupAssets() {
   return prisma.asset.findMany({
@@ -104,7 +114,7 @@ export async function GET(request: NextRequest) {
         ? await getMarketAssets()
         : await getFullAssets();
 
-    return NextResponse.json(assets, {
+    return NextResponse.json(localizeAssets(assets), {
       headers: {
         'Cache-Control': view === 'full'
           ? 'public, s-maxage=60, stale-while-revalidate=120'
