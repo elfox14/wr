@@ -68,44 +68,7 @@ function providerMatchNumber(value: unknown) {
   return Number.isFinite(n) ? n : 0;
 }
 
-function text(value: unknown) {
-  return String(value ?? '').trim();
-}
-
-function norm(value: unknown) {
-  return text(value).toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9\u0600-\u06ff]+/g, ' ').replace(/\s+/g, ' ').trim();
-}
-
-function teamIdFromEvent(match: any, event: any) {
-  const providerTeamId = text(event?.teamId);
-  if (providerTeamId && (providerTeamId === match.homeTeamId || providerTeamId === match.awayTeamId)) return providerTeamId;
-  const name = norm(event?.teamName);
-  if (!name) return null;
-  const home = [match.homeTeam?.name, match.homeTeam?.code].map(norm).filter(Boolean);
-  const away = [match.awayTeam?.name, match.awayTeam?.code].map(norm).filter(Boolean);
-  if (home.some((value) => value && (name.includes(value) || value.includes(name)))) return match.homeTeamId;
-  if (away.some((value) => value && (name.includes(value) || value.includes(name)))) return match.awayTeamId;
-  return null;
-}
-
-function eventMinute(value: unknown) {
-  if (value === null || value === undefined || value === '') return null;
-  const n = Number(value);
-  return Number.isFinite(n) ? Math.round(n) : null;
-}
-
-function eventType(value: unknown) {
-  return text(value || 'event').toLowerCase().replace(/[^a-z0-9_:-]+/g, '_').slice(0, 48) || 'event';
-}
-
-function eventDetail(event: any) {
-  const player = text(event?.playerName);
-  const team = text(event?.teamName);
-  const type = text(event?.type || 'event');
-  return text(event?.detail || [type, player, team].filter(Boolean).join(' - ')).slice(0, 240) || type;
-}
-
-async function deleteOldProviderData(matchId: string, options: { purgeISports: boolean; purgeFootballDataEvents: boolean; replaceTheStatsFinal: boolean }) {
+async function deleteOldProviderData(matchId: string, options: { purgeISports: boolean; purgeFootballDataEvents: boolean; replaceTheStatsFinal: boolean; purgeTheStatsMatchEvents: boolean }) {
   const deleted: Record<string, number> = { snapshots: 0, events: 0 };
 
   if (options.replaceTheStatsFinal) {
@@ -116,13 +79,20 @@ async function deleteOldProviderData(matchId: string, options: { purgeISports: b
       },
     });
     deleted.snapshots += stats.count;
+  }
 
+  if (options.purgeTheStatsMatchEvents) {
     const events = await prisma.matchEvent.deleteMany({
       where: {
         matchId,
         OR: [
           { sourceName: { startsWith: 'THE_STATS_API_FINAL' } },
+          { sourceName: { startsWith: 'THE_STATS_API_MANUAL' } },
           { sourceName: 'THE_STATS_API_MANUAL_FINAL' },
+          { sourceName: 'THE_STATS_API_FINAL_CANONICAL' },
+          { sourceName: 'THE_STATS_API_FINAL_TIMELINE' },
+          { sourceName: 'THE_STATS_API_FINAL_SHOTMAP' },
+          { sourceName: 'TheStats' },
         ],
       },
     });
@@ -149,6 +119,7 @@ async function deleteOldProviderData(matchId: string, options: { purgeISports: b
           { sourceName: { contains: 'iSports' } },
           { sourceName: { contains: 'ISPORTS' } },
           { sourceName: { contains: 'Automated Live Ingest' } },
+          { sourceName: { contains: 'Live Ingest' } },
         ],
       },
     });
@@ -171,44 +142,7 @@ async function deleteOldProviderData(matchId: string, options: { purgeISports: b
   return deleted;
 }
 
-async function insertCanonicalEvents(match: any, events: any[]) {
-  let inserted = 0;
-  for (const event of events) {
-    const minute = eventMinute(event?.minute);
-    const type = eventType(event?.type);
-    const detail = eventDetail(event);
-    const playerName = text(event?.playerName).slice(0, 120) || null;
-    const exists = await prisma.matchEvent.findFirst({
-      where: {
-        matchId: match.id,
-        minute,
-        type,
-        playerName,
-        sourceName: 'THE_STATS_API_FINAL_CANONICAL',
-      },
-      select: { id: true },
-    });
-    if (exists) continue;
-    await prisma.matchEvent.create({
-      data: {
-        id: randomUUID(),
-        matchId: match.id,
-        minute,
-        type,
-        teamId: teamIdFromEvent(match, event),
-        playerId: text(event?.playerId).slice(0, 120) || null,
-        playerName,
-        detail,
-        sourceName: 'THE_STATS_API_FINAL_CANONICAL',
-        sourceUrl: event?.sourceUrl ? text(event.sourceUrl).slice(0, 500) : null,
-      },
-    });
-    inserted += 1;
-  }
-  return inserted;
-}
-
-function localMatchWhere(url: URL, since: Date, matchId?: string | null) {
+function localMatchWhere(since: Date, matchId?: string | null) {
   if (matchId) return { id: matchId } as any;
   return {
     status: { in: FINISHED_STATUSES },
@@ -231,13 +165,15 @@ async function run(req: Request) {
   const includeRaw = boolParam(url, 'includeRaw', false);
   const purgeISports = boolParam(url, 'purgeISports', true);
   const purgeFootballDataEvents = boolParam(url, 'purgeFootballDataEvents', true);
+  const purgeTheStatsMatchEvents = boolParam(url, 'purgeTheStatsMatchEvents', true);
   const replaceTheStatsFinal = boolParam(url, 'replaceTheStatsFinal', true);
+  const writeMatchEvents = boolParam(url, 'writeMatchEvents', false);
   const matchId = url.searchParams.get('matchId');
   const since = new Date(Date.now() - days * 864e5);
   const providerQuery = defaultTheStatsQuery(url.searchParams);
 
   const matches = await prisma.match.findMany({
-    where: localMatchWhere(url, since, matchId),
+    where: localMatchWhere(since, matchId),
     include: {
       homeTeam: true,
       awayTeam: true,
@@ -281,7 +217,7 @@ async function run(req: Request) {
       let insertedEvents = 0;
 
       if (!dryRun) {
-        deleted = await deleteOldProviderData(match.id, { purgeISports, purgeFootballDataEvents, replaceTheStatsFinal });
+        deleted = await deleteOldProviderData(match.id, { purgeISports, purgeFootballDataEvents, replaceTheStatsFinal, purgeTheStatsMatchEvents });
         const snapshot = await prisma.matchStatsSnapshot.create({
           data: {
             id: randomUUID(),
@@ -293,30 +229,34 @@ async function run(req: Request) {
             ...snapshotStatColumns(normalized),
             rawData: {
               provider: 'THE_STATS_API',
-              mode: 'final_canonical_after_match',
+              mode: 'final_canonical_after_match_snapshot_only',
               importedAt: new Date().toISOString(),
               resolvedProviderMatchId: providerMatchId,
               resolvedBy: (collected as any).resolvedBy,
               rateLimitPolicy: { requestsPerMinute, delayMs, note: 'Throttled to stay at or below TheStatsAPI request limit.' },
+              displayPolicy: { eventsSource: 'snapshot.normalized.eventsDetailed.all', writeMatchEvents, note: 'Final TheStats events are kept in the snapshot by default to avoid duplicating MatchEvent rows.' },
               normalized,
             },
           },
           select: { id: true },
         });
         snapshotId = snapshot.id;
-        insertedEvents = await insertCanonicalEvents(match, events);
+        // IMPORTANT: keep TheStats final timeline snapshot-only by default. The match page can read
+        // normalized.eventsDetailed from the snapshot; writing the same events into MatchEvent causes duplicates.
+        insertedEvents = 0;
       }
 
       processed.push({
         matchId: match.id,
         teams: `${match.homeTeam?.name || match.homeTeamId} vs ${match.awayTeam?.name || match.awayTeamId}`,
-        status: dryRun ? 'dry_run_ok' : 'finalized_from_the_stats',
+        status: dryRun ? 'dry_run_ok' : 'finalized_from_the_stats_snapshot_only',
         providerMatchId,
         resolvedBy: (collected as any).resolvedBy,
         counts: { stats: statsCount, events: events.length, shots: shots.length, playerStats: players.length, lineups: normalized?.lineups ? 1 : 0 },
         deleted,
         snapshotId,
         insertedEvents,
+        writeMatchEvents,
       });
     } catch (error: any) {
       processed.push({ matchId: match.id, status: 'failed', error: error?.message || String(error), code: error?.code || null, providerStatus: error?.status || null });
@@ -327,16 +267,18 @@ async function run(req: Request) {
 
   return NextResponse.json({
     ok: true,
-    mode: 'the_stats_finalize_matches_v1',
+    mode: 'the_stats_finalize_matches_v2_snapshot_only',
     dryRun,
-    note: dryRun ? 'Add apply=true or dryRun=false to write final canonical TheStats data.' : 'Final canonical TheStats data was written and selected duplicate iSports/Football-Data events were purged.',
+    note: dryRun ? 'Add apply=true or dryRun=false to write final canonical TheStats snapshot.' : 'Final TheStats snapshot was written. TheStats events are snapshot-only by default; duplicate MatchEvent rows from iSports/old final imports are purged.',
     policy: {
       sourceOfTruth: 'THE_STATS_API for final post-match events and statistics',
       resultsSource: 'Football-Data may remain source of score/status unless you explicitly replace it elsewhere.',
+      eventsStorage: writeMatchEvents ? 'MatchEvent rows enabled by query param' : 'snapshot-only to avoid duplicates',
       requestsPerMinute,
       delayMs,
       theStatsLimitSafety: requestsPerMinute <= 120,
     },
+    cleanup: { purgeISports, purgeFootballDataEvents, purgeTheStatsMatchEvents, replaceTheStatsFinal },
     scope: { matchId, limit: matchId ? 1 : limit, days, localMatches: matches.length },
     providerRequestsBudgetApprox,
     processed,
