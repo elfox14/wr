@@ -2,7 +2,6 @@ import { unstable_cache } from 'next/cache';
 import HomeClientSportsLiveFocus from '@/components/HomeClientSportsLiveFocus';
 import prisma from '@/lib/prisma';
 
-export const dynamic = 'force-dynamic';
 export const revalidate = 60;
 
 const LIVE_STATUSES = ['LIVE', 'IN_PLAY', '1H', '2H', 'ET', 'HT'];
