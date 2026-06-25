@@ -17,7 +17,12 @@ export type MatchShotMapItem = {
 export type MatchEventView = { id: string; minute: number | null; minuteLabel: string; type: string; icon: string; teamId?: string | null; playerName?: string | null; detail: string; sourceName?: string | null; sourceUrl?: string | null; x?: number | null; y?: number | null; shot?: MatchShotMapItem | null; };
 
 export type MatchPlayerStatItem = {
-  playerId?: string | null; playerName?: string | null; teamId?: string | null; teamName?: string | null; position?: string | null; rating?: number | null; started?: boolean | null; played?: boolean | null; minutes?: number | null; goals?: number | null; assists?: number | null; shots?: number | null; shotsOnTarget?: number | null; passes?: number | null; accuratePasses?: number | null; keyPasses?: number | null; crosses?: number | null; tackles?: number | null; interceptions?: number | null; clearances?: number | null; foulsCommitted?: number | null; foulsWon?: number | null; saves?: number | null;
+  playerId?: string | null; playerName?: string | null; teamId?: string | null; teamName?: string | null; position?: string | null; rating?: number | null; started?: boolean | null; played?: boolean | null; minutes?: number | null;
+  goals?: number | null; assists?: number | null; shots?: number | null; shotsOnTarget?: number | null; shotsOffTarget?: number | null; blockedShots?: number | null; bigChancesCreated?: number | null; expectedGoals?: number | null; expectedAssists?: number | null; npExpectedGoals?: number | null;
+  passes?: number | null; accuratePasses?: number | null; keyPasses?: number | null; crosses?: number | null; accurateCrosses?: number | null; longBalls?: number | null; accurateLongBalls?: number | null;
+  tackles?: number | null; interceptions?: number | null; clearances?: number | null; saves?: number | null;
+  duelWon?: number | null; duelLost?: number | null; aerialWon?: number | null; challengeLost?: number | null; wonContest?: number | null; dispossessed?: number | null;
+  touches?: number | null; foulsCommitted?: number | null; foulsWon?: number | null; offsides?: number | null; yellowCards?: number | null; redCards?: number | null; possessionLost?: number | null; playerSubbedOn?: string | null; playerSubbedOff?: string | null;
 };
 
 export type MatchAdvancedData = {
