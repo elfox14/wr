@@ -1,6 +1,11 @@
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
+
+const execFileAsync = promisify(execFile);
 
 function jsonResponse(payload: unknown, status = 200) {
   return Response.json(payload, {
@@ -62,7 +67,6 @@ function applySafeEnvOverrides(req: Request) {
     process.env[envName] = String(Math.max(min, Math.min(max, Math.floor(value))));
   }
 
-  // The HTTP endpoint must run once only. Loop mode is only for Render background workers.
   previous.LIVE_INGEST_LOOP = process.env.LIVE_INGEST_LOOP;
   process.env.LIVE_INGEST_LOOP = 'false';
 
@@ -71,6 +75,38 @@ function applySafeEnvOverrides(req: Request) {
       if (value === undefined) delete process.env[key];
       else process.env[key] = value;
     }
+  };
+}
+
+function parseWorkerSummary(stdout: string) {
+  const text = String(stdout || '').trim();
+  const marker = '\n{';
+  const index = text.lastIndexOf(marker);
+  const jsonText = index >= 0 ? text.slice(index + 1) : text;
+  try {
+    return JSON.parse(jsonText);
+  } catch {
+    return { raw: text.slice(-12000) };
+  }
+}
+
+async function runFreshWorkerProcess() {
+  const timeoutMs = Number(process.env.LIVE_INGEST_HTTP_PROCESS_TIMEOUT_MS || 55000);
+  const { stdout, stderr } = await execFileAsync(
+    process.execPath,
+    ['scripts/automated-live-ingest-worker.mjs'],
+    {
+      cwd: process.cwd(),
+      env: { ...process.env, LIVE_INGEST_LOOP: 'false' },
+      timeout: Math.max(15000, Math.min(90000, timeoutMs)),
+      maxBuffer: 1024 * 1024 * 4,
+    },
+  );
+
+  return {
+    stdout: stdout ? String(stdout).slice(-12000) : '',
+    stderr: stderr ? String(stderr).slice(-4000) : '',
+    summary: parseWorkerSummary(String(stdout || '')),
   };
 }
 
@@ -83,25 +119,23 @@ async function handle(req: Request) {
   const startedAt = Date.now();
 
   try {
-    const mod = await import('../../../../scripts/automated-live-ingest-worker.mjs');
-    const runOnce = mod.runOnce as () => Promise<unknown>;
-    if (typeof runOnce !== 'function') {
-      return jsonResponse({ ok: false, error: 'live_ingest_runOnce_missing' }, 500);
-    }
-
-    const result = await runOnce();
+    const worker = await runFreshWorkerProcess();
     return jsonResponse({
       ok: true,
-      mode: 'http_live_ingest_cron_v1',
+      mode: 'http_live_ingest_cron_v2_fresh_process',
       durationMs: Date.now() - startedAt,
-      result,
+      result: worker.summary,
+      stderr: worker.stderr || undefined,
     });
   } catch (error: unknown) {
+    const anyError = error as { message?: string; stdout?: string; stderr?: string };
     return jsonResponse({
       ok: false,
-      mode: 'http_live_ingest_cron_v1',
+      mode: 'http_live_ingest_cron_v2_fresh_process',
       durationMs: Date.now() - startedAt,
-      error: error instanceof Error ? error.message : String(error),
+      error: anyError?.message || String(error),
+      result: anyError?.stdout ? parseWorkerSummary(String(anyError.stdout)) : undefined,
+      stderr: anyError?.stderr ? String(anyError.stderr).slice(-4000) : undefined,
     }, 500);
   } finally {
     restoreEnv();
