@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { getTeamFlagUrl } from '@/lib/teamFlags';
+import { getArabicTeamName } from '@/lib/teamDisplay';
 
 type Team = { id?: string | number | null; name?: string | null; code?: string | null; image?: string | null };
 
@@ -34,6 +35,8 @@ const FINISHED_STATUSES = ['FINISHED', 'FT', 'AET', 'PEN', 'FULL_TIME', 'ENDED',
 
 function normalizeStatus(status?: string | null) { return String(status || '').toUpperCase(); }
 function formatCount(value: number) { return new Intl.NumberFormat('ar-EG').format(value); }
+function teamName(team?: Team | null) { return team ? getArabicTeamName(team.code, team.name) : 'منتخب'; }
+function teamFlag(team?: Team | null) { const name = teamName(team); return getTeamFlagUrl({ code: team?.code, name, image: null }, 40) || team?.image || null; }
 function groupNumberLabel(match: TickerMatch) {
   const raw = String(match.groupPhase || match.group || match.stage || '').trim().toUpperCase();
   const letter = raw.match(/GROUP[_\s-]*([A-L])/)?.[1] || raw.match(/المجموعة\s*([A-L])/i)?.[1]?.toUpperCase() || (/^[A-L]$/.test(raw) ? raw : '');
@@ -55,7 +58,7 @@ function liveStatusText(match: TickerMatch) {
   if (status === 'P' || status === 'PEN') return 'ركلات الترجيح';
   return 'جارية الآن';
 }
-function matchKey(match?: TickerMatch | null) { return String(match?.id || match?.animationMatchId || `${match?.homeTeam?.name || ''}-${match?.awayTeam?.name || ''}-${match?.matchDate || ''}`); }
+function matchKey(match?: TickerMatch | null) { return String(match?.id || match?.animationMatchId || `${teamName(match?.homeTeam)}-${teamName(match?.awayTeam)}-${match?.matchDate || ''}`); }
 function mergeById(baseMatches: TickerMatch[], updates: TickerMatch[]) {
   const updateMap = new Map<string, TickerMatch>();
   for (const update of updates) {
@@ -132,26 +135,17 @@ export default function HomeLiveMatchTicker({ matches = [] }: Props) {
           const active = key === activeKey;
           const finished = isFinished(match);
           const live = isLive(match);
-          const homeFlag = match.homeTeam?.image || getTeamFlagUrl({ code: match.homeTeam?.code, name: match.homeTeam?.name }, 40);
-          const awayFlag = match.awayTeam?.image || getTeamFlagUrl({ code: match.awayTeam?.code, name: match.awayTeam?.name }, 40);
+          const homeFlag = teamFlag(match.homeTeam);
+          const awayFlag = teamFlag(match.awayTeam);
           const href = match.id ? `/match-center/${match.id}` : '/matches';
           return (
             <Link key={key} href={href} onMouseEnter={() => setActiveKey(key)} className="shrink-0">
-              <div className={`relative flex h-[84px] w-[248px] items-center gap-3 rounded-2xl border px-3 transition hover:-translate-y-1 ${active ? 'border-[#FFD700]/45 bg-black/55 shadow-[0_0_24px_rgba(255,215,0,.10)]' : 'border-white/10 bg-black/30 hover:border-[#0FF0FC]/35'} ${live ? 'ring-1 ring-[#00FF88]/20' : ''}`}>
+              <div className={`relative flex h-[90px] w-[270px] items-center gap-3 rounded-2xl border px-3 transition hover:-translate-y-1 ${active ? 'border-[#FFD700]/45 bg-black/55 shadow-[0_0_24px_rgba(255,215,0,.10)]' : 'border-white/10 bg-black/30 hover:border-[#0FF0FC]/35'} ${live ? 'ring-1 ring-[#00FF88]/20' : ''}`}>
                 {active ? <span className="absolute inset-x-5 -top-px h-px bg-gradient-to-r from-transparent via-[#FFD700] to-transparent" /> : null}
                 <div className="flex min-w-0 flex-1 flex-col gap-1">
-                  <div className="flex items-center gap-1.5">
-                    <span className={`h-1.5 w-1.5 rounded-full ${live ? 'animate-pulse bg-[#00FF88]' : finished ? 'bg-gray-500' : 'bg-[#0FF0FC]'}`} />
-                    <span suppressHydrationWarning className={`truncate text-[10px] font-black ${live ? 'text-[#00FF88]' : finished ? 'text-gray-400' : 'text-[#0FF0FC]'}`}>{statusBadge(match, mounted)}</span>
-                  </div>
-                  <div className="flex items-center justify-between gap-2 text-xs font-black text-white">
-                    <span className="flex min-w-0 items-center gap-1.5"><img src={homeFlag || undefined} alt="" className="h-5 w-5 rounded-md object-cover" /><span className="truncate">{match.homeTeam?.name || 'Home'}</span></span>
-                    {(live || finished) ? <b className="text-[#FFD700]">{match.homeScore ?? 0}</b> : null}
-                  </div>
-                  <div className="flex items-center justify-between gap-2 text-xs font-black text-white">
-                    <span className="flex min-w-0 items-center gap-1.5"><img src={awayFlag || undefined} alt="" className="h-5 w-5 rounded-md object-cover" /><span className="truncate">{match.awayTeam?.name || 'Away'}</span></span>
-                    {(live || finished) ? <b className="text-[#FFD700]">{match.awayScore ?? 0}</b> : null}
-                  </div>
+                  <div className="flex items-center gap-1.5"><span className={`h-1.5 w-1.5 rounded-full ${live ? 'animate-pulse bg-[#00FF88]' : finished ? 'bg-gray-500' : 'bg-[#0FF0FC]'}`} /><span suppressHydrationWarning className={`text-[10px] font-black ${live ? 'text-[#00FF88]' : finished ? 'text-gray-400' : 'text-[#0FF0FC]'}`}>{statusBadge(match, mounted)}</span></div>
+                  <div className="flex items-center justify-between gap-2 text-xs font-black text-white"><span className="flex min-w-0 items-center gap-1.5">{homeFlag ? <img src={homeFlag} alt={`علم ${teamName(match.homeTeam)}`} className="h-5 w-7 rounded object-cover" /> : null}<span className="team-name-full">{teamName(match.homeTeam)}</span></span>{(live || finished) ? <b className="text-[#FFD700]">{match.homeScore ?? 0}</b> : null}</div>
+                  <div className="flex items-center justify-between gap-2 text-xs font-black text-white"><span className="flex min-w-0 items-center gap-1.5">{awayFlag ? <img src={awayFlag} alt={`علم ${teamName(match.awayTeam)}`} className="h-5 w-7 rounded object-cover" /> : null}<span className="team-name-full">{teamName(match.awayTeam)}</span></span>{(live || finished) ? <b className="text-[#FFD700]">{match.awayScore ?? 0}</b> : null}</div>
                 </div>
                 <span className="hidden rounded-xl border border-white/10 bg-white/[.05] px-2 py-1 text-[9px] font-black text-gray-300 sm:block">{groupNumberLabel(match)}</span>
               </div>
