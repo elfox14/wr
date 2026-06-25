@@ -10,15 +10,14 @@ import type { MatchEventView, MatchPageData, MatchPlayerLite, MatchPlayerStatIte
 
 const ar = new Intl.NumberFormat('ar-EG');
 
-type TabId = 'overview' | 'stats' | 'events' | 'lineups' | 'interactive' | 'analysis' | 'group' | 'articles';
+type TabId = 'overview' | 'events' | 'lineups' | 'interactive' | 'analysis' | 'group' | 'articles';
 type TeamLite = MatchPageData['homeTeam'];
 type AnyPlayer = Record<string, any>;
 type PlayerStat = MatchPlayerStatItem & Record<string, any>;
 type PlayerRow = { player: AnyPlayer; stat: PlayerStat | null; role: 'starter' | 'substitute'; index: number };
 
 const TABS: Array<{ id: TabId; label: string; icon: any }> = [
-  { id: 'overview', label: 'نظرة عامة', icon: Layers },
-  { id: 'stats', label: 'الإحصائيات', icon: BarChart3 },
+  { id: 'overview', label: 'نظرة عامة والإحصائيات', icon: Layers },
   { id: 'events', label: 'الأحداث', icon: Radio },
   { id: 'lineups', label: 'التشكيلات وأداء اللاعبين', icon: Users },
   { id: 'interactive', label: 'الملعب التفاعلي', icon: MapPin },
@@ -42,8 +41,10 @@ const PLAYER_STAT_DEFS: Array<[string, string]> = [
 
 function fmt(value: number | string | boolean | null | undefined, suffix = '') {
   if (typeof value === 'boolean') return value ? 'نعم' : 'لا';
-  if (value === null || value === undefined || value === '' || Number.isNaN(Number(value))) return '—';
-  const n = Number(value);
+  if (value === null || value === undefined || value === '') return '—';
+  const text = String(value).trim();
+  const n = Number(text);
+  if (!Number.isFinite(n)) return text || '—';
   return `${Number.isInteger(n) ? ar.format(n) : n.toLocaleString('ar-EG', { maximumFractionDigits: 2 })}${suffix}`;
 }
 
@@ -53,6 +54,11 @@ function fullDate(value: string) {
 
 function normalizeName(value?: string | null) {
   return String(value || '').trim().toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f\u064B-\u065F\u0670]/g, '').replace(/[^a-z0-9\u0600-\u06ff]+/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+function lastNameToken(value?: string | null) {
+  const parts = normalizeName(value).split(' ').filter(Boolean);
+  return parts.length ? parts[parts.length - 1] : '';
 }
 
 function displayTeamName(team: { code?: string | null; name?: string | null }) {
@@ -71,8 +77,21 @@ function playerId(player: AnyPlayer) {
   return player?.id ? String(player.id) : null;
 }
 
+function numberValue(...values: any[]) {
+  for (const value of values) {
+    if (value === null || value === undefined || value === '') continue;
+    const n = Number(String(value).replace(/[^0-9.-]/g, ''));
+    if (Number.isFinite(n)) return String(n);
+  }
+  return '';
+}
+
 function playerNumber(player: AnyPlayer) {
   return player?.number ?? player?.shirtNumber ?? player?.jerseyNumber ?? null;
+}
+
+function statNumber(stat?: PlayerStat | null) {
+  return numberValue(stat?.number, stat?.shirtNumber, stat?.jerseyNumber, stat?.playerNumber);
 }
 
 function playerPosition(player: AnyPlayer, stat?: PlayerStat | null) {
@@ -107,24 +126,34 @@ function Empty({ title, body }: { title: string; body: string }) {
 function findLocalPlayer(player: AnyPlayer | { id?: string | null; name?: string | null }, localPlayers: MatchPlayerLite[]) {
   const id = player.id ? String(player.id) : null;
   const name = normalizeName(player.name);
-  return localPlayers.find((item) => {
+  return localPlayers.find((item: AnyPlayer) => {
     const localName = normalizeName(item.name);
-    return Boolean((id && item.id === id) || (name && localName && (localName === name || localName.includes(name) || name.includes(localName))));
+    const sameNumber = numberValue((player as AnyPlayer).number, (player as AnyPlayer).shirtNumber, (player as AnyPlayer).jerseyNumber) && numberValue(item.number, item.shirtNumber, item.jerseyNumber) === numberValue((player as AnyPlayer).number, (player as AnyPlayer).shirtNumber, (player as AnyPlayer).jerseyNumber);
+    return Boolean((id && item.id === id) || sameNumber || (name && localName && (localName === name || localName.includes(name) || name.includes(localName))));
   });
 }
 
 function playerWithImage(player: AnyPlayer, localPlayers: MatchPlayerLite[]) {
   const local = findLocalPlayer(player, localPlayers) as AnyPlayer | undefined;
-  return { ...player, image: player.image || local?.image || null, position: player.position || local?.position || null };
+  return { ...player, image: player.image || local?.image || null, position: player.position || local?.position || null, number: playerNumber(player) || playerNumber(local || {}) || null };
 }
 
 function playerStatFor(player: AnyPlayer, stats: PlayerStat[]) {
   const id = playerId(player);
   const name = normalizeName(player.name);
+  const last = lastNameToken(player.name);
+  const pNumber = numberValue(playerNumber(player));
+  const pPos = normalizeName(player.position);
   return stats.find((stat) => {
     const statId = stat.playerId ? String(stat.playerId) : null;
     const statName = normalizeName(stat.playerName);
-    return Boolean((id && statId && id === statId) || (name && statName && (statName === name || statName.includes(name) || name.includes(statName))));
+    const sLast = lastNameToken(stat.playerName);
+    const sNumber = statNumber(stat);
+    const sPos = normalizeName(stat.position);
+    const numberMatch = Boolean(pNumber && sNumber && pNumber === sNumber);
+    const exactName = Boolean(name && statName && (statName === name || statName.includes(name) || name.includes(statName)));
+    const lastNameMatch = Boolean(last && sLast && last === sLast && (!pPos || !sPos || pPos === sPos));
+    return Boolean((id && statId && id === statId) || exactName || numberMatch || lastNameMatch);
   }) || null;
 }
 
@@ -135,7 +164,7 @@ function statBelongsToTeam(stat: PlayerStat, team: TeamLite, localPlayers: Match
   const teamCode = normalizeName(team.code);
   if (statTeam && ((teamName && (statTeam === teamName || statTeam.includes(teamName) || teamName.includes(statTeam))) || (teamCode && statTeam === teamCode))) return true;
   const playerName = normalizeName(stat.playerName);
-  return Boolean(playerName && localPlayers.some((player) => normalizeName(player.name) === playerName));
+  return Boolean(playerName && localPlayers.some((player) => normalizeName(player.name) === playerName || lastNameToken(player.name) === lastNameToken(stat.playerName)));
 }
 
 function statAsPlayer(stat: PlayerStat, localPlayers: MatchPlayerLite[]) {
@@ -145,7 +174,7 @@ function statAsPlayer(stat: PlayerStat, localPlayers: MatchPlayerLite[]) {
 function uniqueRows(rows: PlayerRow[]) {
   const seen = new Set<string>();
   return rows.filter((row) => {
-    const key = normalizeName(String(playerId(row.player) || row.player.name || row.stat?.playerName || row.index));
+    const key = normalizeName(String(playerId(row.player) || row.player.name || row.stat?.playerName || playerNumber(row.player) || row.index));
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
@@ -157,7 +186,7 @@ function buildRows(lineup: OfficialLineupTeam | null | undefined, localPlayers: 
   const starterKeys = new Set(starters.map((row) => normalizeName(String(playerId(row.player) || row.player.name))));
   const usedSubsFromLineup: PlayerRow[] = (lineup?.substitutes || [])
     .map((player: AnyPlayer, index) => ({ player: playerWithImage(player, localPlayers), stat: playerStatFor(player, teamStats), role: 'substitute' as const, index }))
-    .filter((row) => playedStat(row.stat));
+    .filter((row) => playedStat(row.stat) || Boolean(row.player?.playerSubbedOn || row.player?.playerSubbedOff));
   const statRows: PlayerRow[] = teamStats
     .filter((stat) => playedStat(stat))
     .map((stat, index) => ({ player: statAsPlayer(stat, localPlayers), stat, role: statStarted(stat) ? 'starter' : 'substitute', index: index + 1000 }));
@@ -173,6 +202,14 @@ function statItems(stat: PlayerStat | null) {
   return PLAYER_STAT_DEFS.map(([key, label]) => ({ key, label, value: stat[key] })).filter((item) => item.value !== null && item.value !== undefined && item.value !== '');
 }
 
+function fallbackPlayerItems(row: PlayerRow) {
+  return [
+    { key: 'role', label: 'الحالة', value: row.role === 'starter' ? 'أساسي' : 'شارك كبديل / تم استبداله' },
+    { key: 'number', label: 'رقم اللاعب', value: playerNumber(row.player) || '—' },
+    { key: 'position', label: 'المركز', value: playerPosition(row.player, row.stat) },
+  ];
+}
+
 function PlayerAvatar({ player, accent }: { player: AnyPlayer; accent: 'home' | 'away' }) {
   const border = accent === 'home' ? 'border-[#F8C846]' : 'border-[#18E58F]';
   const number = playerNumber(player);
@@ -180,8 +217,9 @@ function PlayerAvatar({ player, accent }: { player: AnyPlayer; accent: 'home' | 
 }
 
 function PlayerCard({ row, accent }: { row: PlayerRow; accent: 'home' | 'away' }) {
-  const items = statItems(row.stat);
-  return <article className="rounded-2xl border border-white/10 bg-white/[0.045] p-3"><div className="flex items-start gap-3"><PlayerAvatar player={row.player} accent={accent} /><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-1.5"><p className="truncate text-sm font-black text-white sm:text-base">{row.player.name}</p>{row.player?.isCaptain ? <span className="rounded-full bg-[#F8C846] px-1.5 py-0.5 text-[9px] font-black text-black">C</span> : null}<span className="rounded-full border border-white/10 bg-black/25 px-2 py-0.5 text-[9px] font-black text-slate-300">{row.role === 'starter' ? 'أساسي' : 'شارك كبديل / تم استبداله'}</span></div><p className="mt-1 text-[10px] font-bold text-slate-400">رقم {playerNumber(row.player) || '—'} · {playerPosition(row.player, row.stat)}</p>{items.length ? <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">{items.map((item) => <span key={item.key} className="rounded-xl border border-white/10 bg-black/25 px-2 py-1.5 text-center"><b className="block text-sm font-black text-white tabular-nums">{fmt(item.value as any)}</b><small className="mt-0.5 block text-[9px] font-black text-slate-500">{item.label}</small></span>)}</div> : <p className="mt-3 rounded-xl border border-dashed border-white/10 bg-black/20 p-3 text-xs font-bold text-slate-400">لا توجد إحصائيات تفصيلية لهذا اللاعب حتى الآن.</p>}</div></div></article>;
+  const detailedItems = statItems(row.stat);
+  const items = detailedItems.length ? detailedItems : fallbackPlayerItems(row);
+  return <article className="rounded-2xl border border-white/10 bg-white/[0.045] p-3"><div className="flex items-start gap-3"><PlayerAvatar player={row.player} accent={accent} /><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-1.5"><p className="truncate text-sm font-black text-white sm:text-base">{row.player.name}</p>{row.player?.isCaptain ? <span className="rounded-full bg-[#F8C846] px-1.5 py-0.5 text-[9px] font-black text-black">C</span> : null}<span className="rounded-full border border-white/10 bg-black/25 px-2 py-0.5 text-[9px] font-black text-slate-300">{row.role === 'starter' ? 'أساسي' : 'شارك كبديل / تم استبداله'}</span></div><p className="mt-1 text-[10px] font-bold text-slate-400">رقم {playerNumber(row.player) || '—'} · {playerPosition(row.player, row.stat)}</p><div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">{items.map((item) => <span key={item.key} className="rounded-xl border border-white/10 bg-black/25 px-2 py-1.5 text-center"><b className="block text-sm font-black text-white tabular-nums">{fmt(item.value as any)}</b><small className="mt-0.5 block text-[9px] font-black text-slate-500">{item.label}</small></span>)}</div>{!detailedItems.length ? <p className="mt-2 text-[10px] font-bold text-slate-500">الإحصائيات التفصيلية لم تصل لهذا اللاعب بعد، وتم عرض بيانات المشاركة الأساسية بدلًا من ترك الكارت فارغًا.</p> : null}</div></div></article>;
 }
 
 function TeamPlayersSection({ team, lineup, localPlayers, stats, accent }: { team: TeamLite; lineup: OfficialLineupTeam | null | undefined; localPlayers: MatchPlayerLite[]; stats: PlayerStat[]; accent: 'home' | 'away' }) {
@@ -207,13 +245,10 @@ function StatCard({ metric, data }: { metric: MatchStatMetric; data: MatchPageDa
 }
 
 function OverviewPanel({ data }: { data: MatchPageData }) {
-  const quickStats = data.stats.filter((m) => ['possession', 'shots', 'shotsOnTarget', 'corners'].includes(m.key)).slice(0, 4);
-  return <Panel title="نظرة عامة" icon={<Layers size={22} />} hint="ملخص سريع للمباراة"><div className="grid gap-3 sm:grid-cols-2">{quickStats.length ? quickStats.map((metric) => <StatCard key={metric.key} metric={metric} data={data} />) : <Empty title="لا توجد إحصائيات أساسية" body="ستظهر بعد حفظ الإحصائيات." />}</div></Panel>;
-}
-
-function StatsPanel({ data }: { data: MatchPageData }) {
   const available = data.stats.filter((metric) => metric.available);
-  return <Panel title="إحصائيات المباراة" icon={<BarChart3 size={22} />}><div className="grid gap-3 lg:grid-cols-2">{available.length ? available.map((metric) => <StatCard key={metric.key} metric={metric} data={data} />) : <Empty title="لا توجد إحصائيات" body="شغّل المزامنة النهائية للمباراة." />}</div></Panel>;
+  const quickStats = available.filter((m) => ['possession', 'shots', 'shotsOnTarget', 'corners'].includes(m.key)).slice(0, 4);
+  const otherStats = available.filter((metric) => !quickStats.some((item) => item.key === metric.key));
+  return <Panel title="نظرة عامة والإحصائيات" icon={<BarChart3 size={22} />} hint="ملخص المباراة والإحصائيات في تاب واحد"><div className="space-y-5"><div><h3 className="mb-3 text-sm font-black text-[#F8C846]">أهم المؤشرات</h3><div className="grid gap-3 sm:grid-cols-2">{quickStats.length ? quickStats.map((metric) => <StatCard key={metric.key} metric={metric} data={data} />) : <Empty title="لا توجد مؤشرات أساسية" body="ستظهر بعد حفظ الإحصائيات." />}</div></div><div><h3 className="mb-3 text-sm font-black text-[#18E58F]">كل الإحصائيات المتاحة</h3><div className="grid gap-3 lg:grid-cols-2">{otherStats.length ? otherStats.map((metric) => <StatCard key={metric.key} metric={metric} data={data} />) : <Empty title="لا توجد إحصائيات إضافية" body="سيتم عرض أي إحصائية محفوظة بمجرد وصولها." />}</div></div></div></Panel>;
 }
 
 function EventsPanel({ data }: { data: MatchPageData }) {
@@ -251,5 +286,5 @@ export default function ProfessionalMatchTabsPage({ data }: { data: MatchPageDat
   const pageTitle = useMemo(() => `${displayTeamName(data.homeTeam)} ${fmt(data.score.home)} - ${fmt(data.score.away)} ${displayTeamName(data.awayTeam)}`, [data]);
   function refresh() { window.location.reload(); }
   async function share() { if (navigator.share) await navigator.share({ title: pageTitle, text: pageTitle, url: window.location.href }).catch(() => undefined); else await navigator.clipboard?.writeText(window.location.href).catch(() => undefined); }
-  return <main className="min-h-screen bg-[#04110D] px-3 py-4 text-white" dir="rtl"><MatchAutoRefresh intervalMs={data.status.isLive ? 25000 : 90000} /><div className="mx-auto max-w-7xl space-y-4"><Hero data={data} onRefresh={refresh} onShare={share} /><TabsNav active={active} onChange={setActive} />{active === 'overview' ? <OverviewPanel data={data} /> : null}{active === 'stats' ? <StatsPanel data={data} /> : null}{active === 'events' ? <EventsPanel data={data} /> : null}{active === 'lineups' ? <LineupsPanel data={data} /> : null}{active === 'interactive' ? <InteractivePanel data={data} /> : null}{active === 'analysis' ? <AnalysisPanel data={data} /> : null}{active === 'group' ? <GroupPanel data={data} /> : null}{active === 'articles' ? <ArticlesPanel data={data} /> : null}</div></main>;
+  return <main className="min-h-screen bg-[#04110D] px-3 py-4 text-white" dir="rtl"><MatchAutoRefresh intervalMs={data.status.isLive ? 25000 : 90000} /><div className="mx-auto max-w-7xl space-y-4"><Hero data={data} onRefresh={refresh} onShare={share} /><TabsNav active={active} onChange={setActive} />{active === 'overview' ? <OverviewPanel data={data} /> : null}{active === 'events' ? <EventsPanel data={data} /> : null}{active === 'lineups' ? <LineupsPanel data={data} /> : null}{active === 'interactive' ? <InteractivePanel data={data} /> : null}{active === 'analysis' ? <AnalysisPanel data={data} /> : null}{active === 'group' ? <GroupPanel data={data} /> : null}{active === 'articles' ? <ArticlesPanel data={data} /> : null}</div></main>;
 }
