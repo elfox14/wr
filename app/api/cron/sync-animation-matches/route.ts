@@ -14,9 +14,11 @@ const LINKABLE_STATUSES = [
 function isAuthorized(req: Request) {
   const secret = process.env.CRON_SECRET || process.env.ADMIN_API_SECRET || '';
   if (!secret) return true;
+  const url = new URL(req.url);
+  const queryToken = url.searchParams.get('key') || url.searchParams.get('secret') || url.searchParams.get('token') || '';
   const auth = req.headers.get('authorization') || '';
-  const token = auth.replace(/^Bearer\s+/i, '').trim();
-  return token === secret;
+  const bearerToken = auth.replace(/^Bearer\s+/i, '').trim();
+  return bearerToken === secret || queryToken === secret;
 }
 
 function splitKeys(value?: string) {
@@ -179,7 +181,7 @@ export async function GET(req: Request) {
       updated = result.length;
     }
 
-    return NextResponse.json({ ok: true, mode: 'sync_animation_matches_v2_broader_window', dryRun, scanned: localMatches.length, matched: matched.length, updated, threshold, lookbackHours, lookaheadHours, providerDates: uniqueDates, providerErrors, matches: matched, skipped: skipped.slice(0, 40) });
+    return NextResponse.json({ ok: true, mode: 'sync_animation_matches_v3_query_secret', dryRun, scanned: localMatches.length, matched: matched.length, updated, threshold, lookbackHours, lookaheadHours, providerDates: uniqueDates, providerErrors, matches: matched, skipped: skipped.slice(0, 40) });
   } catch (error: any) {
     return NextResponse.json({ error: error.message || 'sync-animation-matches failed' }, { status: 500 });
   }
