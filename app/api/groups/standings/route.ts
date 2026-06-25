@@ -5,6 +5,10 @@ import { WORLD_CUP_2026_GROUPS, type WorldCup2026GroupKey } from '@/lib/worldCup
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
+const FINISHED_STATUSES = ['FINISHED', 'FT', 'AET', 'PEN', 'COMPLETED', 'ENDED', 'FINAL_VERIFIED', 'FULL_TIME'];
+const LIVE_STATUSES = ['IN_PLAY', 'LIVE', 'HT', '1H', '2H', 'ET', 'BT', 'P'];
+const SCHEDULED_STATUSES = ['SCHEDULED', 'TIMED', 'NOT_STARTED', 'NS'];
+
 type TableRow = {
   team: string;
   code: string;
@@ -40,9 +44,12 @@ function normalizeCode(value?: string | null) {
   return String(value || '').trim().toUpperCase();
 }
 
+function normalizeStatus(status?: string | null) {
+  return String(status || '').trim().toUpperCase();
+}
+
 function isFinished(status?: string | null) {
-  const value = String(status || '').toUpperCase();
-  return value === 'FINISHED' || value === 'FT';
+  return FINISHED_STATUSES.includes(normalizeStatus(status));
 }
 
 function safeNumber(value: unknown) {
@@ -51,10 +58,10 @@ function safeNumber(value: unknown) {
 }
 
 function statusRank(status?: string | null) {
-  const value = String(status || '').toUpperCase();
-  if (value === 'FINISHED' || value === 'FT') return 4;
-  if (value === 'IN_PLAY' || value === 'LIVE' || value === 'HT') return 3;
-  if (value === 'SCHEDULED' || value === 'TIMED' || value === 'NOT_STARTED') return 2;
+  const value = normalizeStatus(status);
+  if (FINISHED_STATUSES.includes(value)) return 4;
+  if (LIVE_STATUSES.includes(value)) return 3;
+  if (SCHEDULED_STATUSES.includes(value)) return 2;
   return 1;
 }
 
@@ -151,9 +158,9 @@ export async function GET() {
       }
 
       for (const match of uniqueMatches.values()) {
-        const status = String(match.status || '').toUpperCase();
-        if (status === 'IN_PLAY' || status === 'LIVE' || status === 'HT') liveMatches += 1;
-        if (status === 'SCHEDULED' || status === 'TIMED' || status === 'NOT_STARTED') scheduledMatches += 1;
+        const status = normalizeStatus(match.status);
+        if (LIVE_STATUSES.includes(status)) liveMatches += 1;
+        if (SCHEDULED_STATUSES.includes(status)) scheduledMatches += 1;
         if (!isFinished(status)) continue;
 
         const home = byCode.get(normalizeCode(match.homeTeam?.code));
