@@ -11,12 +11,21 @@ const LIVE_STAT_FIELDS = [
   'homeCorners', 'awayCorners', 'homeYellowCards', 'awayYellowCards', 'homeRedCards', 'awayRedCards',
   'homeScore', 'awayScore',
 ];
+
 const LIVE_STATUSES = ['IN_PLAY', 'LIVE', '1H', '2H', 'HT', 'HALFTIME', 'HALF_TIME', 'ET', 'BT', 'P', 'PAUSED'];
 const PRELIVE_STATUSES = ['SCHEDULED', 'TIMED', 'NOT_STARTED', 'NS', 'TBD'];
 const FINISHED_STATUSES = ['FINISHED', 'FT', 'AET', 'PEN', 'COMPLETED', 'ENDED'];
 
-function envNumber(name, fallback, min, max) { const value = Number(process.env[name] || fallback); if (!Number.isFinite(value)) return fallback; return Math.max(min, Math.min(max, Math.floor(value))); }
-function envBool(name, fallback = false) { const value = String(process.env[name] || '').trim().toLowerCase(); if (!value) return fallback; return ['1', 'true', 'yes', 'on'].includes(value); }
+function envNumber(name, fallback, min, max) {
+  const value = Number(process.env[name] || fallback);
+  if (!Number.isFinite(value)) return fallback;
+  return Math.max(min, Math.min(max, Math.floor(value)));
+}
+function envBool(name, fallback = false) {
+  const value = String(process.env[name] || '').trim().toLowerCase();
+  if (!value) return fallback;
+  return ['1', 'true', 'yes', 'on'].includes(value);
+}
 function sleep(ms) { return new Promise((resolve) => setTimeout(resolve, ms)); }
 function splitKeys(value) { return String(value || '').split(',').map((key) => key.trim()).filter(Boolean); }
 function iSportsKeys() { const pool = splitKeys(process.env.ISPORTS_API_KEYS); if (pool.length) return pool; return [process.env.ISPORTS_API_KEY].map((key) => String(key || '').trim()).filter(Boolean); }
@@ -131,6 +140,7 @@ function findTextStatPair(text, labels) { const compact = String(text || '').rep
 function normalizeAnimationTextStats(text, match) { const stats = emptyStats(); stats.minute = firstNumber(String(text || '').match(/(?:^|\s)(\d{1,3})\s*[`'′]\s*(?:\n|\s|$)/)?.[1], String(text || '').match(/(?:minute|min|time)\D{0,8}(\d{1,3})/i)?.[1]); const score = String(text || '').match(/(?:^|\s)(\d{1,2})\s*[:]\s*(\d{1,2})(?:\s|$)/); stats.homeScore = firstNumber(score?.[1], match?.homeScore); stats.awayScore = firstNumber(score?.[2], match?.awayScore); const mapping = [['homePossession', 'awayPossession', ['Poss', 'Possession', 'Ball Possession']], ['homeAttacks', 'awayAttacks', ['ATT', 'Attack', 'Attacks']], ['homeDangerousAttacks', 'awayDangerousAttacks', ['D-ATT', 'D ATT', 'Dangerous Attack', 'Dangerous Attacks']], ['homeShots', 'awayShots', ['Shots', 'Shot']], ['homeShotsOnTarget', 'awayShotsOnTarget', ['On-TGT', 'On TGT', 'On Target', 'Shots on Target']], ['homeShotsOffTarget', 'awayShotsOffTarget', ['Off-TGT', 'Off TGT', 'Off Target']], ['homeCorners', 'awayCorners', ['Corner', 'Corners', 'CK']], ['homeYellowCards', 'awayYellowCards', ['Yellow', 'Yellow Cards']], ['homeRedCards', 'awayRedCards', ['Red', 'Red Cards']]]; for (const [homeField, awayField, labels] of mapping) { const pair = findTextStatPair(text, labels); if (pair) { stats[homeField] = pair.home; stats[awayField] = pair.away; } } return stats; }
 function providerError(payload) { const code = payload?.code ?? payload?.status_code ?? payload?.status; if (code === undefined || code === null) return Boolean(payload?.error || payload?.errors); return Number(code) !== 0 && Number(code) !== 200 && String(code).toLowerCase() !== 'success'; }
 function providerErrorMessage(payload) { const value = payload?.message || payload?.msg || payload?.error || payload?.errors || payload; return typeof value === 'string' ? value : JSON.stringify(value || {}).slice(0, 500); }
+function isQuotaError(error) { return /quota|limit|rate|too many|200 trials|try again tomorrow/i.test(error?.message || String(error)); }
 
 async function fetchIsportsAnalysis(providerMatchId) {
   const keys = iSportsKeys();
@@ -146,7 +156,7 @@ async function fetchIsportsAnalysis(providerMatchId) {
     if (!response.ok || providerError(payload)) {
       const reason = !response.ok ? `HTTP ${response.status}` : providerErrorMessage(payload);
       errors.push(reason);
-      if (response.status === 429 || /rate|limit|quota|request/i.test(reason)) continue;
+      if (response.status === 429 || /rate|limit|quota|request|trial/i.test(reason)) continue;
       throw new Error(`iSports analysis failed for ${providerMatchId}: ${reason}`);
     }
     return payload;
@@ -170,22 +180,27 @@ function generateEvents(match, previous, stats, providerStatus) {
 }
 
 function latestSnapshotAgeSeconds(snapshot) { if (!snapshot?.capturedAt) return Number.POSITIVE_INFINITY; const capturedAt = new Date(snapshot.capturedAt).getTime(); if (!Number.isFinite(capturedAt)) return Number.POSITIVE_INFINITY; return (Date.now() - capturedAt) / 1000; }
-async function candidateMatches() { const limit = envNumber('LIVE_INGEST_MATCH_LIMIT', 6, 1, 25); const lookbackHours = envNumber('LIVE_INGEST_LOOKBACK_HOURS', 4, 1, 24); const lookaheadMinutes = envNumber('LIVE_INGEST_LOOKAHEAD_MINUTES', 30, 0, 180); const finishedHours = envNumber('LIVE_INGEST_FINISHED_HOURS', 3, 0, 24); const now = Date.now(); const liveStart = new Date(now - lookbackHours * 60 * 60 * 1000); const liveEnd = new Date(now + lookaheadMinutes * 60 * 1000); const finishedSince = new Date(now - finishedHours * 60 * 60 * 1000); return prisma.match.findMany({ where: { animationMatchId: { not: null }, OR: [{ status: { in: LIVE_STATUSES } }, { status: { in: PRELIVE_STATUSES }, matchDate: { gte: liveStart, lte: liveEnd } }, { matchDate: { gte: liveStart, lte: liveEnd } }, ...(finishedHours > 0 ? [{ status: { in: FINISHED_STATUSES }, matchDate: { gte: finishedSince } }] : [])] }, include: { homeTeam: { select: { id: true, name: true, code: true } }, awayTeam: { select: { id: true, name: true, code: true } } }, orderBy: { matchDate: 'asc' }, take: limit }); }
+async function candidateMatches() { const limit = envNumber('LIVE_INGEST_MATCH_LIMIT', 6, 1, 25); const lookbackHours = envNumber('LIVE_INGEST_LOOKBACK_HOURS', 4, 1, 24); const lookaheadMinutes = envNumber('LIVE_INGEST_LOOKAHEAD_MINUTES', 30, 0, 180); const finishedHours = envNumber('LIVE_INGEST_FINISHED_HOURS', 0, 0, 24); const now = Date.now(); const liveStart = new Date(now - lookbackHours * 60 * 60 * 1000); const liveEnd = new Date(now + lookaheadMinutes * 60 * 1000); const finishedSince = new Date(now - finishedHours * 60 * 60 * 1000); return prisma.match.findMany({ where: { animationMatchId: { not: null }, OR: [{ status: { in: LIVE_STATUSES } }, { status: { in: PRELIVE_STATUSES }, matchDate: { gte: liveStart, lte: liveEnd } }, { matchDate: { gte: liveStart, lte: liveEnd } }, ...(finishedHours > 0 ? [{ status: { in: FINISHED_STATUSES }, matchDate: { gte: finishedSince } }] : [])] }, include: { homeTeam: { select: { id: true, name: true, code: true } }, awayTeam: { select: { id: true, name: true, code: true } } }, orderBy: { matchDate: 'asc' }, take: limit }); }
 async function latestWorkerSnapshot(matchId) { return prisma.matchStatsSnapshot.findFirst({ where: { matchId, provider: { in: ['WORKER_ISPORTS', 'ISPORTS_ANIMATION_BROWSERLESS', 'AUTOMATED_LIVE_INGEST'] } }, orderBy: { capturedAt: 'desc' } }); }
 async function postIngest(payload) { const secret = ingestSecret(); if (!secret) throw new Error('LIVE_INGEST_SECRET/ADMIN_API_SECRET/CRON_SECRET is missing'); const url = `${appBaseUrl()}/api/internal/live-ingest/match-snapshot`; const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-live-ingest-secret': secret }, body: JSON.stringify(payload) }); const text = await response.text(); let data = null; try { data = JSON.parse(text); } catch { data = { raw: text }; } if (!response.ok) throw new Error(`ingest POST failed ${response.status}: ${text.slice(0, 500)}`); return data; }
 function recentSnapshotSkip(match, latest) { const minIntervalSeconds = envNumber('LIVE_INGEST_MIN_INTERVAL_SECONDS', 60, 15, 3600); const ageSeconds = latestSnapshotAgeSeconds(latest); if (ageSeconds >= minIntervalSeconds) return null; return { matchId: match.id, providerMatchId: match.animationMatchId, status: 'skipped_recent_snapshot', ageSeconds: Math.round(ageSeconds), minIntervalSeconds }; }
 async function maybeAnimationBrowserlessFallback(match, currentStats) { if (hasUsefulStats(currentStats)) return null; const fallback = await fetchISportsAnimationBrowserlessText(match.animationMatchId); if (!fallback?.enabled) return fallback; const fallbackStats = normalizeAnimationTextStats(fallback.text || '', match); return { ...fallback, stats: fallbackStats, hasStats: hasUsefulStats(fallbackStats) }; }
 
 async function processMatch(match, latest) {
-  const raw = await fetchIsportsAnalysis(match.animationMatchId);
-  let stats = normalizeStats(raw);
-  const providerState = firstProviderState(raw);
+  let raw = null;
+  let analysisError = null;
+  try { raw = await fetchIsportsAnalysis(match.animationMatchId); }
+  catch (error) { analysisError = error?.message || String(error); if (!envBool('LIVE_INGEST_USE_BROWSERLESS_FALLBACK', false) || !isQuotaError(error)) throw error; }
+
+  let stats = raw ? normalizeStats(raw) : emptyStats();
+  const providerState = raw ? firstProviderState(raw) : null;
   stats.minute ??= minuteFromState(providerState);
   if (stats.homeScore === null) stats.homeScore = match.homeScore;
   if (stats.awayScore === null) stats.awayScore = match.awayScore;
-  let sourceProvider = 'WORKER_ISPORTS';
-  let rawData = raw;
+  let sourceProvider = raw ? 'WORKER_ISPORTS' : 'ISPORTS_QUOTA_FALLBACK';
+  let rawData = raw || { provider: 'WORKER_ISPORTS', error: analysisError };
   let fallbackStatus = null;
+
   if (!hasUsefulStats(stats) && envBool('LIVE_INGEST_USE_BROWSERLESS_FALLBACK', false)) {
     try {
       const fallback = await maybeAnimationBrowserlessFallback(match, stats);
@@ -193,15 +208,16 @@ async function processMatch(match, latest) {
       if (fallback?.hasStats) { stats = fallback.stats; if (stats.homeScore === null) stats.homeScore = match.homeScore; if (stats.awayScore === null) stats.awayScore = match.awayScore; sourceProvider = 'ISPORTS_ANIMATION_BROWSERLESS'; rawData = fallback.rawData; }
     } catch (error) { fallbackStatus = { enabled: true, source: 'ISPORTS_ANIMATION_BROWSERLESS', hasStats: false, error: error?.message || String(error) }; }
   }
+
   const providerStatus = statusFromState(providerState, stats, match);
   const hasStateOrMinute = Boolean(providerState) || Number(stats.minute || 0) > 0 || ['1H', '2H', 'HT', 'FINISHED'].includes(providerStatus);
   const saveEmpty = envBool('LIVE_INGEST_SAVE_EMPTY', false);
-  if (!hasUsefulStats(stats) && !hasStateOrMinute && !saveEmpty) return { matchId: match.id, providerMatchId: match.animationMatchId, status: 'skipped_no_useful_stats', providerState, stats, fallbackStatus };
+  if (!hasUsefulStats(stats) && !hasStateOrMinute && !saveEmpty) return { matchId: match.id, providerMatchId: match.animationMatchId, status: 'skipped_no_useful_stats', providerState, analysisError, stats, fallbackStatus };
   const events = generateEvents(match, latest, stats, providerStatus);
   const includeRaw = envBool('LIVE_INGEST_INCLUDE_RAW', true);
   const ingestPayload = { matchId: match.id, animationMatchId: match.animationMatchId, provider: sourceProvider, providerMatchId: match.animationMatchId, status: providerStatus, state: providerState, providerState, minute: stats.minute, stats, events, ...(includeRaw ? { rawData } : {}) };
   const saved = await postIngest(ingestPayload);
-  return { matchId: match.id, providerMatchId: match.animationMatchId, status: 'saved', sourceProvider, providerStatus, providerState, minute: stats.minute, hasUsefulStats: hasUsefulStats(stats), savedEventsCount: saved.savedEventsCount ?? 0, snapshotId: saved.snapshot?.id, fallbackStatus };
+  return { matchId: match.id, providerMatchId: match.animationMatchId, status: 'saved', sourceProvider, providerStatus, providerState, analysisError, minute: stats.minute, hasUsefulStats: hasUsefulStats(stats), savedEventsCount: saved.savedEventsCount ?? 0, snapshotId: saved.snapshot?.id, fallbackStatus };
 }
 
 export async function runOnce() {
