@@ -2,19 +2,28 @@
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
-import { BarChart3, CalendarDays, FileText, Flag, Layers, List, MapPin, Radio, RefreshCw, Share2, Shield, Trophy, Users } from 'lucide-react';
+import { BarChart3, FileText, Layers, List, MapPin, Radio, RefreshCw, Share2, Shield, Trophy, Users } from 'lucide-react';
 import MatchAutoRefresh from '@/components/match-center/MatchAutoRefresh';
 import { getArabicTeamName } from '@/lib/teamDisplay';
 import { getTeamFlagUrl } from '@/lib/teamFlags';
-import type { MatchEventView, MatchPageData, MatchPlayerLite, MatchPlayerStatItem, MatchStatMetric, OfficialLineupPlayer, OfficialLineupTeam, StandingRow } from '@/lib/match-page/types';
+import type {
+  MatchEventView,
+  MatchPageData,
+  MatchPlayerLite,
+  MatchPlayerStatItem,
+  MatchStatMetric,
+  OfficialLineupPlayer,
+  OfficialLineupTeam,
+  StandingRow,
+} from '@/lib/match-page/types';
 
 const ar = new Intl.NumberFormat('ar-EG');
 
 type TabId = 'overview' | 'stats' | 'events' | 'lineups' | 'players' | 'interactive' | 'analysis' | 'group' | 'articles';
 type PitchPlayer = OfficialLineupPlayer | MatchPlayerLite;
-type PlayerRole = 'starter' | 'substitute';
-type PlayerRow = { player: PitchPlayer; stat: MatchPlayerStatItem | null; role: PlayerRole; index: number };
-type Accent = 'home' | 'away';
+type PlayerRow = { player: PitchPlayer; stat: MatchPlayerStatItem | null; role: 'starter' | 'substitute'; index: number };
+
+type TeamLite = MatchPageData['homeTeam'];
 
 const TABS: Array<{ id: TabId; label: string; icon: any }> = [
   { id: 'overview', label: 'نظرة عامة', icon: Layers },
@@ -28,120 +37,433 @@ const TABS: Array<{ id: TabId; label: string; icon: any }> = [
   { id: 'articles', label: 'المقالات', icon: List },
 ];
 
-const statusClasses: Record<string, string> = {
-  scheduled: 'border-white/15 bg-white/10 text-white',
-  live: 'border-emerald-300/40 bg-emerald-400/15 text-emerald-100',
-  halftime: 'border-amber-300/40 bg-amber-400/15 text-amber-100',
-  finished: 'border-sky-300/35 bg-sky-400/10 text-sky-100',
-  delayed: 'border-rose-300/35 bg-rose-400/10 text-rose-100',
-};
-
-const PLAYER_STAT_DEFS: Array<[keyof MatchPlayerStatItem | string, string]> = [
-  ['rating', 'تقييم'], ['minutes', 'دقائق'], ['goals', 'أهداف'], ['assists', 'أسيست'],
-  ['shots', 'تسديد'], ['shotsOnTarget', 'على المرمى'], ['shotsOffTarget', 'خارج المرمى'], ['blockedShots', 'محجوبة'],
-  ['expectedGoals', 'xG'], ['npExpectedGoals', 'npxG'], ['expectedAssists', 'xA'], ['bigChancesCreated', 'فرص خلقها'],
-  ['passes', 'تمرير'], ['accuratePasses', 'تمرير صحيح'], ['keyPasses', 'تمرير مفتاحي'], ['crosses', 'عرضيات'], ['accurateCrosses', 'عرضيات صحيحة'], ['longBalls', 'كرات طويلة'], ['accurateLongBalls', 'طويلة صحيحة'],
-  ['touches', 'لمسات'], ['tackles', 'تدخلات'], ['interceptions', 'اعتراضات'], ['clearances', 'تشتيت'], ['saves', 'تصديات'],
-  ['duelWon', 'التحامات فاز'], ['duelLost', 'التحامات خسر'], ['aerialWon', 'هوائيات'], ['challengeLost', 'مراوغات عليه'], ['wonContest', 'مراوغات ناجحة'], ['dispossessed', 'فقد تحت ضغط'], ['possessionLost', 'فقد استحواذ'],
-  ['foulsCommitted', 'أخطاء عليه'], ['foulsWon', 'أخطاء حصل عليها'], ['offsides', 'تسلل'], ['yellowCards', 'صفراء'], ['redCards', 'حمراء'],
+const PLAYER_STAT_DEFS: Array<[keyof MatchPlayerStatItem, string]> = [
+  ['rating', 'تقييم'],
+  ['minutes', 'دقائق'],
+  ['goals', 'أهداف'],
+  ['assists', 'أسيست'],
+  ['shots', 'تسديد'],
+  ['shotsOnTarget', 'على المرمى'],
+  ['shotsOffTarget', 'خارج المرمى'],
+  ['blockedShots', 'محجوبة'],
+  ['expectedGoals', 'xG'],
+  ['npExpectedGoals', 'npxG'],
+  ['expectedAssists', 'xA'],
+  ['bigChancesCreated', 'فرص خلقها'],
+  ['passes', 'تمرير'],
+  ['accuratePasses', 'تمرير صحيح'],
+  ['keyPasses', 'تمرير مفتاحي'],
+  ['crosses', 'عرضيات'],
+  ['accurateCrosses', 'عرضيات صحيحة'],
+  ['longBalls', 'طولية'],
+  ['accurateLongBalls', 'طولية صحيحة'],
+  ['touches', 'لمسات'],
+  ['tackles', 'تدخلات'],
+  ['interceptions', 'اعتراضات'],
+  ['clearances', 'تشتيت'],
+  ['saves', 'تصديات'],
+  ['duelWon', 'التحامات فاز'],
+  ['duelLost', 'التحامات خسر'],
+  ['aerialWon', 'هوائيات'],
+  ['possessionLost', 'فقد استحواذ'],
+  ['foulsCommitted', 'أخطاء'],
+  ['foulsWon', 'أخطاء حصل عليها'],
+  ['offsides', 'تسلل'],
+  ['yellowCards', 'صفراء'],
+  ['redCards', 'حمراء'],
 ];
 
 function fmt(value: number | string | null | undefined, suffix = '') {
   if (value === null || value === undefined || value === '' || Number.isNaN(Number(value))) return '—';
-  const number = Number(value);
-  return `${Number.isInteger(number) ? ar.format(number) : number.toLocaleString('ar-EG', { maximumFractionDigits: 2 })}${suffix}`;
+  const n = Number(value);
+  return `${Number.isInteger(n) ? ar.format(n) : n.toLocaleString('ar-EG', { maximumFractionDigits: 2 })}${suffix}`;
 }
-function fullDate(value: string) { return new Intl.DateTimeFormat('ar-EG', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(value)); }
-function gd(value: number) { return value > 0 ? `+${ar.format(value)}` : ar.format(value); }
-function percent(home: number | null, away: number | null) { const h = Math.max(0, Number(home || 0)); const a = Math.max(0, Number(away || 0)); const total = h + a; if (!total) return { home: 50, away: 50 }; const homeWidth = Math.max(6, Math.min(94, (h / total) * 100)); return { home: homeWidth, away: 100 - homeWidth }; }
-function normalizeName(value?: string | null) { return String(value || '').trim().toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f\u064B-\u065F\u0670]/g, '').replace(/[^a-z0-9\u0600-\u06ff]+/g, ' ').replace(/\s+/g, ' ').trim(); }
-function initials(name?: string | null) { return String(name || 'لاعب').trim().split(/\s+/).slice(0, 2).map((part) => part[0]).join('').toUpperCase(); }
-function displayTeamName(team: { code?: string | null; name?: string | null }) { return getArabicTeamName(team.code, team.name); }
-function displayTeamFlagUrl(team: { code?: string | null; name?: string | null; image?: string | null }, width = 160) { return getTeamFlagUrl({ code: team.code, name: displayTeamName(team), image: team.image }, width) || team.image || null; }
-function playerNumber(player: PitchPlayer) { return 'number' in player ? player.number : null; }
-function playerCaptain(player: PitchPlayer) { return 'isCaptain' in player ? Boolean(player.isCaptain) : false; }
-function playerId(player: PitchPlayer) { return 'id' in player && player.id ? String(player.id) : null; }
-function playedStat(stat: MatchPlayerStatItem | null | undefined) { return Boolean(stat?.played) || Number(stat?.minutes || 0) > 0 || Boolean(stat?.started); }
-function statHasSubSignal(stat: MatchPlayerStatItem | null | undefined) { return Boolean(stat?.playerSubbedOn || stat?.playerSubbedOff || playedStat(stat)); }
-function playerStatItems(stat: MatchPlayerStatItem | null) { if (!stat) return []; return PLAYER_STAT_DEFS.map(([key, label]) => ({ key: String(key), label, value: (stat as any)[key] })).filter((item) => item.value !== null && item.value !== undefined && item.value !== ''); }
 
-function FlagImg({ team, small = false }: { team: MatchPageData['homeTeam']; small?: boolean }) {
+function fullDate(value: string) {
+  return new Intl.DateTimeFormat('ar-EG', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(new Date(value));
+}
+
+function normalizeName(value?: string | null) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f\u064B-\u065F\u0670]/g, '')
+    .replace(/[^a-z0-9\u0600-\u06ff]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function displayTeamName(team: { code?: string | null; name?: string | null }) {
+  return getArabicTeamName(team.code, team.name);
+}
+
+function displayTeamFlagUrl(team: { code?: string | null; name?: string | null; image?: string | null }, width = 160) {
+  return getTeamFlagUrl({ code: team.code, name: displayTeamName(team), image: team.image }, width) || team.image || null;
+}
+
+function initials(name?: string | null) {
+  return String(name || 'لاعب')
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join('')
+    .toUpperCase();
+}
+
+function playerId(player: PitchPlayer) {
+  return 'id' in player && player.id ? String(player.id) : null;
+}
+
+function playerNumber(player: PitchPlayer) {
+  return 'number' in player ? player.number : null;
+}
+
+function playerCaptain(player: PitchPlayer) {
+  return 'isCaptain' in player ? Boolean(player.isCaptain) : false;
+}
+
+function playedStat(stat?: MatchPlayerStatItem | null) {
+  return Boolean(stat?.played) || Boolean(stat?.started) || Number(stat?.minutes || 0) > 0;
+}
+
+function FlagImg({ team, small = false }: { team: TeamLite; small?: boolean }) {
   const image = displayTeamFlagUrl(team, small ? 80 : 160);
-  return <span className={`inline-flex shrink-0 items-center justify-center overflow-hidden border border-white/10 bg-black/35 ${small ? 'h-5 w-7 rounded' : 'h-14 w-16 rounded-2xl sm:h-20 sm:w-24'}`}>{image ? <img src={image} alt={`علم ${displayTeamName(team)}`} className="h-full w-full object-cover" loading="lazy" /> : <b className="text-xs text-[#F8C846]">{team.code || displayTeamName(team).slice(0, 3)}</b>}</span>;
+  return (
+    <span className={`inline-flex shrink-0 items-center justify-center overflow-hidden border border-white/10 bg-black/35 ${small ? 'h-5 w-7 rounded' : 'h-14 w-16 rounded-2xl sm:h-20 sm:w-24'}`}>
+      {image ? <img src={image} alt={`علم ${displayTeamName(team)}`} className="h-full w-full object-cover" loading="lazy" /> : <b className="text-xs text-[#F8C846]">{team.code || displayTeamName(team).slice(0, 3)}</b>}
+    </span>
+  );
 }
-function TeamSide({ team }: { team: MatchPageData['homeTeam'] }) { return <div className="flex min-w-0 flex-col items-center gap-2"><FlagImg team={team} /><div className="min-w-0 text-center"><p className="team-name-full text-base font-black text-white sm:text-2xl">{displayTeamName(team)}</p><p className="mt-1 text-[11px] font-bold text-slate-400">{team.code || '—'}{team.fifaRank ? ` · تصنيف ${ar.format(team.fifaRank)}` : ''}</p></div></div>; }
-function Info({ icon, label, value }: { icon: React.ReactNode; label: string; value: string | null | undefined }) { return <div className="rounded-2xl border border-white/10 bg-black/25 p-3"><div className="mb-1 flex items-center gap-2 text-[#18E58F]"><span>{icon}</span><span className="text-[11px] font-black">{label}</span></div><p className="text-sm font-bold leading-6 text-white">{value || '—'}</p></div>; }
-function Panel({ title, icon, children, hint }: { title: string; icon: React.ReactNode; hint?: string; children: React.ReactNode }) { return <section className="rounded-[1.35rem] border border-white/10 bg-white/[0.045] p-3 shadow-[0_18px_48px_rgba(0,0,0,.20)] sm:rounded-[1.65rem] sm:p-5"><div className="mb-4 flex items-center gap-3"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-[#18E58F]/30 bg-[#18E58F]/12 text-[#18E58F] sm:h-11 sm:w-11">{icon}</span><div className="min-w-0"><h2 className="team-name-full text-lg font-black text-white sm:text-2xl">{title}</h2>{hint ? <p className="mt-1 text-xs font-bold leading-5 text-slate-400">{hint}</p> : null}</div></div>{children}</section>; }
-function Empty({ title, body }: { title: string; body: string }) { return <div className="rounded-2xl border border-dashed border-white/15 bg-black/20 p-5 text-center"><p className="font-black text-white">{title}</p><p className="mt-2 text-sm font-bold leading-7 text-slate-400">{body}</p></div>; }
 
-function findLocalPlayer(player: PitchPlayer | { name?: string | null; id?: string | null }, localPlayers: MatchPlayerLite[]) {
+function Panel({ title, icon, hint, children }: { title: string; icon: React.ReactNode; hint?: string; children: React.ReactNode }) {
+  return (
+    <section className="rounded-[1.35rem] border border-white/10 bg-white/[0.045] p-3 shadow-[0_18px_48px_rgba(0,0,0,.20)] sm:rounded-[1.65rem] sm:p-5">
+      <div className="mb-4 flex items-center gap-3">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-[#18E58F]/30 bg-[#18E58F]/12 text-[#18E58F] sm:h-11 sm:w-11">{icon}</span>
+        <div className="min-w-0">
+          <h2 className="team-name-full text-lg font-black text-white sm:text-2xl">{title}</h2>
+          {hint ? <p className="mt-1 text-xs font-bold leading-5 text-slate-400">{hint}</p> : null}
+        </div>
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function Empty({ title, body }: { title: string; body: string }) {
+  return (
+    <div className="rounded-2xl border border-dashed border-white/15 bg-black/20 p-5 text-center">
+      <p className="font-black text-white">{title}</p>
+      <p className="mt-2 text-sm font-bold leading-7 text-slate-400">{body}</p>
+    </div>
+  );
+}
+
+function findLocalPlayer(player: PitchPlayer | { id?: string | null; name?: string | null }, localPlayers: MatchPlayerLite[]) {
   const id = player.id ? String(player.id) : null;
   const name = normalizeName(player.name);
   return localPlayers.find((item) => {
     const localName = normalizeName(item.name);
-    const localCode = normalizeName(item.code);
-    return Boolean((id && item.id === id) || (name && localName && (localName === name || localName.includes(name) || name.includes(localName))) || (name && localCode && localCode === name));
+    return Boolean((id && item.id === id) || (name && localName && (localName === name || localName.includes(name) || name.includes(localName))));
   });
 }
-function playerWithRealImage(player: PitchPlayer, localPlayers: MatchPlayerLite[]): PitchPlayer { const local = findLocalPlayer(player, localPlayers); return { ...player, image: player.image || local?.image || null, position: player.position || local?.position || null } as PitchPlayer; }
+
+function playerWithImage(player: PitchPlayer, localPlayers: MatchPlayerLite[]): PitchPlayer {
+  const local = findLocalPlayer(player, localPlayers);
+  return {
+    ...player,
+    image: player.image || local?.image || null,
+    position: player.position || local?.position || null,
+  } as PitchPlayer;
+}
+
 function playerStatFor(player: PitchPlayer, stats: MatchPlayerStatItem[]) {
   const id = playerId(player);
   const name = normalizeName(player.name);
-  return stats.find((item) => {
-    const statId = item.playerId ? String(item.playerId) : null;
-    const statName = normalizeName(item.playerName);
+  return stats.find((stat) => {
+    const statId = stat.playerId ? String(stat.playerId) : null;
+    const statName = normalizeName(stat.playerName);
     return Boolean((id && statId && id === statId) || (name && statName && (statName === name || statName.includes(name) || name.includes(statName))));
   }) || null;
 }
-function statAsPlayer(stat: MatchPlayerStatItem, localPlayers: MatchPlayerLite[]): PitchPlayer { const fallback = { id: stat.playerId || stat.playerName || 'player', name: stat.playerName || 'لاعب غير معروف', image: (stat as any).image || (stat as any).photo || null, position: stat.position || null } as PitchPlayer; return playerWithRealImage(fallback, localPlayers); }
-function statBelongsToTeam(stat: MatchPlayerStatItem, team: MatchPageData['homeTeam'], localPlayers: MatchPlayerLite[]) {
-  const teamId = String(stat.teamId || '').trim();
-  if (teamId && (teamId === team.id || teamId === team.code)) return true;
+
+function statBelongsToTeam(stat: MatchPlayerStatItem, team: TeamLite, localPlayers: MatchPlayerLite[]) {
+  if (stat.teamId && (stat.teamId === team.id || stat.teamId === team.code)) return true;
   const statTeam = normalizeName(stat.teamName);
-  const teamKey = normalizeName(team.name);
-  const codeKey = normalizeName(team.code);
-  if (statTeam && ((teamKey && (statTeam === teamKey || statTeam.includes(teamKey) || teamKey.includes(statTeam))) || (codeKey && statTeam === codeKey))) return true;
+  const teamName = normalizeName(team.name);
+  const teamCode = normalizeName(team.code);
+  if (statTeam && ((teamName && (statTeam === teamName || statTeam.includes(teamName) || teamName.includes(statTeam))) || (teamCode && statTeam === teamCode))) return true;
   const playerName = normalizeName(stat.playerName);
-  return Boolean(playerName && localPlayers.some((player) => { const localName = normalizeName(player.name); return localName && (localName === playerName || localName.includes(playerName) || playerName.includes(localName)); }));
+  return Boolean(playerName && localPlayers.some((player) => normalizeName(player.name) === playerName));
 }
-function uniqueRows(rows: PlayerRow[]) { const seen = new Set<string>(); return rows.filter((row) => { const key = normalizeName(String(playerId(row.player) || row.player.name || row.stat?.playerName || row.index)); if (!key || seen.has(key)) return false; seen.add(key); return true; }); }
-function lineupRows(team: OfficialLineupTeam | null | undefined, localPlayers: MatchPlayerLite[], stats: MatchPlayerStatItem[]) {
-  const starters = (team?.startingXi || []).map((player, index) => ({ player: playerWithRealImage(player, localPlayers), stat: playerStatFor(player, stats), role: 'starter' as PlayerRole, index }));
+
+function statAsPlayer(stat: MatchPlayerStatItem, localPlayers: MatchPlayerLite[]): PitchPlayer {
+  return playerWithImage({ id: stat.playerId || stat.playerName || 'player', name: stat.playerName || 'لاعب', image: null, position: stat.position || null }, localPlayers);
+}
+
+function uniqueRows(rows: PlayerRow[]) {
+  const seen = new Set<string>();
+  return rows.filter((row) => {
+    const key = normalizeName(String(playerId(row.player) || row.player.name || row.index));
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function buildRows(lineup: OfficialLineupTeam | null | undefined, localPlayers: MatchPlayerLite[], teamStats: MatchPlayerStatItem[]) {
+  const starters: PlayerRow[] = (lineup?.startingXi || []).map((player, index) => ({
+    player: playerWithImage(player, localPlayers),
+    stat: playerStatFor(player, teamStats),
+    role: 'starter',
+    index,
+  }));
+
   const starterKeys = new Set(starters.map((row) => normalizeName(String(playerId(row.player) || row.player.name))));
-  const usedSubstitutes = (team?.substitutes || []).map((player, index) => ({ player: playerWithRealImage(player, localPlayers), stat: playerStatFor(player, stats), role: 'substitute' as PlayerRole, index })).filter((row) => statHasSubSignal(row.stat));
-  const statOnlyRows = stats.filter((stat) => playedStat(stat)).map((stat, index) => ({ player: statAsPlayer(stat, localPlayers), stat, role: stat.started ? 'starter' as PlayerRole : 'substitute' as PlayerRole, index: index + 1000 }));
-  const extraStarters = !starters.length ? statOnlyRows.filter((row) => row.role === 'starter') : [];
-  const extraSubs = statOnlyRows.filter((row) => row.role !== 'starter' && !starterKeys.has(normalizeName(String(row.stat?.playerId || row.stat?.playerName))));
+
+  const usedSubsFromLineup: PlayerRow[] = (lineup?.substitutes || [])
+    .map((player, index) => ({
+      player: playerWithImage(player, localPlayers),
+      stat: playerStatFor(player, teamStats),
+      role: 'substitute' as const,
+      index,
+    }))
+    .filter((row) => playedStat(row.stat));
+
+  const statRows: PlayerRow[] = teamStats
+    .filter((stat) => playedStat(stat))
+    .map((stat, index) => ({
+      player: statAsPlayer(stat, localPlayers),
+      stat,
+      role: stat.started ? 'starter' : 'substitute',
+      index: index + 1000,
+    }));
+
+  const extraStarters = starters.length ? [] : statRows.filter((row) => row.role === 'starter');
+  const extraSubs = statRows.filter((row) => row.role !== 'starter' && !starterKeys.has(normalizeName(String(row.stat?.playerId || row.stat?.playerName))));
+
   const finalStarters = uniqueRows([...starters, ...extraStarters]);
-  const finalSubs = uniqueRows([...usedSubstitutes, ...extraSubs]).filter((row) => !finalStarters.some((starter) => normalizeName(starter.player.name) === normalizeName(row.player.name)));
-  return { starters: finalStarters, usedSubstitutes: finalSubs, total: finalStarters.length + finalSubs.length, withStats: [...finalStarters, ...finalSubs].filter((row) => row.stat).length };
+  const finalSubs = uniqueRows([...usedSubsFromLineup, ...extraSubs]).filter((row) => !finalStarters.some((starter) => normalizeName(starter.player.name) === normalizeName(row.player.name)));
+
+  return { starters: finalStarters, substitutes: finalSubs, total: finalStarters.length + finalSubs.length };
 }
-function PlayerAvatar({ player, accent }: { player: PitchPlayer; accent: Accent }) { const number = playerNumber(player); const border = accent === 'home' ? 'border-[#F8C846]' : 'border-[#18E58F]'; return <div className={`relative flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 ${border} bg-black/45 shadow-lg sm:h-14 sm:w-14`}>{player.image ? <img src={player.image} alt={player.name} className="h-full w-full object-cover" loading="lazy" /> : <span className="text-[11px] font-black text-white">{initials(player.name)}</span>}{number ? <b className="absolute -bottom-1 -right-1 rounded-full bg-black px-1.5 py-0.5 text-[9px] text-white ring-1 ring-white/20">{number}</b> : null}</div>; }
-function StatChip({ label, value }: { label: string; value: any }) { return <span className="rounded-xl border border-white/10 bg-black/25 px-2 py-1.5 text-center"><b className="block text-sm font-black text-white tabular-nums">{fmt(value as any)}</b><small className="mt-0.5 block text-[9px] font-black text-slate-500">{label}</small></span>; }
-function PlayerStatCard({ row, accent }: { row: PlayerRow; accent: Accent }) { const items = playerStatItems(row.stat); const player = row.player; const stat = row.stat; return <article className="rounded-2xl border border-white/10 bg-white/[0.045] p-3"><div className="flex items-start gap-3"><PlayerAvatar player={player} accent={accent} /><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-1.5"><p className="truncate text-sm font-black text-white sm:text-base">{player.name}</p>{playerCaptain(player) ? <span className="rounded-full bg-[#F8C846] px-1.5 py-0.5 text-[9px] font-black text-black">C</span> : null}<span className="rounded-full border border-white/10 bg-black/25 px-2 py-0.5 text-[9px] font-black text-slate-300">{row.role === 'starter' ? 'أساسي' : 'بديل شارك'}</span></div><p className="mt-1 text-[10px] font-bold text-slate-400">#{playerNumber(player) || '—'} · {player.position || stat?.position || '—'}{stat?.playerSubbedOn ? ` · دخل بدل ${stat.playerSubbedOn}` : ''}{stat?.playerSubbedOff ? ` · خرج وبدله ${stat.playerSubbedOff}` : ''}</p>{items.length ? <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">{items.map((item) => <StatChip key={item.key} label={item.label} value={item.value} />)}</div> : <p className="mt-3 rounded-xl border border-dashed border-white/10 bg-black/20 p-3 text-xs font-bold text-slate-400">لا توجد إحصائيات تفصيلية لهذا اللاعب حتى الآن.</p>}</div></div></article>; }
-function PlayerGroup({ title, rows, accent }: { title: string; rows: PlayerRow[]; accent: Accent }) { if (!rows.length) return null; return <div><h4 className="mb-2 text-xs font-black text-[#F8C846]">{title}</h4><div className="grid gap-2">{rows.map((row) => <PlayerStatCard key={`${title}-${row.player.name}-${row.index}`} row={row} accent={accent} />)}</div></div>; }
-function TeamPlayerCard({ team, lineup, localPlayers, stats, accent }: { team: MatchPageData['homeTeam']; lineup: OfficialLineupTeam | null | undefined; localPlayers: MatchPlayerLite[]; stats: MatchPlayerStatItem[]; accent: Accent }) { const teamStats = stats.filter((stat) => statBelongsToTeam(stat, team, localPlayers)); const rows = lineupRows(lineup, localPlayers, teamStats); const color = accent === 'home' ? 'text-[#F8C846] border-[#F8C846]/25 bg-[#F8C846]/10' : 'text-[#18E58F] border-[#18E58F]/25 bg-[#18E58F]/10'; return <div className="rounded-2xl border border-white/10 bg-black/25 p-4"><div className="mb-4 flex items-center justify-between gap-3"><div className="flex min-w-0 items-center gap-2"><FlagImg team={team} small /><div className="min-w-0"><h3 className="team-name-full text-lg font-black text-white">{displayTeamName(team)}</h3><p className="mt-1 text-[10px] font-bold text-slate-500">{lineup?.formation ? `الخطة ${lineup.formation}` : 'لاعبو المنتخب المشاركون'}</p></div></div><span className={`rounded-full border px-3 py-1 text-[10px] font-black ${color}`}>{ar.format(rows.withStats)} / {ar.format(rows.total)} لاعب</span></div><div className="space-y-5"><PlayerGroup title="الأساسيون فقط" rows={rows.starters} accent={accent} /><PlayerGroup title="البدلاء الذين شاركوا فقط" rows={rows.usedSubstitutes} accent={accent} />{!rows.total ? <Empty title="التشكيل وإحصائيات اللاعبين غير متوفرة" body="شغّل TheStats finalize بعد المباراة لجلب lineups وplayer-stats." /> : null}</div></div>; }
+
+function statItems(stat: MatchPlayerStatItem | null) {
+  if (!stat) return [];
+  return PLAYER_STAT_DEFS.map(([key, label]) => ({ key: String(key), label, value: stat[key] }))
+    .filter((item) => item.value !== null && item.value !== undefined && item.value !== '');
+}
+
+function PlayerAvatar({ player, accent }: { player: PitchPlayer; accent: 'home' | 'away' }) {
+  const border = accent === 'home' ? 'border-[#F8C846]' : 'border-[#18E58F]';
+  const number = playerNumber(player);
+  return (
+    <div className={`relative flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 ${border} bg-black/45`}>
+      {player.image ? <img src={player.image} alt={player.name} className="h-full w-full object-cover" loading="lazy" /> : <span className="text-[11px] font-black text-white">{initials(player.name)}</span>}
+      {number ? <b className="absolute -bottom-1 -right-1 rounded-full bg-black px-1.5 py-0.5 text-[9px] text-white ring-1 ring-white/20">{number}</b> : null}
+    </div>
+  );
+}
+
+function PlayerCard({ row, accent }: { row: PlayerRow; accent: 'home' | 'away' }) {
+  const items = statItems(row.stat);
+  return (
+    <article className="rounded-2xl border border-white/10 bg-white/[0.045] p-3">
+      <div className="flex items-start gap-3">
+        <PlayerAvatar player={row.player} accent={accent} />
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <p className="truncate text-sm font-black text-white sm:text-base">{row.player.name}</p>
+            {playerCaptain(row.player) ? <span className="rounded-full bg-[#F8C846] px-1.5 py-0.5 text-[9px] font-black text-black">C</span> : null}
+            <span className="rounded-full border border-white/10 bg-black/25 px-2 py-0.5 text-[9px] font-black text-slate-300">{row.role === 'starter' ? 'أساسي' : 'بديل شارك'}</span>
+          </div>
+          <p className="mt-1 text-[10px] font-bold text-slate-400">#{playerNumber(row.player) || '—'} · {row.player.position || row.stat?.position || '—'}</p>
+          {items.length ? (
+            <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-5">
+              {items.map((item) => (
+                <span key={item.key} className="rounded-xl border border-white/10 bg-black/25 px-2 py-1.5 text-center">
+                  <b className="block text-sm font-black text-white tabular-nums">{fmt(item.value as any)}</b>
+                  <small className="mt-0.5 block text-[9px] font-black text-slate-500">{item.label}</small>
+                </span>
+              ))}
+            </div>
+          ) : <p className="mt-3 rounded-xl border border-dashed border-white/10 bg-black/20 p-3 text-xs font-bold text-slate-400">لا توجد إحصائيات تفصيلية لهذا اللاعب حتى الآن.</p>}
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function TeamPlayerCard({ team, lineup, localPlayers, stats, accent }: { team: TeamLite; lineup: OfficialLineupTeam | null | undefined; localPlayers: MatchPlayerLite[]; stats: MatchPlayerStatItem[]; accent: 'home' | 'away' }) {
+  const rows = buildRows(lineup, localPlayers, stats.filter((stat) => statBelongsToTeam(stat, team, localPlayers)));
+  const color = accent === 'home' ? 'text-[#F8C846] border-[#F8C846]/25 bg-[#F8C846]/10' : 'text-[#18E58F] border-[#18E58F]/25 bg-[#18E58F]/10';
+  return (
+    <div className="rounded-2xl border border-white/10 bg-black/25 p-4">
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-2">
+          <FlagImg team={team} small />
+          <div className="min-w-0">
+            <h3 className="team-name-full text-lg font-black text-white">{displayTeamName(team)}</h3>
+            <p className="mt-1 text-[10px] font-bold text-slate-500">{lineup?.formation ? `الخطة ${lineup.formation}` : 'اللاعبون المشاركون'}</p>
+          </div>
+        </div>
+        <span className={`rounded-full border px-3 py-1 text-[10px] font-black ${color}`}>{ar.format(rows.total)} لاعب</span>
+      </div>
+      <div className="space-y-5">
+        <div>
+          <h4 className="mb-2 text-xs font-black text-[#F8C846]">الأساسيون فقط</h4>
+          <div className="grid gap-2">{rows.starters.length ? rows.starters.map((row) => <PlayerCard key={`starter-${row.player.name}-${row.index}`} row={row} accent={accent} />) : <Empty title="غير متوفر" body="لم يصل التشكيل الأساسي بعد." />}</div>
+        </div>
+        <div>
+          <h4 className="mb-2 text-xs font-black text-[#F8C846]">البدلاء الذين شاركوا فقط</h4>
+          <div className="grid gap-2">{rows.substitutes.length ? rows.substitutes.map((row) => <PlayerCard key={`sub-${row.player.name}-${row.index}`} row={row} accent={accent} />) : <Empty title="لا يوجد بدلاء مشاركون" body="لن نعرض كل دكة البدلاء؛ فقط من شارك فعليًا." />}</div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function Hero({ data, onRefresh, onShare }: { data: MatchPageData; onRefresh: () => void; onShare: () => void }) {
-  return <header className="relative overflow-hidden rounded-[1.6rem] border border-white/10 bg-[#04110D] p-3 text-center shadow-[0_24px_70px_rgba(0,0,0,.36)] sm:rounded-[2rem] sm:p-6"><div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_12%,rgba(24,229,143,.18),transparent_32%),radial-gradient(circle_at_82%_8%,rgba(248,200,70,.12),transparent_30%),linear-gradient(180deg,rgba(255,255,255,.06),transparent_42%)]" /><div className="relative"><div className="mb-3 flex flex-wrap items-center justify-center gap-2 text-xs font-black"><span className={`rounded-full border px-3 py-1.5 ${statusClasses[data.status.kind] || statusClasses.finished}`}>{data.status.label}</span><span className="rounded-full border border-white/10 bg-black/25 px-3 py-1.5 text-slate-300">{data.competition}</span><span className="rounded-full border border-white/10 bg-black/25 px-3 py-1.5 text-slate-300">{data.groupLabel || data.stageLabel}</span></div><div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 sm:gap-5" dir="rtl"><TeamSide team={data.homeTeam} /><div className="space-y-2"><div className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-black/45 px-3 py-2 shadow-inner sm:gap-5 sm:px-7 sm:py-3"><span className="text-3xl font-black text-[#F8C846] tabular-nums sm:text-6xl">{fmt(data.score.home)}</span><span className="text-2xl font-black text-white/70 sm:text-5xl">-</span><span className="text-3xl font-black text-white tabular-nums sm:text-6xl">{fmt(data.score.away)}</span></div><p className="text-xs font-bold text-slate-400">{data.status.isScheduled ? `موعد المباراة: ${fullDate(data.matchDate)}` : data.status.isFinished ? 'نهاية المباراة' : data.status.shortLabel}</p></div><TeamSide team={data.awayTeam} /></div><div className="mt-5 grid grid-cols-2 gap-2 text-right lg:grid-cols-4"><Info icon={<CalendarDays size={15} />} label="الموعد" value={fullDate(data.matchDate)} /><Info icon={<MapPin size={15} />} label="الملعب" value={data.venue} /><Info icon={<Flag size={15} />} label="الحكم" value={data.referee} /><Info icon={<Trophy size={15} />} label="الدور" value={data.groupLabel || data.stageLabel} /></div><div className="mt-4 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center sm:justify-center"><button onClick={onRefresh} className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#18E58F] px-3 py-2 text-xs font-black text-black sm:text-sm"><RefreshCw size={16} /> تحديث</button><button onClick={onShare} className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-xs font-black text-white sm:text-sm"><Share2 size={16} /> مشاركة</button>{data.digest?.href ? <Link href={data.digest.href} className="col-span-2 inline-flex items-center justify-center gap-2 rounded-xl border border-[#F8C846]/30 bg-[#F8C846]/12 px-3 py-2 text-xs font-black text-[#F8C846] sm:col-span-1 sm:text-sm"><FileText size={16} /> تقرير المباراة</Link> : null}</div></div></header>;
+  return (
+    <header className="relative overflow-hidden rounded-[1.6rem] border border-white/10 bg-[#04110D] p-4 text-center shadow-[0_24px_70px_rgba(0,0,0,.36)] sm:rounded-[2rem] sm:p-6">
+      <div className="mb-3 flex flex-wrap items-center justify-center gap-2 text-xs font-black">
+        <span className="rounded-full border border-white/10 bg-white/10 px-3 py-1.5 text-white">{data.status.label}</span>
+        <span className="rounded-full border border-white/10 bg-black/25 px-3 py-1.5 text-slate-300">{data.groupLabel || data.stageLabel}</span>
+      </div>
+      <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 sm:gap-5" dir="rtl">
+        <TeamHero team={data.homeTeam} />
+        <div className="space-y-2">
+          <div className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-black/45 px-3 py-2 shadow-inner sm:gap-5 sm:px-7 sm:py-3">
+            <span className="text-3xl font-black text-[#F8C846] tabular-nums sm:text-6xl">{fmt(data.score.home)}</span>
+            <span className="text-2xl font-black text-white/70 sm:text-5xl">-</span>
+            <span className="text-3xl font-black text-white tabular-nums sm:text-6xl">{fmt(data.score.away)}</span>
+          </div>
+          <p className="text-xs font-bold text-slate-400">{data.status.isScheduled ? `موعد المباراة: ${fullDate(data.matchDate)}` : data.status.isFinished ? 'نهاية المباراة' : data.status.shortLabel}</p>
+        </div>
+        <TeamHero team={data.awayTeam} />
+      </div>
+      <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+        <button onClick={onRefresh} className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#18E58F] px-3 py-2 text-xs font-black text-black sm:text-sm"><RefreshCw size={16} /> تحديث</button>
+        <button onClick={onShare} className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-xs font-black text-white sm:text-sm"><Share2 size={16} /> مشاركة</button>
+      </div>
+    </header>
+  );
 }
-function TabsNav({ active, onChange }: { active: TabId; onChange: (id: TabId) => void }) { return <nav className="sticky top-0 z-30 rounded-2xl border border-white/10 bg-[#04110D]/95 p-2 shadow-xl backdrop-blur"><div className="flex gap-2 overflow-x-auto pb-1">{TABS.map((tab) => { const Icon = tab.icon; return <button key={tab.id} type="button" onClick={() => onChange(tab.id)} className={`inline-flex shrink-0 items-center gap-2 rounded-xl border px-3 py-2 text-xs font-black transition ${active === tab.id ? 'border-[#18E58F]/45 bg-[#18E58F] text-black' : 'border-white/10 bg-white/[0.05] text-slate-200 hover:border-white/20 hover:bg-white/[0.08]'}`}><Icon size={15} />{tab.label}</button>; })}</div></nav>; }
-function StatCard({ metric, data }: { metric: MatchStatMetric; data: MatchPageData }) { const p = percent(metric.home, metric.away); return <article className="rounded-2xl border border-white/10 bg-black/25 p-3"><div className="grid grid-cols-[70px_1fr_70px] items-center gap-3 text-center"><b className="text-base font-black text-[#F8C846] tabular-nums">{fmt(metric.home, metric.suffix)}</b><div><p className="text-xs font-black text-white sm:text-sm">{metric.label}</p><p className="mt-1 text-[10px] font-bold text-slate-500">{metric.source || '—'}</p></div><b className="text-base font-black text-[#18E58F] tabular-nums">{fmt(metric.away, metric.suffix)}</b></div>{metric.available ? <div className="mt-3 flex items-center gap-2" dir="ltr"><div className="flex h-2 flex-1 justify-end overflow-hidden rounded-full bg-white/10"><span className="h-full rounded-full bg-[#18E58F]" style={{ width: `${p.away}%` }} /></div><div className="flex h-2 flex-1 justify-start overflow-hidden rounded-full bg-white/10"><span className="h-full rounded-full bg-[#F8C846]" style={{ width: `${p.home}%` }} /></div></div> : null}<div className="mt-2 grid grid-cols-2 text-[10px] font-bold text-slate-500"><span>{displayTeamName(data.homeTeam)}</span><span className="text-left">{displayTeamName(data.awayTeam)}</span></div></article>; }
-function OverviewPanel({ data }: { data: MatchPageData }) { const quickStats = data.stats.filter((m) => ['possession', 'shots', 'shotsOnTarget', 'corners'].includes(m.key)).slice(0, 4); return <Panel title="نظرة عامة" icon={<Layers size={22} />} hint="ملخص سريع للمباراة وروابط العمل المهمة"><div className="grid gap-4 lg:grid-cols-[1.2fr_.8fr]"><div className="space-y-4"><div className="grid gap-3 sm:grid-cols-2">{quickStats.length ? quickStats.map((metric) => <StatCard key={metric.key} metric={metric} data={data} />) : <Empty title="لا توجد إحصائيات أساسية" body="ستظهر هنا بعد حفظ إحصائيات المباراة في قاعدة البيانات." />}</div>{data.digest?.summary ? <div className="rounded-2xl border border-[#F8C846]/20 bg-[#F8C846]/10 p-4"><h3 className="mb-2 text-lg font-black text-[#F8C846]">ملخص التقرير</h3><p className="text-sm font-bold leading-8 text-white">{data.digest.summary}</p></div> : null}</div><div className="rounded-2xl border border-white/10 bg-black/25 p-4"><h3 className="mb-3 text-lg font-black text-white">روابط المباراة</h3><div className="grid gap-2"><Link href={`/live-animation/${data.id}`} className="rounded-xl border border-sky-300/30 bg-sky-300/10 px-4 py-3 text-center text-sm font-black text-sky-100">فتح الملعب التفاعلي</Link><Link href={`/watch/${data.id}`} className="rounded-xl border border-[#F8C846]/30 bg-[#F8C846]/10 px-4 py-3 text-center text-sm font-black text-[#F8C846]">مشاهدة البث</Link>{data.digest?.href ? <Link href={data.digest.href} className="rounded-xl border border-white/10 bg-white/10 px-4 py-3 text-center text-sm font-black text-white">قراءة تقرير المباراة</Link> : null}</div></div></div></Panel>; }
-function StatsPanel({ data }: { data: MatchPageData }) { const available = data.stats.filter((metric) => metric.available); return <Panel title="إحصائيات المباراة" icon={<BarChart3 size={22} />} hint="TheStats أولًا، وiSports Animation احتياطي للمؤشرات غير الموجودة"><div className="grid gap-3 lg:grid-cols-2">{available.length ? available.map((metric) => <StatCard key={metric.key} metric={metric} data={data} />) : <Empty title="لا توجد إحصائيات محفوظة" body="استخدم استيراد الإحصائيات الأساسية للمباريات السابقة ثم أعد فتح الصفحة." />}</div></Panel>; }
-function EventsPanel({ data }: { data: MatchPageData }) { return <Panel title="أحداث المباراة" icon={<Radio size={22} />} hint="بعد النهاية من TheStats فقط؛ وأثناء المباراة من iSports Animation"><div className="space-y-3">{data.events.length ? data.events.map((event: MatchEventView) => <article key={event.id} className="rounded-2xl border border-white/10 bg-black/25 p-3"><div className="mb-1 flex flex-wrap items-center gap-2"><span className="text-lg">{event.icon}</span><b className="rounded-full bg-white/10 px-2 py-1 text-xs text-white">{event.minuteLabel || '—'}</b><span className="rounded-full bg-[#F8C846]/15 px-2 py-1 text-xs font-black text-[#F8C846]">{event.type}</span>{event.playerName ? <span className="text-sm font-black text-white">{event.playerName}</span> : null}</div><p className="text-sm font-bold leading-7 text-slate-200">{event.detail || 'حدث محفوظ في قاعدة البيانات.'}</p>{event.sourceName ? <p className="mt-1 text-[10px] font-bold text-slate-500">{event.sourceName}</p> : null}</article>) : <Empty title="لا توجد أحداث محفوظة" body="ستظهر الأحداث بعد مزامنة Timeline أو Live Events." />}</div></Panel>; }
-function LineupsPanel({ data }: { data: MatchPageData }) { const stats = data.advanced.playerStats || []; const home = data.officialLineup?.home; const away = data.officialLineup?.away; return <Panel title="التشكيلات وأداء اللاعبين" icon={<Users size={22} />} hint="الأساسيون فقط + البدلاء الذين شاركوا فقط، مع صور وكل إحصائيات اللاعب المتاحة"><div className="grid gap-4 lg:grid-cols-2"><TeamPlayerCard team={data.homeTeam} lineup={home} localPlayers={data.homePlayers} stats={stats} accent="home" /><TeamPlayerCard team={data.awayTeam} lineup={away} localPlayers={data.awayPlayers} stats={stats} accent="away" /></div></Panel>; }
-function PlayersPanel({ data }: { data: MatchPageData }) { return <Panel title="أداء اللاعبين" icon={<Shield size={22} />} hint="كل منتخب بلاعبيه المشاركين وإحصائياتهم المتاحة من TheStats"><div className="grid gap-4 lg:grid-cols-2"><TeamPlayerCard team={data.homeTeam} lineup={data.officialLineup?.home} localPlayers={data.homePlayers} stats={data.advanced.playerStats || []} accent="home" /><TeamPlayerCard team={data.awayTeam} lineup={data.officialLineup?.away} localPlayers={data.awayPlayers} stats={data.advanced.playerStats || []} accent="away" /></div></Panel>; }
-function InteractivePanel({ data }: { data: MatchPageData }) { return <Panel title="الملعب التفاعلي" icon={<MapPin size={22} />} hint="يفتح في صفحة مستقلة لتقليل الضغط"><div className="rounded-2xl border border-sky-300/25 bg-sky-300/10 p-5 text-center"><p className="text-lg font-black text-white">افتح عرض الملعب التفاعلي في صفحة مستقلة</p><p className="mt-2 text-sm font-bold leading-7 text-slate-300">بعد النهاية يعتمد على TheStats، وأثناء المباراة يعتمد على iSports Animation.</p><Link href={`/live-animation/${data.id}`} className="mt-4 inline-flex rounded-xl bg-sky-300 px-5 py-3 text-sm font-black text-black">فتح الملعب التفاعلي</Link></div></Panel>; }
-function AnalysisPanel({ data }: { data: MatchPageData }) { return <Panel title="تحليل تكتيكي" icon={<FileText size={22} />} hint="نقاط محفوظة تصلح كبداية لكتابة المقال"><div className="grid gap-4 lg:grid-cols-2"><div className="rounded-2xl border border-white/10 bg-black/25 p-4"><h3 className="mb-3 text-lg font-black text-white">مفاتيح المباراة</h3><div className="space-y-2">{data.tacticalKeys.length ? data.tacticalKeys.map((item, index) => <p key={index} className="rounded-xl bg-white/[0.045] p-3 text-sm font-bold leading-7 text-slate-200">{item}</p>) : <p className="text-sm font-bold text-slate-400">أضف ملاحظات تكتيكية محفوظة لهذه المباراة.</p>}</div></div><div className="rounded-2xl border border-white/10 bg-black/25 p-4"><h3 className="mb-3 text-lg font-black text-white">تأثير المباراة</h3><div className="space-y-2">{data.matchImpact.length ? data.matchImpact.map((item, index) => <p key={index} className="rounded-xl bg-white/[0.045] p-3 text-sm font-bold leading-7 text-slate-200">{item}</p>) : <p className="text-sm font-bold text-slate-400">سيظهر التأثير بعد اكتمال بيانات المجموعة.</p>}</div></div></div></Panel>; }
-function StandingCard({ row }: { row: StandingRow }) { const name = getArabicTeamName(row.code, row.teamName); const image = getTeamFlagUrl({ code: row.code, name, image: row.image }, 80) || row.image || null; return <article className="rounded-2xl border border-white/10 bg-black/25 p-3"><div className="mb-3 flex items-center justify-between gap-3"><div className="flex min-w-0 items-center gap-3"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-[#F8C846]/25 bg-[#F8C846]/10 text-sm font-black text-[#F8C846]">{ar.format(row.rank)}</span>{image ? <img src={image} alt={`علم ${name}`} className="h-8 w-11 shrink-0 rounded-lg border border-white/10 object-cover" loading="lazy" /> : null}<div className="min-w-0"><p className="team-name-full text-sm font-black text-white">{name}</p><p className="text-[10px] font-bold text-slate-500">{row.code || '—'}</p></div></div><b className="text-xl font-black text-[#18E58F]">{ar.format(row.points)}</b></div><div className="grid grid-cols-4 gap-2 text-center text-xs"><span>لعب {ar.format(row.played)}</span><span>فاز {ar.format(row.won)}</span><span>فارق {gd(row.goalDifference)}</span><span>له {ar.format(row.goalsFor)}</span></div></article>; }
-function GroupPanel({ data }: { data: MatchPageData }) { return <Panel title="المجموعة" icon={<Trophy size={22} />} hint="ترتيب المجموعة وموقف التأهل"><div className="grid gap-4 lg:grid-cols-2"><div className="space-y-2"><h3 className="text-lg font-black text-white">ترتيب المجموعة</h3>{data.groupStandings.length ? data.groupStandings.map((row) => <StandingCard key={`${row.teamId}-${row.rank}`} row={row} />) : <Empty title="الترتيب غير متوفر" body="سيظهر بعد حفظ مباريات المجموعة." />}</div><div className="space-y-2"><h3 className="text-lg font-black text-white">أفضل الثوالث</h3>{data.thirdPlaceTable.length ? data.thirdPlaceTable.slice(0, 8).map((row) => <StandingCard key={`${row.teamId}-${row.rank}-third`} row={row} />) : <Empty title="غير متوفر" body="سيظهر لاحقًا عند توفر جدول الثوالث." />}</div></div></Panel>; }
-function ArticlesPanel({ data }: { data: MatchPageData }) { return <Panel title="المقالات" icon={<List size={22} />} hint="روابط المقالات والتحليلات المرتبطة بالمباراة"><div className="grid gap-3">{data.digest?.href ? <Link href={data.digest.href} className="rounded-2xl border border-[#F8C846]/30 bg-[#F8C846]/10 p-4 text-right"><p className="font-black text-[#F8C846]">تقرير المباراة</p><p className="mt-2 text-sm font-bold leading-7 text-white">{data.digest.summary || data.digest.turningPoint || 'افتح تقرير المباراة الكامل.'}</p></Link> : null}{data.relatedArticles.length ? data.relatedArticles.map((article) => <Link key={article.id} href={article.href} className="rounded-2xl border border-white/10 bg-black/25 p-4 text-right"><p className="text-xs font-black text-[#18E58F]">{article.label}</p><h3 className="mt-1 font-black text-white">{article.title}</h3><p className="mt-2 text-sm font-bold leading-7 text-slate-300">{article.summary}</p></Link>) : null}{!data.digest?.href && !data.relatedArticles.length ? <Empty title="لا توجد مقالات" body="ستظهر المقالات المرتبطة بهذه المباراة هنا." /> : null}</div></Panel>; }
+
+function TeamHero({ team }: { team: TeamLite }) {
+  return (
+    <div className="flex min-w-0 flex-col items-center gap-2">
+      <FlagImg team={team} />
+      <p className="team-name-full text-base font-black text-white sm:text-2xl">{displayTeamName(team)}</p>
+    </div>
+  );
+}
+
+function TabsNav({ active, onChange }: { active: TabId; onChange: (id: TabId) => void }) {
+  return (
+    <nav className="sticky top-0 z-30 rounded-2xl border border-white/10 bg-[#04110D]/95 p-2 shadow-xl backdrop-blur">
+      <div className="flex gap-2 overflow-x-auto pb-1">
+        {TABS.map((tab) => {
+          const Icon = tab.icon;
+          return <button key={tab.id} type="button" onClick={() => onChange(tab.id)} className={`inline-flex shrink-0 items-center gap-2 rounded-xl border px-3 py-2 text-xs font-black transition ${active === tab.id ? 'border-[#18E58F]/45 bg-[#18E58F] text-black' : 'border-white/10 bg-white/[0.05] text-slate-200'}`}><Icon size={15} />{tab.label}</button>;
+        })}
+      </div>
+    </nav>
+  );
+}
+
+function StatCard({ metric, data }: { metric: MatchStatMetric; data: MatchPageData }) {
+  return (
+    <article className="rounded-2xl border border-white/10 bg-black/25 p-3 text-center">
+      <div className="grid grid-cols-[70px_1fr_70px] items-center gap-3">
+        <b className="text-base font-black text-[#F8C846] tabular-nums">{fmt(metric.home, metric.suffix)}</b>
+        <div><p className="text-xs font-black text-white sm:text-sm">{metric.label}</p><p className="mt-1 text-[10px] font-bold text-slate-500">{metric.source || '—'}</p></div>
+        <b className="text-base font-black text-[#18E58F] tabular-nums">{fmt(metric.away, metric.suffix)}</b>
+      </div>
+      <div className="mt-2 grid grid-cols-2 text-[10px] font-bold text-slate-500"><span>{displayTeamName(data.homeTeam)}</span><span className="text-left">{displayTeamName(data.awayTeam)}</span></div>
+    </article>
+  );
+}
+
+function OverviewPanel({ data }: { data: MatchPageData }) {
+  const quickStats = data.stats.filter((m) => ['possession', 'shots', 'shotsOnTarget', 'corners'].includes(m.key)).slice(0, 4);
+  return <Panel title="نظرة عامة" icon={<Layers size={22} />} hint="ملخص سريع للمباراة"><div className="grid gap-3 sm:grid-cols-2">{quickStats.length ? quickStats.map((metric) => <StatCard key={metric.key} metric={metric} data={data} />) : <Empty title="لا توجد إحصائيات أساسية" body="ستظهر بعد حفظ الإحصائيات." />}</div></Panel>;
+}
+
+function StatsPanel({ data }: { data: MatchPageData }) {
+  const available = data.stats.filter((metric) => metric.available);
+  return <Panel title="إحصائيات المباراة" icon={<BarChart3 size={22} />} hint="TheStats أولًا وiSports احتياطي للمؤشرات غير الموجودة"><div className="grid gap-3 lg:grid-cols-2">{available.length ? available.map((metric) => <StatCard key={metric.key} metric={metric} data={data} />) : <Empty title="لا توجد إحصائيات" body="شغّل المزامنة النهائية للمباراة." />}</div></Panel>;
+}
+
+function EventsPanel({ data }: { data: MatchPageData }) {
+  return <Panel title="أحداث المباراة" icon={<Radio size={22} />} hint="بعد النهاية من TheStats فقط؛ وأثناء المباراة من iSports Animation"><div className="space-y-3">{data.events.length ? data.events.map((event: MatchEventView) => <article key={event.id} className="rounded-2xl border border-white/10 bg-black/25 p-3"><div className="mb-1 flex flex-wrap items-center gap-2"><span className="text-lg">{event.icon}</span><b className="rounded-full bg-white/10 px-2 py-1 text-xs text-white">{event.minuteLabel || '—'}</b><span className="rounded-full bg-[#F8C846]/15 px-2 py-1 text-xs font-black text-[#F8C846]">{event.type}</span>{event.playerName ? <span className="text-sm font-black text-white">{event.playerName}</span> : null}</div><p className="text-sm font-bold leading-7 text-slate-200">{event.detail || 'حدث محفوظ.'}</p></article>) : <Empty title="لا توجد أحداث" body="ستظهر بعد مزامنة Timeline أو Live Events." />}</div></Panel>;
+}
+
+function LineupsPanel({ data }: { data: MatchPageData }) {
+  return <Panel title="التشكيلات وأداء اللاعبين" icon={<Users size={22} />} hint="الأساسيون فقط + البدلاء الذين شاركوا فقط، مع صور وكل إحصائيات اللاعب المتاحة"><div className="grid gap-4 lg:grid-cols-2"><TeamPlayerCard team={data.homeTeam} lineup={data.officialLineup?.home} localPlayers={data.homePlayers} stats={data.advanced.playerStats || []} accent="home" /><TeamPlayerCard team={data.awayTeam} lineup={data.officialLineup?.away} localPlayers={data.awayPlayers} stats={data.advanced.playerStats || []} accent="away" /></div></Panel>;
+}
+
+function PlayersPanel({ data }: { data: MatchPageData }) {
+  return <Panel title="أداء اللاعبين" icon={<Shield size={22} />} hint="كل منتخب بلاعبيه المشاركين وإحصائياتهم المتاحة"><div className="grid gap-4 lg:grid-cols-2"><TeamPlayerCard team={data.homeTeam} lineup={data.officialLineup?.home} localPlayers={data.homePlayers} stats={data.advanced.playerStats || []} accent="home" /><TeamPlayerCard team={data.awayTeam} lineup={data.officialLineup?.away} localPlayers={data.awayPlayers} stats={data.advanced.playerStats || []} accent="away" /></div></Panel>;
+}
+
+function InteractivePanel({ data }: { data: MatchPageData }) {
+  return <Panel title="الملعب التفاعلي" icon={<MapPin size={22} />} hint="يفتح في صفحة مستقلة"><div className="rounded-2xl border border-sky-300/25 bg-sky-300/10 p-5 text-center"><p className="text-lg font-black text-white">افتح عرض الملعب التفاعلي</p><Link href={`/live-animation/${data.id}`} className="mt-4 inline-flex rounded-xl bg-sky-300 px-5 py-3 text-sm font-black text-black">فتح الملعب التفاعلي</Link></div></Panel>;
+}
+
+function AnalysisPanel({ data }: { data: MatchPageData }) {
+  return <Panel title="تحليل تكتيكي" icon={<FileText size={22} />}><div className="space-y-2">{data.tacticalKeys.length ? data.tacticalKeys.map((item, index) => <p key={index} className="rounded-xl bg-white/[0.045] p-3 text-sm font-bold leading-7 text-slate-200">{item}</p>) : <Empty title="لا توجد ملاحظات" body="أضف ملاحظات تكتيكية محفوظة لهذه المباراة." />}</div></Panel>;
+}
+
+function StandingCard({ row }: { row: StandingRow }) {
+  const name = getArabicTeamName(row.code, row.teamName);
+  return <article className="rounded-2xl border border-white/10 bg-black/25 p-3"><div className="flex items-center justify-between"><p className="font-black text-white">{ar.format(row.rank)}. {name}</p><b className="text-xl font-black text-[#18E58F]">{ar.format(row.points)}</b></div><p className="mt-2 text-xs font-bold text-slate-400">لعب {ar.format(row.played)} · فاز {ar.format(row.won)} · فارق {ar.format(row.goalDifference)}</p></article>;
+}
+
+function GroupPanel({ data }: { data: MatchPageData }) {
+  return <Panel title="المجموعة" icon={<Trophy size={22} />}><div className="grid gap-3 lg:grid-cols-2">{data.groupStandings.length ? data.groupStandings.map((row) => <StandingCard key={`${row.teamId}-${row.rank}`} row={row} />) : <Empty title="الترتيب غير متوفر" body="سيظهر بعد حفظ مباريات المجموعة." />}</div></Panel>;
+}
+
+function ArticlesPanel({ data }: { data: MatchPageData }) {
+  return <Panel title="المقالات" icon={<List size={22} />}><div className="grid gap-3">{data.digest?.href ? <Link href={data.digest.href} className="rounded-2xl border border-[#F8C846]/30 bg-[#F8C846]/10 p-4 text-right"><p className="font-black text-[#F8C846]">تقرير المباراة</p><p className="mt-2 text-sm font-bold leading-7 text-white">{data.digest.summary || data.digest.turningPoint || 'افتح تقرير المباراة الكامل.'}</p></Link> : null}{!data.digest?.href && !data.relatedArticles.length ? <Empty title="لا توجد مقالات" body="ستظهر المقالات المرتبطة بهذه المباراة هنا." /> : null}</div></Panel>;
+}
 
 export default function ProfessionalMatchTabsPage({ data }: { data: MatchPageData }) {
   const [active, setActive] = useState<TabId>('overview');
   const pageTitle = useMemo(() => `${displayTeamName(data.homeTeam)} ${fmt(data.score.home)} - ${fmt(data.score.away)} ${displayTeamName(data.awayTeam)}`, [data]);
-  function refresh() { window.location.reload(); }
-  async function share() { if (navigator.share) await navigator.share({ title: pageTitle, text: pageTitle, url: window.location.href }).catch(() => undefined); else await navigator.clipboard?.writeText(window.location.href).catch(() => undefined); }
-  return <main className="min-h-screen bg-[#04110D] px-3 py-4 text-white" dir="rtl"><MatchAutoRefresh intervalMs={data.status.isLive ? 25000 : 90000} /><div className="mx-auto max-w-7xl space-y-4"><Hero data={data} onRefresh={refresh} onShare={share} /><TabsNav active={active} onChange={setActive} />{active === 'overview' ? <OverviewPanel data={data} /> : null}{active === 'stats' ? <StatsPanel data={data} /> : null}{active === 'events' ? <EventsPanel data={data} /> : null}{active === 'lineups' ? <LineupsPanel data={data} /> : null}{active === 'players' ? <PlayersPanel data={data} /> : null}{active === 'interactive' ? <InteractivePanel data={data} /> : null}{active === 'analysis' ? <AnalysisPanel data={data} /> : null}{active === 'group' ? <GroupPanel data={data} /> : null}{active === 'articles' ? <ArticlesPanel data={data} /> : null}</div></main>;
+
+  function refresh() {
+    window.location.reload();
+  }
+
+  async function share() {
+    if (navigator.share) await navigator.share({ title: pageTitle, text: pageTitle, url: window.location.href }).catch(() => undefined);
+    else await navigator.clipboard?.writeText(window.location.href).catch(() => undefined);
+  }
+
+  return (
+    <main className="min-h-screen bg-[#04110D] px-3 py-4 text-white" dir="rtl">
+      <MatchAutoRefresh intervalMs={data.status.isLive ? 25000 : 90000} />
+      <div className="mx-auto max-w-7xl space-y-4">
+        <Hero data={data} onRefresh={refresh} onShare={share} />
+        <TabsNav active={active} onChange={setActive} />
+        {active === 'overview' ? <OverviewPanel data={data} /> : null}
+        {active === 'stats' ? <StatsPanel data={data} /> : null}
+        {active === 'events' ? <EventsPanel data={data} /> : null}
+        {active === 'lineups' ? <LineupsPanel data={data} /> : null}
+        {active === 'players' ? <PlayersPanel data={data} /> : null}
+        {active === 'interactive' ? <InteractivePanel data={data} /> : null}
+        {active === 'analysis' ? <AnalysisPanel data={data} /> : null}
+        {active === 'group' ? <GroupPanel data={data} /> : null}
+        {active === 'articles' ? <ArticlesPanel data={data} /> : null}
+      </div>
+    </main>
+  );
 }
