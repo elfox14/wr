@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { withTeamDisplay } from '@/lib/teamDisplay';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 30;
@@ -50,7 +51,24 @@ function statusLabel(status?: string | null) {
 }
 
 function initStanding(team: any) {
-  return { teamId: team.id, name: team.name, code: team.code, image: team.image, played: 0, won: 0, drawn: 0, lost: 0, goalsFor: 0, goalsAgainst: 0, goalDifference: 0, points: 0 };
+  const publicTeam = withTeamDisplay(team);
+  return {
+    teamId: team.id,
+    name: publicTeam.name,
+    code: publicTeam.code,
+    image: publicTeam.image,
+    arabicName: publicTeam.arabicName,
+    flagEmoji: publicTeam.flagEmoji,
+    displayName: publicTeam.displayName,
+    played: 0,
+    won: 0,
+    drawn: 0,
+    lost: 0,
+    goalsFor: 0,
+    goalsAgainst: 0,
+    goalDifference: 0,
+    points: 0,
+  };
 }
 
 function matchKey(match: any) {
@@ -113,8 +131,8 @@ function publicMatch(match: any) {
     isLive: isLive(match.status),
     homeScore: match.homeScore,
     awayScore: match.awayScore,
-    homeTeam: match.homeTeam,
-    awayTeam: match.awayTeam,
+    homeTeam: withTeamDisplay(match.homeTeam),
+    awayTeam: withTeamDisplay(match.awayTeam),
     hasLiveAnimation: Boolean(match.animationMatchId || match._count?.events),
     hasStats: Boolean(match._count?.statsSnapshots),
   };
@@ -152,6 +170,7 @@ export async function GET() {
 
     const groups = GROUPS.map((group) => {
       const groupTeams = teams.filter((team) => groupKeyOf(team.group) === group);
+      const publicGroupTeams = groupTeams.map((team) => withTeamDisplay(team));
       const ids = new Set(groupTeams.map((team) => team.id));
       const groupMatches = dedupe(matches.filter((match) => ids.has(match.homeTeamId) || ids.has(match.awayTeamId) || groupKeyOf(match.groupPhase, match.stage) === group));
       const results = groupMatches.filter((match) => isFinished(match.status)).slice().sort((a, b) => new Date(b.matchDate).getTime() - new Date(a.matchDate).getTime()).map(publicMatch);
@@ -161,7 +180,7 @@ export async function GET() {
       return {
         key: group,
         name: `المجموعة ${group}`,
-        teams: groupTeams,
+        teams: publicGroupTeams,
         standings,
         results,
         upcoming,
