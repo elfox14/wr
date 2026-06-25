@@ -1,11 +1,11 @@
-import { Metadata } from 'next';
-import GroupsClient from '@/components/GroupsClient';
+import type { Metadata } from 'next';
+import GroupsHubClient from '@/components/groups/GroupsHubClient';
 
 export const metadata: Metadata = {
-  title: 'المجموعات والتصفيات | MC PRIME Exchange',
-  description: 'استعرض المنتخبات المشاركة مقسمة حسب مجموعات كأس العالم.',
+  title: 'المجموعات والترتيب | MC PRIME Exchange',
+  description: 'استعرض مجموعات كأس العالم والترتيب والنتائج والمباريات القادمة.',
 };
 
 export default function GroupsPage() {
-  return <GroupsClient />;
+  return <GroupsHubClient />;
 }
