@@ -6,12 +6,14 @@ import HomeTournamentStatsCard from '@/components/HomeTournamentStatsCard';
 import HomeLiveMatchTicker from '@/components/HomeLiveMatchTicker';
 import HomeGroupStandingsWidget from '@/components/HomeGroupStandingsWidget';
 import { getTeamFlagUrl } from '@/lib/teamFlags';
+import { getArabicTeamName } from '@/lib/teamDisplay';
 
 type Team = {
   id?: string | number | null;
   name?: string | null;
   code?: string | null;
   image?: string | null;
+  flagUrl?: string | null;
 };
 
 type HomeMatch = {
@@ -48,7 +50,7 @@ const MATCH_REFRESH_MS = 15_000;
 const LIVE_STATUSES = ['1H', '2H', 'ET', 'BT', 'P', 'IN_PLAY', 'LIVE'];
 const SECOND_HALF_STATUSES = ['2H'];
 const HALF_TIME_STATUSES = ['HT', 'HALFTIME', 'HALF_TIME', 'HALF-TIME'];
-const FINISHED_STATUSES = ['FINISHED', 'FT', 'AET', 'PEN', 'FULL_TIME', 'ENDED'];
+const FINISHED_STATUSES = ['FINISHED', 'FT', 'AET', 'PEN', 'FULL_TIME', 'ENDED', 'COMPLETED', 'FINAL_VERIFIED'];
 const SCHEDULED_STATUSES = ['SCHEDULED', 'TIMED', 'NOT_STARTED', 'NS'];
 const GROUP_LETTERS = 'ABCDEFGHIJKL'.split('');
 
@@ -65,11 +67,17 @@ function normalizeStatus(match?: HomeMatch | null) {
 }
 
 function teamLabel(team?: Team | null) {
-  return team?.name || team?.code || 'منتخب غير محدد';
+  if (!team) return 'منتخب غير محدد';
+  return getArabicTeamName(team.code, team.name);
 }
 
 function teamCode(team?: Team | null) {
   return team?.code || team?.name?.slice(0, 3) || '---';
+}
+
+function teamFlag(team?: Team | null) {
+  const name = teamLabel(team);
+  return team?.flagUrl || getTeamFlagUrl({ code: team?.code, name, image: null }, 96) || team?.image || null;
 }
 
 function getTeamHref(team?: Team | null) {
@@ -105,7 +113,7 @@ function hasKickoffPassed(match: HomeMatch, now: Date) {
 }
 
 function isFinished(match?: HomeMatch | null) {
-  return FINISHED_STATUSES.includes(normalizeStatus(match));
+  return FINISHED_STATUSES.includes(normalizeStatus(match)) || Boolean(match?.isStaleAutoFinished);
 }
 
 function isHalfTime(match?: HomeMatch | null) {
@@ -183,15 +191,15 @@ function countdownParts(match: HomeMatch, now: Date) {
 }
 
 function TeamBadge({ team, align }: { team?: Team | null; align: 'right' | 'left' }) {
-  const src = team?.image?.startsWith('http') ? team.image : getTeamFlagUrl({ code: team?.code, name: team?.name, image: team?.image }, 80);
-
+  const name = teamLabel(team);
+  const src = teamFlag(team);
   return (
     <Link href={getTeamHref(team)} className={`group/team flex min-w-0 items-center gap-2 rounded-2xl border border-white/10 bg-white/[0.04] px-2.5 py-2 transition hover:border-[#FFD700]/25 hover:bg-white/[0.07] sm:border-transparent sm:bg-transparent sm:p-1.5 ${align === 'left' ? 'flex-row-reverse text-left' : 'text-right'}`}>
-      <span className="h-8 w-8 shrink-0 rounded-xl border border-white/10 bg-cover bg-center bg-no-repeat shadow-[0_8px_18px_rgba(0,0,0,0.22)] sm:h-9 sm:w-9" style={src ? { backgroundImage: `url(${src})` } : undefined}>
-        {!src ? <span className="flex h-full w-full items-center justify-center text-[10px] font-black text-[#FFD700]">{teamCode(team)}</span> : null}
+      <span className="h-8 w-11 shrink-0 overflow-hidden rounded-lg border border-white/10 bg-black/40 shadow-[0_8px_18px_rgba(0,0,0,0.22)] sm:h-9 sm:w-12">
+        {src ? <img src={src} alt={`علم ${name}`} className="h-full w-full object-cover" loading="lazy" /> : <span className="flex h-full w-full items-center justify-center text-[10px] font-black text-[#FFD700]">{teamCode(team)}</span>}
       </span>
       <span className="min-w-0">
-        <span className="block truncate text-[11px] font-black leading-4 text-white sm:text-xs">{teamLabel(team)}</span>
+        <span className="team-name-full block text-[11px] font-black leading-4 text-white sm:text-xs">{name}</span>
         <span className="mt-0.5 block text-[9px] font-bold text-gray-500">{teamCode(team)}</span>
       </span>
     </Link>
@@ -222,22 +230,11 @@ function MatchStatePill({ match, now, mounted }: { match: HomeMatch; now: Date; 
     return <span className="rounded-xl border border-[#00FF88]/25 bg-[#00FF88]/10 px-2.5 py-1.5 text-[11px] font-black text-[#00FF88]">{label}</span>;
   }
   if (isWaitingForStartConfirmation(match, now)) return <span className="rounded-xl border border-[#FFD700]/20 bg-[#FFD700]/10 px-2.5 py-1.5 text-[11px] font-black text-[#FFD700]">بانتظار تأكيد البداية</span>;
-
   if (!mounted) return <span className="rounded-xl border border-[#FFD700]/20 bg-[#FFD700]/10 px-2.5 py-1.5 text-[11px] font-black text-[#FFD700]">قريباً</span>;
-
   const parts = countdownParts(match, now);
   if (!parts.active) return <span className="rounded-xl border border-[#FFD700]/20 bg-[#FFD700]/10 px-2.5 py-1.5 text-[11px] font-black text-[#FFD700]">بانتظار المصدر</span>;
-  const visibleParts = parts.days > 0
-    ? `${formatCount(parts.days)}ي ${formatCount(parts.hours)}س`
-    : parts.hours > 0
-      ? `${formatCount(parts.hours)}س ${formatCount(parts.minutes)}د`
-      : `${formatCount(parts.minutes)}د ${formatCount(parts.seconds)}ث`;
-
-  return (
-    <span className="inline-flex items-center gap-1.5 rounded-xl border border-[#0FF0FC]/25 bg-[#0FF0FC]/10 px-2.5 py-1.5 text-[11px] font-black text-[#0FF0FC]">
-      <span className="h-1.5 w-1.5 rounded-full bg-[#0FF0FC] shadow-[0_0_12px_rgba(15,240,252,0.8)]" /> بعد {visibleParts}
-    </span>
-  );
+  const visibleParts = parts.days > 0 ? `${formatCount(parts.days)}ي ${formatCount(parts.hours)}س` : parts.hours > 0 ? `${formatCount(parts.hours)}س ${formatCount(parts.minutes)}د` : `${formatCount(parts.minutes)}د ${formatCount(parts.seconds)}ث`;
+  return <span className="inline-flex items-center gap-1.5 rounded-xl border border-[#0FF0FC]/25 bg-[#0FF0FC]/10 px-2.5 py-1.5 text-[11px] font-black text-[#0FF0FC]"><span className="h-1.5 w-1.5 rounded-full bg-[#0FF0FC] shadow-[0_0_12px_rgba(15,240,252,0.8)]" /> بعد {visibleParts}</span>;
 }
 
 function MatchRow({ match, now, mounted, variant = 'normal' }: { match: HomeMatch; now: Date; mounted: boolean; variant?: 'live' | 'primary' | 'normal' }) {
@@ -257,13 +254,11 @@ function MatchRow({ match, now, mounted, variant = 'normal' }: { match: HomeMatc
         <span className="rounded-full border border-[#0FF0FC]/20 bg-[#0FF0FC]/10 px-2.5 py-1 text-center text-[11px] font-black text-[#0FF0FC]">{formatKickoffTime(match.matchDate, mounted)}</span>
         <span className="flex justify-center sm:block"><MatchStatePill match={match} now={now} mounted={mounted} /></span>
       </div>
-
       <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-1.5 sm:gap-2.5">
         <TeamBadge team={match.homeTeam} align="right" />
         <MatchScore match={match} />
         <TeamBadge team={match.awayTeam} align="left" />
       </div>
-
       <div className="mt-3">
         <Link href={getBroadcastHref(match)} className="mobile-tap inline-flex w-full items-center justify-center rounded-xl bg-[#0FF0FC] px-3 py-2.5 text-center text-[11px] font-black text-black transition hover:bg-[#4AFAFF]">البث التفاعلي</Link>
       </div>
@@ -276,9 +271,7 @@ function MatchCenter({ fallbackMatches = [], nextMatch = null }: { fallbackMatch
   const [matches, setMatches] = useState<HomeMatch[]>([]);
   const [now, setNow] = useState(() => new Date());
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  useEffect(() => setMounted(true), []);
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(new Date()), 1000);
@@ -288,7 +281,6 @@ function MatchCenter({ fallbackMatches = [], nextMatch = null }: { fallbackMatch
   useEffect(() => {
     let cancelled = false;
     async function loadMatches() {
-      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
       try {
         const response = await fetch('/api/matches/live-card', { cache: 'no-store' });
         if (!response.ok) return;
@@ -296,7 +288,7 @@ function MatchCenter({ fallbackMatches = [], nextMatch = null }: { fallbackMatch
         const list = Array.isArray(data) ? data : Array.isArray(data?.matches) ? data.matches : [];
         if (!cancelled) setMatches(list);
       } catch {
-        // Keep server fallback matches if the live-card endpoint is unavailable.
+        // Keep server fallback matches.
       }
     }
     loadMatches();
@@ -314,22 +306,12 @@ function MatchCenter({ fallbackMatches = [], nextMatch = null }: { fallbackMatch
   const nextScheduledMatch = sortedMatches.find((match) => isScheduled(match) && !isWaitingForStartConfirmation(match, now) && !isConfirmedLive(match)) || null;
   const primaryMatch = confirmedLiveMatch || waitingMatch || nextScheduledMatch || sortedMatches.find((match) => !isFinished(match)) || sortedMatches[0] || null;
   const primaryKey = primaryMatch ? matchKey(primaryMatch) : null;
-  const secondaryMatches = sortedMatches
-    .filter((match) => matchKey(match) !== primaryKey)
-    .filter((match) => isScheduled(match) && !isWaitingForStartConfirmation(match, now) && !isConfirmedLive(match) && matchTime(match) >= now.getTime())
-    .slice(0, 2);
+  const secondaryMatches = sortedMatches.filter((match) => matchKey(match) !== primaryKey).filter((match) => isScheduled(match) && !isWaitingForStartConfirmation(match, now) && !isConfirmedLive(match) && matchTime(match) >= now.getTime()).slice(0, 2);
 
   return (
     <section className="flex h-auto flex-col overflow-hidden rounded-[1.45rem] border border-white/10 bg-white/[0.04] p-3 text-white shadow-[0_14px_38px_rgba(0,0,0,0.2)] backdrop-blur sm:rounded-3xl sm:p-4" aria-label="مباريات كأس العالم">
       <div className="flex flex-col gap-4">
-        <div>
-          {primaryMatch ? (
-            <MatchRow match={primaryMatch} now={now} mounted={mounted} variant={isConfirmedLive(primaryMatch) || isHalfTime(primaryMatch) ? 'live' : 'primary'} />
-          ) : (
-            <div className="rounded-2xl border border-dashed border-white/10 bg-black/20 p-4 text-sm font-bold text-gray-400">لا توجد مباراة رئيسية جاهزة للعرض الآن.</div>
-          )}
-        </div>
-
+        <div>{primaryMatch ? <MatchRow match={primaryMatch} now={now} mounted={mounted} variant={isConfirmedLive(primaryMatch) || isHalfTime(primaryMatch) ? 'live' : 'primary'} /> : <div className="rounded-2xl border border-dashed border-white/10 bg-black/20 p-4 text-sm font-bold text-gray-400">لا توجد مباراة رئيسية جاهزة للعرض الآن.</div>}</div>
         <div>
           <div className="mb-2 text-[10px] font-black uppercase tracking-[0.14em] text-gray-400">المباراتان القادمتان</div>
           <div className="grid gap-3 md:grid-cols-2">
@@ -342,14 +324,7 @@ function MatchCenter({ fallbackMatches = [], nextMatch = null }: { fallbackMatch
   );
 }
 
-export default function HomeClientSportsLiveFocus({
-  upcomingMatches = [],
-  tickerMatches = [],
-  nextMarqueeMatch = null,
-  playersCount = 0,
-  teamsCount = 0,
-  upcomingMatchesCount = 0,
-}: Props) {
+export default function HomeClientSportsLiveFocus({ upcomingMatches = [], tickerMatches = [], nextMarqueeMatch = null, playersCount = 0, teamsCount = 0, upcomingMatchesCount = 0 }: Props) {
   const safeUpcomingMatches = Array.isArray(upcomingMatches) ? (upcomingMatches as HomeMatch[]) : [];
   const safeTickerMatches = Array.isArray(tickerMatches) ? (tickerMatches as HomeMatch[]) : [];
   const safeNextMatch = nextMarqueeMatch as HomeMatch | null;
@@ -357,16 +332,10 @@ export default function HomeClientSportsLiveFocus({
   return (
     <main dir="rtl" className="mx-auto max-w-7xl space-y-4 px-3 pb-8 pt-3 sm:space-y-6 sm:px-4 sm:py-5 lg:px-6">
       <HomeLiveMatchTicker matches={safeTickerMatches} />
-
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3 lg:items-start lg:gap-5">
-        <div className="lg:col-span-2">
-          <MatchCenter fallbackMatches={safeUpcomingMatches} nextMatch={safeNextMatch} />
-        </div>
-        <div className="lg:col-span-1">
-          <HomeGroupStandingsWidget compact />
-        </div>
+        <div className="lg:col-span-2"><MatchCenter fallbackMatches={safeUpcomingMatches} nextMatch={safeNextMatch} /></div>
+        <div className="lg:col-span-1"><HomeGroupStandingsWidget compact /></div>
       </div>
-
       <HomeTournamentStatsCard playersCount={playersCount} teamsCount={teamsCount} upcomingMatchesCount={upcomingMatchesCount} />
     </main>
   );
