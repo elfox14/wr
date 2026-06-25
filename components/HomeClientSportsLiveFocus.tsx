@@ -47,6 +47,10 @@ type Props = {
 };
 
 const MATCH_REFRESH_MS = 15_000;
+const LIVE_POLL_LOOKBACK_MS = 3 * 60 * 60 * 1000;
+const LIVE_POLL_LOOKAHEAD_MS = 30 * 60 * 1000;
+const COUNTDOWN_FAST_WINDOW_MS = 10 * 60 * 1000;
+const COUNTDOWN_SLOW_REFRESH_MS = 60_000;
 const LIVE_STATUSES = ['1H', '2H', 'ET', 'BT', 'P', 'IN_PLAY', 'LIVE'];
 const SECOND_HALF_STATUSES = ['2H'];
 const HALF_TIME_STATUSES = ['HT', 'HALFTIME', 'HALF_TIME', 'HALF-TIME'];
@@ -131,6 +135,24 @@ function isConfirmedLive(match?: HomeMatch | null) {
 
 function isWaitingForStartConfirmation(match: HomeMatch, now: Date) {
   return isScheduled(match) && hasKickoffPassed(match, now) && !isConfirmedLive(match) && !isHalfTime(match);
+}
+
+function shouldPollLiveCard(matches: HomeMatch[]) {
+  const now = Date.now();
+  return matches.some((match) => {
+    if (!match || isFinished(match)) return false;
+    if (isConfirmedLive(match) || isHalfTime(match)) return true;
+    const time = matchTime(match);
+    if (!Number.isFinite(time)) return false;
+    return time >= now - LIVE_POLL_LOOKBACK_MS && time <= now + LIVE_POLL_LOOKAHEAD_MS;
+  });
+}
+
+function countdownRefreshMs(match: HomeMatch | null, now: Date) {
+  if (!match || isFinished(match)) return null;
+  if (isConfirmedLive(match) || isHalfTime(match) || isWaitingForStartConfirmation(match, now)) return 1000;
+  const diffMs = matchTime(match) - now.getTime();
+  return diffMs > 0 && diffMs <= COUNTDOWN_FAST_WINDOW_MS ? 1000 : COUNTDOWN_SLOW_REFRESH_MS;
 }
 
 function displayMinute(match: HomeMatch) {
@@ -266,47 +288,27 @@ function MatchRow({ match, now, mounted, variant = 'normal' }: { match: HomeMatc
   );
 }
 
-function MatchCenter({ fallbackMatches = [], nextMatch = null }: { fallbackMatches?: HomeMatch[]; nextMatch?: HomeMatch | null }) {
+function MatchCenter({ fallbackMatches = [], nextMatch = null, liveMatches = [] }: { fallbackMatches?: HomeMatch[]; nextMatch?: HomeMatch | null; liveMatches?: HomeMatch[] }) {
   const [mounted, setMounted] = useState(false);
-  const [matches, setMatches] = useState<HomeMatch[]>([]);
   const [now, setNow] = useState(() => new Date());
 
   useEffect(() => setMounted(true), []);
 
-  useEffect(() => {
-    const timer = window.setInterval(() => setNow(new Date()), 1000);
-    return () => window.clearInterval(timer);
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-    async function loadMatches() {
-      try {
-        const response = await fetch('/api/matches/live-card', { cache: 'no-store' });
-        if (!response.ok) return;
-        const data = await response.json();
-        const list = Array.isArray(data) ? data : Array.isArray(data?.matches) ? data.matches : [];
-        if (!cancelled) setMatches(list);
-      } catch {
-        // Keep server fallback matches.
-      }
-    }
-    loadMatches();
-    const timer = window.setInterval(loadMatches, MATCH_REFRESH_MS);
-    return () => {
-      cancelled = true;
-      window.clearInterval(timer);
-    };
-  }, []);
-
-  const mergedMatches = useMemo(() => uniqueMatches([...(matches.length ? matches : []), ...(nextMatch ? [nextMatch] : []), ...(matches.length ? [] : fallbackMatches)]), [matches, nextMatch, fallbackMatches]);
+  const mergedMatches = useMemo(() => uniqueMatches([...(liveMatches.length ? liveMatches : []), ...(nextMatch ? [nextMatch] : []), ...(liveMatches.length ? [] : fallbackMatches)]), [liveMatches, nextMatch, fallbackMatches]);
   const sortedMatches = useMemo(() => [...mergedMatches].sort((a, b) => matchTime(a) - matchTime(b)), [mergedMatches]);
   const confirmedLiveMatch = sortedMatches.find((match) => isConfirmedLive(match) || isHalfTime(match)) || null;
   const waitingMatch = sortedMatches.find((match) => isWaitingForStartConfirmation(match, now)) || null;
   const nextScheduledMatch = sortedMatches.find((match) => isScheduled(match) && !isWaitingForStartConfirmation(match, now) && !isConfirmedLive(match)) || null;
   const primaryMatch = confirmedLiveMatch || waitingMatch || nextScheduledMatch || sortedMatches.find((match) => !isFinished(match)) || sortedMatches[0] || null;
   const primaryKey = primaryMatch ? matchKey(primaryMatch) : null;
+  const refreshMs = countdownRefreshMs(primaryMatch, now);
   const secondaryMatches = sortedMatches.filter((match) => matchKey(match) !== primaryKey).filter((match) => isScheduled(match) && !isWaitingForStartConfirmation(match, now) && !isConfirmedLive(match) && matchTime(match) >= now.getTime()).slice(0, 2);
+
+  useEffect(() => {
+    if (!refreshMs) return;
+    const timer = window.setInterval(() => setNow(new Date()), refreshMs);
+    return () => window.clearInterval(timer);
+  }, [primaryKey, refreshMs]);
 
   return (
     <section className="flex h-auto flex-col overflow-hidden rounded-[1.45rem] border border-white/10 bg-white/[0.04] p-3 text-white shadow-[0_14px_38px_rgba(0,0,0,0.2)] backdrop-blur sm:rounded-3xl sm:p-4" aria-label="مباريات كأس العالم">
@@ -328,12 +330,42 @@ export default function HomeClientSportsLiveFocus({ upcomingMatches = [], ticker
   const safeUpcomingMatches = Array.isArray(upcomingMatches) ? (upcomingMatches as HomeMatch[]) : [];
   const safeTickerMatches = Array.isArray(tickerMatches) ? (tickerMatches as HomeMatch[]) : [];
   const safeNextMatch = nextMarqueeMatch as HomeMatch | null;
+  const pollSeedMatches = useMemo(() => uniqueMatches([...safeUpcomingMatches, ...safeTickerMatches, ...(safeNextMatch ? [safeNextMatch] : [])]), [safeUpcomingMatches, safeTickerMatches, safeNextMatch]);
+  const livePollingEnabled = useMemo(() => shouldPollLiveCard(pollSeedMatches), [pollSeedMatches]);
+  const [liveCardMatches, setLiveCardMatches] = useState<HomeMatch[]>([]);
+
+  useEffect(() => {
+    if (!livePollingEnabled) return;
+
+    let cancelled = false;
+    async function loadMatches() {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+      try {
+        const response = await fetch('/api/matches/live-card', { cache: 'no-store' });
+        if (!response.ok) return;
+        const data = await response.json();
+        const list = Array.isArray(data) ? data : Array.isArray(data?.matches) ? data.matches : [];
+        if (!cancelled) setLiveCardMatches(list);
+      } catch {
+        // Keep server fallback matches.
+      }
+    }
+
+    loadMatches();
+    const timer = window.setInterval(loadMatches, MATCH_REFRESH_MS);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [livePollingEnabled]);
+
+  const tickerDisplayMatches = useMemo(() => uniqueMatches([...(liveCardMatches.length ? liveCardMatches : []), ...safeTickerMatches]).slice(0, 8), [liveCardMatches, safeTickerMatches]);
 
   return (
     <main dir="rtl" className="mx-auto max-w-7xl space-y-4 px-3 pb-8 pt-3 sm:space-y-6 sm:px-4 sm:py-5 lg:px-6">
-      <HomeLiveMatchTicker matches={safeTickerMatches} />
+      <HomeLiveMatchTicker matches={tickerDisplayMatches} />
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3 lg:items-start lg:gap-5">
-        <div className="lg:col-span-2"><MatchCenter fallbackMatches={safeUpcomingMatches} nextMatch={safeNextMatch} /></div>
+        <div className="lg:col-span-2"><MatchCenter fallbackMatches={safeUpcomingMatches} nextMatch={safeNextMatch} liveMatches={liveCardMatches} /></div>
         <div className="lg:col-span-1"><HomeGroupStandingsWidget compact /></div>
       </div>
       <HomeTournamentStatsCard playersCount={playersCount} teamsCount={teamsCount} upcomingMatchesCount={upcomingMatchesCount} />
