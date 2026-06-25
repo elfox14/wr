@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { withTeamDisplay } from '@/lib/teamDisplay';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 30;
@@ -160,8 +161,8 @@ export async function GET(req: NextRequest) {
         hasLiveAnimation: Boolean(match.animationMatchId || match._count.events > 0),
         hasStats: match._count.statsSnapshots > 0,
         hasEvents: match._count.events > 0,
-        homeTeam: match.homeTeam,
-        awayTeam: match.awayTeam,
+        homeTeam: withTeamDisplay(match.homeTeam),
+        awayTeam: withTeamDisplay(match.awayTeam),
       };
     });
 
