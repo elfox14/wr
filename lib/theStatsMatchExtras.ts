@@ -20,6 +20,7 @@ function str(...values: any[]) {
   return null;
 }
 function n(value: any) { if (value === null || value === undefined || value === '') return null; const number = Number(typeof value === 'string' ? value.replace('%', '').trim() : value); return Number.isFinite(number) ? number : null; }
+function bool(value: any) { if (typeof value === 'boolean') return value; if (value === null || value === undefined || value === '') return null; const s = String(value).trim().toLowerCase(); if (['1', 'true', 'yes', 'y'].includes(s)) return true; if (['0', 'false', 'no', 'n'].includes(s)) return false; return null; }
 function key(value: any) { return String(value || '').toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/&/g, ' and ').replace(/[^a-z0-9\u0600-\u06ff]+/g, ' ').replace(/\s+/g, ' ').trim().replace('czechia', 'czech republic').replace('usa', 'united states').replace('u s a', 'united states').replace('united states of america', 'united states').replace('turkiye', 'turkey').replace('türkiye', 'turkey'); }
 function words(value: any) { return key(value).split(' ').filter((w) => w.length > 1); }
 function similarity(a: any, b: any) { const aa = key(a); const bb = key(b); if (!aa || !bb) return 0; if (aa === bb) return 100; if (aa.includes(bb) || bb.includes(aa)) return 88; const aw = new Set(words(aa)); const bw = new Set(words(bb)); if (!aw.size || !bw.size) return 0; const hit = Array.from(aw).filter((w) => bw.has(w)).length; return Math.round((hit / Math.max(aw.size, bw.size)) * 75); }
@@ -78,17 +79,75 @@ export async function resolveTheStatsProviderId(match: any, query: Record<string
 
 function pair(value: any) { const all = value?.all || value || {}; const home = n(all.home ?? all.home_team ?? all.homeTeam ?? all.home_team_value); const away = n(all.away ?? all.away_team ?? all.awayTeam ?? all.away_team_value); return home === null && away === null ? null : { home, away }; }
 function compactStats(payload: any) {
-  const data = dataOf(payload); const overview = data.overview || data.stats || {}; const shots = data.shots || {}; const attack = data.attack || {}; const defending = data.defending || {}; const out: Record<string, any> = {};
-  const entries: Record<string, any> = { possession: overview.ball_possession || overview.possession, xg: overview.expected_goals || data.expected_goals, npxg: data.np_expected_goals || data.non_penalty_expected_goals, bigChances: overview.big_chances, shots: overview.total_shots || shots.total_shots, shotsOnTarget: overview.shots_on_target || shots.shots_on_target, shotsOffTarget: overview.shots_off_target || shots.shots_off_target, blockedShots: shots.blocked_shots, shotsInsideBox: shots.shots_inside_box, shotsOutsideBox: shots.shots_outside_box, corners: overview.corner_kicks || overview.corners, fouls: overview.fouls, offsides: overview.offsides || attack.offsides, yellowCards: overview.yellow_cards, redCards: overview.red_cards, passes: overview.passes, accuratePasses: overview.accurate_passes, tackles: overview.tackles, saves: overview.goalkeeper_saves, interceptions: defending.interceptions, clearances: defending.clearances, ballRecoveries: defending.ball_recoveries };
+  const data = dataOf(payload); const overview = data.overview || data.stats || {}; const shots = data.shots || {}; const attack = data.attack || {}; const defending = data.defending || {}; const goalkeeping = data.goalkeeping || {}; const passes = data.passes || {}; const out: Record<string, any> = {};
+  const entries: Record<string, any> = { possession: overview.ball_possession || overview.possession, xg: overview.expected_goals || data.expected_goals, npxg: data.np_expected_goals || data.non_penalty_expected_goals, bigChances: overview.big_chances, shots: overview.total_shots || shots.total_shots, shotsOnTarget: overview.shots_on_target || shots.shots_on_target, shotsOffTarget: overview.shots_off_target || shots.shots_off_target, blockedShots: shots.blocked_shots, shotsInsideBox: shots.shots_inside_box, shotsOutsideBox: shots.shots_outside_box, corners: overview.corner_kicks || overview.corners, fouls: overview.fouls, offsides: overview.offsides || attack.offsides, yellowCards: overview.yellow_cards, redCards: overview.red_cards, passes: overview.passes || passes.total_passes, accuratePasses: overview.accurate_passes || passes.accurate_passes, tackles: overview.tackles, saves: overview.goalkeeper_saves || goalkeeping.saves, interceptions: defending.interceptions, clearances: defending.clearances, ballRecoveries: defending.ball_recoveries };
   for (const [keyName, value] of Object.entries(entries)) { const parsed = pair(value); if (parsed) out[keyName] = parsed; }
   return { meta: { source: 'match-stats' }, stats: out };
 }
 function compactMatchInfo(matchInfoPayload: any, statsPayload: any) { const data = dataOf(matchInfoPayload); const stats = dataOf(statsPayload); const venue = data?.venue || data?.fixture?.venue || data?.match?.venue || {}; const referee = data?.referee || data?.fixture?.referee || data?.match?.referee || {}; return { status: str(data?.status, stats?.status), venue: str(venue?.name, venue), city: str(venue?.city, data?.city), referee: str(referee?.name, referee), finalScore: data?.score?.final_score || data?.score || null, xgAvailable: Boolean(data?.xg_available || stats?.overview?.expected_goals) }; }
-function compactEvent(row: any) { const team = row?.team || {}; const player = row?.player || row?.athlete || row?.scorer || {}; return { type: str(row?.type, row?.event_type, row?.incident_type, row?.name) || 'event', minute: n(row?.minute ?? row?.time?.minute ?? row?.elapsed ?? row?.match_minute ?? row?.event_minute), teamId: str(team?.id, row?.team_id, row?.teamId), teamName: str(team?.name, row?.team_name, row?.teamName), playerId: str(player?.id, row?.player_id, row?.playerId), playerName: str(player?.name, row?.player_name, row?.playerName, row?.scorer?.name), detail: str(row?.detail, row?.description, row?.comment, row?.text, row?.message) };
+function compactEvent(row: any) { const team = row?.team || {}; const player = row?.player || row?.athlete || row?.scorer || {}; return { sequence: n(row?.sequence), period: str(row?.period), type: str(row?.type, row?.event_type, row?.incident_type, row?.name) || 'event', minute: n(row?.minute ?? row?.time?.minute ?? row?.elapsed ?? row?.match_minute ?? row?.event_minute), extraTime: n(row?.extra_time ?? row?.extraTime ?? row?.stoppage_time), teamId: str(team?.id, row?.team_id, row?.teamId), teamName: str(team?.name, row?.team_name, row?.teamName), playerId: str(player?.id, row?.player_id, row?.playerId), playerName: str(player?.name, row?.player_name, row?.playerName, row?.scorer?.name), detail: str(row?.detail, row?.description, row?.comment, row?.text, row?.message) }; }
+function compactShot(row: any) { const player = row?.player || row?.athlete || row?.shooter || {}; const team = row?.team || {}; const outcome = str(row?.outcome, row?.result, row?.shot_outcome, row?.status, row?.type); return { id: str(row?.id), minute: n(row?.minute ?? row?.time?.minute ?? row?.elapsed), playerId: str(player?.id, row?.player_id, row?.playerId), playerName: str(player?.name, row?.player_name, row?.playerName), teamId: str(team?.id, row?.team_id, row?.teamId), teamName: str(team?.name, row?.team_name, row?.teamName), x: n(row?.x ?? row?.pitchX ?? row?.location?.x), y: n(row?.y ?? row?.pitchY ?? row?.location?.y), xg: n(row?.xg ?? row?.expected_goals ?? row?.expectedGoals), npxg: n(row?.npxg ?? row?.non_penalty_xg ?? row?.nonPenaltyXg), outcome, situation: str(row?.situation), bodyPart: str(row?.body_part, row?.bodyPart), isOnTarget: bool(row?.is_on_target) ?? /on target|saved|goal/i.test(String(outcome || '')), isGoal: bool(row?.is_goal) ?? /goal|scored/i.test(String(outcome || row?.type || '')), isBlocked: bool(row?.is_blocked_shot), isPenalty: bool(row?.is_penalty) };
 }
-function compactShot(row: any) { const player = row?.player || row?.athlete || row?.shooter || {}; const team = row?.team || {}; const outcome = str(row?.outcome, row?.result, row?.shot_outcome, row?.status, row?.type); return { minute: n(row?.minute ?? row?.time?.minute ?? row?.elapsed), playerName: str(player?.name, row?.player_name, row?.playerName), teamName: str(team?.name, row?.team_name, row?.teamName), x: n(row?.x ?? row?.pitchX ?? row?.location?.x), y: n(row?.y ?? row?.pitchY ?? row?.location?.y), xg: n(row?.xg ?? row?.expected_goals ?? row?.expectedGoals), npxg: n(row?.npxg ?? row?.non_penalty_xg ?? row?.nonPenaltyXg), outcome, isOnTarget: /on target|saved|goal/i.test(String(outcome || '')), isGoal: /goal|scored/i.test(String(outcome || row?.type || '')) };
-}
-function compactPlayerStat(row: any) { const player = row?.player || row?.athlete || row; const team = row?.team || {}; const stats = row?.stats || row?.statistics || row; const passing = row?.passing || stats?.passing || {}; const shooting = row?.shooting || stats?.shooting || {}; const defending = row?.defending || stats?.defending || {}; const goalkeeping = row?.goalkeeping || stats?.goalkeeping || {}; return { playerId: str(player?.id, row?.player_id, row?.playerId, row?.id), playerName: str(player?.name, row?.player_name, row?.playerName, row?.name), teamId: str(team?.id, row?.team_id, row?.teamId), teamName: str(team?.name, row?.team_name, row?.teamName), position: str(player?.position, row?.position), rating: n(stats?.rating ?? row?.rating), minutes: n(stats?.minutes ?? stats?.minutes_played ?? row?.minutes), goals: n(shooting?.goals ?? stats?.goals ?? row?.goals), assists: n(passing?.assists ?? stats?.assists ?? row?.assists), shots: n(shooting?.total_shots ?? stats?.shots ?? row?.shots), shotsOnTarget: n(shooting?.shots_on_target ?? stats?.shots_on_target ?? row?.shots_on_target), passes: n(passing?.total_passes ?? stats?.passes ?? row?.passes), accuratePasses: n(passing?.accurate_passes ?? stats?.accurate_passes ?? row?.accurate_passes), keyPasses: n(passing?.key_passes ?? stats?.key_passes ?? row?.key_passes), tackles: n(defending?.tackles ?? stats?.tackles ?? row?.tackles), interceptions: n(defending?.interceptions ?? stats?.interceptions ?? row?.interceptions), clearances: n(defending?.clearances ?? stats?.clearances ?? row?.clearances), saves: n(goalkeeping?.saves ?? stats?.saves ?? row?.saves) };
+function compactPlayerStat(row: any) {
+  const player = row?.player || row?.athlete || row;
+  const team = row?.team || {};
+  const stats = row?.stats || row?.statistics || row;
+  const passing = row?.passing || stats?.passing || {};
+  const shooting = row?.shooting || stats?.shooting || {};
+  const duels = row?.duels || stats?.duels || {};
+  const defending = row?.defending || stats?.defending || {};
+  const goalkeeping = row?.goalkeeping || stats?.goalkeeping || {};
+  const general = row?.general || stats?.general || {};
+  const minutes = n(stats?.minutes ?? stats?.minutes_played ?? row?.minutes_played ?? row?.minutes);
+  const started = bool(stats?.started ?? row?.started);
+  const played = bool(stats?.played ?? row?.played) ?? (minutes !== null && minutes > 0) ?? null;
+  return {
+    playerId: str(player?.id, row?.player_id, row?.playerId, row?.id),
+    playerName: str(player?.name, row?.player_name, row?.playerName, row?.name),
+    teamId: str(team?.id, row?.team_id, row?.teamId),
+    teamName: str(team?.name, row?.team_name, row?.teamName),
+    position: str(player?.position, row?.position),
+    rating: n(stats?.rating ?? row?.rating),
+    minutes,
+    started,
+    played,
+    goals: n(shooting?.goals ?? stats?.goals ?? row?.goals),
+    assists: n(passing?.assists ?? stats?.assists ?? row?.assists),
+    shots: n(shooting?.total_shots ?? stats?.shots ?? row?.shots),
+    shotsOnTarget: n(shooting?.shots_on_target ?? stats?.shots_on_target ?? row?.shots_on_target),
+    shotsOffTarget: n(shooting?.shots_off_target ?? stats?.shots_off_target ?? row?.shots_off_target),
+    blockedShots: n(shooting?.blocked_shots ?? stats?.blocked_shots ?? row?.blocked_shots),
+    bigChancesCreated: n(shooting?.big_chances_created ?? stats?.big_chances_created ?? row?.big_chances_created),
+    expectedGoals: n(shooting?.expected_goals ?? stats?.expected_goals ?? row?.expected_goals),
+    expectedAssists: n(shooting?.expected_assists ?? passing?.expected_assists ?? stats?.expected_assists ?? row?.expected_assists),
+    npExpectedGoals: n(shooting?.np_expected_goals ?? stats?.np_expected_goals ?? row?.np_expected_goals),
+    passes: n(passing?.total_passes ?? stats?.passes ?? row?.passes),
+    accuratePasses: n(passing?.accurate_passes ?? stats?.accurate_passes ?? row?.accurate_passes),
+    keyPasses: n(passing?.key_passes ?? stats?.key_passes ?? row?.key_passes),
+    crosses: n(passing?.total_crosses ?? stats?.crosses ?? row?.crosses),
+    accurateCrosses: n(passing?.accurate_crosses ?? stats?.accurate_crosses ?? row?.accurate_crosses),
+    longBalls: n(passing?.total_long_balls ?? stats?.long_balls ?? row?.long_balls),
+    accurateLongBalls: n(passing?.accurate_long_balls ?? stats?.accurate_long_balls ?? row?.accurate_long_balls),
+    duelWon: n(duels?.duel_won ?? stats?.duel_won ?? row?.duel_won),
+    duelLost: n(duels?.duel_lost ?? stats?.duel_lost ?? row?.duel_lost),
+    aerialWon: n(duels?.aerial_won ?? stats?.aerial_won ?? row?.aerial_won),
+    challengeLost: n(duels?.challenge_lost ?? stats?.challenge_lost ?? row?.challenge_lost),
+    wonContest: n(duels?.won_contest ?? stats?.won_contest ?? row?.won_contest),
+    dispossessed: n(duels?.dispossessed ?? general?.dispossessed ?? stats?.dispossessed ?? row?.dispossessed),
+    tackles: n(defending?.tackles ?? stats?.tackles ?? row?.tackles),
+    interceptions: n(defending?.interceptions ?? stats?.interceptions ?? row?.interceptions),
+    clearances: n(defending?.clearances ?? stats?.clearances ?? row?.clearances),
+    saves: n(goalkeeping?.saves ?? stats?.saves ?? row?.saves),
+    touches: n(general?.touches ?? stats?.touches ?? row?.touches),
+    foulsCommitted: n(general?.fouls ?? stats?.fouls ?? row?.fouls),
+    foulsWon: n(general?.was_fouled ?? stats?.was_fouled ?? row?.was_fouled),
+    offsides: n(general?.offsides ?? stats?.offsides ?? row?.offsides),
+    yellowCards: n(general?.yellow_cards ?? stats?.yellow_cards ?? row?.yellow_cards),
+    redCards: n(general?.red_cards ?? stats?.red_cards ?? row?.red_cards),
+    possessionLost: n(general?.possession_lost ?? stats?.possession_lost ?? row?.possession_lost),
+    playerSubbedOn: str(general?.player_subbed_on ?? stats?.player_subbed_on ?? row?.player_subbed_on),
+    playerSubbedOff: str(general?.player_subbed_off ?? stats?.player_subbed_off ?? row?.player_subbed_off),
+  };
 }
 async function fetchEndpoint(keyName: string, path: string, timeoutMs: number) { try { return { key: keyName, path, ok: true, payload: await theStatsApiFetch(path, {}, { timeoutMs }) }; } catch (error: any) { return { key: keyName, path, ok: false, error: safeError(error) }; } }
 
