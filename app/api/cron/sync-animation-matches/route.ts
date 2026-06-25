@@ -1,6 +1,16 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
+const LINKABLE_STATUSES = [
+  'SCHEDULED', 'TIMED', 'NOT_STARTED', 'NS', 'TBD',
+  'LIVE', 'IN_PLAY', '1H', '2H', 'HT', 'HALFTIME', 'HALF_TIME', 'BREAK', 'ET', 'P', 'PAUSED',
+  'FINISHED', 'FT', 'AET', 'PEN', 'COMPLETED', 'ENDED', 'FINAL_VERIFIED',
+];
+
 function isAuthorized(req: Request) {
   const secret = process.env.CRON_SECRET || process.env.ADMIN_API_SECRET || '';
   if (!secret) return true;
@@ -85,8 +95,8 @@ async function fetchIsportsSchedule(date: string) {
 }
 
 function scoreCandidate(local: any, provider: any) {
-  const localHome = normalizeName(local.homeTeam.name);
-  const localAway = normalizeName(local.awayTeam.name);
+  const localHome = normalizeName(local.homeTeam.name || local.homeTeam.code);
+  const localAway = normalizeName(local.awayTeam.name || local.awayTeam.code);
   const providerHome = normalizeName(provider.homeName);
   const providerAway = normalizeName(provider.awayName);
   let score = 0;
@@ -99,17 +109,33 @@ function scoreCandidate(local: any, provider: any) {
   return Math.round(score);
 }
 
+function intParam(params: URLSearchParams, name: string, fallback: number, min: number, max: number) {
+  const value = Number(params.get(name) ?? fallback);
+  if (!Number.isFinite(value)) return fallback;
+  return Math.max(min, Math.min(max, Math.floor(value)));
+}
+
 export async function GET(req: Request) {
   if (!isAuthorized(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   try {
     const { searchParams } = new URL(req.url);
     const threshold = Number(searchParams.get('threshold') || 70);
-    const limit = Math.min(Math.max(Number(searchParams.get('limit') || 40), 1), 100);
+    const limit = Math.min(Math.max(Number(searchParams.get('limit') || 80), 1), 150);
     const dryRun = searchParams.get('dryRun') === 'true';
+    const lookbackHours = intParam(searchParams, 'lookbackHours', 12, 1, 24 * 14);
+    const lookaheadHours = intParam(searchParams, 'lookaheadHours', 48, 1, 24 * 14);
+    const now = Date.now();
+    const from = new Date(now - lookbackHours * 60 * 60 * 1000);
+    const to = new Date(now + lookaheadHours * 60 * 60 * 1000);
 
     const localMatches = await prisma.match.findMany({
-      where: { status: { in: ['SCHEDULED', 'IN_PLAY', 'LIVE'] } },
+      where: {
+        OR: [
+          { status: { in: LINKABLE_STATUSES } },
+          { matchDate: { gte: from, lte: to } },
+        ],
+      },
       orderBy: { matchDate: 'asc' },
       take: limit,
       include: {
@@ -133,7 +159,7 @@ export async function GET(req: Request) {
 
     for (const match of localMatches) {
       if (match.animationMatchId) {
-        skipped.push({ id: match.id, reason: 'already-linked', animationMatchId: match.animationMatchId });
+        skipped.push({ id: match.id, reason: 'already-linked', animationMatchId: match.animationMatchId, status: match.status, local: `${match.homeTeam.name} × ${match.awayTeam.name}` });
         continue;
       }
       const candidates = (providerByDate.get(dateOnly(match.matchDate)) || [])
@@ -141,10 +167,10 @@ export async function GET(req: Request) {
         .sort((a, b) => b.score - a.score);
       const best = candidates[0];
       if (!best || best.score < threshold) {
-        skipped.push({ id: match.id, reason: 'no-confident-match', score: best?.score || 0 });
+        skipped.push({ id: match.id, reason: 'no-confident-match', score: best?.score || 0, status: match.status, local: `${match.homeTeam.name} × ${match.awayTeam.name}`, provider: best ? `${best.homeName} × ${best.awayName}` : null });
         continue;
       }
-      matched.push({ id: match.id, animationMatchId: best.matchId, score: best.score, local: `${match.homeTeam.name} × ${match.awayTeam.name}`, provider: `${best.homeName} × ${best.awayName}` });
+      matched.push({ id: match.id, animationMatchId: best.matchId, score: best.score, status: match.status, local: `${match.homeTeam.name} × ${match.awayTeam.name}`, provider: `${best.homeName} × ${best.awayName}` });
     }
 
     let updated = 0;
@@ -153,8 +179,12 @@ export async function GET(req: Request) {
       updated = result.length;
     }
 
-    return NextResponse.json({ ok: true, dryRun, scanned: localMatches.length, matched: matched.length, updated, threshold, providerErrors, matches: matched, skipped });
+    return NextResponse.json({ ok: true, mode: 'sync_animation_matches_v2_broader_window', dryRun, scanned: localMatches.length, matched: matched.length, updated, threshold, lookbackHours, lookaheadHours, providerDates: uniqueDates, providerErrors, matches: matched, skipped: skipped.slice(0, 40) });
   } catch (error: any) {
     return NextResponse.json({ error: error.message || 'sync-animation-matches failed' }, { status: 500 });
   }
+}
+
+export async function POST(req: Request) {
+  return GET(req);
 }
