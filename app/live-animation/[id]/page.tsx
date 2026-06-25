@@ -17,20 +17,73 @@ export const revalidate = 0;
 
 type PageProps = { params: Promise<{ id: string }> };
 
-const LIVE_STATUSES = ['LIVE', 'IN_PLAY', '1H', '2H', 'HT', 'ET', 'BREAK'];
+type MetricView = { key: string; label: string; home: number | null; away: number | null; suffix?: string; source: string; available: boolean };
+
+const LIVE_STATUSES = ['LIVE', 'IN_PLAY', '1H', '2H', 'ET'];
+const HALF_TIME_STATUSES = ['HT', 'HALFTIME', 'HALF_TIME', 'BREAK'];
 const FINISHED_STATUSES = ['FINISHED', 'FT', 'AET', 'PEN', 'COMPLETED', 'ENDED', 'FINAL_VERIFIED'];
+
+const METRIC_DEFS: Array<[string, string, string?]> = [
+  ['possession', 'الاستحواذ', '%'], ['xg', 'الأهداف المتوقعة xG'], ['npxg', 'xG بدون ركلات جزاء'], ['bigChances', 'فرص كبيرة'],
+  ['shots', 'التسديدات'], ['shotsOnTarget', 'على المرمى'], ['shotsOffTarget', 'خارج المرمى'], ['blockedShots', 'تسديدات محجوبة'], ['shotsInsideBox', 'داخل المنطقة'], ['shotsOutsideBox', 'خارج المنطقة'],
+  ['corners', 'الركنيات'], ['fouls', 'الأخطاء'], ['offsides', 'التسللات'], ['yellowCards', 'بطاقات صفراء'], ['redCards', 'بطاقات حمراء'],
+  ['passes', 'التمريرات'], ['accuratePasses', 'تمريرات صحيحة'], ['tackles', 'تدخلات'], ['interceptions', 'اعتراضات'], ['clearances', 'تشتيت'], ['ballRecoveries', 'استرجاع الكرة'], ['saves', 'تصديات الحارس'],
+  ['attacks', 'الهجمات'], ['dangerousAttacks', 'هجمات خطيرة'],
+];
+
+const COLUMN_KEYS: Record<string, [string, string]> = {
+  possession: ['homePossession', 'awayPossession'], attacks: ['homeAttacks', 'awayAttacks'], dangerousAttacks: ['homeDangerousAttacks', 'awayDangerousAttacks'],
+  shots: ['homeShots', 'awayShots'], shotsOnTarget: ['homeShotsOnTarget', 'awayShotsOnTarget'], shotsOffTarget: ['homeShotsOffTarget', 'awayShotsOffTarget'],
+  corners: ['homeCorners', 'awayCorners'], yellowCards: ['homeYellowCards', 'awayYellowCards'], redCards: ['homeRedCards', 'awayRedCards'], saves: ['homeSaves', 'awaySaves'],
+};
 
 function statusKind(status?: string | null) {
   const raw = String(status || '').toUpperCase();
-  if (LIVE_STATUSES.includes(raw)) return 'live';
-  if (raw === 'HT') return 'halftime';
   if (FINISHED_STATUSES.includes(raw)) return 'finished';
+  if (HALF_TIME_STATUSES.includes(raw)) return 'halftime';
+  if (LIVE_STATUSES.includes(raw)) return 'live';
   return 'scheduled';
 }
 
 function safeNumber(value: any, fallback = 0) {
   const number = Number(value);
   return Number.isFinite(number) ? number : fallback;
+}
+function toNullableNumber(value: any) {
+  if (value === null || value === undefined || value === '') return null;
+  const number = Number(typeof value === 'string' ? value.replace('%', '').trim() : value);
+  return Number.isFinite(number) ? number : null;
+}
+function asObject(value: any): Record<string, any> { return value && typeof value === 'object' && !Array.isArray(value) ? value : {}; }
+function rawData(snapshot: any) { return asObject(snapshot?.rawData); }
+function providerName(snapshot: any) { const p = String(snapshot?.provider || rawData(snapshot)?.provider || '').toUpperCase(); if (p.includes('THE_STATS')) return 'TheStats'; if (p.includes('ISPORT')) return 'iSports Animation'; return snapshot?.provider || 'Database'; }
+function isTheStatsSnapshot(snapshot: any) { const p = String(snapshot?.provider || '').toUpperCase(); const raw = rawData(snapshot); return p.includes('THE_STATS') || String(raw.provider || '').toUpperCase().includes('THE_STATS'); }
+function isISportsSnapshot(snapshot: any) { const p = String(snapshot?.provider || '').toUpperCase(); return p.includes('ISPORT') || p.includes('AUTOMATED_LIVE_INGEST') || p.includes('WORKER_ISPORTS'); }
+function latestTheStatsSnapshot(snapshots: any[]) { return snapshots.find((snapshot) => isTheStatsSnapshot(snapshot) && rawData(snapshot)?.normalized) || snapshots.find(isTheStatsSnapshot) || null; }
+function latestISportsSnapshot(snapshots: any[]) { return snapshots.find(isISportsSnapshot) || null; }
+function statPairFromSnapshot(snapshot: any, key: string) {
+  if (!snapshot) return null;
+  const normalizedStats = asObject(rawData(snapshot)?.normalized?.liveStats?.stats);
+  const pair = asObject(normalizedStats[key]);
+  let home = toNullableNumber(pair.home);
+  let away = toNullableNumber(pair.away);
+  const columns = COLUMN_KEYS[key];
+  if (columns) {
+    home ??= toNullableNumber(snapshot[columns[0]]);
+    away ??= toNullableNumber(snapshot[columns[1]]);
+  }
+  if (home === null && away === null) return null;
+  return { home, away, source: providerName(snapshot) };
+}
+function buildMetrics(snapshots: any[], finished: boolean): MetricView[] {
+  const theStats = latestTheStatsSnapshot(snapshots);
+  const iSports = latestISportsSnapshot(snapshots);
+  return METRIC_DEFS.map(([key, label, suffix]) => {
+    const primary = key === 'attacks' || key === 'dangerousAttacks' ? null : statPairFromSnapshot(theStats, key);
+    const fallback = statPairFromSnapshot(iSports, key);
+    const pair = primary || fallback;
+    return { key, label, home: pair?.home ?? null, away: pair?.away ?? null, suffix, source: pair?.source || (finished ? 'TheStats' : 'iSports Animation'), available: Boolean(pair) };
+  }).filter((metric) => metric.available);
 }
 
 function icon(type: string) {
@@ -42,9 +95,9 @@ function icon(type: string) {
   if (key.includes('shot')) return '🎯';
   if (key.includes('corner')) return '🚩';
   if (key.includes('penalty')) return '🥅';
+  if (key.includes('var')) return '📺';
   return '●';
 }
-
 function color(type: string) {
   const key = String(type || '').toLowerCase();
   if (key.includes('goal')) return '#F8C846';
@@ -54,147 +107,101 @@ function color(type: string) {
   if (key.includes('corner')) return '#A78BFA';
   return '#E5E7EB';
 }
-
-function sideFromTeam(teamId: string | null | undefined, homeTeamId: string, awayTeamId: string): AnimationTeamSide {
-  if (teamId === homeTeamId) return 'home';
-  if (teamId === awayTeamId) return 'away';
-  return 'unknown';
-}
+function sideFromTeam(teamId: string | null | undefined, homeTeamId: string, awayTeamId: string): AnimationTeamSide { if (teamId === homeTeamId) return 'home'; if (teamId === awayTeamId) return 'away'; return 'unknown'; }
+function teamIdFromName(teamName: any, home: any, away: any) { const name = String(teamName || '').toLowerCase(); if (!name) return null; if (name.includes(String(home?.name || '').toLowerCase()) || String(home?.name || '').toLowerCase().includes(name)) return home.id; if (name.includes(String(away?.name || '').toLowerCase()) || String(away?.name || '').toLowerCase().includes(name)) return away.id; return null; }
 
 function normalizeEvent(row: any, index: number, homeTeamId: string, awayTeamId: string) {
   const eventType = String(row.eventType || row.type || 'note');
   const teamSide = sideFromTeam(row.teamId, homeTeamId, awayTeamId);
-  const spatial = inferLiveAnimationSpatial({
-    id: String(row.id || `event-${index}`),
-    type: eventType,
-    detail: row.detail || row.eventLabel,
-    minute: row.minute,
-    teamSide,
-    index,
-    explicitX: row.x,
-    explicitY: row.y,
-    explicitEndX: row.endX,
-    explicitEndY: row.endY,
-  });
-
+  const spatial = inferLiveAnimationSpatial({ id: String(row.id || `event-${index}`), type: eventType, detail: row.detail || row.eventLabel, minute: row.minute, teamSide, index, explicitX: row.x, explicitY: row.y, explicitEndX: row.endX, explicitEndY: row.endY });
   return {
-    id: String(row.id || `event-${index}`),
-    sequenceNumber: safeNumber(row.sequenceNumber, safeNumber(row.minute, index + 1) * 100 + index + 1),
-    minute: row.minute ?? null,
-    second: row.second ?? null,
-    teamId: row.teamId || null,
-    playerId: row.playerId || null,
-    playerName: row.playerName || null,
-    jerseyNumber: row.jerseyNumber || null,
-    eventType,
-    eventLabel: row.eventLabel || animationEventLabel(eventType),
-    detail: row.detail || row.eventLabel || animationEventLabel(eventType),
-    x: row.x ?? spatial.x,
-    y: row.y ?? spatial.y,
-    endX: row.endX ?? spatial.endX,
-    endY: row.endY ?? spatial.endY,
-    zone: row.zone || spatial.zone,
-    coordinateSource: row.coordinateSource || spatial.coordinateSource,
-    coordinateConfidence: row.coordinateConfidence || spatial.coordinateConfidence,
-    eventSide: row.eventSide || spatial.eventSide,
-    isInferred: row.isInferred === null || row.isInferred === undefined ? spatial.isInferred : Boolean(row.isInferred),
-    anchorZone: row.anchorZone || spatial.anchorZone,
-    displayPriority: safeNumber(row.displayPriority, spatial.displayPriority),
-    provider: row.provider || row.sourceName || 'MATCH_EVENT_FALLBACK',
-    icon: icon(eventType),
-    color: color(eventType),
-    createdAt: row.createdAt ? new Date(row.createdAt).toISOString() : new Date().toISOString(),
+    id: String(row.id || `event-${index}`), sequenceNumber: safeNumber(row.sequenceNumber, safeNumber(row.minute, index + 1) * 100 + index + 1), minute: row.minute ?? null, second: row.second ?? null,
+    teamId: row.teamId || null, playerId: row.playerId || null, playerName: row.playerName || null, jerseyNumber: row.jerseyNumber || null,
+    eventType, eventLabel: row.eventLabel || animationEventLabel(eventType), detail: row.detail || row.eventLabel || animationEventLabel(eventType),
+    x: row.x ?? spatial.x, y: row.y ?? spatial.y, endX: row.endX ?? spatial.endX, endY: row.endY ?? spatial.endY, zone: row.zone || spatial.zone,
+    coordinateSource: row.coordinateSource || spatial.coordinateSource, coordinateConfidence: row.coordinateConfidence || spatial.coordinateConfidence, eventSide: row.eventSide || spatial.eventSide,
+    isInferred: row.isInferred === null || row.isInferred === undefined ? spatial.isInferred : Boolean(row.isInferred), anchorZone: row.anchorZone || spatial.anchorZone, displayPriority: safeNumber(row.displayPriority, spatial.displayPriority),
+    provider: row.provider || row.sourceName || 'MATCH_EVENT_FALLBACK', icon: icon(eventType), color: color(eventType), createdAt: row.createdAt ? new Date(row.createdAt).toISOString() : new Date().toISOString(),
   };
+}
+function eventDedupeKey(event: any) { return [event.minute ?? '', String(event.eventType || '').toLowerCase(), event.teamId || '', String(event.playerName || '').toLowerCase(), String(event.detail || '').toLowerCase().slice(0, 90)].join('|'); }
+function dedupeEvents(events: any[]) { const seen = new Set<string>(); return events.filter((event) => { const key = eventDedupeKey(event); if (seen.has(key)) return false; seen.add(key); return true; }); }
+
+function theStatsEventsFromSnapshot(snapshot: any, match: any) {
+  const list = rawData(snapshot)?.normalized?.eventsDetailed?.all;
+  if (!Array.isArray(list)) return [];
+  return dedupeEvents(list.map((row: any, index: number) => {
+    const minute = toNullableNumber(row.minute);
+    const teamId = row.teamId || teamIdFromName(row.teamName, match.homeTeam, match.awayTeam);
+    return normalizeEvent({ id: `thestats-${row.sequence ?? index}-${minute ?? 'na'}-${row.type || 'event'}`, sequenceNumber: Math.max(0, Number(minute || 0)) * 100 + index + 1, minute, second: row.second ?? null, teamId, playerId: row.playerId || null, playerName: row.playerName || null, eventType: normalizeAnimationEventType(row.type, row.detail), eventLabel: animationEventLabel(normalizeAnimationEventType(row.type, row.detail)), detail: row.detail || row.type || 'حدث من TheStats', provider: 'THE_STATS_API_FINAL', coordinateSource: 'INFERRED_ZONE', coordinateConfidence: 'MEDIUM', createdAt: snapshot.capturedAt || new Date() }, index, match.homeTeam.id, match.awayTeam.id);
+  }));
 }
 
 async function readLiveAnimationRows(matchId: string, homeTeamId: string, awayTeamId: string) {
   try {
     const rows = await prisma.$queryRawUnsafe<any[]>(`
-      SELECT
-        "id",
-        "sequenceNumber",
-        "minute",
-        "second",
-        "teamId",
-        "playerId",
-        "playerName",
-        "jerseyNumber",
-        "eventType",
-        "eventLabel",
-        "x",
-        "y",
-        "endX",
-        "endY",
-        "zone",
-        "coordinateSource",
-        "coordinateConfidence",
-        "eventSide",
-        "isInferred",
-        "anchorZone",
-        "displayPriority",
-        "provider",
-        "createdAt"
-      FROM "LiveAnimationEvent"
+      SELECT * FROM "LiveAnimationEvent"
       WHERE "matchId" = $1
       ORDER BY "sequenceNumber" ASC
-      LIMIT 80
+      LIMIT 160
     `, matchId);
-    if (rows.length) return rows.map((row, index) => normalizeEvent(row, index, homeTeamId, awayTeamId));
-  } catch {
-    // Migration may not be applied yet. Fallback below.
-  }
-
+    const liveRows = rows.filter((row) => !/THE_STATS|FOOTBALL_DATA|FOOTBALL-DATA/i.test(String(row.provider || '')));
+    if (liveRows.length) return dedupeEvents(liveRows.map((row, index) => normalizeEvent(row, index, homeTeamId, awayTeamId)));
+  } catch {}
   const events = await prisma.matchEvent.findMany({
-    where: { matchId },
-    orderBy: [{ minute: 'asc' }, { createdAt: 'asc' }],
-    take: 80,
+    where: { matchId, OR: [{ sourceName: { contains: 'ISPORTS' } }, { sourceName: { contains: 'iSports' } }, { sourceName: { contains: 'Live Monitor' } }, { sourceName: { contains: 'Live Ingest' } }] },
+    orderBy: [{ minute: 'asc' }, { createdAt: 'asc' }], take: 120,
   }).catch(() => [] as any[]);
+  return dedupeEvents(events.map((event, index) => normalizeEvent({ ...event, eventType: normalizeAnimationEventType(event.type, event.detail), eventLabel: animationEventLabel(normalizeAnimationEventType(event.type, event.detail)), provider: event.sourceName || 'ISPORTS_MATCH_EVENT' }, index, homeTeamId, awayTeamId)));
+}
 
-  return events.map((event, index) => {
-    const eventType = normalizeAnimationEventType(event.type, event.detail);
-    return normalizeEvent({ ...event, eventType, eventLabel: animationEventLabel(eventType) }, index, homeTeamId, awayTeamId);
-  });
+function buildClock(match: any, latestSnapshot: any, phase: string) {
+  const minute = toNullableNumber(latestSnapshot?.minute);
+  const status = String(match.status || '').toUpperCase();
+  if (phase === 'finished') return { label: 'انتهت المباراة', phaseLabel: 'نهاية المباراة', minute: null, source: 'API status', verifiedStarted: true, verifiedFinished: true };
+  if (phase === 'halftime') return { label: 'استراحة بين الشوطين', phaseLabel: 'نهاية الشوط الأول', minute: 45, source: 'API status', verifiedStarted: true, verifiedFinished: false };
+  if (phase === 'live') {
+    const m = minute || 1;
+    if (m <= 45) return { label: `الشوط الأول · د${m}`, phaseLabel: 'الشوط الأول', minute: m, source: minute ? 'Live snapshot' : 'API status', verifiedStarted: true, verifiedFinished: false };
+    if (m <= 90) return { label: `الشوط الثاني · د${m}`, phaseLabel: 'الشوط الثاني', minute: m, source: minute ? 'Live snapshot' : 'API status', verifiedStarted: true, verifiedFinished: false };
+    return { label: `وقت بدل ضائع · د${m}`, phaseLabel: 'وقت بدل ضائع', minute: m, source: 'Live snapshot', verifiedStarted: true, verifiedFinished: false };
+  }
+  return { label: status === 'TIMED' || status === 'SCHEDULED' ? 'لم تبدأ · في انتظار تأكيد API' : 'لم تبدأ', phaseLabel: 'قبل المباراة', minute: null, source: 'Scheduled time + API status', verifiedStarted: false, verifiedFinished: false };
 }
 
 async function getInitialState(matchId: string) {
-  const match = await prisma.match.findUnique({
-    where: { id: matchId },
-    include: {
-      homeTeam: { select: { id: true, name: true, code: true, image: true } },
-      awayTeam: { select: { id: true, name: true, code: true, image: true } },
-      statsSnapshots: { orderBy: { capturedAt: 'desc' }, take: 1 },
-    },
-  });
-
+  const match = await prisma.match.findUnique({ where: { id: matchId }, include: { homeTeam: { select: { id: true, name: true, code: true, image: true } }, awayTeam: { select: { id: true, name: true, code: true, image: true } }, statsSnapshots: { orderBy: { capturedAt: 'desc' }, take: 12 } } });
   if (!match) return null;
-  const latestSnapshot = match.statsSnapshots?.[0] || null;
-  const events = await readLiveAnimationRows(match.id, match.homeTeam.id, match.awayTeam.id);
+  const snapshots = match.statsSnapshots || [];
+  const phase = statusKind(match.status);
+  const finalSnapshot = latestTheStatsSnapshot(snapshots);
+  const latestSnapshot = phase === 'finished' && finalSnapshot ? finalSnapshot : snapshots[0] || null;
+  const finalEvents = phase === 'finished' && finalSnapshot ? theStatsEventsFromSnapshot(finalSnapshot, match) : [];
+  const events = finalEvents.length ? finalEvents : await readLiveAnimationRows(match.id, match.homeTeam.id, match.awayTeam.id);
   const lastSequence = events.reduce((max, event) => Math.max(max, Number(event.sequenceNumber || 0)), 0);
   const homeTeam = withTeamDisplay(match.homeTeam);
   const awayTeam = withTeamDisplay(match.awayTeam);
   const homeTheme = getTeamVisualTheme(homeTeam.code, homeTeam.name);
   const awayTheme = getTeamVisualTheme(awayTeam.code, awayTeam.name);
+  const metrics = buildMetrics(snapshots, phase === 'finished');
+  const clock = buildClock(match, latestSnapshot, phase);
 
   return {
     ok: true,
-    mode: 'db_only_live_animation_state',
+    mode: 'db_only_live_animation_state_v2',
     matchId: match.id,
     title: `${homeTeam.name} ضد ${awayTeam.name}`,
-    phase: statusKind(match.status),
+    phase,
     status: match.status,
-    minute: latestSnapshot?.minute ?? null,
-    score: {
-      home: safeNumber(latestSnapshot?.homeScore ?? match.homeScore, 0),
-      away: safeNumber(latestSnapshot?.awayScore ?? match.awayScore, 0),
-    },
-    teams: {
-      home: { ...homeTeam, theme: homeTheme },
-      away: { ...awayTeam, theme: awayTheme },
-    },
+    minute: clock.minute ?? latestSnapshot?.minute ?? null,
+    clock,
+    score: { home: safeNumber(latestSnapshot?.homeScore ?? match.homeScore, 0), away: safeNumber(latestSnapshot?.awayScore ?? match.awayScore, 0) },
+    teams: { home: { ...homeTeam, theme: homeTheme }, away: { ...awayTeam, theme: awayTheme } },
     visualTheme: { home: homeTheme, away: awayTheme },
+    stats: metrics,
     lastSequence,
     events,
-    source: events.some((event) => event.provider !== 'MATCH_EVENT_FALLBACK') ? 'LiveAnimationEvent' : 'MatchEvent fallback',
+    source: finalEvents.length ? 'TheStats final timeline' : 'iSports Animation live events',
     lastUpdatedAt: latestSnapshot?.capturedAt ? latestSnapshot.capturedAt.toISOString() : new Date().toISOString(),
   };
 }
@@ -210,7 +217,7 @@ export default async function LiveAnimationPage({ params }: PageProps) {
         <header className="flex flex-col gap-3 rounded-[2rem] border border-white/10 bg-white/[0.04] p-4 md:flex-row md:items-center md:justify-between">
           <div>
             <h1 className="text-3xl font-black">مركز الملعب التفاعلي</h1>
-            <p className="mt-1 text-sm font-bold text-slate-400">ملعب افتراضي تفاعلي يقرأ من قاعدة البيانات فقط.</p>
+            <p className="mt-1 text-sm font-bold text-slate-400">أثناء المباراة: iSports Animation · بعد النهاية: TheStats Timeline نهائي بدون تكرار.</p>
           </div>
           <div className="flex flex-wrap gap-2">
             <Link href={`/watch/${id}`} className="rounded-2xl border border-[#F8C846]/30 bg-[#F8C846]/10 px-4 py-2 text-sm font-black text-[#F8C846] transition hover:bg-[#F8C846] hover:text-black">صفحة البث</Link>
