@@ -5,6 +5,17 @@ import Link from 'next/link';
 
 type HubFilter = 'today' | 'yesterday' | 'tomorrow' | 'latest' | 'live' | 'group' | 'all';
 
+type HubTeam = {
+  id: string;
+  name: string;
+  code: string | null;
+  image: string | null;
+  group: string | null;
+  arabicName?: string | null;
+  flagEmoji?: string | null;
+  displayName?: string | null;
+};
+
 type HubMatch = {
   id: string;
   href: string;
@@ -22,8 +33,8 @@ type HubMatch = {
   hasLiveAnimation: boolean;
   hasStats: boolean;
   hasEvents: boolean;
-  homeTeam: { id: string; name: string; code: string | null; image: string | null; group: string | null };
-  awayTeam: { id: string; name: string; code: string | null; image: string | null; group: string | null };
+  homeTeam: HubTeam;
+  awayTeam: HubTeam;
 };
 
 type HubResponse = {
@@ -54,8 +65,20 @@ function score(match: HubMatch) {
   return `${match.homeScore ?? 0} - ${match.awayScore ?? 0}`;
 }
 
-function Flag({ team }: { team: HubMatch['homeTeam'] }) {
-  return <span className="inline-flex h-9 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-white/10 bg-black/35">{team.image ? <img src={team.image} alt={team.name} className="h-full w-full object-cover" loading="lazy" /> : <b className="text-[10px] text-[#F8C846]">{team.code || team.name.slice(0, 3)}</b>}</span>;
+function Flag({ team }: { team: HubTeam }) {
+  return (
+    <span className="inline-flex h-9 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-white/10 bg-black/35 text-xl">
+      {team.image ? (
+        <img src={team.image} alt={`علم ${team.name}`} className="h-full w-full object-cover" loading="lazy" />
+      ) : (
+        <span aria-label={`علم ${team.name}`}>{team.flagEmoji || '🏳️'}</span>
+      )}
+    </span>
+  );
+}
+
+function TeamName({ team, align = 'right' }: { team: HubTeam; align?: 'right' | 'left' }) {
+  return <b className={`block text-sm font-black leading-5 text-white sm:text-base ${align === 'left' ? 'text-left' : 'text-right'}`}>{team.name}</b>;
 }
 
 function FilterButton({ active, children, onClick }: { active: boolean; children: React.ReactNode; onClick: () => void }) {
@@ -68,7 +91,40 @@ function SummaryCard({ label, value }: { label: string; value: number }) {
 
 function MatchCard({ match }: { match: HubMatch }) {
   const tone = match.isLive ? 'border-[#18E58F]/35 bg-[#18E58F]/10' : match.isFinished ? 'border-sky-300/20 bg-sky-300/8' : 'border-white/10 bg-white/[0.045]';
-  return <article className={`rounded-[1.35rem] border p-3 shadow-[0_14px_36px_rgba(0,0,0,.22)] transition hover:-translate-y-0.5 hover:border-[#18E58F]/35 ${tone}`}><div className="mb-3 flex items-center justify-between gap-2"><span className="rounded-full border border-white/10 bg-black/25 px-3 py-1 text-[11px] font-black text-slate-300">{match.group || match.stage || 'المباراة'}</span><span className={`rounded-full px-3 py-1 text-[11px] font-black ${match.isLive ? 'bg-[#18E58F] text-black' : match.isFinished ? 'bg-sky-300/15 text-sky-100' : 'bg-white/10 text-white'}`}>{match.statusLabel}</span></div><div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2"><div className="min-w-0 text-right"><div className="mb-1 flex items-center gap-2"><Flag team={match.homeTeam} /><b className="truncate text-sm text-white sm:text-base">{match.homeTeam.name}</b></div><p className="text-[11px] font-bold text-slate-500">{match.homeTeam.code || '—'}</p></div><div className="rounded-2xl border border-white/10 bg-black/35 px-3 py-2 text-center"><b className="block text-xl font-black text-[#F8C846] tabular-nums">{score(match)}</b><span className="mt-1 block text-[10px] font-bold text-slate-500">{formatDate(match.matchDate)}</span></div><div className="min-w-0 text-left"><div className="mb-1 flex items-center justify-end gap-2"><b className="truncate text-sm text-white sm:text-base">{match.awayTeam.name}</b><Flag team={match.awayTeam} /></div><p className="text-[11px] font-bold text-slate-500">{match.awayTeam.code || '—'}</p></div></div><div className="mt-3 flex flex-wrap items-center gap-2"><Link href={match.href} className="rounded-xl bg-[#18E58F] px-3 py-2 text-xs font-black text-black">صفحة المباراة</Link>{match.hasLiveAnimation ? <Link href={match.liveHref} className="rounded-xl border border-sky-300/30 bg-sky-300/10 px-3 py-2 text-xs font-black text-sky-100">الملعب التفاعلي</Link> : null}<Link href={match.reportHref} className="rounded-xl border border-[#F8C846]/30 bg-[#F8C846]/10 px-3 py-2 text-xs font-black text-[#F8C846]">المقالات</Link>{match.hasStats ? <span className="mr-auto rounded-full border border-white/10 bg-black/20 px-2 py-1 text-[10px] font-bold text-slate-400">إحصائيات محفوظة</span> : null}</div></article>;
+  return (
+    <article className={`rounded-[1.35rem] border p-3 shadow-[0_14px_36px_rgba(0,0,0,.22)] transition hover:-translate-y-0.5 hover:border-[#18E58F]/35 ${tone}`}>
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <span className="rounded-full border border-white/10 bg-black/25 px-3 py-1 text-[11px] font-black text-slate-300">{match.group || match.stage || 'المباراة'}</span>
+        <span className={`rounded-full px-3 py-1 text-[11px] font-black ${match.isLive ? 'bg-[#18E58F] text-black' : match.isFinished ? 'bg-sky-300/15 text-sky-100' : 'bg-white/10 text-white'}`}>{match.statusLabel}</span>
+      </div>
+      <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2">
+        <div className="min-w-0 text-right">
+          <div className="mb-1 flex items-center gap-2">
+            <Flag team={match.homeTeam} />
+            <TeamName team={match.homeTeam} />
+          </div>
+          <p className="text-[11px] font-bold text-slate-500">{match.homeTeam.code || '—'}</p>
+        </div>
+        <div className="rounded-2xl border border-white/10 bg-black/35 px-3 py-2 text-center">
+          <b className="block text-xl font-black text-[#F8C846] tabular-nums">{score(match)}</b>
+          <span className="mt-1 block text-[10px] font-bold text-slate-500">{formatDate(match.matchDate)}</span>
+        </div>
+        <div className="min-w-0 text-left">
+          <div className="mb-1 flex items-center justify-end gap-2">
+            <TeamName team={match.awayTeam} align="left" />
+            <Flag team={match.awayTeam} />
+          </div>
+          <p className="text-[11px] font-bold text-slate-500">{match.awayTeam.code || '—'}</p>
+        </div>
+      </div>
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <Link href={match.href} className="rounded-xl bg-[#18E58F] px-3 py-2 text-xs font-black text-black">صفحة المباراة</Link>
+        {match.hasLiveAnimation ? <Link href={match.liveHref} className="rounded-xl border border-sky-300/30 bg-sky-300/10 px-3 py-2 text-xs font-black text-sky-100">الملعب التفاعلي</Link> : null}
+        <Link href={match.reportHref} className="rounded-xl border border-[#F8C846]/30 bg-[#F8C846]/10 px-3 py-2 text-xs font-black text-[#F8C846]">المقالات</Link>
+        {match.hasStats ? <span className="mr-auto rounded-full border border-white/10 bg-black/20 px-2 py-1 text-[10px] font-bold text-slate-400">إحصائيات محفوظة</span> : null}
+      </div>
+    </article>
+  );
 }
 
 export default function MatchesHubClient() {
