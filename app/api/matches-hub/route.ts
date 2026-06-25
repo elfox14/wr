@@ -1,0 +1,180 @@
+import { NextRequest, NextResponse } from 'next/server';
+import prisma from '@/lib/prisma';
+
+export const dynamic = 'force-dynamic';
+export const revalidate = 30;
+
+const LIVE_STATUSES = ['1H', '2H', 'ET', 'BT', 'P', 'IN_PLAY', 'LIVE'];
+const SCHEDULED_STATUSES = ['SCHEDULED', 'TIMED', 'NOT_STARTED', 'NS'];
+const FINISHED_STATUSES = ['FINISHED', 'FT', 'AET', 'PEN', 'COMPLETED', 'ENDED', 'FINAL_VERIFIED'];
+const HALF_TIME_STATUSES = ['HT', 'HALFTIME', 'HALF_TIME', 'HALF-TIME', 'PAUSED'];
+const GROUPS = 'ABCDEFGHIJKL'.split('');
+
+type HubFilter = 'today' | 'yesterday' | 'tomorrow' | 'latest' | 'live' | 'group' | 'all';
+
+function normalizeStatus(status?: string | null) {
+  return String(status || '').trim().toUpperCase();
+}
+
+function isLive(status?: string | null) {
+  const value = normalizeStatus(status);
+  return LIVE_STATUSES.includes(value) || HALF_TIME_STATUSES.includes(value);
+}
+
+function isFinished(status?: string | null) {
+  return FINISHED_STATUSES.includes(normalizeStatus(status));
+}
+
+function isScheduled(status?: string | null) {
+  return SCHEDULED_STATUSES.includes(normalizeStatus(status));
+}
+
+function labelForStatus(status?: string | null) {
+  const value = normalizeStatus(status);
+  if (isLive(value)) return value === 'HT' || value.includes('HALF') ? 'استراحة' : 'مباشر';
+  if (isFinished(value)) return 'انتهت';
+  if (isScheduled(value)) return 'لم تبدأ';
+  return value || 'مباراة';
+}
+
+function normalizeFilter(value: string | null): HubFilter {
+  const allowed: HubFilter[] = ['today', 'yesterday', 'tomorrow', 'latest', 'live', 'group', 'all'];
+  return allowed.includes(value as HubFilter) ? value as HubFilter : 'today';
+}
+
+function normalizeGroup(value: string | null) {
+  const key = String(value || 'A').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 1) || 'A';
+  return GROUPS.includes(key) ? key : 'A';
+}
+
+function dayRangeInEgypt(dayOffset: number) {
+  const offsetMs = 3 * 60 * 60 * 1000;
+  const localNow = new Date(Date.now() + offsetMs);
+  const localStart = new Date(Date.UTC(localNow.getUTCFullYear(), localNow.getUTCMonth(), localNow.getUTCDate() + dayOffset, 0, 0, 0, 0));
+  const start = new Date(localStart.getTime() - offsetMs);
+  const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
+  return { gte: start, lt: end };
+}
+
+function groupLabels(group: string) {
+  return [group, `Group ${group}`, `GROUP ${group}`, `GROUP_${group}`, `المجموعة ${group}`];
+}
+
+function groupWhere(group: string) {
+  const labels = groupLabels(group);
+  return {
+    OR: [
+      { homeTeam: { group } },
+      { awayTeam: { group } },
+      { groupPhase: { in: labels } },
+      { stage: { in: labels } },
+    ],
+  };
+}
+
+function searchWhere(query: string) {
+  const q = query.trim();
+  if (!q) return {};
+  return {
+    OR: [
+      { homeTeam: { name: { contains: q, mode: 'insensitive' as const } } },
+      { awayTeam: { name: { contains: q, mode: 'insensitive' as const } } },
+      { homeTeam: { code: { contains: q, mode: 'insensitive' as const } } },
+      { awayTeam: { code: { contains: q, mode: 'insensitive' as const } } },
+    ],
+  };
+}
+
+function whereFor(filter: HubFilter, group: string) {
+  if (filter === 'yesterday') return { matchDate: dayRangeInEgypt(-1) };
+  if (filter === 'tomorrow') return { matchDate: dayRangeInEgypt(1) };
+  if (filter === 'latest') return { status: { in: FINISHED_STATUSES } };
+  if (filter === 'live') return { status: { in: [...LIVE_STATUSES, ...HALF_TIME_STATUSES] } };
+  if (filter === 'group') return groupWhere(group);
+  if (filter === 'all') return {};
+  return { matchDate: dayRangeInEgypt(0) };
+}
+
+function orderByFor(filter: HubFilter) {
+  return filter === 'latest' ? { matchDate: 'desc' as const } : { matchDate: 'asc' as const };
+}
+
+function takeFor(filter: HubFilter, limit: number) {
+  if (filter === 'all') return Math.min(limit, 60);
+  if (filter === 'group') return Math.min(limit, 12);
+  if (filter === 'latest') return Math.min(limit, 30);
+  return Math.min(limit, 24);
+}
+
+function matchDateDayKey(value: Date) {
+  const offsetMs = 3 * 60 * 60 * 1000;
+  const local = new Date(value.getTime() + offsetMs);
+  return local.toISOString().slice(0, 10);
+}
+
+export async function GET(req: NextRequest) {
+  try {
+    const filter = normalizeFilter(req.nextUrl.searchParams.get('filter'));
+    const group = normalizeGroup(req.nextUrl.searchParams.get('group'));
+    const q = String(req.nextUrl.searchParams.get('q') || '').trim();
+    const limit = Math.max(1, Math.min(80, Number(req.nextUrl.searchParams.get('limit') || 24)));
+    const where = { AND: [whereFor(filter, group), searchWhere(q)].filter((part) => Object.keys(part).length) };
+
+    const matches = await prisma.match.findMany({
+      where,
+      select: {
+        id: true,
+        matchDate: true,
+        status: true,
+        homeScore: true,
+        awayScore: true,
+        groupPhase: true,
+        stage: true,
+        animationMatchId: true,
+        homeTeam: { select: { id: true, name: true, code: true, image: true, group: true } },
+        awayTeam: { select: { id: true, name: true, code: true, image: true, group: true } },
+        _count: { select: { events: true, statsSnapshots: true } },
+      },
+      orderBy: orderByFor(filter),
+      take: takeFor(filter, limit),
+    });
+
+    const normalized = matches.map((match) => {
+      const groupValue = match.homeTeam.group || match.awayTeam.group || match.groupPhase || match.stage || null;
+      return {
+        id: match.id,
+        href: `/match-center/${match.id}`,
+        liveHref: `/live-animation/${match.id}`,
+        reportHref: `/articles/match/${match.id}`,
+        matchDate: match.matchDate,
+        dayKey: matchDateDayKey(match.matchDate),
+        status: match.status,
+        statusLabel: labelForStatus(match.status),
+        isLive: isLive(match.status),
+        isFinished: isFinished(match.status),
+        isScheduled: isScheduled(match.status),
+        homeScore: match.homeScore,
+        awayScore: match.awayScore,
+        group: groupValue,
+        stage: match.stage,
+        hasLiveAnimation: Boolean(match.animationMatchId || match._count.events > 0),
+        hasStats: match._count.statsSnapshots > 0,
+        hasEvents: match._count.events > 0,
+        homeTeam: match.homeTeam,
+        awayTeam: match.awayTeam,
+      };
+    });
+
+    const summary = {
+      total: normalized.length,
+      live: normalized.filter((item) => item.isLive).length,
+      finished: normalized.filter((item) => item.isFinished).length,
+      scheduled: normalized.filter((item) => item.isScheduled).length,
+    };
+
+    return NextResponse.json({ ok: true, mode: 'matches_hub_v1', filter, group, q, summary, matches: normalized }, { headers: { 'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=60' } });
+  } catch (error) {
+    console.error('matches hub error', error);
+    return NextResponse.json({ ok: false, error: 'Internal Server Error' }, { status: 500, headers: { 'Cache-Control': 'no-store' } });
+  }
+}
