@@ -30,6 +30,7 @@ type Props = { matches: TickerMatch[] | unknown[] };
 
 const GROUP_LETTERS = 'ABCDEFGHIJKL'.split('');
 const TICKER_REFRESH_MS = 15_000;
+const FINISHED_STATUSES = ['FINISHED', 'FT', 'AET', 'PEN', 'FULL_TIME', 'ENDED', 'COMPLETED', 'FINAL_VERIFIED'];
 
 function normalizeStatus(status?: string | null) { return String(status || '').toUpperCase(); }
 function formatCount(value: number) { return new Intl.NumberFormat('ar-EG').format(value); }
@@ -43,7 +44,7 @@ function groupNumberLabel(match: TickerMatch) {
 }
 function matchStatus(match: TickerMatch) { return normalizeStatus(match.displayStatus || match.status); }
 function isHalfTime(match: TickerMatch) { return ['HT', 'HALFTIME', 'HALF_TIME', 'HALF-TIME'].includes(matchStatus(match)) || Boolean(match.isHalfTime); }
-function isFinished(match: TickerMatch) { return ['FINISHED', 'FT', 'AET', 'PEN', 'FULL_TIME', 'ENDED'].includes(matchStatus(match)) || Boolean(match.isStaleAutoFinished); }
+function isFinished(match: TickerMatch) { return FINISHED_STATUSES.includes(matchStatus(match)) || Boolean(match.isStaleAutoFinished); }
 function isLive(match: TickerMatch) { if (isFinished(match)) return false; const status = matchStatus(match); return ['1H', '2H', 'ET', 'BT', 'P', 'IN_PLAY', 'LIVE'].includes(status) || Boolean(match.isLiveNow) || isHalfTime(match); }
 function liveStatusText(match: TickerMatch) {
   if (isHalfTime(match)) return 'استراحة';
