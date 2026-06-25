@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import prisma from '@/lib/prisma';
 import LiveAnimationPitch from '@/components/live-animation/LiveAnimationPitch';
 import { getTeamVisualTheme } from '@/lib/teamVisualThemes';
+import { withTeamDisplay } from '@/lib/teamDisplay';
 import {
   animationEventLabel,
   inferLiveAnimationSpatial,
@@ -169,14 +170,16 @@ async function getInitialState(matchId: string) {
   const latestSnapshot = match.statsSnapshots?.[0] || null;
   const events = await readLiveAnimationRows(match.id, match.homeTeam.id, match.awayTeam.id);
   const lastSequence = events.reduce((max, event) => Math.max(max, Number(event.sequenceNumber || 0)), 0);
-  const homeTheme = getTeamVisualTheme(match.homeTeam.code, match.homeTeam.name);
-  const awayTheme = getTeamVisualTheme(match.awayTeam.code, match.awayTeam.name);
+  const homeTeam = withTeamDisplay(match.homeTeam);
+  const awayTeam = withTeamDisplay(match.awayTeam);
+  const homeTheme = getTeamVisualTheme(homeTeam.code, homeTeam.name);
+  const awayTheme = getTeamVisualTheme(awayTeam.code, awayTeam.name);
 
   return {
     ok: true,
     mode: 'db_only_live_animation_state',
     matchId: match.id,
-    title: `${match.homeTeam.name} ضد ${match.awayTeam.name}`,
+    title: `${homeTeam.name} ضد ${awayTeam.name}`,
     phase: statusKind(match.status),
     status: match.status,
     minute: latestSnapshot?.minute ?? null,
@@ -185,8 +188,8 @@ async function getInitialState(matchId: string) {
       away: safeNumber(latestSnapshot?.awayScore ?? match.awayScore, 0),
     },
     teams: {
-      home: { ...match.homeTeam, theme: homeTheme },
-      away: { ...match.awayTeam, theme: awayTheme },
+      home: { ...homeTeam, theme: homeTheme },
+      away: { ...awayTeam, theme: awayTheme },
     },
     visualTheme: { home: homeTheme, away: awayTheme },
     lastSequence,
@@ -206,7 +209,7 @@ export default async function LiveAnimationPage({ params }: PageProps) {
       <div className="mx-auto max-w-7xl space-y-4">
         <header className="flex flex-col gap-3 rounded-[2rem] border border-white/10 bg-white/[0.04] p-4 md:flex-row md:items-center md:justify-between">
           <div>
-            <h1 className="text-3xl font-black">Live Animation Center</h1>
+            <h1 className="text-3xl font-black">مركز الملعب التفاعلي</h1>
             <p className="mt-1 text-sm font-bold text-slate-400">ملعب افتراضي تفاعلي يقرأ من قاعدة البيانات فقط.</p>
           </div>
           <div className="flex flex-wrap gap-2">
