@@ -30,7 +30,6 @@ type RoundMatch = { matchNo: number; home: Slot; away: Slot };
 type ResolvedSide = {
   label: string;
   qualifier: Qualifier | null;
-  placeholder: string;
   note?: string;
 };
 
@@ -77,10 +76,6 @@ function teamFlag(row?: TableRow | null, width = 48) {
 
 function teamHref(row?: TableRow | null) {
   return row?.code ? `/teams/team-${row.code.toLowerCase()}` : '/teams';
-}
-
-function formatGoalDifference(value: number) {
-  return value > 0 ? `+${ar.format(value)}` : ar.format(value);
 }
 
 function seedLabel(qualifier: Qualifier) {
@@ -167,7 +162,7 @@ function assignThirdSlots(bestThirds: Qualifier[]) {
 
 function resolveRankSlot(slot: Extract<Slot, { kind: 'rank' }>, direct: Qualifier[]): ResolvedSide {
   const qualifier = direct.find((item) => item.groupKey === slot.group && item.rank === slot.rank) || null;
-  return { label: qualifier ? seedLabel(qualifier) : `${slot.rank}${slot.group}`, qualifier, placeholder: slotPlaceholder(slot) };
+  return { label: qualifier ? seedLabel(qualifier) : `${slot.rank}${slot.group}`, qualifier };
 }
 
 function resolveSide(slot: Slot, direct: Qualifier[], thirdAssignments: Map<number, Qualifier>, matchIndex: number): ResolvedSide {
@@ -176,7 +171,6 @@ function resolveSide(slot: Slot, direct: Qualifier[], thirdAssignments: Map<numb
   return {
     label: qualifier ? seedLabel(qualifier) : slotPlaceholder(slot),
     qualifier,
-    placeholder: slotPlaceholder(slot),
     note: qualifier ? `أفضل ثالث رقم ${ar.format(qualifier.bestThirdRank || 0)}` : 'ينتظر تركيبة الثوالث',
   };
 }
