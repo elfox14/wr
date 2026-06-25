@@ -2,25 +2,6 @@ const DEFAULT_ANIMATION_BASE_URL = 'https://www.isportslive8.com/football/pc.htm
 
 let browserlessRequestsThisRun = 0;
 
-async function fetchWithTimeout(url, options = {}, timeoutMs = 8000) {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    const response = await fetch(url, {
-      ...options,
-      signal: controller.signal,
-    });
-    return response;
-  } catch (error) {
-    if (error.name === 'AbortError') {
-      throw new Error(`Request timed out after ${timeoutMs}ms`);
-    }
-    throw error;
-  } finally {
-    clearTimeout(timeoutId);
-  }
-}
-
 function envBool(name, fallback = false) {
   const value = String(process.env[name] || '').trim().toLowerCase();
   if (!value) return fallback;
@@ -42,6 +23,19 @@ function tryJson(text) {
   try { return JSON.parse(text); } catch { return null; }
 }
 
+async function fetchWithTimeout(url, options = {}, timeoutMs = 8000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } catch (error) {
+    if (error?.name === 'AbortError') throw new Error(`Request timed out after ${timeoutMs}ms`);
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 function canonicalAnimationUrl(providerMatchId) {
   const url = new URL(String(process.env.ISPORTS_ANIMATION_BASE_URL || DEFAULT_ANIMATION_BASE_URL));
   url.searchParams.set('matchId', String(providerMatchId));
@@ -54,7 +48,6 @@ function endpointToUrl(endpointValue, tokenValue, suffix) {
   const raw = String(endpointValue || '').trim();
   const token = String(tokenValue || '').trim();
   if (!raw) return '';
-
   const url = new URL(raw);
   let pathname = url.pathname.replace(/\/$/, '');
   if (pathname.endsWith('/content') || pathname.endsWith('/function')) {
@@ -94,8 +87,8 @@ function browserlessFunctionCandidates() {
 }
 
 function browserlessContentCandidates() {
-  const primaryExplicit = endpointToUrl(process.env.BROWSERLESS_CONTENT_URL, '', '/content');
-  const fallbackExplicit = endpointToUrl(process.env.BROWSERLESS_FALLBACK_CONTENT_URL, '', '/content');
+  const primaryExplicit = endpointToUrl(process.env.BROWSERLESS_CONTENT_URL || process.env.BROWSERLESS_CONTENT_ENDPOINT, '', '/content');
+  const fallbackExplicit = endpointToUrl(process.env.BROWSERLESS_FALLBACK_CONTENT_URL || process.env.BROWSERLESS_FALLBACK_CONTENT_ENDPOINT, '', '/content');
   const primaryEndpoint = endpointToUrl(process.env.BROWSERLESS_ENDPOINT, process.env.BROWSERLESS_TOKEN, '/content');
   const fallbackEndpoint = endpointToUrl(process.env.BROWSERLESS_FALLBACK_ENDPOINT, process.env.BROWSERLESS_FALLBACK_TOKEN, '/content');
   const preferFallback = envBool('BROWSERLESS_PREFER_FALLBACK', false);
@@ -124,10 +117,6 @@ function htmlToText(html) {
     .trim();
 }
 
-function asObject(value) {
-  return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
-}
-
 function num(value) {
   if (value === null || value === undefined || value === '') return null;
   const n = Number(typeof value === 'string' ? value.replace('%', '').replace(/[^0-9.-]/g, '').trim() : value);
@@ -146,30 +135,23 @@ function statLinesFromJsonPayload(payload) {
     seen.add(key);
     lines.push(`${h ?? ''} ${label} ${a ?? ''}`.trim());
   }
-  function sideObject(item, side) {
-    const keys = side === 'home' ? ['home', 'homeTeam', 'homeStats', 'homeStatistics', 'teamA', 'localteam', 'host'] : ['away', 'awayTeam', 'awayStats', 'awayStatistics', 'teamB', 'visitorteam', 'guest'];
-    for (const key of keys) if (item?.[key] && typeof item[key] === 'object') return item[key];
-    return {};
-  }
   function visit(value, depth = 0) {
-    if (!value || typeof value !== 'object' || depth > 6 || lines.length > 60) return;
+    if (!value || typeof value !== 'object' || depth > 7 || lines.length > 80) return;
     if (Array.isArray(value)) { value.forEach((item) => visit(item, depth + 1)); return; }
-    const item = asObject(value);
-    const home = sideObject(item, 'home');
-    const away = sideObject(item, 'away');
-    add('Possession', home.possession ?? home.poss ?? home.ballPossession ?? home.ball_possession ?? item.homePossession ?? item.home_possession, away.possession ?? away.poss ?? away.ballPossession ?? away.ball_possession ?? item.awayPossession ?? item.away_possession);
-    add('Attacks', home.attacks ?? home.attack ?? home.att ?? item.homeAttacks ?? item.home_attacks, away.attacks ?? away.attack ?? away.att ?? item.awayAttacks ?? item.away_attacks);
-    add('Dangerous Attacks', home.dangerousAttacks ?? home.dangerous_attacks ?? home.dAtt ?? home.d_att ?? item.homeDangerousAttacks ?? item.home_dangerous_attacks, away.dangerousAttacks ?? away.dangerous_attacks ?? away.dAtt ?? away.d_att ?? item.awayDangerousAttacks ?? item.away_dangerous_attacks);
-    add('Shots', home.shots ?? home.shotsTotal ?? home.shots_total ?? item.homeShots ?? item.home_shots, away.shots ?? away.shotsTotal ?? away.shots_total ?? item.awayShots ?? item.away_shots);
-    add('On Target', home.shotsOnTarget ?? home.shots_on_target ?? home.onTarget ?? item.homeShotsOnTarget ?? item.home_shots_on_target, away.shotsOnTarget ?? away.shots_on_target ?? away.onTarget ?? item.awayShotsOnTarget ?? item.away_shots_on_target);
-    add('Off Target', home.shotsOffTarget ?? home.shots_off_target ?? home.offTarget ?? item.homeShotsOffTarget ?? item.home_shots_off_target, away.shotsOffTarget ?? away.shots_off_target ?? away.offTarget ?? item.awayShotsOffTarget ?? item.away_shots_off_target);
-    add('Corners', home.corners ?? home.corner ?? home.cornerKicks ?? item.homeCorners ?? item.home_corners, away.corners ?? away.corner ?? away.cornerKicks ?? item.awayCorners ?? item.away_corners);
-    add('Yellow Cards', home.yellowCards ?? home.yellow_cards ?? home.yellow ?? item.homeYellowCards ?? item.home_yellow_cards, away.yellowCards ?? away.yellow_cards ?? away.yellow ?? item.awayYellowCards ?? item.away_yellow_cards);
-    add('Red Cards', home.redCards ?? home.red_cards ?? home.red ?? item.homeRedCards ?? item.home_red_cards, away.redCards ?? away.red_cards ?? away.red ?? item.awayRedCards ?? item.away_red_cards);
+    const item = value;
+    const home = item.home || item.homeTeam || item.homeStats || item.teamA || item.localteam || {};
+    const away = item.away || item.awayTeam || item.awayStats || item.teamB || item.visitorteam || {};
+    add('Possession', home.possession ?? home.poss ?? home.ballPossession ?? item.homePossession, away.possession ?? away.poss ?? away.ballPossession ?? item.awayPossession);
+    add('Attacks', home.attacks ?? home.attack ?? home.att ?? item.homeAttacks, away.attacks ?? away.attack ?? away.att ?? item.awayAttacks);
+    add('Dangerous Attacks', home.dangerousAttacks ?? home.dangerous_attacks ?? home.dAtt ?? item.homeDangerousAttacks, away.dangerousAttacks ?? away.dangerous_attacks ?? away.dAtt ?? item.awayDangerousAttacks);
+    add('Shots', home.shots ?? home.shotsTotal ?? item.homeShots, away.shots ?? away.shotsTotal ?? item.awayShots);
+    add('On Target', home.shotsOnTarget ?? home.shots_on_target ?? home.onTarget ?? item.homeShotsOnTarget, away.shotsOnTarget ?? away.shots_on_target ?? away.onTarget ?? item.awayShotsOnTarget);
+    add('Off Target', home.shotsOffTarget ?? home.shots_off_target ?? home.offTarget ?? item.homeShotsOffTarget, away.shotsOffTarget ?? away.shots_off_target ?? away.offTarget ?? item.awayShotsOffTarget);
+    add('Corners', home.corners ?? home.corner ?? item.homeCorners, away.corners ?? away.corner ?? item.awayCorners);
+    add('Yellow Cards', home.yellowCards ?? home.yellow_cards ?? home.yellow ?? item.homeYellowCards, away.yellowCards ?? away.yellow_cards ?? away.yellow ?? item.awayYellowCards);
+    add('Red Cards', home.redCards ?? home.red_cards ?? home.red ?? item.homeRedCards, away.redCards ?? away.red_cards ?? away.red ?? item.awayRedCards);
     const label = item.type ?? item.name ?? item.key ?? item.stat ?? item.statName ?? item.statisticsType;
-    const hv = item.home ?? item.homeValue ?? item.home_value ?? item.homeTeam ?? item.values?.home ?? item.value?.home;
-    const av = item.away ?? item.awayValue ?? item.away_value ?? item.awayTeam ?? item.values?.away ?? item.value?.away;
-    if (label) add(String(label), hv, av);
+    if (label) add(String(label), item.homeValue ?? item.home_value ?? item.values?.home ?? item.value?.home, item.awayValue ?? item.away_value ?? item.values?.away ?? item.value?.away);
     Object.values(item).forEach((child) => visit(child, depth + 1));
   }
   visit(payload);
@@ -181,7 +163,7 @@ const FUNCTION_CAPTURE_CODE = `export default async function ({ page, context })
   const waitMs = context.waitMs || 6000;
   const timeoutMs = context.timeoutMs || 25000;
   const responses = [];
-  const maxResponses = 20;
+  const maxResponses = 40;
   page.on('response', async (response) => {
     if (responses.length >= maxResponses) return;
     const responseUrl = response.url();
@@ -191,42 +173,32 @@ const FUNCTION_CAPTURE_CODE = `export default async function ({ page, context })
     try {
       const text = await response.text();
       if (!text || text.length > 250000) return;
-      responses.push({ url: responseUrl, status: response.status(), contentType, text: text.slice(0, 12000) });
+      responses.push({ url: responseUrl, status: response.status(), contentType, text: text.slice(0, 16000) });
     } catch {}
   });
   await page.goto(url, { waitUntil: 'domcontentloaded', timeout: timeoutMs });
   await new Promise((resolve) => setTimeout(resolve, waitMs));
-  const text = await page.evaluate(() => document.body ? document.body.innerText : '');
-  return { data: { url, text, responses }, type: 'application/json' };
+  const mainText = await page.evaluate(() => document.body ? document.body.innerText : '').catch(() => '');
+  const frameTexts = [];
+  const frameUrls = [];
+  for (const frame of page.frames()) {
+    try {
+      const frameUrl = frame.url();
+      if (frameUrl) frameUrls.push(frameUrl);
+      const frameText = await frame.evaluate(() => document.body ? document.body.innerText : '').catch(() => '');
+      if (frameText && frameText !== mainText) frameTexts.push(frameText);
+    } catch {}
+  }
+  const iframeSrcs = await page.evaluate(() => Array.from(document.querySelectorAll('iframe')).map((iframe) => iframe.src).filter(Boolean)).catch(() => []);
+  return { data: { url, text: [mainText, ...frameTexts].filter(Boolean).join('\n'), mainText, frameTexts, frameUrls, iframeSrcs, responses }, type: 'application/json' };
 }`;
 
 function inlineFunctionCaptureCode(sourceUrl, waitMs, timeoutMs) {
-  const urlLiteral = JSON.stringify(sourceUrl);
-  const waitLiteral = Number(waitMs);
-  const timeoutLiteral = Number(timeoutMs);
-  return `export default async function ({ page }) {
-    const url = ${urlLiteral};
-    const waitMs = ${waitLiteral};
-    const timeoutMs = ${timeoutLiteral};
-    const responses = [];
-    const maxResponses = 20;
-    page.on('response', async (response) => {
-      if (responses.length >= maxResponses) return;
-      const responseUrl = response.url();
-      const contentType = response.headers()['content-type'] || '';
-      const interesting = /json|javascript|text|event-stream/i.test(contentType) || /match|stats|stat|event|live|animation|football|score|timeline|socket|analysis/i.test(responseUrl);
-      if (!interesting) return;
-      try {
-        const text = await response.text();
-        if (!text || text.length > 250000) return;
-        responses.push({ url: responseUrl, status: response.status(), contentType, text: text.slice(0, 12000) });
-      } catch {}
-    });
-    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: timeoutMs });
-    await new Promise((resolve) => setTimeout(resolve, waitMs));
-    const text = await page.evaluate(() => document.body ? document.body.innerText : '');
-    return { data: { url, text, responses }, type: 'application/json' };
-  }`;
+  const code = FUNCTION_CAPTURE_CODE
+    .replace('const url = context.url;', `const url = ${JSON.stringify(sourceUrl)};`)
+    .replace('const waitMs = context.waitMs || 6000;', `const waitMs = ${Number(waitMs)};`)
+    .replace('const timeoutMs = context.timeoutMs || 25000;', `const timeoutMs = ${Number(timeoutMs)};`);
+  return code;
 }
 
 function unwrapFunctionResponse(body) {
@@ -255,32 +227,15 @@ async function fetchFunctionCaptureFrom(functionUrl, sourceUrl) {
   const waitMs = envNumber('BROWSERLESS_FALLBACK_WAIT_MS', 2000, 1000, 20000);
   const payloadMode = String(process.env.BROWSERLESS_FUNCTION_PAYLOAD_MODE || 'javascript').trim().toLowerCase();
   const errors = [];
-
   if (payloadMode === 'json' || payloadMode === 'both') {
-    try {
-      return await postFunctionRequest(
-        functionUrl,
-        'json',
-        JSON.stringify({ code: FUNCTION_CAPTURE_CODE, context: { url: sourceUrl, waitMs, timeoutMs } }),
-      );
-    } catch (error) {
-      errors.push(error?.message || String(error));
-    }
+    try { return await postFunctionRequest(functionUrl, 'json', JSON.stringify({ code: FUNCTION_CAPTURE_CODE, context: { url: sourceUrl, waitMs, timeoutMs } })); }
+    catch (error) { errors.push(error?.message || String(error)); }
   }
-
   if (payloadMode === 'javascript' || payloadMode === 'both') {
-    try {
-      return await postFunctionRequest(functionUrl, 'javascript', inlineFunctionCaptureCode(sourceUrl, waitMs, timeoutMs));
-    } catch (error) {
-      errors.push(error?.message || String(error));
-    }
+    try { return await postFunctionRequest(functionUrl, 'javascript', inlineFunctionCaptureCode(sourceUrl, waitMs, timeoutMs)); }
+    catch (error) { errors.push(error?.message || String(error)); }
   }
-
-  if (errors.length) {
-    throw new Error(`Browserless function failed: ${errors.join(' | ')}`);
-  } else {
-    throw new Error(`Browserless function failed: no payload modes matching ${payloadMode}`);
-  }
+  throw new Error(`Browserless function failed: ${errors.join(' | ') || `no payload modes matching ${payloadMode}`}`);
 }
 
 async function fetchFunctionCapture(sourceUrl) {
@@ -336,7 +291,6 @@ export async function fetchISportsAnimationBrowserlessText(providerMatchId) {
   if (!envBool('LIVE_INGEST_USE_BROWSERLESS_FALLBACK', false)) {
     return { enabled: false, source: 'ISPORTS_ANIMATION_BROWSERLESS', hasText: false, hasStats: false, skipped: true, reason: 'LIVE_INGEST_USE_BROWSERLESS_FALLBACK is false', error: 'LIVE_INGEST_USE_BROWSERLESS_FALLBACK is false' };
   }
-
   const maxBrowserlessRequests = envNumber('LIVE_INGEST_MAX_BROWSERLESS_REQUESTS', 1, 0, 10);
   if (browserlessRequestsThisRun >= maxBrowserlessRequests) {
     return { enabled: true, source: 'ISPORTS_ANIMATION_BROWSERLESS', hasText: false, hasStats: false, skipped: true, reason: 'skipped_browserless_run_limit', error: 'skipped_browserless_run_limit', browserlessRequestsThisRun, maxBrowserlessRequests };
@@ -350,6 +304,8 @@ export async function fetchISportsAnimationBrowserlessText(providerMatchId) {
   let functionError = '';
   const jsonPayloads = [];
   const networkSamples = [];
+  let frameUrls = [];
+  let iframeSrcs = [];
 
   const functionFirst = envBool('LIVE_INGEST_BROWSERLESS_FUNCTION_FIRST', true);
   if (functionFirst) {
@@ -357,12 +313,15 @@ export async function fetchISportsAnimationBrowserlessText(providerMatchId) {
     if (capture && !capture.error) {
       loader = capture.loader || 'browserless_function';
       text = String(capture.text || '');
+      frameUrls = Array.isArray(capture.frameUrls) ? capture.frameUrls : [];
+      iframeSrcs = Array.isArray(capture.iframeSrcs) ? capture.iframeSrcs : [];
       for (const response of Array.isArray(capture.responses) ? capture.responses : []) {
-        networkSamples.push({ url: response.url, contentType: response.contentType, textSample: truncate(response.text, 800) });
+        networkSamples.push({ url: response.url, status: response.status, contentType: response.contentType, textSample: truncate(response.text, 1000) });
         const parsed = tryJson(response.text);
         if (parsed) {
           jsonPayloads.push(parsed);
-          text += `\n${statLinesFromJsonPayload(parsed).join('\n')}`;
+          const lines = statLinesFromJsonPayload(parsed);
+          if (lines.length) text += `\n${lines.join('\n')}`;
         }
       }
     } else {
@@ -372,7 +331,6 @@ export async function fetchISportsAnimationBrowserlessText(providerMatchId) {
 
   const contentAfterError = envBool('LIVE_INGEST_CONTENT_AFTER_FUNCTION_ERROR', false);
   const shouldTryContent = !loader && (!functionFirst || !functionError || contentAfterError);
-
   if (shouldTryContent) {
     try {
       const content = await fetchContentText(sourceUrl);
@@ -380,15 +338,15 @@ export async function fetchISportsAnimationBrowserlessText(providerMatchId) {
       text = content.text;
       htmlLength = content.htmlLength;
     } catch (error) {
-      functionError = functionError
-        ? `${functionError} | content_fallback_error: ${error?.message || String(error)}`
-        : error?.message || String(error);
+      functionError = functionError ? `${functionError} | content_fallback_error: ${error?.message || String(error)}` : error?.message || String(error);
     }
   }
 
   const debug = envBool('LIVE_INGEST_FALLBACK_DEBUG', false);
   const debugParts = [`loader:${loader || 'none'}`, `text:${truncate(text, 1200)}`];
   if (functionError) debugParts.unshift(`function_error:${truncate(functionError, 500)}`);
+  if (frameUrls.length) debugParts.push(`frames:${frameUrls.slice(0, 5).join(',')}`);
+  if (iframeSrcs.length) debugParts.push(`iframes:${iframeSrcs.slice(0, 5).join(',')}`);
 
   return {
     enabled: true,
@@ -398,6 +356,6 @@ export async function fetchISportsAnimationBrowserlessText(providerMatchId) {
     hasStats: false,
     text,
     error: debug ? `debug_${debugParts.join(' | ')}` : (functionError || null),
-    rawData: { sourceUrl, loader, functionError, htmlLength, textSample: truncate(text), jsonPayloads: jsonPayloads.slice(0, 5), networkSamples: networkSamples.slice(0, 10) },
+    rawData: { sourceUrl, loader, functionError, htmlLength, textSample: truncate(text), frameUrls, iframeSrcs, jsonPayloads: jsonPayloads.slice(0, 5), networkSamples: networkSamples.slice(0, 12) },
   };
 }
