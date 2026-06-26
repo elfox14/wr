@@ -85,6 +85,33 @@ function isUpcoming(match: MatchRow) {
   return !isFinished(match.status) && !isLive(match.status) && new Date(match.matchDate).getTime() >= Date.now() - 3 * 60 * 60 * 1000;
 }
 
+function completionOf(match: MatchRow) {
+  const finalCounts = match.latestTheStatsSnapshot?.counts;
+  const liveLinked = Boolean(match.animationMatchId);
+  const liveSnapshotReady = Boolean(match.latestSnapshot) || isFinished(match.status);
+  const resultSynced = isFinished(match.status) || isLive(match.status) || match.score !== '0-0';
+  const finalStatsReady = !isFinished(match.status) || Boolean(match.latestTheStatsSnapshot && ((finalCounts?.stats || 0) > 0 || match.latestTheStatsSnapshot.homeShots !== null || match.latestTheStatsSnapshot.homePossession !== null));
+  const finalEventsReady = !isFinished(match.status) || Boolean((finalCounts?.events || 0) > 0);
+  const playerRatingsReady = !isFinished(match.status) || Boolean((finalCounts?.playerRatings || 0) > 0);
+  const articleReady = !isFinished(match.status) || Boolean(match.article?.slug);
+  const infographicReady = !isFinished(match.status) || Boolean(match.article?.infographicImageUrl);
+  const weights = [
+    [liveLinked, 10],
+    [liveSnapshotReady, 10],
+    [resultSynced, 15],
+    [finalStatsReady, 20],
+    [finalEventsReady, 15],
+    [playerRatingsReady, 10],
+    [articleReady, 15],
+    [infographicReady, 5],
+  ] as const;
+  const percent = weights.reduce((sum, [ok, points]) => sum + (ok ? points : 0), 0);
+  return {
+    percent,
+    flags: { liveLinked, liveSnapshotReady, resultSynced, finalStatsReady, finalEventsReady, playerRatingsReady, articleReady, infographicReady },
+  };
+}
+
 function Badge({ children, tone = 'slate' }: { children: React.ReactNode; tone?: 'slate' | 'green' | 'red' | 'cyan' | 'amber' | 'violet' }) {
   const styles = {
     slate: 'bg-slate-800 text-slate-200 ring-slate-700',
@@ -173,6 +200,13 @@ export default function AdminMatchToolsClient({ adminKey, matches }: Props) {
     }
   }
 
+  function runSmartPipeline(match?: MatchRow) {
+    const params = match
+      ? `matchId=${enc(match.id)}&maxSteps=3&stepTimeoutMs=55000`
+      : 'limit=1&maxSteps=2&stepTimeoutMs=55000';
+    return callUrl(match ? `إكمال ذكي — ${match.homeTeam} vs ${match.awayTeam}` : 'إكمال ذكي لمباراة واحدة', `/api/cron/match-complete-pipeline?key=${enc(adminKey)}&${params}`);
+  }
+
   function autoFinal(match: MatchRow) {
     const url = `/api/cron/the-stats-finalize-matches?key=${enc(adminKey)}&matchId=${enc(match.id)}&apply=true&limit=1&days=60&requestsPerMinute=110&timeoutMs=20000&includeRaw=false&writeMatchEvents=false&purgeISportsSnapshots=false&dryRun=false`;
     return callUrl(`جلب الإحصائيات النهائية — ${match.homeTeam} vs ${match.awayTeam}`, url);
@@ -236,7 +270,8 @@ export default function AdminMatchToolsClient({ adminKey, matches }: Props) {
           <p className="mt-3 max-w-4xl text-sm leading-7 text-slate-300">
             الصفحة مبسطة: المباريات القادمة لمزامنة البث، المباريات المباشرة للجلب الحي، والمباريات المنتهية لجلب الإحصائيات والأحداث وتقييمات اللاعبين ثم إنشاء المقال والإنفوغرافيك.
           </p>
-          <div className="mt-5 grid gap-3 sm:grid-cols-3">
+          <div className="mt-5 grid gap-3 sm:grid-cols-4">
+            <button onClick={() => runSmartPipeline()} disabled={Boolean(running)} className="rounded-2xl bg-white px-4 py-3 text-sm font-black text-slate-950 disabled:opacity-50">إكمال ذكي لمباراة واحدة</button>
             <button onClick={() => syncLive()} disabled={Boolean(running)} className="rounded-2xl bg-cyan-400 px-4 py-3 text-sm font-black text-slate-950 disabled:opacity-50">مزامنة البث للمباريات القريبة</button>
             <button onClick={liveIngestNow} disabled={Boolean(running)} className="rounded-2xl bg-emerald-400 px-4 py-3 text-sm font-black text-slate-950 disabled:opacity-50">تشغيل الجلب المباشر</button>
             <button onClick={footballDataResults} disabled={Boolean(running)} className="rounded-2xl bg-amber-300 px-4 py-3 text-sm font-black text-slate-950 disabled:opacity-50">تحديث النتائج والحالات</button>
@@ -271,9 +306,20 @@ export default function AdminMatchToolsClient({ adminKey, matches }: Props) {
               const isMatchUpcoming = isUpcoming(match);
               const isMatchFinished = isFinished(match.status);
               const isMatchLive = isLive(match.status);
+              const completion = completionOf(match);
 
               return (
                 <article key={match.id} className="rounded-[2rem] border border-slate-800 bg-slate-900/80 p-4 shadow-xl">
+                  <div className="mb-4 rounded-2xl bg-slate-950/70 p-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-xs font-bold text-slate-400">نسبة اكتمال المباراة</span>
+                      <span className="text-lg font-black text-white">{completion.percent}%</span>
+                    </div>
+                    <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-800">
+                      <div className="h-full rounded-full bg-emerald-400" style={{ width: `${completion.percent}%` }} />
+                    </div>
+                  </div>
+
                   <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap gap-2">
@@ -300,6 +346,8 @@ export default function AdminMatchToolsClient({ adminKey, matches }: Props) {
                     </div>
 
                     <div className="w-full space-y-2 xl:w-72">
+                      <button onClick={() => runSmartPipeline(match)} disabled={Boolean(running)} className="w-full rounded-2xl bg-white px-4 py-3 text-sm font-black text-slate-950 disabled:opacity-50">إكمال ذكي لهذه المباراة</button>
+
                       {isMatchUpcoming ? (
                         <button onClick={() => syncLive(match)} disabled={Boolean(running)} className="w-full rounded-2xl bg-cyan-400 px-4 py-3 text-sm font-black text-slate-950 disabled:opacity-50">مزامنة البث المباشر</button>
                       ) : null}
