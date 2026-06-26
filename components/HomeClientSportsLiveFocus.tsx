@@ -135,6 +135,10 @@ function isConfirmedLive(match?: HomeMatch | null) {
   return !isFinished(match) && !isHalfTime(match) && (LIVE_STATUSES.includes(status) || Boolean(match?.isLiveNow) || Boolean(match?.isLikelyLiveByTime));
 }
 
+function isLiveOrBreak(match?: HomeMatch | null) {
+  return isConfirmedLive(match) || isHalfTime(match);
+}
+
 function isWaitingForStartConfirmation(match: HomeMatch, now: Date) {
   return isScheduled(match) && hasKickoffPassed(match, now) && !isConfirmedLive(match) && !isHalfTime(match);
 }
@@ -283,8 +287,9 @@ function MatchRow({ match, now, mounted, variant = 'normal' }: { match: HomeMatc
         <MatchScore match={match} />
         <TeamBadge team={match.awayTeam} align="left" />
       </div>
-      <div className="mt-3">
-        <Link href={getBroadcastHref(match)} className="mobile-tap inline-flex w-full items-center justify-center rounded-xl bg-[#0FF0FC] px-3 py-2.5 text-center text-[11px] font-black text-black transition hover:bg-[#4AFAFF]">البث التفاعلي</Link>
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <Link href={getBroadcastHref(match)} className="mobile-tap inline-flex min-h-10 items-center justify-center rounded-xl bg-[#0FF0FC] px-3 py-2.5 text-center text-[11px] font-black text-black transition hover:bg-[#4AFAFF]">البث التفاعلي</Link>
+        <Link href={getMatchHref(match)} className="mobile-tap inline-flex min-h-10 items-center justify-center rounded-xl border border-[#FFD700]/25 bg-[#FFD700]/10 px-3 py-2.5 text-center text-[11px] font-black text-[#FFD700] transition hover:bg-[#FFD700]/15">صفحة المباراة</Link>
       </div>
     </article>
   );
@@ -304,7 +309,16 @@ function MatchCenter({ fallbackMatches = [], nextMatch = null, liveMatches = [] 
   const primaryMatch = confirmedLiveMatch || waitingMatch || nextScheduledMatch || sortedMatches.find((match) => !isFinished(match)) || sortedMatches[0] || null;
   const primaryKey = primaryMatch ? matchKey(primaryMatch) : null;
   const refreshMs = countdownRefreshMs(primaryMatch, now);
-  const secondaryMatches = sortedMatches.filter((match) => matchKey(match) !== primaryKey).filter((match) => isScheduled(match) && !isWaitingForStartConfirmation(match, now) && !isConfirmedLive(match) && matchTime(match) >= now.getTime()).slice(0, 2);
+  const extraLiveMatches = sortedMatches
+    .filter((match) => matchKey(match) !== primaryKey)
+    .filter((match) => isLiveOrBreak(match) || isWaitingForStartConfirmation(match, now));
+  const upcomingSecondaryMatches = sortedMatches
+    .filter((match) => matchKey(match) !== primaryKey)
+    .filter((match) => !extraLiveMatches.some((live) => matchKey(live) === matchKey(match)))
+    .filter((match) => isScheduled(match) && !isWaitingForStartConfirmation(match, now) && matchTime(match) >= now.getTime())
+    .slice(0, Math.max(0, 2 - extraLiveMatches.length));
+  const secondaryMatches = uniqueMatches([...extraLiveMatches, ...upcomingSecondaryMatches]);
+  const secondaryTitle = extraLiveMatches.length ? 'مباريات مباشرة في نفس التوقيت' : 'المباراتان القادمتان';
 
   useEffect(() => {
     if (!refreshMs) return;
@@ -315,11 +329,14 @@ function MatchCenter({ fallbackMatches = [], nextMatch = null, liveMatches = [] 
   return (
     <section className="flex h-auto flex-col overflow-hidden rounded-[1.45rem] border border-white/10 bg-white/[0.04] p-3 text-white shadow-[0_14px_38px_rgba(0,0,0,0.2)] backdrop-blur sm:rounded-3xl sm:p-4" aria-label="مباريات كأس العالم">
       <div className="flex flex-col gap-4">
-        <div>{primaryMatch ? <MatchRow match={primaryMatch} now={now} mounted={mounted} variant={isConfirmedLive(primaryMatch) || isHalfTime(primaryMatch) ? 'live' : 'primary'} /> : <div className="rounded-2xl border border-dashed border-white/10 bg-black/20 p-4 text-sm font-bold text-gray-400">لا توجد مباراة رئيسية جاهزة للعرض الآن.</div>}</div>
+        <div>{primaryMatch ? <MatchRow match={primaryMatch} now={now} mounted={mounted} variant={isLiveOrBreak(primaryMatch) ? 'live' : 'primary'} /> : <div className="rounded-2xl border border-dashed border-white/10 bg-black/20 p-4 text-sm font-bold text-gray-400">لا توجد مباراة رئيسية جاهزة للعرض الآن.</div>}</div>
         <div>
-          <div className="mb-2 text-[10px] font-black uppercase tracking-[0.14em] text-gray-400">المباراتان القادمتان</div>
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <span className="text-[10px] font-black uppercase tracking-[0.14em] text-gray-400">{secondaryTitle}</span>
+            {extraLiveMatches.length ? <span className="rounded-full border border-[#00FF88]/25 bg-[#00FF88]/10 px-2 py-1 text-[9px] font-black text-[#00FF88]">لا يتم إخفاء أي مباراة مباشرة</span> : null}
+          </div>
           <div className="grid gap-3 md:grid-cols-2">
-            {secondaryMatches.map((match) => <MatchRow key={matchKey(match)} match={match} now={now} mounted={mounted} />)}
+            {secondaryMatches.map((match) => <MatchRow key={matchKey(match)} match={match} now={now} mounted={mounted} variant={isLiveOrBreak(match) || isWaitingForStartConfirmation(match, now) ? 'live' : 'normal'} />)}
             {!secondaryMatches.length ? <div className="rounded-2xl border border-dashed border-white/10 bg-black/20 p-4 text-sm font-bold text-gray-400 md:col-span-2">لا توجد مباريات قادمة إضافية جاهزة للعرض الآن.</div> : null}
           </div>
         </div>
@@ -362,7 +379,7 @@ export default function HomeClientSportsLiveFocus({ upcomingMatches = [], ticker
     };
   }, [livePollingEnabled]);
 
-  const tickerDisplayMatches = useMemo(() => uniqueMatches([...(liveCardMatches.length ? liveCardMatches : []), ...safeTickerMatches]).slice(0, 8), [liveCardMatches, safeTickerMatches]);
+  const tickerDisplayMatches = useMemo(() => uniqueMatches([...(liveCardMatches.length ? liveCardMatches : []), ...safeTickerMatches]).slice(0, 10), [liveCardMatches, safeTickerMatches]);
 
   return (
     <main dir="rtl" className="mx-auto max-w-7xl space-y-4 px-3 pb-8 pt-3 sm:space-y-6 sm:px-4 sm:py-5 lg:px-6">
