@@ -41,6 +41,15 @@ function formatScore(value?: number | null) { return typeof value === 'number' &
 function teamName(team?: Team | null) { return team ? getArabicTeamName(team.code, team.name) : 'منتخب'; }
 function teamCode(team?: Team | null) { return team?.code || team?.name?.slice(0, 3) || '---'; }
 function teamFlag(team?: Team | null) { const name = teamName(team); return getTeamFlagUrl({ code: team?.code, name, image: null }, 64) || team?.image || null; }
+function matchStatus(match: TickerMatch) { return normalizeStatus(match.displayStatus || match.status); }
+function isHalfTime(match: TickerMatch) { return ['HT', 'HALFTIME', 'HALF_TIME', 'HALF-TIME'].includes(matchStatus(match)) || Boolean(match.isHalfTime); }
+function isFinished(match: TickerMatch) { return FINISHED_STATUSES.includes(matchStatus(match)) || Boolean(match.isStaleAutoFinished); }
+function isScheduled(match: TickerMatch) { return !isFinished(match) && SCHEDULED_STATUSES.includes(matchStatus(match)); }
+function isLive(match: TickerMatch) { return !isFinished(match) && (LIVE_STATUSES.includes(matchStatus(match)) || Boolean(match.isLiveNow) || Boolean(match.isLikelyLiveByTime) || isHalfTime(match)); }
+function matchKey(match?: TickerMatch | null) { return String(match?.id || match?.animationMatchId || `${teamName(match?.homeTeam)}-${teamName(match?.awayTeam)}-${match?.matchDate || ''}`); }
+function matchTime(match: TickerMatch) { const date = match.matchDate ? new Date(match.matchDate) : null; return date && Number.isFinite(date.getTime()) ? date.getTime() : Number.MAX_SAFE_INTEGER; }
+function getCenterHref(match: TickerMatch) { return match.id ? `/match-center/${encodeURIComponent(String(match.id))}` : '/matches'; }
+function getMatchHref(match: TickerMatch) { return match.id ? `/matches/${encodeURIComponent(String(match.id))}` : '/matches'; }
 
 function groupNumberLabel(match: TickerMatch) {
   const raw = String(match.groupPhase || match.group || match.stage || '').trim().toUpperCase();
@@ -56,16 +65,6 @@ function groupNumberLabel(match: TickerMatch) {
   return 'كأس العالم';
 }
 
-function matchStatus(match: TickerMatch) { return normalizeStatus(match.displayStatus || match.status); }
-function isHalfTime(match: TickerMatch) { return ['HT', 'HALFTIME', 'HALF_TIME', 'HALF-TIME'].includes(matchStatus(match)) || Boolean(match.isHalfTime); }
-function isFinished(match: TickerMatch) { return FINISHED_STATUSES.includes(matchStatus(match)) || Boolean(match.isStaleAutoFinished); }
-function isScheduled(match: TickerMatch) { return !isFinished(match) && SCHEDULED_STATUSES.includes(matchStatus(match)); }
-function isLive(match: TickerMatch) {
-  if (isFinished(match)) return false;
-  const status = matchStatus(match);
-  return LIVE_STATUSES.includes(status) || Boolean(match.isLiveNow) || Boolean(match.isLikelyLiveByTime) || isHalfTime(match);
-}
-
 function liveStatusText(match: TickerMatch) {
   if (match.liveLabel) return match.liveLabel;
   if (isHalfTime(match)) return 'استراحة';
@@ -73,24 +72,15 @@ function liveStatusText(match: TickerMatch) {
   if (status === '1H') return 'الشوط الأول';
   if (status === '2H') return 'الشوط الثاني';
   if (status === 'ET') return 'وقت إضافي';
-  if (status === 'P' || status === 'PEN') return 'ركلات الترجيح';
   const minute = Number(match.minute);
   if (Number.isFinite(minute) && minute > 0) return `د ${formatCount(Math.floor(minute))}`;
   return 'جارية الآن';
 }
 
-function matchKey(match?: TickerMatch | null) {
-  return String(match?.id || match?.animationMatchId || `${teamName(match?.homeTeam)}-${teamName(match?.awayTeam)}-${match?.matchDate || ''}`);
-}
-
-function matchTime(match: TickerMatch) {
-  const date = match.matchDate ? new Date(match.matchDate) : null;
-  return date && Number.isFinite(date.getTime()) ? date.getTime() : Number.MAX_SAFE_INTEGER;
-}
-
-function timeLabel(match: TickerMatch, mounted: boolean) {
-  if (!match.matchDate) return 'قريبًا';
-  if (!mounted) return 'قريبًا';
+function statusBadge(match: TickerMatch, mounted: boolean) {
+  if (isFinished(match)) return 'انتهت';
+  if (isLive(match)) return liveStatusText(match);
+  if (!match.matchDate || !mounted) return 'قريبًا';
   const date = new Date(match.matchDate);
   if (!Number.isFinite(date.getTime())) return 'قريبًا';
   return new Intl.DateTimeFormat('ar-EG', { hour: '2-digit', minute: '2-digit' }).format(date);
@@ -103,28 +93,12 @@ function dateLabel(match: TickerMatch, mounted: boolean) {
   return new Intl.DateTimeFormat('ar-EG', { day: 'numeric', month: 'short' }).format(date);
 }
 
-function statusBadge(match: TickerMatch, mounted: boolean) {
-  if (isFinished(match)) return 'انتهت';
-  if (isLive(match)) return liveStatusText(match);
-  return timeLabel(match, mounted);
-}
-
-function statusTone(match: TickerMatch) {
-  if (isLive(match)) return 'live';
-  if (isFinished(match)) return 'finished';
-  return 'upcoming';
-}
-
-function getMatchHref(match: TickerMatch) {
-  return match.id ? `/match-center/${encodeURIComponent(String(match.id))}` : '/matches';
-}
-
-function TeamLine({ team, score, showScore, align = 'right' }: { team?: Team | null; score?: number | null; showScore: boolean; align?: 'right' | 'left' }) {
+function TeamLine({ team, score, showScore }: { team?: Team | null; score?: number | null; showScore: boolean }) {
   const flag = teamFlag(team);
   const name = teamName(team);
   return (
-    <div className={`grid grid-cols-[minmax(0,1fr)_32px] items-center gap-2 ${align === 'left' ? 'text-left' : 'text-right'}`}>
-      <div className={`flex min-w-0 items-center gap-1.5 ${align === 'left' ? 'flex-row-reverse' : ''}`}>
+    <div className="grid grid-cols-[minmax(0,1fr)_32px] items-center gap-2 text-right">
+      <div className="flex min-w-0 items-center gap-1.5">
         <span className="flex h-5 w-7 shrink-0 items-center justify-center overflow-hidden rounded border border-white/10 bg-black/35 sm:h-6 sm:w-8">
           {flag ? <img src={flag} alt={`علم ${name}`} className="h-full w-full object-cover" loading="lazy" /> : <b className="text-[7px] text-[#FFD700]">{teamCode(team)}</b>}
         </span>
@@ -140,21 +114,17 @@ export default function HomeLiveMatchTicker({ matches = [] }: Props) {
   const safeMatches = Array.isArray(matches) ? (matches as TickerMatch[]) : [];
   const [activeKey, setActiveKey] = useState<string>('');
   const stripRef = useRef<HTMLDivElement | null>(null);
-  const cardRefs = useRef<Record<string, HTMLAnchorElement | null>>({});
+  const cardRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   useEffect(() => { setMounted(true); }, []);
 
-  const displayMatches = useMemo(() => {
-    return [...safeMatches]
-      .sort((a, b) => {
-        const liveDelta = Number(isLive(b)) - Number(isLive(a));
-        if (liveDelta) return liveDelta;
-        const finishedDelta = Number(isFinished(a)) - Number(isFinished(b));
-        if (finishedDelta) return finishedDelta;
-        return matchTime(a) - matchTime(b);
-      })
-      .slice(0, 10);
-  }, [safeMatches]);
+  const displayMatches = useMemo(() => [...safeMatches].sort((a, b) => {
+    const liveDelta = Number(isLive(b)) - Number(isLive(a));
+    if (liveDelta) return liveDelta;
+    const finishedDelta = Number(isFinished(a)) - Number(isFinished(b));
+    if (finishedDelta) return finishedDelta;
+    return matchTime(a) - matchTime(b);
+  }).slice(0, 10), [safeMatches]);
 
   const liveCount = displayMatches.filter(isLive).length;
   const finishedCount = displayMatches.filter(isFinished).length;
@@ -177,31 +147,23 @@ export default function HomeLiveMatchTicker({ matches = [] }: Props) {
 
   useEffect(() => {
     const card = activeKey ? cardRefs.current[activeKey] : null;
-    const strip = stripRef.current;
-    if (!card || !strip) return;
+    if (!card || !stripRef.current) return;
     card.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
   }, [activeKey]);
 
-  if (displayMatches.length === 0) return null;
+  if (!displayMatches.length) return null;
 
   return (
     <section className="relative overflow-hidden rounded-[1.45rem] border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(15,240,252,.12),transparent_32%),linear-gradient(135deg,rgba(3,17,13,.96),rgba(5,7,10,.98))] p-2.5 text-white shadow-[0_18px_50px_rgba(0,0,0,.30)] backdrop-blur-xl sm:rounded-[1.8rem] sm:p-3" aria-label="شريط مباريات كأس العالم">
       <div className="pointer-events-none absolute inset-0 opacity-70" style={{ backgroundImage: 'linear-gradient(90deg, rgba(15,240,252,.10), rgba(255,215,0,.08), rgba(0,255,136,.08), rgba(15,240,252,.10))', backgroundSize: '240% 240%' }} />
       <div className="relative mb-2 flex flex-wrap items-center justify-between gap-2 px-0.5">
-        <div className="flex items-center gap-2">
-          <span className="flex h-8 w-8 items-center justify-center rounded-2xl border border-[#0FF0FC]/20 bg-[#0FF0FC]/10 text-sm shadow-[0_0_18px_rgba(15,240,252,.12)]">⚽</span>
-          <div>
-            <h2 className="text-sm font-black leading-none text-white">شريط المباريات</h2>
-            <p className="mt-1 text-[9px] font-bold text-gray-500">مباشر، نتائج، والقادم</p>
-          </div>
-        </div>
+        <div className="flex items-center gap-2"><span className="flex h-8 w-8 items-center justify-center rounded-2xl border border-[#0FF0FC]/20 bg-[#0FF0FC]/10 text-sm">⚽</span><div><h2 className="text-sm font-black leading-none text-white">شريط المباريات</h2><p className="mt-1 text-[9px] font-bold text-gray-500">مباشر، نتائج، والقادم</p></div></div>
         <div className="flex items-center gap-1.5 text-[9px] font-black">
           {liveCount ? <span className="rounded-full border border-[#00FF88]/25 bg-[#00FF88]/10 px-2 py-1 text-[#00FF88]"><span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-[#00FF88]" /> مباشر {formatCount(liveCount)}</span> : null}
           <span className="rounded-full border border-white/10 bg-white/[0.05] px-2 py-1 text-gray-400">المعروض {formatCount(displayMatches.length)}</span>
           {finishedCount ? <span className="hidden rounded-full border border-white/10 bg-white/[0.05] px-2 py-1 text-gray-400 sm:inline-flex">انتهت {formatCount(finishedCount)}</span> : null}
         </div>
       </div>
-
       <div ref={stripRef} className="relative flex snap-x snap-mandatory gap-2 overflow-x-auto pb-1 mobile-scrollbar" dir="rtl">
         {displayMatches.map((match) => {
           const key = matchKey(match);
@@ -210,42 +172,22 @@ export default function HomeLiveMatchTicker({ matches = [] }: Props) {
           const finished = isFinished(match);
           const scheduled = isScheduled(match);
           const showScore = live || finished;
-          const tone = statusTone(match);
-          const href = getMatchHref(match);
+          const tone = live ? 'live' : finished ? 'finished' : 'upcoming';
           const date = dateLabel(match, mounted);
-
           return (
-            <Link
-              key={key}
-              ref={(node) => { cardRefs.current[key] = node; }}
-              href={href}
-              onMouseEnter={() => setActiveKey(key)}
-              onFocus={() => setActiveKey(key)}
-              className="mobile-tap shrink-0 snap-center focus:outline-none focus-visible:ring-2 focus-visible:ring-[#FFD700]/70"
-            >
-              <article className={`relative h-[112px] w-[248px] overflow-hidden rounded-2xl border px-3 py-2.5 transition duration-200 hover:-translate-y-0.5 sm:h-[118px] sm:w-[286px] ${active ? 'border-[#FFD700]/45 bg-black/60 shadow-[0_0_26px_rgba(255,215,0,.12)]' : 'border-white/10 bg-black/28 hover:border-[#0FF0FC]/35'} ${live ? 'ring-1 ring-[#00FF88]/25' : ''}`}>
-                {active ? <span className="absolute inset-x-5 -top-px h-px bg-gradient-to-r from-transparent via-[#FFD700] to-transparent" /> : null}
-                {live ? <span className="absolute -left-5 -top-5 h-16 w-16 rounded-full bg-[#00FF88]/12 blur-2xl" /> : null}
-
-                <div className="mb-2 flex items-center justify-between gap-2">
-                  <span suppressHydrationWarning className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-1 text-[9px] font-black ${tone === 'live' ? 'border-[#00FF88]/25 bg-[#00FF88]/10 text-[#00FF88]' : tone === 'finished' ? 'border-white/10 bg-white/[0.06] text-gray-300' : 'border-[#0FF0FC]/20 bg-[#0FF0FC]/10 text-[#0FF0FC]'}`}>
-                    <span className={`h-1.5 w-1.5 rounded-full ${live ? 'animate-pulse bg-[#00FF88]' : finished ? 'bg-gray-500' : 'bg-[#0FF0FC]'}`} />
-                    {statusBadge(match, mounted)}
-                  </span>
-                  <span className="truncate rounded-full border border-white/10 bg-white/[.05] px-2 py-1 text-[8px] font-black text-gray-400">{groupNumberLabel(match)}</span>
-                </div>
-
-                <div className="grid gap-1.5">
-                  <TeamLine team={match.homeTeam} score={match.homeScore} showScore={showScore} />
-                  <TeamLine team={match.awayTeam} score={match.awayScore} showScore={showScore} />
-                </div>
-
-                <div className="mt-2 flex items-center justify-between gap-2 border-t border-white/10 pt-2 text-[9px] font-bold text-gray-500">
-                  <span suppressHydrationWarning>{date || (scheduled ? 'موعد المباراة' : 'تفاصيل المباراة')}</span>
-                  <span className="rounded-lg bg-white/[0.05] px-2 py-1 text-[#FFD700]">فتح المركز</span>
-                </div>
-              </article>
-            </Link>
+            <article key={key} ref={(node) => { cardRefs.current[key] = node; }} onMouseEnter={() => setActiveKey(key)} className={`relative h-[132px] w-[254px] shrink-0 snap-center overflow-hidden rounded-2xl border px-3 py-2.5 transition duration-200 hover:-translate-y-0.5 sm:h-[138px] sm:w-[292px] ${active ? 'border-[#FFD700]/45 bg-black/60 shadow-[0_0_26px_rgba(255,215,0,.12)]' : 'border-white/10 bg-black/28 hover:border-[#0FF0FC]/35'} ${live ? 'ring-1 ring-[#00FF88]/25' : ''}`}>
+              {active ? <span className="absolute inset-x-5 -top-px h-px bg-gradient-to-r from-transparent via-[#FFD700] to-transparent" /> : null}
+              {live ? <span className="absolute -left-5 -top-5 h-16 w-16 rounded-full bg-[#00FF88]/12 blur-2xl" /> : null}
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <span suppressHydrationWarning className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-1 text-[9px] font-black ${tone === 'live' ? 'border-[#00FF88]/25 bg-[#00FF88]/10 text-[#00FF88]' : tone === 'finished' ? 'border-white/10 bg-white/[0.06] text-gray-300' : 'border-[#0FF0FC]/20 bg-[#0FF0FC]/10 text-[#0FF0FC]'}`}><span className={`h-1.5 w-1.5 rounded-full ${live ? 'animate-pulse bg-[#00FF88]' : finished ? 'bg-gray-500' : 'bg-[#0FF0FC]'}`} />{statusBadge(match, mounted)}</span>
+                <span className="truncate rounded-full border border-white/10 bg-white/[.05] px-2 py-1 text-[8px] font-black text-gray-400">{groupNumberLabel(match)}</span>
+              </div>
+              <div className="grid gap-1.5"><TeamLine team={match.homeTeam} score={match.homeScore} showScore={showScore} /><TeamLine team={match.awayTeam} score={match.awayScore} showScore={showScore} /></div>
+              <div className="mt-2 flex items-center justify-between gap-2 border-t border-white/10 pt-2 text-[9px] font-bold text-gray-500">
+                <span suppressHydrationWarning>{date || (scheduled ? 'موعد المباراة' : 'تفاصيل المباراة')}</span>
+                <div className="grid grid-cols-2 gap-1.5"><Link href={getCenterHref(match)} className="mobile-tap rounded-lg bg-[#0FF0FC] px-2 py-1 text-center text-[8px] font-black text-black transition hover:bg-[#4AFAFF]">تفاعلي</Link><Link href={getMatchHref(match)} className="mobile-tap rounded-lg border border-[#FFD700]/25 bg-[#FFD700]/10 px-2 py-1 text-center text-[8px] font-black text-[#FFD700] transition hover:bg-[#FFD700]/15">المباراة</Link></div>
+              </div>
+            </article>
           );
         })}
       </div>
