@@ -9,13 +9,7 @@ import HomeRoundOf32Widget from '@/components/HomeRoundOf32Widget';
 import { getTeamFlagUrl } from '@/lib/teamFlags';
 import { getArabicTeamName } from '@/lib/teamDisplay';
 
-type Team = {
-  id?: string | number | null;
-  name?: string | null;
-  code?: string | null;
-  image?: string | null;
-  flagUrl?: string | null;
-};
+type Team = { id?: string | number | null; name?: string | null; code?: string | null; image?: string | null; flagUrl?: string | null };
 
 type HomeMatch = {
   id?: string | number | null;
@@ -49,12 +43,10 @@ type Props = {
 };
 
 const MATCH_REFRESH_MS = 15_000;
-const LIVE_POLL_LOOKBACK_MS = 3 * 60 * 60 * 1000;
-const LIVE_POLL_LOOKAHEAD_MS = 30 * 60 * 1000;
-const COUNTDOWN_FAST_WINDOW_MS = 10 * 60 * 1000;
-const COUNTDOWN_SLOW_REFRESH_MS = 60_000;
-const LIVE_STATUSES = ['1H', '2H', 'ET', 'BT', 'P', 'IN_PLAY', 'LIVE'];
-const SECOND_HALF_STATUSES = ['2H'];
+const LIVE_LOOKBACK_MS = 3 * 60 * 60 * 1000;
+const LIVE_LOOKAHEAD_MS = 30 * 60 * 1000;
+const FAST_COUNTDOWN_MS = 10 * 60 * 1000;
+const LIVE_STATUSES = ['1H', '2H', 'ET', 'BT', 'P', 'PEN', 'IN_PLAY', 'LIVE'];
 const HALF_TIME_STATUSES = ['HT', 'HALFTIME', 'HALF_TIME', 'HALF-TIME'];
 const FINISHED_STATUSES = ['FINISHED', 'FT', 'AET', 'PEN', 'FULL_TIME', 'ENDED', 'COMPLETED', 'FINAL_VERIFIED'];
 const SCHEDULED_STATUSES = ['SCHEDULED', 'TIMED', 'NOT_STARTED', 'NS'];
@@ -68,13 +60,12 @@ function formatScore(value?: number | null) {
   return typeof value === 'number' && Number.isFinite(value) ? new Intl.NumberFormat('en-US').format(value) : '0';
 }
 
-function normalizeStatus(match?: HomeMatch | null) {
+function status(match?: HomeMatch | null) {
   return String(match?.displayStatus || match?.status || '').toUpperCase();
 }
 
 function teamLabel(team?: Team | null) {
-  if (!team) return 'منتخب غير محدد';
-  return getArabicTeamName(team.code, team.name);
+  return team ? getArabicTeamName(team.code, team.name) : 'منتخب غير محدد';
 }
 
 function teamCode(team?: Team | null) {
@@ -95,7 +86,7 @@ function getMatchHref(match: HomeMatch) {
 }
 
 function getBroadcastHref(match: HomeMatch) {
-  return match.id ? `/match-center/${encodeURIComponent(String(match.id))}` : getMatchHref(match);
+  return match.id ? `/live-animation/${encodeURIComponent(String(match.id))}` : '/animation-live';
 }
 
 function matchKey(match?: HomeMatch | null) {
@@ -108,31 +99,25 @@ function matchTime(match: HomeMatch) {
 }
 
 function minutesSinceKickoff(match: HomeMatch, now: Date) {
-  const date = match.matchDate ? new Date(match.matchDate) : null;
-  if (!date || !Number.isFinite(date.getTime())) return null;
-  return Math.floor((now.getTime() - date.getTime()) / 60_000) + 1;
-}
-
-function hasKickoffPassed(match: HomeMatch, now: Date) {
-  const minutes = minutesSinceKickoff(match, now);
-  return minutes !== null && minutes >= 1;
+  const time = matchTime(match);
+  if (!Number.isFinite(time)) return null;
+  return Math.floor((now.getTime() - time) / 60_000) + 1;
 }
 
 function isFinished(match?: HomeMatch | null) {
-  return FINISHED_STATUSES.includes(normalizeStatus(match)) || Boolean(match?.isStaleAutoFinished);
+  return FINISHED_STATUSES.includes(status(match)) || Boolean(match?.isStaleAutoFinished);
 }
 
 function isHalfTime(match?: HomeMatch | null) {
-  return HALF_TIME_STATUSES.includes(normalizeStatus(match)) || Boolean(match?.isHalfTime);
+  return HALF_TIME_STATUSES.includes(status(match)) || Boolean(match?.isHalfTime);
 }
 
 function isScheduled(match?: HomeMatch | null) {
-  return !isFinished(match) && SCHEDULED_STATUSES.includes(normalizeStatus(match));
+  return !isFinished(match) && SCHEDULED_STATUSES.includes(status(match));
 }
 
 function isConfirmedLive(match?: HomeMatch | null) {
-  const status = normalizeStatus(match);
-  return !isFinished(match) && !isHalfTime(match) && (LIVE_STATUSES.includes(status) || Boolean(match?.isLiveNow) || Boolean(match?.isLikelyLiveByTime));
+  return !isFinished(match) && !isHalfTime(match) && (LIVE_STATUSES.includes(status(match)) || Boolean(match?.isLiveNow) || Boolean(match?.isLikelyLiveByTime));
 }
 
 function isLiveOrBreak(match?: HomeMatch | null) {
@@ -140,32 +125,31 @@ function isLiveOrBreak(match?: HomeMatch | null) {
 }
 
 function isWaitingForStartConfirmation(match: HomeMatch, now: Date) {
-  return isScheduled(match) && hasKickoffPassed(match, now) && !isConfirmedLive(match) && !isHalfTime(match);
+  const minute = minutesSinceKickoff(match, now);
+  return isScheduled(match) && minute !== null && minute >= 1 && !isLiveOrBreak(match);
 }
 
 function shouldPollLiveCard(matches: HomeMatch[]) {
   const now = Date.now();
   return matches.some((match) => {
     if (!match || isFinished(match)) return false;
-    if (isConfirmedLive(match) || isHalfTime(match)) return true;
+    if (isLiveOrBreak(match)) return true;
     const time = matchTime(match);
-    if (!Number.isFinite(time)) return false;
-    return time >= now - LIVE_POLL_LOOKBACK_MS && time <= now + LIVE_POLL_LOOKAHEAD_MS;
+    return Number.isFinite(time) && time >= now - LIVE_LOOKBACK_MS && time <= now + LIVE_LOOKAHEAD_MS;
   });
 }
 
 function countdownRefreshMs(match: HomeMatch | null, now: Date) {
   if (!match || isFinished(match)) return null;
-  if (isConfirmedLive(match) || isHalfTime(match) || isWaitingForStartConfirmation(match, now)) return 1000;
-  const diffMs = matchTime(match) - now.getTime();
-  return diffMs > 0 && diffMs <= COUNTDOWN_FAST_WINDOW_MS ? 1000 : COUNTDOWN_SLOW_REFRESH_MS;
+  if (isLiveOrBreak(match) || isWaitingForStartConfirmation(match, now)) return 1000;
+  const diff = matchTime(match) - now.getTime();
+  return diff > 0 && diff <= FAST_COUNTDOWN_MS ? 1000 : 60_000;
 }
 
 function displayMinute(match: HomeMatch) {
   if (isHalfTime(match) || isFinished(match)) return null;
   const minute = Number(match.minute);
-  const status = normalizeStatus(match);
-  if (SECOND_HALF_STATUSES.includes(status) && (!Number.isFinite(minute) || minute < 45)) return 45;
+  if (status(match) === '2H' && (!Number.isFinite(minute) || minute < 45)) return 45;
   if (!Number.isFinite(minute) || minute <= 0) return null;
   return Math.max(1, Math.min(150, Math.floor(minute)));
 }
@@ -198,24 +182,23 @@ function formatMatchDate(value?: string | Date | null, mounted?: boolean) {
 }
 
 function formatKickoffTime(value?: string | Date | null, mounted?: boolean) {
-  if (!value) return '—';
-  if (mounted === false) return '—';
+  if (!value || mounted === false) return '—';
   const date = new Date(value);
   if (!Number.isFinite(date.getTime())) return '—';
   return new Intl.DateTimeFormat('ar-EG', { hour: '2-digit', minute: '2-digit' }).format(date);
 }
 
-function countdownParts(match: HomeMatch, now: Date) {
-  const date = match.matchDate ? new Date(match.matchDate) : null;
-  const diffMs = date && Number.isFinite(date.getTime()) ? date.getTime() - now.getTime() : 0;
+function countdownLabel(match: HomeMatch, now: Date) {
+  const diffMs = matchTime(match) - now.getTime();
   const totalSeconds = Math.max(0, Math.floor(diffMs / 1000));
-  return {
-    active: diffMs > 0,
-    days: Math.floor(totalSeconds / 86_400),
-    hours: Math.floor((totalSeconds % 86_400) / 3_600),
-    minutes: Math.floor((totalSeconds % 3_600) / 60),
-    seconds: totalSeconds % 60,
-  };
+  const days = Math.floor(totalSeconds / 86_400);
+  const hours = Math.floor((totalSeconds % 86_400) / 3_600);
+  const minutes = Math.floor((totalSeconds % 3_600) / 60);
+  const seconds = totalSeconds % 60;
+  if (diffMs <= 0) return 'بانتظار المصدر';
+  if (days > 0) return `بعد ${formatCount(days)}ي ${formatCount(hours)}س`;
+  if (hours > 0) return `بعد ${formatCount(hours)}س ${formatCount(minutes)}د`;
+  return `بعد ${formatCount(minutes)}د ${formatCount(seconds)}ث`;
 }
 
 function TeamBadge({ team, align }: { team?: Team | null; align: 'right' | 'left' }) {
@@ -254,15 +237,11 @@ function MatchStatePill({ match, now, mounted }: { match: HomeMatch; now: Date; 
   if (isConfirmedLive(match)) {
     if (match.liveLabel) return <span className="rounded-xl border border-[#00FF88]/25 bg-[#00FF88]/10 px-2.5 py-1.5 text-[11px] font-black text-[#00FF88]">{match.liveLabel}</span>;
     const minute = displayMinute(match);
-    const label = minute ? `جارية الآن - د${formatCount(minute)}` : 'جارية الآن';
-    return <span className="rounded-xl border border-[#00FF88]/25 bg-[#00FF88]/10 px-2.5 py-1.5 text-[11px] font-black text-[#00FF88]">{label}</span>;
+    return <span className="rounded-xl border border-[#00FF88]/25 bg-[#00FF88]/10 px-2.5 py-1.5 text-[11px] font-black text-[#00FF88]">{minute ? `جارية الآن - د${formatCount(minute)}` : 'جارية الآن'}</span>;
   }
   if (isWaitingForStartConfirmation(match, now)) return <span className="rounded-xl border border-[#FFD700]/20 bg-[#FFD700]/10 px-2.5 py-1.5 text-[11px] font-black text-[#FFD700]">بانتظار تأكيد البداية</span>;
   if (!mounted) return <span className="rounded-xl border border-[#FFD700]/20 bg-[#FFD700]/10 px-2.5 py-1.5 text-[11px] font-black text-[#FFD700]">قريباً</span>;
-  const parts = countdownParts(match, now);
-  if (!parts.active) return <span className="rounded-xl border border-[#FFD700]/20 bg-[#FFD700]/10 px-2.5 py-1.5 text-[11px] font-black text-[#FFD700]">بانتظار المصدر</span>;
-  const visibleParts = parts.days > 0 ? `${formatCount(parts.days)}ي ${formatCount(parts.hours)}س` : parts.hours > 0 ? `${formatCount(parts.hours)}س ${formatCount(parts.minutes)}د` : `${formatCount(parts.minutes)}د ${formatCount(parts.seconds)}ث`;
-  return <span className="inline-flex items-center gap-1.5 rounded-xl border border-[#0FF0FC]/25 bg-[#0FF0FC]/10 px-2.5 py-1.5 text-[11px] font-black text-[#0FF0FC]"><span className="h-1.5 w-1.5 rounded-full bg-[#0FF0FC] shadow-[0_0_12px_rgba(15,240,252,0.8)]" /> بعد {visibleParts}</span>;
+  return <span className="inline-flex items-center gap-1.5 rounded-xl border border-[#0FF0FC]/25 bg-[#0FF0FC]/10 px-2.5 py-1.5 text-[11px] font-black text-[#0FF0FC]"><span className="h-1.5 w-1.5 rounded-full bg-[#0FF0FC] shadow-[0_0_12px_rgba(15,240,252,0.8)]" /> {countdownLabel(match, now)}</span>;
 }
 
 function MatchRow({ match, now, mounted, variant = 'normal' }: { match: HomeMatch; now: Date; mounted: boolean; variant?: 'live' | 'primary' | 'normal' }) {
@@ -288,7 +267,7 @@ function MatchRow({ match, now, mounted, variant = 'normal' }: { match: HomeMatc
         <TeamBadge team={match.awayTeam} align="left" />
       </div>
       <div className="mt-3 grid grid-cols-2 gap-2">
-        <Link href={getBroadcastHref(match)} className="mobile-tap inline-flex min-h-10 items-center justify-center rounded-xl bg-[#0FF0FC] px-3 py-2.5 text-center text-[11px] font-black text-black transition hover:bg-[#4AFAFF]">البث التفاعلي</Link>
+        <Link href={getBroadcastHref(match)} className="mobile-tap inline-flex min-h-10 items-center justify-center rounded-xl bg-[#0FF0FC] px-3 py-2.5 text-center text-[11px] font-black text-black transition hover:bg-[#4AFAFF]">الملعب التفاعلي</Link>
         <Link href={getMatchHref(match)} className="mobile-tap inline-flex min-h-10 items-center justify-center rounded-xl border border-[#FFD700]/25 bg-[#FFD700]/10 px-3 py-2.5 text-center text-[11px] font-black text-[#FFD700] transition hover:bg-[#FFD700]/15">صفحة المباراة</Link>
       </div>
     </article>
@@ -303,15 +282,10 @@ function MatchCenter({ fallbackMatches = [], nextMatch = null, liveMatches = [] 
 
   const mergedMatches = useMemo(() => uniqueMatches([...(liveMatches.length ? liveMatches : []), ...(nextMatch ? [nextMatch] : []), ...(liveMatches.length ? [] : fallbackMatches)]), [liveMatches, nextMatch, fallbackMatches]);
   const sortedMatches = useMemo(() => [...mergedMatches].sort((a, b) => matchTime(a) - matchTime(b)), [mergedMatches]);
-  const confirmedLiveMatch = sortedMatches.find((match) => isConfirmedLive(match) || isHalfTime(match)) || null;
-  const waitingMatch = sortedMatches.find((match) => isWaitingForStartConfirmation(match, now)) || null;
-  const nextScheduledMatch = sortedMatches.find((match) => isScheduled(match) && !isWaitingForStartConfirmation(match, now) && !isConfirmedLive(match)) || null;
-  const primaryMatch = confirmedLiveMatch || waitingMatch || nextScheduledMatch || sortedMatches.find((match) => !isFinished(match)) || sortedMatches[0] || null;
+  const primaryMatch = sortedMatches.find(isLiveOrBreak) || sortedMatches.find((match) => isWaitingForStartConfirmation(match, now)) || sortedMatches.find((match) => isScheduled(match)) || sortedMatches.find((match) => !isFinished(match)) || sortedMatches[0] || null;
   const primaryKey = primaryMatch ? matchKey(primaryMatch) : null;
   const refreshMs = countdownRefreshMs(primaryMatch, now);
-  const extraLiveMatches = sortedMatches
-    .filter((match) => matchKey(match) !== primaryKey)
-    .filter((match) => isLiveOrBreak(match) || isWaitingForStartConfirmation(match, now));
+  const extraLiveMatches = sortedMatches.filter((match) => matchKey(match) !== primaryKey).filter((match) => isLiveOrBreak(match) || isWaitingForStartConfirmation(match, now));
   const upcomingSecondaryMatches = sortedMatches
     .filter((match) => matchKey(match) !== primaryKey)
     .filter((match) => !extraLiveMatches.some((live) => matchKey(live) === matchKey(match)))
@@ -356,7 +330,6 @@ export default function HomeClientSportsLiveFocus({ upcomingMatches = [], ticker
 
   useEffect(() => {
     if (!livePollingEnabled) return;
-
     let cancelled = false;
     async function loadMatches() {
       if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
@@ -366,17 +339,11 @@ export default function HomeClientSportsLiveFocus({ upcomingMatches = [], ticker
         const data = await response.json();
         const list = Array.isArray(data) ? data : Array.isArray(data?.matches) ? data.matches : [];
         if (!cancelled) setLiveCardMatches(list);
-      } catch {
-        // Keep server fallback matches.
-      }
+      } catch {}
     }
-
     loadMatches();
     const timer = window.setInterval(loadMatches, MATCH_REFRESH_MS);
-    return () => {
-      cancelled = true;
-      window.clearInterval(timer);
-    };
+    return () => { cancelled = true; window.clearInterval(timer); };
   }, [livePollingEnabled]);
 
   const tickerDisplayMatches = useMemo(() => uniqueMatches([...(liveCardMatches.length ? liveCardMatches : []), ...safeTickerMatches]).slice(0, 10), [liveCardMatches, safeTickerMatches]);
