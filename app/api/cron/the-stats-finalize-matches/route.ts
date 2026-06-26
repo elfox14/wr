@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { hasValidAdminSecret } from '@/lib/adminAuth';
 import { collectTheStatsMatchExtras, defaultTheStatsQuery } from '@/lib/theStatsMatchExtras';
+import { revalidateStatsViews } from '@/lib/revalidateStatsViews';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -190,6 +191,7 @@ async function run(req: Request) {
 
   const processed = [];
   let providerRequestsBudgetApprox = 0;
+  let wroteFinalSnapshots = false;
 
   for (const match of matches) {
     try {
@@ -248,6 +250,7 @@ async function run(req: Request) {
         });
         snapshotId = snapshot.id;
         insertedEvents = 0;
+        wroteFinalSnapshots = true;
       }
 
       processed.push({
@@ -269,6 +272,8 @@ async function run(req: Request) {
     if (delayMs > 0) await sleep(delayMs);
   }
 
+  const revalidated = wroteFinalSnapshots ? revalidateStatsViews('the-stats-finalize-matches') : null;
+
   return NextResponse.json({
     ok: true,
     mode: 'the_stats_finalize_matches_v2_snapshot_only',
@@ -287,6 +292,7 @@ async function run(req: Request) {
     scope: { matchId, limit: matchId ? 1 : limit, days, localMatches: matches.length },
     providerRequestsBudgetApprox,
     processed,
+    revalidated,
   }, { headers: { 'Cache-Control': 'no-store' } });
 }
 
