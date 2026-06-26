@@ -117,17 +117,64 @@ async function fetchProviderMatches(query: Record<string, string | number>) {
 
 async function existingProviderId(matchId: string) {
   const snapshots = await prisma.matchStatsSnapshot.findMany({
-    where: { matchId, provider: { startsWith: 'THE_STATS_API' } },
+    where: { matchId },
     orderBy: { capturedAt: 'desc' },
-    take: 20,
-    select: { providerMatchId: true, rawData: true },
+    take: 50,
+    select: { provider: true, providerMatchId: true, rawData: true },
   }).catch(() => []);
+
+  const blacklistedIds = new Set<string>();
+  // Hardcode known bad placeholder IDs
+  blacklistedIds.add('mt_28383092');
+
+  function has404Error(raw: any): boolean {
+    if (!raw) return false;
+    if (raw.endpointsFailed && Array.isArray(raw.endpointsFailed)) {
+      if (raw.endpointsFailed.some((e: any) => e.status === 404 || String(e.message || '').includes('404'))) return true;
+    }
+    if (raw.endpoints && Array.isArray(raw.endpoints)) {
+      if (raw.endpoints.some((e: any) => !e.ok && (e.error?.status === 404 || String(e.error?.message || '').includes('404')))) return true;
+    }
+    if (raw.error && (raw.error.status === 404 || String(raw.error.message || '').includes('404'))) return true;
+    return false;
+  }
+
+  // First pass: identify blacklisted (failed) IDs
   for (const snapshot of snapshots) {
     const raw = snapshot?.rawData as any;
-    const candidates = [raw?.resolvedProviderMatchId, raw?.providerMatchId, raw?.matchId, raw?.source?.providerMatchId, raw?.normalized?.matchInfo?.providerMatchId, snapshot?.providerMatchId ? `mt_${snapshot.providerMatchId}` : null];
+    if (has404Error(raw)) {
+      const candidates = [
+        raw?.resolvedProviderMatchId,
+        raw?.providerMatchId,
+        raw?.matchId,
+        raw?.source?.providerMatchId,
+        raw?.normalized?.matchInfo?.providerMatchId,
+        snapshot?.providerMatchId ? `mt_${snapshot.providerMatchId}` : null
+      ];
+      for (const candidate of candidates) {
+        const id = normalizeProviderId(candidate);
+        if (id) blacklistedIds.add(id);
+      }
+    }
+  }
+
+  // Second pass: find a valid cached ID that is not blacklisted
+  for (const snapshot of snapshots) {
+    if (!snapshot.provider.startsWith('THE_STATS_API')) continue;
+    const raw = snapshot?.rawData as any;
+    if (has404Error(raw)) continue;
+
+    const candidates = [
+      raw?.resolvedProviderMatchId,
+      raw?.providerMatchId,
+      raw?.matchId,
+      raw?.source?.providerMatchId,
+      raw?.normalized?.matchInfo?.providerMatchId,
+      snapshot?.providerMatchId ? `mt_${snapshot.providerMatchId}` : null
+    ];
     for (const candidate of candidates) {
       const id = normalizeProviderId(candidate);
-      if (id) return id;
+      if (id && !blacklistedIds.has(id)) return id;
     }
   }
   return null;
