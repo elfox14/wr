@@ -24,6 +24,8 @@ type PipelineStep = {
   error?: string;
 };
 
+type ProviderBlock = { provider: string; blockedUntil: Date | null; reason: string | null };
+
 function response(payload: unknown, status = 200) {
   return NextResponse.json(payload, {
     status,
@@ -62,7 +64,7 @@ function isNearLive(match: { status: string; matchDate: Date }) {
   return diffMinutes >= -30 && diffMinutes <= 160;
 }
 
-function isUpcomingSoon(match: { status: string; matchDate: Date }, hours = 72) {
+function isUpcomingSoon(match: { status: string; matchDate: Date }, hours = 6) {
   if (isFinished(match.status) || isLive(match.status)) return false;
   const diffHours = (new Date(match.matchDate).getTime() - Date.now()) / 36e5;
   return diffHours >= -3 && diffHours <= hours;
@@ -98,6 +100,50 @@ function hasSnapshotColumnStats(snapshot: any) {
 
 function articleMapRows(rows: any[]) {
   return new Map(rows.map((row) => [row.matchId, row]));
+}
+
+async function ensurePipelineStateTable() {
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "CronProviderState" (
+      "provider" TEXT PRIMARY KEY,
+      "blockedUntil" TIMESTAMPTZ NULL,
+      "reason" TEXT NULL,
+      "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `).catch(() => undefined);
+}
+
+async function getProviderBlock(provider: string): Promise<ProviderBlock | null> {
+  await ensurePipelineStateTable();
+  const rows = await prisma.$queryRawUnsafe<ProviderBlock[]>(
+    `SELECT "provider", "blockedUntil", "reason" FROM "CronProviderState" WHERE "provider" = $1 LIMIT 1`,
+    provider,
+  ).catch(() => []);
+  return rows[0] || null;
+}
+
+async function setProviderBlock(provider: string, blockedUntil: Date, reason: string) {
+  await ensurePipelineStateTable();
+  await prisma.$executeRawUnsafe(
+    `INSERT INTO "CronProviderState" ("provider", "blockedUntil", "reason", "updatedAt")
+     VALUES ($1, $2, $3, NOW())
+     ON CONFLICT ("provider") DO UPDATE SET "blockedUntil" = EXCLUDED."blockedUntil", "reason" = EXCLUDED."reason", "updatedAt" = NOW()`,
+    provider,
+    blockedUntil,
+    reason.slice(0, 500),
+  ).catch(() => undefined);
+}
+
+function isBlockActive(block: ProviderBlock | null) {
+  const until = block?.blockedUntil ? new Date(block.blockedUntil).getTime() : 0;
+  return Number.isFinite(until) && until > Date.now();
+}
+
+function nextProviderResetDate() {
+  const now = new Date();
+  const next = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1, 0, 30, 0));
+  if (next.getTime() <= now.getTime()) return new Date(now.getTime() + 6 * 36e5);
+  return next;
 }
 
 async function loadArticles(matchIds: string[]) {
@@ -200,11 +246,11 @@ function completeness(match: MatchWithData) {
   };
 }
 
-function candidatePriority(match: MatchWithData) {
+function candidatePriority(match: MatchWithData, options: { preSyncHours: number; iSportsBlocked: boolean }) {
   const c = completeness(match);
-  if (isNearLive(match) && !c.flags.liveLinked) return 1000;
-  if (isNearLive(match) && c.flags.liveLinked) return 950;
-  if (isUpcomingSoon(match) && !c.flags.liveLinked) return 850;
+  if (!options.iSportsBlocked && isNearLive(match) && !c.flags.liveLinked) return 1000;
+  if (!options.iSportsBlocked && isNearLive(match) && c.flags.liveLinked) return 950;
+  if (!options.iSportsBlocked && isUpcomingSoon(match, options.preSyncHours) && !c.flags.liveLinked) return 850;
   if (isFinished(match.status) && !c.flags.finalStatsReady) return 800;
   if (isFinished(match.status) && (!c.flags.finalEventsReady || !c.flags.playerRatingsReady) && match.externalId) return 760;
   if (isFinished(match.status) && c.flags.finalStatsReady && !c.flags.articleReady) return 700;
@@ -212,9 +258,9 @@ function candidatePriority(match: MatchWithData) {
   return 100 - c.percent;
 }
 
-function pickMatch(matches: MatchWithData[]) {
+function pickMatch(matches: MatchWithData[], options: { preSyncHours: number; iSportsBlocked: boolean }) {
   return [...matches]
-    .map((match) => ({ match, priority: candidatePriority(match), completeness: completeness(match) }))
+    .map((match) => ({ match, priority: candidatePriority(match, options), completeness: completeness(match) }))
     .sort((a, b) => b.priority - a.priority || new Date(a.match.matchDate).getTime() - new Date(b.match.matchDate).getTime())[0] || null;
 }
 
@@ -246,6 +292,32 @@ async function callJson(name: string, url: string, init?: RequestInit, timeoutMs
   } finally {
     clearTimeout(timeout);
   }
+}
+
+function textOf(value: unknown) {
+  return typeof value === 'string' ? value : JSON.stringify(value || {});
+}
+
+function isQuotaText(value: unknown) {
+  return /quota|limit|rate|too many|200 trials|try again tomorrow/i.test(textOf(value));
+}
+
+function stepResult(step: PipelineStep): any {
+  return step.result && typeof step.result === 'object' ? step.result as any : {};
+}
+
+function syncStepHasQuota(step: PipelineStep) {
+  if (step.name !== 'sync-animation-matches') return false;
+  const result = stepResult(step);
+  return isQuotaText(result.providerErrors) || isQuotaText(result.error) || isQuotaText(step.error);
+}
+
+function syncStepNoUsefulUpdate(step: PipelineStep) {
+  if (step.name !== 'sync-animation-matches') return false;
+  const result = stepResult(step);
+  const matched = Number(result.matched || 0);
+  const updated = Number(result.updated || 0);
+  return step.ok && matched === 0 && updated === 0;
 }
 
 function cleanOrigin(value: string | null | undefined) {
@@ -304,11 +376,15 @@ async function refreshMatch(matchId: string) {
   return matches[0] || null;
 }
 
-async function runNextStep(req: Request, match: MatchWithData, key: string, options: { includeResults: boolean; maxStepTimeoutMs: number }) {
+async function runNextStep(req: Request, match: MatchWithData, key: string, options: { includeResults: boolean; maxStepTimeoutMs: number; preSyncHours: number; iSportsBlocked: boolean; iSportsBlockedUntil: string | null }) {
   const c = completeness(match);
   const date = dateOnly(match.matchDate);
 
-  if (isNearLive(match) && !c.flags.liveLinked) {
+  if (options.iSportsBlocked && !c.flags.liveLinked && (isNearLive(match) || isUpcomingSoon(match, options.preSyncHours))) {
+    return { name: 'sync-animation-matches', ok: true, skipped: true, durationMs: 0, result: { reason: 'isports-quota-blocked', blockedUntil: options.iSportsBlockedUntil } } satisfies PipelineStep;
+  }
+
+  if (!options.iSportsBlocked && isNearLive(match) && !c.flags.liveLinked) {
     return callJson('sync-animation-matches', withKey('/api/cron/sync-animation-matches', key, {
       limit: 80,
       lookbackHours: 12,
@@ -319,7 +395,7 @@ async function runNextStep(req: Request, match: MatchWithData, key: string, opti
     }, req), undefined, options.maxStepTimeoutMs);
   }
 
-  if (isUpcomingSoon(match) && !c.flags.liveLinked) {
+  if (!options.iSportsBlocked && isUpcomingSoon(match, options.preSyncHours) && !c.flags.liveLinked) {
     return callJson('sync-animation-matches', withKey('/api/cron/sync-animation-matches', key, {
       limit: 80,
       lookbackHours: 12,
@@ -330,7 +406,7 @@ async function runNextStep(req: Request, match: MatchWithData, key: string, opti
     }, req), undefined, options.maxStepTimeoutMs);
   }
 
-  if (isNearLive(match) && c.flags.liveLinked && !isFinished(match.status)) {
+  if (!options.iSportsBlocked && isNearLive(match) && c.flags.liveLinked && !isFinished(match.status)) {
     return callJson('live-ingest', withKey('/api/cron/live-ingest', key, {
       limit: 1,
       maxExternalRequests: 1,
@@ -391,7 +467,14 @@ async function runNextStep(req: Request, match: MatchWithData, key: string, opti
     }, options.maxStepTimeoutMs);
   }
 
-  return { name: 'no-action', ok: true, skipped: true, durationMs: 0, result: { reason: 'match already complete or needs manual provider id', completeness: c } } satisfies PipelineStep;
+  return { name: 'no-action', ok: true, skipped: true, durationMs: 0, result: { reason: 'match already complete or not yet ready for the next source', completeness: c } } satisfies PipelineStep;
+}
+
+function nextActionHint(finalCompleteness: ReturnType<typeof completeness>, steps: PipelineStep[]) {
+  if (finalCompleteness.percent >= 100) return 'complete';
+  if (steps.some(syncStepHasQuota)) return 'iSports quota is exhausted. Live linking is paused until provider reset; pipeline can still process finished matches and TheStats when available.';
+  if (steps.some(syncStepNoUsefulUpdate)) return 'No confident iSports match was found. Run again later closer to kickoff, or enter animationMatchId manually in admin.';
+  return 'run again in 5 minutes or use admin manual IDs when provider matching fails';
 }
 
 async function run(req: Request) {
@@ -404,24 +487,40 @@ async function run(req: Request) {
   const maxSteps = intParam(url, 'maxSteps', 2, 1, 5);
   const lookbackDays = intParam(url, 'lookbackDays', 7, 1, 60);
   const lookaheadHours = intParam(url, 'lookaheadHours', 120, 1, 24 * 14);
+  const preSyncHours = intParam(url, 'preSyncHours', 6, 1, 120);
   const take = intParam(url, 'candidateLimit', 80, 1, 200);
   const maxStepTimeoutMs = intParam(url, 'stepTimeoutMs', 45000, 5000, 90000);
   const includeResults = boolParam(url, 'includeResults', true);
 
+  const iSportsBlock = await getProviderBlock('ISPORTS');
+  let iSportsBlocked = isBlockActive(iSportsBlock);
+  let iSportsBlockedUntil = iSportsBlocked && iSportsBlock?.blockedUntil ? new Date(iSportsBlock.blockedUntil).toISOString() : null;
+
   const candidates = await loadMatchCandidates({ matchId, lookbackDays, lookaheadHours, take });
-  const picked = matchId ? (candidates[0] ? { match: candidates[0], priority: 9999, completeness: completeness(candidates[0]) } : null) : pickMatch(candidates);
+  const picked = matchId ? (candidates[0] ? { match: candidates[0], priority: 9999, completeness: completeness(candidates[0]) } : null) : pickMatch(candidates, { preSyncHours, iSportsBlocked });
 
   if (!picked) {
-    return response({ ok: true, mode: 'match_complete_pipeline_v1', status: 'no_candidates', durationMs: Date.now() - startedAt });
+    return response({ ok: true, mode: 'match_complete_pipeline_v2_quota_aware', status: 'no_candidates', durationMs: Date.now() - startedAt, providerState: { iSportsBlocked, iSportsBlockedUntil } });
   }
 
   const steps: PipelineStep[] = [];
   let current = picked.match;
 
   for (let index = 0; index < maxSteps; index += 1) {
-    const step = await runNextStep(req, current, key, { includeResults: includeResults && index === 0, maxStepTimeoutMs });
+    const step = await runNextStep(req, current, key, { includeResults: includeResults && index === 0, maxStepTimeoutMs, preSyncHours, iSportsBlocked, iSportsBlockedUntil });
     steps.push(step);
+
+    if (syncStepHasQuota(step)) {
+      const until = nextProviderResetDate();
+      await setProviderBlock('ISPORTS', until, 'iSports daily quota exceeded while syncing animation matches');
+      iSportsBlocked = true;
+      iSportsBlockedUntil = until.toISOString();
+      break;
+    }
+
+    if (syncStepNoUsefulUpdate(step)) break;
     if (!step.ok || step.skipped) break;
+
     const fresh = await refreshMatch(current.id);
     if (!fresh) break;
     current = fresh;
@@ -430,7 +529,7 @@ async function run(req: Request) {
   const finalCompleteness = completeness(current);
   return response({
     ok: true,
-    mode: 'match_complete_pipeline_v1_one_match',
+    mode: 'match_complete_pipeline_v2_quota_aware',
     durationMs: Date.now() - startedAt,
     selected: {
       matchId: current.id,
@@ -439,10 +538,11 @@ async function run(req: Request) {
       matchDate: current.matchDate,
       priority: picked.priority,
     },
+    providerState: { iSportsBlocked, iSportsBlockedUntil },
     before: picked.completeness,
     after: finalCompleteness,
     steps,
-    nextActionHint: finalCompleteness.percent >= 100 ? 'complete' : 'run again in 5 minutes or use admin manual ID if TheStats matching failed',
+    nextActionHint: nextActionHint(finalCompleteness, steps),
   });
 }
 
