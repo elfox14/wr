@@ -118,10 +118,6 @@ function MiniTable({ teams }: { teams: TeamStanding[] }) {
     .sort((a, b) => safeNumber(b.points) - safeNumber(a.points) || safeNumber(b.goalDifference) - safeNumber(a.goalDifference) || safeNumber(b.goalsFor) - safeNumber(a.goalsFor))
     .slice(0, 5);
 
-  if (!topTeams.length) {
-    return <div className="rounded-2xl border border-dashed border-white/10 bg-black/20 p-4 text-center text-xs font-bold text-gray-500">بانتظار اكتمال بيانات الإحصائيات.</div>;
-  }
-
   return (
     <div className="overflow-hidden rounded-2xl border border-white/10 bg-black/20">
       <div className="grid grid-cols-[minmax(0,1fr)_42px_42px_42px] gap-2 border-b border-white/10 px-3 py-2 text-[9px] font-black text-gray-500">
@@ -143,6 +139,8 @@ function MiniTable({ teams }: { teams: TeamStanding[] }) {
 
 export default function HomeTournamentStatsCard({ playersCount = 0, teamsCount = 0, upcomingMatchesCount = 0, groupStandings = [] }: Props) {
   const summary = buildSummary(groupStandings, teamsCount, playersCount);
+  if (!summary.teams.length) return null;
+
   const topAttackMetric = summary.topAttack ? `${format(safeNumber(summary.topAttack.goalsFor))} هدف` : 'غير متوفر';
   const bestDefenseMetric = summary.bestDefense ? `${format(safeNumber(summary.bestDefense.goalsAgainst))} هدف مستقبَل` : 'غير متوفر';
   const bestPointsMetric = summary.bestPoints ? `${format(safeNumber(summary.bestPoints.points))} نقطة` : 'غير متوفر';
