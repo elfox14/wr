@@ -32,7 +32,7 @@ function extractList(payload: any) { if (Array.isArray(payload)) return payload;
 function listFrom(payload: any, fields: string[]) { if (Array.isArray(payload)) return payload; const data = dataOf(payload); if (Array.isArray(data)) return data; for (const field of fields) if (Array.isArray(data?.[field])) return data[field]; for (const field of fields) if (Array.isArray(payload?.[field])) return payload[field]; return []; }
 function providerMatch(row: any) { const fixture = row?.fixture || row?.match || row; const teams = row?.teams || row?.participants || {}; const home = teams?.home || row?.home || row?.homeTeam || row?.home_team || {}; const away = teams?.away || row?.away || row?.awayTeam || row?.away_team || {}; return { id: str(fixture?.id, fixture?.matchId, fixture?.match_id, row?.id, row?.matchId, row?.match_id, row?.fixtureId, row?.fixture_id), home: str(home?.name, row?.homeName, row?.home_team_name, home), away: str(away?.name, row?.awayName, row?.away_team_name, away), date: str(fixture?.utc_date, fixture?.date, row?.utc_date, row?.date, row?.matchDate, row?.kickoff, row?.start_time), raw: row }; }
 function candidateScore(candidate: any, match: any) { const directHome = teamScore(candidate.home, match.homeTeam); const directAway = teamScore(candidate.away, match.awayTeam); const swappedHome = teamScore(candidate.home, match.awayTeam); const swappedAway = teamScore(candidate.away, match.homeTeam); const direct = (directHome + directAway) / 2; const swapped = (swappedHome + swappedAway) / 2; const reversed = swapped > direct; const team = Math.max(direct, swapped); const hours = hoursApart(candidate.date, match.matchDate); const time = hours <= 4 ? 25 : hours <= 12 ? 15 : hours <= 30 ? 8 : candidate.date ? -15 : 0; return { ...candidate, score: Math.round(team + time), teamScore: Math.round(team), timeHours: hours === 999 ? null : Number(hours.toFixed(2)), reversed }; }
-function normalizeProviderId(value: any) { const raw = str(value); if (!raw) return null; const id = raw.startsWith('mt_') ? raw : `mt_${raw.replace(/^mt_/i, '').replace(/\D/g, '')}`; return id && id !== 'mt_' && id !== 'mt_12345' ? id : null; }
+function normalizeProviderId(value: any) { const raw = str(value); if (!raw) return null; const digits = raw.replace(/^mt_/i, '').replace(/\D/g, ''); if (digits.length <= 6) return null; const id = `mt_${digits}`; return id && id !== 'mt_' && id !== 'mt_12345' ? id : null; }
 function isPageOutOfRange(error: any) { const code = String(error?.payload?.error?.code || error?.code || '').toUpperCase(); const message = String(error?.payload?.error?.message || error?.message || '').toLowerCase(); return code === 'PAGE_OUT_OF_RANGE' || message.includes('out of range'); }
 function safeError(error: any) { return { name: error?.name || 'TheStatsApiError', message: String(error?.message || error), status: Number(error?.status || error?.payload?.error?.status_code || 0) || null, code: error?.code || error?.payload?.error?.code || null, payload: error?.payload || null }; }
 
@@ -149,7 +149,27 @@ function compactPlayerStat(row: any) {
     playerSubbedOff: str(general?.player_subbed_off ?? stats?.player_subbed_off ?? row?.player_subbed_off),
   };
 }
-async function fetchEndpoint(keyName: string, path: string, timeoutMs: number) { try { return { key: keyName, path, ok: true, payload: await theStatsApiFetch(path, {}, { timeoutMs }) }; } catch (error: any) { return { key: keyName, path, ok: false, error: safeError(error) }; } }
+async function fetchEndpoint(keyName: string, path: string, timeoutMs: number) {
+  const attempts = 3;
+  let delay = 5000;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      const payload = await theStatsApiFetch(path, {}, { timeoutMs });
+      return { key: keyName, path, ok: true, payload };
+    } catch (error: any) {
+      const err = safeError(error);
+      const is429 = Number(err.status) === 429 || String(err.message || '').includes('429') || String(err.code || '').includes('429');
+      if (is429 && i < attempts - 1) {
+        console.log(`[Rate Limit 429] Waiting ${delay / 1000}s before retry ${i + 1}/${attempts - 1} for ${path}...`);
+        await sleep(delay);
+        delay *= 2.5;
+        continue;
+      }
+      return { key: keyName, path, ok: false, error: err };
+    }
+  }
+  return { key: keyName, path, ok: false, error: { name: 'TheStatsApiError', message: 'Max retry attempts reached due to rate limiting (429)', status: 429, code: 'rate_limited', payload: null } };
+}
 
 export async function collectTheStatsMatchExtras(match: any, options: { dryRun?: boolean; save?: boolean; includeRaw?: boolean; timeoutMs?: number; query?: Record<string, string | number>; endpointMode?: TheStatsExtrasEndpointMode; delayMs?: number } = {}) {
   const dryRun = Boolean(options.dryRun);
