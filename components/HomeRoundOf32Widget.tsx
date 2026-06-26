@@ -37,8 +37,8 @@ function isGroups(value: unknown): value is Group[] {
 }
 
 function matchLabel(no: number) { return `مباراة ${nf.format(no)}`; }
-function winner(no: number) { return `الفائز من ${matchLabel(no)}`; }
-function loser(no: number) { return `الخاسر من ${matchLabel(no)}`; }
+function winner(no: number) { return `فائز ${nf.format(no)}`; }
+function loser(no: number) { return `خاسر ${nf.format(no)}`; }
 function teamName(row?: Row | null) { return row ? getArabicTeamName(row.code, row.team) : 'غير محدد'; }
 function flagUrl(row?: Row | null) { return row ? getTeamFlagUrl({ code: row.code, name: teamName(row), image: null }, 64) : null; }
 
@@ -78,24 +78,23 @@ function resolveSlot(slot: string, direct: Qualifier[], thirds: Map<number, Qual
   return {
     seed: q ? `${q.rank}${q.group}` : slot.startsWith('3') ? `3 من ${slot.slice(1).split('').join('/')}` : slot,
     name: teamName(q?.row),
-    note: q?.rank === 3 ? `أفضل ثالث رقم ${nf.format(q.thirdRank || 0)}` : 'حسب ترتيب المجموعة',
+    note: q?.rank === 3 ? `أفضل ثالث ${nf.format(q.thirdRank || 0)}` : 'حسب الترتيب',
     row: q?.row || null,
   };
 }
 
-function nextOf(no: number) { return [...R16, ...QF, ...SF, FINAL].find((match) => match.from.includes(no)) || null; }
 function findFuture(no: number, list: Future[]) { return list.find((match) => match.no === no) || null; }
 
 function TeamPill({ side, align }: { side: ReturnType<typeof resolveSlot>; align: 'left' | 'right' }) {
   const flag = flagUrl(side.row);
   return (
-    <div className={`flex min-w-0 items-center gap-2 rounded-xl border border-white/10 bg-white/[0.96] px-2 py-1.5 text-black shadow-[0_10px_28px_rgba(0,0,0,0.28)] ${align === 'right' ? 'flex-row-reverse text-right' : 'text-left'}`}>
-      <span className="flex h-7 w-10 shrink-0 items-center justify-center overflow-hidden rounded-md border border-black/10 bg-slate-200">
-        {flag ? <img src={flag} alt={`علم ${side.name}`} className="h-full w-full object-cover" loading="lazy" /> : <b className="text-[9px]">{side.seed}</b>}
+    <div className={`flex min-w-0 items-center gap-1.5 rounded-lg border border-black/10 bg-white px-1.5 py-1 text-black shadow-[0_8px_22px_rgba(0,0,0,0.28)] ${align === 'right' ? 'flex-row-reverse text-right' : 'text-left'}`}>
+      <span className="flex h-6 w-9 shrink-0 items-center justify-center overflow-hidden rounded border border-black/10 bg-slate-200">
+        {flag ? <img src={flag} alt={`علم ${side.name}`} className="h-full w-full object-cover" loading="lazy" /> : <b className="text-[8px]">{side.seed}</b>}
       </span>
       <span className="min-w-0 flex-1">
-        <b className="block truncate text-[10px] leading-3">{side.name}</b>
-        <span className="block truncate text-[8px] font-black text-slate-500">{side.seed}</span>
+        <b className="block truncate text-[9px] leading-3">{side.name}</b>
+        <span className="block truncate text-[7px] font-black text-slate-500">{side.seed}</span>
       </span>
     </div>
   );
@@ -105,9 +104,9 @@ function Round32Pair({ no, direct, thirds, align }: { no: number; direct: Qualif
   const item = R32.find(([matchNo]) => matchNo === no);
   if (!item) return null;
   return (
-    <article className="relative rounded-2xl border border-white/10 bg-black/35 p-2">
-      <div className="mb-1 flex items-center justify-between px-1 text-[8px] font-black text-[#FFD700]"><span>{matchLabel(no)}</span><span>R32</span></div>
-      <div className="space-y-1.5">
+    <article className="relative rounded-xl border border-white/10 bg-black/35 p-1.5">
+      <div className="mb-1 flex items-center justify-between px-0.5 text-[7px] font-black text-[#FFD700]"><span>{matchLabel(no)}</span><span>R32</span></div>
+      <div className="space-y-1">
         <TeamPill side={resolveSlot(item[1], direct, thirds, no)} align={align} />
         <TeamPill side={resolveSlot(item[2], direct, thirds, no)} align={align} />
       </div>
@@ -115,19 +114,25 @@ function Round32Pair({ no, direct, thirds, align }: { no: number; direct: Qualif
   );
 }
 
-function WinnerBox({ item, stage, useLoser = false }: { item: Future; stage: string; useLoser?: boolean }) {
-  const next = useLoser ? null : nextOf(item.no);
-  const other = next?.from.find((matchNo) => matchNo !== item.no) || null;
-  const sideLabel = useLoser ? loser : winner;
+function BracketSlot({ item, stage, useLoser = false, size = 'md' }: { item: Future; stage: string; useLoser?: boolean; size?: 'sm' | 'md' | 'lg' }) {
+  const label = useLoser ? `${loser(item.from[0])} / ${loser(item.from[1])}` : `${winner(item.from[0])} / ${winner(item.from[1])}`;
+  const sizeClass = size === 'lg' ? 'min-h-[74px] px-3 py-2' : size === 'md' ? 'min-h-[58px] px-2.5 py-2' : 'min-h-[46px] px-2 py-1.5';
   return (
-    <article className="rounded-2xl border border-white/10 bg-white px-3 py-2 text-black shadow-[0_10px_28px_rgba(0,0,0,0.25)]">
-      <div className="mb-1 flex items-center justify-between gap-2 text-[8px] font-black text-slate-500"><span>{stage}</span><span>{matchLabel(item.no)}</span></div>
-      <div className="space-y-1 text-[10px] font-black leading-4">
-        <div className="rounded-lg bg-slate-100 px-2 py-1">{sideLabel(item.from[0])}</div>
-        <div className="rounded-lg bg-slate-100 px-2 py-1">{sideLabel(item.from[1])}</div>
+    <div className={`flex items-center justify-center rounded-xl border border-black/10 bg-white text-center text-black shadow-[0_10px_28px_rgba(0,0,0,0.28)] ${sizeClass}`}>
+      <div className="min-w-0">
+        <div className="text-[7px] font-black uppercase tracking-wide text-slate-400">{stage} · {matchLabel(item.no)}</div>
+        <div className="mt-0.5 truncate text-[9px] font-black leading-4">{label}</div>
       </div>
-      {other ? <div className="mt-1 text-[8px] font-black text-emerald-700">ثم يقابل {winner(other)}</div> : null}
-    </article>
+    </div>
+  );
+}
+
+function StageColumn({ title, children, gap = 'gap-5' }: { title: string; children: React.ReactNode; gap?: string }) {
+  return (
+    <div>
+      <div className="mb-1.5 text-center text-[8px] font-black text-gray-500">{title}</div>
+      <div className={`grid content-center ${gap}`}>{children}</div>
+    </div>
   );
 }
 
@@ -136,14 +141,15 @@ function HalfBracket({ column, direct, thirds, side }: { column: (typeof COLUMNS
   const r16 = column.sections.flatMap((section) => section.r16);
   const qf = column.sections.map((section) => section.qf);
   const semi = findFuture(column.semi, SF);
-  const round32Column = <div className="grid gap-2">{r32.map((no) => <Round32Pair key={no} no={no} direct={direct} thirds={thirds} align={side} />)}</div>;
-  const round16Column = <div className="grid content-center gap-5">{r16.map((no) => { const item = findFuture(no, R16); return item ? <WinnerBox key={no} item={item} stage="دور الـ١٦" /> : null; })}</div>;
-  const finalColumn = <div className="grid content-center gap-8">{qf.map((no) => { const item = findFuture(no, QF); return item ? <WinnerBox key={no} item={item} stage="ربع النهائي" /> : null; })}{semi ? <WinnerBox item={semi} stage="نصف النهائي" /> : null}</div>;
+  const round32Column = <StageColumn title="دور الـ٣٢" gap="gap-1.5">{r32.map((no) => <Round32Pair key={no} no={no} direct={direct} thirds={thirds} align={side} />)}</StageColumn>;
+  const round16Column = <StageColumn title="دور الـ١٦" gap="gap-[3.6rem]">{r16.map((no) => { const item = findFuture(no, R16); return item ? <BracketSlot key={no} item={item} stage="R16" size="sm" /> : null; })}</StageColumn>;
+  const qfColumn = <StageColumn title="ربع النهائي" gap="gap-[8.6rem]">{qf.map((no) => { const item = findFuture(no, QF); return item ? <BracketSlot key={no} item={item} stage="QF" size="md" /> : null; })}</StageColumn>;
+  const semiColumn = <StageColumn title="نصف النهائي" gap="gap-3">{semi ? <BracketSlot item={semi} stage="SF" size="lg" /> : null}</StageColumn>;
   return (
     <section className="rounded-[1.6rem] border border-white/10 bg-white/[0.035] p-3">
       <div className="mb-3 text-center"><h3 className="text-sm font-black text-white">{column.title}</h3><p className="text-[9px] font-bold text-gray-500">{column.subtitle}</p></div>
-      <div className={`grid gap-3 ${side === 'left' ? 'xl:grid-cols-[1.45fr_1fr_.9fr]' : 'xl:grid-cols-[.9fr_1fr_1.45fr]'}`}>
-        {side === 'left' ? <>{round32Column}{round16Column}{finalColumn}</> : <>{finalColumn}{round16Column}{round32Column}</>}
+      <div className={`grid gap-3 ${side === 'left' ? 'xl:grid-cols-[1.45fr_.82fr_.72fr_.68fr]' : 'xl:grid-cols-[.68fr_.72fr_.82fr_1.45fr]'}`}>
+        {side === 'left' ? <>{round32Column}{round16Column}{qfColumn}{semiColumn}</> : <>{semiColumn}{qfColumn}{round16Column}{round32Column}</>}
       </div>
     </section>
   );
@@ -153,11 +159,9 @@ function CenterPodium() {
   return (
     <aside className="flex flex-col items-center justify-between gap-4 rounded-[2rem] border border-[#FFD700]/20 bg-[radial-gradient(circle_at_center,rgba(255,215,0,0.18),transparent_42%),rgba(0,0,0,0.45)] p-4 text-center">
       <div className="w-full rounded-2xl border border-white/10 bg-white px-4 py-3 text-black shadow-[0_14px_34px_rgba(0,0,0,0.35)]"><div className="text-[10px] font-black uppercase text-slate-500">البطل</div><div className="mt-1 text-xs font-black">{winner(FINAL.no)}</div></div>
-      <div className="relative flex h-56 w-44 items-center justify-center rounded-full bg-[radial-gradient(circle,rgba(255,215,0,0.24),transparent_65%)]">
-        <div className="text-8xl drop-shadow-[0_18px_25px_rgba(0,0,0,0.55)]">🏆</div>
-      </div>
-      <WinnerBox item={FINAL} stage="النهائي" />
-      <WinnerBox item={THIRD} stage="المركز الثالث" useLoser />
+      <div className="relative flex h-56 w-44 items-center justify-center rounded-full bg-[radial-gradient(circle,rgba(255,215,0,0.24),transparent_65%)]"><div className="text-8xl drop-shadow-[0_18px_25px_rgba(0,0,0,0.55)]">🏆</div></div>
+      <BracketSlot item={FINAL} stage="النهائي" size="lg" />
+      <BracketSlot item={THIRD} stage="المركز الثالث" useLoser size="md" />
     </aside>
   );
 }
@@ -172,7 +176,7 @@ export default function HomeRoundOf32Widget({ groups = [] }: Props) {
   return (
     <section className="overflow-hidden rounded-[2rem] border border-white/10 bg-[radial-gradient(circle_at_top,rgba(15,240,252,0.12),transparent_28%),linear-gradient(135deg,#080808,#101010_45%,#050505)] p-3 text-white shadow-[0_20px_70px_rgba(0,0,0,0.35)]" aria-label="مسار التصفيات النهائية">
       <div className="mb-4 flex flex-wrap items-end justify-between gap-3 px-1">
-        <div><div className="inline-flex rounded-full border border-[#0FF0FC]/25 bg-[#0FF0FC]/10 px-2 py-0.5 text-[8px] font-black text-[#0FF0FC]">KNOCKOUT BRACKET</div><h2 className="mt-1.5 text-xl font-black md:text-2xl">مسار دور الـ٣٢ حتى النهائي</h2><p className="mt-1 max-w-3xl text-[11px] font-bold leading-5 text-gray-400">تصميم بصري قريب من لوحة التصفيات: المنتخبات على الأطراف، مسارات الفوز للداخل، والكأس في المنتصف.</p></div>
+        <div><div className="inline-flex rounded-full border border-[#0FF0FC]/25 bg-[#0FF0FC]/10 px-2 py-0.5 text-[8px] font-black text-[#0FF0FC]">KNOCKOUT BRACKET</div><h2 className="mt-1.5 text-xl font-black md:text-2xl">مسار دور الـ٣٢ حتى النهائي</h2><p className="mt-1 max-w-3xl text-[11px] font-bold leading-5 text-gray-400">تصميم أقرب للصورة: مواجهات دور الـ٣٢ على الأطراف، ومربعات فائزين صغيرة تتقدم للداخل بدل كروت كبيرة لكل دور.</p></div>
         <div className="grid gap-1 text-[10px] font-bold text-gray-400 sm:grid-cols-3"><span>المباشرون: <b className="text-white">{nf.format(direct.length)}</b></span><span>أفضل الثوالث: <b className="text-[#FFD700]">{nf.format(bestThirds.length)}</b></span><span>الإجمالي: <b className="text-[#00FF88]">{nf.format(direct.length + bestThirds.length)}</b></span></div>
       </div>
       {!ready ? <div className="rounded-2xl border border-dashed border-white/10 bg-black/20 p-4 text-center text-xs font-bold text-gray-500">بيانات المجموعات غير كافية لبناء مسار دور الـ٣٢ الآن.</div> : <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_260px_minmax(0,1fr)]"><HalfBracket column={COLUMNS[0]} direct={direct} thirds={thirds} side="left" /><CenterPodium /><HalfBracket column={COLUMNS[1]} direct={direct} thirds={thirds} side="right" /></div>}
