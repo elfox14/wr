@@ -5,5 +5,5 @@ export const revalidate = 0;
 
 export default async function MatchLivePage({ params }: { params: Promise<{ id: string }> }) {
   const resolved = await params;
-  redirect(`/match-center/${encodeURIComponent(resolved.id)}`);
+  redirect(`/live-animation/${encodeURIComponent(resolved.id)}`);
 }
