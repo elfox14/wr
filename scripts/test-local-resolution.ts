@@ -1,50 +1,66 @@
 import prisma from '../lib/prisma';
 
+async function sleep(ms: number) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 async function main() {
-  const match = await prisma.match.findFirst({
-    where: {
-      homeTeam: { name: 'Sweden' },
-      awayTeam: { name: 'Tunisia' }
+  let match = null;
+  const dbMaxAttempts = 5;
+  
+  for (let attempt = 1; attempt <= dbMaxAttempts; attempt++) {
+    try {
+      match = await prisma.match.findFirst({
+        where: {
+          homeTeam: { name: 'England' },
+          awayTeam: { name: 'Croatia' }
+        }
+      });
+      break;
+    } catch (err: any) {
+      if (attempt === dbMaxAttempts) {
+        throw new Error(`Failed to query database after ${dbMaxAttempts} attempts: ${err.message || err}`);
+      }
+      console.log(`[DB Warning] Query attempt ${attempt}/${dbMaxAttempts} failed. Retrying in 5 seconds...`);
+      await sleep(5000);
     }
-  });
+  }
 
   if (!match) {
     console.error('Match not found');
     return;
   }
 
-  const query: any = {};
-  const matchDateVal = match.matchDate ? new Date(match.matchDate) : null;
-  const params = new URLSearchParams();
-  
-  const compId = String(query.competition_id || process.env.THE_STATS_API_WORLD_CUP_COMPETITION_ID || 'comp_6107');
-  const seasonId = String(query.season_id || process.env.THE_STATS_API_WORLD_CUP_SEASON_ID || 'sn_118868');
-  params.set('competition_id', compId);
-  params.set('season_id', seasonId);
-  params.set('providerMatchesPerPage', String(query.per_page || 100));
+  console.log('Match found:', {
+    id: match.id,
+    matchDate: match.matchDate,
+    externalId: match.externalId
+  });
 
-  if (query.status) params.set('status', String(query.status));
-  if (query.stage) params.set('stage', String(query.stage));
-  if (query.group) params.set('group', String(query.group));
-  if (query.utc_offset) params.set('utc_offset', String(query.utc_offset));
+  const snapshots = await prisma.matchStatsSnapshot.findMany({
+    where: { matchId: match.id },
+    orderBy: { capturedAt: 'desc' },
+    select: {
+      id: true,
+      provider: true,
+      providerMatchId: true,
+      capturedAt: true,
+      rawData: true
+    }
+  });
 
-  if (query.date_from) {
-    params.set('date_from', String(query.date_from));
-  } else if (matchDateVal && !isNaN(matchDateVal.getTime())) {
-    const dateFrom = new Date(matchDateVal.getTime() - 3 * 24 * 3600 * 1000).toISOString().split('T')[0];
-    params.set('date_from', dateFrom);
-  }
-
-  if (query.date_to) {
-    params.set('date_to', String(query.date_to));
-  } else if (matchDateVal && !isNaN(matchDateVal.getTime())) {
-    const dateTo = new Date(matchDateVal.getTime() + 3 * 24 * 3600 * 1000).toISOString().split('T')[0];
-    params.set('date_to', dateTo);
-  }
-
-  console.log('Generated params:');
-  params.forEach((val, key) => {
-    console.log(`  ${key}: ${val}`);
+  console.log(`Snapshots count: ${snapshots.length}`);
+  snapshots.forEach((snap, idx) => {
+    console.log(`\n--- Snapshot [${idx + 1}] ---`);
+    console.log(`  Provider: ${snap.provider} | ProviderMatchId: ${snap.providerMatchId} | CapturedAt: ${snap.capturedAt}`);
+    const raw = snap.rawData as any;
+    if (raw) {
+      console.log(`  resolvedProviderMatchId: ${raw.resolvedProviderMatchId}`);
+      console.log(`  resolvedBy: ${raw.resolvedBy}`);
+      console.log(`  endpointsOk: ${JSON.stringify(raw.endpointsOk)}`);
+      console.log(`  endpointsFailed: ${JSON.stringify(raw.endpointsFailed)}`);
+      console.log(`  endpoints: ${JSON.stringify(raw.endpoints)}`);
+    }
   });
 }
 
