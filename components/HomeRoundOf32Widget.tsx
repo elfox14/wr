@@ -89,12 +89,12 @@ function findFuture(no: number, list: Future[]) { return list.find((match) => ma
 function FlagTeam({ side, reverse = false }: { side: ReturnType<typeof resolveSlot>; reverse?: boolean }) {
   const flag = flagUrl(side.row);
   return (
-    <div className={`flex h-8 items-center gap-1.5 ${reverse ? 'flex-row-reverse text-right' : 'text-left'}`}>
-      <span className="flex h-7 w-10 shrink-0 items-center justify-center overflow-hidden rounded-md border border-white/20 bg-white">
+    <div className={`flex h-7 items-center gap-1.5 ${reverse ? 'flex-row-reverse text-right' : 'text-left'}`}>
+      <span className="flex h-6 w-9 shrink-0 items-center justify-center overflow-hidden rounded-md border border-white/20 bg-white">
         {flag ? <img src={flag} alt={`علم ${side.name}`} className="h-full w-full object-cover" loading="lazy" /> : <b className="text-[8px] text-black">{side.seed}</b>}
       </span>
       <span className="min-w-0 flex-1">
-        <b className="block truncate text-[9px] leading-3 text-white">{side.name}</b>
+        <b className="block truncate text-[8px] leading-3 text-white">{side.name}</b>
         <span className="block text-[7px] font-black text-gray-500">{side.seed}</span>
       </span>
     </div>
@@ -111,12 +111,12 @@ function R32MatchBlock({ no, direct, thirds, side }: { no: number; direct: Quali
     </div>
   );
   const win = (
-    <div className="flex h-[54px] w-[78px] items-center justify-center rounded-lg border border-black/10 bg-white text-center text-black shadow-[0_8px_18px_rgba(0,0,0,.35)]">
-      <div><div className="text-[7px] font-black text-slate-400">الفائز</div><div className="text-[9px] font-black">{winner(no)}</div></div>
+    <div className="flex h-[48px] w-[64px] items-center justify-center rounded-lg border border-black/10 bg-white text-center text-black shadow-[0_8px_18px_rgba(0,0,0,.35)]">
+      <div><div className="text-[6px] font-black text-slate-400">الفائز</div><div className="text-[8px] font-black">{winner(no)}</div></div>
     </div>
   );
   return (
-    <div className={`grid items-center gap-2 ${side === 'left' ? 'grid-cols-[minmax(0,1fr)_78px]' : 'grid-cols-[78px_minmax(0,1fr)]'}`}>
+    <div className={`grid items-center gap-1.5 ${side === 'left' ? 'grid-cols-[minmax(0,1fr)_64px]' : 'grid-cols-[64px_minmax(0,1fr)]'}`}>
       {side === 'left' ? <>{teams}{win}</> : <>{win}{teams}</>}
     </div>
   );
@@ -125,8 +125,8 @@ function R32MatchBlock({ no, direct, thirds, side }: { no: number; direct: Quali
 function WinnerSlot({ item, stage, useLoser = false, big = false }: { item: Future; stage: string; useLoser?: boolean; big?: boolean }) {
   const label = useLoser ? `${loser(item.from[0])} / ${loser(item.from[1])}` : `${winner(item.from[0])} / ${winner(item.from[1])}`;
   return (
-    <div className={`flex items-center justify-center rounded-lg border border-black/10 bg-white px-2 text-center text-black shadow-[0_8px_18px_rgba(0,0,0,.35)] ${big ? 'h-[70px] w-[112px]' : 'h-[56px] w-[92px]'}`}>
-      <div className="min-w-0"><div className="text-[7px] font-black text-slate-400">{stage} · {nf.format(item.no)}</div><div className="mt-0.5 truncate text-[9px] font-black">{label}</div></div>
+    <div className={`flex items-center justify-center rounded-lg border border-black/10 bg-white px-1.5 text-center text-black shadow-[0_8px_18px_rgba(0,0,0,.35)] ${big ? 'h-[60px] w-[92px]' : 'h-[48px] w-[76px]'}`}>
+      <div className="min-w-0"><div className="text-[6px] font-black text-slate-400">{stage} · {nf.format(item.no)}</div><div className="mt-0.5 truncate text-[8px] font-black">{label}</div></div>
     </div>
   );
 }
@@ -136,28 +136,28 @@ function SideBracket({ side, direct, thirds }: { side: 'left' | 'right'; direct:
   const r16 = side === 'left' ? LEFT_R16 : RIGHT_R16;
   const qf = side === 'left' ? LEFT_QF : RIGHT_QF;
   const semiNo = side === 'left' ? 101 : 102;
-  const r32Col = <div className="grid gap-3">{r32.map((no) => <R32MatchBlock key={no} no={no} direct={direct} thirds={thirds} side={side} />)}</div>;
-  const r16Col = <div className="grid content-center gap-[3.35rem]">{r16.map((no) => { const item = findFuture(no, R16); return item ? <WinnerSlot key={no} item={item} stage="R16" /> : null; })}</div>;
-  const qfCol = <div className="grid content-center gap-[8.75rem]">{qf.map((no) => { const item = findFuture(no, QF); return item ? <WinnerSlot key={no} item={item} stage="QF" big /> : null; })}</div>;
+  const r32Col = <div className="grid gap-2.5">{r32.map((no) => <R32MatchBlock key={no} no={no} direct={direct} thirds={thirds} side={side} />)}</div>;
+  const r16Col = <div className="grid content-center gap-[2.6rem]">{r16.map((no) => { const item = findFuture(no, R16); return item ? <WinnerSlot key={no} item={item} stage="R16" /> : null; })}</div>;
+  const qfCol = <div className="grid content-center gap-[6.35rem]">{qf.map((no) => { const item = findFuture(no, QF); return item ? <WinnerSlot key={no} item={item} stage="QF" big /> : null; })}</div>;
   const sf = findFuture(semiNo, SF);
   const sfCol = <div className="grid content-center">{sf ? <WinnerSlot item={sf} stage="SF" big /> : null}</div>;
   return (
-    <div className={`grid h-full gap-4 ${side === 'left' ? 'grid-cols-[245px_105px_120px_120px]' : 'grid-cols-[120px_120px_105px_245px]'}`}>
+    <div className={`grid h-full gap-3 ${side === 'left' ? 'grid-cols-[184px_82px_92px_92px]' : 'grid-cols-[92px_92px_82px_184px]'}`}>
       {side === 'left' ? <>{r32Col}{r16Col}{qfCol}{sfCol}</> : <>{sfCol}{qfCol}{r16Col}{r32Col}</>}
     </div>
   );
 }
 
 function PosterCorners() {
-  return <><div className="absolute -left-10 -top-10 h-36 w-72 rotate-[-8deg] rounded-[40%] bg-[#ff4b00] opacity-95" /><div className="absolute left-20 -top-12 h-28 w-72 rotate-[6deg] rounded-[45%] bg-[#1d63ff] opacity-95" /><div className="absolute right-0 -top-12 h-28 w-80 rotate-[-12deg] rounded-[45%] bg-[#7c00ff] opacity-95" /><div className="absolute -right-8 -top-5 h-20 w-72 rotate-[-18deg] rounded-[45%] bg-[#00f0c8] opacity-95" /><div className="absolute -bottom-12 left-0 h-28 w-80 rotate-[5deg] rounded-[45%] bg-[#00f0c8] opacity-95" /><div className="absolute -bottom-14 right-0 h-28 w-96 rotate-[-7deg] rounded-[45%] bg-[#ff2b00] opacity-95" /></>;
+  return <><div className="absolute -left-10 -top-10 h-28 w-56 rotate-[-8deg] rounded-[40%] bg-[#ff4b00] opacity-95" /><div className="absolute left-16 -top-10 h-24 w-60 rotate-[6deg] rounded-[45%] bg-[#1d63ff] opacity-95" /><div className="absolute right-0 -top-10 h-24 w-64 rotate-[-12deg] rounded-[45%] bg-[#7c00ff] opacity-95" /><div className="absolute -right-8 -top-5 h-16 w-60 rotate-[-18deg] rounded-[45%] bg-[#00f0c8] opacity-95" /><div className="absolute -bottom-10 left-0 h-24 w-64 rotate-[5deg] rounded-[45%] bg-[#00f0c8] opacity-95" /><div className="absolute -bottom-12 right-0 h-24 w-80 rotate-[-7deg] rounded-[45%] bg-[#ff2b00] opacity-95" /></>;
 }
 
 function CenterColumn() {
   return (
-    <div className="relative z-10 flex h-full flex-col items-center justify-between py-8 text-center">
-      <div><div className="text-4xl font-black tracking-tight text-white drop-shadow-[0_6px_10px_rgba(0,0,0,.7)]">البطل</div><div className="mt-3 flex h-[86px] w-[160px] items-center justify-center rounded-lg bg-white text-xs font-black text-black shadow-[0_10px_30px_rgba(0,0,0,.45)]">{winner(FINAL.no)}</div></div>
-      <div className="relative flex h-[360px] w-[250px] items-center justify-center rounded-full bg-[radial-gradient(circle,rgba(255,215,0,.23),transparent_65%)]"><div className="text-[12rem] drop-shadow-[0_22px_28px_rgba(0,0,0,.65)]">🏆</div></div>
-      <div><div className="mb-2 text-2xl font-black text-white drop-shadow-[0_6px_10px_rgba(0,0,0,.7)]">المركز الثالث</div><WinnerSlot item={THIRD} stage="3RD" useLoser big /></div>
+    <div className="relative z-10 flex h-full flex-col items-center justify-between py-6 text-center">
+      <div><div className="text-3xl font-black tracking-tight text-white drop-shadow-[0_6px_10px_rgba(0,0,0,.7)]">البطل</div><div className="mt-2 flex h-[68px] w-[132px] items-center justify-center rounded-lg bg-white text-[10px] font-black text-black shadow-[0_10px_30px_rgba(0,0,0,.45)]">{winner(FINAL.no)}</div></div>
+      <div className="relative flex h-[270px] w-[190px] items-center justify-center rounded-full bg-[radial-gradient(circle,rgba(255,215,0,.23),transparent_65%)]"><div className="text-[8.5rem] drop-shadow-[0_22px_28px_rgba(0,0,0,.65)]">🏆</div></div>
+      <div><div className="mb-2 text-xl font-black text-white drop-shadow-[0_6px_10px_rgba(0,0,0,.7)]">المركز الثالث</div><WinnerSlot item={THIRD} stage="3RD" useLoser big /></div>
     </div>
   );
 }
@@ -170,12 +170,12 @@ export default function HomeRoundOf32Widget({ groups = [] }: Props) {
   const thirds = assignThirds(bestThirds);
   const ready = safeGroups.length > 0 && direct.length >= 24;
   return (
-    <section className="overflow-x-auto rounded-[2rem] border border-white/10 bg-black p-2 shadow-[0_20px_70px_rgba(0,0,0,.38)]" aria-label="مسار التصفيات النهائية">
-      <div className="relative min-h-[980px] w-[1500px] overflow-hidden rounded-[1.7rem] bg-[radial-gradient(circle_at_center,rgba(255,255,255,.06),transparent_38%),linear-gradient(180deg,#151515,#070707)] px-6 py-10">
+    <section className="overflow-hidden rounded-[2rem] border border-white/10 bg-black p-2 shadow-[0_20px_70px_rgba(0,0,0,.38)]" aria-label="مسار التصفيات النهائية">
+      <div className="relative mx-auto min-h-[760px] w-full max-w-[1180px] overflow-hidden rounded-[1.7rem] bg-[radial-gradient(circle_at_center,rgba(255,255,255,.06),transparent_38%),linear-gradient(180deg,#151515,#070707)] px-4 py-8">
         <PosterCorners />
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,rgba(0,0,0,.25)_42%,rgba(0,0,0,.72)_100%)]" />
-        <div className="relative z-10 mb-6 flex items-center justify-between px-6 text-[10px] font-black text-gray-400"><span>دور الـ٣٢</span><span>R16</span><span>QF</span><span>SF</span><span>FINAL</span><span>SF</span><span>QF</span><span>R16</span><span>دور الـ٣٢</span></div>
-        {!ready ? <div className="relative z-10 mt-32 rounded-2xl border border-dashed border-white/10 bg-black/35 p-6 text-center text-sm font-bold text-gray-400">بيانات المجموعات غير كافية لبناء مسار دور الـ٣٢ الآن.</div> : <div className="relative z-10 grid h-[850px] grid-cols-[590px_280px_590px] gap-4"><SideBracket side="left" direct={direct} thirds={thirds} /><CenterColumn /><SideBracket side="right" direct={direct} thirds={thirds} /></div>}
+        <div className="relative z-10 mb-5 flex items-center justify-between px-4 text-[9px] font-black text-gray-400"><span>دور الـ٣٢</span><span>R16</span><span>QF</span><span>SF</span><span>FINAL</span><span>SF</span><span>QF</span><span>R16</span><span>دور الـ٣٢</span></div>
+        {!ready ? <div className="relative z-10 mt-32 rounded-2xl border border-dashed border-white/10 bg-black/35 p-6 text-center text-sm font-bold text-gray-400">بيانات المجموعات غير كافية لبناء مسار دور الـ٣٢ الآن.</div> : <div className="relative z-10 grid h-[650px] grid-cols-[455px_220px_455px] gap-3"><SideBracket side="left" direct={direct} thirds={thirds} /><CenterColumn /><SideBracket side="right" direct={direct} thirds={thirds} /></div>}
       </div>
     </section>
   );
