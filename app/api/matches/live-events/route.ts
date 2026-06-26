@@ -20,18 +20,54 @@ const IMPORTANT_TYPES = [
   'substitution',
 ];
 
+const FINISHED_STATUSES = ['FINISHED', 'FT', 'AET', 'PEN', 'COMPLETED', 'ENDED', 'FINAL_VERIFIED', 'FULL_TIME'];
+
+function isFinishedStatus(status?: string | null) {
+  return FINISHED_STATUSES.includes(String(status || '').toUpperCase());
+}
+
 function normalizeName(value?: string | null) {
   return String(value || '')
     .trim()
     .toLowerCase()
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
-    .replace(/\s+/g, ' ');
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 function validMinute(value: unknown) {
   const minute = Number(value);
   return Number.isFinite(minute) && minute > 0 ? Math.floor(minute) : null;
+}
+
+function firstText(...values: any[]) {
+  for (const value of values) {
+    if (value === undefined || value === null || value === '') continue;
+    if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+      const text = String(value).trim();
+      if (text && text !== '[object Object]') return text;
+    }
+    if (value && typeof value === 'object') {
+      const nested = firstText(value.name, value.fullName, value.full_name, value.title, value.label, value.displayName, value.display_name);
+      if (nested) return nested;
+    }
+  }
+  return null;
+}
+
+function normalizeEventType(value: unknown) {
+  const raw = String(value || '').toLowerCase();
+  if (raw.includes('goal')) return 'goal';
+  if (raw.includes('yellow')) return 'yellow_card';
+  if (raw.includes('red')) return 'red_card';
+  if (raw.includes('sub')) return 'substitution';
+  if (raw.includes('penalty')) return 'penalty';
+  if (raw.includes('corner')) return 'corner';
+  if (raw.includes('shot')) return 'shot';
+  if (raw.includes('var')) return 'var';
+  return firstText(value) || 'event';
 }
 
 function wasEventSavedDuringFirstHalf(event: any, matchDate?: Date | string | null) {
@@ -78,11 +114,85 @@ async function getPlayerAssetsForEvents(events: any[]) {
   return map;
 }
 
+function snapshotEvents(snapshot: any) {
+  const normalized = snapshot?.rawData?.normalized || {};
+  const events = normalized?.eventsDetailed?.all;
+  return Array.isArray(events) ? events : [];
+}
+
+function teamIdFromEvent(match: any, event: any) {
+  const providerTeamId = firstText(event?.providerTeamId, event?.teamId, event?.team?.id);
+  if (providerTeamId && String(providerTeamId) === String(match.homeTeamId)) return match.homeTeamId;
+  if (providerTeamId && String(providerTeamId) === String(match.awayTeamId)) return match.awayTeamId;
+
+  const teamName = normalizeName(firstText(event?.teamName, event?.team, event?.team_name, event?.teamName));
+  const homeName = normalizeName(match.homeTeam?.name || match.homeTeam?.code || '');
+  const awayName = normalizeName(match.awayTeam?.name || match.awayTeam?.code || '');
+  const homeCode = normalizeName(match.homeTeam?.code || '');
+  const awayCode = normalizeName(match.awayTeam?.code || '');
+
+  if (teamName && (teamName === homeName || teamName.includes(homeName) || homeName.includes(teamName) || teamName === homeCode)) return match.homeTeamId;
+  if (teamName && (teamName === awayName || teamName.includes(awayName) || awayName.includes(teamName) || teamName === awayCode)) return match.awayTeamId;
+  return null;
+}
+
+function normalizeSnapshotEvent(event: any, index: number, match: any, snapshot: any) {
+  const player = event?.player || event?.athlete || event?.scorer || {};
+  const minute = validMinute(event?.minute ?? event?.time?.minute ?? event?.elapsed ?? event?.match_minute ?? event?.event_minute);
+  const type = normalizeEventType(firstText(event?.type, event?.event_type, event?.incident_type, event?.name));
+  const detail = firstText(event?.detail, event?.description, event?.comment, event?.text, event?.message, event?.assistName);
+  const playerId = firstText(event?.playerId, event?.player_id, event?.player?.id, player?.id);
+  const playerName = firstText(event?.playerName, event?.player_name, event?.playerName, player?.name, event?.scorer?.name);
+
+  return {
+    id: `thestats:${snapshot.id}:${index}`,
+    minute,
+    minuteLabel: minute ? String(minute) : null,
+    type,
+    teamId: teamIdFromEvent(match, event),
+    playerId,
+    playerName,
+    playerImage: null,
+    playerAsset: null,
+    detail: detail || type,
+    sourceName: null,
+    createdAt: toIso(snapshot.capturedAt),
+    updatedAt: toIso(snapshot.capturedAt),
+    finalSource: 'the_stats_snapshot',
+  };
+}
+
+function dedupeEvents(events: any[]) {
+  const seen = new Set<string>();
+  const out = [];
+  for (const event of events) {
+    const key = [
+      event.minute ?? '',
+      normalizeEventType(event.type),
+      normalizeName(event.teamId || ''),
+      normalizeName(event.playerName || ''),
+      normalizeName(event.detail || ''),
+    ].join('|');
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(event);
+  }
+  return out;
+}
+
+function sortEventsDesc(a: any, b: any) {
+  const ma = Number(a.minute || 0);
+  const mb = Number(b.minute || 0);
+  if (mb !== ma) return mb - ma;
+  return String(b.createdAt || '').localeCompare(String(a.createdAt || ''));
+}
+
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const providerMatchId = Number(searchParams.get('matchId') || searchParams.get('animationMatchId') || 0);
     const dbMatchId = searchParams.get('dbMatchId') || searchParams.get('id') || '';
+    const preferFinal = !['0', 'false', 'no'].includes(String(searchParams.get('preferFinal') || 'true').toLowerCase());
 
     if (!providerMatchId && !dbMatchId) {
       return NextResponse.json({ ok: false, error: 'matchId or dbMatchId is required' }, { status: 400, headers: { 'Cache-Control': 'no-store' } });
@@ -106,7 +216,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ ok: false, linkedInDatabase: false, error: 'Match is not linked in database yet.' }, { status: 404, headers: { 'Cache-Control': 'no-store' } });
     }
 
-    const events = await prisma.matchEvent.findMany({
+    const dbEvents = await prisma.matchEvent.findMany({
       where: {
         matchId: match.id,
         OR: [
@@ -122,12 +232,35 @@ export async function GET(request: Request) {
       take: 80,
     });
 
+    let finalSnapshot: any = null;
+    let finalEvents: any[] = [];
+    if (preferFinal && isFinishedStatus(match.status)) {
+      finalSnapshot = await prisma.matchStatsSnapshot.findFirst({
+        where: {
+          matchId: match.id,
+          provider: { startsWith: 'THE_STATS_API' },
+        },
+        orderBy: { capturedAt: 'desc' },
+        select: { id: true, provider: true, capturedAt: true, rawData: true },
+      });
+
+      finalEvents = dedupeEvents(
+        snapshotEvents(finalSnapshot)
+          .map((event, index) => normalizeSnapshotEvent(event, index, match, finalSnapshot))
+          .filter((event) => event.minute || event.type),
+      ).sort(sortEventsDesc).slice(0, 120);
+    }
+
+    const useFinalEvents = finalEvents.length > 0;
+    const events = useFinalEvents ? finalEvents : dbEvents;
     const playerAssets = await getPlayerAssetsForEvents(events);
 
     return NextResponse.json({
       ok: true,
       updatedAt: new Date().toISOString(),
-      pollingSeconds: 30,
+      pollingSeconds: isFinishedStatus(match.status) ? 300 : 30,
+      eventSource: useFinalEvents ? 'THE_STATS_FINAL_SNAPSHOT' : 'MATCH_EVENT',
+      finalSnapshot: finalSnapshot ? { id: finalSnapshot.id, provider: finalSnapshot.provider, capturedAt: toIso(finalSnapshot.capturedAt), events: finalEvents.length } : null,
       match: {
         id: match.id,
         animationMatchId: match.animationMatchId,
@@ -136,7 +269,7 @@ export async function GET(request: Request) {
         homeTeam: match.homeTeam,
         awayTeam: match.awayTeam,
       },
-      events: events.map((event) => {
+      events: events.map((event: any) => {
         const playerAsset = event.playerId
           ? playerAssets.get(`id:${event.playerId}`)
           : event.playerName
@@ -145,12 +278,12 @@ export async function GET(request: Request) {
         return {
           id: event.id,
           minute: event.minute,
-          minuteLabel: eventMinuteLabel(event, match.matchDate),
+          minuteLabel: event.minuteLabel || eventMinuteLabel(event, match.matchDate),
           type: event.type,
           teamId: event.teamId,
           playerId: event.playerId,
           playerName: event.playerName,
-          playerImage: playerAsset?.image || null,
+          playerImage: event.playerImage || playerAsset?.image || null,
           playerAsset: playerAsset ? {
             id: playerAsset.id,
             name: playerAsset.name,
@@ -160,7 +293,7 @@ export async function GET(request: Request) {
             teamId: playerAsset.teamId,
           } : null,
           detail: event.detail,
-          sourceName: event.sourceName,
+          sourceName: null,
           createdAt: toIso(event.createdAt),
           updatedAt: toIso(event.updatedAt),
         };
