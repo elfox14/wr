@@ -53,6 +53,6 @@ export default async function AnimationLivePlayerPage({ searchParams }: { search
   const params = (await searchParams) || {};
   const dbMatchId = await resolveDbMatchId(params);
 
-  if (dbMatchId) redirect(`/match-center/${encodeURIComponent(dbMatchId)}`);
+  if (dbMatchId) redirect(`/live-animation/${encodeURIComponent(dbMatchId)}`);
   redirect('/animation-live');
 }
