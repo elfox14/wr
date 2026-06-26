@@ -95,7 +95,38 @@ export async function resolveTheStatsProviderId(match: any, query: Record<string
   if (external.startsWith('mt_') && external !== 'mt_12345') return { id: external, by: 'local_external_id' };
   const cached = await existingProviderId(match.id);
   if (cached) return { id: cached, by: 'cached_the_stats_snapshot' };
-  const list = await fetchProviderMatches(query);
+
+  // Dynamically build the matches query using default competition/season and date window +/- 3 days of matchDate
+  const matchDateVal = match.matchDate ? new Date(match.matchDate) : null;
+  const params = new URLSearchParams();
+  
+  const compId = String(query.competition_id || process.env.THE_STATS_API_WORLD_CUP_COMPETITION_ID || 'comp_6107');
+  const seasonId = String(query.season_id || process.env.THE_STATS_API_WORLD_CUP_SEASON_ID || 'sn_118868');
+  params.set('competition_id', compId);
+  params.set('season_id', seasonId);
+  params.set('providerMatchesPerPage', String(query.per_page || 100));
+
+  if (query.status) params.set('status', String(query.status));
+  if (query.stage) params.set('stage', String(query.stage));
+  if (query.group) params.set('group', String(query.group));
+  if (query.utc_offset) params.set('utc_offset', String(query.utc_offset));
+
+  if (query.date_from) {
+    params.set('date_from', String(query.date_from));
+  } else if (matchDateVal && !isNaN(matchDateVal.getTime())) {
+    const dateFrom = new Date(matchDateVal.getTime() - 3 * 24 * 3600 * 1000).toISOString().split('T')[0];
+    params.set('date_from', dateFrom);
+  }
+
+  if (query.date_to) {
+    params.set('date_to', String(query.date_to));
+  } else if (matchDateVal && !isNaN(matchDateVal.getTime())) {
+    const dateTo = new Date(matchDateVal.getTime() + 3 * 24 * 3600 * 1000).toISOString().split('T')[0];
+    params.set('date_to', dateTo);
+  }
+
+  const finalQuery = defaultTheStatsQuery(params);
+  const list = await fetchProviderMatches(finalQuery);
   const candidates = list.map((row) => candidateScore(row, match)).sort((a, b) => b.score - a.score).slice(0, 8);
   const found = candidates.find((row) => row.score >= 82 && row.teamScore >= 70 && (row.timeHours === null || row.timeHours <= 30));
   return { id: found?.id || null, by: found ? (found.reversed ? 'provider_match_list_fuzzy_reversed' : 'provider_match_list_fuzzy') : null, searched: list.length, confidence: found?.score || 0, candidates: candidates.map(({ raw, ...row }) => row) };
