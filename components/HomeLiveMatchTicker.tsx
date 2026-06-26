@@ -48,7 +48,7 @@ function isScheduled(match: TickerMatch) { return !isFinished(match) && SCHEDULE
 function isLive(match: TickerMatch) { return !isFinished(match) && (LIVE_STATUSES.includes(matchStatus(match)) || Boolean(match.isLiveNow) || Boolean(match.isLikelyLiveByTime) || isHalfTime(match)); }
 function matchKey(match?: TickerMatch | null) { return String(match?.id || match?.animationMatchId || `${teamName(match?.homeTeam)}-${teamName(match?.awayTeam)}-${match?.matchDate || ''}`); }
 function matchTime(match: TickerMatch) { const date = match.matchDate ? new Date(match.matchDate) : null; return date && Number.isFinite(date.getTime()) ? date.getTime() : Number.MAX_SAFE_INTEGER; }
-function getCenterHref(match: TickerMatch) { return match.id ? `/match-center/${encodeURIComponent(String(match.id))}` : '/matches'; }
+function getCenterHref(match: TickerMatch) { return match.id ? `/live-animation/${encodeURIComponent(String(match.id))}` : '/animation-live'; }
 function getMatchHref(match: TickerMatch) { return match.id ? `/matches/${encodeURIComponent(String(match.id))}` : '/matches'; }
 
 function groupNumberLabel(match: TickerMatch) {
@@ -68,10 +68,10 @@ function groupNumberLabel(match: TickerMatch) {
 function liveStatusText(match: TickerMatch) {
   if (match.liveLabel) return match.liveLabel;
   if (isHalfTime(match)) return 'استراحة';
-  const status = matchStatus(match);
-  if (status === '1H') return 'الشوط الأول';
-  if (status === '2H') return 'الشوط الثاني';
-  if (status === 'ET') return 'وقت إضافي';
+  const current = matchStatus(match);
+  if (current === '1H') return 'الشوط الأول';
+  if (current === '2H') return 'الشوط الثاني';
+  if (current === 'ET') return 'وقت إضافي';
   const minute = Number(match.minute);
   if (Number.isFinite(minute) && minute > 0) return `د ${formatCount(Math.floor(minute))}`;
   return 'جارية الآن';
@@ -147,8 +147,11 @@ export default function HomeLiveMatchTicker({ matches = [] }: Props) {
 
   useEffect(() => {
     const card = activeKey ? cardRefs.current[activeKey] : null;
-    if (!card || !stripRef.current) return;
-    card.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+    const strip = stripRef.current;
+    if (!card || !strip) return;
+    const cardLeft = card.offsetLeft;
+    const targetLeft = Math.max(0, cardLeft - (strip.clientWidth - card.clientWidth) / 2);
+    strip.scrollTo({ left: targetLeft, behavior: 'smooth' });
   }, [activeKey]);
 
   if (!displayMatches.length) return null;
@@ -185,7 +188,7 @@ export default function HomeLiveMatchTicker({ matches = [] }: Props) {
               <div className="grid gap-1.5"><TeamLine team={match.homeTeam} score={match.homeScore} showScore={showScore} /><TeamLine team={match.awayTeam} score={match.awayScore} showScore={showScore} /></div>
               <div className="mt-2 flex items-center justify-between gap-2 border-t border-white/10 pt-2 text-[9px] font-bold text-gray-500">
                 <span suppressHydrationWarning>{date || (scheduled ? 'موعد المباراة' : 'تفاصيل المباراة')}</span>
-                <div className="grid grid-cols-2 gap-1.5"><Link href={getCenterHref(match)} className="mobile-tap rounded-lg bg-[#0FF0FC] px-2 py-1 text-center text-[8px] font-black text-black transition hover:bg-[#4AFAFF]">تفاعلي</Link><Link href={getMatchHref(match)} className="mobile-tap rounded-lg border border-[#FFD700]/25 bg-[#FFD700]/10 px-2 py-1 text-center text-[8px] font-black text-[#FFD700] transition hover:bg-[#FFD700]/15">المباراة</Link></div>
+                <div className="grid grid-cols-2 gap-1.5"><Link href={getCenterHref(match)} className="mobile-tap rounded-lg bg-[#0FF0FC] px-2 py-1 text-center text-[8px] font-black text-black transition hover:bg-[#4AFAFF]">الملعب</Link><Link href={getMatchHref(match)} className="mobile-tap rounded-lg border border-[#FFD700]/25 bg-[#FFD700]/10 px-2 py-1 text-center text-[8px] font-black text-[#FFD700] transition hover:bg-[#FFD700]/15">المباراة</Link></div>
               </div>
             </article>
           );
