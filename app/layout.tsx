@@ -1,5 +1,5 @@
 import Script from "next/script";
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Cairo } from "next/font/google";
 import "./globals.css";
 import "./brand-logo.css";
@@ -23,6 +23,14 @@ const cairo = Cairo({
 const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://worldcup.mcprim.com';
 const description = 'بورصة المونديال من MC PRIME: مباريات كأس العالم مباشرة، أخبار موثقة، منتخبات ولاعبون ومجموعات، وتحليل كروي مع بورصة افتراضية ترفيهية.';
 const brandIcon = '/brand/borsa-mondial-sport-logo-icon.svg?v=20260616sport';
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 5,
+  viewportFit: 'cover',
+  themeColor: '#04110D',
+};
 
 export const metadata: Metadata = {
   metadataBase: new URL(baseUrl),
@@ -55,12 +63,12 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       <head>
         <Script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9147440531390790" crossOrigin="anonymous" strategy="afterInteractive" />
       </head>
-      <body className="min-h-full flex flex-col">
+      <body className="min-h-full flex flex-col overflow-x-hidden bg-[#04110D] mobile-safe-body">
         <Providers>
           <NotificationProvider>
             <HardNavigationGuard />
             <Navbar />
-            <div className="min-h-[calc(100vh-180px)]">{children}</div>
+            <div className="min-h-[calc(100vh-180px)] min-w-0 flex-1 overflow-x-clip mobile-page-shell">{children}</div>
             <Footer />
           </NotificationProvider>
         </Providers>
