@@ -1,12 +1,12 @@
 'use client';
 
-import { type ReactNode, useMemo, useState } from 'react';
+import { type ReactNode, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { BarChart3, FileText, Layers, List, MapPin, Radio, RefreshCw, Share2, Trophy, Users } from 'lucide-react';
+import { BarChart3, FileText, Layers, List, MapPin, Pause, Play, Radio, RefreshCw, Share2, Trophy, Users } from 'lucide-react';
 import MatchAutoRefresh from '@/components/match-center/MatchAutoRefresh';
 import { getArabicTeamName } from '@/lib/teamDisplay';
 import { getTeamFlagUrl } from '@/lib/teamFlags';
-import type { MatchEventView, MatchPageData, MatchPlayerLite, MatchPlayerStatItem, MatchStatMetric, OfficialLineupTeam, StandingRow } from '@/lib/match-page/types';
+import type { MatchEventView, MatchPageData, MatchPlayerLite, MatchPlayerStatItem, MatchStatMetric, StandingRow } from '@/lib/match-page/types';
 
 const ar = new Intl.NumberFormat('ar-EG');
 
@@ -14,7 +14,16 @@ type TabId = 'overview' | 'events' | 'lineups' | 'interactive' | 'analysis' | 'g
 type TeamLite = MatchPageData['homeTeam'];
 type AnyPlayer = Record<string, any>;
 type PlayerStat = MatchPlayerStatItem & Record<string, any>;
-type PlayerRow = { player: AnyPlayer; stat: PlayerStat | null; role: 'starter' | 'substitute'; index: number };
+
+type EventPoint = MatchEventView & {
+  index: number;
+  side: 'home' | 'away' | 'neutral';
+  xPos: number;
+  yPos: number;
+  playerImage?: string | null;
+  playerNumber?: string | null;
+  teamName: string;
+};
 
 const TABS: Array<{ id: TabId; label: string; icon: any }> = [
   { id: 'overview', label: 'نظرة عامة والإحصائيات', icon: Layers },
@@ -27,15 +36,10 @@ const TABS: Array<{ id: TabId; label: string; icon: any }> = [
 ];
 
 const PLAYER_STAT_DEFS: Array<[string, string]> = [
-  ['rating', 'تقييم'], ['started', 'أساسي'], ['played', 'شارك'], ['minutes', 'دقائق'],
-  ['goals', 'أهداف'], ['assists', 'أسيست'],
-  ['shots', 'تسديد'], ['shotsOnTarget', 'على المرمى'], ['shotsOffTarget', 'خارج المرمى'], ['blockedShots', 'محجوبة'],
-  ['expectedGoals', 'xG'], ['npExpectedGoals', 'npxG'], ['expectedAssists', 'xA'], ['bigChancesCreated', 'فرص خلقها'],
+  ['rating', 'تقييم'], ['minutes', 'دقائق'], ['goals', 'أهداف'], ['assists', 'أسيست'],
+  ['shots', 'تسديد'], ['shotsOnTarget', 'على المرمى'], ['expectedGoals', 'xG'], ['expectedAssists', 'xA'],
   ['passes', 'تمرير'], ['accuratePasses', 'تمرير صحيح'], ['keyPasses', 'تمرير مفتاحي'],
-  ['crosses', 'عرضيات'], ['accurateCrosses', 'عرضيات صحيحة'], ['longBalls', 'طولية'], ['accurateLongBalls', 'طولية صحيحة'],
   ['touches', 'لمسات'], ['tackles', 'تدخلات'], ['interceptions', 'اعتراضات'], ['clearances', 'تشتيت'], ['saves', 'تصديات'],
-  ['duelWon', 'التحامات فاز'], ['duelLost', 'التحامات خسر'], ['aerialWon', 'هوائيات'], ['challengeLost', 'تحديات خسر'], ['wonContest', 'مراوغات ناجحة'], ['dispossessed', 'افتكاك منه'], ['possessionLost', 'فقد استحواذ'],
-  ['foulsCommitted', 'أخطاء ارتكبها'], ['foulsWon', 'أخطاء حصل عليها'], ['offsides', 'تسلل'],
   ['yellowCards', 'صفراء'], ['redCards', 'حمراء'], ['playerSubbedOn', 'دخل بديلًا'], ['playerSubbedOff', 'خرج مستبدلًا'],
 ];
 
@@ -56,11 +60,6 @@ function normalizeName(value?: string | null) {
   return String(value || '').trim().toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f\u064B-\u065F\u0670]/g, '').replace(/[^a-z0-9\u0600-\u06ff]+/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
-function lastNameToken(value?: string | null) {
-  const parts = normalizeName(value).split(' ').filter(Boolean);
-  return parts.length ? parts[parts.length - 1] : '';
-}
-
 function displayTeamName(team: { code?: string | null; name?: string | null }) {
   return getArabicTeamName(team.code, team.name);
 }
@@ -70,11 +69,7 @@ function displayTeamFlagUrl(team: { code?: string | null; name?: string | null; 
 }
 
 function initials(name?: string | null) {
-  return String(name || 'لاعب').split(/\s+/).slice(0, 2).map((part) => part[0]).join('').toUpperCase();
-}
-
-function playerId(player: AnyPlayer) {
-  return player?.id ? String(player.id) : null;
+  return String(name || 'لاعب').split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join('').toUpperCase() || '؟';
 }
 
 function numberValue(...values: any[]) {
@@ -86,15 +81,15 @@ function numberValue(...values: any[]) {
   return '';
 }
 
-function playerNumber(player: AnyPlayer) {
-  return player?.number ?? player?.shirtNumber ?? player?.jerseyNumber ?? null;
+function playerNumber(player: AnyPlayer | null | undefined) {
+  return player?.number ?? player?.shirtNumber ?? player?.jerseyNumber ?? player?.playerNumber ?? null;
 }
 
 function statNumber(stat?: PlayerStat | null) {
   return numberValue(stat?.number, stat?.shirtNumber, stat?.jerseyNumber, stat?.playerNumber);
 }
 
-function playerPosition(player: AnyPlayer, stat?: PlayerStat | null) {
+function playerPosition(player: AnyPlayer | null | undefined, stat?: PlayerStat | null) {
   return player?.position || stat?.position || '—';
 }
 
@@ -104,10 +99,6 @@ function playedStat(stat?: PlayerStat | null) {
 
 function statStarted(stat?: PlayerStat | null) {
   return Boolean(stat?.started) || Number(stat?.started || 0) === 1;
-}
-
-function isSubstituteStat(stat?: PlayerStat | null) {
-  return Boolean(stat?.playerSubbedOn) || (!statStarted(stat) && playedStat(stat));
 }
 
 function FlagImg({ team, small = false }: { team: TeamLite; small?: boolean }) {
@@ -123,109 +114,117 @@ function Empty({ title, body }: { title: string; body: string }) {
   return <div className="rounded-2xl border border-dashed border-white/15 bg-black/20 p-5 text-center"><p className="font-black text-white">{title}</p><p className="mt-2 text-sm font-bold leading-7 text-slate-400">{body}</p></div>;
 }
 
-function findLocalPlayer(player: AnyPlayer | { id?: string | null; name?: string | null }, localPlayers: MatchPlayerLite[]) {
-  const id = player.id ? String(player.id) : null;
-  const name = normalizeName(player.name);
-  return localPlayers.find((item: AnyPlayer) => {
-    const localName = normalizeName(item.name);
-    const sameNumber = numberValue((player as AnyPlayer).number, (player as AnyPlayer).shirtNumber, (player as AnyPlayer).jerseyNumber) && numberValue(item.number, item.shirtNumber, item.jerseyNumber) === numberValue((player as AnyPlayer).number, (player as AnyPlayer).shirtNumber, (player as AnyPlayer).jerseyNumber);
-    return Boolean((id && item.id === id) || sameNumber || (name && localName && (localName === name || localName.includes(name) || name.includes(localName))));
-  });
-}
-
-function playerWithImage(player: AnyPlayer, localPlayers: MatchPlayerLite[]): AnyPlayer {
-  const local = findLocalPlayer(player, localPlayers) as AnyPlayer | undefined;
-  return { ...player, image: player.image || local?.image || null, position: player.position || local?.position || null, number: playerNumber(player) || playerNumber(local || {}) || null };
-}
-
-function playerStatFor(player: AnyPlayer, stats: PlayerStat[]) {
-  const id = playerId(player);
-  const name = normalizeName(player.name);
-  const last = lastNameToken(player.name);
-  const pNumber = numberValue(playerNumber(player));
-  const pPos = normalizeName(player.position);
-  return stats.find((stat) => {
-    const statId = stat.playerId ? String(stat.playerId) : null;
-    const statName = normalizeName(stat.playerName);
-    const sLast = lastNameToken(stat.playerName);
-    const sNumber = statNumber(stat);
-    const sPos = normalizeName(stat.position);
-    const numberMatch = Boolean(pNumber && sNumber && pNumber === sNumber);
-    const exactName = Boolean(name && statName && (statName === name || statName.includes(name) || name.includes(statName)));
-    const lastNameMatch = Boolean(last && sLast && last === sLast && (!pPos || !sPos || pPos === sPos));
-    return Boolean((id && statId && id === statId) || exactName || numberMatch || lastNameMatch);
+function findPlayerByName(name: string | null | undefined, players: AnyPlayer[], stats: PlayerStat[]) {
+  const normalized = normalizeName(name);
+  if (!normalized) return { player: null as AnyPlayer | null, stat: null as PlayerStat | null };
+  const player = players.find((item) => {
+    const pName = normalizeName(item.name);
+    return Boolean(pName && (pName === normalized || pName.includes(normalized) || normalized.includes(pName)));
   }) || null;
+  const stat = stats.find((item) => {
+    const sName = normalizeName(item.playerName);
+    return Boolean(sName && (sName === normalized || sName.includes(normalized) || normalized.includes(sName)));
+  }) || null;
+  return { player, stat };
 }
 
-function statBelongsToTeam(stat: PlayerStat, team: TeamLite, localPlayers: MatchPlayerLite[]) {
-  if (stat.teamId && (stat.teamId === team.id || stat.teamId === team.code)) return true;
-  const statTeam = normalizeName(stat.teamName);
-  const teamName = normalizeName(team.name);
-  const teamCode = normalizeName(team.code);
-  if (statTeam && ((teamName && (statTeam === teamName || statTeam.includes(teamName) || teamName.includes(statTeam))) || (teamCode && statTeam === teamCode))) return true;
-  const playerName = normalizeName(stat.playerName);
-  return Boolean(playerName && localPlayers.some((player) => normalizeName(player.name) === playerName || lastNameToken(player.name) === lastNameToken(stat.playerName)));
+function eventKind(event: MatchEventView) {
+  const raw = `${event.type || ''} ${event.detail || ''}`.toLowerCase();
+  if (raw.includes('goal') || raw.includes('هدف')) return { label: 'هدف', tone: 'bg-[#F8C846] text-black border-[#F8C846]', baseX: 88 };
+  if (raw.includes('red') || raw.includes('حمراء') || raw.includes('طرد')) return { label: 'بطاقة حمراء', tone: 'bg-red-500 text-white border-red-300', baseX: 47 };
+  if (raw.includes('yellow') || raw.includes('صفراء')) return { label: 'بطاقة صفراء', tone: 'bg-yellow-300 text-black border-yellow-100', baseX: 47 };
+  if (raw.includes('sub') || raw.includes('تبديل')) return { label: 'تبديل', tone: 'bg-sky-300 text-black border-sky-100', baseX: 24 };
+  if (raw.includes('var')) return { label: 'VAR', tone: 'bg-purple-300 text-black border-purple-100', baseX: 52 };
+  if (raw.includes('pen')) return { label: 'ركلة جزاء', tone: 'bg-[#18E58F] text-black border-[#18E58F]', baseX: 84 };
+  if (raw.includes('corner')) return { label: 'ركنية', tone: 'bg-cyan-300 text-black border-cyan-100', baseX: 94 };
+  if (raw.includes('shot') || raw.includes('تسديد')) return { label: 'تسديدة', tone: 'bg-white text-black border-white', baseX: 76 };
+  return { label: event.type || 'حدث', tone: 'bg-white/90 text-black border-white', baseX: 50 };
 }
 
-function statAsPlayer(stat: PlayerStat, localPlayers: MatchPlayerLite[]) {
-  return playerWithImage({ id: stat.playerId || stat.playerName || 'player', name: stat.playerName || 'لاعب', image: null, number: stat.number || stat.shirtNumber || stat.jerseyNumber || null, position: stat.position || null }, localPlayers);
+function eventSide(event: MatchEventView, data: MatchPageData): 'home' | 'away' | 'neutral' {
+  if (event.teamId && (event.teamId === data.homeTeam.id || event.teamId === data.homeTeam.code)) return 'home';
+  if (event.teamId && (event.teamId === data.awayTeam.id || event.teamId === data.awayTeam.code)) return 'away';
+  const text = normalizeName(`${event.detail || ''} ${event.playerName || ''}`);
+  const home = normalizeName(displayTeamName(data.homeTeam));
+  const away = normalizeName(displayTeamName(data.awayTeam));
+  if (home && text.includes(home)) return 'home';
+  if (away && text.includes(away)) return 'away';
+  return 'neutral';
 }
 
-function uniqueRows(rows: PlayerRow[]) {
-  const seen = new Set<string>();
-  return rows.filter((row) => {
-    const key = normalizeName(String(playerId(row.player) || row.player.name || row.stat?.playerName || playerNumber(row.player) || row.index));
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
+function normalizeCoord(value: unknown) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return null;
+  if (n >= 0 && n <= 1) return n * 100;
+  if (n >= 0 && n <= 100) return n;
+  return null;
+}
+
+function buildEventPoints(data: MatchPageData): EventPoint[] {
+  const allPlayers = [...(data.homePlayers || []), ...(data.awayPlayers || [])] as AnyPlayer[];
+  const stats = (data.advanced.playerStats || []) as PlayerStat[];
+  return data.events.map((event, index) => {
+    const kind = eventKind(event);
+    const side = eventSide(event, data);
+    const shotX = normalizeCoord(event.x ?? event.shot?.x);
+    const shotY = normalizeCoord(event.y ?? event.shot?.y);
+    const baseX = shotX ?? kind.baseX;
+    const xPos = side === 'away' ? 100 - baseX : baseX;
+    const ySeed = ((Number(event.minute || index * 7) * 37 + index * 19) % 64) + 18;
+    const yPos = shotY ?? ySeed;
+    const { player, stat } = findPlayerByName(event.playerName, allPlayers, stats);
+    const playerImage = (player as AnyPlayer | null)?.image || null;
+    const playerNumberText = numberValue(playerNumber(player), statNumber(stat));
+    const teamName = side === 'home' ? displayTeamName(data.homeTeam) : side === 'away' ? displayTeamName(data.awayTeam) : 'حدث محايد';
+    return { ...event, index, side, xPos: Math.max(6, Math.min(94, xPos)), yPos: Math.max(10, Math.min(90, yPos)), playerImage, playerNumber: playerNumberText || null, teamName };
   });
 }
 
-function buildRows(lineup: OfficialLineupTeam | null | undefined, localPlayers: MatchPlayerLite[], teamStats: PlayerStat[]) {
-  const starters: PlayerRow[] = (lineup?.startingXi || []).map((player: AnyPlayer, index) => ({ player: playerWithImage(player, localPlayers), stat: playerStatFor(player, teamStats), role: 'starter', index }));
-  const starterKeys = new Set(starters.map((row) => normalizeName(String(playerId(row.player) || row.player.name))));
-  const usedSubsFromLineup: PlayerRow[] = (lineup?.substitutes || [])
-    .map((player: AnyPlayer, index) => ({ player: playerWithImage(player, localPlayers), stat: playerStatFor(player, teamStats), role: 'substitute' as const, index }))
-    .filter((row) => playedStat(row.stat) || Boolean(row.player?.playerSubbedOn || row.player?.playerSubbedOff));
-  const statRows: PlayerRow[] = teamStats
-    .filter((stat) => playedStat(stat))
-    .map((stat, index) => ({ player: statAsPlayer(stat, localPlayers), stat, role: statStarted(stat) ? 'starter' : 'substitute', index: index + 1000 }));
-  const fallbackStarters = starters.length ? [] : statRows.filter((row) => row.role === 'starter');
-  const statSubs = statRows.filter((row) => row.role === 'substitute' || isSubstituteStat(row.stat)).filter((row) => !starterKeys.has(normalizeName(String(row.stat?.playerId || row.stat?.playerName || row.player.name))));
-  const finalStarters = uniqueRows([...starters, ...fallbackStarters]);
-  const finalSubs = uniqueRows([...usedSubsFromLineup, ...statSubs]).filter((row) => !finalStarters.some((starter) => normalizeName(starter.player.name) === normalizeName(row.player.name)));
-  return { starters: finalStarters, substitutes: finalSubs, total: finalStarters.length + finalSubs.length };
+function EventAvatar({ event, active }: { event: EventPoint; active: boolean }) {
+  const kind = eventKind(event);
+  return <div className={`relative flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 bg-black/65 shadow-2xl ${active ? 'border-[#F8C846] ring-4 ring-[#F8C846]/20' : event.side === 'away' ? 'border-[#18E58F]/70' : 'border-[#F8C846]/70'}`}>{event.playerImage ? <img src={event.playerImage} alt={event.playerName || 'لاعب'} className="h-full w-full object-cover" loading="lazy" /> : <span className="text-sm font-black text-white">{initials(event.playerName || kind.label)}</span>}{event.playerNumber ? <b className="absolute -bottom-1 -right-1 rounded-full bg-[#F8C846] px-1.5 py-0.5 text-[10px] font-black text-black ring-2 ring-black">#{event.playerNumber}</b> : null}</div>;
 }
 
-function statItems(stat: PlayerStat | null) {
-  if (!stat) return [];
-  return PLAYER_STAT_DEFS.map(([key, label]) => ({ key, label, value: stat[key] })).filter((item) => item.value !== null && item.value !== undefined && item.value !== '');
-}
+function InteractiveEventsPitch({ data }: { data: MatchPageData }) {
+  const points = useMemo(() => buildEventPoints(data), [data]);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [playing, setPlaying] = useState(false);
+  const active = points[activeIndex] || points[0] || null;
 
-function fallbackPlayerItems(row: PlayerRow) {
-  return [
-    { key: 'role', label: 'الحالة', value: row.role === 'starter' ? 'أساسي' : 'شارك كبديل / تم استبداله' },
-    { key: 'number', label: 'رقم اللاعب', value: playerNumber(row.player) || '—' },
-    { key: 'position', label: 'المركز', value: playerPosition(row.player, row.stat) },
-  ];
-}
+  useEffect(() => {
+    if (!playing || points.length <= 1) return;
+    const timer = window.setInterval(() => setActiveIndex((current) => (current + 1) % points.length), 1800);
+    return () => window.clearInterval(timer);
+  }, [playing, points.length]);
 
-function PlayerAvatar({ player, accent }: { player: AnyPlayer; accent: 'home' | 'away' }) {
-  const border = accent === 'home' ? 'border-[#F8C846]' : 'border-[#18E58F]';
-  const number = playerNumber(player);
-  return <div className={`relative flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 ${border} bg-black/45`}>{player.image ? <img src={player.image} alt={player.name} className="h-full w-full object-cover" loading="lazy" /> : <span className="text-[11px] font-black text-white">{initials(player.name)}</span>}{number ? <b className="absolute -bottom-1 -right-1 rounded-full bg-black px-1.5 py-0.5 text-[9px] text-white ring-1 ring-white/20">{number}</b> : null}</div>;
-}
+  if (!points.length) return <Empty title="لا توجد أحداث" body="ستظهر خريطة الأحداث بعد مزامنة الأهداف والبطاقات والتبديلات." />;
 
-function PlayerCard({ row, accent }: { row: PlayerRow; accent: 'home' | 'away' }) {
-  const detailedItems = statItems(row.stat);
-  const items = detailedItems.length ? detailedItems : fallbackPlayerItems(row);
-  return <article className="rounded-2xl border border-white/10 bg-white/[0.045] p-3"><div className="flex items-start gap-3"><PlayerAvatar player={row.player} accent={accent} /><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-1.5"><p className="truncate text-sm font-black text-white sm:text-base">{row.player.name}</p>{row.player?.isCaptain ? <span className="rounded-full bg-[#F8C846] px-1.5 py-0.5 text-[9px] font-black text-black">C</span> : null}<span className="rounded-full border border-white/10 bg-black/25 px-2 py-0.5 text-[9px] font-black text-slate-300">{row.role === 'starter' ? 'أساسي' : 'شارك كبديل / تم استبداله'}</span></div><p className="mt-1 text-[10px] font-bold text-slate-400">رقم {playerNumber(row.player) || '—'} · {playerPosition(row.player, row.stat)}</p><div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">{items.map((item) => <span key={item.key} className="rounded-xl border border-white/10 bg-black/25 px-2 py-1.5 text-center"><b className="block text-sm font-black text-white tabular-nums">{fmt(item.value as any)}</b><small className="mt-0.5 block text-[9px] font-black text-slate-500">{item.label}</small></span>)}</div>{!detailedItems.length ? <p className="mt-2 text-[10px] font-bold text-slate-500">الإحصائيات التفصيلية لم تصل لهذا اللاعب بعد، وتم عرض بيانات المشاركة الأساسية بدلًا من ترك الكارت فارغًا.</p> : null}</div></div></article>;
-}
+  return <div className="space-y-4">
+    <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
+      <section className="relative min-h-[390px] overflow-hidden rounded-[1.6rem] border border-emerald-300/20 bg-[radial-gradient(circle_at_center,rgba(24,229,143,0.18),transparent_32%),linear-gradient(90deg,rgba(10,80,52,.85),rgba(4,62,42,.95))] p-3 shadow-[inset_0_0_0_1px_rgba(255,255,255,.04)]">
+        <div className="absolute inset-3 rounded-[1.25rem] border-2 border-white/35" />
+        <div className="absolute left-1/2 top-3 h-[calc(100%-1.5rem)] w-px bg-white/35" />
+        <div className="absolute left-1/2 top-1/2 h-28 w-28 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white/35" />
+        <div className="absolute left-3 top-1/2 h-40 w-20 -translate-y-1/2 rounded-r-2xl border-y-2 border-r-2 border-white/35" />
+        <div className="absolute right-3 top-1/2 h-40 w-20 -translate-y-1/2 rounded-l-2xl border-y-2 border-l-2 border-white/35" />
+        <div className="absolute inset-x-6 top-4 flex justify-between text-[10px] font-black text-white/65"><span>{displayTeamName(data.homeTeam)}</span><span>{displayTeamName(data.awayTeam)}</span></div>
+        {points.map((event, index) => {
+          const isActive = index === activeIndex;
+          const kind = eventKind(event);
+          return <button key={event.id} type="button" onClick={() => { setActiveIndex(index); setPlaying(false); }} className={`absolute z-10 -translate-x-1/2 -translate-y-1/2 rounded-full transition duration-300 ${isActive ? 'scale-125' : 'scale-100 opacity-80 hover:scale-110 hover:opacity-100'}`} style={{ left: `${event.xPos}%`, top: `${event.yPos}%` }} aria-label={`${kind.label} ${event.playerName || ''}`}>
+            <span className={`flex h-10 w-10 items-center justify-center rounded-full border-2 text-base font-black shadow-[0_10px_28px_rgba(0,0,0,.35)] ${kind.tone}`}>{event.icon || (index + 1)}</span>
+            {isActive ? <span className="absolute inset-[-12px] animate-ping rounded-full border border-[#F8C846]/70" /> : null}
+          </button>;
+        })}
+        {active ? <div className="absolute bottom-4 left-4 right-4 z-20 rounded-2xl border border-white/10 bg-black/70 p-3 backdrop-blur"><div className="flex items-center gap-3"><EventAvatar event={active} active /><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><b className="rounded-full bg-white/10 px-2 py-1 text-xs text-white">{active.minuteLabel || '—'}</b><span className={`rounded-full border px-2 py-1 text-[11px] font-black ${eventKind(active).tone}`}>{eventKind(active).label}</span><span className="rounded-full border border-white/10 bg-white/10 px-2 py-1 text-[11px] font-black text-slate-300">{active.teamName}</span></div><h3 className="mt-2 truncate text-base font-black text-white">{active.playerName || 'حدث بدون لاعب محدد'} {active.playerNumber ? <span className="text-[#F8C846]">#{active.playerNumber}</span> : null}</h3><p className="mt-1 line-clamp-2 text-xs font-bold leading-5 text-slate-300">{active.detail || 'حدث محفوظ في قاعدة البيانات.'}</p></div></div></div> : null}
+      </section>
 
-function TeamPlayersSection({ team, lineup, localPlayers, stats, accent }: { team: TeamLite; lineup: OfficialLineupTeam | null | undefined; localPlayers: MatchPlayerLite[]; stats: PlayerStat[]; accent: 'home' | 'away' }) {
-  const rows = buildRows(lineup, localPlayers, stats.filter((stat) => statBelongsToTeam(stat, team, localPlayers)));
-  const color = accent === 'home' ? 'text-[#F8C846] border-[#F8C846]/25 bg-[#F8C846]/10' : 'text-[#18E58F] border-[#18E58F]/25 bg-[#18E58F]/10';
-  return <section className="rounded-[1.5rem] border border-white/10 bg-black/25 p-4"><div className="mb-5 flex flex-wrap items-center justify-between gap-3"><div className="flex min-w-0 items-center gap-3"><FlagImg team={team} small /><div className="min-w-0"><h3 className="team-name-full text-xl font-black text-white">{displayTeamName(team)}</h3><p className="mt-1 text-xs font-bold text-slate-500">{lineup?.formation ? `الخطة ${lineup.formation}` : 'كل منتخب بلاعبيه المشاركين'}</p></div></div><span className={`rounded-full border px-3 py-1 text-[11px] font-black ${color}`}>{ar.format(rows.total)} لاعب</span></div><div className="space-y-6"><div><div className="mb-3 flex items-center justify-between"><h4 className="text-sm font-black text-[#F8C846]">اللاعبون الأساسيون</h4><span className="text-xs font-bold text-slate-500">{ar.format(rows.starters.length)} لاعب</span></div><div className="grid gap-3">{rows.starters.length ? rows.starters.map((row) => <PlayerCard key={`starter-${row.player.name}-${row.index}`} row={row} accent={accent} />) : <Empty title="غير متوفر" body="لم يصل التشكيل الأساسي بعد." />}</div></div><div><div className="mb-3 flex items-center justify-between"><h4 className="text-sm font-black text-[#18E58F]">اللاعبون الذين شاركوا كبدلاء / تم استبدالهم</h4><span className="text-xs font-bold text-slate-500">{ar.format(rows.substitutes.length)} لاعب</span></div><div className="grid gap-3">{rows.substitutes.length ? rows.substitutes.map((row) => <PlayerCard key={`sub-${row.player.name}-${row.index}`} row={row} accent={accent} />) : <Empty title="لا يوجد لاعبو تبديل مشاركون" body="لن يتم عرض كل دكة البدلاء؛ فقط من شارك فعليًا أو ظهر في بيانات التبديلات." />}</div></div></div></section>;
+      <aside className="rounded-[1.6rem] border border-white/10 bg-black/25 p-3">
+        <div className="mb-3 flex items-center justify-between gap-2"><div><h3 className="text-sm font-black text-white">تشغيل الأحداث</h3><p className="mt-1 text-[10px] font-bold text-slate-500">اضغط على أي حدث أو شغّل التسلسل.</p></div><button type="button" onClick={() => setPlaying((value) => !value)} className="inline-flex items-center gap-2 rounded-xl bg-[#18E58F] px-3 py-2 text-xs font-black text-black">{playing ? <Pause size={14} /> : <Play size={14} />}{playing ? 'إيقاف' : 'تشغيل'}</button></div>
+        <div className="max-h-[420px] space-y-2 overflow-y-auto pr-1 mobile-scrollbar">{points.map((event, index) => { const isActive = index === activeIndex; const kind = eventKind(event); return <button key={event.id} type="button" onClick={() => { setActiveIndex(index); setPlaying(false); }} className={`w-full rounded-2xl border p-2 text-right transition ${isActive ? 'border-[#F8C846]/55 bg-[#F8C846]/10' : 'border-white/10 bg-white/[0.035] hover:border-white/25'}`}><div className="flex items-center gap-2"><span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full border text-sm ${kind.tone}`}>{event.icon || index + 1}</span><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-1.5"><b className="rounded-full bg-white/10 px-1.5 py-0.5 text-[10px] text-white">{event.minuteLabel || '—'}</b><span className="text-[10px] font-black text-[#F8C846]">{kind.label}</span>{event.playerNumber ? <span className="text-[10px] font-black text-slate-400">#{event.playerNumber}</span> : null}</div><p className="mt-1 truncate text-xs font-black text-white">{event.playerName || event.detail || 'حدث'}</p><p className="mt-0.5 truncate text-[10px] font-bold text-slate-500">{event.teamName}</p></div></div></button>; })}</div>
+      </aside>
+    </div>
+  </div>;
 }
 
 function Hero({ data, onRefresh, onShare }: { data: MatchPageData; onRefresh: () => void; onShare: () => void }) {
@@ -252,16 +251,23 @@ function OverviewPanel({ data }: { data: MatchPageData }) {
 }
 
 function EventsPanel({ data }: { data: MatchPageData }) {
-  return <Panel title="أحداث المباراة" icon={<Radio size={22} />}><div className="space-y-3">{data.events.length ? data.events.map((event: MatchEventView) => <article key={event.id} className="rounded-2xl border border-white/10 bg-black/25 p-3"><div className="mb-1 flex flex-wrap items-center gap-2"><span className="text-lg">{event.icon}</span><b className="rounded-full bg-white/10 px-2 py-1 text-xs text-white">{event.minuteLabel || '—'}</b><span className="rounded-full bg-[#F8C846]/15 px-2 py-1 text-xs font-black text-[#F8C846]">{event.type}</span>{event.playerName ? <span className="text-sm font-black text-white">{event.playerName}</span> : null}</div><p className="text-sm font-bold leading-7 text-slate-200">{event.detail || 'حدث محفوظ.'}</p></article>) : <Empty title="لا توجد أحداث" body="ستظهر بعد مزامنة الأحداث." />}</div></Panel>;
+  return <Panel title="أحداث المباراة" icon={<Radio size={22} />} hint="ملعب تفاعلي يعرض الأحداث، اللاعب، الرقم، نوع الحدث، والدقيقة"><InteractiveEventsPitch data={data} /></Panel>;
+}
+
+function TeamMiniPlayers({ team, players, stats, accent }: { team: TeamLite; players: MatchPlayerLite[]; stats: PlayerStat[]; accent: 'home' | 'away' }) {
+  const teamStats = stats.filter((stat) => stat.teamId === team.id || normalizeName(stat.teamName).includes(normalizeName(team.name)) || players.some((p) => normalizeName(p.name) === normalizeName(stat.playerName)));
+  const playerRows = teamStats.length ? teamStats.slice(0, 18).map((stat, index) => ({ name: stat.playerName || 'لاعب', image: players.find((p) => normalizeName(p.name) === normalizeName(stat.playerName))?.image || null, number: statNumber(stat), position: stat.position, stat, index })) : players.slice(0, 18).map((player: AnyPlayer, index) => ({ name: player.name, image: player.image || null, number: playerNumber(player), position: player.position, stat: null as PlayerStat | null, index }));
+  const color = accent === 'home' ? 'text-[#F8C846] border-[#F8C846]/25 bg-[#F8C846]/10' : 'text-[#18E58F] border-[#18E58F]/25 bg-[#18E58F]/10';
+  return <section className="rounded-[1.5rem] border border-white/10 bg-black/25 p-4"><div className="mb-4 flex items-center justify-between gap-3"><div className="flex min-w-0 items-center gap-3"><FlagImg team={team} small /><h3 className="team-name-full text-lg font-black text-white">{displayTeamName(team)}</h3></div><span className={`rounded-full border px-3 py-1 text-[11px] font-black ${color}`}>{ar.format(playerRows.length)} لاعب</span></div><div className="grid gap-3">{playerRows.length ? playerRows.map((row) => <article key={`${row.name}-${row.index}`} className="rounded-2xl border border-white/10 bg-white/[0.045] p-3"><div className="flex gap-3"><div className={`relative flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 ${accent === 'home' ? 'border-[#F8C846]' : 'border-[#18E58F]'} bg-black/45`}>{row.image ? <img src={row.image} alt={row.name} className="h-full w-full object-cover" loading="lazy" /> : <span className="text-[11px] font-black text-white">{initials(row.name)}</span>}{row.number ? <b className="absolute -bottom-1 -right-1 rounded-full bg-black px-1.5 py-0.5 text-[9px] text-white ring-1 ring-white/20">{row.number}</b> : null}</div><div className="min-w-0 flex-1"><p className="truncate text-sm font-black text-white">{row.name}</p><p className="mt-1 text-[10px] font-bold text-slate-400">رقم {row.number || '—'} · {playerPosition(row, row.stat)}</p><div className="mt-2 flex flex-wrap gap-1.5">{(row.stat ? PLAYER_STAT_DEFS.map(([key, label]) => ({ key, label, value: row.stat?.[key] })).filter((item) => item.value !== null && item.value !== undefined && item.value !== '').slice(0, 6) : []).map((item) => <span key={item.key} className="rounded-lg bg-black/35 px-2 py-1 text-[10px] font-bold text-slate-300"><b className="text-white">{fmt(item.value as any)}</b> {item.label}</span>)}</div></div></div></article>) : <Empty title="غير متوفر" body="لم تصل بيانات اللاعبين بعد." />}</div></section>;
 }
 
 function LineupsPanel({ data }: { data: MatchPageData }) {
   const playerStats = (data.advanced.playerStats || []) as PlayerStat[];
-  return <Panel title="التشكيلات وأداء اللاعبين" icon={<Users size={22} />} hint="صفحة واحدة تعرض كل منتخب وحده: الأساسيون أولًا، ثم لاعبو التبديل المشاركون، مع الصورة والرقم وكل الإحصائيات المتاحة."><div className="space-y-5"><TeamPlayersSection team={data.homeTeam} lineup={data.officialLineup?.home} localPlayers={data.homePlayers} stats={playerStats} accent="home" /><TeamPlayersSection team={data.awayTeam} lineup={data.officialLineup?.away} localPlayers={data.awayPlayers} stats={playerStats} accent="away" /></div></Panel>;
+  return <Panel title="التشكيلات وأداء اللاعبين" icon={<Users size={22} />} hint="عرض مختصر للاعبين المشاركين مع الصورة والرقم وأهم الإحصائيات المتاحة"><div className="grid gap-5 xl:grid-cols-2"><TeamMiniPlayers team={data.homeTeam} players={data.homePlayers} stats={playerStats} accent="home" /><TeamMiniPlayers team={data.awayTeam} players={data.awayPlayers} stats={playerStats} accent="away" /></div></Panel>;
 }
 
 function InteractivePanel({ data }: { data: MatchPageData }) {
-  return <Panel title="الملعب التفاعلي" icon={<MapPin size={22} />} hint="يفتح في صفحة مستقلة"><div className="rounded-2xl border border-sky-300/25 bg-sky-300/10 p-5 text-center"><p className="text-lg font-black text-white">افتح عرض الملعب التفاعلي</p><Link href={`/live-animation/${data.id}`} className="mt-4 inline-flex rounded-xl bg-sky-300 px-5 py-3 text-sm font-black text-black">فتح الملعب التفاعلي</Link></div></Panel>;
+  return <Panel title="الملعب التفاعلي" icon={<MapPin size={22} />} hint="يفتح في صفحة مستقلة"><div className="rounded-2xl border border-sky-300/25 bg-sky-300/10 p-5 text-center"><p className="text-lg font-black text-white">افتح عرض الملعب التفاعلي الكامل</p><Link href={`/live-animation/${data.id}`} className="mt-4 inline-flex rounded-xl bg-sky-300 px-5 py-3 text-sm font-black text-black">فتح الملعب التفاعلي</Link></div></Panel>;
 }
 
 function AnalysisPanel({ data }: { data: MatchPageData }) {
@@ -278,7 +284,7 @@ function GroupPanel({ data }: { data: MatchPageData }) {
 }
 
 function ArticlesPanel({ data }: { data: MatchPageData }) {
-  return <Panel title="المقالات" icon={<List size={22} />}><div className="grid gap-3">{data.digest?.href ? <Link href={data.digest.href} className="rounded-2xl border border-[#F8C846]/30 bg-[#F8C846]/10 p-4 text-right"><p className="font-black text-[#F8C846]">تقرير المباراة</p><p className="mt-2 text-sm font-bold leading-7 text-white">{data.digest.summary || data.digest.turningPoint || 'افتح تقرير المباراة الكامل.'}</p></Link> : null}{!data.digest?.href && !data.relatedArticles.length ? <Empty title="لا توجد مقالات" body="ستظهر المقالات المرتبطة بهذه المباراة هنا." /> : null}</div></Panel>;
+  return <Panel title="المقالات" icon={<List size={22} />}><div className="grid gap-3">{data.digest?.href ? <Link href={data.digest.href} className="rounded-2xl border border-[#F8C846]/30 bg-[#F8C846]/10 p-4 text-right"><p className="font-black text-[#F8C846]">تقرير المباراة</p><p className="mt-2 text-sm font-bold leading-7 text-white">{data.digest.summary || data.digest.turningPoint || 'افتح تقرير المباراة الكامل.'}</p></Link> : null}{data.relatedArticles.map((article) => <Link key={article.id} href={article.href} className="rounded-2xl border border-white/10 bg-black/25 p-4 text-right"><p className="font-black text-white">{article.title}</p><p className="mt-2 text-sm font-bold leading-7 text-slate-400">{article.summary}</p></Link>)}{!data.digest?.href && !data.relatedArticles.length ? <Empty title="لا توجد مقالات" body="ستظهر المقالات المرتبطة بهذه المباراة هنا." /> : null}</div></Panel>;
 }
 
 export default function ProfessionalMatchTabsPage({ data }: { data: MatchPageData }) {
