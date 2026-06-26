@@ -1,5 +1,6 @@
 import prisma from '@/lib/prisma';
 import AdminMatchToolsClient from '@/components/admin/AdminMatchToolsClient';
+import { ensurePostMatchContentTables } from '@/lib/post-match-content/schema';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -18,6 +19,24 @@ function validKey(key: string) {
   return Boolean(key) && allowed.includes(key);
 }
 
+function snapshotCounts(snapshot: any) {
+  const raw = snapshot?.rawData || {};
+  const normalized = raw?.normalized || {};
+  const stats = normalized?.liveStats?.stats || normalized?.stats || {};
+  const events = Array.isArray(normalized?.eventsDetailed?.all) ? normalized.eventsDetailed.all : [];
+  const shots = Array.isArray(normalized?.shotmap) ? normalized.shotmap : [];
+  const players = Array.isArray(normalized?.playerStats) ? normalized.playerStats : [];
+  const playerRatings = players.filter((player: any) => player?.rating !== null && player?.rating !== undefined && player?.rating !== '').length;
+  return {
+    stats: Object.keys(stats || {}).length,
+    events: events.length,
+    shots: shots.length,
+    players: players.length,
+    playerRatings,
+    lineups: normalized?.lineups ? 1 : 0,
+  };
+}
+
 function snapshotSummary(snapshot: any) {
   if (!snapshot) return null;
   return {
@@ -28,7 +47,20 @@ function snapshotSummary(snapshot: any) {
     awayPossession: snapshot.awayPossession,
     homeShots: snapshot.homeShots,
     awayShots: snapshot.awayShots,
+    homeShotsOnTarget: snapshot.homeShotsOnTarget,
+    awayShotsOnTarget: snapshot.awayShotsOnTarget,
+    counts: snapshotCounts(snapshot),
   };
+}
+
+async function articleMapFor(matchIds: string[]) {
+  await ensurePostMatchContentTables();
+  if (!matchIds.length) return new Map<string, any>();
+  const rows = await prisma.$queryRawUnsafe<any[]>(
+    `SELECT "matchId", "slug", "status", "heroImageUrl", "infographicImageUrl" FROM "MatchArticle" WHERE "language" = 'ar' AND "matchId" = ANY($1)`,
+    matchIds,
+  ).catch(() => []);
+  return new Map(rows.map((row) => [row.matchId, row]));
 }
 
 export default async function AdminMatchesToolsPage({ searchParams }: { searchParams?: Promise<SearchParams> | SearchParams }) {
@@ -55,8 +87,9 @@ export default async function AdminMatchesToolsPage({ searchParams }: { searchPa
       awayTeam: { select: { name: true, code: true } },
       statsSnapshots: {
         orderBy: { capturedAt: 'desc' },
-        take: 8,
+        take: 10,
         select: {
+          id: true,
           provider: true,
           providerMatchId: true,
           capturedAt: true,
@@ -64,15 +97,21 @@ export default async function AdminMatchesToolsPage({ searchParams }: { searchPa
           awayPossession: true,
           homeShots: true,
           awayShots: true,
+          homeShotsOnTarget: true,
+          awayShotsOnTarget: true,
+          rawData: true,
         },
       },
       _count: { select: { events: true } },
     },
   });
 
+  const articles = await articleMapFor(matches.map((match) => match.id));
+
   const rows = matches.map((match) => {
-    const theStats = match.statsSnapshots.find((snapshot) => snapshot.provider.startsWith('THE_STATS_API')) || null;
+    const finalSnapshot = match.statsSnapshots.find((snapshot) => snapshot.provider.startsWith('THE_STATS_API')) || null;
     const latest = match.statsSnapshots[0] || null;
+    const article = articles.get(match.id) || null;
     return {
       id: match.id,
       externalId: match.externalId,
@@ -87,8 +126,14 @@ export default async function AdminMatchesToolsPage({ searchParams }: { searchPa
       stage: match.stage,
       groupPhase: match.groupPhase,
       latestSnapshot: snapshotSummary(latest),
-      latestTheStatsSnapshot: snapshotSummary(theStats),
+      latestTheStatsSnapshot: snapshotSummary(finalSnapshot),
       eventsCount: match._count.events,
+      article: article ? {
+        slug: article.slug,
+        status: article.status,
+        heroImageUrl: article.heroImageUrl,
+        infographicImageUrl: article.infographicImageUrl,
+      } : null,
     };
   });
 
