@@ -1,7 +1,9 @@
-import { redirect } from 'next/navigation';
+import MatchCenterPageLivePriority from '@/components/match-center/MatchCenterPageLivePriority';
 
-export default async function MatchDetailRedirect({ params }: { params: Promise<{ id: string }> }) {
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
+export default async function MatchDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const resolved = await params;
-  const safeId = encodeURIComponent(resolved.id);
-  redirect(`/match-center/${safeId}`);
+  return <MatchCenterPageLivePriority matchId={resolved.id} />;
 }
