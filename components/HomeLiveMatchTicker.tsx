@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { getTeamFlagUrl } from '@/lib/teamFlags';
 import { getArabicTeamName } from '@/lib/teamDisplay';
@@ -113,8 +113,6 @@ export default function HomeLiveMatchTicker({ matches = [] }: Props) {
   const [mounted, setMounted] = useState(false);
   const safeMatches = Array.isArray(matches) ? (matches as TickerMatch[]) : [];
   const [activeKey, setActiveKey] = useState<string>('');
-  const stripRef = useRef<HTMLDivElement | null>(null);
-  const cardRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   useEffect(() => { setMounted(true); }, []);
 
@@ -134,40 +132,20 @@ export default function HomeLiveMatchTicker({ matches = [] }: Props) {
     if (!activeKey || !displayMatches.some((match) => matchKey(match) === activeKey)) setActiveKey(matchKey(displayMatches[0]));
   }, [displayMatches, activeKey]);
 
-  useEffect(() => {
-    if (displayMatches.length <= 1) return;
-    const timer = window.setInterval(() => {
-      setActiveKey((current) => {
-        const index = Math.max(0, displayMatches.findIndex((match) => matchKey(match) === current));
-        return matchKey(displayMatches[(index + 1) % displayMatches.length]);
-      });
-    }, 5500);
-    return () => window.clearInterval(timer);
-  }, [displayMatches]);
-
-  useEffect(() => {
-    const card = activeKey ? cardRefs.current[activeKey] : null;
-    const strip = stripRef.current;
-    if (!card || !strip) return;
-    const cardLeft = card.offsetLeft;
-    const targetLeft = Math.max(0, cardLeft - (strip.clientWidth - card.clientWidth) / 2);
-    strip.scrollTo({ left: targetLeft, behavior: 'smooth' });
-  }, [activeKey]);
-
   if (!displayMatches.length) return null;
 
   return (
     <section className="relative overflow-hidden rounded-[1.45rem] border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(15,240,252,.12),transparent_32%),linear-gradient(135deg,rgba(3,17,13,.96),rgba(5,7,10,.98))] p-2.5 text-white shadow-[0_18px_50px_rgba(0,0,0,.30)] backdrop-blur-xl sm:rounded-[1.8rem] sm:p-3" aria-label="شريط مباريات كأس العالم">
       <div className="pointer-events-none absolute inset-0 opacity-70" style={{ backgroundImage: 'linear-gradient(90deg, rgba(15,240,252,.10), rgba(255,215,0,.08), rgba(0,255,136,.08), rgba(15,240,252,.10))', backgroundSize: '240% 240%' }} />
       <div className="relative mb-2 flex flex-wrap items-center justify-between gap-2 px-0.5">
-        <div className="flex items-center gap-2"><span className="flex h-8 w-8 items-center justify-center rounded-2xl border border-[#0FF0FC]/20 bg-[#0FF0FC]/10 text-sm">⚽</span><div><h2 className="text-sm font-black leading-none text-white">شريط المباريات</h2><p className="mt-1 text-[9px] font-bold text-gray-500">مباشر، نتائج، والقادم</p></div></div>
+        <div className="flex items-center gap-2"><span className="flex h-8 w-8 items-center justify-center rounded-2xl border border-[#0FF0FC]/20 bg-[#0FF0FC]/10 text-sm">⚽</span><div><h2 className="text-sm font-black leading-none text-white">شريط المباريات</h2><p className="mt-1 text-[9px] font-bold text-gray-500">اسحب يمينًا ويسارًا لعرض باقي المباريات</p></div></div>
         <div className="flex items-center gap-1.5 text-[9px] font-black">
           {liveCount ? <span className="rounded-full border border-[#00FF88]/25 bg-[#00FF88]/10 px-2 py-1 text-[#00FF88]"><span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-[#00FF88]" /> مباشر {formatCount(liveCount)}</span> : null}
           <span className="rounded-full border border-white/10 bg-white/[0.05] px-2 py-1 text-gray-400">المعروض {formatCount(displayMatches.length)}</span>
           {finishedCount ? <span className="hidden rounded-full border border-white/10 bg-white/[0.05] px-2 py-1 text-gray-400 sm:inline-flex">انتهت {formatCount(finishedCount)}</span> : null}
         </div>
       </div>
-      <div ref={stripRef} className="relative flex snap-x snap-mandatory gap-2 overflow-x-auto pb-1 mobile-scrollbar" dir="rtl">
+      <div className="relative flex snap-x snap-mandatory gap-2 overflow-x-auto overscroll-x-contain pb-1 mobile-scrollbar" dir="rtl">
         {displayMatches.map((match) => {
           const key = matchKey(match);
           const active = key === activeKey;
@@ -178,7 +156,7 @@ export default function HomeLiveMatchTicker({ matches = [] }: Props) {
           const tone = live ? 'live' : finished ? 'finished' : 'upcoming';
           const date = dateLabel(match, mounted);
           return (
-            <article key={key} ref={(node) => { cardRefs.current[key] = node; }} onMouseEnter={() => setActiveKey(key)} className={`relative h-[132px] w-[254px] shrink-0 snap-center overflow-hidden rounded-2xl border px-3 py-2.5 transition duration-200 hover:-translate-y-0.5 sm:h-[138px] sm:w-[292px] ${active ? 'border-[#FFD700]/45 bg-black/60 shadow-[0_0_26px_rgba(255,215,0,.12)]' : 'border-white/10 bg-black/28 hover:border-[#0FF0FC]/35'} ${live ? 'ring-1 ring-[#00FF88]/25' : ''}`}>
+            <article key={key} onMouseEnter={() => setActiveKey(key)} onTouchStart={() => setActiveKey(key)} className={`relative h-[132px] w-[254px] shrink-0 snap-center overflow-hidden rounded-2xl border px-3 py-2.5 transition duration-200 hover:-translate-y-0.5 sm:h-[138px] sm:w-[292px] ${active ? 'border-[#FFD700]/45 bg-black/60 shadow-[0_0_26px_rgba(255,215,0,.12)]' : 'border-white/10 bg-black/28 hover:border-[#0FF0FC]/35'} ${live ? 'ring-1 ring-[#00FF88]/25' : ''}`}>
               {active ? <span className="absolute inset-x-5 -top-px h-px bg-gradient-to-r from-transparent via-[#FFD700] to-transparent" /> : null}
               {live ? <span className="absolute -left-5 -top-5 h-16 w-16 rounded-full bg-[#00FF88]/12 blur-2xl" /> : null}
               <div className="mb-2 flex items-center justify-between gap-2">
