@@ -245,7 +245,7 @@ const getHomeData = unstable_cache(
     };
   },
   ['home-dashboard-v6'],
-  { revalidate: 60 },
+  { revalidate: 60, tags: ['home-dashboard'] },
 );
 
 export default async function Home() {
