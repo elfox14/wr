@@ -1,5 +1,6 @@
 import { unstable_cache } from 'next/cache';
 import HomeClientSportsLiveFocus from '@/components/HomeClientSportsLiveFocus';
+import HomeTournamentStatsCard from '@/components/HomeTournamentStatsCard';
 import prisma from '@/lib/prisma';
 import { getHomeGroupStandings } from '@/lib/homeGroupStandings';
 
@@ -243,7 +244,7 @@ const getHomeData = unstable_cache(
       groupStandings: JSON.parse(JSON.stringify(groupStandingsRaw)),
     };
   },
-  ['home-dashboard-v5'],
+  ['home-dashboard-v6'],
   { revalidate: 60 },
 );
 
@@ -265,14 +266,24 @@ export default async function Home() {
   }
 
   return (
-    <HomeClientSportsLiveFocus
-      upcomingMatches={data.upcomingMatches}
-      tickerMatches={data.tickerMatches}
-      nextMarqueeMatch={data.nextMarqueeMatch}
-      groupStandings={data.groupStandings}
-      playersCount={data.playersCount}
-      teamsCount={data.teamsCount}
-      upcomingMatchesCount={data.upcomingMatchesCount}
-    />
+    <>
+      <HomeClientSportsLiveFocus
+        upcomingMatches={data.upcomingMatches}
+        tickerMatches={data.tickerMatches}
+        nextMarqueeMatch={data.nextMarqueeMatch}
+        groupStandings={data.groupStandings}
+        playersCount={data.playersCount}
+        teamsCount={data.teamsCount}
+        upcomingMatchesCount={data.upcomingMatchesCount}
+      />
+      <div dir="rtl" className="mx-auto max-w-7xl px-3 pb-8 sm:px-4 lg:px-6">
+        <HomeTournamentStatsCard
+          playersCount={data.playersCount}
+          teamsCount={data.teamsCount}
+          upcomingMatchesCount={data.upcomingMatchesCount}
+          groupStandings={data.groupStandings}
+        />
+      </div>
+    </>
   );
 }
