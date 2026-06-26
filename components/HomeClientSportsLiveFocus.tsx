@@ -71,20 +71,21 @@ const SCHEDULED_STATUSES = ['SCHEDULED', 'TIMED', 'NOT_STARTED', 'NS'];
 const GROUP_LETTERS = 'ABCDEFGHIJKL'.split('');
 
 function formatCount(value?: number | null, fallback = 0) {
-  return new Intl.NumberFormat('ar-EG').format(typeof value === 'number' && Number.isFinite(value) ? value : fallback);
+  const number = typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+  return new Intl.NumberFormat('ar-EG').format(number);
 }
 
 function formatScore(value?: number | null) {
   return typeof value === 'number' && Number.isFinite(value) ? new Intl.NumberFormat('en-US').format(value) : '0';
 }
 
-function status(match?: HomeMatch | null) {
-  return String(match?.displayStatus || match?.status || '').toUpperCase();
-}
-
 function safeNumber(value: unknown) {
   const number = Number(value || 0);
   return Number.isFinite(number) ? number : 0;
+}
+
+function status(match?: HomeMatch | null) {
+  return String(match?.displayStatus || match?.status || '').toUpperCase();
 }
 
 function isGroupList(value: unknown): value is GroupData[] {
@@ -316,7 +317,55 @@ function MatchRow({ match, now, mounted, variant = 'normal' }: { match: HomeMatc
   );
 }
 
-function MatchCenter({ fallbackMatches = [], nextMatch = null, liveMatches = [] }: { fallbackMatches?: HomeMatch[]; nextMatch?: HomeMatch | null; liveMatches?: HomeMatch[] }) {
+function BracketTeaser({ groups, compact = false }: { groups: unknown[]; compact?: boolean }) {
+  const group = hotGroup(groups);
+  const leader = group?.standings?.[0] || null;
+  const runner = group?.standings?.[1] || null;
+
+  if (compact) {
+    return (
+      <section className="max-h-[170px] overflow-hidden rounded-[1.25rem] border border-[#FFD700]/15 bg-[radial-gradient(circle_at_top_left,rgba(255,215,0,0.12),transparent_34%),rgba(0,0,0,0.24)] p-3 text-white">
+        <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
+          <div className="min-w-0">
+            <p className="text-[9px] font-black tracking-[0.16em] text-[#FFD700]">KNOCKOUT PATH</p>
+            <h2 className="mt-1 truncate text-base font-black">مسار البطولة</h2>
+            <p className="mt-1 line-clamp-2 text-[11px] font-bold leading-5 text-gray-400">طريق دور الـ٣٢ حتى النهائي حسب ترتيب المجموعات الحالي.</p>
+          </div>
+          <div className="grid gap-2 md:min-w-[240px] md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
+            <div className="min-w-0 rounded-2xl border border-white/10 bg-black/25 px-3 py-2 text-[10px] font-bold text-gray-300">
+              <span className="block text-[9px] font-black text-gray-500">مجموعة قريبة</span>
+              <b className="mt-1 block truncate text-xs font-black text-white">{group?.arName || (group?.key ? `المجموعة ${group.key}` : 'بانتظار البيانات')}</b>
+              <span className="mt-1 block truncate">{standingName(leader)} {leader ? `· ${formatCount(safeNumber(leader.points))} نقطة` : ''}</span>
+              <span className="block truncate">{standingName(runner)} {runner ? `· ${formatCount(safeNumber(runner.points))} نقطة` : ''}</span>
+            </div>
+            <Link href="/round-of-32" className="inline-flex min-h-10 items-center justify-center rounded-2xl bg-[#FFD700] px-4 py-2 text-xs font-black text-black transition hover:bg-[#ffe66b]">فتح</Link>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <section className="overflow-hidden rounded-[1.45rem] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(255,215,0,0.12),transparent_34%),linear-gradient(135deg,rgba(255,255,255,0.05),rgba(0,0,0,0.22))] p-4 text-white sm:rounded-3xl">
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div>
+          <p className="text-[10px] font-black tracking-[0.16em] text-[#FFD700]">KNOCKOUT PATH</p>
+          <h2 className="mt-1 text-xl font-black">مسار البطولة</h2>
+          <p className="mt-2 max-w-2xl text-sm font-bold leading-6 text-gray-400">شاهد طريق دور الـ٣٢ حتى النهائي حسب ترتيب المجموعات الحالي، بدون تحميل المخطط الكبير داخل الرئيسية.</p>
+        </div>
+        <div className="grid min-w-[220px] gap-2 rounded-2xl border border-white/10 bg-black/25 p-3 text-xs font-bold text-gray-300">
+          <span className="text-[10px] font-black text-gray-500">مجموعة قريبة</span>
+          <b className="text-sm font-black text-white">{group?.arName || (group?.key ? `المجموعة ${group.key}` : 'بانتظار اكتمال البيانات')}</b>
+          <span>{standingName(leader)} {leader ? `· ${formatCount(safeNumber(leader.points))} نقطة` : ''}</span>
+          <span>{standingName(runner)} {runner ? `· ${formatCount(safeNumber(runner.points))} نقطة` : ''}</span>
+        </div>
+        <Link href="/round-of-32" className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-[#FFD700] px-5 py-3 text-sm font-black text-black transition hover:bg-[#ffe66b]">فتح المسار</Link>
+      </div>
+    </section>
+  );
+}
+
+function MatchCenter({ fallbackMatches = [], nextMatch = null, liveMatches = [], groups = [] }: { fallbackMatches?: HomeMatch[]; nextMatch?: HomeMatch | null; liveMatches?: HomeMatch[]; groups?: unknown[] }) {
   const [mounted, setMounted] = useState(false);
   const [now, setNow] = useState(() => new Date());
 
@@ -343,8 +392,8 @@ function MatchCenter({ fallbackMatches = [], nextMatch = null, liveMatches = [] 
   }, [primaryKey, refreshMs]);
 
   return (
-    <section className="flex h-auto flex-col overflow-hidden rounded-[1.45rem] border border-white/10 bg-white/[0.04] p-3 text-white shadow-[0_14px_38px_rgba(0,0,0,0.2)] backdrop-blur sm:rounded-3xl sm:p-4" aria-label="مباريات كأس العالم">
-      <div className="flex flex-col gap-4">
+    <section className="flex h-full min-h-[520px] flex-col overflow-hidden rounded-[1.45rem] border border-white/10 bg-white/[0.04] p-3 text-white shadow-[0_14px_38px_rgba(0,0,0,0.2)] backdrop-blur sm:rounded-3xl sm:p-4" aria-label="مباريات كأس العالم">
+      <div className="flex min-h-0 flex-1 flex-col gap-4">
         <div>{primaryMatch ? <MatchRow match={primaryMatch} now={now} mounted={mounted} variant={isLiveOrBreak(primaryMatch) ? 'live' : 'primary'} /> : <div className="rounded-2xl border border-dashed border-white/10 bg-black/20 p-4 text-sm font-bold text-gray-400">لا توجد مباراة رئيسية جاهزة للعرض الآن.</div>}</div>
         <div>
           <div className="mb-2 flex items-center justify-between gap-2">
@@ -353,34 +402,12 @@ function MatchCenter({ fallbackMatches = [], nextMatch = null, liveMatches = [] 
           </div>
           <div className="grid gap-3 md:grid-cols-2">
             {secondaryMatches.map((match) => <MatchRow key={matchKey(match)} match={match} now={now} mounted={mounted} variant={isLiveOrBreak(match) || isWaitingForStartConfirmation(match, now) ? 'live' : 'normal'} />)}
-            {!secondaryMatches.length ? <div className="rounded-2xl border border-dashed border-white/10 bg-black/20 p-4 text-sm font-bold text-gray-400 md:col-span-2">لا توجد مباريات قادمة إضافية جاهزة للعرض الآن.</div> : null}
+            {!secondaryMatches.length ? <div className="rounded-2xl border border-dashed border-white/10 bg-black/20 p-3 text-sm font-bold text-gray-400 md:col-span-2">لا توجد مباريات قادمة إضافية جاهزة للعرض الآن.</div> : null}
           </div>
         </div>
-      </div>
-    </section>
-  );
-}
-
-function BracketTeaser({ groups }: { groups: unknown[] }) {
-  const group = hotGroup(groups);
-  const leader = group?.standings?.[0] || null;
-  const runner = group?.standings?.[1] || null;
-
-  return (
-    <section className="overflow-hidden rounded-[1.45rem] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(255,215,0,0.12),transparent_34%),linear-gradient(135deg,rgba(255,255,255,0.05),rgba(0,0,0,0.22))] p-4 text-white sm:rounded-3xl">
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div>
-          <p className="text-[10px] font-black tracking-[0.16em] text-[#FFD700]">KNOCKOUT PATH</p>
-          <h2 className="mt-1 text-xl font-black">مسار البطولة</h2>
-          <p className="mt-2 max-w-2xl text-sm font-bold leading-6 text-gray-400">شاهد طريق دور الـ٣٢ حتى النهائي حسب ترتيب المجموعات الحالي، بدون تحميل المخطط الكبير داخل الرئيسية.</p>
+        <div className="mt-auto">
+          <BracketTeaser groups={groups} compact />
         </div>
-        <div className="grid min-w-[220px] gap-2 rounded-2xl border border-white/10 bg-black/25 p-3 text-xs font-bold text-gray-300">
-          <span className="text-[10px] font-black text-gray-500">مجموعة قريبة</span>
-          <b className="text-sm font-black text-white">{group?.arName || (group?.key ? `المجموعة ${group.key}` : 'بانتظار اكتمال البيانات')}</b>
-          <span>{standingName(leader)} {leader ? `· ${formatCount(safeNumber(leader.points))} نقطة` : ''}</span>
-          <span>{standingName(runner)} {runner ? `· ${formatCount(safeNumber(runner.points))} نقطة` : ''}</span>
-        </div>
-        <Link href="/round-of-32" className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-[#FFD700] px-5 py-3 text-sm font-black text-black transition hover:bg-[#ffe66b]">فتح المسار</Link>
       </div>
     </section>
   );
@@ -420,11 +447,10 @@ export default function HomeClientSportsLiveFocus({ upcomingMatches = [], ticker
   return (
     <main dir="rtl" className="mx-auto max-w-7xl space-y-4 px-3 pb-8 pt-3 sm:space-y-6 sm:px-4 sm:py-5 lg:px-6">
       <HomeLiveMatchTicker matches={tickerDisplayMatches} />
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3 lg:items-start lg:gap-5">
-        <div className="lg:col-span-2"><MatchCenter fallbackMatches={safeUpcomingMatches} nextMatch={safeNextMatch} liveMatches={liveCardMatches} /></div>
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3 lg:items-stretch lg:gap-5">
+        <div className="lg:col-span-2"><MatchCenter fallbackMatches={safeUpcomingMatches} nextMatch={safeNextMatch} liveMatches={liveCardMatches} groups={safeGroupStandings} /></div>
         <div className="lg:col-span-1"><HomeGroupStandingsWidget compact initialGroups={safeGroupStandings} /></div>
       </div>
-      <BracketTeaser groups={safeGroupStandings} />
       <HomeTournamentStatsCard playersCount={playersCount} teamsCount={teamsCount} upcomingMatchesCount={upcomingMatchesCount} />
     </main>
   );
