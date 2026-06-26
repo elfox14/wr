@@ -100,15 +100,32 @@ function TeamPill({ side, align }: { side: ReturnType<typeof resolveSlot>; align
   );
 }
 
+function R32WinnerBox({ no }: { no: number }) {
+  return (
+    <div className="flex min-h-[58px] items-center justify-center rounded-xl border border-black/10 bg-white px-2 py-1.5 text-center text-black shadow-[0_10px_28px_rgba(0,0,0,0.32)]">
+      <div>
+        <div className="text-[7px] font-black uppercase tracking-wide text-slate-400">الفائز</div>
+        <div className="mt-0.5 text-[9px] font-black leading-4">{winner(no)}</div>
+      </div>
+    </div>
+  );
+}
+
 function Round32Pair({ no, direct, thirds, align }: { no: number; direct: Qualifier[]; thirds: Map<number, Qualifier>; align: 'left' | 'right' }) {
   const item = R32.find(([matchNo]) => matchNo === no);
   if (!item) return null;
+  const teams = (
+    <div className="space-y-1">
+      <TeamPill side={resolveSlot(item[1], direct, thirds, no)} align={align} />
+      <TeamPill side={resolveSlot(item[2], direct, thirds, no)} align={align} />
+    </div>
+  );
+  const winnerBox = <R32WinnerBox no={no} />;
   return (
     <article className="relative rounded-xl border border-white/10 bg-black/35 p-1.5">
       <div className="mb-1 flex items-center justify-between px-0.5 text-[7px] font-black text-[#FFD700]"><span>{matchLabel(no)}</span><span>R32</span></div>
-      <div className="space-y-1">
-        <TeamPill side={resolveSlot(item[1], direct, thirds, no)} align={align} />
-        <TeamPill side={resolveSlot(item[2], direct, thirds, no)} align={align} />
+      <div className="grid grid-cols-[minmax(0,1fr)_82px] items-center gap-2 rtl:grid-cols-[82px_minmax(0,1fr)]">
+        {align === 'left' ? <>{teams}{winnerBox}</> : <>{winnerBox}{teams}</>}
       </div>
     </article>
   );
@@ -148,7 +165,7 @@ function HalfBracket({ column, direct, thirds, side }: { column: (typeof COLUMNS
   return (
     <section className="rounded-[1.6rem] border border-white/10 bg-white/[0.035] p-3">
       <div className="mb-3 text-center"><h3 className="text-sm font-black text-white">{column.title}</h3><p className="text-[9px] font-bold text-gray-500">{column.subtitle}</p></div>
-      <div className={`grid gap-3 ${side === 'left' ? 'xl:grid-cols-[1.45fr_.82fr_.72fr_.68fr]' : 'xl:grid-cols-[.68fr_.72fr_.82fr_1.45fr]'}`}>
+      <div className={`grid gap-3 ${side === 'left' ? 'xl:grid-cols-[1.65fr_.72fr_.66fr_.62fr]' : 'xl:grid-cols-[.62fr_.66fr_.72fr_1.65fr]'}`}>
         {side === 'left' ? <>{round32Column}{round16Column}{qfColumn}{semiColumn}</> : <>{semiColumn}{qfColumn}{round16Column}{round32Column}</>}
       </div>
     </section>
@@ -176,7 +193,7 @@ export default function HomeRoundOf32Widget({ groups = [] }: Props) {
   return (
     <section className="overflow-hidden rounded-[2rem] border border-white/10 bg-[radial-gradient(circle_at_top,rgba(15,240,252,0.12),transparent_28%),linear-gradient(135deg,#080808,#101010_45%,#050505)] p-3 text-white shadow-[0_20px_70px_rgba(0,0,0,0.35)]" aria-label="مسار التصفيات النهائية">
       <div className="mb-4 flex flex-wrap items-end justify-between gap-3 px-1">
-        <div><div className="inline-flex rounded-full border border-[#0FF0FC]/25 bg-[#0FF0FC]/10 px-2 py-0.5 text-[8px] font-black text-[#0FF0FC]">KNOCKOUT BRACKET</div><h2 className="mt-1.5 text-xl font-black md:text-2xl">مسار دور الـ٣٢ حتى النهائي</h2><p className="mt-1 max-w-3xl text-[11px] font-bold leading-5 text-gray-400">تصميم أقرب للصورة: مواجهات دور الـ٣٢ على الأطراف، ومربعات فائزين صغيرة تتقدم للداخل بدل كروت كبيرة لكل دور.</p></div>
+        <div><div className="inline-flex rounded-full border border-[#0FF0FC]/25 bg-[#0FF0FC]/10 px-2 py-0.5 text-[8px] font-black text-[#0FF0FC]">KNOCKOUT BRACKET</div><h2 className="mt-1.5 text-xl font-black md:text-2xl">مسار دور الـ٣٢ حتى النهائي</h2><p className="mt-1 max-w-3xl text-[11px] font-bold leading-5 text-gray-400">تصميم أقرب للصورة: كل مواجهة في دور الـ٣٢ أمامها مربع فائز داخل نفس الكارت، ثم تتقدم المربعات للداخل حتى النهائي.</p></div>
         <div className="grid gap-1 text-[10px] font-bold text-gray-400 sm:grid-cols-3"><span>المباشرون: <b className="text-white">{nf.format(direct.length)}</b></span><span>أفضل الثوالث: <b className="text-[#FFD700]">{nf.format(bestThirds.length)}</b></span><span>الإجمالي: <b className="text-[#00FF88]">{nf.format(direct.length + bestThirds.length)}</b></span></div>
       </div>
       {!ready ? <div className="rounded-2xl border border-dashed border-white/10 bg-black/20 p-4 text-center text-xs font-bold text-gray-500">بيانات المجموعات غير كافية لبناء مسار دور الـ٣٢ الآن.</div> : <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_260px_minmax(0,1fr)]"><HalfBracket column={COLUMNS[0]} direct={direct} thirds={thirds} side="left" /><CenterPodium /><HalfBracket column={COLUMNS[1]} direct={direct} thirds={thirds} side="right" /></div>}
