@@ -13,7 +13,7 @@ export function revalidateStatsViews(reason = 'stats-updated') {
 
   for (const tag of STATS_RELATED_TAGS) {
     try {
-      revalidateTag(tag, 'max');
+      revalidateTag(tag);
       result.tags.push(tag);
     } catch (error: any) {
       result.errors.push(`tag:${tag}:${error?.message || String(error)}`);

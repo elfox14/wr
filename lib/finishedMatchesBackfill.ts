@@ -32,10 +32,6 @@ type BackfillMatch = {
   awayTeam?: any;
 };
 
-function sleep(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
 function numberFrom(value: unknown, fallback: number, min: number, max: number) {
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) return fallback;
@@ -146,35 +142,8 @@ function eventDetail(event: any) {
 }
 
 async function saveFinalEvents(match: BackfillMatch, normalized: any, dryRun: boolean) {
-  // Purge old duplicate events for this match to keep the DB clean
-  if (!dryRun) {
-    await prisma.matchEvent.deleteMany({
-      where: {
-        matchId: match.id,
-        sourceName: {
-          in: [
-            'THE_STATS_API_FINAL_TIMELINE',
-            'THE_STATS_API_FINAL_SHOTMAP',
-            'THE_STATS_API_FINAL',
-            'THE_STATS_API',
-            'TheStats',
-            'ISPORTS',
-            'ISPORTS_TIMELINE',
-            'Live Ingest',
-            'Automated Live Ingest',
-            'Football-Data Results Sync'
-          ]
-        }
-      }
-    }).catch(() => {});
-  }
-
   const events = Array.isArray(normalized?.eventsDetailed?.all) ? normalized.eventsDetailed.all : [];
   const shotmap = Array.isArray(normalized?.shotmap) ? normalized.shotmap : [];
-  
-  // Filter out goal shots from the shotmap since they are already covered in the timeline
-  const filteredShotmap = shotmap.filter((shot: any) => !shot.isGoal && !/goal/i.test(shot.outcome || ''));
-
   const compactEvents = [
     ...events.map((event: any) => ({
       minute: nullableNumber(event.minute),
@@ -185,33 +154,21 @@ async function saveFinalEvents(match: BackfillMatch, normalized: any, dryRun: bo
       detail: eventDetail(event),
       sourceName: 'THE_STATS_API_FINAL_TIMELINE',
     })),
-    ...filteredShotmap.map((shot: any) => ({
+    ...shotmap.map((shot: any) => ({
       minute: nullableNumber(shot.minute),
-      type: 'shot',
+      type: shot.isGoal ? 'goal' : 'shot',
       teamId: teamIdFromProviderName(match, shot.teamName),
       playerId: null,
       playerName: shot.playerName || null,
-      detail: `تسديدة${shot.xg !== null && shot.xg !== undefined ? ` | xG ${shot.xg}` : ''}${shot.outcome ? ` | ${shot.outcome}` : ''}`,
+      detail: `${shot.isGoal ? 'هدف' : 'تسديدة'}${shot.xg !== null && shot.xg !== undefined ? ` | xG ${shot.xg}` : ''}${shot.outcome ? ` | ${shot.outcome}` : ''}`,
       sourceName: 'THE_STATS_API_FINAL_SHOTMAP',
     })),
   ].filter((event) => event.minute !== null || event.type !== 'note');
 
-  // Local deduplication: ensure no duplicate event key (same minute, type, team, player)
-  const seenEvents = new Set<string>();
-  const uniqueEvents = [];
-  for (const event of compactEvents) {
-    const key = `${event.minute || 0}-${event.type}-${event.teamId || ''}-${event.playerName || ''}`;
-    if (seenEvents.has(key)) {
-      continue;
-    }
-    seenEvents.add(key);
-    uniqueEvents.push(event);
-  }
-
   let inserted = 0;
   let skipped = 0;
 
-  for (const event of uniqueEvents) {
+  for (const event of compactEvents) {
     const existing = await prisma.matchEvent.findFirst({
       where: {
         matchId: match.id,
@@ -248,7 +205,7 @@ async function saveFinalEvents(match: BackfillMatch, normalized: any, dryRun: bo
     }
   }
 
-  return { input: uniqueEvents.length, inserted, skipped };
+  return { input: compactEvents.length, inserted, skipped };
 }
 
 function internalRating(player: any) {
@@ -381,8 +338,6 @@ async function saveQualitySnapshot(match: BackfillMatch, fixtureId: number | nul
         counts,
         projections,
         resolvedProviderMatchId: result?.resolvedProviderMatchId || null,
-        resolvedBy: result?.resolvedBy || null,
-        resolved: result?.debug?.resolved || null,
         endpointsOk: result?.endpointsOk || [],
         endpointsFailed: result?.endpointsFailed || [],
       },
@@ -439,12 +394,11 @@ async function processMatch(match: BackfillMatch, options: Required<Omit<Finishe
     projections: { events: eventsProjection, players: playersProjection },
     animationSync: animationSync ? { ok: animationSync.ok, results: animationSync.results } : null,
     markedFinalVerified: Boolean(options.markVerified && !options.dryRun && result.ok && quality.dataQuality !== 'missing'),
-    debug: result.debug,
   };
 }
 
 export async function runFinishedMatchesBackfill(options: FinishedMatchesBackfillOptions = {}) {
-  const limit = numberFrom(options.limit, 5, 1, 120);
+  const limit = numberFrom(options.limit, 5, 1, 20);
   const lookbackDays = numberFrom(options.lookbackDays, 14, 1, 120);
   const freshnessHours = numberFrom(options.freshnessHours, 24, 1, 720);
   const timeoutMs = numberFrom(options.timeoutMs, 30000, 3000, 60000);
@@ -474,12 +428,6 @@ export async function runFinishedMatchesBackfill(options: FinishedMatchesBackfil
   for (const match of matches) {
     if (processed.filter((item) => !item.skipped).length >= limit) break;
     if (stoppedEarly) break;
-
-    // Add a delay between matches to avoid rate limits
-    if (processed.length > 0) {
-      console.log(`[Backfill] Sleeping 3 seconds between matches to avoid 429 rate limits...`);
-      await sleep(3000);
-    }
 
     try {
       const result = await processMatch(match, { limit, lookbackDays, freshnessHours, timeoutMs, force, dryRun, includeRaw, stopOnRateLimit, syncAnimation, markVerified });
