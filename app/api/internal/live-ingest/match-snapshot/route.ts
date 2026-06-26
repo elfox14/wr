@@ -215,7 +215,7 @@ export async function POST(req: Request) {
   for (const field of STAT_FIELDS) snapshotData[field] = valueFromStats(payload, stats, field);
 
   const matchUpdate: any = {};
-  if (status) matchUpdate.status = status;
+  if (status && match.status !== 'FINAL_VERIFIED') matchUpdate.status = status;
   if (snapshotData.homeScore !== null) matchUpdate.homeScore = snapshotData.homeScore;
   if (snapshotData.awayScore !== null) matchUpdate.awayScore = snapshotData.awayScore;
 
