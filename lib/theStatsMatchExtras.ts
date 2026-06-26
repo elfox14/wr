@@ -84,6 +84,12 @@ async function existingProviderId(matchId: string) {
   const snapshots = await prisma.matchStatsSnapshot.findMany({ where: { matchId, provider: { startsWith: 'THE_STATS_API' } }, orderBy: { capturedAt: 'desc' }, take: 20, select: { providerMatchId: true, rawData: true } }).catch(() => []);
   for (const snapshot of snapshots) {
     const raw = snapshot?.rawData as any;
+    if (raw) {
+      const has404MatchInfo = 
+        raw.endpointsFailed?.some((e: any) => e.key === 'matchInfo' && Number(e.status) === 404) ||
+        raw.endpoints?.some((e: any) => e.key === 'matchInfo' && (Number(e.error?.status) === 404 || String(e.error?.message || '').includes('404')));
+      if (has404MatchInfo) continue;
+    }
     const candidates = [raw?.resolvedProviderMatchId, raw?.providerMatchId, raw?.matchId, raw?.source?.providerMatchId, raw?.source?.matchId, raw?.theStatsApi?.matchId, raw?.normalized?.matchInfo?.providerMatchId, snapshot?.providerMatchId ? `mt_${snapshot.providerMatchId}` : null];
     for (const candidate of candidates) { const id = normalizeProviderId(candidate); if (id) return id; }
   }
