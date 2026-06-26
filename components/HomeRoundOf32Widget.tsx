@@ -29,6 +29,7 @@ type ThirdSlot = Extract<Slot, { kind: 'third' }>;
 type RoundMatch = { matchNo: number; home: Slot; away: Slot };
 type FutureMatch = { matchNo: number; from: [number, number] };
 type BracketSection = { title: string; subtitle: string; roundOf32: number[]; roundOf16: number[]; quarterFinal: number; semiFinal: number };
+type BracketColumn = { title: string; subtitle: string; sections: BracketSection[]; semiFinal: number };
 
 type ResolvedSide = {
   label: string;
@@ -85,10 +86,15 @@ const FINAL_MATCH: FutureMatch = { matchNo: 104, from: [101, 102] };
 const THIRD_PLACE_MATCH: FutureMatch = { matchNo: 103, from: [101, 102] };
 
 const BRACKET_SECTIONS: BracketSection[] = [
-  { title: 'المسار الأول', subtitle: 'الفائز يصعد إلى نصف النهائي ١٠١', roundOf32: [73, 75, 74, 77], roundOf16: [89, 90], quarterFinal: 97, semiFinal: 101 },
-  { title: 'المسار الثاني', subtitle: 'الفائز يصعد إلى نصف النهائي ١٠١', roundOf32: [83, 84, 81, 82], roundOf16: [93, 94], quarterFinal: 98, semiFinal: 101 },
-  { title: 'المسار الثالث', subtitle: 'الفائز يصعد إلى نصف النهائي ١٠٢', roundOf32: [76, 78, 79, 80], roundOf16: [91, 92], quarterFinal: 99, semiFinal: 102 },
-  { title: 'المسار الرابع', subtitle: 'الفائز يصعد إلى نصف النهائي ١٠٢', roundOf32: [86, 88, 85, 87], roundOf16: [95, 96], quarterFinal: 100, semiFinal: 102 },
+  { title: 'مسار ١', subtitle: 'دور ٣٢ → دور ١٦ → ربع نهائي ٩٧', roundOf32: [73, 75, 74, 77], roundOf16: [89, 90], quarterFinal: 97, semiFinal: 101 },
+  { title: 'مسار ٢', subtitle: 'دور ٣٢ → دور ١٦ → ربع نهائي ٩٨', roundOf32: [83, 84, 81, 82], roundOf16: [93, 94], quarterFinal: 98, semiFinal: 101 },
+  { title: 'مسار ٣', subtitle: 'دور ٣٢ → دور ١٦ → ربع نهائي ٩٩', roundOf32: [76, 78, 79, 80], roundOf16: [91, 92], quarterFinal: 99, semiFinal: 102 },
+  { title: 'مسار ٤', subtitle: 'دور ٣٢ → دور ١٦ → ربع نهائي ١٠٠', roundOf32: [86, 88, 85, 87], roundOf16: [95, 96], quarterFinal: 100, semiFinal: 102 },
+];
+
+const BRACKET_COLUMNS: BracketColumn[] = [
+  { title: 'العمود الأول', subtitle: 'نصف مسار البطولة المؤدي إلى نصف النهائي ١٠١', sections: [BRACKET_SECTIONS[0], BRACKET_SECTIONS[1]], semiFinal: 101 },
+  { title: 'العمود الثاني', subtitle: 'نصف مسار البطولة المؤدي إلى نصف النهائي ١٠٢', sections: [BRACKET_SECTIONS[2], BRACKET_SECTIONS[3]], semiFinal: 102 },
 ];
 
 function isGroupDataList(value: unknown): value is GroupData[] {
@@ -319,15 +325,15 @@ function BracketSectionCard({ section, direct, thirdAssignments }: { section: Br
   const roundOf16Matches = section.roundOf16.map((matchNo) => findFutureMatch(ROUND_OF_16, matchNo)).filter((match): match is FutureMatch => Boolean(match));
   const quarterFinal = findFutureMatch(QUARTER_FINALS, section.quarterFinal);
   return (
-    <section className="rounded-[1.45rem] border border-white/10 bg-white/[0.035] p-2.5 shadow-[0_12px_34px_rgba(0,0,0,0.18)]">
+    <section className="rounded-[1.35rem] border border-white/10 bg-black/20 p-2.5">
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h3 className="text-sm font-black text-white">{section.title}</h3>
+          <h4 className="text-xs font-black text-white">{section.title}</h4>
           <p className="mt-0.5 text-[9px] font-bold text-gray-500">{section.subtitle}</p>
         </div>
-        <span className="rounded-full border border-[#0FF0FC]/20 bg-[#0FF0FC]/10 px-2 py-0.5 text-[9px] font-black text-[#0FF0FC]">مسار إقصائي</span>
+        <span className="rounded-full border border-[#0FF0FC]/20 bg-[#0FF0FC]/10 px-2 py-0.5 text-[9px] font-black text-[#0FF0FC]">دور ٣٢ ← ربع النهائي</span>
       </div>
-      <div className="grid gap-2 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,0.95fr)]">
+      <div className="grid gap-2 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,0.9fr)]">
         <div>
           <div className="mb-1.5 text-[9px] font-black text-gray-500">دور الـ٣٢</div>
           <div className="grid gap-2 sm:grid-cols-2">
@@ -344,6 +350,30 @@ function BracketSectionCard({ section, direct, thirdAssignments }: { section: Br
           <div className="mb-1.5 text-[9px] font-black text-gray-500">ربع النهائي</div>
           {quarterFinal ? <FuturePathCard match={quarterFinal} stage="ربع النهائي" /> : null}
         </div>
+      </div>
+    </section>
+  );
+}
+
+function BracketColumnCard({ column, direct, thirdAssignments }: { column: BracketColumn; direct: Qualifier[]; thirdAssignments: Map<number, Qualifier> }) {
+  const semiFinal = findFutureMatch(SEMI_FINALS, column.semiFinal);
+  return (
+    <section className="rounded-[1.6rem] border border-white/10 bg-white/[0.035] p-3 shadow-[0_12px_34px_rgba(0,0,0,0.2)]">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h3 className="text-base font-black text-white">{column.title}</h3>
+          <p className="mt-0.5 text-[10px] font-bold text-gray-500">{column.subtitle}</p>
+        </div>
+        <span className="rounded-full border border-[#FFD700]/20 bg-[#FFD700]/10 px-2 py-0.5 text-[9px] font-black text-[#FFD700]">نصف البطولة</span>
+      </div>
+      <div className="grid gap-3">
+        {column.sections.map((section) => <BracketSectionCard key={section.title} section={section} direct={direct} thirdAssignments={thirdAssignments} />)}
+        {semiFinal ? (
+          <div>
+            <div className="mb-1.5 text-[9px] font-black text-gray-500">نصف النهائي</div>
+            <FuturePathCard match={semiFinal} stage="نصف النهائي" />
+          </div>
+        ) : null}
       </div>
     </section>
   );
@@ -381,7 +411,7 @@ export default function HomeRoundOf32Widget({ groups = [] }: Props) {
             CURRENT KNOCKOUT PATH
           </div>
           <h2 className="mt-1.5 text-lg font-black leading-tight text-white md:text-xl">مسار التصفيات النهائية حسب النتائج الحالية</h2>
-          <p className="mt-1 max-w-3xl text-[11px] font-bold leading-5 text-gray-400">محاكاة فورية: أوائل وثواني المجموعات + أفضل ٨ ثوالث. كل مباراة توضح الفائز سيقابل الفائز من أي مباراة لاحقة حتى النهائي.</p>
+          <p className="mt-1 max-w-3xl text-[11px] font-bold leading-5 text-gray-400">محاكاة فورية وفق طريقة التأهل الرسمية: أول وثاني كل مجموعة + أفضل ٨ ثوالث. العرض مقسوم إلى عمودين: كل عمود يصل إلى نصف نهائي، والفائزان يلتقيان في النهائي.</p>
         </div>
         <Link href="/groups" className="rounded-full border border-[#FFD700]/20 bg-[#FFD700]/10 px-3 py-1.5 text-[10px] font-black text-[#FFD700] transition hover:bg-[#FFD700]/15">تفاصيل المجموعات</Link>
       </div>
@@ -395,11 +425,10 @@ export default function HomeRoundOf32Widget({ groups = [] }: Props) {
             <span>أفضل الثوالث الحالية: <b className="text-[#FFD700]">{ar.format(bestThirds.length)}</b></span>
             <span>إجمالي دور الـ٣٢: <b className="text-[#00FF88]">{ar.format(direct.length + bestThirds.length)}</b></span>
           </div>
-          <div className="grid gap-3">
-            {BRACKET_SECTIONS.map((section) => <BracketSectionCard key={section.title} section={section} direct={direct} thirdAssignments={thirdAssignments} />)}
+          <div className="grid gap-3 2xl:grid-cols-2">
+            {BRACKET_COLUMNS.map((column) => <BracketColumnCard key={column.title} column={column} direct={direct} thirdAssignments={thirdAssignments} />)}
           </div>
-          <div className="mt-3 grid gap-2 lg:grid-cols-4">
-            {SEMI_FINALS.map((match) => <FuturePathCard key={match.matchNo} match={match} stage="نصف النهائي" />)}
+          <div className="mt-3 grid gap-2 lg:grid-cols-2">
             <FinalPathCard match={THIRD_PLACE_MATCH} stage="مباراة المركز الثالث" loser />
             <FinalPathCard match={FINAL_MATCH} stage="النهائي" />
           </div>
