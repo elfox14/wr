@@ -8,8 +8,8 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 export const metadata: Metadata = {
-  title: 'البث الأنيميشن للمباريات | MC PRIME World Cup',
-  description: 'قائمة مباريات اليوم وروابط البث الأنيميشن داخل منصة MC PRIME World Cup.',
+  title: 'الملعب التفاعلي للمباريات | MC PRIME World Cup',
+  description: 'قائمة مباريات اليوم وروابط الملعب التفاعلي داخل منصة MC PRIME World Cup.',
 };
 
 const LIVE_STATUSES = ['LIVE', 'IN_PLAY', 'HT'];
@@ -22,22 +22,6 @@ function getMatchWindow() {
   const start = new Date(now.getTime() - 12 * 60 * 60 * 1000);
   const end = new Date(now.getTime() + 24 * 60 * 60 * 1000);
   return { now, start, end };
-}
-
-function dayHourKey(value: Date | string) {
-  const date = new Date(value);
-  if (!Number.isFinite(date.getTime())) return 'unknown-time';
-  date.setMinutes(0, 0, 0);
-  return date.toISOString();
-}
-
-function teamsKey(match: any) {
-  const ids = [match.homeTeamId || match.homeTeam?.id, match.awayTeamId || match.awayTeam?.id].filter(Boolean).map(String).sort();
-  return ids.length === 2 ? ids.join(':') : `${match.homeTeam?.name || 'home'}:${match.awayTeam?.name || 'away'}`.toLowerCase();
-}
-
-function duplicateFamilyKey(match: any) {
-  return `teams:${teamsKey(match)}:${dayHourKey(match.matchDate)}`;
 }
 
 function isGroupStage(match: any) {
@@ -59,8 +43,7 @@ function isFinishedByTime(match: any, now = new Date()) {
   const status = String(match.status || '').toUpperCase();
   if (!LIVE_STATUSES.includes(status) && status !== 'SCHEDULED') return false;
   const elapsed = elapsedMinutes(match, now);
-  if (elapsed === null) return false;
-  return elapsed >= maxLiveMinutes(match);
+  return elapsed !== null && elapsed >= maxLiveMinutes(match);
 }
 
 function isFinished(match: any, now = new Date()) {
@@ -77,22 +60,17 @@ function isLiveByTime(match: any, now = new Date()) {
   return minute !== null && minute >= 0 && minute < maxLiveMinutes(match);
 }
 
-function rankMatch(match: any, now = new Date()) {
-  const status = String(match.status || '').toUpperCase();
-  const statusRank = isLiveByTime(match, now) ? 50 : isFinished(match, now) || status === 'FINISHED' ? 30 : 10;
-  const animationRank = match.animationMatchId ? 20 : 0;
-  const externalRank = match.externalId ? 5 : 0;
-  return statusRank + animationRank + externalRank;
+function getLiveMinute(match: any, now = new Date()) {
+  const minute = (elapsedMinutes(match, now) || 0) + 1;
+  return Math.max(1, Math.min(maxLiveMinutes(match), minute));
 }
 
-function dedupeMatches(matches: any[], now = new Date()) {
-  const byFamily = new Map<string, any>();
-  for (const match of matches) {
-    const key = duplicateFamilyKey(match);
-    const previous = byFamily.get(key);
-    if (!previous || rankMatch(match, now) > rankMatch(previous, now)) byFamily.set(key, match);
-  }
-  return Array.from(byFamily.values());
+function statusLabel(match: any, now = new Date()) {
+  const normalized = String(match.status || '').toUpperCase();
+  if (isFinished(match, now)) return 'انتهت';
+  if (normalized === 'HT') return 'استراحة بين الشوطين';
+  if (isLiveByTime(match, now)) return `مباشر الآن - الدقيقة ${getLiveMinute(match, now)}`;
+  return 'لم تبدأ';
 }
 
 function teamFlagUrl(team: any) {
@@ -121,31 +99,47 @@ function TeamName({ team, fallback }: { team: any; fallback: string }) {
   );
 }
 
-function getLiveMinute(match: any, now = new Date()) {
-  const minute = (elapsedMinutes(match, now) || 0) + 1;
-  return Math.max(1, Math.min(maxLiveMinutes(match), minute));
+function dayHourKey(value: Date | string) {
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return 'unknown-time';
+  date.setMinutes(0, 0, 0);
+  return date.toISOString();
 }
 
-function statusLabel(match: any, now = new Date()) {
-  const normalized = String(match.status || '').toUpperCase();
-  if (isFinished(match, now)) return 'انتهت';
-  if (normalized === 'HT') return 'استراحة بين الشوطين';
-  if (isLiveByTime(match, now)) {
-    const minute = getLiveMinute(match, now);
-    if (minute >= 46 && minute <= 65) return 'استراحة بين الشوطين';
-    if (minute > 65) return 'الشوط الثاني جارٍ';
-    return `مباشر الآن - الدقيقة ${minute}`;
+function teamsKey(match: any) {
+  const ids = [match.homeTeamId || match.homeTeam?.id, match.awayTeamId || match.awayTeam?.id].filter(Boolean).map(String).sort();
+  return ids.length === 2 ? ids.join(':') : `${match.homeTeam?.name || 'home'}:${match.awayTeam?.name || 'away'}`.toLowerCase();
+}
+
+function duplicateFamilyKey(match: any) {
+  return `teams:${teamsKey(match)}:${dayHourKey(match.matchDate)}`;
+}
+
+function rankMatch(match: any, now = new Date()) {
+  const status = String(match.status || '').toUpperCase();
+  const statusRank = isLiveByTime(match, now) ? 50 : isFinished(match, now) || status === 'FINISHED' ? 30 : 10;
+  const animationRank = match.animationMatchId ? 20 : 0;
+  const externalRank = match.externalId ? 5 : 0;
+  return statusRank + animationRank + externalRank;
+}
+
+function dedupeMatches(matches: any[], now = new Date()) {
+  const byFamily = new Map<string, any>();
+  for (const match of matches) {
+    const key = duplicateFamilyKey(match);
+    const previous = byFamily.get(key);
+    if (!previous || rankMatch(match, now) > rankMatch(previous, now)) byFamily.set(key, match);
   }
-  return 'لم تبدأ';
+  return Array.from(byFamily.values());
 }
 
 function getBroadcastHref(match: any) {
-  if (match?.id) return `/match-center/${encodeURIComponent(String(match.id))}`;
+  if (match?.id) return `/live-animation/${encodeURIComponent(String(match.id))}`;
   return '/animation-live/player';
 }
 
 function getMatchDetailsHref(match: any) {
-  if (match?.id) return `/match-center/${encodeURIComponent(String(match.id))}`;
+  if (match?.id) return `/matches/${encodeURIComponent(String(match.id))}`;
   return '/matches';
 }
 
@@ -165,30 +159,20 @@ function MatchCard({ match, now }: { match: any; now: Date }) {
       </div>
 
       <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 text-center">
-        <div>
-          <TeamMiniLogo team={match.homeTeam} name={homeName} />
-          <div className="line-clamp-1 text-base font-black text-white"><TeamName team={match.homeTeam} fallback="الفريق الأول" /></div>
-        </div>
-        <div>
-          <div className={`rounded-2xl border border-white/10 bg-black/45 px-4 py-2 text-xl font-black ${isLive || finished ? 'text-white' : 'text-[#FFD700]'}`}>{isLive || finished ? score : 'VS'}</div>
-          <div className="mt-2 text-[10px] font-bold text-gray-500">{new Date(match.matchDate).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}</div>
-        </div>
-        <div>
-          <TeamMiniLogo team={match.awayTeam} name={awayName} />
-          <div className="line-clamp-1 text-base font-black text-white"><TeamName team={match.awayTeam} fallback="الفريق الثاني" /></div>
-        </div>
+        <div><TeamMiniLogo team={match.homeTeam} name={homeName} /><div className="line-clamp-1 text-base font-black text-white"><TeamName team={match.homeTeam} fallback="الفريق الأول" /></div></div>
+        <div><div className={`rounded-2xl border border-white/10 bg-black/45 px-4 py-2 text-xl font-black ${isLive || finished ? 'text-white' : 'text-[#FFD700]'}`}>{isLive || finished ? score : 'VS'}</div><div className="mt-2 text-[10px] font-bold text-gray-500">{new Date(match.matchDate).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}</div></div>
+        <div><TeamMiniLogo team={match.awayTeam} name={awayName} /><div className="line-clamp-1 text-base font-black text-white"><TeamName team={match.awayTeam} fallback="الفريق الثاني" /></div></div>
       </div>
 
       <div className="mt-4 flex items-center justify-center gap-2 text-xs font-bold text-gray-400"><CalendarDays size={14} /> {new Date(match.matchDate).toLocaleString('ar-EG')}</div>
-      {!finished ? (
-        <Link href={getBroadcastHref(match)} className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-[#FFD700]/25 bg-[#FFD700]/10 px-4 py-3 text-sm font-black text-[#FFD700] transition hover:bg-[#FFD700] hover:text-black">
-          <Radio size={16} /> {hasAnimationId ? 'دخول البث' : 'دخول البث الداخلي'}
+      <div className="mt-4 grid grid-cols-2 gap-2">
+        <Link href={getBroadcastHref(match)} className="inline-flex items-center justify-center gap-2 rounded-2xl border border-[#FFD700]/25 bg-[#FFD700]/10 px-3 py-3 text-xs font-black text-[#FFD700] transition hover:bg-[#FFD700] hover:text-black">
+          <Radio size={15} /> {hasAnimationId ? 'الملعب التفاعلي' : 'ملعب داخلي'}
         </Link>
-      ) : (
-        <Link href={getMatchDetailsHref(match)} className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-[#0FF0FC]/25 bg-[#0FF0FC]/10 px-4 py-3 text-sm font-black text-[#0FF0FC] transition hover:bg-[#0FF0FC] hover:text-black">
-          تفاصيل المباراة
+        <Link href={getMatchDetailsHref(match)} className="inline-flex items-center justify-center rounded-2xl border border-[#0FF0FC]/25 bg-[#0FF0FC]/10 px-3 py-3 text-xs font-black text-[#0FF0FC] transition hover:bg-[#0FF0FC] hover:text-black">
+          صفحة المباراة
         </Link>
-      )}
+      </div>
     </article>
   );
 }
@@ -217,19 +201,19 @@ export default async function AnimationLivePage() {
         <div className="rounded-[2rem] border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(15,240,252,0.16),transparent_30%),linear-gradient(135deg,rgba(255,255,255,0.05),rgba(255,255,255,0.015))] p-5 shadow-card md:p-6">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div>
-              <p className="mb-2 inline-flex items-center gap-2 rounded-full border border-[#0FF0FC]/25 bg-[#0FF0FC]/10 px-3 py-1 text-[11px] font-black text-[#0FF0FC]"><Radio size={13} /> Football Animation Live</p>
-              <h1 className="text-2xl font-black md:text-4xl">البث الأنيميشن - المباريات الحالية والقريبة</h1>
-              <p className="mt-2 text-sm font-bold text-gray-400">يعرض المباراة الجارية والنتيجة وحالة المباراة بدون تكرار.</p>
+              <p className="mb-2 inline-flex items-center gap-2 rounded-full border border-[#0FF0FC]/25 bg-[#0FF0FC]/10 px-3 py-1 text-[11px] font-black text-[#0FF0FC]"><Radio size={13} /> Football Interactive Stadium</p>
+              <h1 className="text-3xl font-black text-white md:text-4xl">الملعب التفاعلي للمباريات</h1>
+              <p className="mt-2 max-w-3xl text-sm font-bold leading-7 text-gray-400">اختر مباراة للدخول إلى صفحة الملعب التفاعلي الخاصة بها، أو افتح صفحة المباراة للتفاصيل الكاملة.</p>
             </div>
-            <Link href="/broadcast" className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-xs font-black text-white hover:border-[#0FF0FC]/40 hover:text-[#0FF0FC]"><Tv size={15} /> شاشة البث</Link>
+            <div className="grid grid-cols-2 gap-2 text-xs font-black text-gray-300 sm:grid-cols-3">
+              <span className="rounded-2xl border border-white/10 bg-black/25 px-3 py-2"><Tv size={14} className="mb-1" /> مباريات: {visibleMatches.length}</span>
+              <span className="rounded-2xl border border-white/10 bg-black/25 px-3 py-2"><Radio size={14} className="mb-1" /> مباشر: {visibleMatches.filter((match: any) => isLiveByTime(match, now)).length}</span>
+              <span className="rounded-2xl border border-white/10 bg-black/25 px-3 py-2"><ShieldCheck size={14} className="mb-1" /> DB Only</span>
+            </div>
           </div>
         </div>
-        {visibleMatches.length > 0 ? (
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{visibleMatches.map((match: any) => <MatchCard key={match.id} match={match} now={now} />)}</div>
-        ) : (
-          <div className="rounded-[2rem] border border-dashed border-white/10 bg-white/[0.035] p-8 text-center"><p className="text-xl font-black text-white">لا توجد مباريات حالية أو قريبة في جدول المنصة</p><Link href="/matches" className="mt-4 inline-flex rounded-2xl border border-[#0FF0FC]/25 bg-[#0FF0FC]/10 px-5 py-3 text-sm font-black text-[#0FF0FC] hover:bg-[#0FF0FC] hover:text-black">عرض كل المباريات</Link></div>
-        )}
-        <div className="rounded-2xl border border-emerald-400/20 bg-emerald-400/10 px-3 py-2 text-[11px] font-bold leading-5 text-emerald-100"><span className="inline-flex items-center gap-2"><ShieldCheck size={14} /> مهم:</span> هذا تكامل عرض رياضي فقط داخل المنصة.</div>
+
+        {visibleMatches.length ? <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{visibleMatches.map((match: any) => <MatchCard key={match.id} match={match} now={now} />)}</div> : <div className="rounded-3xl border border-dashed border-white/10 bg-white/[0.035] p-8 text-center text-sm font-bold text-gray-400">لا توجد مباريات في نافذة البث الآن.</div>}
       </section>
     </main>
   );
