@@ -218,29 +218,72 @@ function pickMatch(matches: MatchWithData[]) {
     .sort((a, b) => b.priority - a.priority || new Date(a.match.matchDate).getTime() - new Date(b.match.matchDate).getTime())[0] || null;
 }
 
+function maskSensitiveUrl(value: string) {
+  try {
+    const url = new URL(value);
+    for (const key of ['key', 'secret', 'token', 'cronSecret', 'adminSecret']) {
+      if (url.searchParams.has(key)) url.searchParams.set(key, '***');
+    }
+    return url.toString();
+  } catch {
+    return value.replace(/([?&](?:key|secret|token|cronSecret|adminSecret)=)[^&]+/gi, '$1***');
+  }
+}
+
 async function callJson(name: string, url: string, init?: RequestInit, timeoutMs = 45000): Promise<PipelineStep> {
   const startedAt = Date.now();
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  const safeUrl = maskSensitiveUrl(url);
   try {
     const res = await fetch(url, { ...init, signal: controller.signal, cache: 'no-store' });
     const text = await res.text();
     let result: unknown = text;
     try { result = JSON.parse(text); } catch {}
-    return { name, ok: res.ok, status: res.status, durationMs: Date.now() - startedAt, url, result };
+    return { name, ok: res.ok, status: res.status, durationMs: Date.now() - startedAt, url: safeUrl, result };
   } catch (error: any) {
-    return { name, ok: false, durationMs: Date.now() - startedAt, url, error: error?.name === 'AbortError' ? `timeout after ${timeoutMs}ms` : String(error?.message || error) };
+    return { name, ok: false, durationMs: Date.now() - startedAt, url: safeUrl, error: error?.name === 'AbortError' ? `timeout after ${timeoutMs}ms` : String(error?.message || error) };
   } finally {
     clearTimeout(timeout);
   }
 }
 
+function cleanOrigin(value: string | null | undefined) {
+  const text = String(value || '').trim().replace(/\/$/, '');
+  if (!text) return null;
+  if (/localhost|127\.0\.0\.1|0\.0\.0\.0/i.test(text)) return null;
+  if (!/^https?:\/\//i.test(text)) return `https://${text}`;
+  return text;
+}
+
+function forwardedOrigin(req: Request) {
+  const host = req.headers.get('x-forwarded-host') || req.headers.get('host');
+  const proto = req.headers.get('x-forwarded-proto') || 'https';
+  return cleanOrigin(host ? `${proto}://${host}` : null);
+}
+
 function endpointBase(req: Request) {
-  return new URL(req.url).origin;
+  const envCandidates = [
+    process.env.MATCH_PIPELINE_TARGET_ORIGIN,
+    process.env.FOOTBALL_DATA_SYNC_TARGET_ORIGIN,
+    process.env.POST_MATCH_STATS_SYNC_TARGET_ORIGIN,
+    process.env.LIVE_INGEST_TARGET_ORIGIN,
+    process.env.LIVE_SYNC_PUBLIC_ORIGIN,
+    process.env.NEXT_PUBLIC_SITE_URL,
+    process.env.NEXT_PUBLIC_BASE_URL,
+    process.env.APP_BASE_URL,
+  ];
+
+  for (const candidate of envCandidates) {
+    const origin = cleanOrigin(candidate);
+    if (origin) return origin;
+  }
+
+  return forwardedOrigin(req) || 'https://worldcup.mcprim.com';
 }
 
 function withKey(path: string, key: string, params: Record<string, string | number | boolean | null | undefined> = {}, req?: Request) {
-  const base = req ? endpointBase(req) : '';
+  const base = req ? endpointBase(req) : 'https://worldcup.mcprim.com';
   const url = new URL(`${base}${path}`);
   url.searchParams.set('key', key);
   for (const [name, value] of Object.entries(params)) {
