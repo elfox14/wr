@@ -63,6 +63,54 @@ function teamNameForEvent(event: MatchEventView, data: MatchPageData) {
   return 'المباراة';
 }
 
+function normalizeEventText(value?: string | number | null) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f\u064B-\u065F\u0670]/g, '')
+    .replace(/[^a-z0-9\u0600-\u06ff]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function eventMinuteKey(event: MatchEventView) {
+  if (event.minute !== null && event.minute !== undefined) return String(event.minute);
+  return normalizeEventText(event.minuteLabel);
+}
+
+function eventDedupeKey(event: MatchEventView) {
+  const kind = eventKind(event);
+  const minute = eventMinuteKey(event);
+  const team = String(event.teamId || 'neutral');
+  const player = normalizeEventText(event.playerName);
+  const detail = normalizeEventText(event.detail);
+
+  if (['goal', 'red', 'yellow', 'penalty'].includes(kind)) {
+    return [minute, kind, team, player || detail].join('|');
+  }
+
+  if (kind === 'substitution') {
+    return [minute, kind, team, detail || player].join('|');
+  }
+
+  return [minute, kind, team, player, detail].join('|');
+}
+
+function dedupeTimelineEvents(events: MatchEventView[]) {
+  const seen = new Set<string>();
+  const rows: MatchEventView[] = [];
+
+  for (const event of events || []) {
+    const key = eventDedupeKey(event);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    rows.push(event);
+  }
+
+  return rows;
+}
+
 function TeamCard({ team }: { team: MatchPageData['homeTeam'] }) {
   return (
     <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-4 text-center">
@@ -240,7 +288,7 @@ export default function ProfessionalMatchPageWithDateCard({ data }: { data: Matc
     ...FEATURED_STAT_KEYS.map((key) => availableStats.find((metric) => metric.key === key)).filter(Boolean),
     ...availableStats.filter((metric) => !FEATURED_STAT_KEYS.includes(metric.key)),
   ].slice(0, 16) as MatchStatMetric[];
-  const timelineEvents = [...data.events].sort((a, b) => (a.minute ?? 999) - (b.minute ?? 999)).slice(0, 45);
+  const timelineEvents = dedupeTimelineEvents(data.events).sort((a, b) => (a.minute ?? 999) - (b.minute ?? 999)).slice(0, 45);
   const playerRatings = [...(data.advanced.playerStats || [])].filter((player) => player.playerName).sort((a, b) => Number(b.rating || 0) - Number(a.rating || 0)).slice(0, 10);
   const bestPlayer = playerRatings.find((player) => player.rating !== null && player.rating !== undefined) || playerRatings[0] || null;
   const shouldShowArticleCta = data.status.isFinished || String(data.status.raw || '').toUpperCase() === 'FINAL_VERIFIED';
@@ -371,7 +419,7 @@ export default function ProfessionalMatchPageWithDateCard({ data }: { data: Matc
             <h2 className="text-2xl font-black text-white">Timeline أحداث المباراة</h2>
             <span className="text-xs font-bold text-slate-500">{timelineEvents.length} حدث محفوظ</span>
           </div>
-          {timelineEvents.length ? <div className="space-y-3">{timelineEvents.map((event) => <EventTimelineItem key={event.id} event={event} data={data} />)}</div> : <p className="rounded-2xl border border-dashed border-white/15 bg-black/20 p-5 text-center font-bold text-slate-400">لا توجد أحداث محفوظة لهذه المباراة حتى الآن.</p>}
+          {timelineEvents.length ? <div className="space-y-3">{timelineEvents.map((event, index) => <EventTimelineItem key={`${event.id}-${index}`} event={event} data={data} />)}</div> : <p className="rounded-2xl border border-dashed border-white/15 bg-black/20 p-5 text-center font-bold text-slate-400">لا توجد أحداث محفوظة لهذه المباراة حتى الآن.</p>}
         </section>
 
         {data.relatedArticles.length > 0 && (
