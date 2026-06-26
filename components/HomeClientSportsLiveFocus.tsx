@@ -8,11 +8,57 @@ import HomeGroupStandingsWidget from '@/components/HomeGroupStandingsWidget';
 import { getTeamFlagUrl } from '@/lib/teamFlags';
 import { getArabicTeamName } from '@/lib/teamDisplay';
 
-type Team = { id?: string | number | null; name?: string | null; code?: string | null; image?: string | null; flagUrl?: string | null };
-type HomeMatch = { id?: string | number | null; animationMatchId?: string | number | null; matchDate?: string | Date | null; status?: string | null; displayStatus?: string | null; stage?: string | null; group?: string | null; groupPhase?: string | null; homeScore?: number | null; awayScore?: number | null; homeTeam?: Team | null; awayTeam?: Team | null; isLiveNow?: boolean; isHalfTime?: boolean; isLikelyLiveByTime?: boolean; isStaleAutoFinished?: boolean; minute?: number | null; liveLabel?: string | null };
-type TeamStanding = { team?: string; code?: string; played?: number; goalsFor?: number; goalsAgainst?: number; goalDifference?: number; points?: number };
-type GroupData = { key?: string; arName?: string; standings?: TeamStanding[] };
-type Props = { upcomingMatches?: HomeMatch[] | unknown[]; tickerMatches?: HomeMatch[] | unknown[]; nextMarqueeMatch?: HomeMatch | null | unknown; groupStandings?: unknown[]; playersCount?: number; teamsCount?: number; upcomingMatchesCount?: number };
+type Team = {
+  id?: string | number | null;
+  name?: string | null;
+  code?: string | null;
+  image?: string | null;
+  flagUrl?: string | null;
+};
+
+type HomeMatch = {
+  id?: string | number | null;
+  animationMatchId?: string | number | null;
+  matchDate?: string | Date | null;
+  status?: string | null;
+  displayStatus?: string | null;
+  stage?: string | null;
+  group?: string | null;
+  groupPhase?: string | null;
+  homeScore?: number | null;
+  awayScore?: number | null;
+  homeTeam?: Team | null;
+  awayTeam?: Team | null;
+  isLiveNow?: boolean;
+  isHalfTime?: boolean;
+  isLikelyLiveByTime?: boolean;
+  isStaleAutoFinished?: boolean;
+  minute?: number | null;
+  liveLabel?: string | null;
+};
+
+type TeamStanding = {
+  team?: string;
+  code?: string;
+  points?: number;
+  goalDifference?: number;
+};
+
+type GroupData = {
+  key?: string;
+  arName?: string;
+  standings?: TeamStanding[];
+};
+
+type Props = {
+  upcomingMatches?: HomeMatch[] | unknown[];
+  tickerMatches?: HomeMatch[] | unknown[];
+  nextMarqueeMatch?: HomeMatch | null | unknown;
+  groupStandings?: unknown[];
+  playersCount?: number;
+  teamsCount?: number;
+  upcomingMatchesCount?: number;
+};
 
 const MATCH_REFRESH_MS = 15_000;
 const LIVE_LOOKBACK_MS = 3 * 60 * 60 * 1000;
@@ -24,54 +70,217 @@ const FINISHED_STATUSES = ['FINISHED', 'FT', 'AET', 'PEN', 'FULL_TIME', 'ENDED',
 const SCHEDULED_STATUSES = ['SCHEDULED', 'TIMED', 'NOT_STARTED', 'NS'];
 const GROUP_LETTERS = 'ABCDEFGHIJKL'.split('');
 
-function formatCount(value?: number | null, fallback = 0) { return new Intl.NumberFormat('ar-EG').format(typeof value === 'number' && Number.isFinite(value) ? value : fallback); }
-function formatScore(value?: number | null) { return typeof value === 'number' && Number.isFinite(value) ? new Intl.NumberFormat('en-US').format(value) : '0'; }
-function status(match?: HomeMatch | null) { return String(match?.displayStatus || match?.status || '').toUpperCase(); }
-function teamLabel(team?: Team | null) { return team ? getArabicTeamName(team.code, team.name) : 'منتخب غير محدد'; }
-function teamCode(team?: Team | null) { return team?.code || team?.name?.slice(0, 3) || '---'; }
-function teamFlag(team?: Team | null) { const name = teamLabel(team); return team?.flagUrl || getTeamFlagUrl({ code: team?.code, name, image: null }, 96) || team?.image || null; }
-function getTeamHref(team?: Team | null) { return team?.id ? `/teams/${encodeURIComponent(String(team.id))}` : '/teams'; }
-function getMatchHref(match: HomeMatch) { return match.id ? `/matches/${encodeURIComponent(String(match.id))}` : '/matches'; }
-function getBroadcastHref(match: HomeMatch) { return match.id ? `/live-animation/${encodeURIComponent(String(match.id))}` : '/animation-live'; }
-function matchKey(match?: HomeMatch | null) { return String(match?.id || `${teamLabel(match?.homeTeam)}-${teamLabel(match?.awayTeam)}-${match?.matchDate || ''}`); }
-function matchTime(match: HomeMatch) { const date = match.matchDate ? new Date(match.matchDate) : null; return date && Number.isFinite(date.getTime()) ? date.getTime() : Number.MAX_SAFE_INTEGER; }
-function minutesSinceKickoff(match: HomeMatch, now: Date) { const time = matchTime(match); if (!Number.isFinite(time)) return null; return Math.floor((now.getTime() - time) / 60_000) + 1; }
-function isFinished(match?: HomeMatch | null) { return FINISHED_STATUSES.includes(status(match)) || Boolean(match?.isStaleAutoFinished); }
-function isHalfTime(match?: HomeMatch | null) { return HALF_TIME_STATUSES.includes(status(match)) || Boolean(match?.isHalfTime); }
-function isScheduled(match?: HomeMatch | null) { return !isFinished(match) && SCHEDULED_STATUSES.includes(status(match)); }
-function isConfirmedLive(match?: HomeMatch | null) { return !isFinished(match) && !isHalfTime(match) && (LIVE_STATUSES.includes(status(match)) || Boolean(match?.isLiveNow) || Boolean(match?.isLikelyLiveByTime)); }
-function isLiveOrBreak(match?: HomeMatch | null) { return isConfirmedLive(match) || isHalfTime(match); }
-function isWaitingForStartConfirmation(match: HomeMatch, now: Date) { const minute = minutesSinceKickoff(match, now); return isScheduled(match) && minute !== null && minute >= 1 && !isLiveOrBreak(match); }
-function shouldPollLiveCard(matches: HomeMatch[]) { const now = Date.now(); return matches.some((match) => { if (!match || isFinished(match)) return false; if (isLiveOrBreak(match)) return true; const time = matchTime(match); return Number.isFinite(time) && time >= now - LIVE_LOOKBACK_MS && time <= now + LIVE_LOOKAHEAD_MS; }); }
-function countdownRefreshMs(match: HomeMatch | null, now: Date) { if (!match || isFinished(match)) return null; if (isLiveOrBreak(match) || isWaitingForStartConfirmation(match, now)) return 1000; const diff = matchTime(match) - now.getTime(); return diff > 0 && diff <= FAST_COUNTDOWN_MS ? 1000 : 60_000; }
-function displayMinute(match: HomeMatch) { if (isHalfTime(match) || isFinished(match)) return null; const minute = Number(match.minute); if (status(match) === '2H' && (!Number.isFinite(minute) || minute < 45)) return 45; if (!Number.isFinite(minute) || minute <= 0) return null; return Math.max(1, Math.min(150, Math.floor(minute))); }
-function uniqueMatches(list: HomeMatch[]) { const seen = new Set<string>(); return list.filter((match) => { const key = matchKey(match); if (seen.has(key)) return false; seen.add(key); return true; }); }
-function sameLocalDay(a: Date, b: Date) { return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate(); }
-function standingName(row?: TeamStanding | null) { return row ? getArabicTeamName(row.code || null, row.team || row.code || '') : 'غير محدد'; }
-function safeNumber(value: unknown) { const n = Number(value || 0); return Number.isFinite(n) ? n : 0; }
-function isGroupList(value: unknown): value is GroupData[] { return Array.isArray(value) && value.every((group) => group && Array.isArray((group as GroupData).standings)); }
-function readStandingTeams(groups: unknown[]) { return isGroupList(groups) ? groups.flatMap((group) => group.standings || []) : []; }
-function topAttackTeam(groups: unknown[]) { return [...readStandingTeams(groups)].sort((a, b) => safeNumber(b.goalsFor) - safeNumber(a.goalsFor) || safeNumber(b.points) - safeNumber(a.points))[0] || null; }
-function bestPointsTeam(groups: unknown[]) { return [...readStandingTeams(groups)].sort((a, b) => safeNumber(b.points) - safeNumber(a.points) || safeNumber(b.goalDifference) - safeNumber(a.goalDifference))[0] || null; }
-function hotGroup(groups: unknown[]) { if (!isGroupList(groups)) return null; return [...groups].filter((group) => (group.standings || []).length >= 2).sort((a, b) => { const aGap = Math.abs(safeNumber(a.standings?.[0]?.points) - safeNumber(a.standings?.[1]?.points)); const bGap = Math.abs(safeNumber(b.standings?.[0]?.points) - safeNumber(b.standings?.[1]?.points)); return aGap - bGap; })[0] || null; }
-function groupNumberLabel(match: HomeMatch) { const raw = String(match.groupPhase || match.group || match.stage || '').trim().toUpperCase(); const letter = raw.match(/GROUP[_\s-]*([A-L])/)?.[1] || (/^[A-L]$/.test(raw) ? raw : ''); if (letter) return `المجموعة ${formatCount(GROUP_LETTERS.indexOf(letter) + 1)}`; const number = raw.match(/(?:GROUP|المجموعة)?[_\s-]*(\d{1,2})/)?.[1]; if (number) return `المجموعة ${formatCount(Number(number))}`; return 'كأس العالم 2026'; }
-function formatMatchDate(value?: string | Date | null, mounted?: boolean) { if (!value) return 'موعد غير متوفر'; if (mounted === false) return '—'; const date = new Date(value); if (!Number.isFinite(date.getTime())) return 'موعد غير متوفر'; return new Intl.DateTimeFormat('ar-EG', { weekday: 'short', day: 'numeric', month: 'short' }).format(date); }
-function formatKickoffTime(value?: string | Date | null, mounted?: boolean) { if (!value || mounted === false) return '—'; const date = new Date(value); if (!Number.isFinite(date.getTime())) return '—'; return new Intl.DateTimeFormat('ar-EG', { hour: '2-digit', minute: '2-digit' }).format(date); }
-function countdownLabel(match: HomeMatch, now: Date) { const diffMs = matchTime(match) - now.getTime(); const totalSeconds = Math.max(0, Math.floor(diffMs / 1000)); const days = Math.floor(totalSeconds / 86_400); const hours = Math.floor((totalSeconds % 86_400) / 3_600); const minutes = Math.floor((totalSeconds % 3_600) / 60); const seconds = totalSeconds % 60; if (diffMs <= 0) return 'بانتظار المصدر'; if (days > 0) return `بعد ${formatCount(days)}ي ${formatCount(hours)}س`; if (hours > 0) return `بعد ${formatCount(hours)}س ${formatCount(minutes)}د`; return `بعد ${formatCount(minutes)}د ${formatCount(seconds)}ث`; }
-function matchTitle(match: HomeMatch) { return `${teamLabel(match.homeTeam)} × ${teamLabel(match.awayTeam)}`; }
-function matchStatusLine(match: HomeMatch, now: Date, mounted: boolean) { if (isFinished(match)) return 'انتهت'; if (isHalfTime(match)) return 'استراحة'; if (isConfirmedLive(match)) { const minute = displayMinute(match); return match.liveLabel || (minute ? `مباشرة الآن · د${formatCount(minute)}` : 'مباشرة الآن'); } if (isWaitingForStartConfirmation(match, now)) return 'بانتظار تأكيد البداية'; return `${formatMatchDate(match.matchDate, mounted)} · ${formatKickoffTime(match.matchDate, mounted)}`; }
+function formatCount(value?: number | null, fallback = 0) {
+  return new Intl.NumberFormat('ar-EG').format(typeof value === 'number' && Number.isFinite(value) ? value : fallback);
+}
+
+function formatScore(value?: number | null) {
+  return typeof value === 'number' && Number.isFinite(value) ? new Intl.NumberFormat('en-US').format(value) : '0';
+}
+
+function status(match?: HomeMatch | null) {
+  return String(match?.displayStatus || match?.status || '').toUpperCase();
+}
+
+function safeNumber(value: unknown) {
+  const number = Number(value || 0);
+  return Number.isFinite(number) ? number : 0;
+}
+
+function isGroupList(value: unknown): value is GroupData[] {
+  return Array.isArray(value) && value.every((group) => group && Array.isArray((group as GroupData).standings));
+}
+
+function teamLabel(team?: Team | null) {
+  return team ? getArabicTeamName(team.code, team.name) : 'منتخب غير محدد';
+}
+
+function teamCode(team?: Team | null) {
+  return team?.code || team?.name?.slice(0, 3) || '---';
+}
+
+function teamFlag(team?: Team | null) {
+  const name = teamLabel(team);
+  return team?.flagUrl || getTeamFlagUrl({ code: team?.code, name, image: null }, 96) || team?.image || null;
+}
+
+function standingName(row?: TeamStanding | null) {
+  return row ? getArabicTeamName(row.code || null, row.team || row.code || '') : 'غير محدد';
+}
+
+function getTeamHref(team?: Team | null) {
+  return team?.id ? `/teams/${encodeURIComponent(String(team.id))}` : '/teams';
+}
+
+function getMatchHref(match: HomeMatch) {
+  return match.id ? `/matches/${encodeURIComponent(String(match.id))}` : '/matches';
+}
+
+function getBroadcastHref(match: HomeMatch) {
+  return match.id ? `/live-animation/${encodeURIComponent(String(match.id))}` : '/animation-live';
+}
+
+function matchKey(match?: HomeMatch | null) {
+  return String(match?.id || `${teamLabel(match?.homeTeam)}-${teamLabel(match?.awayTeam)}-${match?.matchDate || ''}`);
+}
+
+function matchTime(match: HomeMatch) {
+  const date = match.matchDate ? new Date(match.matchDate) : null;
+  return date && Number.isFinite(date.getTime()) ? date.getTime() : Number.MAX_SAFE_INTEGER;
+}
+
+function minutesSinceKickoff(match: HomeMatch, now: Date) {
+  const time = matchTime(match);
+  if (!Number.isFinite(time)) return null;
+  return Math.floor((now.getTime() - time) / 60_000) + 1;
+}
+
+function isFinished(match?: HomeMatch | null) {
+  return FINISHED_STATUSES.includes(status(match)) || Boolean(match?.isStaleAutoFinished);
+}
+
+function isHalfTime(match?: HomeMatch | null) {
+  return HALF_TIME_STATUSES.includes(status(match)) || Boolean(match?.isHalfTime);
+}
+
+function isScheduled(match?: HomeMatch | null) {
+  return !isFinished(match) && SCHEDULED_STATUSES.includes(status(match));
+}
+
+function isConfirmedLive(match?: HomeMatch | null) {
+  return !isFinished(match) && !isHalfTime(match) && (LIVE_STATUSES.includes(status(match)) || Boolean(match?.isLiveNow) || Boolean(match?.isLikelyLiveByTime));
+}
+
+function isLiveOrBreak(match?: HomeMatch | null) {
+  return isConfirmedLive(match) || isHalfTime(match);
+}
+
+function isWaitingForStartConfirmation(match: HomeMatch, now: Date) {
+  const minute = minutesSinceKickoff(match, now);
+  return isScheduled(match) && minute !== null && minute >= 1 && !isLiveOrBreak(match);
+}
+
+function shouldPollLiveCard(matches: HomeMatch[]) {
+  const now = Date.now();
+  return matches.some((match) => {
+    if (!match || isFinished(match)) return false;
+    if (isLiveOrBreak(match)) return true;
+    const time = matchTime(match);
+    return Number.isFinite(time) && time >= now - LIVE_LOOKBACK_MS && time <= now + LIVE_LOOKAHEAD_MS;
+  });
+}
+
+function countdownRefreshMs(match: HomeMatch | null, now: Date) {
+  if (!match || isFinished(match)) return null;
+  if (isLiveOrBreak(match) || isWaitingForStartConfirmation(match, now)) return 1000;
+  const diff = matchTime(match) - now.getTime();
+  return diff > 0 && diff <= FAST_COUNTDOWN_MS ? 1000 : 60_000;
+}
+
+function displayMinute(match: HomeMatch) {
+  if (isHalfTime(match) || isFinished(match)) return null;
+  const minute = Number(match.minute);
+  if (status(match) === '2H' && (!Number.isFinite(minute) || minute < 45)) return 45;
+  if (!Number.isFinite(minute) || minute <= 0) return null;
+  return Math.max(1, Math.min(150, Math.floor(minute)));
+}
+
+function uniqueMatches(list: HomeMatch[]) {
+  const seen = new Set<string>();
+  return list.filter((match) => {
+    const key = matchKey(match);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function groupNumberLabel(match: HomeMatch) {
+  const raw = String(match.groupPhase || match.group || match.stage || '').trim().toUpperCase();
+  const letter = raw.match(/GROUP[_\s-]*([A-L])/)?.[1] || (/^[A-L]$/.test(raw) ? raw : '');
+  if (letter) return `المجموعة ${formatCount(GROUP_LETTERS.indexOf(letter) + 1)}`;
+  const number = raw.match(/(?:GROUP|المجموعة)?[_\s-]*(\d{1,2})/)?.[1];
+  if (number) return `المجموعة ${formatCount(Number(number))}`;
+  return 'كأس العالم 2026';
+}
+
+function hotGroup(groups: unknown[]) {
+  if (!isGroupList(groups)) return null;
+  return [...groups]
+    .filter((group) => (group.standings || []).length >= 2)
+    .sort((a, b) => {
+      const aGap = Math.abs(safeNumber(a.standings?.[0]?.points) - safeNumber(a.standings?.[1]?.points));
+      const bGap = Math.abs(safeNumber(b.standings?.[0]?.points) - safeNumber(b.standings?.[1]?.points));
+      return aGap - bGap;
+    })[0] || null;
+}
+
+function formatMatchDate(value?: string | Date | null, mounted?: boolean) {
+  if (!value) return 'موعد غير متوفر';
+  if (mounted === false) return '—';
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return 'موعد غير متوفر';
+  return new Intl.DateTimeFormat('ar-EG', { weekday: 'short', day: 'numeric', month: 'short' }).format(date);
+}
+
+function formatKickoffTime(value?: string | Date | null, mounted?: boolean) {
+  if (!value || mounted === false) return '—';
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return '—';
+  return new Intl.DateTimeFormat('ar-EG', { hour: '2-digit', minute: '2-digit' }).format(date);
+}
+
+function countdownLabel(match: HomeMatch, now: Date) {
+  const diffMs = matchTime(match) - now.getTime();
+  const totalSeconds = Math.max(0, Math.floor(diffMs / 1000));
+  const days = Math.floor(totalSeconds / 86_400);
+  const hours = Math.floor((totalSeconds % 86_400) / 3_600);
+  const minutes = Math.floor((totalSeconds % 3_600) / 60);
+  const seconds = totalSeconds % 60;
+  if (diffMs <= 0) return 'بانتظار المصدر';
+  if (days > 0) return `بعد ${formatCount(days)}ي ${formatCount(hours)}س`;
+  if (hours > 0) return `بعد ${formatCount(hours)}س ${formatCount(minutes)}د`;
+  return `بعد ${formatCount(minutes)}د ${formatCount(seconds)}ث`;
+}
 
 function TeamBadge({ team, align }: { team?: Team | null; align: 'right' | 'left' }) {
-  const name = teamLabel(team); const src = teamFlag(team);
-  return <Link href={getTeamHref(team)} className={`group/team flex min-w-0 items-center gap-2 rounded-2xl border border-white/10 bg-white/[0.04] px-2.5 py-2 transition hover:border-[#FFD700]/25 hover:bg-white/[0.07] sm:border-transparent sm:bg-transparent sm:p-1.5 ${align === 'left' ? 'flex-row-reverse text-left' : 'text-right'}`}><span className="h-8 w-11 shrink-0 overflow-hidden rounded-lg border border-white/10 bg-black/40 shadow-[0_8px_18px_rgba(0,0,0,0.22)] sm:h-9 sm:w-12">{src ? <img src={src} alt={`علم ${name}`} className="h-full w-full object-cover" loading="lazy" /> : <span className="flex h-full w-full items-center justify-center text-[10px] font-black text-[#FFD700]">{teamCode(team)}</span>}</span><span className="min-w-0"><span className="team-name-full block text-[11px] font-black leading-4 text-white sm:text-xs">{name}</span><span className="mt-0.5 block text-[9px] font-bold text-gray-500">{teamCode(team)}</span></span></Link>;
+  const name = teamLabel(team);
+  const src = teamFlag(team);
+  return (
+    <Link href={getTeamHref(team)} className={`group/team flex min-w-0 items-center gap-2 rounded-2xl border border-white/10 bg-white/[0.04] px-2.5 py-2 transition hover:border-[#FFD700]/25 hover:bg-white/[0.07] sm:border-transparent sm:bg-transparent sm:p-1.5 ${align === 'left' ? 'flex-row-reverse text-left' : 'text-right'}`}>
+      <span className="h-8 w-11 shrink-0 overflow-hidden rounded-lg border border-white/10 bg-black/40 shadow-[0_8px_18px_rgba(0,0,0,0.22)] sm:h-9 sm:w-12">
+        {src ? <img src={src} alt={`علم ${name}`} className="h-full w-full object-cover" loading="lazy" /> : <span className="flex h-full w-full items-center justify-center text-[10px] font-black text-[#FFD700]">{teamCode(team)}</span>}
+      </span>
+      <span className="min-w-0">
+        <span className="team-name-full block text-[11px] font-black leading-4 text-white sm:text-xs">{name}</span>
+        <span className="mt-0.5 block text-[9px] font-bold text-gray-500">{teamCode(team)}</span>
+      </span>
+    </Link>
+  );
 }
-function ScoreBox({ value }: { value?: number | null }) { return <span className="flex h-9 min-w-9 items-center justify-center rounded-xl border border-[#FFD700]/35 bg-[#FFD700]/10 px-2 text-lg font-black leading-none text-[#FFD700] sm:h-10 sm:min-w-10 sm:text-xl" dir="ltr">{formatScore(value)}</span>; }
-function MatchScore({ match }: { match: HomeMatch }) { return <div className="flex items-center justify-center gap-1 rounded-2xl border border-white/10 bg-black/40 px-1.5 py-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]" dir="rtl" aria-label="النتيجة: صاحب الأرض يمين والضيف يسار"><ScoreBox value={match.homeScore} /><span className="h-7 w-px rounded-full bg-white/15" /><ScoreBox value={match.awayScore} /></div>; }
+
+function ScoreBox({ value }: { value?: number | null }) {
+  return <span className="flex h-9 min-w-9 items-center justify-center rounded-xl border border-[#FFD700]/35 bg-[#FFD700]/10 px-2 text-lg font-black leading-none text-[#FFD700] sm:h-10 sm:min-w-10 sm:text-xl" dir="ltr">{formatScore(value)}</span>;
+}
+
+function MatchScore({ match }: { match: HomeMatch }) {
+  return (
+    <div className="flex items-center justify-center gap-1 rounded-2xl border border-white/10 bg-black/40 px-1.5 py-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]" dir="rtl" aria-label="النتيجة: صاحب الأرض يمين والضيف يسار">
+      <ScoreBox value={match.homeScore} />
+      <span className="h-7 w-px rounded-full bg-white/15" />
+      <ScoreBox value={match.awayScore} />
+    </div>
+  );
+}
 
 function MatchStatePill({ match, now, mounted }: { match: HomeMatch; now: Date; mounted: boolean }) {
   if (isFinished(match)) return <span className="rounded-xl border border-white/10 bg-white/[0.06] px-2.5 py-1.5 text-[11px] font-black text-gray-300">انتهت</span>;
   if (isHalfTime(match)) return <span className="rounded-xl border border-[#FFD700]/20 bg-[#FFD700]/10 px-2.5 py-1.5 text-[11px] font-black text-[#FFD700]">استراحة</span>;
-  if (isConfirmedLive(match)) { if (match.liveLabel) return <span className="rounded-xl border border-[#00FF88]/25 bg-[#00FF88]/10 px-2.5 py-1.5 text-[11px] font-black text-[#00FF88]">{match.liveLabel}</span>; const minute = displayMinute(match); return <span className="rounded-xl border border-[#00FF88]/25 bg-[#00FF88]/10 px-2.5 py-1.5 text-[11px] font-black text-[#00FF88]">{minute ? `جارية الآن - د${formatCount(minute)}` : 'جارية الآن'}</span>; }
+  if (isConfirmedLive(match)) {
+    if (match.liveLabel) return <span className="rounded-xl border border-[#00FF88]/25 bg-[#00FF88]/10 px-2.5 py-1.5 text-[11px] font-black text-[#00FF88]">{match.liveLabel}</span>;
+    const minute = displayMinute(match);
+    return <span className="rounded-xl border border-[#00FF88]/25 bg-[#00FF88]/10 px-2.5 py-1.5 text-[11px] font-black text-[#00FF88]">{minute ? `جارية الآن - د${formatCount(minute)}` : 'جارية الآن'}</span>;
+  }
   if (isWaitingForStartConfirmation(match, now)) return <span className="rounded-xl border border-[#FFD700]/20 bg-[#FFD700]/10 px-2.5 py-1.5 text-[11px] font-black text-[#FFD700]">بانتظار تأكيد البداية</span>;
   if (!mounted) return <span className="rounded-xl border border-[#FFD700]/20 bg-[#FFD700]/10 px-2.5 py-1.5 text-[11px] font-black text-[#FFD700]">قريباً</span>;
   return <span className="inline-flex items-center gap-1.5 rounded-xl border border-[#0FF0FC]/25 bg-[#0FF0FC]/10 px-2.5 py-1.5 text-[11px] font-black text-[#0FF0FC]"><span className="h-1.5 w-1.5 rounded-full bg-[#0FF0FC] shadow-[0_0_12px_rgba(15,240,252,0.8)]" /> {countdownLabel(match, now)}</span>;
@@ -79,52 +288,105 @@ function MatchStatePill({ match, now, mounted }: { match: HomeMatch; now: Date; 
 
 function MatchRow({ match, now, mounted, variant = 'normal' }: { match: HomeMatch; now: Date; mounted: boolean; variant?: 'live' | 'primary' | 'normal' }) {
   const isPrimary = variant === 'primary' || variant === 'live';
-  const shell = variant === 'live' ? 'border-[#00FF88]/25 bg-[radial-gradient(circle_at_top,rgba(0,255,136,0.12),transparent_34%),rgba(0,0,0,0.30)]' : isPrimary ? 'border-[#FFD700]/25 bg-[radial-gradient(circle_at_top,rgba(255,215,0,0.12),transparent_34%),rgba(0,0,0,0.30)]' : 'border-white/10 bg-black/25 hover:border-[#0FF0FC]/30';
-  return <article className={`relative overflow-hidden rounded-[1.35rem] border p-3 transition sm:rounded-3xl sm:p-3.5 ${shell}`}>{isPrimary ? <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#FFD700]/60 to-transparent" /> : null}<div className="mb-3 grid grid-cols-2 gap-1.5 sm:flex sm:flex-wrap sm:items-center sm:justify-between"><span className="rounded-full border border-[#FFD700]/20 bg-[#FFD700]/10 px-2.5 py-1 text-center text-[10px] font-black text-[#FFD700]">{groupNumberLabel(match)}</span><span className="rounded-full border border-white/10 bg-white/[0.06] px-2.5 py-1 text-center text-[10px] font-black text-gray-200">{formatMatchDate(match.matchDate, mounted)}</span><span className="rounded-full border border-[#0FF0FC]/20 bg-[#0FF0FC]/10 px-2.5 py-1 text-center text-[11px] font-black text-[#0FF0FC]">{formatKickoffTime(match.matchDate, mounted)}</span><span className="flex justify-center sm:block"><MatchStatePill match={match} now={now} mounted={mounted} /></span></div><div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-1.5 sm:gap-2.5"><TeamBadge team={match.homeTeam} align="right" /><MatchScore match={match} /><TeamBadge team={match.awayTeam} align="left" /></div><div className="mt-3 grid grid-cols-2 gap-2"><Link href={getBroadcastHref(match)} className="mobile-tap inline-flex min-h-10 items-center justify-center rounded-xl bg-[#0FF0FC] px-3 py-2.5 text-center text-[11px] font-black text-black transition hover:bg-[#4AFAFF]">الملعب التفاعلي</Link><Link href={getMatchHref(match)} className="mobile-tap inline-flex min-h-10 items-center justify-center rounded-xl border border-[#FFD700]/25 bg-[#FFD700]/10 px-3 py-2.5 text-center text-[11px] font-black text-[#FFD700] transition hover:bg-[#FFD700]/15">صفحة المباراة</Link></div></article>;
+  const shell = variant === 'live'
+    ? 'border-[#00FF88]/25 bg-[radial-gradient(circle_at_top,rgba(0,255,136,0.12),transparent_34%),rgba(0,0,0,0.30)]'
+    : isPrimary
+      ? 'border-[#FFD700]/25 bg-[radial-gradient(circle_at_top,rgba(255,215,0,0.12),transparent_34%),rgba(0,0,0,0.30)]'
+      : 'border-white/10 bg-black/25 hover:border-[#0FF0FC]/30';
+
+  return (
+    <article className={`relative overflow-hidden rounded-[1.35rem] border p-3 transition sm:rounded-3xl sm:p-3.5 ${shell}`}>
+      {isPrimary ? <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#FFD700]/60 to-transparent" /> : null}
+      <div className="mb-3 grid grid-cols-2 gap-1.5 sm:flex sm:flex-wrap sm:items-center sm:justify-between">
+        <span className="rounded-full border border-[#FFD700]/20 bg-[#FFD700]/10 px-2.5 py-1 text-center text-[10px] font-black text-[#FFD700]">{groupNumberLabel(match)}</span>
+        <span className="rounded-full border border-white/10 bg-white/[0.06] px-2.5 py-1 text-center text-[10px] font-black text-gray-200">{formatMatchDate(match.matchDate, mounted)}</span>
+        <span className="rounded-full border border-[#0FF0FC]/20 bg-[#0FF0FC]/10 px-2.5 py-1 text-center text-[11px] font-black text-[#0FF0FC]">{formatKickoffTime(match.matchDate, mounted)}</span>
+        <span className="flex justify-center sm:block"><MatchStatePill match={match} now={now} mounted={mounted} /></span>
+      </div>
+      <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-1.5 sm:gap-2.5">
+        <TeamBadge team={match.homeTeam} align="right" />
+        <MatchScore match={match} />
+        <TeamBadge team={match.awayTeam} align="left" />
+      </div>
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <Link href={getBroadcastHref(match)} className="mobile-tap inline-flex min-h-10 items-center justify-center rounded-xl bg-[#0FF0FC] px-3 py-2.5 text-center text-[11px] font-black text-black transition hover:bg-[#4AFAFF]">الملعب التفاعلي</Link>
+        <Link href={getMatchHref(match)} className="mobile-tap inline-flex min-h-10 items-center justify-center rounded-xl border border-[#FFD700]/25 bg-[#FFD700]/10 px-3 py-2.5 text-center text-[11px] font-black text-[#FFD700] transition hover:bg-[#FFD700]/15">صفحة المباراة</Link>
+      </div>
+    </article>
+  );
 }
 
 function MatchCenter({ fallbackMatches = [], nextMatch = null, liveMatches = [] }: { fallbackMatches?: HomeMatch[]; nextMatch?: HomeMatch | null; liveMatches?: HomeMatch[] }) {
-  const [mounted, setMounted] = useState(false); const [now, setNow] = useState(() => new Date());
+  const [mounted, setMounted] = useState(false);
+  const [now, setNow] = useState(() => new Date());
+
   useEffect(() => setMounted(true), []);
+
   const mergedMatches = useMemo(() => uniqueMatches([...(liveMatches.length ? liveMatches : []), ...(nextMatch ? [nextMatch] : []), ...(liveMatches.length ? [] : fallbackMatches)]), [liveMatches, nextMatch, fallbackMatches]);
   const sortedMatches = useMemo(() => [...mergedMatches].sort((a, b) => matchTime(a) - matchTime(b)), [mergedMatches]);
   const primaryMatch = sortedMatches.find(isLiveOrBreak) || sortedMatches.find((match) => isWaitingForStartConfirmation(match, now)) || sortedMatches.find((match) => isScheduled(match)) || sortedMatches.find((match) => !isFinished(match)) || sortedMatches[0] || null;
-  const primaryKey = primaryMatch ? matchKey(primaryMatch) : null; const refreshMs = countdownRefreshMs(primaryMatch, now);
+  const primaryKey = primaryMatch ? matchKey(primaryMatch) : null;
+  const refreshMs = countdownRefreshMs(primaryMatch, now);
   const extraLiveMatches = sortedMatches.filter((match) => matchKey(match) !== primaryKey).filter((match) => isLiveOrBreak(match) || isWaitingForStartConfirmation(match, now));
-  const upcomingSecondaryMatches = sortedMatches.filter((match) => matchKey(match) !== primaryKey).filter((match) => !extraLiveMatches.some((live) => matchKey(live) === matchKey(match))).filter((match) => isScheduled(match) && !isWaitingForStartConfirmation(match, now) && matchTime(match) >= now.getTime()).slice(0, Math.max(0, 2 - extraLiveMatches.length));
-  const secondaryMatches = uniqueMatches([...extraLiveMatches, ...upcomingSecondaryMatches]); const secondaryTitle = extraLiveMatches.length ? 'مباريات مباشرة في نفس التوقيت' : 'المباراتان القادمتان';
-  useEffect(() => { if (!refreshMs) return; const timer = window.setInterval(() => setNow(new Date()), refreshMs); return () => window.clearInterval(timer); }, [primaryKey, refreshMs]);
-  return <section className="flex h-auto flex-col overflow-hidden rounded-[1.45rem] border border-white/10 bg-white/[0.04] p-3 text-white shadow-[0_14px_38px_rgba(0,0,0,0.2)] backdrop-blur sm:rounded-3xl sm:p-4" aria-label="مباريات كأس العالم"><div className="flex flex-col gap-4"><div>{primaryMatch ? <MatchRow match={primaryMatch} now={now} mounted={mounted} variant={isLiveOrBreak(primaryMatch) ? 'live' : 'primary'} /> : <div className="rounded-2xl border border-dashed border-white/10 bg-black/20 p-4 text-sm font-bold text-gray-400">لا توجد مباراة رئيسية جاهزة للعرض الآن.</div>}</div><div><div className="mb-2 flex items-center justify-between gap-2"><span className="text-[10px] font-black uppercase tracking-[0.14em] text-gray-400">{secondaryTitle}</span>{extraLiveMatches.length ? <span className="rounded-full border border-[#00FF88]/25 bg-[#00FF88]/10 px-2 py-1 text-[9px] font-black text-[#00FF88]">لا يتم إخفاء أي مباراة مباشرة</span> : null}</div><div className="grid gap-3 md:grid-cols-2">{secondaryMatches.map((match) => <MatchRow key={matchKey(match)} match={match} now={now} mounted={mounted} variant={isLiveOrBreak(match) || isWaitingForStartConfirmation(match, now) ? 'live' : 'normal'} />)}{!secondaryMatches.length ? <div className="rounded-2xl border border-dashed border-white/10 bg-black/20 p-4 text-sm font-bold text-gray-400 md:col-span-2">لا توجد مباريات قادمة إضافية جاهزة للعرض الآن.</div> : null}</div></div></div></section>;
-}
+  const upcomingSecondaryMatches = sortedMatches
+    .filter((match) => matchKey(match) !== primaryKey)
+    .filter((match) => !extraLiveMatches.some((live) => matchKey(live) === matchKey(match)))
+    .filter((match) => isScheduled(match) && !isWaitingForStartConfirmation(match, now) && matchTime(match) >= now.getTime())
+    .slice(0, Math.max(0, 2 - extraLiveMatches.length));
+  const secondaryMatches = uniqueMatches([...extraLiveMatches, ...upcomingSecondaryMatches]);
+  const secondaryTitle = extraLiveMatches.length ? 'مباريات مباشرة في نفس التوقيت' : 'المباراتان القادمتان';
 
-function NowCard({ matches, groups, mounted }: { matches: HomeMatch[]; groups: unknown[]; mounted: boolean }) {
-  const now = new Date();
-  const live = matches.filter(isLiveOrBreak);
-  const waiting = matches.find((match) => isWaitingForStartConfirmation(match, now));
-  const next = matches.filter((match) => !isFinished(match) && matchTime(match) >= now.getTime()).sort((a, b) => matchTime(a) - matchTime(b))[0] || null;
-  const leader = bestPointsTeam(groups);
-  const attack = topAttackTeam(groups);
-  const focus = live[0] || waiting || next;
-  return <section className="rounded-[1.45rem] border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(0,255,136,0.10),transparent_34%),rgba(255,255,255,0.04)] p-3 text-white sm:rounded-3xl sm:p-4"><div className="mb-3 flex items-center justify-between gap-3"><div><p className="text-[10px] font-black tracking-[0.16em] text-[#00FF88]">LIVE CONTEXT</p><h2 className="mt-1 text-lg font-black">ماذا يحدث الآن؟</h2></div><span className="rounded-full border border-white/10 bg-black/25 px-3 py-1 text-[10px] font-black text-gray-400">خفيف من بيانات الصفحة</span></div><div className="grid gap-3 lg:grid-cols-3"><article className="rounded-2xl border border-white/10 bg-black/25 p-3 lg:col-span-1"><p className="text-[10px] font-black text-gray-500">الحالة الحالية</p><b className="mt-2 block truncate text-sm font-black text-white">{focus ? matchTitle(focus) : 'لا توجد مباراة قريبة الآن'}</b><p className="mt-1 text-[11px] font-bold text-[#00FF88]">{focus ? matchStatusLine(focus, now, mounted) : 'تابع مباريات اليوم عند توفرها'}</p></article><article className="rounded-2xl border border-white/10 bg-black/25 p-3"><p className="text-[10px] font-black text-gray-500">أفضل رصيد نقاط</p><b className="mt-2 block truncate text-sm font-black text-white">{standingName(leader)}</b><p className="mt-1 text-[11px] font-bold text-[#FFD700]">{leader ? `${formatCount(safeNumber(leader.points))} نقطة` : 'غير متوفر'}</p></article><article className="rounded-2xl border border-white/10 bg-black/25 p-3"><p className="text-[10px] font-black text-gray-500">أقوى هجوم</p><b className="mt-2 block truncate text-sm font-black text-white">{standingName(attack)}</b><p className="mt-1 text-[11px] font-bold text-[#0FF0FC]">{attack ? `${formatCount(safeNumber(attack.goalsFor))} هدف` : 'غير متوفر'}</p></article></div></section>;
-}
+  useEffect(() => {
+    if (!refreshMs) return;
+    const timer = window.setInterval(() => setNow(new Date()), refreshMs);
+    return () => window.clearInterval(timer);
+  }, [primaryKey, refreshMs]);
 
-function TodayMatchesCard({ matches, mounted }: { matches: HomeMatch[]; mounted: boolean }) {
-  const now = new Date();
-  const today = matches.filter((match) => match.matchDate && sameLocalDay(new Date(match.matchDate), now)).sort((a, b) => matchTime(a) - matchTime(b));
-  const rows = (today.length ? today : matches.filter((match) => matchTime(match) >= now.getTime()).sort((a, b) => matchTime(a) - matchTime(b)).slice(0, 4)).slice(0, 6);
-  return <section className="rounded-[1.45rem] border border-white/10 bg-white/[0.04] p-3 text-white sm:rounded-3xl sm:p-4"><div className="mb-3 flex items-center justify-between gap-3"><div><p className="text-[10px] font-black tracking-[0.16em] text-[#0FF0FC]">TODAY</p><h2 className="mt-1 text-lg font-black">مباريات اليوم</h2></div><Link href="/matches" className="rounded-full border border-[#FFD700]/20 bg-[#FFD700]/10 px-3 py-1.5 text-[10px] font-black text-[#FFD700]">كل المباريات</Link></div><div className="grid gap-2">{rows.map((match) => <article key={matchKey(match)} className="grid gap-2 rounded-2xl border border-white/10 bg-black/25 p-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"><div className="min-w-0"><b className="block truncate text-sm font-black text-white">{matchTitle(match)}</b><p className="mt-1 text-[11px] font-bold text-gray-400">{groupNumberLabel(match)} · {matchStatusLine(match, now, mounted)}</p></div><div className="grid grid-cols-2 gap-2"><Link href={getBroadcastHref(match)} className="rounded-xl bg-[#0FF0FC] px-3 py-2 text-center text-[10px] font-black text-black">الملعب</Link><Link href={getMatchHref(match)} className="rounded-xl border border-[#FFD700]/25 bg-[#FFD700]/10 px-3 py-2 text-center text-[10px] font-black text-[#FFD700]">المباراة</Link></div></article>)}{!rows.length ? <div className="rounded-2xl border border-dashed border-white/10 bg-black/20 p-4 text-center text-sm font-bold text-gray-500">لا توجد مباريات اليوم في البيانات الحالية.</div> : null}</div></section>;
+  return (
+    <section className="flex h-auto flex-col overflow-hidden rounded-[1.45rem] border border-white/10 bg-white/[0.04] p-3 text-white shadow-[0_14px_38px_rgba(0,0,0,0.2)] backdrop-blur sm:rounded-3xl sm:p-4" aria-label="مباريات كأس العالم">
+      <div className="flex flex-col gap-4">
+        <div>{primaryMatch ? <MatchRow match={primaryMatch} now={now} mounted={mounted} variant={isLiveOrBreak(primaryMatch) ? 'live' : 'primary'} /> : <div className="rounded-2xl border border-dashed border-white/10 bg-black/20 p-4 text-sm font-bold text-gray-400">لا توجد مباراة رئيسية جاهزة للعرض الآن.</div>}</div>
+        <div>
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <span className="text-[10px] font-black uppercase tracking-[0.14em] text-gray-400">{secondaryTitle}</span>
+            {extraLiveMatches.length ? <span className="rounded-full border border-[#00FF88]/25 bg-[#00FF88]/10 px-2 py-1 text-[9px] font-black text-[#00FF88]">لا يتم إخفاء أي مباراة مباشرة</span> : null}
+          </div>
+          <div className="grid gap-3 md:grid-cols-2">
+            {secondaryMatches.map((match) => <MatchRow key={matchKey(match)} match={match} now={now} mounted={mounted} variant={isLiveOrBreak(match) || isWaitingForStartConfirmation(match, now) ? 'live' : 'normal'} />)}
+            {!secondaryMatches.length ? <div className="rounded-2xl border border-dashed border-white/10 bg-black/20 p-4 text-sm font-bold text-gray-400 md:col-span-2">لا توجد مباريات قادمة إضافية جاهزة للعرض الآن.</div> : null}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
 }
 
 function BracketTeaser({ groups }: { groups: unknown[] }) {
   const group = hotGroup(groups);
   const leader = group?.standings?.[0] || null;
   const runner = group?.standings?.[1] || null;
-  return <section className="overflow-hidden rounded-[1.45rem] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(255,215,0,0.12),transparent_34%),linear-gradient(135deg,rgba(255,255,255,0.05),rgba(0,0,0,0.22))] p-4 text-white sm:rounded-3xl"><div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between"><div><p className="text-[10px] font-black tracking-[0.16em] text-[#FFD700]">KNOCKOUT PATH</p><h2 className="mt-1 text-xl font-black">مسار البطولة</h2><p className="mt-2 max-w-2xl text-sm font-bold leading-6 text-gray-400">شاهد طريق دور الـ٣٢ حتى النهائي حسب ترتيب المجموعات الحالي، بدون تحميل المخطط الكبير داخل الرئيسية.</p></div><div className="grid min-w-[220px] gap-2 rounded-2xl border border-white/10 bg-black/25 p-3 text-xs font-bold text-gray-300"><span className="text-[10px] font-black text-gray-500">مجموعة قريبة</span><b className="text-sm font-black text-white">{group?.arName || (group?.key ? `المجموعة ${group.key}` : 'بانتظار اكتمال البيانات')}</b><span>{standingName(leader)} {leader ? `· ${formatCount(safeNumber(leader.points))} نقطة` : ''}</span><span>{standingName(runner)} {runner ? `· ${formatCount(safeNumber(runner.points))} نقطة` : ''}</span></div><Link href="/round-of-32" className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-[#FFD700] px-5 py-3 text-sm font-black text-black transition hover:bg-[#ffe66b]">فتح المسار</Link></div></section>;
+
+  return (
+    <section className="overflow-hidden rounded-[1.45rem] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(255,215,0,0.12),transparent_34%),linear-gradient(135deg,rgba(255,255,255,0.05),rgba(0,0,0,0.22))] p-4 text-white sm:rounded-3xl">
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div>
+          <p className="text-[10px] font-black tracking-[0.16em] text-[#FFD700]">KNOCKOUT PATH</p>
+          <h2 className="mt-1 text-xl font-black">مسار البطولة</h2>
+          <p className="mt-2 max-w-2xl text-sm font-bold leading-6 text-gray-400">شاهد طريق دور الـ٣٢ حتى النهائي حسب ترتيب المجموعات الحالي، بدون تحميل المخطط الكبير داخل الرئيسية.</p>
+        </div>
+        <div className="grid min-w-[220px] gap-2 rounded-2xl border border-white/10 bg-black/25 p-3 text-xs font-bold text-gray-300">
+          <span className="text-[10px] font-black text-gray-500">مجموعة قريبة</span>
+          <b className="text-sm font-black text-white">{group?.arName || (group?.key ? `المجموعة ${group.key}` : 'بانتظار اكتمال البيانات')}</b>
+          <span>{standingName(leader)} {leader ? `· ${formatCount(safeNumber(leader.points))} نقطة` : ''}</span>
+          <span>{standingName(runner)} {runner ? `· ${formatCount(safeNumber(runner.points))} نقطة` : ''}</span>
+        </div>
+        <Link href="/round-of-32" className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-[#FFD700] px-5 py-3 text-sm font-black text-black transition hover:bg-[#ffe66b]">فتح المسار</Link>
+      </div>
+    </section>
+  );
 }
 
 export default function HomeClientSportsLiveFocus({ upcomingMatches = [], tickerMatches = [], nextMarqueeMatch = null, groupStandings = [], playersCount = 0, teamsCount = 0, upcomingMatchesCount = 0 }: Props) {
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
   const safeUpcomingMatches = Array.isArray(upcomingMatches) ? (upcomingMatches as HomeMatch[]) : [];
   const safeTickerMatches = Array.isArray(tickerMatches) ? (tickerMatches as HomeMatch[]) : [];
   const safeGroupStandings = Array.isArray(groupStandings) ? groupStandings : [];
@@ -136,12 +398,34 @@ export default function HomeClientSportsLiveFocus({ upcomingMatches = [], ticker
   useEffect(() => {
     if (!livePollingEnabled) return;
     let cancelled = false;
-    async function loadMatches() { if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return; try { const response = await fetch('/api/matches/live-card', { cache: 'no-store' }); if (!response.ok) return; const data = await response.json(); const list = Array.isArray(data) ? data : Array.isArray(data?.matches) ? data.matches : []; if (!cancelled) setLiveCardMatches(list); } catch {} }
-    loadMatches(); const timer = window.setInterval(loadMatches, MATCH_REFRESH_MS); return () => { cancelled = true; window.clearInterval(timer); };
+
+    async function loadMatches() {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+      try {
+        const response = await fetch('/api/matches/live-card', { cache: 'no-store' });
+        if (!response.ok) return;
+        const data = await response.json();
+        const list = Array.isArray(data) ? data : Array.isArray(data?.matches) ? data.matches : [];
+        if (!cancelled) setLiveCardMatches(list);
+      } catch {}
+    }
+
+    loadMatches();
+    const timer = window.setInterval(loadMatches, MATCH_REFRESH_MS);
+    return () => { cancelled = true; window.clearInterval(timer); };
   }, [livePollingEnabled]);
 
   const tickerDisplayMatches = useMemo(() => uniqueMatches([...(liveCardMatches.length ? liveCardMatches : []), ...safeTickerMatches]).slice(0, 10), [liveCardMatches, safeTickerMatches]);
-  const lightweightMatches = useMemo(() => uniqueMatches([...(liveCardMatches.length ? liveCardMatches : []), ...safeUpcomingMatches, ...safeTickerMatches, ...(safeNextMatch ? [safeNextMatch] : [])]), [liveCardMatches, safeUpcomingMatches, safeTickerMatches, safeNextMatch]);
 
-  return <main dir="rtl" className="mx-auto max-w-7xl space-y-4 px-3 pb-8 pt-3 sm:space-y-6 sm:px-4 sm:py-5 lg:px-6"><HomeLiveMatchTicker matches={tickerDisplayMatches} /><div className="grid grid-cols-1 gap-4 lg:grid-cols-3 lg:items-start lg:gap-5"><div className="lg:col-span-2"><MatchCenter fallbackMatches={safeUpcomingMatches} nextMatch={safeNextMatch} liveMatches={liveCardMatches} /></div><div className="lg:col-span-1"><HomeGroupStandingsWidget compact initialGroups={safeGroupStandings} /></div></div><NowCard matches={lightweightMatches} groups={safeGroupStandings} mounted={mounted} /><TodayMatchesCard matches={lightweightMatches} mounted={mounted} /><BracketTeaser groups={safeGroupStandings} /><HomeTournamentStatsCard playersCount={playersCount} teamsCount={teamsCount} upcomingMatchesCount={upcomingMatchesCount} /></main>;
+  return (
+    <main dir="rtl" className="mx-auto max-w-7xl space-y-4 px-3 pb-8 pt-3 sm:space-y-6 sm:px-4 sm:py-5 lg:px-6">
+      <HomeLiveMatchTicker matches={tickerDisplayMatches} />
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3 lg:items-start lg:gap-5">
+        <div className="lg:col-span-2"><MatchCenter fallbackMatches={safeUpcomingMatches} nextMatch={safeNextMatch} liveMatches={liveCardMatches} /></div>
+        <div className="lg:col-span-1"><HomeGroupStandingsWidget compact initialGroups={safeGroupStandings} /></div>
+      </div>
+      <BracketTeaser groups={safeGroupStandings} />
+      <HomeTournamentStatsCard playersCount={playersCount} teamsCount={teamsCount} upcomingMatchesCount={upcomingMatchesCount} />
+    </main>
+  );
 }
