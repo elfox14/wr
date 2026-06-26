@@ -78,11 +78,14 @@ function columns(normalized: any) {
 }
 
 function endpointsFailed(collected: any) { return Array.isArray(collected?.endpointsFailed) ? collected.endpointsFailed : []; }
+function endpointStatus(item: any) { return Number(item?.status ?? item?.error?.status ?? 0) || 0; }
 function all404(collected: any) {
   const failed = endpointsFailed(collected);
-  return failed.length > 0 && failed.every((item: any) => Number(item?.status) === 404 || Number(item?.error?.status) === 404);
+  return failed.length > 0 && failed.every((item: any) => endpointStatus(item) === 404);
 }
-function has429(value: any) { return /\b429\b|rate.?limit|too many|quota/i.test(JSON.stringify(value || {})); }
+function any429(collected: any) {
+  return endpointsFailed(collected).some((item: any) => endpointStatus(item) === 429 || /\b429\b|rate.?limit|too many|quota/i.test(String(item?.message || item?.error?.message || '')));
+}
 
 async function ensureSkipTable() {
   await prisma.$executeRawUnsafe(`
@@ -135,7 +138,7 @@ async function saveSnapshot(match: any, collected: any, includeRaw: boolean) {
       ...columns(normalized),
       rawData: {
         provider: 'THE_STATS_API',
-        mode: 'safe_backfill_snapshot_only_skip_404_v1',
+        mode: 'safe_backfill_snapshot_only_skip_404_v2_precise_status',
         importedAt: new Date().toISOString(),
         resolvedProviderMatchId: collected?.resolvedProviderMatchId,
         resolvedBy: collected?.resolvedBy,
@@ -212,7 +215,6 @@ async function run(req: Request) {
     estimatedProviderRequests += 6;
 
     if (!collected.ok) {
-      if (stopOn429 && has429(collected)) { processed.push({ matchId: match.id, teams, status: 'rate_limited_stop', error: collected.error, endpointsFailed: endpointsFailed(collected) }); stoppedEarly = { reason: '429 from TheStats', matchId: match.id, teams }; break; }
       if (skip404 && all404(collected)) {
         const retryAfter = new Date(Date.now() + skipHours * 36e5);
         await markSkip(match.id, 'all details endpoints returned 404', (collected as any)?.resolvedProviderMatchId || null, retryAfter);
@@ -220,6 +222,13 @@ async function run(req: Request) {
         if (betweenMatchesDelayMs) await sleep(betweenMatchesDelayMs);
         continue;
       }
+
+      if (stopOn429 && any429(collected)) {
+        processed.push({ matchId: match.id, teams, status: 'rate_limited_stop', error: collected.error, endpointsFailed: endpointsFailed(collected) });
+        stoppedEarly = { reason: '429 from TheStats', matchId: match.id, teams };
+        break;
+      }
+
       processed.push({ matchId: match.id, teams, status: 'failed_collect', error: collected.error || 'no useful data', resolved: collected.resolved || null, endpointsFailed: endpointsFailed(collected) });
       if (betweenMatchesDelayMs) await sleep(betweenMatchesDelayMs);
       continue;
@@ -239,7 +248,7 @@ async function run(req: Request) {
 
   return json({
     ok: true,
-    mode: 'the_stats_backfill_finals_safe_v1_skip_404',
+    mode: 'the_stats_backfill_finals_safe_v2_precise_404_before_429',
     durationMs: Date.now() - startedAt,
     dryRun,
     stoppedEarly,
