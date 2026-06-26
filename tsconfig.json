@@ -35,6 +35,7 @@
   ],
   "exclude": [
     "node_modules",
+    "scripts",
     "app/api/admin/the-stats-backfill-events-safe/route.ts",
     "app/api/admin/the-stats-backfill-previous/route.ts",
     "app/api/admin/the-stats-import-match-events/route.ts",

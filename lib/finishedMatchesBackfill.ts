@@ -381,6 +381,8 @@ async function saveQualitySnapshot(match: BackfillMatch, fixtureId: number | nul
         counts,
         projections,
         resolvedProviderMatchId: result?.resolvedProviderMatchId || null,
+        resolvedBy: result?.resolvedBy || null,
+        resolved: result?.debug?.resolved || null,
         endpointsOk: result?.endpointsOk || [],
         endpointsFailed: result?.endpointsFailed || [],
       },
@@ -437,6 +439,7 @@ async function processMatch(match: BackfillMatch, options: Required<Omit<Finishe
     projections: { events: eventsProjection, players: playersProjection },
     animationSync: animationSync ? { ok: animationSync.ok, results: animationSync.results } : null,
     markedFinalVerified: Boolean(options.markVerified && !options.dryRun && result.ok && quality.dataQuality !== 'missing'),
+    debug: result.debug,
   };
 }
 
