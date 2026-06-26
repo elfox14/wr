@@ -1,6 +1,7 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { hasValidAdminSecret } from '@/lib/adminAuth';
+import { revalidateStatsViews } from '@/lib/revalidateStatsViews';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -71,6 +72,11 @@ function parseWorkerSummary(stdout: string) {
   catch { return { raw: text.slice(-12000) }; }
 }
 
+function shouldRevalidateAfterFootballData(req: Request) {
+  const url = new URL(req.url);
+  return !boolFrom(url.searchParams.get('dryRun'), false);
+}
+
 async function runFreshWorkerProcess(req: Request) {
   const timeoutRaw = Number(process.env.FOOTBALL_DATA_RESULTS_HTTP_PROCESS_TIMEOUT_MS || 55000);
   const timeout = Math.max(15000, Math.min(90000, timeoutRaw));
@@ -97,9 +103,13 @@ async function run(req: Request) {
   const quick = boolFrom(url.searchParams.get('quick'), false) || boolFrom(url.searchParams.get('background'), false);
 
   if (quick) {
-    runFreshWorkerProcess(req).catch((error) => {
-      console.error('[football-data-results-sync-cron] background failed:', error);
-    });
+    runFreshWorkerProcess(req)
+      .then(() => {
+        if (shouldRevalidateAfterFootballData(req)) revalidateStatsViews('football-data-results-sync-background');
+      })
+      .catch((error) => {
+        console.error('[football-data-results-sync-cron] background failed:', error);
+      });
 
     return jsonResponse({
       ok: true,
@@ -111,11 +121,13 @@ async function run(req: Request) {
 
   try {
     const worker = await runFreshWorkerProcess(req);
+    const revalidated = shouldRevalidateAfterFootballData(req) ? revalidateStatsViews('football-data-results-sync') : null;
     return jsonResponse({
       ok: true,
       mode: 'http_football_data_results_sync_cron_v1_fresh_process',
       durationMs: Date.now() - startedAt,
       result: worker.summary,
+      revalidated,
       stderr: worker.stderr || undefined,
     });
   } catch (error: unknown) {
