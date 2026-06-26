@@ -10,9 +10,6 @@ import type {
   MatchStatMetric,
   MatchStatusView,
   MatchTeamLite,
-  OfficialLineupPlayer,
-  OfficialLineupTeam,
-  OfficialLineupView,
   RelatedArticle,
   SourceChecklistItem,
 } from './types';
@@ -39,8 +36,7 @@ const BAD_GROUP_KEYS = ['STAGE', 'GROUP', 'GROUPS', 'GROUP STAGE', 'GROUP_STAGE'
 function usableImage(value: any) {
   const text = String(value || '').trim();
   if (!text) return null;
-  if (text.startsWith('http://') || text.startsWith('https://') || text.startsWith('/')) return text;
-  return null;
+  return text.startsWith('http://') || text.startsWith('https://') || text.startsWith('/') ? text : null;
 }
 
 function cleanText(value: any): string | null {
@@ -54,29 +50,40 @@ function cleanText(value: any): string | null {
       if (text) return text;
     }
   }
-  if (value && typeof value === 'object') return cleanText(value.name || value.fullName || value.full_name || value.displayName || value.display_name || value.title || value.label);
+  if (value && typeof value === 'object') {
+    return cleanText(value.name || value.fullName || value.full_name || value.displayName || value.display_name || value.title || value.label);
+  }
   return null;
 }
 
 function cleanVenue(value: any): string | null {
   if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return cleanText(value);
-  if (Array.isArray(value)) {
-    for (const item of value) {
-      const text = cleanVenue(item);
-      if (text) return text;
-    }
-  }
-  if (value && typeof value === 'object') return cleanText(value.name || value.stadium || value.venue || value.ground || value.title || value.fullName || value.full_name || value.displayName || value.display_name);
+  if (value && typeof value === 'object') return cleanText(value.name || value.stadium || value.venue || value.ground || value.title || value.fullName || value.full_name);
   return null;
 }
 
 function teamLite(team: any): MatchTeamLite {
   const flag = getTeamFlagUrl({ code: team.code, name: team.name, image: team.image }, 160);
-  return { id: team.id, name: team.name || team.code || 'منتخب غير معروف', code: team.code || null, image: usableImage(flag) || usableImage(team.image), coach: team.coach || null, fifaRank: team.fifaRank ?? null, group: team.group || null };
+  return {
+    id: team.id,
+    name: team.name || team.code || 'منتخب غير معروف',
+    code: team.code || null,
+    image: usableImage(flag) || usableImage(team.image),
+    coach: team.coach || null,
+    fifaRank: team.fifaRank ?? null,
+    group: team.group || null,
+  };
 }
 
 function playerLite(player: any): MatchPlayerLite {
-  return { id: player.id, name: player.name || player.code || 'لاعب غير معروف', code: player.code || null, image: usableImage(player.image), position: player.position || null, teamId: player.teamId || null };
+  return {
+    id: player.id,
+    name: player.name || player.code || 'لاعب غير معروف',
+    code: player.code || null,
+    image: usableImage(player.image),
+    position: player.position || null,
+    teamId: player.teamId || null,
+  };
 }
 
 function normalizeGoodGroup(value: any) {
@@ -84,29 +91,12 @@ function normalizeGoodGroup(value: any) {
   return key && !BAD_GROUP_KEYS.includes(String(key).toUpperCase()) ? key : null;
 }
 
-function findDeep(value: any, keys: string[], depth = 0): any {
-  if (!value || depth > 5 || typeof value !== 'object') return null;
-  for (const key of keys) if (value[key] !== undefined && value[key] !== null && value[key] !== '') return value[key];
-  for (const item of Object.values(value)) {
-    if (item && typeof item === 'object') {
-      const found = findDeep(item, keys, depth + 1);
-      if (found !== null && found !== undefined && found !== '') return found;
-    }
-  }
-  return null;
-}
-
 function asList(value: any): any[] {
   if (Array.isArray(value)) return value;
   if (!value || typeof value !== 'object') return [];
-  for (const key of ['players', 'lineup', 'startingXi', 'startingXI', 'starting_xi', 'starters', 'substitutes', 'subs', 'bench', 'items', 'data', 'results']) if (Array.isArray(value[key])) return value[key];
-  return [];
-}
-
-function firstList(value: any, keys: string[]): any[] {
-  if (Array.isArray(value)) return value;
-  if (!value || typeof value !== 'object') return [];
-  for (const key of keys) if (Array.isArray(value[key])) return value[key];
+  for (const key of ['all', 'events', 'timeline', 'incidents', 'commentary', 'items', 'data', 'results', 'shotmap', 'shots', 'players', 'playerStats', 'player_stats']) {
+    if (Array.isArray(value[key])) return value[key];
+  }
   return [];
 }
 
@@ -115,7 +105,7 @@ function teamKey(value: any) {
 }
 
 function looksLikeTeam(row: any, team: MatchTeamLite) {
-  const text = teamKey(`${cleanText(row?.teamName || row?.team?.name || row?.team || row?.country || row?.side)} ${row?.teamId || row?.team_id || ''}`);
+  const text = teamKey(`${cleanText(row?.teamName || row?.team_name || row?.team?.name || row?.team || row?.country || row?.side)} ${row?.teamId || row?.team_id || ''}`);
   const name = teamKey(team.name);
   const code = teamKey(team.code);
   if (row?.teamId && row.teamId === team.id) return true;
@@ -124,61 +114,112 @@ function looksLikeTeam(row: any, team: MatchTeamLite) {
   return false;
 }
 
-function lineupPlayer(row: any): OfficialLineupPlayer | null {
-  const player = row?.player || row?.athlete || row;
-  const name = cleanText(player?.name || row?.playerName || row?.player_name || row?.name);
-  if (!name) return null;
-  return { id: cleanText(player?.id || row?.playerId || row?.player_id || row?.id), name, number: row?.number ?? row?.shirtNumber ?? row?.shirt_number ?? player?.number ?? null, image: usableImage(player?.image || row?.image || row?.photo), position: cleanText(player?.position || row?.position || row?.role), rating: toNumber(row?.rating || player?.rating), isCaptain: Boolean(row?.isCaptain || row?.captain || player?.captain) };
+function isTheStatsSnapshot(snapshot: any) {
+  const provider = String(snapshot?.provider || '').toUpperCase();
+  const raw = rawData(snapshot);
+  return provider.includes('THE_STATS') || String(raw?.provider || '').toUpperCase().includes('THE_STATS');
 }
 
-function buildLineupTeam(rawTeam: any, fallbackName: string): OfficialLineupTeam | null {
-  if (!rawTeam) return null;
-  const startingRaw = firstList(rawTeam, ['startingXi', 'startingXI', 'starting_xi', 'starters', 'lineup', 'players']).filter(Boolean);
-  const substitutesRaw = firstList(rawTeam, ['substitutes', 'subs', 'bench']).filter(Boolean);
-  const startingXi = startingRaw.map(lineupPlayer).filter(Boolean).slice(0, 16) as OfficialLineupPlayer[];
-  const substitutes = substitutesRaw.map(lineupPlayer).filter(Boolean).slice(0, 16) as OfficialLineupPlayer[];
-  if (!startingXi.length && !substitutes.length) return null;
-  return { teamName: cleanText(rawTeam.teamName || rawTeam.team_name || rawTeam.name || rawTeam.team?.name) || fallbackName, formation: cleanText(rawTeam.formation || rawTeam.tacticalFormation || rawTeam.tactical_formation), startingXi, substitutes };
+function coord(value: any) {
+  const n = toNumber(value);
+  if (n === null) return null;
+  if (n >= 0 && n <= 1) return n * 100;
+  if (n >= 0 && n <= 100) return n;
+  return null;
 }
 
-function extractLineupSide(lineups: any, team: MatchTeamLite) {
-  const direct = lineups?.home && looksLikeTeam(lineups.home, team) ? lineups.home : lineups?.away && looksLikeTeam(lineups.away, team) ? lineups.away : null;
-  if (direct) return direct;
-  const bySide = lineups?.homeTeam || lineups?.awayTeam || lineups?.home_team || lineups?.away_team;
-  if (bySide && looksLikeTeam(bySide, team)) return bySide;
-  const candidates = [...asList(lineups), ...firstList(lineups, ['teams', 'lineups', 'participants'])];
-  return candidates.find((item) => looksLikeTeam(item, team)) || null;
+function eventCoordinate(row: any, axis: 'x' | 'y') {
+  const direct = coord(row?.[axis] ?? row?.[`start${axis.toUpperCase()}`] ?? row?.location?.[axis] ?? row?.coordinates?.[axis] ?? row?.position?.[axis]);
+  if (direct !== null) return direct;
+  const shot = row?.shot || row?.shotmap || row?.event || {};
+  return coord(shot?.[axis] ?? shot?.location?.[axis] ?? shot?.coordinates?.[axis] ?? shot?.position?.[axis]);
 }
 
-function extractOfficialLineup(snapshots: any[], homeTeam: MatchTeamLite, awayTeam: MatchTeamLite): OfficialLineupView {
-  for (const snapshot of snapshots) {
+function normalizeSnapshotEvent(row: any, index: number, homeTeam: MatchTeamLite, awayTeam: MatchTeamLite): MatchEventView | null {
+  const type = cleanText(row?.type || row?.eventType || row?.event_type || row?.incident_type || row?.name) || 'event';
+  const minute = toNumber(row?.minute ?? row?.time?.minute ?? row?.elapsed ?? row?.match_minute ?? row?.event_minute);
+  const player = row?.player || row?.athlete || row?.scorer || {};
+  const playerName = cleanText(row?.playerName || row?.player_name || player?.name || row?.scorer?.name);
+  const detail = cleanText(row?.detail || row?.description || row?.comment || row?.text || row?.message) || type;
+  const teamName = cleanText(row?.teamName || row?.team_name || row?.team?.name || row?.side);
+  const teamId = row?.teamId === homeTeam.id || looksLikeTeam({ ...row, teamName }, homeTeam) ? homeTeam.id : row?.teamId === awayTeam.id || looksLikeTeam({ ...row, teamName }, awayTeam) ? awayTeam.id : cleanText(row?.teamId || row?.team_id);
+  return {
+    id: cleanText(row?.id) || `thestats-event-${index}-${minute ?? 'na'}-${type}`,
+    minute,
+    minuteLabel: eventMinuteLabel({ minute, detail }),
+    type,
+    icon: eventIcon(type),
+    teamId,
+    playerName,
+    detail,
+    sourceName: 'THE_STATS_API_FINAL',
+    sourceUrl: null,
+    x: eventCoordinate(row, 'x'),
+    y: eventCoordinate(row, 'y'),
+    shot: null,
+  };
+}
+
+function finalTheStatsEvents(snapshots: any[], homeTeam: MatchTeamLite, awayTeam: MatchTeamLite): MatchEventView[] {
+  const rows: MatchEventView[] = [];
+  const seen = new Set<string>();
+  for (const snapshot of snapshots.filter(isTheStatsSnapshot)) {
     const data = rawData(snapshot);
     const normalized = data.normalized || {};
-    const lineups = normalized.lineups || data.lineups || data.lineup;
-    if (!lineups) continue;
-    const homeRaw = lineups.home || lineups.homeTeam || lineups.home_team || extractLineupSide(lineups, homeTeam);
-    const awayRaw = lineups.away || lineups.awayTeam || lineups.away_team || extractLineupSide(lineups, awayTeam);
-    const home = buildLineupTeam(homeRaw, homeTeam.name);
-    const away = buildLineupTeam(awayRaw, awayTeam.name);
-    if (home || away) return { confirmed: Boolean(normalized.lineups?.confirmed || data.confirmed || data.lineupsConfirmed || data.lineups_confirmed || home?.startingXi?.length || away?.startingXi?.length), source: cleanText(snapshot.provider) || 'Snapshot محفوظ', home, away };
+    const eventList = [
+      ...asList(normalized.eventsDetailed?.all),
+      ...asList(normalized.eventsDetailed),
+      ...asList(normalized.events),
+      ...asList(data.eventsDetailed?.all),
+      ...asList(data.eventsDetailed),
+      ...asList(data.events),
+    ];
+    for (const row of eventList) {
+      const event = normalizeSnapshotEvent(row, rows.length, homeTeam, awayTeam);
+      if (!event) continue;
+      const key = `${event.minute ?? ''}|${String(event.type || '').toLowerCase()}|${event.teamId || ''}|${teamKey(event.playerName)}|${teamKey(event.detail).slice(0, 60)}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      rows.push(event);
+    }
+    if (rows.length) break;
   }
-  return null;
+  return rows.sort((a, b) => Number(a.minute ?? 999) - Number(b.minute ?? 999)).slice(0, 120);
 }
 
 function normalizePlayerStat(row: any, homeTeam: MatchTeamLite, awayTeam: MatchTeamLite): MatchPlayerStatItem | null {
   const player = row?.player || row?.athlete || row;
   const playerName = cleanText(player?.name || row?.playerName || row?.player_name || row?.name);
   if (!playerName) return null;
-  const rawTeamName = cleanText(row?.teamName || row?.team_name || row?.team?.name || row?.team);
   const teamId = row?.teamId === homeTeam.id || looksLikeTeam(row, homeTeam) ? homeTeam.id : row?.teamId === awayTeam.id || looksLikeTeam(row, awayTeam) ? awayTeam.id : cleanText(row?.teamId || row?.team_id);
-  const teamName = teamId === homeTeam.id ? homeTeam.name : teamId === awayTeam.id ? awayTeam.name : rawTeamName;
-  return { playerId: cleanText(player?.id || row?.playerId || row?.player_id || row?.id), playerName, teamId, teamName, position: cleanText(player?.position || row?.position), rating: toNumber(row?.rating || row?.score), started: typeof row?.started === 'boolean' ? row.started : Boolean(row?.starting || row?.isStarter || row?.starter), played: row?.played === false ? false : true, minutes: toNumber(row?.minutes || row?.minutesPlayed || row?.minutes_played), goals: toNumber(row?.goals), assists: toNumber(row?.assists), shots: toNumber(row?.shots), shotsOnTarget: toNumber(row?.shotsOnTarget || row?.shots_on_target), passes: toNumber(row?.passes), accuratePasses: toNumber(row?.accuratePasses || row?.accurate_passes), keyPasses: toNumber(row?.keyPasses || row?.key_passes), tackles: toNumber(row?.tackles), interceptions: toNumber(row?.interceptions), clearances: toNumber(row?.clearances), saves: toNumber(row?.saves) };
+  return {
+    playerId: cleanText(player?.id || row?.playerId || row?.player_id || row?.id),
+    playerName,
+    teamId,
+    teamName: teamId === homeTeam.id ? homeTeam.name : teamId === awayTeam.id ? awayTeam.name : cleanText(row?.teamName || row?.team_name || row?.team?.name),
+    position: cleanText(player?.position || row?.position),
+    rating: toNumber(row?.rating || row?.score),
+    started: typeof row?.started === 'boolean' ? row.started : Boolean(row?.starting || row?.isStarter || row?.starter),
+    played: row?.played === false ? false : true,
+    minutes: toNumber(row?.minutes || row?.minutesPlayed || row?.minutes_played),
+    goals: toNumber(row?.goals),
+    assists: toNumber(row?.assists),
+    shots: toNumber(row?.shots),
+    shotsOnTarget: toNumber(row?.shotsOnTarget || row?.shots_on_target),
+    passes: toNumber(row?.passes),
+    accuratePasses: toNumber(row?.accuratePasses || row?.accurate_passes),
+    keyPasses: toNumber(row?.keyPasses || row?.key_passes),
+    tackles: toNumber(row?.tackles),
+    interceptions: toNumber(row?.interceptions),
+    clearances: toNumber(row?.clearances),
+    saves: toNumber(row?.saves),
+  };
 }
 
 function extractPlayerStats(snapshots: any[], homeTeam: MatchTeamLite, awayTeam: MatchTeamLite): MatchPlayerStatItem[] {
   const rows: MatchPlayerStatItem[] = [];
   const seen = new Set<string>();
-  for (const snapshot of snapshots) {
+  for (const snapshot of snapshots.filter(isTheStatsSnapshot)) {
     const data = rawData(snapshot);
     const normalized = data.normalized || {};
     const list = [...asList(normalized.playerStats), ...asList(data.playerStats), ...asList(data.players)];
@@ -195,93 +236,37 @@ function extractPlayerStats(snapshots: any[], homeTeam: MatchTeamLite, awayTeam:
   return rows.sort((a, b) => (Number(b.rating || 0) - Number(a.rating || 0)) || (Number(b.goals || 0) - Number(a.goals || 0))).slice(0, 60);
 }
 
-function coord(value: any) {
-  const n = toNumber(value);
-  if (n === null) return null;
-  if (n >= 0 && n <= 1) return n * 100;
-  if (n >= 0 && n <= 100) return n;
-  return null;
+function extractAdvancedData(snapshots: any[], homeTeam: MatchTeamLite, awayTeam: MatchTeamLite): MatchAdvancedData {
+  const theStats = snapshots.find(isTheStatsSnapshot);
+  const normalized = theStats?.rawData && typeof theStats.rawData === 'object' ? (theStats.rawData as any).normalized || {} : {};
+  const matchInfo = normalized.matchInfo || {};
+  const npxgRaw = matchInfo.npxgSummary?.live || matchInfo.npxgSummary?.stored || null;
+  return {
+    venue: cleanVenue(matchInfo.venue),
+    city: cleanText(matchInfo.city),
+    referee: cleanText(matchInfo.referee),
+    finalScore: matchInfo.finalScore || null,
+    xg: null,
+    npxg: npxgRaw ? { home: toNumber(npxgRaw.home_team ?? npxgRaw.home), away: toNumber(npxgRaw.away_team ?? npxgRaw.away) } : null,
+    events: finalTheStatsEvents(snapshots, homeTeam, awayTeam),
+    shotmap: [],
+    playerStats: extractPlayerStats(snapshots, homeTeam, awayTeam),
+  };
 }
 
-function eventCoordinate(row: any, axis: 'x' | 'y') {
-  const direct = coord(row?.[axis] ?? row?.[`start${axis.toUpperCase()}`] ?? row?.location?.[axis] ?? row?.coordinates?.[axis] ?? row?.position?.[axis]);
-  if (direct !== null) return direct;
-  const shot = row?.shot || row?.shotmap || row?.event;
-  return coord(shot?.[axis] ?? shot?.location?.[axis] ?? shot?.coordinates?.[axis] ?? shot?.position?.[axis]);
-}
-
-function shotFromEvent(row: any) {
-  const shot = row?.shot || row?.shotmap || row?.event || null;
-  if (!shot) return null;
-  return { id: cleanText(shot.id || row.id), minute: toNumber(shot.minute ?? row.minute), playerName: cleanText(shot.playerName || row.playerName), teamName: cleanText(shot.teamName || row.teamName), x: eventCoordinate(row, 'x'), y: eventCoordinate(row, 'y'), xg: toNumber(shot.xg || row.xg), outcome: cleanText(shot.outcome || row.outcome), isGoal: Boolean(shot.isGoal || row.isGoal) };
-}
-
-function normalizeSnapshotEvent(row: any, index: number, homeTeam: MatchTeamLite, awayTeam: MatchTeamLite): MatchEventView | null {
-  const type = cleanText(row?.type || row?.eventType || row?.event_type || row?.incident_type || row?.name) || 'event';
-  const minute = toNumber(row?.minute ?? row?.time?.minute ?? row?.elapsed ?? row?.match_minute ?? row?.event_minute);
-  const playerName = cleanText(row?.playerName || row?.player_name || row?.player?.name || row?.athlete?.name || row?.scorer?.name);
-  const detail = cleanText(row?.detail || row?.description || row?.comment || row?.text || row?.message) || type;
-  const teamName = cleanText(row?.teamName || row?.team_name || row?.team?.name || row?.side);
-  const teamId = row?.teamId === homeTeam.id || looksLikeTeam({ ...row, teamName }, homeTeam) ? homeTeam.id : row?.teamId === awayTeam.id || looksLikeTeam({ ...row, teamName }, awayTeam) ? awayTeam.id : cleanText(row?.teamId || row?.team_id);
-  return { id: cleanText(row?.id) || `thestats-event-${index}-${minute ?? 'na'}-${type}`, minute, minuteLabel: eventMinuteLabel({ minute, detail }), type, icon: eventIcon(type), teamId, playerName, detail, sourceName: 'THE_STATS_API_EXTRAS', sourceUrl: null, x: eventCoordinate(row, 'x'), y: eventCoordinate(row, 'y'), shot: shotFromEvent(row) };
-}
-
-function normalizeShotEvent(row: any, index: number, homeTeam: MatchTeamLite, awayTeam: MatchTeamLite): MatchEventView | null {
-  const minute = toNumber(row?.minute ?? row?.time?.minute ?? row?.elapsed);
-  const playerName = cleanText(row?.playerName || row?.player_name || row?.player?.name || row?.athlete?.name || row?.shooter?.name);
-  const teamName = cleanText(row?.teamName || row?.team_name || row?.team?.name);
-  const x = eventCoordinate(row, 'x');
-  const y = eventCoordinate(row, 'y');
-  const type = Boolean(row?.isGoal) || /goal|scored/i.test(String(row?.outcome || row?.result || '')) ? 'goal' : 'shot';
-  const teamId = row?.teamId === homeTeam.id || looksLikeTeam({ ...row, teamName }, homeTeam) ? homeTeam.id : row?.teamId === awayTeam.id || looksLikeTeam({ ...row, teamName }, awayTeam) ? awayTeam.id : cleanText(row?.teamId || row?.team_id);
-  return { id: cleanText(row?.id) || `thestats-shot-${index}-${minute ?? 'na'}-${playerName || 'shot'}`, minute, minuteLabel: eventMinuteLabel({ minute }), type, icon: eventIcon(type), teamId, playerName, detail: cleanText(row?.detail || row?.outcome || row?.result) || (type === 'goal' ? 'هدف' : 'تسديدة'), sourceName: 'THE_STATS_API_SHOTMAP', sourceUrl: null, x, y, shot: { id: cleanText(row?.id), minute, playerName, teamName, x, y, xg: toNumber(row?.xg || row?.expected_goals), outcome: cleanText(row?.outcome || row?.result), isGoal: type === 'goal' } };
-}
-
-function extractSnapshotEvents(snapshots: any[], homeTeam: MatchTeamLite, awayTeam: MatchTeamLite): MatchEventView[] {
-  const rows: MatchEventView[] = [];
-  const seen = new Set<string>();
-  for (const snapshot of snapshots) {
+function extractBasicInfo(snapshots: any[]) {
+  let venue: string | null = null;
+  let city: string | null = null;
+  let referee: string | null = null;
+  for (const snapshot of snapshots.filter(isTheStatsSnapshot).slice(0, 4)) {
     const data = rawData(snapshot);
-    const normalized = data.normalized || {};
-    const eventList = [...asList(normalized.eventsDetailed?.all), ...asList(normalized.events), ...asList(data.eventsDetailed?.all), ...asList(data.events)];
-    const shotList = [...asList(normalized.shotmap), ...asList(data.shotmap)];
-    for (const item of [...eventList.map((row, index) => normalizeSnapshotEvent(row, index, homeTeam, awayTeam)), ...shotList.map((row, index) => normalizeShotEvent(row, index, homeTeam, awayTeam))]) {
-      if (!item) continue;
-      const key = `${item.minute ?? ''}|${String(item.type).toLowerCase()}|${item.teamId || ''}|${normalizeGroupKey(item.playerName || '') || item.playerName || ''}|${String(item.detail || '').slice(0, 60)}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      rows.push(item);
-    }
-    if (rows.length >= 120) break;
-  }
-  return rows.sort((a, b) => Number(a.minute ?? 999) - Number(b.minute ?? 999)).slice(0, 120);
-}
-
-function extractBasicInfo(match: any, snapshots: any[]) {
-  const directVenue = cleanVenue(match.venue) || cleanVenue(match.stadium) || cleanVenue(match.location);
-  const directCity = cleanText(match.city);
-  const directReferee = cleanText(match.referee);
-  let venue = directVenue;
-  let city = directCity;
-  let referee = directReferee;
-  for (const snapshot of snapshots.slice(0, 6)) {
-    const data = rawData(snapshot);
-    const normalized = data.normalized || {};
-    const info = data.matchInfo || normalized.matchInfo || data;
-    venue ||= cleanVenue(info.venue || findDeep(data, ['venue', 'stadium', 'ground', 'arena', 'venue_name', 'stadium_name']));
-    city ||= cleanText(info.city || findDeep(data, ['city', 'venue_city', 'location_city', 'town']));
-    referee ||= cleanText(info.referee || findDeep(data, ['referee', 'main_referee', 'referee_name']));
+    const info = data.matchInfo || data.normalized?.matchInfo || data;
+    venue ||= cleanVenue(info.venue || info.stadium || info.ground);
+    city ||= cleanText(info.city || info.venue_city);
+    referee ||= cleanText(info.referee || info.main_referee || info.referee_name);
     if (venue && city && referee) break;
   }
   return { venue, city, referee };
-}
-
-function extractAdvancedData(snapshots: any[], homeTeam: MatchTeamLite, awayTeam: MatchTeamLite): MatchAdvancedData {
-  const extras = snapshots.find((snapshot) => String(snapshot.provider || '').toUpperCase() === 'THE_STATS_API_EXTRAS') || snapshots.find((snapshot) => String(snapshot.provider || '').toUpperCase().includes('THE_STATS'));
-  const normalized = extras?.rawData && typeof extras.rawData === 'object' ? (extras.rawData as any).normalized || {} : {};
-  const matchInfo = normalized.matchInfo || {};
-  const npxgRaw = matchInfo.npxgSummary?.live || matchInfo.npxgSummary?.stored || null;
-  return { venue: cleanVenue(matchInfo.venue), city: cleanText(matchInfo.city), referee: cleanText(matchInfo.referee), finalScore: matchInfo.finalScore || null, xg: null, npxg: npxgRaw ? { home: toNumber(npxgRaw.home_team ?? npxgRaw.home), away: toNumber(npxgRaw.away_team ?? npxgRaw.away) } : null, events: extractSnapshotEvents(snapshots, homeTeam, awayTeam), shotmap: [], playerStats: extractPlayerStats(snapshots, homeTeam, awayTeam) };
 }
 
 function forceFinishedStatus(match: any, current: MatchStatusView): MatchStatusView {
@@ -290,12 +275,25 @@ function forceFinishedStatus(match: any, current: MatchStatusView): MatchStatusV
   return current;
 }
 
+function mergeEventViews(dbEvents: MatchEventView[], theStatsEvents: MatchEventView[], status: MatchStatusView) {
+  if (status.isFinished) return theStatsEvents;
+  const rows: MatchEventView[] = [];
+  const seen = new Set<string>();
+  for (const event of [...theStatsEvents, ...dbEvents]) {
+    const key = `${event.minute ?? ''}|${String(event.type || '').toLowerCase()}|${event.teamId || ''}|${teamKey(event.playerName)}|${teamKey(event.detail).slice(0, 50)}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    rows.push(event);
+  }
+  return rows.sort((a, b) => Number(a.minute ?? 999) - Number(b.minute ?? 999)).slice(0, 120);
+}
+
 function sourceChecklist(match: any, statsAvailable: boolean, eventsCount: number, lineupAvailable: boolean, playerStatsCount: number): SourceChecklistItem[] {
   return [
     { label: 'بيانات المباراة والمنتخبين', status: match ? 'ready' : 'missing', note: 'الفرق، الموعد، الحالة والنتيجة الأساسية.' },
     { label: 'الإحصائيات الحية والنهائية', status: statsAvailable ? 'ready' : 'missing', note: statsAvailable ? 'تم حفظ Snapshot إحصائي من مزود البيانات.' : 'سيتم تحديثها تلقائيًا عند وصول Snapshot جديد.' },
-    { label: 'أحداث المباراة', status: eventsCount > 0 ? 'ready' : 'missing', note: eventsCount > 0 ? 'الأحداث محفوظة في قاعدة البيانات.' : 'تظهر الأحداث عند توفر مصدر موثق.' },
-    { label: 'التشكيلات', status: lineupAvailable ? 'ready' : 'optional', note: lineupAvailable ? 'تم العثور على تشكيل محفوظ في Snapshot.' : 'ستظهر التشكيلات عند حفظها من مزود موثق أو إدخالها يدويًا.' },
+    { label: 'أحداث المباراة النهائية', status: eventsCount > 0 ? 'ready' : 'missing', note: eventsCount > 0 ? 'بعد نهاية المباراة يتم عرض أحداث TheStats فقط بدون دمج iSport.' : 'لم تصل أحداث TheStats النهائية بعد.' },
+    { label: 'التشكيلات', status: lineupAvailable ? 'ready' : 'optional', note: lineupAvailable ? 'تم العثور على تشكيل محفوظ.' : 'ستظهر التشكيلات عند حفظها من مزود موثق أو إدخالها يدويًا.' },
     { label: 'تقييمات اللاعبين', status: playerStatsCount > 0 ? 'ready' : 'optional', note: playerStatsCount > 0 ? 'تقييمات وإحصائيات اللاعبين محفوظة.' : 'تظهر تقييمات اللاعبين بعد توفر player stats محفوظة.' },
   ];
 }
@@ -320,18 +318,6 @@ function buildTacticalKeys(homeName: string, awayName: string, statsAvailable: b
   return keys.slice(0, 4);
 }
 
-function mergeEventViews(dbEvents: MatchEventView[], snapshotEvents: MatchEventView[]) {
-  const rows: MatchEventView[] = [];
-  const seen = new Set<string>();
-  for (const event of [...snapshotEvents, ...dbEvents]) {
-    const key = `${event.minute ?? ''}|${String(event.type || '').toLowerCase()}|${event.teamId || ''}|${normalizeGroupKey(event.playerName || '') || event.playerName || ''}|${String(event.detail || '').slice(0, 50)}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    rows.push(event);
-  }
-  return rows.sort((a, b) => Number(a.minute ?? 999) - Number(b.minute ?? 999)).slice(0, 120);
-}
-
 export async function getMatchPageDataFast(matchId: string): Promise<MatchPageData | null> {
   const match = await prisma.match.findUnique({ where: { id: matchId }, include: { homeTeam: true, awayTeam: true, events: { orderBy: [{ minute: 'asc' }, { createdAt: 'asc' }], take: 80 }, statsSnapshots: { orderBy: { capturedAt: 'desc' }, take: 12 } } });
   if (!match) return null;
@@ -347,7 +333,6 @@ export async function getMatchPageDataFast(matchId: string): Promise<MatchPageDa
   const homeTeam = teamLite(match.homeTeam);
   const awayTeam = teamLite(match.awayTeam);
   const advanced = extractAdvancedData(snapshots, homeTeam, awayTeam);
-  const officialLineup = extractOfficialLineup(snapshots, homeTeam, awayTeam);
   const score = scoreForDisplay(match, snapshots);
   const status = forceFinishedStatus(match, buildStatusView(match, snapshots));
   const stats = metricDefinitions().map(([key, label, homeKey, awayKey, suffix]) => buildStatMetric(snapshots, key, label, homeKey, awayKey, suffix));
@@ -356,8 +341,8 @@ export async function getMatchPageDataFast(matchId: string): Promise<MatchPageDa
   const groupStandings = groupKey ? buildGroupStandings(allMatches as any[], groupKey) : [];
   const thirdPlaceTable = buildBestThirdsTable(allMatches as any[]);
   const dbEvents: MatchEventView[] = (match.events || []).map(buildEventView);
-  const pageEvents = mergeEventViews(dbEvents, advanced.events || []);
-  const basicInfo = extractBasicInfo(match, snapshots);
+  const pageEvents = mergeEventViews(dbEvents, advanced.events || [], status);
+  const basicInfo = extractBasicInfo(snapshots);
   const groupLabelValue = groupKey ? `المجموعة ${groupKey}` : null;
   const stageLabelValue = groupKey ? `المجموعة ${groupKey}` : stageLabel(match.stage, null);
   const sources: MatchSourceView[] = [
@@ -365,5 +350,35 @@ export async function getMatchPageDataFast(matchId: string): Promise<MatchPageDa
     ...buildSourceList(snapshots),
   ];
 
-  return { id: match.id, title: `${homeTeam.name} ضد ${awayTeam.name}`, matchDate: match.matchDate.toISOString(), venue: basicInfo.venue || cleanVenue(advanced.venue), city: basicInfo.city || cleanText(advanced.city), referee: basicInfo.referee || cleanText(advanced.referee), competition: process.env.NEXT_PUBLIC_COMPETITION_NAME || 'كأس العالم 2026', groupLabel: groupLabelValue, stageLabel: stageLabelValue, homeTeam, awayTeam, score, status, stats, events: pageEvents, homePlayers: players.filter((player) => player.teamId === match.homeTeamId).map(playerLite), awayPlayers: players.filter((player) => player.teamId === match.awayTeamId).map(playerLite), officialLineup, advanced, voteEndpoint: `/api/matches/${match.id}/votes`, groupStandings, thirdPlaceTable, tacticalKeys: buildTacticalKeys(homeTeam.name, awayTeam.name, statsAvailable, digest), matchImpact: buildMatchImpact(match.homeTeamId, match.awayTeamId, groupStandings, thirdPlaceTable), digest: digest ? { summary: digest.summary, turningPoint: digest.turningPoint, scoreLine: digest.scoreLine, href: `/match-digests/${match.id}` } : null, relatedArticles: relatedArticlesFrom(relatedNews, digest, match.id), sources, sourceChecklist: sourceChecklist(match, statsAvailable, pageEvents.length, Boolean(officialLineup), advanced.playerStats.length), lastUpdatedAt: maxDateIso([...(match.statsSnapshots || []).map((snapshot) => snapshot.capturedAt), ...(match.events || []).map((event) => event.updatedAt), match.matchDate]) };
+  return {
+    id: match.id,
+    title: `${homeTeam.name} ضد ${awayTeam.name}`,
+    matchDate: match.matchDate.toISOString(),
+    venue: basicInfo.venue || cleanVenue(advanced.venue),
+    city: basicInfo.city || cleanText(advanced.city),
+    referee: basicInfo.referee || cleanText(advanced.referee),
+    competition: process.env.NEXT_PUBLIC_COMPETITION_NAME || 'كأس العالم 2026',
+    groupLabel: groupLabelValue,
+    stageLabel: stageLabelValue,
+    homeTeam,
+    awayTeam,
+    score,
+    status,
+    stats,
+    events: pageEvents,
+    homePlayers: players.filter((player) => player.teamId === match.homeTeamId).map(playerLite),
+    awayPlayers: players.filter((player) => player.teamId === match.awayTeamId).map(playerLite),
+    officialLineup: null,
+    advanced,
+    voteEndpoint: `/api/matches/${match.id}/votes`,
+    groupStandings,
+    thirdPlaceTable,
+    tacticalKeys: buildTacticalKeys(homeTeam.name, awayTeam.name, statsAvailable, digest),
+    matchImpact: buildMatchImpact(match.homeTeamId, match.awayTeamId, groupStandings, thirdPlaceTable),
+    digest: digest ? { summary: digest.summary, turningPoint: digest.turningPoint, scoreLine: digest.scoreLine, href: `/match-digests/${match.id}` } : null,
+    relatedArticles: relatedArticlesFrom(relatedNews, digest, match.id),
+    sources,
+    sourceChecklist: sourceChecklist(match, statsAvailable, pageEvents.length, false, advanced.playerStats.length),
+    lastUpdatedAt: maxDateIso([...(match.statsSnapshots || []).map((snapshot) => snapshot.capturedAt), ...(match.events || []).map((event) => event.updatedAt), match.matchDate]),
+  };
 }
