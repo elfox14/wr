@@ -15,9 +15,14 @@ function jsonResponse(payload: unknown, status = 200) {
   });
 }
 
+function boolFrom(value: string | null | undefined, fallback = false) {
+  if (value === null || value === undefined || value === '') return fallback;
+  return ['1', 'true', 'yes', 'on'].includes(String(value).trim().toLowerCase());
+}
+
 function boolText(value: string | null, fallback: string) {
   if (value === null || value === '') return fallback;
-  return ['1', 'true', 'yes', 'on'].includes(value.trim().toLowerCase()) ? 'true' : 'false';
+  return boolFrom(value) ? 'true' : 'false';
 }
 
 function numberText(value: string | null, fallback: number, min: number, max: number) {
@@ -87,7 +92,23 @@ async function run(req: Request) {
     return jsonResponse({ ok: false, error: 'Unauthorized' }, 401);
   }
 
+  const url = new URL(req.url);
   const startedAt = Date.now();
+  const quick = boolFrom(url.searchParams.get('quick'), false) || boolFrom(url.searchParams.get('background'), false);
+
+  if (quick) {
+    runFreshWorkerProcess(req).catch((error) => {
+      console.error('[football-data-results-sync-cron] background failed:', error);
+    });
+
+    return jsonResponse({
+      ok: true,
+      mode: 'http_football_data_results_sync_cron_v2_quick_ack',
+      durationMs: Date.now() - startedAt,
+      note: 'Accepted. Worker is running asynchronously; check Render logs or saved snapshots for details.',
+    });
+  }
+
   try {
     const worker = await runFreshWorkerProcess(req);
     return jsonResponse({
