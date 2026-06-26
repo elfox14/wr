@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { resolveTheStatsProviderId } from '@/lib/theStatsMatchExtras';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -11,17 +10,6 @@ export async function GET() {
   try {
     await prisma.$queryRaw`SELECT 1`;
 
-    const testMatch = await prisma.match.findFirst({
-      where: {
-        homeTeam: { name: 'Sweden' },
-        awayTeam: { name: 'Tunisia' }
-      }
-    });
-
-    const resolutionResult = testMatch 
-      ? await resolveTheStatsProviderId(testMatch, {}).catch(err => ({ error: err.message }))
-      : null;
-
     return NextResponse.json({
       ok: true,
       status: 'healthy',
@@ -30,7 +18,6 @@ export async function GET() {
       uptimeSeconds: Math.round(process.uptime()),
       responseTimeMs: Date.now() - startedAt,
       checkedAt: new Date().toISOString(),
-      resolutionResult,
     }, {
       headers: { 'Cache-Control': 'no-store, max-age=0' },
     });
