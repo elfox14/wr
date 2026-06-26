@@ -21,7 +21,31 @@ function str(...values: any[]) {
 }
 function n(value: any) { if (value === null || value === undefined || value === '') return null; const number = Number(typeof value === 'string' ? value.replace('%', '').trim() : value); return Number.isFinite(number) ? number : null; }
 function bool(value: any) { if (typeof value === 'boolean') return value; if (value === null || value === undefined || value === '') return null; const s = String(value).trim().toLowerCase(); if (['1', 'true', 'yes', 'y'].includes(s)) return true; if (['0', 'false', 'no', 'n'].includes(s)) return false; return null; }
-function key(value: any) { return String(value || '').toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/&/g, ' and ').replace(/[^a-z0-9\u0600-\u06ff]+/g, ' ').replace(/\s+/g, ' ').trim().replace('czechia', 'czech republic').replace('usa', 'united states').replace('u s a', 'united states').replace('united states of america', 'united states').replace('turkiye', 'turkey').replace('türkiye', 'turkey'); }
+function key(value: any) { 
+  return String(value || '').toLowerCase().normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/&/g, ' and ')
+    .replace(/[^a-z0-9\u0600-\u06ff]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace('czechia', 'czech republic')
+    .replace('usa', 'united states')
+    .replace('u s a', 'united states')
+    .replace('united states of america', 'united states')
+    .replace('turkiye', 'turkey')
+    .replace('türkiye', 'turkey')
+    .replace('korea republic', 'south korea')
+    .replace('republic of korea', 'south korea')
+    .replace('cote d ivoire', 'ivory coast')
+    .replace('cote divoire', 'ivory coast')
+    .replace('democratic republic of the congo', 'dr congo')
+    .replace('congo dr', 'dr congo')
+    .replace('d r congo', 'dr congo')
+    .replace('bosnia and herzegovina', 'bosnia')
+    .replace('bosnia herzegovina', 'bosnia')
+    .replace('bosnia h', 'bosnia')
+    .replace('cape verde islands', 'cape verde');
+}
 function words(value: any) { return key(value).split(' ').filter((w) => w.length > 1); }
 function similarity(a: any, b: any) { const aa = key(a); const bb = key(b); if (!aa || !bb) return 0; if (aa === bb) return 100; if (aa.includes(bb) || bb.includes(aa)) return 88; const aw = new Set(words(aa)); const bw = new Set(words(bb)); if (!aw.size || !bw.size) return 0; const hit = Array.from(aw).filter((w) => bw.has(w)).length; return Math.round((hit / Math.max(aw.size, bw.size)) * 75); }
 function teamScore(providerName: any, localTeam: any) { return Math.max(similarity(providerName, localTeam?.name), similarity(providerName, localTeam?.code)); }
