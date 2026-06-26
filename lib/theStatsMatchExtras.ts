@@ -202,7 +202,7 @@ export async function collectTheStatsMatchExtras(match: any, options: { dryRun?:
   const timeoutMs = Math.max(3000, Math.min(60000, Number(options.timeoutMs || 15000)));
   const delayMs = Math.max(0, Math.min(5000, Number(options.delayMs || 350)));
   const resolved = await resolveTheStatsProviderId(match, options.query || {});
-  if (!resolved.id) return { ok: false, matchId: match.id, error: 'Could not resolve provider match id', resolved };
+  if (!resolved.id) return { ok: false, matchId: match.id, error: 'Could not resolve provider match id', resolved, debug: { resolved } };
   const id = encodeURIComponent(String(resolved.id));
   const mode = options.endpointMode === 'full' || options.endpointMode === 'all' ? 'full' : 'essential';
   const endpoints = [
