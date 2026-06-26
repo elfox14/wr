@@ -18,6 +18,11 @@ function asNumber(value: unknown) {
   return Number.isFinite(n) ? n : null;
 }
 
+function boolParam(value: string | null, fallback = false) {
+  if (value === null || value === '') return fallback;
+  return ['1', 'true', 'yes', 'on'].includes(String(value).toLowerCase());
+}
+
 function cleanProviderId(value: string | null) {
   const raw = String(value || '').trim();
   if (!raw) return null;
@@ -177,6 +182,22 @@ function teamIdFromName(match: any, teamName: string | null) {
   return null;
 }
 
+async function cleanupManualTheStatsData(matchId: string, provider: string) {
+  const deletedSnapshots = await prisma.matchStatsSnapshot.deleteMany({
+    where: { matchId, provider },
+  });
+  const deletedEvents = await prisma.matchEvent.deleteMany({
+    where: {
+      matchId,
+      OR: [
+        { sourceName: 'THE_STATS_API_MANUAL_FINAL' },
+        { sourceName: 'THE_STATS_API_MANUAL_BASIC' },
+      ],
+    },
+  });
+  return { snapshots: deletedSnapshots.count, events: deletedEvents.count };
+}
+
 async function run(req: Request) {
   if (!hasValidAdminSecret(req)) {
     return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401, headers: { 'Cache-Control': 'no-store' } });
@@ -185,9 +206,11 @@ async function run(req: Request) {
   const url = new URL(req.url);
   const matchId = url.searchParams.get('matchId');
   const providerMatchId = cleanProviderId(url.searchParams.get('providerMatchId'));
-  const dryRun = ['1', 'true', 'yes'].includes(String(url.searchParams.get('dryRun') || '').toLowerCase());
-  const includeRaw = ['1', 'true', 'yes'].includes(String(url.searchParams.get('includeRaw') || '').toLowerCase());
-  const syncAnimation = !['0', 'false', 'no'].includes(String(url.searchParams.get('syncAnimation') || '').toLowerCase());
+  const dryRun = boolParam(url.searchParams.get('dryRun'), false);
+  const includeRaw = boolParam(url.searchParams.get('includeRaw'), false);
+  const writeEvents = boolParam(url.searchParams.get('writeEvents'), false);
+  const replaceManualSnapshot = !['0', 'false', 'no'].includes(String(url.searchParams.get('replaceManualSnapshot') || 'true').toLowerCase());
+  const syncAnimation = writeEvents && !['0', 'false', 'no'].includes(String(url.searchParams.get('syncAnimation') || '').toLowerCase());
   const stopOnRateLimit = !['0', 'false', 'no'].includes(String(url.searchParams.get('stopOnRateLimit') || 'true').toLowerCase());
   const timeoutMs = Math.max(3000, Math.min(60000, Number(url.searchParams.get('timeoutMs') || 30000)));
   const delayMs = Math.max(0, Math.min(10000, Number(url.searchParams.get('delayMs') || 1500)));
@@ -236,13 +259,17 @@ async function run(req: Request) {
 
   let snapshotId: string | null = null;
   let insertedEvents = 0;
+  let cleanup = { snapshots: 0, events: 0 };
+  const provider = scope === 'basic' ? 'THE_STATS_API_MANUAL_BASIC' : 'THE_STATS_API_MANUAL_FINAL';
 
   if (!dryRun && hasUsefulData) {
+    if (replaceManualSnapshot) cleanup = await cleanupManualTheStatsData(matchId, provider);
+
     const snapshot = await prisma.matchStatsSnapshot.create({
       data: {
         id: randomUUID(),
         matchId,
-        provider: scope === 'basic' ? 'THE_STATS_API_MANUAL_BASIC' : 'THE_STATS_API_MANUAL_FINAL',
+        provider,
         providerMatchId: idNumber(providerMatchId),
         homeScore: match.homeScore,
         awayScore: match.awayScore,
@@ -252,6 +279,12 @@ async function run(req: Request) {
           importedAt: new Date().toISOString(),
           endpoints: endpoints.map((item) => ({ key: item.key, ok: item.ok, error: item.ok ? null : item.error })),
           normalized: { stats, lineups, eventsDetailed: { all: events }, shotmap: shots, playerStats: players },
+          noDuplicatePolicy: {
+            storage: 'snapshot-only-by-default',
+            matchEventsWritten: writeEvents,
+            deletedOldManualMatchEvents: cleanup.events,
+            replacedOldManualSnapshots: cleanup.snapshots,
+          },
           raw: includeRaw ? Object.fromEntries(endpoints.filter((item) => item.ok).map((item) => [item.key, item.payload])) : undefined,
         },
       },
@@ -259,26 +292,28 @@ async function run(req: Request) {
     });
     snapshotId = snapshot.id;
 
-    for (const event of events) {
-      const exists = await prisma.matchEvent.findFirst({
-        where: { matchId, minute: event.minute, type: event.type, playerName: event.playerName, sourceName: 'THE_STATS_API_MANUAL_FINAL' },
-        select: { id: true },
-      }).catch(() => null);
-      if (exists) continue;
-      await prisma.matchEvent.create({
-        data: {
-          id: randomUUID(),
-          matchId,
-          minute: event.minute,
-          type: event.type,
-          teamId: teamIdFromName(match, event.teamName),
-          playerId: event.playerId,
-          playerName: event.playerName,
-          detail: event.detail || event.type,
-          sourceName: 'THE_STATS_API_MANUAL_FINAL',
-        },
-      });
-      insertedEvents += 1;
+    if (writeEvents) {
+      for (const event of events) {
+        const exists = await prisma.matchEvent.findFirst({
+          where: { matchId, minute: event.minute, type: event.type, playerName: event.playerName, sourceName: 'THE_STATS_API_MANUAL_FINAL' },
+          select: { id: true },
+        }).catch(() => null);
+        if (exists) continue;
+        await prisma.matchEvent.create({
+          data: {
+            id: randomUUID(),
+            matchId,
+            minute: event.minute,
+            type: event.type,
+            teamId: teamIdFromName(match, event.teamName),
+            playerId: event.playerId,
+            playerName: event.playerName,
+            detail: event.detail || event.type,
+            sourceName: 'THE_STATS_API_MANUAL_FINAL',
+          },
+        });
+        insertedEvents += 1;
+      }
     }
   }
 
@@ -289,18 +324,20 @@ async function run(req: Request) {
 
   return NextResponse.json({
     ok: true,
-    mode: 'manual_final_import_v2_throttled',
+    mode: 'manual_final_import_v3_snapshot_only_default',
     matchId,
     providerMatchId,
     scope,
     dryRun,
     delayMs,
+    writeEvents,
     stoppedEarly,
     endpointsOk: endpoints.filter((item) => item.ok).map((item) => item.key),
     endpointsFailed: endpoints.filter((item) => !item.ok).map((item) => ({ key: item.key, error: item.error })),
     counts: { stats: Object.keys(stats).length, events: events.length, shots: shots.length, players: players.length, lineups: lineups ? 1 : 0 },
     hasUsefulData,
     snapshotId,
+    cleanup,
     insertedEvents,
     animationSync: animationSync ? { ok: animationSync.ok, results: animationSync.results } : null,
   }, { headers: { 'Cache-Control': 'no-store' } });
