@@ -1,8 +1,10 @@
 import prisma from '@/lib/prisma';
 import { getTeamFlagUrl } from '@/lib/teamFlags';
 import type {
+  HeadToHeadItem,
   MatchAdvancedData,
   MatchEventView,
+  MatchFormItem,
   MatchPageData,
   MatchPlayerLite,
   MatchPlayerStatItem,
@@ -10,6 +12,8 @@ import type {
   MatchStatMetric,
   MatchStatusView,
   MatchTeamLite,
+  OfficialLineupPlayer,
+  OfficialLineupView,
   RelatedArticle,
   SourceChecklistItem,
 } from './types';
@@ -72,6 +76,8 @@ function teamLite(team: any): MatchTeamLite {
     coach: team.coach || null,
     fifaRank: team.fifaRank ?? null,
     group: team.group || null,
+    participations: team.participations ?? null,
+    worldCupLegacy: team.worldCupLegacy ?? null,
   };
 }
 
@@ -83,6 +89,7 @@ function playerLite(player: any): MatchPlayerLite {
     image: usableImage(player.image),
     position: player.position || null,
     teamId: player.teamId || null,
+    number: player.number || null,
   };
 }
 
@@ -94,7 +101,7 @@ function normalizeGoodGroup(value: any) {
 function asList(value: any): any[] {
   if (Array.isArray(value)) return value;
   if (!value || typeof value !== 'object') return [];
-  for (const key of ['all', 'events', 'timeline', 'incidents', 'commentary', 'items', 'data', 'results', 'shotmap', 'shots', 'players', 'playerStats', 'player_stats']) {
+  for (const key of ['all', 'events', 'timeline', 'incidents', 'commentary', 'items', 'data', 'results', 'shotmap', 'shots', 'players', 'playerStats', 'player_stats', 'startingXi', 'substitutes', 'lineups']) {
     if (Array.isArray(value[key])) return value[key];
   }
   return [];
@@ -102,6 +109,10 @@ function asList(value: any): any[] {
 
 function teamKey(value: any) {
   return String(value || '').toLowerCase().replace(/[^a-z0-9\u0600-\u06ff]+/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+function playerKey(value: any) {
+  return teamKey(value).replace(/\b(jr|sr|ii|iii)\b/g, '').trim();
 }
 
 function looksLikeTeam(row: any, team: MatchTeamLite) {
@@ -157,6 +168,8 @@ function normalizeSnapshotEvent(row: any, index: number, homeTeam: MatchTeamLite
     x: eventCoordinate(row, 'x'),
     y: eventCoordinate(row, 'y'),
     shot: null,
+    playerImage: usableImage(player?.image || player?.photo || row?.playerImage || row?.player_image || row?.photo),
+    playerNumber: cleanText(player?.number || player?.shirtNumber || row?.number || row?.shirtNumber || row?.shirt_number || row?.jerseyNumber || row?.jersey_number),
   };
 }
 
@@ -199,13 +212,17 @@ function normalizePlayerStat(row: any, homeTeam: MatchTeamLite, awayTeam: MatchT
     teamName: teamId === homeTeam.id ? homeTeam.name : teamId === awayTeam.id ? awayTeam.name : cleanText(row?.teamName || row?.team_name || row?.team?.name),
     position: cleanText(player?.position || row?.position),
     rating: toNumber(row?.rating || row?.score),
-    started: typeof row?.started === 'boolean' ? row.started : Boolean(row?.starting || row?.isStarter || row?.starter),
+    started: typeof row?.started === 'boolean' ? row.started : Boolean(row?.starting || row?.isStarter || row?.starter || row?.lineup === 'start'),
     played: row?.played === false ? false : true,
     minutes: toNumber(row?.minutes || row?.minutesPlayed || row?.minutes_played),
+    image: usableImage(player?.image || player?.photo || row?.image || row?.photo || row?.playerImage || row?.player_image),
+    number: cleanText(player?.number || player?.shirtNumber || row?.number || row?.shirtNumber || row?.shirt_number || row?.jerseyNumber || row?.jersey_number),
+    isCaptain: Boolean(row?.captain || row?.isCaptain || player?.captain),
     goals: toNumber(row?.goals),
     assists: toNumber(row?.assists),
     shots: toNumber(row?.shots),
     shotsOnTarget: toNumber(row?.shotsOnTarget || row?.shots_on_target),
+    shotsOffTarget: toNumber(row?.shotsOffTarget || row?.shots_off_target),
     passes: toNumber(row?.passes),
     accuratePasses: toNumber(row?.accuratePasses || row?.accurate_passes),
     keyPasses: toNumber(row?.keyPasses || row?.key_passes),
@@ -213,6 +230,11 @@ function normalizePlayerStat(row: any, homeTeam: MatchTeamLite, awayTeam: MatchT
     interceptions: toNumber(row?.interceptions),
     clearances: toNumber(row?.clearances),
     saves: toNumber(row?.saves),
+    touches: toNumber(row?.touches),
+    yellowCards: toNumber(row?.yellowCards || row?.yellow_cards),
+    redCards: toNumber(row?.redCards || row?.red_cards),
+    playerSubbedOn: cleanText(row?.playerSubbedOn || row?.subbedOn || row?.subbed_on),
+    playerSubbedOff: cleanText(row?.playerSubbedOff || row?.subbedOff || row?.subbed_off),
   };
 }
 
@@ -231,16 +253,61 @@ function extractPlayerStats(snapshots: any[], homeTeam: MatchTeamLite, awayTeam:
       seen.add(key);
       rows.push(parsed);
     }
-    if (rows.length >= 60) break;
+    if (rows.length >= 70) break;
   }
-  return rows.sort((a, b) => (Number(b.rating || 0) - Number(a.rating || 0)) || (Number(b.goals || 0) - Number(a.goals || 0))).slice(0, 60);
+  return rows.sort((a, b) => {
+    const aStarted = a.started === true ? 0 : 1;
+    const bStarted = b.started === true ? 0 : 1;
+    return aStarted - bStarted || (Number(b.minutes || 0) - Number(a.minutes || 0)) || (Number(b.rating || 0) - Number(a.rating || 0));
+  }).slice(0, 70);
 }
 
-function extractAdvancedData(snapshots: any[], homeTeam: MatchTeamLite, awayTeam: MatchTeamLite): MatchAdvancedData {
+function extractLineupFromPlayers(players: MatchPlayerStatItem[], homeTeam: MatchTeamLite, awayTeam: MatchTeamLite): OfficialLineupView {
+  const toLineupPlayer = (player: MatchPlayerStatItem): OfficialLineupPlayer => ({
+    id: player.playerId || null,
+    name: player.playerName || 'لاعب غير معروف',
+    number: player.number || null,
+    image: player.image || null,
+    position: player.position || null,
+    rating: player.rating ?? null,
+    isCaptain: player.isCaptain || null,
+  });
+  const byTeam = (team: MatchTeamLite) => {
+    const rows = players.filter((player) => player.teamId === team.id || teamKey(player.teamName).includes(teamKey(team.name)));
+    const starting = rows.filter((player) => player.started === true).map(toLineupPlayer);
+    const substitutes = rows.filter((player) => player.started !== true && (Number(player.minutes || 0) > 0 || player.playerSubbedOn || player.playerSubbedOff || player.played)).map(toLineupPlayer);
+    return { teamName: team.name, formation: null, startingXi: starting.slice(0, 11), substitutes: substitutes.slice(0, 12) };
+  };
+  const home = byTeam(homeTeam);
+  const away = byTeam(awayTeam);
+  if (!home.startingXi.length && !away.startingXi.length && !home.substitutes.length && !away.substitutes.length) return null;
+  return { confirmed: true, source: 'THE_STATS_API_EXTRAS', home, away };
+}
+
+function enrichPlayersFromDb(stats: MatchPlayerStatItem[], dbPlayers: any[]) {
+  const byName = new Map<string, any>();
+  for (const p of dbPlayers) byName.set(playerKey(p.name), p);
+  return stats.map((player) => {
+    const asset = byName.get(playerKey(player.playerName));
+    return asset ? { ...player, playerId: player.playerId || asset.id, image: player.image || usableImage(asset.image), position: player.position || asset.position || null, number: player.number || asset.code || null } : player;
+  });
+}
+
+function enrichEventsWithPlayers(events: MatchEventView[], players: MatchPlayerStatItem[]) {
+  const byName = new Map<string, MatchPlayerStatItem>();
+  for (const player of players) if (player.playerName) byName.set(playerKey(player.playerName), player);
+  return events.map((event) => {
+    const player = byName.get(playerKey(event.playerName));
+    return player ? { ...event, playerImage: event.playerImage || player.image || null, playerNumber: event.playerNumber || player.number || null } : event;
+  });
+}
+
+function extractAdvancedData(snapshots: any[], homeTeam: MatchTeamLite, awayTeam: MatchTeamLite, dbPlayers: any[] = []): MatchAdvancedData {
   const theStats = snapshots.find(isTheStatsSnapshot);
   const normalized = theStats?.rawData && typeof theStats.rawData === 'object' ? (theStats.rawData as any).normalized || {} : {};
   const matchInfo = normalized.matchInfo || {};
   const npxgRaw = matchInfo.npxgSummary?.live || matchInfo.npxgSummary?.stored || null;
+  const playerStats = enrichPlayersFromDb(extractPlayerStats(snapshots, homeTeam, awayTeam), dbPlayers);
   return {
     venue: cleanVenue(matchInfo.venue),
     city: cleanText(matchInfo.city),
@@ -248,9 +315,9 @@ function extractAdvancedData(snapshots: any[], homeTeam: MatchTeamLite, awayTeam
     finalScore: matchInfo.finalScore || null,
     xg: null,
     npxg: npxgRaw ? { home: toNumber(npxgRaw.home_team ?? npxgRaw.home), away: toNumber(npxgRaw.away_team ?? npxgRaw.away) } : null,
-    events: finalTheStatsEvents(snapshots, homeTeam, awayTeam),
+    events: enrichEventsWithPlayers(finalTheStatsEvents(snapshots, homeTeam, awayTeam), playerStats),
     shotmap: [],
-    playerStats: extractPlayerStats(snapshots, homeTeam, awayTeam),
+    playerStats,
   };
 }
 
@@ -293,7 +360,7 @@ function sourceChecklist(match: any, statsAvailable: boolean, eventsCount: numbe
     { label: 'بيانات المباراة والمنتخبين', status: match ? 'ready' : 'missing', note: 'الفرق، الموعد، الحالة والنتيجة الأساسية.' },
     { label: 'الإحصائيات الحية والنهائية', status: statsAvailable ? 'ready' : 'missing', note: statsAvailable ? 'تم حفظ Snapshot إحصائي من مزود البيانات.' : 'سيتم تحديثها تلقائيًا عند وصول Snapshot جديد.' },
     { label: 'أحداث المباراة النهائية', status: eventsCount > 0 ? 'ready' : 'missing', note: eventsCount > 0 ? 'بعد نهاية المباراة يتم عرض أحداث TheStats فقط بدون دمج iSport.' : 'لم تصل أحداث TheStats النهائية بعد.' },
-    { label: 'التشكيلات', status: lineupAvailable ? 'ready' : 'optional', note: lineupAvailable ? 'تم العثور على تشكيل محفوظ.' : 'ستظهر التشكيلات عند حفظها من مزود موثق أو إدخالها يدويًا.' },
+    { label: 'التشكيلات', status: lineupAvailable ? 'ready' : 'optional', note: lineupAvailable ? 'تم بناء قائمة المشاركين والأساسيين من بيانات اللاعبين النهائية.' : 'ستظهر التشكيلات عند حفظها من مزود موثق أو إدخالها يدويًا.' },
     { label: 'تقييمات اللاعبين', status: playerStatsCount > 0 ? 'ready' : 'optional', note: playerStatsCount > 0 ? 'تقييمات وإحصائيات اللاعبين محفوظة.' : 'تظهر تقييمات اللاعبين بعد توفر player stats محفوظة.' },
   ];
 }
@@ -309,6 +376,41 @@ function relatedArticlesFrom(news: any[], digest: any | null, matchId: string): 
   return articles.slice(0, 5);
 }
 
+function resultFor(teamScore: number | null, opponentScore: number | null): MatchFormItem['result'] {
+  if (teamScore === null || opponentScore === null) return 'N';
+  if (teamScore > opponentScore) return 'W';
+  if (teamScore < opponentScore) return 'L';
+  return 'D';
+}
+
+function recentForm(allMatches: any[], teamId: string, currentMatchId: string, currentDate: Date): MatchFormItem[] {
+  return allMatches
+    .filter((m) => m.id !== currentMatchId && new Date(m.matchDate).getTime() <= currentDate.getTime() && (m.homeTeamId === teamId || m.awayTeamId === teamId))
+    .sort((a, b) => new Date(b.matchDate).getTime() - new Date(a.matchDate).getTime())
+    .slice(0, 5)
+    .map((m) => {
+      const isHome = m.homeTeamId === teamId;
+      const teamScore = isHome ? m.homeScore : m.awayScore;
+      const opponentScore = isHome ? m.awayScore : m.homeScore;
+      const opponent = isHome ? m.awayTeam : m.homeTeam;
+      return { id: m.id, date: m.matchDate.toISOString(), opponentName: opponent?.name || 'غير معروف', opponentCode: opponent?.code || null, homeAway: isHome ? 'home' : 'away', teamScore, opponentScore, result: resultFor(teamScore, opponentScore), status: m.status, stage: m.stage || m.groupPhase || null };
+    });
+}
+
+function headToHead(allMatches: any[], homeTeamId: string, awayTeamId: string, currentMatchId: string, currentDate: Date): HeadToHeadItem[] {
+  return allMatches
+    .filter((m) => m.id !== currentMatchId && new Date(m.matchDate).getTime() <= currentDate.getTime() && ((m.homeTeamId === homeTeamId && m.awayTeamId === awayTeamId) || (m.homeTeamId === awayTeamId && m.awayTeamId === homeTeamId)))
+    .sort((a, b) => new Date(b.matchDate).getTime() - new Date(a.matchDate).getTime())
+    .slice(0, 6)
+    .map((m) => ({ id: m.id, date: m.matchDate.toISOString(), homeTeamName: m.homeTeam?.name || 'غير معروف', awayTeamName: m.awayTeam?.name || 'غير معروف', homeScore: m.homeScore, awayScore: m.awayScore, status: m.status, stage: m.stage || m.groupPhase || null }));
+}
+
+function worldCupHistory(team: MatchTeamLite) {
+  if (team.participations !== null && team.participations !== undefined) return `${team.name} شارك في كأس العالم ${team.participations} مرة حسب قاعدة البيانات.`;
+  if (team.worldCupLegacy !== null && team.worldCupLegacy !== undefined) return `${team.name} لديه مؤشر إرث عالمي محفوظ بقيمة ${team.worldCupLegacy}.`;
+  return `تاريخ مشاركات ${team.name} في كأس العالم غير متوفر في قاعدة البيانات الحالية.`;
+}
+
 function buildTacticalKeys(homeName: string, awayName: string, statsAvailable: boolean, digest?: any | null) {
   const keys: string[] = [];
   if (digest?.turningPoint) keys.push(`نقطة التحول: ${digest.turningPoint}`);
@@ -319,11 +421,11 @@ function buildTacticalKeys(homeName: string, awayName: string, statsAvailable: b
 }
 
 export async function getMatchPageDataFast(matchId: string): Promise<MatchPageData | null> {
-  const match = await prisma.match.findUnique({ where: { id: matchId }, include: { homeTeam: true, awayTeam: true, events: { orderBy: [{ minute: 'asc' }, { createdAt: 'asc' }], take: 80 }, statsSnapshots: { orderBy: { capturedAt: 'desc' }, take: 12 } } });
+  const match = await prisma.match.findUnique({ where: { id: matchId }, include: { homeTeam: true, awayTeam: true, events: { orderBy: [{ minute: 'asc' }, { createdAt: 'asc' }], take: 80 }, statsSnapshots: { orderBy: { capturedAt: 'desc' }, take: 24 } } });
   if (!match) return null;
 
   const [players, allMatches, digest, relatedNews] = await Promise.all([
-    prisma.asset.findMany({ where: { type: 'PLAYER', teamId: { in: [match.homeTeamId, match.awayTeamId] } }, select: { id: true, name: true, code: true, image: true, position: true, teamId: true }, take: 60, orderBy: [{ position: 'asc' }, { name: 'asc' }] }),
+    prisma.asset.findMany({ where: { type: 'PLAYER', teamId: { in: [match.homeTeamId, match.awayTeamId] } }, select: { id: true, name: true, code: true, image: true, position: true, teamId: true }, take: 80, orderBy: [{ position: 'asc' }, { name: 'asc' }] }),
     prisma.match.findMany({ select: { id: true, homeTeamId: true, awayTeamId: true, homeScore: true, awayScore: true, status: true, matchDate: true, groupPhase: true, stage: true, homeTeam: { select: { id: true, name: true, code: true, image: true, group: true } }, awayTeam: { select: { id: true, name: true, code: true, image: true, group: true } } }, orderBy: { matchDate: 'asc' } }),
     prisma.matchDigest.findUnique({ where: { matchId: match.id } }).catch(() => null),
     prisma.pressNews.findMany({ where: { status: 'published', OR: [{ relatedMatchId: match.id }, { relatedTeamId: { in: [match.homeTeamId, match.awayTeamId] } }] }, orderBy: { publishedAt: 'desc' }, take: 3 }).catch(() => []),
@@ -332,16 +434,19 @@ export async function getMatchPageDataFast(matchId: string): Promise<MatchPageDa
   const snapshots = [...(match.statsSnapshots || [])].sort((a, b) => providerPriority(a) - providerPriority(b) || new Date(b.capturedAt).getTime() - new Date(a.capturedAt).getTime());
   const homeTeam = teamLite(match.homeTeam);
   const awayTeam = teamLite(match.awayTeam);
-  const advanced = extractAdvancedData(snapshots, homeTeam, awayTeam);
+  const advanced = extractAdvancedData(snapshots, homeTeam, awayTeam, players);
   const score = scoreForDisplay(match, snapshots);
   const status = forceFinishedStatus(match, buildStatusView(match, snapshots));
   const stats = metricDefinitions().map(([key, label, homeKey, awayKey, suffix]) => buildStatMetric(snapshots, key, label, homeKey, awayKey, suffix));
   const statsAvailable = stats.some((metric: MatchStatMetric) => metric.available);
   const groupKey = normalizeGoodGroup(match.groupPhase) || normalizeGoodGroup(homeTeam.group) || normalizeGoodGroup(awayTeam.group);
-  const groupStandings = groupKey ? buildGroupStandings(allMatches as any[], groupKey) : [];
-  const thirdPlaceTable = buildBestThirdsTable(allMatches as any[]);
+  const currentDate = match.matchDate;
+  const matchesUntilKickoff = (allMatches as any[]).filter((m) => new Date(m.matchDate).getTime() <= currentDate.getTime());
+  const groupStandings = groupKey ? buildGroupStandings(matchesUntilKickoff as any[], groupKey) : [];
+  const thirdPlaceTable = buildBestThirdsTable(matchesUntilKickoff as any[]);
   const dbEvents: MatchEventView[] = (match.events || []).map(buildEventView);
-  const pageEvents = mergeEventViews(dbEvents, advanced.events || [], status);
+  const pageEvents = enrichEventsWithPlayers(mergeEventViews(dbEvents, advanced.events || [], status), advanced.playerStats);
+  const officialLineup = extractLineupFromPlayers(advanced.playerStats, homeTeam, awayTeam);
   const basicInfo = extractBasicInfo(snapshots);
   const groupLabelValue = groupKey ? `المجموعة ${groupKey}` : null;
   const stageLabelValue = groupKey ? `المجموعة ${groupKey}` : stageLabel(match.stage, null);
@@ -368,7 +473,7 @@ export async function getMatchPageDataFast(matchId: string): Promise<MatchPageDa
     events: pageEvents,
     homePlayers: players.filter((player) => player.teamId === match.homeTeamId).map(playerLite),
     awayPlayers: players.filter((player) => player.teamId === match.awayTeamId).map(playerLite),
-    officialLineup: null,
+    officialLineup,
     advanced,
     voteEndpoint: `/api/matches/${match.id}/votes`,
     groupStandings,
@@ -378,7 +483,14 @@ export async function getMatchPageDataFast(matchId: string): Promise<MatchPageDa
     digest: digest ? { summary: digest.summary, turningPoint: digest.turningPoint, scoreLine: digest.scoreLine, href: `/match-digests/${match.id}` } : null,
     relatedArticles: relatedArticlesFrom(relatedNews, digest, match.id),
     sources,
-    sourceChecklist: sourceChecklist(match, statsAvailable, pageEvents.length, false, advanced.playerStats.length),
+    sourceChecklist: sourceChecklist(match, statsAvailable, pageEvents.length, Boolean(officialLineup?.home?.startingXi?.length || officialLineup?.away?.startingXi?.length), advanced.playerStats.length),
     lastUpdatedAt: maxDateIso([...(match.statsSnapshots || []).map((snapshot) => snapshot.capturedAt), ...(match.events || []).map((event) => event.updatedAt), match.matchDate]),
+    history: {
+      homeRecentForm: recentForm(allMatches as any[], match.homeTeamId, match.id, currentDate),
+      awayRecentForm: recentForm(allMatches as any[], match.awayTeamId, match.id, currentDate),
+      headToHead: headToHead(allMatches as any[], match.homeTeamId, match.awayTeamId, match.id, currentDate),
+      homeWorldCupHistory: worldCupHistory(homeTeam),
+      awayWorldCupHistory: worldCupHistory(awayTeam),
+    },
   };
 }
