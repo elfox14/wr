@@ -1,4 +1,4 @@
-generator client {
+﻿generator client {
   provider = "prisma-client-js"
 }
 
@@ -171,6 +171,7 @@ model Asset {
   captains      CaptainSelection[]
   performances  PlayerPerformance[]
   intelligenceReports TeamIntelligenceReport[]
+  teamAliases TeamAlias[]
   @@index([apiFootballId])
   @@index([isportsId])
 }
@@ -191,6 +192,19 @@ model Match {
   stage       String   @default("group")
   events      MatchEvent[]
   statsSnapshots MatchStatsSnapshot[]
+  externalIds  Json?
+  kickoffAt    DateTime?
+  competition  String?
+  season       String?
+  minute       Int?
+  syncSource   String?
+  syncState    Json?
+  lastSyncedAt DateTime?
+  nextSyncAt   DateTime?
+  syncStats    MatchStats?
+  snapshots    MatchSnapshot[]
+  @@index([status, nextSyncAt])
+  @@index([kickoffAt])
   @@index([animationMatchId])
 }
 
@@ -208,6 +222,8 @@ model MatchEvent {
   sourceUrl  String?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
+  fingerprint String? @unique
+  raw         Json?
   @@index([matchId, minute])
   @@index([playerId])
 }
@@ -489,4 +505,53 @@ model AdSession {
   completedAt      DateTime?
   @@index([userId, createdAt])
   @@index([status, createdAt])
+}
+model MatchStats {
+  matchId   String   @id
+  match     Match    @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  data      Json
+  updatedAt DateTime @updatedAt
+}
+
+model MatchSnapshot {
+  id        String   @id @default(cuid())
+  matchId   String?
+  match     Match?   @relation(fields: [matchId], references: [id], onDelete: SetNull)
+  source    String
+  endpoint  String
+  payload   Json
+  fetchedAt DateTime @default(now())
+
+  @@index([matchId, source, fetchedAt])
+}
+
+model SyncJob {
+  id         String    @id @default(cuid())
+  type       String
+  source     String
+  status     String
+  startedAt  DateTime?
+  finishedAt DateTime?
+  error      String?
+  meta       Json?
+  createdAt  DateTime  @default(now())
+
+  @@index([type, status, createdAt])
+}
+
+model TeamAlias {
+  id          String   @id @default(cuid())
+  teamId      String?
+  team        Asset?   @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  source      String
+  externalId  String
+  name        String
+  needsReview Boolean  @default(false)
+  confidence  Int?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([source, externalId])
+  @@index([name])
+  @@index([teamId])
 }
