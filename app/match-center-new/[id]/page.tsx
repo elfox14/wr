@@ -1,17 +1,9 @@
-import MatchDataPanel from '../../match-center/[id]/MatchDataPanel';
+import MatchDataPanel from '@/components/match-center-new/MatchDataPanel';
 
-type PageProps = {
-  params: Promise<{ id: string }>;
-};
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
-export default async function MatchCenterNewPage({ params }: PageProps) {
+export default async function MatchCenterNewPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-
-  return (
-    <main className="min-h-screen bg-[#050816] px-3 py-4 sm:px-4 lg:px-6">
-      <div className="mx-auto w-full max-w-[1500px]">
-        <MatchDataPanel matchId={id} dbMatchId={id} />
-      </div>
-    </main>
-  );
+  return <MatchDataPanel matchId={id} dbMatchId={id} />;
 }
