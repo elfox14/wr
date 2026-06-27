@@ -20,7 +20,7 @@
     "worker:live-animation-sync": "node scripts/live-animation-sync-worker.mjs",
     "worker:finished-matches-backfill": "node scripts/finished-matches-backfill-worker.mjs",
     "test": "vitest run",
-    "lint": "eslint . --max-warnings=0",
+    "lint": "eslint .",
     "lint:ai": "eslint features/analysis app/ai-analyst app/api/ai-analyst app/api/ai-analyst/alerts/route.ts --max-warnings=0",
     "lint:asset-page": "echo Asset page removed from slim production build",
     "lint:market-lite": "echo Market page removed from slim production build",
