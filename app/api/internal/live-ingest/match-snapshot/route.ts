@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 
@@ -46,6 +46,7 @@ type IngestEvent = {
   detail?: unknown;
   sourceName?: unknown;
   sourceUrl?: unknown;
+  raw?: unknown;
 };
 
 function configuredSecrets() {
@@ -138,6 +139,7 @@ function normalizeEvents(payload: Record<string, any>, match: any) {
         detail,
         sourceName: text(row.sourceName || payload.provider || 'Internal Live Ingest').slice(0, 120) || 'Internal Live Ingest',
         sourceUrl: text(row.sourceUrl).slice(0, 500) || null,
+        raw: row.raw ?? row,
       };
     })
     .filter(Boolean) as Array<{
@@ -149,22 +151,53 @@ function normalizeEvents(payload: Record<string, any>, match: any) {
       detail: string;
       sourceName: string;
       sourceUrl: string | null;
+      raw: unknown;
     }>;
 }
 
+function eventFingerprint(event: ReturnType<typeof normalizeEvents>[number]) {
+  const stable = [
+    event.matchId,
+    event.minute ?? '',
+    event.type,
+    event.teamId ?? '',
+    event.playerName ?? '',
+    event.detail,
+    event.sourceName ?? '',
+  ].join('|');
+  return createHash('sha256').update(stable).digest('hex');
+}
+
 async function createEventIfMissing(tx: any, event: ReturnType<typeof normalizeEvents>[number]) {
-  const existing = await tx.matchEvent.findFirst({
-    where: {
-      matchId: event.matchId,
-      minute: event.minute,
-      type: event.type,
-      detail: event.detail,
-      sourceName: event.sourceName,
-    },
+  const fingerprint = eventFingerprint(event);
+  const existing = await tx.matchEvent.findUnique({
+    where: { fingerprint },
     select: { id: true },
   });
   if (existing) return null;
-  return tx.matchEvent.create({ data: event });
+  return tx.matchEvent.create({
+    data: {
+      ...event,
+      raw: event.raw,
+      fingerprint,
+    },
+  });
+}
+
+function statsPayload(snapshotData: Record<string, any>) {
+  return Object.fromEntries(STAT_FIELDS.map((field) => [field, snapshotData[field]]));
+}
+
+function nextSyncAtFor(status: string | null, minute: number | null) {
+  const normalized = String(status || '').toUpperCase();
+  const now = Date.now();
+  if (['LIVE', 'IN_PLAY', '1H', '2H', 'HT', 'ET', 'PEN'].includes(normalized) || minute !== null) {
+    return new Date(now + 60 * 1000);
+  }
+  if (['SCHEDULED'].includes(normalized)) {
+    return new Date(now + 10 * 60 * 1000);
+  }
+  return null;
 }
 
 export async function POST(req: Request) {
@@ -196,6 +229,7 @@ export async function POST(req: Request) {
   const providerMatchId = nullableInt(payload.providerMatchId ?? payload.animationMatchId ?? match.animationMatchId, 0);
   if (providerMatchId === null) return NextResponse.json({ ok: false, error: 'providerMatchId is required when the matched row has no animationMatchId' }, { status: 400, headers: { 'Cache-Control': 'no-store' } });
 
+  const receivedAt = new Date();
   const snapshotData: any = {
     id: randomUUID(),
     matchId: match.id,
@@ -207,15 +241,36 @@ export async function POST(req: Request) {
       provider,
       status,
       providerStatus: status,
-      receivedAt: new Date().toISOString(),
+      receivedAt: receivedAt.toISOString(),
       stats,
       raw: payload.rawData ?? null,
     },
   };
   for (const field of STAT_FIELDS) snapshotData[field] = valueFromStats(payload, stats, field);
 
-  const matchUpdate: any = {};
+  const latestStats = {
+    source: 'internal-live-ingest',
+    provider,
+    providerMatchId,
+    status,
+    providerState: payload.providerState ?? payload.state ?? null,
+    minute: snapshotData.minute,
+    stats: statsPayload(snapshotData),
+    score: {
+      home: snapshotData.homeScore,
+      away: snapshotData.awayScore,
+    },
+    receivedAt: receivedAt.toISOString(),
+  };
+
+  const matchUpdate: any = {
+    syncSource: provider,
+    syncState: latestStats,
+    lastSyncedAt: receivedAt,
+    nextSyncAt: nextSyncAtFor(status, snapshotData.minute),
+  };
   if (status) matchUpdate.status = status;
+  if (snapshotData.minute !== null) matchUpdate.minute = snapshotData.minute;
   if (snapshotData.homeScore !== null) matchUpdate.homeScore = snapshotData.homeScore;
   if (snapshotData.awayScore !== null) matchUpdate.awayScore = snapshotData.awayScore;
 
@@ -223,9 +278,29 @@ export async function POST(req: Request) {
 
   const result = await prisma.$transaction(async (tx) => {
     const snapshot = await tx.matchStatsSnapshot.create({ data: snapshotData });
-    const updatedMatch = Object.keys(matchUpdate).length
-      ? await tx.match.update({ where: { id: match.id }, data: matchUpdate, select: { id: true, status: true, homeScore: true, awayScore: true } })
-      : { id: match.id, status: match.status, homeScore: match.homeScore, awayScore: match.awayScore };
+    const rawSnapshot = await tx.matchSnapshot.create({
+      data: {
+        matchId: match.id,
+        source: provider,
+        endpoint: '/api/internal/live-ingest/match-snapshot',
+        payload: {
+          ...latestStats,
+          raw: payload.rawData ?? null,
+          events: payload.events ?? [],
+        },
+      },
+    });
+    const latest = await tx.matchStats.upsert({
+      where: { matchId: match.id },
+      update: { data: latestStats },
+      create: { matchId: match.id, data: latestStats },
+      select: { matchId: true, updatedAt: true },
+    });
+    const updatedMatch = await tx.match.update({
+      where: { id: match.id },
+      data: matchUpdate,
+      select: { id: true, status: true, homeScore: true, awayScore: true, minute: true, lastSyncedAt: true, nextSyncAt: true },
+    });
 
     const savedEvents = [];
     for (const event of events) {
@@ -233,7 +308,7 @@ export async function POST(req: Request) {
       if (saved) savedEvents.push(saved);
     }
 
-    return { snapshot, updatedMatch, savedEvents };
+    return { snapshot, rawSnapshot, latest, updatedMatch, savedEvents };
   });
 
   return NextResponse.json({
@@ -247,8 +322,13 @@ export async function POST(req: Request) {
       minute: result.snapshot.minute,
       capturedAt: result.snapshot.capturedAt,
     },
+    autoSync: {
+      matchSnapshotId: result.rawSnapshot.id,
+      matchStatsMatchId: result.latest.matchId,
+      matchStatsUpdatedAt: result.latest.updatedAt,
+    },
     savedEventsCount: result.savedEvents.length,
-    note: 'This endpoint only writes supplied payload data into the database. It never fetches external providers.',
+    note: 'This endpoint writes supplied payload data into both legacy live snapshots and the auto-sync tables. It never fetches external providers.',
   }, { headers: { 'Cache-Control': 'no-store' } });
 }
 
