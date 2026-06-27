@@ -49,30 +49,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   let newsUrls: MetadataRoute.Sitemap = [];
   try {
-    await prisma.$executeRawUnsafe(`
-      CREATE TABLE IF NOT EXISTS "PressNews" (
-        "id" TEXT PRIMARY KEY,
-        "title" TEXT NOT NULL,
-        "body" TEXT NOT NULL,
-        "category" TEXT NOT NULL DEFAULT 'رصد صحفي',
-        "sourceName" TEXT NOT NULL,
-        "sourceUrl" TEXT,
-        "sourceType" TEXT NOT NULL DEFAULT 'newsletter',
-        "language" TEXT NOT NULL DEFAULT 'ar',
-        "status" TEXT NOT NULL DEFAULT 'published',
-        "importance" INTEGER NOT NULL DEFAULT 50,
-        "tags" JSONB,
-        "publishedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-
-    const newsItems = await prisma.$queryRawUnsafe<any[]>(`
-      SELECT "id", "publishedAt", "updatedAt" FROM "PressNews"
-      WHERE "status" = 'published'
-      ORDER BY "publishedAt" DESC
-    `);
+    const newsItems = await prisma.pressNews.findMany({
+      where: { status: 'published' },
+      select: { id: true, publishedAt: true, updatedAt: true },
+      orderBy: { publishedAt: 'desc' },
+    });
 
     newsUrls = newsItems.map((item) => ({
       url: `${baseUrl}/news/${item.id}`,
@@ -81,35 +62,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.8,
     }));
   } catch (err) {
-    console.error('Sitemap news generation error:', err);
+    console.error('Sitemap news generation skipped:', err);
   }
 
   let articleUrls: MetadataRoute.Sitemap = [];
   try {
-    await prisma.$executeRawUnsafe(`
-      CREATE TABLE IF NOT EXISTS "MatchArticle" (
-        "id" TEXT PRIMARY KEY,
-        "matchId" TEXT NOT NULL,
-        "title" TEXT NOT NULL,
-        "slug" TEXT NOT NULL UNIQUE,
-        "metaTitle" TEXT NOT NULL,
-        "metaDescription" TEXT NOT NULL,
-        "excerpt" TEXT NOT NULL,
-        "body" TEXT NOT NULL,
-        "sections" JSONB,
-        "statsSummary" JSONB,
-        "status" TEXT NOT NULL DEFAULT 'DRAFT_READY',
-        "language" TEXT NOT NULL DEFAULT 'ar',
-        "seoScore" INTEGER NOT NULL DEFAULT 0,
-        "sourceSnapshotId" TEXT,
-        "heroImageUrl" TEXT,
-        "infographicImageUrl" TEXT,
-        "publishedAt" TIMESTAMP(3),
-        "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-
     const articles = await prisma.$queryRawUnsafe<any[]>(`
       SELECT "slug", "publishedAt", "updatedAt" FROM "MatchArticle"
       WHERE "status" = 'PUBLISHED'
@@ -123,7 +80,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.82,
     }));
   } catch (err) {
-    console.error('Sitemap article generation error:', err);
+    console.error('Sitemap article generation skipped:', err);
   }
 
   return [

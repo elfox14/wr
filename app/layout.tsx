@@ -11,8 +11,7 @@ import { Navbar } from "@/components/ui/Navbar";
 import { Footer } from "@/components/ui/Footer";
 import { HardNavigationGuard } from "@/components/ui/HardNavigationGuard";
 
-export const dynamic = 'force-dynamic';
-export const revalidate = 0;
+
 
 const cairo = Cairo({
   variable: "--font-cairo",
@@ -61,14 +60,18 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="ar" dir="rtl" className={`${cairo.variable} h-full antialiased tabular-nums`} suppressHydrationWarning>
       <head>
+        <link rel="manifest" href="/manifest.json" />
         <Script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9147440531390790" crossOrigin="anonymous" strategy="afterInteractive" />
       </head>
       <body className="min-h-full flex flex-col overflow-x-hidden bg-[#04110D] mobile-safe-body">
+        <a href="#main-content" className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:right-2 focus:z-[100] focus:rounded-xl focus:bg-[var(--wc-green)] focus:px-4 focus:py-2 focus:text-sm focus:font-bold focus:text-[#04110D]">
+          تخطي إلى المحتوى
+        </a>
         <Providers>
           <NotificationProvider>
             <HardNavigationGuard />
             <Navbar />
-            <div className="min-h-[calc(100vh-180px)] min-w-0 flex-1 overflow-x-clip mobile-page-shell">{children}</div>
+            <div id="main-content" className="min-h-[calc(100vh-180px)] min-w-0 flex-1 overflow-x-clip mobile-page-shell">{children}</div>
             <Footer />
           </NotificationProvider>
         </Providers>
