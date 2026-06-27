@@ -1,4 +1,4 @@
-﻿-- Auto-sync additive schema.
+-- Auto-sync additive schema.
 
 ALTER TABLE "Match"
   ADD COLUMN IF NOT EXISTS "externalIds" JSONB,
