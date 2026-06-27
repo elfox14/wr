@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import ProfessionalMatchTabsPage from '@/components/match-page/ProfessionalMatchTabsPageCleanStats';
+import ProfessionalMatchTabsPage from '@/components/match-page/ProfessionalMatchTabsPageRich';
 import { getMatchPageDataFast } from '@/lib/match-page/getMatchPageDataFast';
 import type { MatchEventView } from '@/lib/match-page/types';
 
