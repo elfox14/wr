@@ -87,7 +87,6 @@ export default function MatchDataPanel({ matchId, dbMatchId }: Props) {
   const fetchEvents = useCallback(async () => { if (!query) return; const res = await fetch(`/api/matches/live-events?${query}`, { cache: 'no-store' }); const data = (await res.json()) as EventsResponse; if (res.ok && data.ok) setEvents(Array.isArray(data.events) ? data.events : []); }, [query]);
   const loadAll = useCallback(async () => { setError(null); try { await Promise.all([fetchStats(), fetchEvents()]); } catch (e: unknown) { setError(e instanceof Error ? e.message : 'حدث خطأ غير متوقع'); } finally { setLoading(false); } }, [fetchEvents, fetchStats]);
   useEffect(() => { setLoading(true); void loadAll(); const statsTimer = window.setInterval(() => { void fetchStats().catch(() => undefined); }, 30000); const eventsTimer = window.setInterval(() => { void fetchEvents().catch(() => undefined); }, 15000); return () => { window.clearInterval(statsTimer); window.clearInterval(eventsTimer); }; }, [loadAll, fetchStats, fetchEvents]);
-  const stats = useMemo(() => statDefs.map((def) => readStat(def, [latest, ...history].filter((s): s is Snapshot => Boolean(s))).sort ? def : def), [latest, history]);
   const computedStats = useMemo(() => statDefs.map((def) => readStat(def, [latest, ...history].filter((s): s is Snapshot => Boolean(s)))).sort((a, b) => statPriority.indexOf(a.key) - statPriority.indexOf(b.key)), [latest, history]);
   const visibleStats = useMemo(() => computedStats.filter((s) => s.home !== null || s.away !== null), [computedStats]);
   if (loading) return <Spinner />;
