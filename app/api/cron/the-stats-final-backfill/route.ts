@@ -1,6 +1,9 @@
+import { randomUUID } from 'crypto';
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { hasValidAdminSecret } from '@/lib/adminAuth';
+import { collectTheStatsMatchExtras, defaultTheStatsQuery } from '@/lib/theStatsMatchExtras';
+import { revalidateStatsViews } from '@/lib/revalidateStatsViews';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -15,6 +18,20 @@ const SNAPSHOT_STAT_COLUMNS = [
 
 type AuditStatus = 'ready' | 'missing_the_stats' | 'missing_stats' | 'missing_events' | 'missing_player_stats';
 type SnapshotCounts = { stats: number; events: number; shots: number; playerStats: number; lineups: number };
+
+type FinalizeResult = {
+  ok: boolean;
+  status: string;
+  endpointMode: 'full';
+  providerMatchId?: unknown;
+  resolvedBy?: unknown;
+  counts?: { stats: number; events: number; shots: number; playerStats: number; lineups: number };
+  snapshotId?: string | null;
+  collected?: unknown;
+  error?: string;
+  code?: string | null;
+  providerStatus?: number | null;
+};
 
 function boolParam(url: URL, name: string, fallback = false) {
   const raw = url.searchParams.get(name);
@@ -128,45 +145,140 @@ function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function bearer(req: Request) {
-  const auth = req.headers.get('authorization') || '';
-  return auth.replace(/^Bearer\s+/i, '').trim();
+function statPair(stats: Record<string, any>, key: string) {
+  const pair = stats?.[key] || {};
+  const home = Number(pair.home);
+  const away = Number(pair.away);
+  return { home: Number.isFinite(home) ? Math.round(home) : null, away: Number.isFinite(away) ? Math.round(away) : null };
 }
 
-function querySecret(url: URL) {
-  return url.searchParams.get('key') || url.searchParams.get('secret') || url.searchParams.get('token') || '';
+function snapshotStatColumns(normalized: any) {
+  const stats = normalized?.liveStats?.stats || {};
+  const possession = statPair(stats, 'possession');
+  const shots = statPair(stats, 'shots');
+  const shotsOnTarget = statPair(stats, 'shotsOnTarget');
+  const shotsOffTarget = statPair(stats, 'shotsOffTarget');
+  const corners = statPair(stats, 'corners');
+  const yellowCards = statPair(stats, 'yellowCards');
+  const redCards = statPair(stats, 'redCards');
+  return {
+    homePossession: possession.home,
+    awayPossession: possession.away,
+    homeShots: shots.home,
+    awayShots: shots.away,
+    homeShotsOnTarget: shotsOnTarget.home,
+    awayShotsOnTarget: shotsOnTarget.away,
+    homeShotsOffTarget: shotsOffTarget.home,
+    awayShotsOffTarget: shotsOffTarget.away,
+    homeCorners: corners.home,
+    awayCorners: corners.away,
+    homeYellowCards: yellowCards.home,
+    awayYellowCards: yellowCards.away,
+    homeRedCards: redCards.home,
+    awayRedCards: redCards.away,
+  };
 }
 
-function buildFinalizeUrl(req: Request, matchId: string, apply: boolean) {
-  const incomingUrl = new URL(req.url);
-  const target = new URL('/api/cron/the-stats-finalize-matches', incomingUrl.origin);
-  const token = querySecret(incomingUrl);
-  if (token) target.searchParams.set('key', token);
-  target.searchParams.set(apply ? 'apply' : 'dryRun', apply ? 'true' : 'true');
-  target.searchParams.set('matchId', matchId);
-  target.searchParams.set('endpointMode', 'full');
-  target.searchParams.set('includeRaw', incomingUrl.searchParams.get('includeRaw') || 'false');
-  target.searchParams.set('writeMatchEvents', 'false');
-  target.searchParams.set('purgeISportsEvents', 'false');
-  target.searchParams.set('purgeISportsSnapshots', 'false');
-  target.searchParams.set('purgeFootballDataEvents', 'false');
-  target.searchParams.set('purgeTheStatsMatchEvents', 'false');
-  target.searchParams.set('replaceTheStatsFinal', 'true');
-  target.searchParams.set('timeoutMs', incomingUrl.searchParams.get('timeoutMs') || '18000');
-  target.searchParams.set('requestsPerMinute', incomingUrl.searchParams.get('requestsPerMinute') || '45');
-  return target;
+function providerMatchNumber(value: unknown) {
+  const n = Number(String(value || '').replace(/\D/g, ''));
+  return Number.isFinite(n) ? n : 0;
 }
 
-async function callFinalize(req: Request, matchId: string, apply: boolean) {
-  const target = buildFinalizeUrl(req, matchId, apply);
-  const token = bearer(req);
-  const response = await fetch(target.toString(), {
-    method: 'GET',
-    cache: 'no-store',
-    headers: token ? { authorization: `Bearer ${token}` } : undefined,
-  });
-  const payload = await response.json().catch(() => null);
-  return { ok: response.ok, status: response.status, payload };
+function countCollected(normalized: any) {
+  const events = Array.isArray(normalized?.eventsDetailed?.all) ? normalized.eventsDetailed.all : [];
+  const shots = Array.isArray(normalized?.shotmap) ? normalized.shotmap : [];
+  const players = Array.isArray(normalized?.playerStats) ? normalized.playerStats : [];
+  const stats = Object.keys(normalized?.liveStats?.stats || {}).length;
+  return { stats, events: events.length, shots: shots.length, playerStats: players.length, lineups: normalized?.lineups ? 1 : 0 };
+}
+
+async function finalizeMatchFromTheStats(match: any, reqUrl: URL, apply: boolean): Promise<FinalizeResult> {
+  try {
+    const includeRaw = boolParam(reqUrl, 'includeRaw', false);
+    const timeoutMs = numberParam(reqUrl, 'timeoutMs', 18000, 3000, 60000);
+    const delayMs = numberParam(reqUrl, 'innerDelayMs', 0, 0, 15000);
+    const requestsPerMinute = numberParam(reqUrl, 'requestsPerMinute', 45, 10, 90);
+    const providerQuery = defaultTheStatsQuery(reqUrl.searchParams);
+    const collected = await collectTheStatsMatchExtras(match, {
+      dryRun: true,
+      save: false,
+      includeRaw,
+      endpointMode: 'full',
+      timeoutMs,
+      delayMs,
+      query: providerQuery,
+    });
+
+    const normalized = (collected as any)?.debug?.normalizedPreview;
+    const counts = countCollected(normalized);
+    const hasUsefulData = Boolean(normalized) && (counts.stats > 0 || counts.events > 0 || counts.shots > 0 || counts.playerStats > 0 || counts.lineups > 0);
+    if (!(collected as any)?.ok || !hasUsefulData) {
+      return { ok: false, status: 'skipped_no_final_the_stats_data', endpointMode: 'full', counts, collected };
+    }
+
+    const providerMatchId = (collected as any).resolvedProviderMatchId;
+    let snapshotId: string | null = null;
+
+    if (apply) {
+      await prisma.matchStatsSnapshot.deleteMany({
+        where: {
+          matchId: match.id,
+          provider: { in: ['THE_STATS_API_EXTRAS', 'THE_STATS_API_FINAL_CANONICAL', 'THE_STATS_API_MANUAL_FINAL'] },
+        },
+      });
+
+      const snapshot = await prisma.matchStatsSnapshot.create({
+        data: {
+          id: randomUUID(),
+          matchId: match.id,
+          provider: 'THE_STATS_API_EXTRAS',
+          providerMatchId: providerMatchNumber(providerMatchId),
+          homeScore: match.homeScore,
+          awayScore: match.awayScore,
+          ...snapshotStatColumns(normalized),
+          rawData: {
+            provider: 'THE_STATS_API',
+            mode: 'final_canonical_after_match_snapshot_only',
+            endpointMode: 'full',
+            importedAt: new Date().toISOString(),
+            resolvedProviderMatchId: providerMatchId,
+            resolvedBy: (collected as any).resolvedBy,
+            rateLimitPolicy: {
+              requestsPerMinute,
+              note: 'Backfill runner writes one safe final snapshot per selected missing match.',
+            },
+            displayPolicy: {
+              eventsSource: 'snapshot.normalized.eventsDetailed.all',
+              writeMatchEvents: false,
+              nonDestructive: true,
+            },
+            normalized,
+          },
+        },
+        select: { id: true },
+      });
+      snapshotId = snapshot.id;
+    }
+
+    return {
+      ok: true,
+      status: apply ? 'finalized_from_the_stats_snapshot_only' : 'dry_run_ok',
+      endpointMode: 'full',
+      providerMatchId,
+      resolvedBy: (collected as any).resolvedBy,
+      counts,
+      snapshotId,
+    };
+  } catch (error: any) {
+    return {
+      ok: false,
+      status: 'failed',
+      endpointMode: 'full',
+      error: error?.message || String(error),
+      code: error?.code || null,
+      providerStatus: error?.status || null,
+    };
+  }
 }
 
 async function run(req: Request) {
@@ -208,9 +320,11 @@ async function run(req: Request) {
   }).filter((item) => item.auditStatus !== 'ready' && (includeMissingTheStats || item.auditStatus !== 'missing_the_stats')).slice(0, limit);
 
   const processed = [];
+  let wroteFinalSnapshots = false;
   for (const item of candidates) {
     const before = item.best?.counts || { stats: 0, events: 0, shots: 0, playerStats: 0, lineups: 0 };
-    const finalize = await callFinalize(req, item.match.id, apply);
+    const finalize = await finalizeMatchFromTheStats(item.match, url, apply);
+    if (apply && finalize.ok && finalize.snapshotId) wroteFinalSnapshots = true;
     processed.push({
       matchId: item.match.id,
       title: item.title,
@@ -219,20 +333,21 @@ async function run(req: Request) {
       label: statusLabel(item.auditStatus),
       before,
       action: apply ? 'applied_the_stats_full_finalize' : 'dry_run_the_stats_full_finalize',
-      finalizeStatus: finalize.status,
       finalizeOk: finalize.ok,
-      finalize: finalize.payload,
+      finalize,
       pageDataCheckUrl: `/api/matches/${item.match.id}/page-data-check`,
     });
     if (delayMs > 0) await sleep(delayMs);
   }
 
+  const revalidated = wroteFinalSnapshots ? revalidateStatsViews('the-stats-final-backfill') : null;
+
   return NextResponse.json({
     ok: true,
-    mode: 'the_stats_final_backfill_v1_safe_runner',
+    mode: 'the_stats_final_backfill_v2_direct_safe_runner',
     dryRun: !apply,
     note: apply
-      ? 'Processed missing finished matches through TheStats full finalize. iSports and Football-Data data were not purged.'
+      ? 'Processed missing finished matches directly through TheStats full finalize. iSports and Football-Data data were not purged.'
       : 'Dry run only. Add apply=true to write final TheStats snapshots.',
     safety: {
       maxWriteLimit: 3,
@@ -242,9 +357,11 @@ async function run(req: Request) {
       purgeFootballDataEvents: false,
       purgeTheStatsMatchEvents: false,
       endpointMode: 'full',
+      noSelfFetch: true,
     },
     scope: { matchId, days, scanLimit, limit, scanned: matches.length, candidates: candidates.length, includeMissingTheStats },
     processed,
+    revalidated,
   }, { headers: { 'Cache-Control': 'no-store' } });
 }
 
