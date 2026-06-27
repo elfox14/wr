@@ -1,12 +1,17 @@
 param(
   [string]$ApiUrl = "https://worldcup.mcprim.com/api/admin/official-squads/reconcile",
-  [string]$OfficialSquadsFile = ".\official-squads-2026.json",
+  [string]$OfficialSquadsFile = ".\scripts\data\official-squads-2026.json",
   [string]$AdminSecret = $env:ADMIN_API_SECRET,
   [switch]$Apply,
-  [string]$ReportPrefix = ".\official-squads-reconcile"
+  [string]$ReportPrefix = ".\scripts\data\official-squads-reconcile"
 )
 
 $ErrorActionPreference = "Stop"
+
+$reportDir = Split-Path -Parent $ReportPrefix
+if ($reportDir -and -not (Test-Path $reportDir)) {
+  New-Item -ItemType Directory -Force -Path $reportDir | Out-Null
+}
 
 if (-not (Test-Path $OfficialSquadsFile)) {
   throw "Official squads file not found: $OfficialSquadsFile"
