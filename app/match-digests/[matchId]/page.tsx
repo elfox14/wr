@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ArrowLeft, BarChart3, FileText, Image as ImageIcon, Sparkles, Trophy, Users } from 'lucide-react';
@@ -218,7 +219,7 @@ function TeamChip({ team }: { team?: MatchLite['homeTeam'] }) {
   );
 }
 
-function Section({ title, icon, children }: { title: string; icon?: React.ReactNode; children: React.ReactNode }) {
+function Section({ title, icon, children }: { title: string; icon?: ReactNode; children: ReactNode }) {
   return (
     <section className="rounded-[1.35rem] border border-white/10 bg-white/[0.04] p-4 sm:p-5">
       <h2 className="mb-3 flex items-center gap-2 text-xl font-black text-white">{icon}{title}</h2>
