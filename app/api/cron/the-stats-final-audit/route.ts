@@ -169,23 +169,58 @@ async function run(req: Request) {
   const url = new URL(req.url);
   const matchId = url.searchParams.get('matchId');
   const includeReady = boolParam(url, 'includeReady', false);
-  const limit = numberParam(url, 'limit', 50, 1, 200);
+  const limit = numberParam(url, 'limit', 20, 1, 50);
+  const page = numberParam(url, 'page', 1, 1, 1000);
+  const snapshotTake = numberParam(url, 'snapshotTake', 8, 1, 12);
   const days = numberParam(url, 'days', 30, 1, 180);
   const since = new Date(Date.now() - days * 864e5);
+  const where = matchId ? { id: matchId } as any : { status: { in: FINISHED_STATUSES }, matchDate: { gte: since } } as any;
+  const skip = matchId ? 0 : (page - 1) * limit;
 
-  const matches = await prisma.match.findMany({
-    where: matchId ? { id: matchId } as any : { status: { in: FINISHED_STATUSES }, matchDate: { gte: since } } as any,
-    orderBy: { matchDate: 'desc' },
-    take: matchId ? 1 : limit,
-    include: {
-      homeTeam: { select: { name: true, code: true } },
-      awayTeam: { select: { name: true, code: true } },
-      statsSnapshots: { orderBy: { capturedAt: 'desc' }, take: 24 },
-      _count: { select: { events: true } },
-    },
-  } as any) as any[];
+  const [matches, totalFinishedInWindow] = await Promise.all([
+    prisma.match.findMany({
+      where,
+      orderBy: { matchDate: 'desc' },
+      skip,
+      take: matchId ? 1 : limit,
+      include: {
+        homeTeam: { select: { name: true, code: true } },
+        awayTeam: { select: { name: true, code: true } },
+        statsSnapshots: {
+          orderBy: { capturedAt: 'desc' },
+          take: snapshotTake,
+          select: {
+            id: true,
+            provider: true,
+            capturedAt: true,
+            rawData: true,
+            homePossession: true,
+            awayPossession: true,
+            homeShots: true,
+            awayShots: true,
+            homeShotsOnTarget: true,
+            awayShotsOnTarget: true,
+            homeShotsOffTarget: true,
+            awayShotsOffTarget: true,
+            homeCorners: true,
+            awayCorners: true,
+            homeYellowCards: true,
+            awayYellowCards: true,
+            homeRedCards: true,
+            awayRedCards: true,
+            homeAttacks: true,
+            awayAttacks: true,
+            homeDangerousAttacks: true,
+            awayDangerousAttacks: true,
+          },
+        },
+        _count: { select: { events: true } },
+      },
+    } as any),
+    matchId ? Promise.resolve(1) : prisma.match.count({ where }),
+  ]) as any[];
 
-  const rows = matches.map((match) => {
+  const rows = matches.map((match: any) => {
     const snapshots = match.statsSnapshots || [];
     const best = pickBestTheStatsSnapshot(snapshots);
     const status = auditStatus(best);
@@ -217,9 +252,9 @@ async function run(req: Request) {
       finalizeUrl: status === 'ready' ? null : finalizeUrl(match.id),
       pageDataCheckUrl: `/api/matches/${match.id}/page-data-check`,
     };
-  }).filter((row) => shouldInclude(row.auditStatus, includeReady));
+  }).filter((row: any) => shouldInclude(row.auditStatus, includeReady));
 
-  const summary = rows.reduce((acc, row) => {
+  const summary = rows.reduce((acc: Record<string, number>, row: any) => {
     acc.total += 1;
     acc[row.auditStatus] = (acc[row.auditStatus] || 0) + 1;
     if (row.ready) acc.ready += 1;
@@ -229,9 +264,22 @@ async function run(req: Request) {
 
   return NextResponse.json({
     ok: true,
-    mode: 'the_stats_final_audit_v1_db_only',
-    note: 'DB-only audit. It does not call TheStats and does not delete iSports data.',
-    scope: { matchId, days, limit, includeReady, scanned: matches.length, returned: rows.length },
+    mode: 'the_stats_final_audit_v2_memory_safe_db_only',
+    note: 'DB-only paged audit. It does not call TheStats and does not delete iSports data. Use page/limit instead of very large limits.',
+    scope: {
+      matchId,
+      days,
+      limit,
+      page,
+      snapshotTake,
+      offset: skip,
+      scanned: matches.length,
+      returned: rows.length,
+      totalFinishedInWindow,
+      hasNextPage: !matchId && skip + matches.length < totalFinishedInWindow,
+      nextPage: !matchId && skip + matches.length < totalFinishedInWindow ? page + 1 : null,
+      includeReady,
+    },
     summary,
     rows,
   }, { headers: { 'Cache-Control': 'no-store' } });
