@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import prisma from '@/lib/prisma';
 import { ensurePostMatchContentTables } from './schema';
+import { GoogleGenAI, Type } from '@google/genai';
 
 const FINISHED_STATUSES = ['FINAL_VERIFIED', 'FINISHED', 'FT', 'AET', 'PEN', 'COMPLETED', 'ENDED'];
 const DEFAULT_COMPETITION = 'كأس العالم 2026';
@@ -115,50 +116,113 @@ function statPhrase(metric: Metric, homeTeam: string, awayTeam: string) {
   return `${metric.label}: ${homeTeam} ${home} مقابل ${awayTeam} ${away}`;
 }
 
-function buildSections(match: CandidateMatch, metrics: Metric[]): Section[] {
-  const result = scoreLine(match);
-  const winner = winnerLabel(match);
-  const statusNote = String(match.status || '').toUpperCase() === 'FINAL_VERIFIED'
-    ? 'تم بناء هذا التحليل بعد تأكيد الإحصائيات النهائية.'
-    : 'هذا تحليل مبني على آخر Snapshot محفوظة بعد نهاية المباراة، ويُفضّل مراجعته قبل النشر النهائي.';
-  const topMetrics = metrics.slice(0, 6);
-  const shots = metrics.find((metric) => metric.key === 'shots');
-  const onTarget = metrics.find((metric) => metric.key === 'shots_on_target');
-  const possession = metrics.find((metric) => metric.key === 'possession');
+async function buildSections(match: CandidateMatch, metrics: Metric[]): Promise<Section[]> {
+  const fallback = () => {
+    const result = scoreLine(match);
+    const winner = winnerLabel(match);
+    const statusNote = String(match.status || '').toUpperCase() === 'FINAL_VERIFIED'
+      ? 'تم بناء هذا التحليل بعد تأكيد الإحصائيات النهائية.'
+      : 'هذا تحليل مبني على آخر Snapshot محفوظة بعد نهاية المباراة، ويُفضّل مراجعته قبل النشر النهائي.';
+    const topMetrics = metrics.slice(0, 6);
+    const shots = metrics.find((metric) => metric.key === 'shots');
+    const onTarget = metrics.find((metric) => metric.key === 'shots_on_target');
+    const possession = metrics.find((metric) => metric.key === 'possession');
 
-  return [
-    {
-      type: 'SUMMARY',
-      heading: 'ملخص المباراة',
-      content: `انتهت مواجهة ${match.homeTeamName} ضد ${match.awayTeamName} بنتيجة ${result} ضمن ${DEFAULT_COMPETITION}. ${winner === 'التعادل' ? 'النتيجة تعكس مباراة متوازنة على مستوى الحسم الرقمي، مع حاجة قراءة التفاصيل الإحصائية لفهم اتجاه السيطرة.' : `النتيجة منحت ${winner} أفضلية واضحة في لوحة النتيجة، لكن قراءة المباراة الحقيقية تظهر من تفاصيل التسديدات، الاستحواذ، وجودة الوصول للمناطق الخطيرة.`} ${statusNote}`,
-    },
-    {
-      type: 'TACTICAL_ANALYSIS',
-      heading: 'القراءة الفنية للمباراة',
-      content: possession
-        ? `إيقاع المباراة يمكن قراءته من مؤشر الاستحواذ أولًا: ${statPhrase(possession, match.homeTeamName, match.awayTeamName)}. هذا الرقم وحده لا يكفي للحكم على السيطرة، لكنه يوضح أين ذهبت فترات امتلاك الكرة، ثم تأتي جودة التسديدات والفرص لتحديد من كان أكثر خطورة.`
-        : `القراءة الفنية تعتمد هنا على النتيجة النهائية وأحداث المباراة المحفوظة. لم تصل بيانات استحواذ مؤكدة في Snapshot النهائية، لذلك لا يتم اختراع نسبة سيطرة غير موجودة.`,
-    },
-    {
-      type: 'STATS_ANALYSIS',
-      heading: 'الإحصائيات النهائية',
-      content: topMetrics.length
-        ? `أبرز أرقام المباراة جاءت كالتالي: ${topMetrics.map((metric) => statPhrase(metric, match.homeTeamName, match.awayTeamName)).join('، ')}. هذه الأرقام تمنح القارئ صورة أكثر دقة من النتيجة فقط، خصوصًا عند مقارنة التسديدات بالتسديدات على المرمى.`
-        : 'لا توجد إحصائيات تفصيلية مؤكدة محفوظة لهذه المباراة حتى الآن، لذلك تم الاكتفاء بالنتيجة وسياق المباراة دون إضافة أرقام غير موثقة.',
-    },
-    {
-      type: 'TURNING_POINTS',
-      heading: 'نقطة التحول',
-      content: shots || onTarget
-        ? `الفارق الأهم يظهر عند مقارنة حجم المحاولات بجودة الوصول للمرمى. ${shots ? statPhrase(shots, match.homeTeamName, match.awayTeamName) : ''}${shots && onTarget ? '، و' : ''}${onTarget ? statPhrase(onTarget, match.homeTeamName, match.awayTeamName) : ''}. عندما تتقارب النتيجة، تصبح هذه التفاصيل هي المفتاح لفهم من صنع فرصًا أخطر ومن اكتفى بالاستحواذ أو المحاولات البعيدة.`
-        : 'لا توجد بيانات تسديدات مؤكدة كافية لاستخراج نقطة تحول رقمية، لذلك يجب الاعتماد على مراجعة Timeline المباراة قبل نشر تفسير نهائي لهذه الجزئية.',
-    },
-    {
-      type: 'GROUP_IMPACT',
-      heading: 'ماذا تعني النتيجة؟',
-      content: `هذه النتيجة تؤثر مباشرة على حسابات ${match.groupPhase ? `المجموعة ${match.groupPhase}` : 'مرحلة البطولة'}، خصوصًا في بطولة قصيرة مثل كأس العالم حيث يمكن لنقطة واحدة أو فارق هدف أن يغيّر ترتيب المجموعة. صفحة المباراة ستظل هي المرجع الرقمي، بينما يقدم هذا المقال قراءة تحليلية مبنية على البيانات النهائية المحفوظة.`,
-    },
-  ];
+    return [
+      {
+        type: 'SUMMARY',
+        heading: 'ملخص المباراة',
+        content: `انتهت مواجهة ${match.homeTeamName} ضد ${match.awayTeamName} بنتيجة ${result} ضمن ${DEFAULT_COMPETITION}. ${winner === 'التعادل' ? 'النتيجة تعكس مباراة متوازنة على مستوى الحسم الرقمي، مع حاجة قراءة التفاصيل الإحصائية لفهم اتجاه السيطرة.' : `النتيجة منحت ${winner} أفضلية واضحة في لوحة النتيجة، لكن قراءة المباراة الحقيقية تظهر من تفاصيل التسديدات، الاستحواذ، وجودة الوصول للمناطق الخطيرة.`} ${statusNote}`,
+      },
+      {
+        type: 'TACTICAL_ANALYSIS',
+        heading: 'القراءة الفنية للمباراة',
+        content: possession
+          ? `إيقاع المباراة يمكن قراءته من مؤشر الاستحواذ أولًا: ${statPhrase(possession, match.homeTeamName, match.awayTeamName)}. هذا الرقم وحده لا يكفي للحكم على السيطرة، لكنه يوضح أين ذهبت فترات امتلاك الكرة، ثم تأتي جودة التسديدات والفرص لتحديد من كان أكثر خطورة.`
+          : `القراءة الفنية تعتمد هنا على النتيجة النهائية وأحداث المباراة المحفوظة. لم تصل بيانات استحواذ مؤكدة في Snapshot النهائية، لذلك لا يتم اختراع نسبة سيطرة غير موجودة.`,
+      },
+      {
+        type: 'STATS_ANALYSIS',
+        heading: 'الإحصائيات النهائية',
+        content: topMetrics.length
+          ? `أبرز أرقام المباراة جاءت كالتالي: ${topMetrics.map((metric) => statPhrase(metric, match.homeTeamName, match.awayTeamName)).join('، ')}. هذه الأرقام تمنح القارئ صورة أكثر دقة من النتيجة فقط، خصوصًا عند مقارنة التسديدات بالتسديدات على المرمى.`
+          : 'لا توجد إحصائيات تفصيلية مؤكدة محفوظة لهذه المباراة حتى الآن، لذلك تم الاكتفاء بالنتيجة وسياق المباراة دون إضافة أرقام غير موثقة.',
+      },
+      {
+        type: 'TURNING_POINTS',
+        heading: 'نقطة التحول',
+        content: shots || onTarget
+          ? `الفارق الأهم يظهر عند مقارنة حجم المحاولات بجودة الوصول للمرمى. ${shots ? statPhrase(shots, match.homeTeamName, match.awayTeamName) : ''}${shots && onTarget ? '، و' : ''}${onTarget ? statPhrase(onTarget, match.homeTeamName, match.awayTeamName) : ''}. عندما تتقارب النتيجة، تصبح هذه التفاصيل هي المفتاح لفهم من صنع فرصًا أخطر ومن اكتفى بالاستحواذ أو المحاولات البعيدة.`
+          : 'لا توجد بيانات تسديدات مؤكدة كافية لاستخراج نقطة تحول رقمية، لذلك يجب الاعتماد على مراجعة Timeline المباراة قبل نشر تفسير نهائي لهذه الجزئية.',
+      },
+      {
+        type: 'GROUP_IMPACT',
+        heading: 'ماذا تعني النتيجة؟',
+        content: `هذه النتيجة تؤثر مباشرة على حسابات ${match.groupPhase ? `المجموعة ${match.groupPhase}` : 'مرحلة البطولة'}، خصوصًا في بطولة قصيرة مثل كأس العالم حيث يمكن لنقطة واحدة أو فارق هدف أن يغيّر ترتيب المجموعة. صفحة المباراة ستظل هي المرجع الرقمي، بينما يقدم هذا المقال قراءة تحليلية مبنية على البيانات النهائية المحفوظة.`,
+      },
+    ];
+  };
+
+  const apiKey = process.env.GEMINI_API_KEY || '';
+  if (!apiKey) return fallback();
+
+  try {
+    const ai = new GoogleGenAI({ apiKey });
+    const prompt = `أنت محلل رياضي عالمي خبير (مثل كبار محللي قنوات beIN Sports و Sky Sports).
+قم بتحليل مباراة: ${match.homeTeamName} ضد ${match.awayTeamName}
+النتيجة النهائية: ${match.homeScore} - ${match.awayScore}
+الإحصائيات: ${JSON.stringify(metrics)}
+المرحلة/المجموعة: ${match.groupPhase || match.stage || DEFAULT_COMPETITION}
+
+المطلوب كتابة مقال تحليلي رياضي باللغة العربية بأسلوب احترافي جداً ومبني على الأرقام.
+الأقسام المطلوبة:
+1. SUMMARY: ملخص المباراة وسرد الأحداث بشكل درامي مشوق.
+2. TACTICAL_ANALYSIS: القراءة الفنية (تكتيك) بناءً على الاستحواذ والتسديدات والبطاقات.
+3. STATS_ANALYSIS: تحليل الإحصائيات النهائية وتأثيرها.
+4. TURNING_POINTS: نقاط التحول في سير اللعب.
+5. GROUP_IMPACT: ماذا تعني النتيجة؟ (تأثيرها على ترتيب البطولة).
+6. SOCIAL_THREAD: ثريد تويتر (Twitter Thread) مكون من 3 تغريدات تلخص المقال بأرقام مثيرة وجاهز للنشر.
+
+يجب أن يكون المقال طويلاً وغنياً بالمعلومات (لا يقل عن 600 كلمة) ومناسباً لمحركات البحث (SEO). لا تستخدم جملاً عامة، بل اربط الأرقام بالواقع التكتيكي (مثلاً: "الاستحواذ 60% كان سلبياً بلا فاعلية").`;
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: prompt,
+      config: {
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            sections: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  type: { type: Type.STRING },
+                  heading: { type: Type.STRING },
+                  content: { type: Type.STRING }
+                },
+                required: ['type', 'heading', 'content']
+              }
+            }
+          },
+          required: ['sections']
+        }
+      }
+    });
+
+    const text = response.text;
+    if (text) {
+      const parsed = JSON.parse(text);
+      if (parsed.sections && Array.isArray(parsed.sections) && parsed.sections.length > 0) {
+        return parsed.sections;
+      }
+    }
+  } catch (error) {
+    console.error('AI Generation failed, falling back to templates', error);
+  }
+
+  return fallback();
 }
 
 function bodyFromSections(sections: Section[]) {
@@ -240,7 +304,7 @@ export async function generateArticleForMatch(match: CandidateMatch, options?: {
   const infographicAssetId = randomUUID();
   const jobId = randomUUID();
   const metrics = metricsFrom(match);
-  const sections = buildSections(match, metrics);
+  const sections = await buildSections(match, metrics);
   const score = scoreLine(match);
   const slug = latinSlug(match);
   const title = `نتيجة مباراة ${match.homeTeamName} و${match.awayTeamName} في كأس العالم 2026.. تحليل فني وإحصائيات كاملة`;

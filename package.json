@@ -41,6 +41,7 @@
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.2",
+    "@google/genai": "^2.10.0",
     "@prisma/client": "^6.19.3",
     "@tailwindcss/postcss": "^4",
     "bcryptjs": "^3.0.3",
