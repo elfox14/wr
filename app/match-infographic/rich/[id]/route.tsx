@@ -80,8 +80,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
           <span style={{ color: awayColor }}>{awayVal}{label.includes('استحواذ') ? '%' : ''}</span>
         </div>
         <div style={{ display: 'flex', width: '100%', height: '16px', backgroundColor: '#1e293b', borderRadius: '8px', overflow: 'hidden' }}>
-          <div style={{ display: 'flex', width: \`\${homePct}%\`, backgroundColor: homeColor, height: '100%' }}></div>
-          <div style={{ display: 'flex', width: \`\${awayPct}%\`, backgroundColor: awayColor, height: '100%' }}></div>
+          <div style={{ display: 'flex', width: `${homePct}%`, backgroundColor: homeColor, height: '100%' }}></div>
+          <div style={{ display: 'flex', width: `${awayPct}%`, backgroundColor: awayColor, height: '100%' }}></div>
         </div>
       </div>
     );
