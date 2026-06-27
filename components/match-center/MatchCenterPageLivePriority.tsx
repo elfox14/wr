@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
+import Head from 'next/head';
 import ProfessionalMatchTabsPage from '@/components/match-page/ProfessionalMatchTabsPageCleanStats';
 import { getMatchPageDataFast } from '@/lib/match-page/getMatchPageDataFast';
 import type { MatchEventView } from '@/lib/match-page/types';
@@ -60,5 +61,48 @@ function dedupeMatchEvents(events: MatchEventView[]) {
 export default async function MatchCenterPageLivePriority({ matchId }: { matchId: string }) {
   const data = await getMatchPageDataFast(matchId);
   if (!data) notFound();
-  return <ProfessionalMatchTabsPage data={{ ...data, events: dedupeMatchEvents(data.events || []) }} />;
+
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://worldcup.mcprim.com';
+  const matchUrl = `${baseUrl}/match-center/${data.id}`;
+
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'SportsEvent',
+    name: `${data.homeTeam.name} vs ${data.awayTeam.name}`,
+    description: `مباراة ${data.homeTeam.name} ضد ${data.awayTeam.name} في ${data.competition}`,
+    startDate: data.matchDate,
+    eventStatus: data.status.isFinished
+      ? 'https://schema.org/EventRescheduled'
+      : data.status.isLive
+      ? 'https://schema.org/EventLive'
+      : 'https://schema.org/EventScheduled',
+    homeTeam: {
+      '@type': 'SportsTeam',
+      name: data.homeTeam.name,
+      sport: 'Soccer',
+    },
+    awayTeam: {
+      '@type': 'SportsTeam',
+      name: data.awayTeam.name,
+      sport: 'Soccer',
+    },
+    location: data.venue
+      ? {
+          '@type': 'Place',
+          name: data.venue,
+          address: data.city ? { '@type': 'PostalAddress', addressLocality: data.city } : undefined,
+        }
+      : undefined,
+    url: matchUrl,
+  };
+
+  return (
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, '\\u003c') }}
+      />
+      <ProfessionalMatchTabsPage data={{ ...data, events: dedupeMatchEvents(data.events || []) }} />
+    </>
+  );
 }

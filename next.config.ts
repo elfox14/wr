@@ -16,9 +16,7 @@ const webpackBuildStubAliases = {
 const nextConfig: NextConfig = {
   cacheMaxMemorySize: 0,
   devIndicators: false,
-  typescript: {
-    ignoreBuildErrors: true,
-  },
+
   turbopack: {
     resolveAlias: turbopackBuildStubAliases,
   },
