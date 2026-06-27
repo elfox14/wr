@@ -11,6 +11,11 @@ export default function AdminMatchControls({ matchId }: { matchId: string }) {
     setLoadingArticle(true);
     try {
       const res = await fetch(`/api/admin/match/${matchId}/generate-article`, { method: 'POST' });
+      if (!res.ok) {
+        const text = await res.text();
+        alert(`خطأ من الخادم (${res.status}): ${text.slice(0, 100)}`);
+        return;
+      }
       const data = await res.json();
       if (data.slug) {
         alert('تم إنشاء المقال بنجاح!');
@@ -19,7 +24,7 @@ export default function AdminMatchControls({ matchId }: { matchId: string }) {
         alert(data.error || 'حدث خطأ أثناء توليد المقال.');
       }
     } catch (err) {
-      alert('خطأ في الاتصال بالخادم.');
+      alert('خطأ في الاتصال بالخادم أو فشل في تحليل الاستجابة.');
     } finally {
       setLoadingArticle(false);
     }
