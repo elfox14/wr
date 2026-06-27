@@ -7,7 +7,7 @@ export const revalidate = 86400; // 1 day
 
 // Load a font that supports Arabic. We use a CDN link for a TTF font.
 // Almarai or Cairo TTF.
-const fontUrl = 'https://github.com/google/fonts/raw/main/ofl/cairo/Cairo-Bold.ttf';
+const fontUrl = 'https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/cairo/Cairo-Bold.ttf';
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -60,7 +60,17 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     awayDangerousAttacks: match.awayDangerousAttacks || 0,
   };
 
-  const fontData = await fetch(fontUrl).then((res) => res.arrayBuffer());
+  let fontData: ArrayBuffer | null = null;
+  try {
+    const fontRes = await fetch(fontUrl, { signal: AbortSignal.timeout(8000) });
+    if (fontRes.ok) {
+      fontData = await fontRes.arrayBuffer();
+    } else {
+      console.error('Font fetch failed with status:', fontRes.status);
+    }
+  } catch (error) {
+    console.error('Error fetching font:', error);
+  }
 
   // Function to render a stat bar
   const StatBar = ({ label, homeVal, awayVal, invertColors = false }: { label: string, homeVal: number, awayVal: number, invertColors?: boolean }) => {
@@ -154,13 +164,13 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     {
       width: 1080,
       height: 1350,
-      fonts: [
+      fonts: fontData ? [
         {
           name: 'Cairo',
           data: fontData,
           style: 'normal',
         },
-      ],
+      ] : undefined,
     }
   );
 }
