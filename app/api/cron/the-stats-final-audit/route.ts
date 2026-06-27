@@ -171,7 +171,7 @@ async function run(req: Request) {
   const includeReady = boolParam(url, 'includeReady', false);
   const limit = numberParam(url, 'limit', 20, 1, 50);
   const page = numberParam(url, 'page', 1, 1, 1000);
-  const snapshotTake = numberParam(url, 'snapshotTake', 8, 1, 12);
+  const snapshotTake = numberParam(url, 'snapshotTake', 24, 1, 50);
   const days = numberParam(url, 'days', 30, 1, 180);
   const since = new Date(Date.now() - days * 864e5);
   const where = matchId ? { id: matchId } as any : { status: { in: FINISHED_STATUSES }, matchDate: { gte: since } } as any;
@@ -187,6 +187,7 @@ async function run(req: Request) {
         homeTeam: { select: { name: true, code: true } },
         awayTeam: { select: { name: true, code: true } },
         statsSnapshots: {
+          where: { provider: { contains: 'THE_STATS' } },
           orderBy: { capturedAt: 'desc' },
           take: snapshotTake,
           select: {
@@ -240,7 +241,7 @@ async function run(req: Request) {
         playerStats: best?.counts.playerStats || 0,
         lineups: best?.counts.lineups || 0,
         dbEvents: match._count?.events || 0,
-        snapshots: snapshots.length,
+        scannedSnapshots: snapshots.length,
         theStatsSnapshots: theStatsSnapshots.length,
       },
       latestTheStatsSnapshot: best?.snapshot ? {
@@ -264,14 +265,15 @@ async function run(req: Request) {
 
   return NextResponse.json({
     ok: true,
-    mode: 'the_stats_final_audit_v2_memory_safe_db_only',
-    note: 'DB-only paged audit. It does not call TheStats and does not delete iSports data. Use page/limit instead of very large limits.',
+    mode: 'the_stats_final_audit_v3_the_stats_snapshots_only',
+    note: 'DB-only paged audit. It reads TheStats snapshots only, so iSports snapshot volume cannot hide older final TheStats data.',
     scope: {
       matchId,
       days,
       limit,
       page,
       snapshotTake,
+      snapshotFilter: 'provider contains THE_STATS',
       offset: skip,
       scanned: matches.length,
       returned: rows.length,
