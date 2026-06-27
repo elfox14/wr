@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { ImageResponse } from 'next/og';
 import prisma from '@/lib/prisma';
+import fs from 'fs';
+import path from 'path';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 86400; // 1 day
@@ -71,6 +73,39 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     }
   } catch (error) {
     console.error('Error fetching font:', error);
+  }
+
+  // Fallback to local Geist-Regular font to prevent Satori process crash if fetch fails
+  let fallbackFontData: ArrayBuffer | null = null;
+  try {
+    const fallbackPath = path.join(process.cwd(), 'node_modules/next/dist/compiled/@vercel/og/Geist-Regular.ttf');
+    if (fs.existsSync(fallbackPath)) {
+      fallbackFontData = fs.readFileSync(fallbackPath);
+    }
+  } catch (err) {
+    console.error('Failed to read fallback font:', err);
+  }
+
+  const satoriFonts: any[] = [];
+  if (fontData) {
+    satoriFonts.push({
+      name: 'Cairo',
+      data: fontData,
+      weight: 700,
+      style: 'normal',
+    });
+  } else if (fallbackFontData) {
+    // If Cairo failed to load, load Geist mapped as Cairo so Satori doesn't crash.
+    satoriFonts.push({
+      name: 'Cairo',
+      data: fallbackFontData,
+      weight: 700,
+      style: 'normal',
+    });
+  }
+
+  if (satoriFonts.length === 0) {
+    return new NextResponse('Failed to load any fonts for rendering', { status: 500 });
   }
 
   // Function to render a stat bar
@@ -166,14 +201,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     {
       width: 1080,
       height: 1350,
-      fonts: fontData ? [
-        {
-          name: 'Cairo',
-          data: fontData,
-          weight: 700,
-          style: 'normal',
-        },
-      ] : undefined,
+      fonts: satoriFonts,
     }
   );
 }
