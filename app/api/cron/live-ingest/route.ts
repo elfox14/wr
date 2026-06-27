@@ -1,5 +1,6 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
+import prisma from '@/lib/prisma';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -42,6 +43,59 @@ function isAuthorized(req: Request) {
   const secret = secretValue();
   if (!secret) return false;
   return tokenFromRequest(req) === secret;
+}
+
+function safeQueryMeta(req: Request) {
+  const url = new URL(req.url);
+  const entries: Record<string, string> = {};
+  for (const [key, value] of url.searchParams.entries()) {
+    if (/key|secret|token/i.test(key)) continue;
+    entries[key] = value;
+  }
+  return entries;
+}
+
+async function createSyncJob(req: Request) {
+  try {
+    return await prisma.syncJob.create({
+      data: {
+        type: 'LIVE_INGEST',
+        source: 'AUTOMATED_LIVE_INGEST',
+        status: 'RUNNING',
+        startedAt: new Date(),
+        meta: {
+          route: '/api/cron/live-ingest',
+          query: safeQueryMeta(req),
+        },
+      },
+      select: { id: true },
+    });
+  } catch (error) {
+    console.error('[live-ingest-cron] failed to create SyncJob:', error);
+    return null;
+  }
+}
+
+async function finishSyncJob(
+  job: { id: string } | null,
+  status: 'SUCCESS' | 'FAILED',
+  meta: Record<string, any>,
+  error?: unknown,
+) {
+  if (!job) return;
+  try {
+    await prisma.syncJob.update({
+      where: { id: job.id },
+      data: {
+        status,
+        finishedAt: new Date(),
+        error: error ? String((error as { message?: string })?.message || error).slice(0, 1000) : null,
+        meta,
+      },
+    });
+  } catch (updateError) {
+    console.error('[live-ingest-cron] failed to update SyncJob:', updateError);
+  }
 }
 
 function applySafeEnvOverrides(req: Request) {
@@ -117,26 +171,46 @@ async function handle(req: Request) {
 
   const restoreEnv = applySafeEnvOverrides(req);
   const startedAt = Date.now();
+  const syncJob = await createSyncJob(req);
 
   try {
     const worker = await runFreshWorkerProcess();
-    return jsonResponse({
+    const responsePayload = {
       ok: true,
       mode: 'http_live_ingest_cron_v2_fresh_process',
+      syncJobId: syncJob?.id,
       durationMs: Date.now() - startedAt,
       result: worker.summary,
       stderr: worker.stderr || undefined,
+    };
+    await finishSyncJob(syncJob, 'SUCCESS', {
+      route: '/api/cron/live-ingest',
+      query: safeQueryMeta(req),
+      durationMs: responsePayload.durationMs,
+      result: worker.summary,
+      stderr: worker.stderr || undefined,
     });
+    return jsonResponse(responsePayload);
   } catch (error: unknown) {
     const anyError = error as { message?: string; stdout?: string; stderr?: string };
-    return jsonResponse({
+    const result = anyError?.stdout ? parseWorkerSummary(String(anyError.stdout)) : undefined;
+    const responsePayload = {
       ok: false,
       mode: 'http_live_ingest_cron_v2_fresh_process',
+      syncJobId: syncJob?.id,
       durationMs: Date.now() - startedAt,
       error: anyError?.message || String(error),
-      result: anyError?.stdout ? parseWorkerSummary(String(anyError.stdout)) : undefined,
+      result,
       stderr: anyError?.stderr ? String(anyError.stderr).slice(-4000) : undefined,
-    }, 500);
+    };
+    await finishSyncJob(syncJob, 'FAILED', {
+      route: '/api/cron/live-ingest',
+      query: safeQueryMeta(req),
+      durationMs: responsePayload.durationMs,
+      result,
+      stderr: responsePayload.stderr,
+    }, error);
+    return jsonResponse(responsePayload, 500);
   } finally {
     restoreEnv();
   }
