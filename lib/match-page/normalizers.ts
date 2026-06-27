@@ -33,7 +33,6 @@ const STAT_ALIASES: Record<string, string[]> = {
   interceptions: ['interceptions'],
   clearances: ['clearances'],
   ballRecoveries: ['ballRecoveries', 'ball_recoveries'],
-  // Usually supplied by iSports live snapshots, not TheStats. Keep them as a lower-priority fallback.
   attacks: ['attacks', 'attack', 'total_attacks'],
   dangerousAttacks: ['dangerousAttacks', 'dangerous_attacks', 'dangerousAttack'],
 };
@@ -56,7 +55,32 @@ export function rawData(snapshot: any) { return asObject(snapshot?.rawData); }
 export function rawStats(snapshot: any) { const data = rawData(snapshot); const nested = asObject(data.theStatsApi); const liveStatsPayload = asObject(data.liveStats?.data || data.liveStats); const normalizedStats = asObject(data.normalized?.liveStats?.stats); return { ...asObject(nested.providerStats), ...asObject(nested.stats), ...asObject(liveStatsPayload.providerStats), ...asObject(liveStatsPayload.stats), ...asObject(liveStatsPayload.overview), ...normalizedStats, ...asObject(data.providerStats), ...asObject(data.stats) }; }
 
 function pairFromValue(value: any, source: string): Pair { const stat = asObject(value); const all = asObject(stat.all); const home = toNumber(stat.home ?? stat.home_value ?? stat.homeValue ?? all.home); const away = toNumber(stat.away ?? stat.away_value ?? stat.awayValue ?? all.away); return home === null && away === null ? null : { home, away, source }; }
-function statPair(snapshot: any, homeKey: string, awayKey: string, statKey: string): Pair { const stats = rawStats(snapshot); const aliases = STAT_ALIASES[statKey] || [statKey]; for (const alias of aliases) { const direct = pairFromValue(stats[alias], providerName(snapshot)); if (direct) return direct; } const home = aliases.map((alias) => toNumber(stats[homeKey] ?? stats[`home_${alias}`] ?? stats[`${alias}_home`] ?? stats[`${alias}Home`])).find((v) => v !== null) ?? null; const away = aliases.map((alias) => toNumber(stats[awayKey] ?? stats[`away_${alias}`] ?? stats[`${alias}_away`] ?? stats[`${alias}Away`])).find((v) => v !== null) ?? null; return home === null && away === null ? null : { home, away, source: providerName(snapshot) }; }
+function firstNumber(...values: any[]) { for (const value of values) { const n = toNumber(value); if (n !== null) return n; } return null; }
+function statPair(snapshot: any, homeKey: string, awayKey: string, statKey: string): Pair {
+  const stats = rawStats(snapshot);
+  const aliases = STAT_ALIASES[statKey] || [statKey];
+  for (const alias of aliases) {
+    const direct = pairFromValue(stats[alias], providerName(snapshot));
+    if (direct) return direct;
+  }
+  const home = aliases.map((alias) => firstNumber(
+    snapshot?.[homeKey],
+    stats[homeKey],
+    stats[`home_${alias}`],
+    stats[`${alias}_home`],
+    stats[`${alias}Home`],
+    stats[`home${alias.charAt(0).toUpperCase()}${alias.slice(1)}`],
+  )).find((v) => v !== null) ?? null;
+  const away = aliases.map((alias) => firstNumber(
+    snapshot?.[awayKey],
+    stats[awayKey],
+    stats[`away_${alias}`],
+    stats[`${alias}_away`],
+    stats[`${alias}Away`],
+    stats[`away${alias.charAt(0).toUpperCase()}${alias.slice(1)}`],
+  )).find((v) => v !== null) ?? null;
+  return home === null && away === null ? null : { home, away, source: providerName(snapshot) };
+}
 export function buildStatMetric(sources: any[], key: string, label: string, homeKey: string, awayKey: string, suffix = ''): MatchStatMetric { const pair = sources.map((snapshot) => statPair(snapshot, homeKey, awayKey, key)).find(Boolean) as Pair; return { key, label, home: pair?.home ?? null, away: pair?.away ?? null, suffix, source: pair?.source || '', available: pair !== null }; }
 export function metricDefinitions(): Array<[string, string, string, string, string?]> { return [ ['possession', 'الاستحواذ', 'homePossession', 'awayPossession', '%'], ['xg', 'الأهداف المتوقعة xG', 'homeXg', 'awayXg'], ['npxg', 'xG بدون ركلات جزاء', 'homeNpxg', 'awayNpxg'], ['bigChances', 'فرص كبيرة', 'homeBigChances', 'awayBigChances'], ['shots', 'التسديدات', 'homeShots', 'awayShots'], ['shotsOnTarget', 'على المرمى', 'homeShotsOnTarget', 'awayShotsOnTarget'], ['shotsOffTarget', 'خارج المرمى', 'homeShotsOffTarget', 'awayShotsOffTarget'], ['blockedShots', 'تسديدات محجوبة', 'homeBlockedShots', 'awayBlockedShots'], ['shotsInsideBox', 'تسديدات داخل المنطقة', 'homeShotsInsideBox', 'awayShotsInsideBox'], ['shotsOutsideBox', 'تسديدات خارج المنطقة', 'homeShotsOutsideBox', 'awayShotsOutsideBox'], ['corners', 'الركنيات', 'homeCorners', 'awayCorners'], ['fouls', 'الأخطاء', 'homeFouls', 'awayFouls'], ['offsides', 'التسللات', 'homeOffsides', 'awayOffsides'], ['yellowCards', 'بطاقات صفراء', 'homeYellowCards', 'awayYellowCards'], ['redCards', 'بطاقات حمراء', 'homeRedCards', 'awayRedCards'], ['passes', 'التمريرات', 'homePasses', 'awayPasses'], ['accuratePasses', 'تمريرات صحيحة', 'homeAccuratePasses', 'awayAccuratePasses'], ['tackles', 'تدخلات', 'homeTackles', 'awayTackles'], ['interceptions', 'اعتراضات', 'homeInterceptions', 'awayInterceptions'], ['clearances', 'تشتيت الكرة', 'homeClearances', 'awayClearances'], ['ballRecoveries', 'استرجاع الكرة', 'homeBallRecoveries', 'awayBallRecoveries'], ['saves', 'تصديات الحارس', 'homeSaves', 'awaySaves'], ['attacks', 'الهجمات', 'homeAttacks', 'awayAttacks'], ['dangerousAttacks', 'هجمات خطيرة', 'homeDangerousAttacks', 'awayDangerousAttacks'] ]; }
 
@@ -65,29 +89,8 @@ function statusFromProviderValue(value: unknown, minute: number | null) { const 
 function statusCandidate(snapshot: any): StatusCandidate | null { const data = rawData(snapshot); const flashMeta = asObject(data.flashMeta); const nestedFlashMeta = asObject(data.flash?.meta); const meta = asObject(data.meta); const minute = snapshotMinute(snapshot); const rawStatus = data.status ?? data.providerStatus ?? data.matchState ?? flashMeta.matchState ?? nestedFlashMeta.matchState ?? meta.status ?? meta.matchState; const status = statusFromProviderValue(rawStatus, minute); if (!status) return null; return { status, minute, priority: providerPriority(snapshot), capturedAt: snapshot?.capturedAt ? new Date(snapshot.capturedAt).getTime() : 0, sourceKey: providerKey(snapshot) }; }
 export function statusFromSnapshots(sources: any[]) { const candidates = sources.map(statusCandidate).filter(Boolean) as StatusCandidate[]; const flash = candidates.filter((candidate) => candidate.sourceKey === 'isports-flash').sort((a, b) => b.capturedAt - a.capturedAt)[0]; if (flash && ['HT', 'FINISHED', '2H', '1H', 'PEN'].includes(flash.status)) return { status: flash.status, minute: flash.minute }; const best = candidates.sort((a, b) => a.priority - b.priority || b.capturedAt - a.capturedAt)[0]; return best ? { status: best.status, minute: best.minute } : null; }
 export function scoreFromSnapshot(snapshot: any): MatchScore | null { if (!snapshot) return null; const data = rawData(snapshot); const counts = asObject(data.counts); const meta = asObject(data.meta); const flashMeta = asObject(data.flashMeta); const finalScore = asObject(data.normalized?.matchInfo?.finalScore); const home = toNumber(snapshot.homeScore ?? data.homeScore ?? data.home_goals ?? finalScore.home ?? flashMeta.homeScore ?? meta.home_goals ?? counts.homeScore); const away = toNumber(snapshot.awayScore ?? data.awayScore ?? data.away_goals ?? finalScore.away ?? flashMeta.awayScore ?? meta.away_goals ?? counts.awayScore); if (home === null && away === null) return null; return { home, away, source: providerName(snapshot) }; }
-export function scoreForDisplay(match: any, sources: any[]): MatchScore { const matchHome = toNumber(match.homeScore); const matchAway = toNumber(match.awayScore); const matchScore: MatchScore = { home: matchHome, away: matchAway, source: 'قاعدة المباراة' }; const matchTotal = Number(matchHome || 0) + Number(matchAway || 0); const snapshotScore = sources.map(scoreFromSnapshot).find(Boolean) || null; const snapshotTotal = Number(snapshotScore?.home || 0) + Number(snapshotScore?.away || 0); if (snapshotScore && snapshotTotal >= matchTotal) return snapshotScore; if (matchHome !== null || matchAway !== null) return matchScore; return snapshotScore || { home: null, away: null, source: '' }; }
-
-function statusKind(status: string): MatchStatusKind { const value = normalizeStatusValue(status); if (FINISHED_STATUSES.includes(value)) return 'finished'; if (HALF_TIME_STATUSES.includes(value)) return 'halftime'; if (LIVE_STATUSES.includes(value)) return 'live'; if (SCHEDULED_STATUSES.includes(value)) return 'scheduled'; return 'delayed'; }
-
-export function buildStatusView(match: any, sources: any[]): MatchStatusView {
-  const matchStatus = normalizeStatusValue(match.status || '');
-  if (FINISHED_STATUSES.includes(matchStatus)) return { raw: matchStatus, kind: 'finished', label: 'انتهت المباراة', shortLabel: 'انتهت', minute: null, isLive: false, isFinished: true, isScheduled: false };
-
-  const fromSource = statusFromSnapshots(sources);
-  const raw = fromSource?.status || normalizeStatusValue(match.status || 'SCHEDULED');
-  const kind = statusKind(raw);
-
-  if (kind === 'finished') return { raw, kind, label: 'انتهت المباراة', shortLabel: 'انتهت', minute: null, isLive: false, isFinished: true, isScheduled: false };
-  if (kind === 'halftime') return { raw, kind, label: 'استراحة بين الشوطين', shortLabel: 'استراحة', minute: null, isLive: false, isFinished: false, isScheduled: false };
-
-  if (kind === 'live') {
-    const phase = raw === '1H' ? 'الشوط الأول' : raw === '2H' ? 'الشوط الثاني' : raw === 'ET' ? 'وقت إضافي' : 'مباشرة الآن';
-    return { raw, kind, label: phase, shortLabel: phase, minute: fromSource?.minute ?? null, isLive: true, isFinished: false, isScheduled: false };
-  }
-
-  return { raw, kind: 'scheduled', label: 'لم تبدأ', shortLabel: 'لم تبدأ', minute: null, isLive: false, isFinished: false, isScheduled: true };
-}
-
-export function eventMinuteLabel(event: any) { const detail = String(event?.detail || ''); const stoppage = detail.match(/(?:د|minute|min)?\s*(45|90|105)\s*\+\s*(\d+)/i); if (stoppage) return `د${Number(stoppage[1]).toLocaleString('ar-EG')}+${Number(stoppage[2]).toLocaleString('ar-EG')}`; return event.minute !== null && event.minute !== undefined ? `د${Number(event.minute).toLocaleString('ar-EG')}` : '—'; }
-export function eventIcon(type?: string | null) { const value = normalizeStatusValue(type); if (value.includes('GOAL')) return '⚽'; if (value.includes('YELLOW')) return '🟨'; if (value.includes('RED')) return '🟥'; if (value.includes('SUB')) return '🔁'; if (value.includes('VAR')) return '📺'; if (value.includes('PEN')) return '🎯'; if (value.includes('SAVE')) return '🧤'; if (value.includes('CORNER')) return '🚩'; if (value.includes('SHOT') || value.includes('CHANCE')) return '🎯'; return '•'; }
-export function buildEventView(event: any): MatchEventView { return { id: event.id, minute: event.minute ?? null, minuteLabel: eventMinuteLabel(event), type: event.type || 'note', icon: eventIcon(event.type), teamId: event.teamId || null, playerName: event.playerName || null, detail: event.detail || 'حدث مباراة', sourceName: event.sourceName || null, sourceUrl: event.sourceUrl || null }; }
+export function scoreForDisplay(match: any, sources: any[]): MatchScore { const matchHome = toNumber(match.homeScore); const matchAway = toNumber(match.awayScore); const matchScore: MatchScore = { home: matchHome, away: matchAway, source: 'قاعدة المباراة' }; const matchTotal = Number(matchHome || 0) + Number(matchAway || 0); const snapshotScore = sources.map(scoreFromSnapshot).find(Boolean) || null; const snapshotTotal = Number(snapshotScore?.home || 0) + Number(snapshotScore?.away || 0); if (snapshotScore && snapshotTotal >= matchTotal) return snapshotScore; return matchScore; }
+export function buildStatusView(match: any, sources: any[]): MatchStatusView { const fromSnapshots = statusFromSnapshots(sources); const raw = normalizeStatusValue(fromSnapshots?.status || match?.status || 'SCHEDULED'); const minute = fromSnapshots?.minute ?? snapshotMinute(sources?.[0]) ?? null; let kind: MatchStatusKind = 'scheduled'; if (LIVE_STATUSES.includes(raw)) kind = 'live'; else if (HALF_TIME_STATUSES.includes(raw)) kind = 'halftime'; else if (FINISHED_STATUSES.includes(raw)) kind = 'finished'; else if (raw.includes('DELAY')) kind = 'delayed'; const label = kind === 'live' ? `مباشر${minute ? ` · د${minute}` : ''}` : kind === 'halftime' ? 'استراحة بين الشوطين' : kind === 'finished' ? 'انتهت المباراة' : kind === 'delayed' ? 'تأجيل / تأخير' : 'لم تبدأ بعد'; const shortLabel = kind === 'live' ? 'مباشر' : kind === 'halftime' ? 'بين الشوطين' : kind === 'finished' ? 'انتهت' : kind === 'delayed' ? 'متأخرة' : 'لم تبدأ'; return { raw, kind, label, shortLabel, minute, isLive: kind === 'live', isFinished: kind === 'finished', isScheduled: kind === 'scheduled' }; }
+export function eventMinuteLabel(event: { minute?: number | null; detail?: string | null }) { const minute = toNumber(event.minute); if (minute === null) return '—'; const detail = String(event.detail || '').toLowerCase(); const explicit = detail.match(/45\s*\+\s*(\d{1,2})/); if (explicit) return `45+${Number(explicit[1])}`; if (minute > 45 && minute < 60 && /first half|1h|الشوط الأول/i.test(detail)) return `45+${minute - 45}`; return String(minute); }
+export function eventIcon(type: string) { const key = String(type || '').toLowerCase(); if (key.includes('goal')) return '⚽'; if (key.includes('yellow')) return '🟨'; if (key.includes('red')) return '🟥'; if (key.includes('sub')) return '🔁'; if (key.includes('penalty')) return '🥅'; if (key.includes('var')) return '📺'; if (key.includes('corner')) return '🚩'; if (key.includes('shot')) return '🎯'; return '●'; }
+export function buildEventView(event: any): MatchEventView { return { id: event.id, minute: toNumber(event.minute), minuteLabel: eventMinuteLabel(event), type: event.type || 'event', icon: eventIcon(event.type || ''), teamId: event.teamId || null, playerName: event.playerName || null, detail: event.detail || event.type || 'حدث', sourceName: event.sourceName || null, sourceUrl: event.sourceUrl || null, x: null, y: null, shot: null }; }
