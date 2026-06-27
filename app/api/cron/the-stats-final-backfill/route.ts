@@ -290,24 +290,60 @@ async function run(req: Request) {
   const apply = boolParam(url, 'apply', false) && !boolParam(url, 'dryRun', false);
   const matchId = url.searchParams.get('matchId');
   const limit = numberParam(url, 'limit', 1, 1, 3);
-  const scanLimit = numberParam(url, 'scanLimit', 80, 1, 200);
+  const scanLimit = numberParam(url, 'scanLimit', 20, 1, 50);
+  const page = numberParam(url, 'page', 1, 1, 1000);
+  const snapshotTake = numberParam(url, 'snapshotTake', 24, 1, 50);
   const days = numberParam(url, 'days', 30, 1, 180);
   const delayMs = numberParam(url, 'delayMs', 1500, 0, 15000);
   const includeMissingTheStats = boolParam(url, 'includeMissingTheStats', true);
   const since = new Date(Date.now() - days * 864e5);
+  const where = matchId ? { id: matchId } as any : { status: { in: FINISHED_STATUSES }, matchDate: { gte: since } } as any;
+  const skip = matchId ? 0 : (page - 1) * scanLimit;
 
-  const matches = await prisma.match.findMany({
-    where: matchId ? { id: matchId } as any : { status: { in: FINISHED_STATUSES }, matchDate: { gte: since } } as any,
-    orderBy: { matchDate: 'desc' },
-    take: matchId ? 1 : scanLimit,
-    include: {
-      homeTeam: { select: { name: true, code: true } },
-      awayTeam: { select: { name: true, code: true } },
-      statsSnapshots: { orderBy: { capturedAt: 'desc' }, take: 24 },
-    },
-  } as any) as any[];
+  const [matches, totalFinishedInWindow] = await Promise.all([
+    prisma.match.findMany({
+      where,
+      orderBy: { matchDate: 'desc' },
+      skip,
+      take: matchId ? 1 : scanLimit,
+      include: {
+        homeTeam: { select: { name: true, code: true } },
+        awayTeam: { select: { name: true, code: true } },
+        statsSnapshots: {
+          where: { provider: { contains: 'THE_STATS' } },
+          orderBy: { capturedAt: 'desc' },
+          take: snapshotTake,
+          select: {
+            id: true,
+            provider: true,
+            capturedAt: true,
+            rawData: true,
+            homePossession: true,
+            awayPossession: true,
+            homeShots: true,
+            awayShots: true,
+            homeShotsOnTarget: true,
+            awayShotsOnTarget: true,
+            homeShotsOffTarget: true,
+            awayShotsOffTarget: true,
+            homeCorners: true,
+            awayCorners: true,
+            homeYellowCards: true,
+            awayYellowCards: true,
+            homeRedCards: true,
+            awayRedCards: true,
+            homeAttacks: true,
+            awayAttacks: true,
+            homeDangerousAttacks: true,
+            awayDangerousAttacks: true,
+          },
+        },
+      },
+    } as any),
+    matchId ? Promise.resolve(1) : prisma.match.count({ where }),
+  ]) as any[];
 
-  const candidates = matches.map((match) => {
+  const candidates = matches.map((match: any) => {
     const snapshots = match.statsSnapshots || [];
     const best = pickBestTheStatsSnapshot(snapshots);
     const status = auditStatus(best);
@@ -317,7 +353,7 @@ async function run(req: Request) {
       auditStatus: status,
       title: `${match.homeTeam?.name || match.homeTeamId} ضد ${match.awayTeam?.name || match.awayTeamId}`,
     };
-  }).filter((item) => item.auditStatus !== 'ready' && (includeMissingTheStats || item.auditStatus !== 'missing_the_stats')).slice(0, limit);
+  }).filter((item: any) => item.auditStatus !== 'ready' && (includeMissingTheStats || item.auditStatus !== 'missing_the_stats')).slice(0, limit);
 
   const processed = [];
   let wroteFinalSnapshots = false;
@@ -344,7 +380,7 @@ async function run(req: Request) {
 
   return NextResponse.json({
     ok: true,
-    mode: 'the_stats_final_backfill_v2_direct_safe_runner',
+    mode: 'the_stats_final_backfill_v3_paged_the_stats_only',
     dryRun: !apply,
     note: apply
       ? 'Processed missing finished matches directly through TheStats full finalize. iSports and Football-Data data were not purged.'
@@ -358,8 +394,25 @@ async function run(req: Request) {
       purgeTheStatsMatchEvents: false,
       endpointMode: 'full',
       noSelfFetch: true,
+      snapshotFilter: 'provider contains THE_STATS',
+      maxScanLimit: 50,
+      paged: true,
     },
-    scope: { matchId, days, scanLimit, limit, scanned: matches.length, candidates: candidates.length, includeMissingTheStats },
+    scope: {
+      matchId,
+      days,
+      scanLimit,
+      page,
+      snapshotTake,
+      offset: skip,
+      limit,
+      scanned: matches.length,
+      candidates: candidates.length,
+      totalFinishedInWindow,
+      hasNextPage: !matchId && skip + matches.length < totalFinishedInWindow,
+      nextPage: !matchId && skip + matches.length < totalFinishedInWindow ? page + 1 : null,
+      includeMissingTheStats,
+    },
     processed,
     revalidated,
   }, { headers: { 'Cache-Control': 'no-store' } });
