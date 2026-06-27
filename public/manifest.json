@@ -1,0 +1,35 @@
+{
+  "name": "بورصة المونديال",
+  "short_name": "المونديال",
+  "description": "بورصة المونديال من MC PRIME: مباريات كأس العالم مباشرة، أخبار موثقة، منتخبات ولاعبون ومجموعات، وتحليل كروي.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#04110D",
+  "theme_color": "#04110D",
+  "orientation": "portrait-primary",
+  "lang": "ar",
+  "dir": "rtl",
+  "scope": "/",
+  "icons": [
+    {
+      "src": "/brand/borsa-mondial-sport-logo-icon.svg?v=20260616sport",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/favicon.ico",
+      "sizes": "64x64 32x32 16x16",
+      "type": "image/x-icon"
+    }
+  ],
+  "categories": ["sports", "news", "entertainment"],
+  "screenshots": [],
+  "prefer_related_applications": false
+}
