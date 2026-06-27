@@ -3,6 +3,8 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import prisma from '@/lib/prisma';
 import { ensurePostMatchContentTables } from '@/lib/post-match-content/schema';
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 3600;
@@ -47,8 +49,9 @@ function absoluteUrl(path?: string | null) {
   return `${baseUrl()}${path.startsWith('/') ? path : `/${path}`}`;
 }
 
-async function getArticle(slug: string) {
+async function getArticle(slug: string, isAdmin: boolean) {
   await ensurePostMatchContentTables();
+  const statusCondition = isAdmin ? '' : `AND article."status" = 'PUBLISHED'`;
   const rows = await prisma.$queryRawUnsafe<ArticleRow[]>(`
     SELECT
       article.*,
@@ -65,7 +68,7 @@ async function getArticle(slug: string) {
     JOIN "Match" match ON match."id" = article."matchId"
     JOIN "Asset" home ON home."id" = match."homeTeamId"
     JOIN "Asset" away ON away."id" = match."awayTeamId"
-    WHERE article."slug" = $1 AND article."status" = 'PUBLISHED'
+    WHERE article."slug" = $1 ${statusCondition}
     LIMIT 1
   `, slug);
   return rows[0] || null;
@@ -104,7 +107,7 @@ function metricValue(value: unknown, suffix = '') {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
-  const article = await getArticle(slug);
+  const article = await getArticle(slug, false);
   if (!article) return { title: 'تحليل مباراة غير متوفر' };
 
   const image = absoluteUrl(article.heroImageUrl || `/match-article-image/${article.slug}`);
@@ -132,7 +135,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function ArticlePage({ params }: Props) {
   const { slug } = await params;
-  const article = await getArticle(slug);
+  const session = await getServerSession(authOptions);
+  const isAdmin = session?.user?.role === 'ADMIN';
+  
+  const article = await getArticle(slug, isAdmin);
   if (!article) notFound();
 
   const sections = asArray(article.sections);
