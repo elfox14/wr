@@ -39,3 +39,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Generated audit/reconcile/dryrun outputs
+scripts/data/*-dryrun*.json
+scripts/data/*-audit*.json
+scripts/data/*-dryrun-summary.csv
