@@ -387,11 +387,16 @@ export async function generateArticleForMatch(match: CandidateMatch, options?: {
 
   try {
     await prisma.$transaction(async (tx) => {
+      // 1. Clean up existing assets and article for this match to prevent unique constraint conflicts and orphaned rows
+      await tx.$executeRawUnsafe(`DELETE FROM "MatchInfographic" WHERE "matchId" = $1`, match.id);
+      await tx.$executeRawUnsafe(`DELETE FROM "MediaAsset" WHERE "matchId" = $1 AND "assetType" IN ('ARTICLE_HERO', 'INFOGRAPHIC')`, match.id);
+      await tx.$executeRawUnsafe(`DELETE FROM "MatchArticle" WHERE "matchId" = $1 AND "language" = 'ar'`, match.id);
+
+      // 2. Insert the new article
       await tx.$executeRawUnsafe(
         `INSERT INTO "MatchArticle" (
           "id", "matchId", "title", "slug", "metaTitle", "metaDescription", "excerpt", "body", "sections", "statsSummary", "status", "language", "seoScore", "sourceSnapshotId", "heroImageUrl", "infographicImageUrl", "publishedAt", "updatedAt"
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10::jsonb, $11, 'ar', $12, $13, $14, $15, $16, CURRENT_TIMESTAMP)
-        ON CONFLICT ("matchId", "language") DO NOTHING`,
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10::jsonb, $11, 'ar', $12, $13, $14, $15, $16, CURRENT_TIMESTAMP)`,
         articleId,
         match.id,
         title,
