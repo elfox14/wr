@@ -3,6 +3,9 @@ import { notFound } from 'next/navigation';
 import ProfessionalMatchTabsPage from '@/components/match-page/ProfessionalMatchTabsPageRich';
 import { getMatchPageDataFast } from '@/lib/match-page/getMatchPageDataFast';
 import type { MatchEventView } from '@/lib/match-page/types';
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/lib/auth";
+import AdminMatchControls from './AdminMatchControls';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -63,6 +66,9 @@ export default async function MatchCenterPageLivePriority({ matchId }: { matchId
 
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://worldcup.mcprim.com';
   const matchUrl = `${baseUrl}/match-center/${data.id}`;
+  
+  const session = await getServerSession(authOptions);
+  const isAdmin = session?.user?.role === 'ADMIN';
 
   const jsonLd = {
     '@context': 'https://schema.org',
@@ -101,7 +107,10 @@ export default async function MatchCenterPageLivePriority({ matchId }: { matchId
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, '\\u003c') }}
       />
-      <ProfessionalMatchTabsPage data={{ ...data, events: dedupeMatchEvents(data.events || []) }} />
+      <div className="mx-auto max-w-7xl px-2 py-4 sm:px-4 sm:py-6">
+        {isAdmin && <AdminMatchControls matchId={data.id} />}
+        <ProfessionalMatchTabsPage data={{ ...data, events: dedupeMatchEvents(data.events || []) }} />
+      </div>
     </>
   );
 }

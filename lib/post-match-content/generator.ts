@@ -6,7 +6,7 @@ import { GoogleGenAI, Type } from '@google/genai';
 const FINISHED_STATUSES = ['FINAL_VERIFIED', 'FINISHED', 'FT', 'AET', 'PEN', 'COMPLETED', 'ENDED'];
 const DEFAULT_COMPETITION = 'كأس العالم 2026';
 
-type CandidateMatch = {
+export type CandidateMatch = {
   id: string;
   status: string;
   matchDate: Date;
@@ -294,6 +294,58 @@ export async function findPostMatchCandidates(limit: number, allowFinished: bool
     ORDER BY m."matchDate" DESC
     LIMIT $1
   `, limit, ...statuses);
+}
+
+export async function findPostMatchCandidateById(matchId: string) {
+  await ensurePostMatchContentTables();
+  const rows = await prisma.$queryRawUnsafe<CandidateMatch[]>(`
+    SELECT
+      m."id",
+      m."status",
+      m."matchDate",
+      m."homeScore",
+      m."awayScore",
+      m."groupPhase",
+      m."stage",
+      m."homeTeamId",
+      m."awayTeamId",
+      home."name" AS "homeTeamName",
+      away."name" AS "awayTeamName",
+      home."code" AS "homeTeamCode",
+      away."code" AS "awayTeamCode",
+      latest."id" AS "snapshotId",
+      latest."provider" AS "provider",
+      latest."capturedAt" AS "capturedAt",
+      latest."homePossession" AS "homePossession",
+      latest."awayPossession" AS "awayPossession",
+      latest."homeShots" AS "homeShots",
+      latest."awayShots" AS "awayShots",
+      latest."homeShotsOnTarget" AS "homeShotsOnTarget",
+      latest."awayShotsOnTarget" AS "awayShotsOnTarget",
+      latest."homeShotsOffTarget" AS "homeShotsOffTarget",
+      latest."awayShotsOffTarget" AS "awayShotsOffTarget",
+      latest."homeCorners" AS "homeCorners",
+      latest."awayCorners" AS "awayCorners",
+      latest."homeYellowCards" AS "homeYellowCards",
+      latest."awayYellowCards" AS "awayYellowCards",
+      latest."homeRedCards" AS "homeRedCards",
+      latest."awayRedCards" AS "awayRedCards",
+      latest."homeAttacks" AS "homeAttacks",
+      latest."awayAttacks" AS "awayAttacks",
+      latest."homeDangerousAttacks" AS "homeDangerousAttacks",
+      latest."awayDangerousAttacks" AS "awayDangerousAttacks"
+    FROM "Match" m
+    JOIN "Asset" home ON home."id" = m."homeTeamId"
+    JOIN "Asset" away ON away."id" = m."awayTeamId"
+    LEFT JOIN LATERAL (
+      SELECT * FROM "MatchStatsSnapshot" s
+      WHERE s."matchId" = m."id"
+      ORDER BY s."capturedAt" DESC
+      LIMIT 1
+    ) latest ON TRUE
+    WHERE m."id" = $1
+  `, matchId);
+  return rows[0] || null;
 }
 
 export async function generateArticleForMatch(match: CandidateMatch, options?: { autoPublish?: boolean }) {
