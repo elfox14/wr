@@ -5,9 +5,8 @@ import prisma from '@/lib/prisma';
 export const dynamic = 'force-dynamic';
 export const revalidate = 86400; // 1 day
 
-// Load a font that supports Arabic. We use a CDN link for a TTF font.
-// Almarai or Cairo TTF.
-const fontUrl = 'https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/cairo/Cairo-Bold.ttf';
+// Load a font that supports Arabic. We use a CDN link for a TTF/WOFF font from Fontsource.
+const fontUrl = 'https://cdn.jsdelivr.net/npm/@fontsource/cairo@5.0.3/files/cairo-arabic-700-normal.woff';
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -54,6 +53,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     awayCorners: match.awayCorners || 0,
     homeYellowCards: match.homeYellowCards || 0,
     awayYellowCards: match.awayYellowCards || 0,
+    homeRedCards: match.homeRedCards || 0,
+    awayRedCards: match.awayRedCards || 0,
     homeAttacks: match.homeAttacks || 0,
     awayAttacks: match.awayAttacks || 0,
     homeDangerousAttacks: match.homeDangerousAttacks || 0,
@@ -74,9 +75,11 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
   // Function to render a stat bar
   const StatBar = ({ label, homeVal, awayVal, invertColors = false }: { label: string, homeVal: number, awayVal: number, invertColors?: boolean }) => {
-    const total = homeVal + awayVal || 1;
-    const homePct = (homeVal / total) * 100;
-    const awayPct = (awayVal / total) * 100;
+    const homeValNum = Number(homeVal) || 0;
+    const awayValNum = Number(awayVal) || 0;
+    const total = homeValNum + awayValNum;
+    const homePct = total > 0 ? (homeValNum / total) * 100 : 50;
+    const awayPct = total > 0 ? (awayValNum / total) * 100 : 50;
     
     // Invert colors means Home is blue, Away is red (or vice versa). Let's use red for Home, blue for Away as a default theme.
     const homeColor = invertColors ? '#3b82f6' : '#ef4444'; // blue or red
@@ -115,8 +118,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
         <div style={{
           position: 'absolute',
           top: 0, left: 0, right: 0, bottom: 0,
-          backgroundImage: 'radial-gradient(circle at 50% 0%, #1e293b 0%, #020617 70%)',
-          zIndex: -1,
+          backgroundImage: 'linear-gradient(to bottom, #1e293b, #020617)',
         }} />
 
         {/* Header Section */}
@@ -168,6 +170,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
         {
           name: 'Cairo',
           data: fontData,
+          weight: 700,
           style: 'normal',
         },
       ] : undefined,
