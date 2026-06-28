@@ -11,7 +11,7 @@ const FINISHED_STATUSES = ['FINISHED', 'FT', 'AET', 'PEN', 'COMPLETED', 'ENDED',
 const HALF_TIME_STATUSES = ['HT', 'HALFTIME', 'HALF_TIME', 'HALF-TIME', 'PAUSED'];
 const GROUPS = 'ABCDEFGHIJKL'.split('');
 
-type HubFilter = 'today' | 'yesterday' | 'tomorrow' | 'latest' | 'live' | 'group' | 'all';
+type HubFilter = 'today' | 'yesterday' | 'tomorrow' | 'latest' | 'live' | 'group' | 'all' | 'round_of_32' | 'round_of_16' | 'quarter_finals' | 'semi_finals' | 'final';
 
 function normalizeStatus(status?: string | null) {
   return String(status || '').trim().toUpperCase();
@@ -39,7 +39,7 @@ function labelForStatus(status?: string | null) {
 }
 
 function normalizeFilter(value: string | null): HubFilter {
-  const allowed: HubFilter[] = ['today', 'yesterday', 'tomorrow', 'latest', 'live', 'group', 'all'];
+  const allowed: HubFilter[] = ['today', 'yesterday', 'tomorrow', 'latest', 'live', 'group', 'all', 'round_of_32', 'round_of_16', 'quarter_finals', 'semi_finals', 'final'];
   return allowed.includes(value as HubFilter) ? value as HubFilter : 'today';
 }
 
@@ -93,6 +93,11 @@ function whereFor(filter: HubFilter, group: string) {
   if (filter === 'live') return { status: { in: [...LIVE_STATUSES, ...HALF_TIME_STATUSES] } };
   if (filter === 'group') return groupWhere(group);
   if (filter === 'all') return {};
+  if (filter === 'round_of_32') return { stage: { in: ['round_of_32', 'last_32'] } };
+  if (filter === 'round_of_16') return { stage: { in: ['round_of_16', 'last_16'] } };
+  if (filter === 'quarter_finals') return { stage: { in: ['quarter_finals', 'quarter_final'] } };
+  if (filter === 'semi_finals') return { stage: { in: ['semi_finals', 'semi_final'] } };
+  if (filter === 'final') return { stage: { in: ['final', 'third_place'] } };
   return { matchDate: dayRangeInEgypt(0) };
 }
 
@@ -101,9 +106,14 @@ function orderByFor(filter: HubFilter) {
 }
 
 function takeFor(filter: HubFilter, limit: number) {
-  if (filter === 'all') return Math.min(limit, 60);
+  if (filter === 'all') return Math.min(limit, 120);
   if (filter === 'group') return Math.min(limit, 12);
   if (filter === 'latest') return Math.min(limit, 30);
+  if (filter === 'round_of_32') return 32;
+  if (filter === 'round_of_16') return 16;
+  if (filter === 'quarter_finals') return 8;
+  if (filter === 'semi_finals') return 4;
+  if (filter === 'final') return 2;
   return Math.min(limit, 24);
 }
 

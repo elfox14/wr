@@ -53,6 +53,11 @@ const MAIN_FILTERS: Array<{ id: HubFilter; label: string }> = [
   { id: 'tomorrow', label: 'غدًا' },
   { id: 'latest', label: 'آخر النتائج' },
   { id: 'live', label: 'مباشر الآن' },
+  { id: 'round_of_32', label: 'دور الـ 32' },
+  { id: 'round_of_16', label: 'دور الـ 16' },
+  { id: 'quarter_finals', label: 'ربع النهائي' },
+  { id: 'semi_finals', label: 'نصف النهائي' },
+  { id: 'final', label: 'النهائي' },
   { id: 'all', label: 'كل المباريات' },
 ];
 
@@ -136,7 +141,7 @@ export default function MatchesHubClient() {
   const [error, setError] = useState<string | null>(null);
 
   const endpoint = useMemo(() => {
-    const params = new URLSearchParams({ filter, group, limit: filter === 'all' ? '48' : filter === 'latest' ? '24' : '18' });
+    const params = new URLSearchParams({ filter, group, limit: filter === 'all' ? '120' : filter === 'latest' ? '24' : '18' });
     if (query.trim()) params.set('q', query.trim());
     return `/api/matches-hub?${params.toString()}`;
   }, [filter, group, query]);
@@ -155,5 +160,102 @@ export default function MatchesHubClient() {
 
   const matches = data?.matches || [];
 
-  return <main className="min-h-screen bg-[#04110D] px-3 py-5 text-white sm:px-5" dir="rtl"><div className="mx-auto max-w-7xl space-y-5"><header className="rounded-[1.75rem] border border-white/10 bg-white/[0.045] p-4 shadow-[0_24px_70px_rgba(0,0,0,.30)] sm:p-6"><div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between"><div><p className="text-xs font-black text-[#18E58F]">مركز مباريات كأس العالم</p><h1 className="mt-2 text-3xl font-black text-white sm:text-5xl">المباريات والنتائج</h1><p className="mt-2 max-w-2xl text-sm font-bold leading-7 text-slate-400">صفحة خفيفة تعرض آخر المباريات والنتائج حسب اليوم أو المجموعة، وتفتح التفاصيل داخل صفحة المباراة فقط.</p></div><div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:min-w-[420px]"><SummaryCard label="المعروضة" value={data?.summary.total || 0} /><SummaryCard label="مباشر" value={data?.summary.live || 0} /><SummaryCard label="انتهت" value={data?.summary.finished || 0} /><SummaryCard label="قادمة" value={data?.summary.scheduled || 0} /></div></div></header><section className="sticky top-0 z-30 rounded-[1.35rem] border border-white/10 bg-[#04110D]/95 p-3 shadow-xl backdrop-blur"><div className="flex gap-2 overflow-x-auto pb-1">{MAIN_FILTERS.map((item) => <FilterButton key={item.id} active={filter === item.id} onClick={() => setFilter(item.id)}>{item.label}</FilterButton>)}<FilterButton active={filter === 'group'} onClick={() => setFilter('group')}>المجموعات</FilterButton></div>{filter === 'group' ? <div className="mt-3 grid grid-cols-6 gap-2 sm:grid-cols-12">{GROUPS.map((item) => <button key={item} onClick={() => setGroup(item)} className={`rounded-xl border px-3 py-2 text-xs font-black ${group === item ? 'border-[#F8C846]/50 bg-[#F8C846] text-black' : 'border-white/10 bg-white/[0.04] text-slate-200'}`}>Group {item}</button>)}</div> : null}<div className="mt-3"><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="ابحث باسم منتخب..." className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm font-bold text-white outline-none placeholder:text-slate-500 focus:border-[#18E58F]/40" /></div></section><section className="rounded-[1.5rem] border border-white/10 bg-white/[0.035] p-3 sm:p-4"><div className="mb-4 flex items-center justify-between gap-3"><h2 className="text-xl font-black text-white">{filter === 'today' ? 'مباريات اليوم' : filter === 'yesterday' ? 'مباريات أمس' : filter === 'tomorrow' ? 'مباريات الغد' : filter === 'latest' ? 'آخر النتائج' : filter === 'live' ? 'المباشر الآن' : filter === 'group' ? `مباريات Group ${group}` : 'كل المباريات'}</h2>{loading ? <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-black text-slate-300">جاري التحميل...</span> : null}</div>{error ? <div className="rounded-2xl border border-rose-400/25 bg-rose-400/10 p-4 text-sm font-black text-rose-100">{error}</div> : null}{!loading && !error && !matches.length ? <div className="rounded-2xl border border-dashed border-white/15 bg-black/20 p-8 text-center"><p className="font-black text-white">لا توجد مباريات في هذا الفلتر</p><p className="mt-2 text-sm font-bold text-slate-400">جرّب فلتر آخر أو ابحث باسم منتخب.</p></div> : null}<div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">{matches.map((match) => <MatchCard key={match.id} match={match} />)}</div></section></div></main>;
+  return (
+    <main className="min-h-screen bg-[#04110D] px-3 py-5 text-white sm:px-5" dir="rtl">
+      <div className="mx-auto max-w-7xl space-y-5">
+        <header className="rounded-[1.75rem] border border-white/10 bg-white/[0.045] p-4 shadow-[0_24px_70px_rgba(0,0,0,.30)] sm:p-6">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <p className="text-xs font-black text-[#18E58F]">مركز مباريات كأس العالم</p>
+              <h1 className="mt-2 text-3xl font-black text-white sm:text-5xl">المباريات والنتائج</h1>
+              <p className="mt-2 max-w-2xl text-sm font-bold leading-7 text-slate-400">
+                صفحة خفيفة تعرض آخر المباريات والنتائج حسب اليوم أو المجموعة، وتفتح التفاصيل داخل صفحة المباراة فقط.
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:min-w-[420px]">
+              <SummaryCard label="المعروضة" value={data?.summary.total || 0} />
+              <SummaryCard label="مباشر" value={data?.summary.live || 0} />
+              <SummaryCard label="انتهت" value={data?.summary.finished || 0} />
+              <SummaryCard label="قادمة" value={data?.summary.scheduled || 0} />
+            </div>
+          </div>
+        </header>
+
+        <section className="sticky top-0 z-30 rounded-[1.35rem] border border-white/10 bg-[#04110D]/95 p-3 shadow-xl backdrop-blur">
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            {MAIN_FILTERS.map((item) => (
+              <FilterButton key={item.id} active={filter === item.id} onClick={() => setFilter(item.id)}>
+                {item.label}
+              </FilterButton>
+            ))}
+            <FilterButton active={filter === 'group'} onClick={() => setFilter('group')}>
+              المجموعات
+            </FilterButton>
+          </div>
+          {filter === 'group' ? (
+            <div className="mt-3 grid grid-cols-6 gap-2 sm:grid-cols-12">
+              {GROUPS.map((item) => (
+                <button
+                  key={item}
+                  onClick={() => setGroup(item)}
+                  className={`rounded-xl border px-3 py-2 text-xs font-black ${
+                    group === item ? 'border-[#F8C846]/50 bg-[#F8C846] text-black' : 'border-white/10 bg-white/[0.04] text-slate-200'
+                  }`}
+                >
+                  Group {item}
+                </button>
+              ))}
+            </div>
+          ) : null}
+          <div className="mt-3">
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="ابحث باسم منتخب..."
+              className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm font-bold text-white outline-none placeholder:text-slate-500 focus:border-[#18E58F]/40"
+            />
+          </div>
+        </section>
+
+        <section className="rounded-[1.5rem] border border-white/10 bg-white/[0.035] p-3 sm:p-4">
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <h2 className="text-xl font-black text-white">
+              {filter === 'today' ? 'مباريات اليوم' :
+               filter === 'yesterday' ? 'مباريات أمس' :
+               filter === 'tomorrow' ? 'مباريات الغد' :
+               filter === 'latest' ? 'آخر النتائج' :
+               filter === 'live' ? 'المباشر الآن' :
+               filter === 'round_of_32' ? 'مباريات دور الـ 32' :
+               filter === 'round_of_16' ? 'مباريات دور الـ 16' :
+               filter === 'quarter_finals' ? 'مباريات ربع النهائي' :
+               filter === 'semi_finals' ? 'مباريات نصف النهائي' :
+               filter === 'final' ? 'النهائي والمركز الثالث' :
+               filter === 'group' ? `مباريات Group ${group}` :
+               'كل المباريات'}
+            </h2>
+            {loading ? <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-black text-slate-300">جاري التحميل...</span> : null}
+          </div>
+
+          {error ? (
+            <div className="rounded-2xl border border-rose-400/25 bg-rose-400/10 p-4 text-sm font-black text-rose-100">
+              {error}
+            </div>
+          ) : null}
+
+          {!loading && !error && !matches.length ? (
+            <div className="rounded-2xl border border-dashed border-white/15 bg-black/20 p-8 text-center">
+              <p className="font-black text-white">لا توجد مباريات في هذا الفلتر</p>
+              <p className="mt-2 text-sm font-bold text-slate-400">جرّب فلتر آخر أو ابحث باسم منتخب.</p>
+            </div>
+          ) : null}
+
+          <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
+            {matches.map((match) => (
+              <MatchCard key={match.id} match={match} />
+            ))}
+          </div>
+        </section>
+      </div>
+    </main>
+  );
 }
