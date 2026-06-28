@@ -10,11 +10,29 @@ const SCHEDULED_STATUSES = ['SCHEDULED', 'TIMED', 'NOT_STARTED', 'NS'];
 const FINISHED_STATUSES = ['FINISHED', 'FT', 'AET', 'PEN', 'COMPLETED', 'ENDED', 'FINAL_VERIFIED'];
 const HALF_TIME_STATUSES = ['HT', 'HALFTIME', 'HALF_TIME', 'HALF-TIME', 'PAUSED'];
 const GROUPS = 'ABCDEFGHIJKL'.split('');
+const GROUP_STAGE_LABELS = ['group', 'GROUP', 'Group', 'GROUP_STAGE', 'Group Stage', 'دور المجموعات'];
+const ROUND_OF_32_LABELS = [
+  'round_of_32',
+  'ROUND_OF_32',
+  'ROUND_32',
+  'LAST_32',
+  'last_32',
+  'Round of 32',
+  'ROUND OF 32',
+  'R32',
+  'دور الـ32',
+  'دور ال32',
+  'دور 32',
+];
 
-type HubFilter = 'today' | 'yesterday' | 'tomorrow' | 'latest' | 'live' | 'group' | 'all';
+type HubFilter = 'round32' | 'today' | 'yesterday' | 'tomorrow' | 'latest' | 'live' | 'group' | 'all';
 
 function normalizeStatus(status?: string | null) {
   return String(status || '').trim().toUpperCase();
+}
+
+function normalizeStage(stage?: string | null) {
+  return String(stage || '').trim().toUpperCase().replace(/[\s-]+/g, '_');
 }
 
 function isLive(status?: string | null) {
@@ -30,6 +48,28 @@ function isScheduled(status?: string | null) {
   return SCHEDULED_STATUSES.includes(normalizeStatus(status));
 }
 
+function isGroupStage(stage?: string | null) {
+  const value = normalizeStage(stage);
+  return !value || value === 'GROUP' || value === 'GROUP_STAGE' || value.includes('GROUP');
+}
+
+function isRoundOf32(stage?: string | null) {
+  const value = normalizeStage(stage);
+  return value === 'ROUND_OF_32' || value === 'ROUND_32' || value === 'LAST_32' || value === 'R32' || value.includes('32');
+}
+
+function displayStageLabel(stage?: string | null) {
+  const value = normalizeStage(stage);
+  if (isRoundOf32(stage)) return 'دور الـ32';
+  if (value === 'ROUND_OF_16' || value === 'LAST_16') return 'دور الـ16';
+  if (value.includes('QUARTER')) return 'ربع النهائي';
+  if (value.includes('SEMI')) return 'نصف النهائي';
+  if (value.includes('THIRD')) return 'تحديد المركز الثالث';
+  if (value === 'FINAL') return 'النهائي';
+  if (isGroupStage(stage)) return 'دور المجموعات';
+  return stage || 'المباراة';
+}
+
 function labelForStatus(status?: string | null) {
   const value = normalizeStatus(status);
   if (isLive(value)) return value === 'HT' || value.includes('HALF') ? 'استراحة' : 'مباشر';
@@ -39,8 +79,8 @@ function labelForStatus(status?: string | null) {
 }
 
 function normalizeFilter(value: string | null): HubFilter {
-  const allowed: HubFilter[] = ['today', 'yesterday', 'tomorrow', 'latest', 'live', 'group', 'all'];
-  return allowed.includes(value as HubFilter) ? value as HubFilter : 'today';
+  const allowed: HubFilter[] = ['round32', 'today', 'yesterday', 'tomorrow', 'latest', 'live', 'group', 'all'];
+  return allowed.includes(value as HubFilter) ? value as HubFilter : 'round32';
 }
 
 function normalizeGroup(value: string | null) {
@@ -65,10 +105,25 @@ function groupWhere(group: string) {
   const labels = groupLabels(group);
   return {
     OR: [
-      { homeTeam: { group } },
-      { awayTeam: { group } },
       { groupPhase: { in: labels } },
       { stage: { in: labels } },
+      {
+        AND: [
+          { stage: { in: GROUP_STAGE_LABELS } },
+          { OR: [{ homeTeam: { group } }, { awayTeam: { group } }] },
+        ],
+      },
+    ],
+  };
+}
+
+function roundOf32Where() {
+  return {
+    OR: [
+      { stage: { in: ROUND_OF_32_LABELS } },
+      { groupPhase: { in: ROUND_OF_32_LABELS } },
+      { stage: { contains: '32', mode: 'insensitive' as const } },
+      { groupPhase: { contains: '32', mode: 'insensitive' as const } },
     ],
   };
 }
@@ -87,6 +142,7 @@ function searchWhere(query: string) {
 }
 
 function whereFor(filter: HubFilter, group: string) {
+  if (filter === 'round32') return roundOf32Where();
   if (filter === 'yesterday') return { matchDate: dayRangeInEgypt(-1) };
   if (filter === 'tomorrow') return { matchDate: dayRangeInEgypt(1) };
   if (filter === 'latest') return { status: { in: FINISHED_STATUSES } };
@@ -101,7 +157,8 @@ function orderByFor(filter: HubFilter) {
 }
 
 function takeFor(filter: HubFilter, limit: number) {
-  if (filter === 'all') return Math.min(limit, 60);
+  if (filter === 'all') return Math.min(limit, 120);
+  if (filter === 'round32') return Math.min(limit, 32);
   if (filter === 'group') return Math.min(limit, 12);
   if (filter === 'latest') return Math.min(limit, 30);
   return Math.min(limit, 24);
@@ -118,7 +175,7 @@ export async function GET(req: NextRequest) {
     const filter = normalizeFilter(req.nextUrl.searchParams.get('filter'));
     const group = normalizeGroup(req.nextUrl.searchParams.get('group'));
     const q = String(req.nextUrl.searchParams.get('q') || '').trim();
-    const limit = Math.max(1, Math.min(80, Number(req.nextUrl.searchParams.get('limit') || 24)));
+    const limit = Math.max(1, Math.min(120, Number(req.nextUrl.searchParams.get('limit') || 32)));
     const where = { AND: [whereFor(filter, group), searchWhere(q)].filter((part) => Object.keys(part).length) };
 
     const matches = await prisma.match.findMany({
@@ -141,7 +198,11 @@ export async function GET(req: NextRequest) {
     });
 
     const normalized = matches.map((match) => {
-      const groupValue = match.homeTeam.group || match.awayTeam.group || match.groupPhase || match.stage || null;
+      const stageValue = match.stage || match.groupPhase || null;
+      const groupValue = isGroupStage(stageValue)
+        ? match.groupPhase || match.homeTeam.group || match.awayTeam.group || displayStageLabel(stageValue)
+        : displayStageLabel(stageValue);
+
       return {
         id: match.id,
         href: `/match-center/${match.id}`,
@@ -173,7 +234,10 @@ export async function GET(req: NextRequest) {
       scheduled: normalized.filter((item) => item.isScheduled).length,
     };
 
-    return NextResponse.json({ ok: true, mode: 'matches_hub_v1', filter, group, q, summary, matches: normalized }, { headers: { 'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=60' } });
+    return NextResponse.json(
+      { ok: true, mode: 'matches_hub_v2_round32', filter, group, q, summary, matches: normalized },
+      { headers: { 'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=60' } },
+    );
   } catch (error) {
     console.error('matches hub error', error);
     return NextResponse.json({ ok: false, error: 'Internal Server Error' }, { status: 500, headers: { 'Cache-Control': 'no-store' } });
