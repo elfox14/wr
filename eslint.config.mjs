@@ -8,6 +8,7 @@ const eslintConfig = defineConfig([
   {
     rules: {
       "@typescript-eslint/no-explicit-any": "warn",
+      "@typescript-eslint/no-require-imports": "warn",
       "@next/next/no-html-link-for-pages": "warn",
       "react/no-unescaped-entities": "warn",
       "react-hooks/immutability": "warn",
