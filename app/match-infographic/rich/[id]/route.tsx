@@ -1,14 +1,34 @@
 import { NextResponse } from 'next/server';
 import { ImageResponse } from 'next/og';
 import prisma from '@/lib/prisma';
-import fs from 'fs';
-import path from 'path';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 86400; // 1 day
 
-// Load a font that supports Arabic. We use a CDN link for a TTF/WOFF font from Fontsource.
-const fontUrl = 'https://cdn.jsdelivr.net/npm/@fontsource/cairo@5.0.3/files/cairo-arabic-700-normal.woff';
+// Dynamically fetch the official Google Fonts TTF file for Cairo-Bold.
+// This is 100% reliable, uses Google's CDN, and retrieves the TTF format which Satori supports.
+async function getCairoFontData(): Promise<ArrayBuffer | null> {
+  try {
+    const cssRes = await fetch('https://fonts.googleapis.com/css2?family=Cairo:wght@700', {
+      headers: {
+        // Send a non-modern User-Agent or empty to force Google Fonts to return TTF format instead of WOFF2
+        'User-Agent': 'Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; Trident/5.0)',
+      },
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!cssRes.ok) return null;
+    const cssText = await cssRes.text();
+    const match = cssText.match(/src:\s*url\((https:\/\/[^)]+)\)/);
+    if (!match || !match[1]) return null;
+
+    const fontRes = await fetch(match[1], { signal: AbortSignal.timeout(5000) });
+    if (!fontRes.ok) return null;
+    return await fontRes.arrayBuffer();
+  } catch (err) {
+    console.error('Error loading Cairo font:', err);
+    return null;
+  }
+}
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -63,50 +83,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     awayDangerousAttacks: match.awayDangerousAttacks || 0,
   };
 
-  let fontData: ArrayBuffer | null = null;
-  try {
-    const fontRes = await fetch(fontUrl, { signal: AbortSignal.timeout(8000) });
-    if (fontRes.ok) {
-      fontData = await fontRes.arrayBuffer();
-    } else {
-      console.error('Font fetch failed with status:', fontRes.status);
-    }
-  } catch (error) {
-    console.error('Error fetching font:', error);
-  }
-
-  // Fallback to local Geist-Regular font to prevent Satori process crash if fetch fails
-  let fallbackFontData: ArrayBuffer | null = null;
-  try {
-    const fallbackPath = path.join(process.cwd(), 'node_modules/next/dist/compiled/@vercel/og/Geist-Regular.ttf');
-    if (fs.existsSync(fallbackPath)) {
-      fallbackFontData = fs.readFileSync(fallbackPath);
-    }
-  } catch (err) {
-    console.error('Failed to read fallback font:', err);
-  }
-
-  const satoriFonts: any[] = [];
-  if (fontData) {
-    satoriFonts.push({
-      name: 'Cairo',
-      data: fontData,
-      weight: 700,
-      style: 'normal',
-    });
-  } else if (fallbackFontData) {
-    // If Cairo failed to load, load Geist mapped as Cairo so Satori doesn't crash.
-    satoriFonts.push({
-      name: 'Cairo',
-      data: fallbackFontData,
-      weight: 700,
-      style: 'normal',
-    });
-  }
-
-  if (satoriFonts.length === 0) {
-    return new NextResponse('Failed to load any fonts for rendering', { status: 500 });
-  }
+  const fontData = await getCairoFontData();
 
   // Function to render a stat bar
   const StatBar = ({ label, homeVal, awayVal, invertColors = false }: { label: string, homeVal: number, awayVal: number, invertColors?: boolean }) => {
@@ -201,7 +178,14 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     {
       width: 1080,
       height: 1350,
-      fonts: satoriFonts,
+      fonts: fontData ? [
+        {
+          name: 'Cairo',
+          data: fontData,
+          weight: 700,
+          style: 'normal',
+        },
+      ] : undefined,
     }
   );
 }
