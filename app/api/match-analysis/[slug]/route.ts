@@ -66,6 +66,8 @@ type EventRow = {
   detail: string | null;
 };
 
+type SectionRecord = Record<string, unknown>;
+
 function toDate(value: Date | string | null | undefined) {
   if (!value) return null;
   const date = value instanceof Date ? value : new Date(value);
@@ -93,11 +95,11 @@ function cleanText(value: unknown, fallback = '') {
   return text || fallback;
 }
 
-function asRecord(value: unknown): Record<string, any> {
-  return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, any>) : {};
+function asRecord(value: unknown): SectionRecord {
+  return value && typeof value === 'object' && !Array.isArray(value) ? (value as SectionRecord) : {};
 }
 
-function asArray(value: unknown): any[] {
+function asArray(value: unknown): unknown[] {
   return Array.isArray(value) ? value : [];
 }
 
@@ -122,7 +124,10 @@ function sectionText(sections: unknown, keys: string[], fallback = '') {
   for (const [key, value] of Object.entries(record)) {
     if (normalizedKeys.includes(normalizeSectionKey(key))) {
       if (Array.isArray(value)) return value.map((item) => cleanText(item)).filter(Boolean).join('\n');
-      if (typeof value === 'object') return cleanText(asRecord(value).content || asRecord(value).body || asRecord(value).text, fallback);
+      if (typeof value === 'object') {
+        const nested = asRecord(value);
+        return cleanText(nested.content || nested.body || nested.text, fallback);
+      }
       return cleanText(value, fallback);
     }
   }
@@ -175,8 +180,8 @@ function buildGeneratedSections(row: ArticleRow): MatchAnalysisGeneratedSections
 }
 
 function buildStats(snapshot: SnapshotRow | null): MatchAnalysisStats {
-  const stats: MatchAnalysisStats = {};
-  if (!snapshot) return stats;
+  const stats: Partial<Record<keyof MatchAnalysisStats, TeamPair<number | null>>> = {};
+  if (!snapshot) return stats as MatchAnalysisStats;
 
   const add = (key: keyof MatchAnalysisStats, home: string, away: string) => {
     const value = pair(snapshot[home], snapshot[away]);
@@ -192,7 +197,7 @@ function buildStats(snapshot: SnapshotRow | null): MatchAnalysisStats {
   add('attacks', 'homeAttacks', 'awayAttacks');
   add('dangerousAttacks', 'homeDangerousAttacks', 'awayDangerousAttacks');
 
-  return stats;
+  return stats as MatchAnalysisStats;
 }
 
 function eventTypeFrom(value: unknown): MatchAnalysisEventType {
