@@ -1,0 +1,121 @@
+// Match analysis DB shape reference.
+//
+// This project currently creates the post-match content tables through
+// lib/post-match-content/schema.ts using raw SQL. Copy this file into
+// prisma/schema.prisma only when you want Prisma Client typed access to
+// those tables. If you do that, also add this relation to the existing
+// Match model:
+//
+//   articles MatchArticle[]
+//
+// The fields below intentionally mirror the existing raw SQL tables:
+// MatchArticle, MatchInfographic, MediaAsset, ArticleGenerationJob,
+// and EditorialReview.
+
+model MatchArticle {
+  id                  String    @id
+  matchId             String
+  match               Match     @relation(fields: [matchId], references: [id], onDelete: Cascade)
+
+  title               String
+  slug                String    @unique
+  metaTitle           String
+  metaDescription     String
+  excerpt             String
+  body                String
+  sections            Json?
+  statsSummary        Json?
+  status              String    @default("DRAFT_READY")
+  language            String    @default("ar")
+  seoScore            Int       @default(0)
+  sourceSnapshotId    String?
+  heroImageUrl        String?
+  infographicImageUrl String?
+  publishedAt         DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  infographics        MatchInfographic[]
+  mediaAssets         MediaAsset[]
+  generationJobs      ArticleGenerationJob[]
+  reviews             EditorialReview[]
+
+  @@unique([matchId, language])
+  @@index([status, publishedAt])
+  @@index([slug])
+}
+
+model MatchInfographic {
+  id               String        @id
+  matchId          String
+  match            Match         @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  articleId        String?
+  article          MatchArticle? @relation(fields: [articleId], references: [id], onDelete: SetNull)
+
+  type             String        @default("MATCH_STATS")
+  title            String
+  imageUrl         String
+  data             Json?
+  sourceSnapshotId String?
+  status           String        @default("READY")
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  @@index([matchId, type])
+  @@index([status])
+}
+
+model MediaAsset {
+  id            String        @id
+  matchId       String?
+  match         Match?        @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  articleId     String?
+  article       MatchArticle? @relation(fields: [articleId], references: [id], onDelete: SetNull)
+
+  assetType     String
+  url           String
+  width         Int?
+  height        Int?
+  altText       String?
+  caption       String?
+  credit        String?
+  source        String        @default("generated-template")
+  licenseStatus String        @default("safe-generated")
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@index([matchId, assetType])
+  @@index([articleId])
+}
+
+model ArticleGenerationJob {
+  id               String        @id
+  matchId          String
+  match            Match         @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  articleId        String?
+  article          MatchArticle? @relation(fields: [articleId], references: [id], onDelete: SetNull)
+
+  status           String        @default("STARTED")
+  startedAt        DateTime      @default(now())
+  finishedAt       DateTime?
+  errorMessage     String?
+  sourceSnapshotId String?
+  createdBy        String        @default("post-match-content-engine")
+
+  @@index([matchId, startedAt])
+  @@index([status])
+}
+
+model EditorialReview {
+  id         String       @id
+  articleId  String
+  article    MatchArticle @relation(fields: [articleId], references: [id], onDelete: Cascade)
+
+  reviewer   String?
+  status     String       @default("PENDING")
+  notes      String?
+  reviewedAt DateTime?
+  createdAt  DateTime     @default(now())
+
+  @@index([articleId, status])
+}
