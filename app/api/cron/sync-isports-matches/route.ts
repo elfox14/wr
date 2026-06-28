@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import type { Prisma } from '@prisma/client';
 import prisma from '@/lib/prisma';
 
 export const runtime = 'nodejs';
@@ -208,7 +209,9 @@ export async function GET(req: Request) {
             select: { id: true },
           });
 
-          const data = {
+          const jsonExternalIds = { isports: fixture.providerMatchId } as Prisma.InputJsonObject;
+          const jsonSyncState = { source: 'isports_schedule', raw: fixture.raw as Prisma.InputJsonValue } as Prisma.InputJsonObject;
+          const updateData: Prisma.MatchUncheckedUpdateInput = {
             externalId,
             animationMatchId: fixture.providerMatchId,
             homeTeamId: homeTeam.id,
@@ -222,13 +225,31 @@ export async function GET(req: Request) {
             groupPhase: fixture.stage,
             competition: 'WC',
             syncSource: 'isports',
-            externalIds: { isports: fixture.providerMatchId },
-            syncState: { source: 'isports_schedule', raw: fixture.raw },
+            externalIds: jsonExternalIds,
+            syncState: jsonSyncState,
+            lastSyncedAt: new Date(),
+          };
+          const createData: Prisma.MatchUncheckedCreateInput = {
+            externalId,
+            animationMatchId: fixture.providerMatchId,
+            homeTeamId: homeTeam.id,
+            awayTeamId: awayTeam.id,
+            matchDate: fixture.matchDate,
+            kickoffAt: fixture.matchDate,
+            homeScore: 0,
+            awayScore: 0,
+            status: fixture.status,
+            stage: fixture.stage,
+            groupPhase: fixture.stage,
+            competition: 'WC',
+            syncSource: 'isports',
+            externalIds: jsonExternalIds,
+            syncState: jsonSyncState,
             lastSyncedAt: new Date(),
           };
 
-          if (existing?.id) await prisma.match.update({ where: { id: existing.id }, data });
-          else await prisma.match.create({ data });
+          if (existing?.id) await prisma.match.update({ where: { id: existing.id }, data: updateData });
+          else await prisma.match.create({ data: createData });
         }
 
         saved.push({ providerMatchId: fixture.providerMatchId, home: homeTeam.name, away: awayTeam.name, matchDate: fixture.matchDate, stage: fixture.stage });
