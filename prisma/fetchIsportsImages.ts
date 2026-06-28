@@ -104,7 +104,7 @@ async function fetchIsportsImages() {
       for (const dbPlayer of dbPlayers) {
         const normDbPlayerName = normalizeName(dbPlayer.name);
         
-        let match = isportsSquad.find((p: any) => normalizeName(p.name).includes(normDbPlayerName) || normDbPlayerName.includes(normalizeName(p.name)));
+        const match = isportsSquad.find((p: any) => normalizeName(p.name).includes(normDbPlayerName) || normDbPlayerName.includes(normalizeName(p.name)));
         
         if (match && match.photo) {
           await prisma.asset.update({
