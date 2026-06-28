@@ -38,6 +38,12 @@ function getIsportsKeys() {
   return [process.env.ISPORTS_API_KEY].filter(Boolean) as string[];
 }
 
+function boolParam(params: URLSearchParams, name: string, fallback = false) {
+  const value = params.get(name);
+  if (value === null || value === '') return fallback;
+  return ['1', 'true', 'yes', 'on'].includes(value.trim().toLowerCase());
+}
+
 function dateOnly(value: Date | string) {
   return new Date(value).toISOString().slice(0, 10);
 }
@@ -56,6 +62,30 @@ function datesBetween(dateFrom: string, dateTo: string) {
     days.push(dateOnly(current));
   }
   return days;
+}
+
+function parseProviderDate(value: unknown): Date | null {
+  if (value === null || value === undefined || value === '') return null;
+  if (value instanceof Date) return Number.isFinite(value.getTime()) ? value : null;
+
+  const raw = String(value).trim();
+  const numeric = typeof value === 'number' || /^\d{10,13}$/.test(raw) ? Number(value) : NaN;
+
+  if (Number.isFinite(numeric)) {
+    const milliseconds = numeric > 1_000_000_000_000 ? numeric : numeric * 1000;
+    const parsed = new Date(milliseconds);
+    return Number.isFinite(parsed.getTime()) ? parsed : null;
+  }
+
+  const parsed = new Date(raw);
+  return Number.isFinite(parsed.getTime()) ? parsed : null;
+}
+
+function isDateInsideRange(date: Date, dateFrom: string, dateTo: string) {
+  const start = new Date(`${dateFrom}T00:00:00.000Z`).getTime();
+  const end = new Date(`${dateTo}T23:59:59.999Z`).getTime();
+  const value = date.getTime();
+  return value >= start && value <= end;
 }
 
 function normalizeName(value?: string | null) {
@@ -96,7 +126,7 @@ function getArrayPayload(payload: any) {
   return [];
 }
 
-function normalizeFixture(item: any, fallbackStage: string): ProviderFixture | null {
+function normalizeFixture(item: any, fallbackStage: string, forceStage: boolean): ProviderFixture | null {
   const providerMatchId = Number(item.matchId ?? item.match_id ?? item.id ?? item.fixtureId ?? item.fixture_id);
   if (!Number.isFinite(providerMatchId) || providerMatchId <= 0) return null;
 
@@ -104,9 +134,11 @@ function normalizeFixture(item: any, fallbackStage: string): ProviderFixture | n
   const awayName = String(item.awayName || item.away_name || item.awayTeamName || item.away_team_name || item.awayTeam?.name || item.away?.name || '').trim();
   if (!homeName || !awayName) return null;
 
-  const rawDate = item.matchTime || item.match_time || item.date || item.time || item.kickoffTime || item.startTime || item.start_time;
-  const matchDate = rawDate ? new Date(rawDate) : new Date();
-  if (!Number.isFinite(matchDate.getTime())) return null;
+  const rawDate = item.matchTime || item.match_time || item.timestamp || item.timestamp_ms || item.date || item.time || item.kickoffTime || item.startTime || item.start_time;
+  const matchDate = parseProviderDate(rawDate);
+  if (!matchDate) return null;
+
+  const rawStage = String(item.stage || item.round || item.phase || fallbackStage);
 
   return {
     providerMatchId,
@@ -116,7 +148,7 @@ function normalizeFixture(item: any, fallbackStage: string): ProviderFixture | n
     awayCode: item.awayCode || item.away_code || item.awayTeam?.code || item.away?.code || null,
     matchDate,
     status: mapStatus(String(item.status || item.state || item.matchStatus || 'SCHEDULED')),
-    stage: mapStage(String(item.stage || item.round || item.phase || fallbackStage)),
+    stage: forceStage ? fallbackStage : mapStage(rawStage),
     raw: item,
   };
 }
@@ -179,9 +211,21 @@ export async function GET(req: Request) {
     const url = new URL(req.url);
     const dateFrom = url.searchParams.get('dateFrom') || url.searchParams.get('date_from') || dateOnly(new Date());
     const dateTo = url.searchParams.get('dateTo') || url.searchParams.get('date_to') || dateOnly(addDays(new Date(), 14));
+    const hasStageParam = url.searchParams.has('stage');
     const stage = mapStage(url.searchParams.get('stage') || 'round_of_32');
-    const dryRun = ['1', 'true', 'yes'].includes(String(url.searchParams.get('dryRun') || '').toLowerCase());
+    const dryRun = boolParam(url.searchParams, 'dryRun', false);
+    const cleanupBadDates = boolParam(url.searchParams, 'cleanupBadDates', false);
     const days = datesBetween(dateFrom, dateTo);
+
+    if (cleanupBadDates) {
+      const deleted = await prisma.match.deleteMany({
+        where: {
+          matchDate: { lt: new Date('2000-01-01T00:00:00.000Z') },
+          OR: [{ syncSource: 'isports' }, { externalId: { startsWith: 'isports:' } }],
+        },
+      });
+      return NextResponse.json({ ok: true, mode: 'sync_isports_matches_cleanup_bad_dates_v1', deleted: deleted.count }, { headers: { 'Cache-Control': 'no-store' } });
+    }
 
     const teams = await prisma.asset.findMany({ where: { type: 'TEAM' }, select: { id: true, name: true, code: true } });
     const skipped: any[] = [];
@@ -190,10 +234,15 @@ export async function GET(req: Request) {
 
     for (const day of days) {
       const payload = await fetchSchedule(day);
-      const fixtures = payload.map((item: any) => normalizeFixture(item, stage)).filter(Boolean) as ProviderFixture[];
+      const fixtures = payload.map((item: any) => normalizeFixture(item, stage, hasStageParam)).filter(Boolean) as ProviderFixture[];
       scanned += fixtures.length;
 
       for (const fixture of fixtures) {
+        if (!isDateInsideRange(fixture.matchDate, dateFrom, dateTo)) {
+          skipped.push({ providerMatchId: fixture.providerMatchId, homeName: fixture.homeName, awayName: fixture.awayName, matchDate: fixture.matchDate, reason: 'outside_requested_date_window' });
+          continue;
+        }
+
         const homeTeam = findTeam(teams, fixture.homeName, fixture.homeCode);
         const awayTeam = findTeam(teams, fixture.awayName, fixture.awayCode);
 
@@ -256,7 +305,7 @@ export async function GET(req: Request) {
       }
     }
 
-    return NextResponse.json({ ok: true, mode: 'sync_isports_matches_v1', dryRun, dateFrom, dateTo, stage, days: days.length, scanned, saved: saved.length, skipped: skipped.length, savedPreview: saved.slice(0, 30), skippedPreview: skipped.slice(0, 30) }, { headers: { 'Cache-Control': 'no-store' } });
+    return NextResponse.json({ ok: true, mode: 'sync_isports_matches_v2_safe_dates', dryRun, dateFrom, dateTo, stage, forceStage: hasStageParam, days: days.length, scanned, saved: saved.length, skipped: skipped.length, savedPreview: saved.slice(0, 30), skippedPreview: skipped.slice(0, 30) }, { headers: { 'Cache-Control': 'no-store' } });
   } catch (error: any) {
     return NextResponse.json({ ok: false, error: error.message || 'sync-isports-matches failed' }, { status: 500, headers: { 'Cache-Control': 'no-store' } });
   }
