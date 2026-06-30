@@ -69,7 +69,7 @@ async function getDailyData() {
 
   await ensurePressNewsTable();
 
-  const [todayMatches, nextMatches, pressNews, marketNews] = await Promise.all([
+  const [todayMatches, nextMatches] = await Promise.all([
     prisma.match.findMany({
       where: { matchDate: { gte: todayStart, lt: todayEnd } },
       orderBy: { matchDate: 'asc' },
@@ -81,27 +81,13 @@ async function getDailyData() {
       take: 8,
       include: { homeTeam: true, awayTeam: true },
     }),
-    prisma.$queryRawUnsafe<any[]>(`
-      SELECT * FROM "PressNews"
-      WHERE "status" = 'published'
-      ORDER BY "publishedAt" DESC, "importance" DESC
-      LIMIT 6
-    `),
-    prisma.marketNews.findMany({
-      orderBy: { publishedAt: 'desc' },
-      take: 6,
-      include: { asset: { select: { id: true, name: true, code: true, image: true } } },
-    }),
-  ]);
+    ]);
 
   return {
     todayMatches,
     nextMatches,
-    pressNews,
-    marketNews: marketNews.map((item) => {
-      const rendered = renderMarketNews(item, 'ar');
-      return { ...item, title: rendered.title, body: rendered.body };
-    }),
+    pressNews: [],
+    marketNews: [],
   };
 }
 

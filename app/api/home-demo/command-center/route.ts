@@ -92,7 +92,7 @@ export async function GET() {
   const matchWindowEnd = new Date(now.getTime() + 36 * 60 * 60 * 1000);
 
   try {
-    const [recentEvents, tacticalReports, marketNews, priceRows, matches, snapshotCount, eventCount, reportCount] = await Promise.all([
+    const [recentEvents, tacticalReports, priceRows, matches, snapshotCount, eventCount, reportCount] = await Promise.all([
       prisma.matchEvent.findMany({
         where: {
           OR: [
@@ -123,13 +123,7 @@ export async function GET() {
           team: { select: { id: true, name: true, code: true, image: true, group: true, fifaRank: true, coach: true } },
         },
       }).catch(() => []),
-      prisma.marketNews.findMany({
-        orderBy: { publishedAt: 'desc' },
-        take: 10,
-        include: {
-          asset: { select: { id: true, name: true, code: true, image: true, type: true, current_price: true, change: true, momentum: true } },
-        },
-      }).catch(() => []),
+
       prisma.priceHistory.findMany({
         orderBy: { timestamp: 'desc' },
         take: 240,
@@ -229,17 +223,7 @@ export async function GET() {
       metrics: report.metrics || null,
     }));
 
-    const latestNews = marketNews.map((item: any) => ({
-      id: item.id,
-      eventType: item.eventType,
-      severity: item.severity,
-      titleAr: item.titleAr,
-      bodyAr: compactText(item.bodyAr, 180),
-      changePercent: item.changePercent,
-      publishedAt: item.publishedAt,
-      asset: item.asset,
-      context: item.context || null,
-    }));
+
 
     return NextResponse.json({
       ok: true,
@@ -251,13 +235,12 @@ export async function GET() {
         reportCount,
         recentEvents: recentEvents.length,
         tacticalReports: tacticalReports.length,
-        marketNews: marketNews.length,
+
         priceRows: priceRows.length,
       },
       matches,
       turningPoints,
       tacticalSnapshots,
-      marketNews: latestNews,
       movers: buildMovers(priceRows as PriceHistoryRow[]),
     }, { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } });
   } catch (error: any) {

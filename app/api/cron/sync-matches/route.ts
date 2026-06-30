@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { applyMarketMove, calculateMatchPriceDelta } from '@/lib/pricingService';
-import { generateMarketNews } from '@/lib/market-news/generator';
+
 
 const FOOTBALL_DATA_URL = 'https://api.football-data.org/v4/competitions/WC/matches';
 
@@ -183,13 +183,7 @@ export async function GET(request: Request) {
           if (lastContext.isEliminated) newsContext.eliminated = true;
           if (lastContext.wonTournament) newsContext.wonTournament = true;
 
-          const news = await generateMarketNews({
-            assetId: team.id,
-            before: priceBefore,
-            after: newPrice,
-            context: newsContext,
-          });
-          if (news) newsGeneratedCount++;
+
         }
       }
     }

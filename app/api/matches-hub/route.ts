@@ -156,7 +156,6 @@ export async function GET(req: NextRequest) {
         id: match.id,
         href: `/match-center/${match.id}`,
         liveHref: `/live-animation/${match.id}`,
-        reportHref: `/articles/match/${match.id}`,
         matchDate: match.matchDate,
         dayKey: matchDateDayKey(match.matchDate),
         status: match.status,

@@ -159,7 +159,7 @@ export async function GET() {
     const dayStart = new Date(now);
     dayStart.setHours(0, 0, 0, 0);
 
-    const [liveMatches, upcomingMatches, recentMatches, newsRows, movers, linkedMatches, unlinkedNearMatches] = await Promise.all([
+    const [liveMatches, upcomingMatches, recentMatches, movers, linkedMatches, unlinkedNearMatches] = await Promise.all([
       prisma.match.findMany({
         where: { status: { in: ['IN_PLAY', 'LIVE'] } },
         orderBy: { matchDate: 'asc' },
@@ -178,11 +178,7 @@ export async function GET() {
         take: 20,
         select: MATCH_SELECT,
       }),
-      prisma.marketNews.findMany({
-        orderBy: { publishedAt: 'desc' },
-        take: 30,
-        include: { asset: { select: { id: true, name: true, code: true, image: true, marketPrice: true, current_price: true } } },
-      }),
+
       prisma.asset.findMany({
         where: { type: 'TEAM' },
         orderBy: { change: 'desc' },
@@ -195,30 +191,9 @@ export async function GET() {
 
     const statsMap = await fetchLatestStatsForMatches([...liveMatches, ...upcomingMatches, ...recentMatches].map((match) => match.id));
 
-    const news = newsRows.map((item) => {
-      const rendered = renderMarketNews(item, 'ar');
-      const category = categoryFromEvent(item.eventType);
-      return {
-        id: item.id,
-        title: rendered.title,
-        body: rendered.body,
-        category,
-        eventType: item.eventType,
-        severity: item.severity,
-        publishedAt: item.publishedAt.toISOString(),
-        asset: item.asset ? {
-          id: item.asset.id,
-          name: item.asset.name,
-          code: item.asset.code,
-          image: item.asset.image,
-          price: Math.round(toNumber(item.priceAfter ?? item.asset.marketPrice ?? item.asset.current_price)),
-        } : null,
-        changePercent: Math.round(toNumber(item.changePercent) * 10) / 10,
-      };
-    });
-
-    const matchNews = news.filter((item) => item.category === 'match');
-    const tradingNews = news.filter((item) => item.category === 'trading');
+    const news: any[] = [];
+    const matchNews: any[] = [];
+    const tradingNews: any[] = [];
     const pollingSeconds = liveMatches.length > 0 ? 15 : upcomingMatches.length > 0 ? 45 : 60;
 
     const payload = {

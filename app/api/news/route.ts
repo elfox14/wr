@@ -50,12 +50,7 @@ export async function GET() {
     const now = new Date();
     const upcomingWindow = new Date(now.getTime() + 12 * 60 * 60 * 1000);
 
-    const [marketNewsRows, liveMatches, upcomingMatches] = await Promise.all([
-      prisma.marketNews.findMany({
-        orderBy: { publishedAt: 'desc' },
-        take: 60,
-        include: { asset: { select: { id: true, name: true, code: true, image: true, marketPrice: true, current_price: true } } },
-      }),
+    const [liveMatches, upcomingMatches] = await Promise.all([
       prisma.match.findMany({
         where: { status: { in: ['IN_PLAY', 'LIVE', 'FINISHED'] }, matchDate: { lte: now } },
         orderBy: { matchDate: 'desc' },
@@ -70,26 +65,7 @@ export async function GET() {
       }),
     ]);
 
-    const news: NewsItem[] = marketNewsRows.map((item) => {
-      const rendered = renderMarketNews(item, 'ar');
-      const category = newsCategory(item.eventType, 'market_news');
-      const priceAfter = item.priceAfter == null ? null : Math.round(toNumber(item.priceAfter));
-      return {
-        id: item.id,
-        title: rendered.title,
-        body: rendered.body,
-        source: category === 'match' ? 'أحداث المباريات' : 'تداول المنصة',
-        category,
-        type: typeFromNews(item),
-        link: item.assetId ? `/asset/${item.assetId}` : '/market',
-        assetId: item.assetId,
-        assetName: item.asset?.name,
-        assetImage: item.asset?.image,
-        marketPrice: priceAfter ?? Math.round(toNumber(item.asset?.marketPrice ?? item.asset?.current_price)),
-        changePercent: toNumber(item.changePercent),
-        date: item.publishedAt.toISOString(),
-      };
-    });
+    const news: NewsItem[] = [];
 
     for (const match of liveMatches) {
       news.push({

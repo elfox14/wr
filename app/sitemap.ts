@@ -49,11 +49,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   let newsUrls: MetadataRoute.Sitemap = [];
   try {
-    const newsItems = await prisma.pressNews.findMany({
-      where: { status: 'published' },
-      select: { id: true, publishedAt: true, updatedAt: true },
-      orderBy: { publishedAt: 'desc' },
-    });
+    const newsItems: any[] = [];
 
     newsUrls = newsItems.map((item) => ({
       url: `${baseUrl}/news/${item.id}`,

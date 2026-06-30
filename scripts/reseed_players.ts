@@ -19,8 +19,7 @@ async function main() {
   console.log('Deleting player-related transactions...');
   await prisma.transaction.deleteMany({ where: { asset: { type: 'PLAYER' } } });
   
-  console.log('Deleting player-related market news...');
-  await prisma.marketNews.deleteMany({ where: { asset: { type: 'PLAYER' } } });
+
   
   console.log('Deleting player-related price history...');
   await prisma.priceHistory.deleteMany({ where: { asset: { type: 'PLAYER' } } });

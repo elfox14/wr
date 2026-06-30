@@ -125,14 +125,14 @@ async function main() {
     // Delete players of this team first
     const oldPlayers = await prisma.asset.findMany({ where: { teamId: dup.id } });
     for (const oldPlayer of oldPlayers) {
-      await prisma.marketNews.deleteMany({ where: { assetId: oldPlayer.id } });
+
       await prisma.priceHistory.deleteMany({ where: { assetId: oldPlayer.id } });
       await prisma.transaction.deleteMany({ where: { assetId: oldPlayer.id } });
       await prisma.holding.deleteMany({ where: { assetId: oldPlayer.id } });
       await prisma.asset.delete({ where: { id: oldPlayer.id } });
     }
     // Delete team's related data
-    await prisma.marketNews.deleteMany({ where: { assetId: dup.id } });
+
     await prisma.priceHistory.deleteMany({ where: { assetId: dup.id } });
     await prisma.transaction.deleteMany({ where: { assetId: dup.id } });
     await prisma.holding.deleteMany({ where: { assetId: dup.id } });
@@ -387,7 +387,7 @@ async function main() {
 
     for (const op of orphanPlayers) {
       console.log(`  🗑️ Removing orphan player: ${op.name} (ID: ${op.id})`);
-      await prisma.marketNews.deleteMany({ where: { assetId: op.id } });
+
       await prisma.priceHistory.deleteMany({ where: { assetId: op.id } });
       await prisma.transaction.deleteMany({ where: { assetId: op.id } });
       await prisma.holding.deleteMany({ where: { assetId: op.id } });

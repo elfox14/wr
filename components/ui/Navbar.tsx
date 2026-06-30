@@ -15,7 +15,6 @@ const links = [
   ['/players', 'اللاعبون'],
   ['/statistics', 'الإحصائيات'],
   ['/round-of-32', 'مسار البطولة'],
-  ['/news', 'الأخبار والتحليل'],
   ['/animation-live', 'البث التفاعلي'],
 ] as const;
 

@@ -1,3 +1,16 @@
 {
-  "crons": []
+  "crons": [
+    {
+      "path": "/api/cron/master-sync",
+      "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/cron/sync-matches",
+      "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/cron/sync-isports-matches",
+      "schedule": "15 * * * *"
+    }
+  ]
 }

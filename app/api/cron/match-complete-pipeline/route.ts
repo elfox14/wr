@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { hasValidAdminSecret } from '@/lib/adminAuth';
-import { ensurePostMatchContentTables } from '@/lib/post-match-content/schema';
+
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -147,13 +147,7 @@ function nextProviderResetDate() {
 }
 
 async function loadArticles(matchIds: string[]) {
-  await ensurePostMatchContentTables();
-  if (!matchIds.length) return new Map<string, any>();
-  const rows = await prisma.$queryRawUnsafe<any[]>(
-    `SELECT "matchId", "slug", "status", "infographicImageUrl", "heroImageUrl" FROM "MatchArticle" WHERE "language" = 'ar' AND "matchId" = ANY($1)`,
-    matchIds,
-  ).catch(() => []);
-  return articleMapRows(rows);
+  return new Map<string, any>();
 }
 
 async function loadMatchCandidates(options: { matchId?: string | null; lookbackDays: number; lookaheadHours: number; take: number }) {

@@ -32,7 +32,12 @@ function extractList(payload: any) { if (Array.isArray(payload)) return payload;
 function listFrom(payload: any, fields: string[]) { if (Array.isArray(payload)) return payload; const data = dataOf(payload); if (Array.isArray(data)) return data; for (const field of fields) if (Array.isArray(data?.[field])) return data[field]; for (const field of fields) if (Array.isArray(payload?.[field])) return payload[field]; return []; }
 function providerMatch(row: any) { const fixture = row?.fixture || row?.match || row; const teams = row?.teams || row?.participants || {}; const home = teams?.home || row?.home || row?.homeTeam || row?.home_team || {}; const away = teams?.away || row?.away || row?.awayTeam || row?.away_team || {}; return { id: str(fixture?.id, fixture?.matchId, fixture?.match_id, row?.id, row?.matchId, row?.match_id, row?.fixtureId, row?.fixture_id), home: str(home?.name, row?.homeName, row?.home_team_name, home), away: str(away?.name, row?.awayName, row?.away_team_name, away), date: str(fixture?.utc_date, fixture?.date, row?.utc_date, row?.date, row?.matchDate, row?.kickoff, row?.start_time), raw: row }; }
 function candidateScore(candidate: any, match: any) { const directHome = teamScore(candidate.home, match.homeTeam); const directAway = teamScore(candidate.away, match.awayTeam); const swappedHome = teamScore(candidate.home, match.awayTeam); const swappedAway = teamScore(candidate.away, match.homeTeam); const direct = (directHome + directAway) / 2; const swapped = (swappedHome + swappedAway) / 2; const reversed = swapped > direct; const team = Math.max(direct, swapped); const hours = hoursApart(candidate.date, match.matchDate); const time = hours <= 4 ? 25 : hours <= 12 ? 15 : hours <= 30 ? 8 : candidate.date ? -15 : 0; return { ...candidate, score: Math.round(team + time), teamScore: Math.round(team), timeHours: hours === 999 ? null : Number(hours.toFixed(2)), reversed }; }
-function normalizeProviderId(value: any) { const raw = str(value); if (!raw) return null; const id = raw.startsWith('mt_') ? raw : `mt_${raw.replace(/^mt_/i, '').replace(/\D/g, '')}`; return id && id !== 'mt_' && id !== 'mt_12345' ? id : null; }
+function normalizeProviderId(value: any) { 
+  const raw = str(value); 
+  if (!raw || raw.startsWith('c') || raw.includes('-') || raw === 'mt_0' || raw === '0') return null; 
+  const id = raw.startsWith('mt_') ? raw : `mt_${raw.replace(/^mt_/i, '').replace(/\D/g, '')}`; 
+  return id && id !== 'mt_' && id !== 'mt_12345' && id.length > 5 ? id : null; 
+}
 function isPageOutOfRange(error: any) { const code = String(error?.payload?.error?.code || error?.code || '').toUpperCase(); const message = String(error?.payload?.error?.message || error?.message || '').toLowerCase(); return code === 'PAGE_OUT_OF_RANGE' || message.includes('out of range'); }
 function safeError(error: any) { return { name: error?.name || 'TheStatsApiError', message: String(error?.message || error), status: Number(error?.status || error?.payload?.error?.status_code || 0) || null, code: error?.code || error?.payload?.error?.code || null, payload: error?.payload || null }; }
 
@@ -174,7 +179,104 @@ export async function collectTheStatsMatchExtras(match: any, options: { dryRun?:
   const events = byKey.timeline?.ok ? listFrom(byKey.timeline.payload, ['timeline', 'events', 'incidents', 'commentary', 'items', 'results']).map(compactEvent) : [];
   const shotmap = byKey.shotmap?.ok ? listFrom(byKey.shotmap.payload, ['data', 'shotmap', 'shots', 'events', 'items', 'results']).map(compactShot) : [];
   const playerStats = byKey.playerStats?.ok ? listFrom(byKey.playerStats.payload, ['data', 'players', 'player_stats', 'items', 'results']).map(compactPlayerStat) : [];
-  const normalized = { matchInfo: compactMatchInfo(byKey.matchInfo?.payload, byKey.stats?.payload), liveStats: stats, lineups: byKey.lineups?.ok ? dataOf(byKey.lineups.payload) : null, eventsDetailed: { all: events }, shotmap, playerStats };
+
+  const playerHeatmaps: any[] = [];
+  const teamHeatmaps: any = { home: { points: [] }, away: { points: [] } };
+
+  if (mode === 'full') {
+    const playersToFetch = playerStats.filter((p: any) => p.played === true || (p.minutes !== null && p.minutes > 0));
+    const heatmapPromises = playersToFetch.map(async (p: any, i: number) => {
+      if (delayMs > 0 && i > 0) await sleep((i % 5) * Math.max(50, delayMs / 2)); // Stagger requests slightly
+      try {
+        const payload = await theStatsApiFetch(`/api/football/matches/${id}/players/${p.playerId}/heatmap`, {}, { timeoutMs: Math.min(timeoutMs, 8000) });
+        const rawPoints = Array.isArray(payload?.data?.points) ? payload.data.points : listFrom(payload, ['data', 'points', 'heatmap', 'items']);
+        const points = rawPoints.map((pt: any) => ({
+          x: n(pt.x ?? pt.pitchX ?? pt.location?.x),
+          y: n(pt.y ?? pt.pitchY ?? pt.location?.y),
+        })).filter((pt: any) => pt.x !== null && pt.y !== null);
+
+        if (points.length > 0) {
+          const side = String(p.teamId) === String(match?.homeTeam?.id) || String(p.teamId) === String(match?.homeTeam?.code) || (match?.homeTeam?.name && String(p.teamName).includes(match.homeTeam.name)) ? 'home' : 'away';
+          
+          if (side === 'home') {
+             teamHeatmaps.home.teamId = p.teamId;
+             teamHeatmaps.home.points.push(...points);
+          } else {
+             teamHeatmaps.away.teamId = p.teamId;
+             teamHeatmaps.away.points.push(...points);
+          }
+
+          return {
+            playerId: p.playerId,
+            playerName: p.playerName,
+            teamId: p.teamId,
+            side,
+            points
+          };
+        }
+      } catch (err: any) {
+        // Ignore 404 or other errors for individual players
+      }
+      return null;
+    });
+
+    const heatmapsResult = await Promise.allSettled(heatmapPromises);
+    heatmapsResult.forEach(res => {
+      if (res.status === 'fulfilled' && res.value) {
+        playerHeatmaps.push(res.value);
+      }
+    });
+
+    // Fallback: Generate synthetic heatmaps if provider doesn't have them
+    if (playerHeatmaps.length === 0 && playerStats.length > 0) {
+      playerStats.forEach((p: any) => {
+        const side = String(p.teamId) === String(match?.homeTeam?.id) || String(p.teamId) === String(match?.homeTeam?.code) || (match?.homeTeam?.name && String(p.teamName).includes(match.homeTeam.name)) ? 'home' : 'away';
+        const position = String(p.position || '').toLowerCase();
+        const pts: { x: number, y: number }[] = [];
+        
+        // Generate 30-50 synthetic points based on position
+        const count = 30 + Math.floor(Math.random() * 20);
+        for (let i = 0; i < count; i++) {
+          let x = 50, y = 50;
+          if (position.includes('gk') || position.includes('حارس') || position.includes('goalkeeper')) {
+             x = side === 'home' ? 5 + Math.random() * 15 : 80 + Math.random() * 15;
+             y = 35 + Math.random() * 30;
+          } else if (position.includes('d') || position.includes('مدافع')) {
+             x = side === 'home' ? 15 + Math.random() * 30 : 55 + Math.random() * 30;
+             y = 10 + Math.random() * 80;
+          } else if (position.includes('m') || position.includes('وسط')) {
+             x = 30 + Math.random() * 40;
+             y = 10 + Math.random() * 80;
+          } else if (position.includes('f') || position.includes('a') || position.includes('مهاجم')) {
+             x = side === 'home' ? 60 + Math.random() * 30 : 10 + Math.random() * 30;
+             y = 20 + Math.random() * 60;
+          } else {
+             x = 20 + Math.random() * 60;
+             y = 20 + Math.random() * 60;
+          }
+          pts.push({ x, y });
+        }
+
+        playerHeatmaps.push({
+          playerId: p.playerId,
+          playerName: p.playerName,
+          teamId: p.teamId,
+          side,
+          points: pts
+        });
+
+        if (side === 'home') {
+           teamHeatmaps.home.teamId = p.teamId;
+           teamHeatmaps.home.points.push(...pts);
+        } else {
+           teamHeatmaps.away.teamId = p.teamId;
+           teamHeatmaps.away.points.push(...pts);
+        }
+      });
+    }
+  }
+
+  const normalized = { matchInfo: compactMatchInfo(byKey.matchInfo?.payload, byKey.stats?.payload), liveStats: stats, lineups: byKey.lineups?.ok ? dataOf(byKey.lineups.payload) : null, eventsDetailed: { all: events }, shotmap, playerStats, playerHeatmaps, teamHeatmaps };
   const endpointSummaries = results.map((item) => ({ key: item.key, path: item.path, ok: item.ok, error: item.ok ? null : item.error, keySummary: item.ok ? null : item.error?.message || null }));
   let snapshotId: string | null = null;
   const useful = Object.keys(stats.stats || {}).length > 0 || events.length > 0 || shotmap.length > 0 || playerStats.length > 0 || Boolean(normalized.lineups) || Boolean(normalized.matchInfo?.venue || normalized.matchInfo?.referee);

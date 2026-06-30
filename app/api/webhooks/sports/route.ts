@@ -92,20 +92,7 @@ export async function POST(request: Request) {
         }
       });
 
-      await prisma.marketNews.create({
-        data: {
-          assetId: asset.id,
-          eventType: isSpike ? 'price_spike' : 'rating_update',
-          severity: Math.abs(percentChange) > 10 ? 'high' : 'normal',
-          priceBefore: asset.current_price,
-          priceAfter: finalNewPrice,
-          changePercent: percentChange,
-          titleAr: title,
-          titleEn: title,
-          bodyAr: `تم تحديث سعر الأصل بنسبة ${percentChange.toFixed(2)}% بناءً على هذا الحدث. السعر الجديد: ${finalNewPrice}¢`,
-          bodyEn: `Asset price updated by ${percentChange.toFixed(2)}% due to this event.`,
-        }
-      });
+
 
       // Send WhatsApp Alert for Spikes or major moves
       if (Math.abs(percentChange) >= 5) {

@@ -241,6 +241,22 @@ function normalizePlayerStat(row: any, homeTeam: MatchTeamLite, awayTeam: MatchT
 function extractPlayerStats(snapshots: any[], homeTeam: MatchTeamLite, awayTeam: MatchTeamLite): MatchPlayerStatItem[] {
   const rows: MatchPlayerStatItem[] = [];
   const seen = new Set<string>();
+  const starterIds = new Set<string>();
+  const subIds = new Set<string>();
+  
+  for (const snapshot of snapshots.filter(isTheStatsSnapshot)) {
+    const data = rawData(snapshot);
+    const normalized = data.normalized || {};
+    if (normalized.lineups) {
+      const hs = asList(normalized.lineups.home?.starting_xi || normalized.lineups.home?.startingXi);
+      const as = asList(normalized.lineups.away?.starting_xi || normalized.lineups.away?.startingXi);
+      const hsub = asList(normalized.lineups.home?.substitutes);
+      const asub = asList(normalized.lineups.away?.substitutes);
+      hs.concat(as).forEach((p: any) => { if(p.id) starterIds.add(String(p.id)); if(p.name) starterIds.add(String(p.name)); });
+      hsub.concat(asub).forEach((p: any) => { if(p.id) subIds.add(String(p.id)); if(p.name) subIds.add(String(p.name)); });
+    }
+  }
+
   for (const snapshot of snapshots.filter(isTheStatsSnapshot)) {
     const data = rawData(snapshot);
     const normalized = data.normalized || {};
@@ -248,11 +264,40 @@ function extractPlayerStats(snapshots: any[], homeTeam: MatchTeamLite, awayTeam:
     for (const item of list) {
       const parsed = normalizePlayerStat(item, homeTeam, awayTeam);
       if (!parsed?.playerName) continue;
+      
+      if (starterIds.has(String(parsed.playerId)) || starterIds.has(String(parsed.playerName))) parsed.started = true;
+      else if (subIds.has(String(parsed.playerId)) || subIds.has(String(parsed.playerName))) parsed.started = false;
+
       const key = `${parsed.playerId || ''}:${parsed.playerName}:${parsed.teamId || parsed.teamName || ''}`;
       if (seen.has(key)) continue;
       seen.add(key);
       rows.push(parsed);
     }
+    
+    // Add missing players from lineups
+    if (normalized.lineups) {
+      const addMissing = (lineupsList: any[], teamId: string, teamName: string, isStarter: boolean) => {
+        for (const p of lineupsList) {
+          if (!p.name) continue;
+          const key = `${p.id || ''}:${p.name}:${teamId}`;
+          if (!seen.has(key)) {
+            seen.add(key);
+            rows.push({
+              playerId: p.id ? String(p.id) : null,
+              playerName: String(p.name),
+              teamId, teamName, position: p.position || null, number: p.number || null,
+              started: isStarter, played: isStarter ? true : null, minutes: isStarter ? 0 : null,
+              image: p.image || null, isCaptain: p.is_captain || p.captain || false,
+            });
+          }
+        }
+      };
+      addMissing(asList(normalized.lineups.home?.starting_xi || normalized.lineups.home?.startingXi), homeTeam.id, homeTeam.name, true);
+      addMissing(asList(normalized.lineups.home?.substitutes), homeTeam.id, homeTeam.name, false);
+      addMissing(asList(normalized.lineups.away?.starting_xi || normalized.lineups.away?.startingXi), awayTeam.id, awayTeam.name, true);
+      addMissing(asList(normalized.lineups.away?.substitutes), awayTeam.id, awayTeam.name, false);
+    }
+
     if (rows.length >= 70) break;
   }
   return rows.sort((a, b) => {
@@ -318,6 +363,8 @@ function extractAdvancedData(snapshots: any[], homeTeam: MatchTeamLite, awayTeam
     events: enrichEventsWithPlayers(finalTheStatsEvents(snapshots, homeTeam, awayTeam), playerStats),
     shotmap: [],
     playerStats,
+    playerHeatmaps: normalized.playerHeatmaps,
+    teamHeatmaps: normalized.teamHeatmaps,
   };
 }
 
@@ -424,11 +471,9 @@ export async function getMatchPageDataFast(matchId: string): Promise<MatchPageDa
   const match = await prisma.match.findUnique({ where: { id: matchId }, include: { homeTeam: true, awayTeam: true, events: { orderBy: [{ minute: 'asc' }, { createdAt: 'asc' }], take: 80 }, statsSnapshots: { orderBy: { capturedAt: 'desc' }, take: 24 } } });
   if (!match) return null;
 
-  const [players, allMatches, digest, relatedNews] = await Promise.all([
+  const [players, allMatches] = await Promise.all([
     prisma.asset.findMany({ where: { type: 'PLAYER', teamId: { in: [match.homeTeamId, match.awayTeamId] } }, select: { id: true, name: true, code: true, image: true, position: true, teamId: true }, take: 80, orderBy: [{ position: 'asc' }, { name: 'asc' }] }),
     prisma.match.findMany({ select: { id: true, homeTeamId: true, awayTeamId: true, homeScore: true, awayScore: true, status: true, matchDate: true, groupPhase: true, stage: true, homeTeam: { select: { id: true, name: true, code: true, image: true, group: true } }, awayTeam: { select: { id: true, name: true, code: true, image: true, group: true } } }, orderBy: { matchDate: 'asc' } }),
-    prisma.matchDigest.findUnique({ where: { matchId: match.id } }).catch(() => null),
-    prisma.pressNews.findMany({ where: { status: 'published', OR: [{ relatedMatchId: match.id }, { relatedTeamId: { in: [match.homeTeamId, match.awayTeamId] } }] }, orderBy: { publishedAt: 'desc' }, take: 3 }).catch(() => []),
   ]);
 
   const snapshots = [...(match.statsSnapshots || [])].sort((a, b) => providerPriority(a) - providerPriority(b) || new Date(b.capturedAt).getTime() - new Date(a.capturedAt).getTime());
@@ -478,10 +523,10 @@ export async function getMatchPageDataFast(matchId: string): Promise<MatchPageDa
     voteEndpoint: `/api/matches/${match.id}/votes`,
     groupStandings,
     thirdPlaceTable,
-    tacticalKeys: buildTacticalKeys(homeTeam.name, awayTeam.name, statsAvailable, digest),
+    tacticalKeys: buildTacticalKeys(homeTeam.name, awayTeam.name, statsAvailable, null),
     matchImpact: buildMatchImpact(match.homeTeamId, match.awayTeamId, groupStandings, thirdPlaceTable),
-    digest: digest ? { summary: digest.summary, turningPoint: digest.turningPoint, scoreLine: digest.scoreLine, href: `/match-digests/${match.id}` } : null,
-    relatedArticles: relatedArticlesFrom(relatedNews, digest, match.id),
+    digest: null,
+    relatedArticles: [],
     sources,
     sourceChecklist: sourceChecklist(match, statsAvailable, pageEvents.length, Boolean(officialLineup?.home?.startingXi?.length || officialLineup?.away?.startingXi?.length), advanced.playerStats.length),
     lastUpdatedAt: maxDateIso([...(match.statsSnapshots || []).map((snapshot) => snapshot.capturedAt), ...(match.events || []).map((event) => event.updatedAt), match.matchDate]),

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 
-type HubFilter = 'today' | 'yesterday' | 'tomorrow' | 'latest' | 'live' | 'group' | 'all';
+type HubFilter = 'today' | 'yesterday' | 'tomorrow' | 'latest' | 'live' | 'group' | 'round_of_32' | 'round_of_16' | 'quarter_finals' | 'semi_finals' | 'final' | 'all';
 
 type HubTeam = {
   id: string;
@@ -20,7 +20,7 @@ type HubMatch = {
   id: string;
   href: string;
   liveHref: string;
-  reportHref: string;
+
   matchDate: string;
   statusLabel: string;
   isLive: boolean;
@@ -125,7 +125,7 @@ function MatchCard({ match }: { match: HubMatch }) {
       <div className="mt-3 flex flex-wrap items-center gap-2">
         <Link href={match.href} className="rounded-xl bg-[#18E58F] px-3 py-2 text-xs font-black text-black">صفحة المباراة</Link>
         {match.hasLiveAnimation ? <Link href={match.liveHref} className="rounded-xl border border-sky-300/30 bg-sky-300/10 px-3 py-2 text-xs font-black text-sky-100">الملعب التفاعلي</Link> : null}
-        <Link href={match.reportHref} className="rounded-xl border border-[#F8C846]/30 bg-[#F8C846]/10 px-3 py-2 text-xs font-black text-[#F8C846]">المقالات</Link>
+
         {match.hasStats ? <span className="mr-auto rounded-full border border-white/10 bg-black/20 px-2 py-1 text-[10px] font-bold text-slate-400">إحصائيات محفوظة</span> : null}
       </div>
     </article>

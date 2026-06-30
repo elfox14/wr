@@ -169,7 +169,6 @@ model Asset {
   awayMatches           Match[]                  @relation("AwayTeam")
   holdings              Holding[]
   transactions          Transaction[]
-  marketNews            MarketNews[]
   priceHistory          PriceHistory[]
   captains              CaptainSelection[]
   performances          PlayerPerformance[]
@@ -207,6 +206,7 @@ model Match {
   nextSyncAt       DateTime?
   syncStats        MatchStats?
   snapshots        MatchSnapshot[]
+  infographicData  Json?
 
   @@index([status, nextSyncAt])
   @@index([kickoffAt])
@@ -376,91 +376,6 @@ model Transaction {
   timestamp     DateTime @default(now())
 }
 
-model MarketNews {
-  id             String   @id @default(cuid())
-  asset          Asset    @relation(fields: [assetId], references: [id])
-  assetId        String
-  eventType      String
-  severity       String   @default("normal")
-  localeGroupKey String?
-  priceBefore    Float?
-  priceAfter     Float?
-  changePercent  Float    @default(0)
-  titleAr        String
-  bodyAr         String
-  titleEn        String
-  bodyEn         String
-  titleKey       String?
-  bodyKey        String?
-  titleParams    Json?
-  bodyParams     Json?
-  context        Json?
-  publishedAt    DateTime @default(now())
-
-  @@index([assetId, publishedAt])
-  @@index([eventType, publishedAt])
-}
-
-model PressNews {
-  id              String   @id @default(cuid())
-  title           String
-  body            String
-  category        String   @default("رصد صحفي")
-  sourceName      String
-  sourceUrl       String?
-  sourceType      String   @default("newsletter")
-  language        String   @default("ar")
-  status          String   @default("published")
-  importance      Int      @default(50)
-  tags            Json?
-  relatedTeamId   String?
-  relatedPlayerId String?
-  relatedMatchId  String?
-  publishedAt     DateTime @default(now())
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  @@index([status, publishedAt])
-  @@index([category, publishedAt])
-  @@index([relatedTeamId])
-  @@index([relatedPlayerId])
-  @@index([relatedMatchId])
-}
-
-model DailyDigest {
-  id                 String   @id @default(cuid())
-  digestDate         String   @unique
-  headline           String
-  summary            String
-  videoScript        String
-  facebookPost       String?
-  youtubeTitle       String?
-  youtubeDescription String?
-  infographicPoints  Json?
-  status             String   @default("published")
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
-
-  @@index([digestDate])
-}
-
-model MatchDigest {
-  id                String   @id @default(cuid())
-  matchId           String   @unique
-  matchTitle        String
-  scoreLine         String
-  statusLabel       String
-  summary           String
-  turningPoint      String?
-  videoScript       String
-  facebookPost      String?
-  infographicPoints Json?
-  status            String   @default("published")
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-
-  @@index([matchId])
-}
 
 model CaptainSelection {
   id        String   @id @default(cuid())
@@ -573,3 +488,4 @@ model TeamAlias {
   @@index([name])
   @@index([teamId])
 }
+

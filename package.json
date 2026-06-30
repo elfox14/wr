@@ -40,10 +40,12 @@
     "seed:team-intelligence": "tsx prisma/seedTeamIntelligenceReports.ts"
   },
   "dependencies": {
+    "@ai-sdk/google": "^4.0.2",
     "@auth/prisma-adapter": "^2.11.2",
     "@google/genai": "^2.10.0",
     "@prisma/client": "^6.19.3",
     "@tailwindcss/postcss": "^4",
+    "ai": "^7.0.6",
     "bcryptjs": "^3.0.3",
     "clsx": "^2.1.1",
     "framer-motion": "^12.40.0",
@@ -57,6 +59,7 @@
     "recharts": "^3.8.1",
     "tailwind-merge": "^3.6.0",
     "tailwindcss": "^4",
+    "zod": "^4.4.3",
     "zustand": "^5.0.14"
   },
   "devDependencies": {

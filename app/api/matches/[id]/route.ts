@@ -14,20 +14,12 @@ export async function GET(
       include: {
         homeTeam: {
           include: {
-            players: true,
-            marketNews: {
-              orderBy: { publishedAt: 'desc' },
-              take: 5
-            }
+            players: true
           }
         },
         awayTeam: {
           include: {
-            players: true,
-            marketNews: {
-              orderBy: { publishedAt: 'desc' },
-              take: 5
-            }
+            players: true
           }
         }
       }
