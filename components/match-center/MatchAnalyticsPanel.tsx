@@ -1,18 +1,25 @@
 'use client';
+
 // ============================================================
 // components/match-center/MatchAnalyticsPanel.tsx
 // Client wrapper يستقبل بيانات المباراة من Server Component
-// ويحسب مخرجات التحليل ثم يعرضها عبر ثلاثة مكونات:
-//   - AutoSummaryHeader  — الخلاصة السردية
-//   - TopMomentsCard     — أبرز اللحظات
-//   - FairnessIndex      — مؤشر العدالة
+// ويحسب مخرجات التحليل ثم يعرضها عبر المكونات:
+// - AutoSummaryHeader — الخلاصة السردية
+// - TopMomentsCard    — أبرز اللحظات
+// - FairnessIndex     — مؤشر العدالة
+// - XgFlowChart       — تدفق الأهداف المتوقعة
+// - MomentumBar       — شريط الزخم
 // ============================================================
 import { useMemo, useState } from 'react';
 import type { MatchInsightsInput } from '@/lib/analytics/match-analytics.types';
 import { createMatchInsights } from '@/lib/analytics/match-insights';
+import { deriveXgFlow } from '@/lib/analytics/derive-xg-flow';
+import { deriveMomentum } from '@/lib/analytics/derive-momentum';
 import { AutoSummaryHeader, AutoSummaryHeaderSkeleton } from '@/components/analytics/AutoSummaryHeader';
 import { TopMomentsCard, TopMomentsCardSkeleton } from '@/components/analytics/TopMomentsCard';
 import { FairnessIndex, FairnessIndexSkeleton } from '@/components/analytics/FairnessIndex';
+import XgFlowChart from '@/components/analytics/XgFlowChart';
+import MomentumBar from '@/components/analytics/MomentumBar';
 
 interface Props {
   /** بيانات التحليل المحسوبة على السيرفر */
@@ -33,6 +40,13 @@ export function MatchAnalyticsPanel({ input, className = '' }: Props) {
       return null;
     }
   }, [input]);
+
+  // تدفق xG والزخم — مشتقان مباشرة من input
+  const xgFlow = useMemo(() => (input ? deriveXgFlow(input) : []), [input]);
+  const momentum = useMemo(() => (input ? deriveMomentum(input) : []), [input]);
+
+  const homeLabel = input?.homeTeam?.name ?? 'المضيف';
+  const awayLabel = input?.awayTeam?.name ?? 'الضيف';
 
   // هيكل أثناء التحميل أو عدم وجود بيانات
   if (!insights) {
@@ -63,7 +77,27 @@ export function MatchAnalyticsPanel({ input, className = '' }: Props) {
         className="w-full"
       />
 
-      {/* بطاقةتان جنباً إلى جنب */}
+      {/* شريط الزخم */}
+      <div className="rounded-2xl bg-white/5 border border-white/10 p-4">
+        <h3 className="text-xs font-semibold text-white/60 mb-3">الزخم</h3>
+        <MomentumBar
+          segments={momentum}
+          homeLabel={homeLabel}
+          awayLabel={awayLabel}
+        />
+      </div>
+
+      {/* تدفق xG */}
+      <div className="rounded-2xl bg-white/5 border border-white/10 p-4">
+        <h3 className="text-xs font-semibold text-white/60 mb-3">تدفق الأهداف المتوقعة (xG)</h3>
+        <XgFlowChart
+          data={xgFlow}
+          homeLabel={homeLabel}
+          awayLabel={awayLabel}
+        />
+      </div>
+
+      {/* بطاقتان جنباً إلى جنب */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* أبرز اللحظات */}
         <div className="rounded-2xl bg-white/5 border border-white/10 p-4">
@@ -77,11 +111,9 @@ export function MatchAnalyticsPanel({ input, className = '' }: Props) {
           />
         </div>
 
-        {/* معلومات الدقيقة المختارة + مؤشر العدالة */}
+        {/* مؤشر العدالة + سياق الدقيقة */}
         <div className="space-y-3">
           <FairnessIndex fairness={insights.fairness} />
-
-          {/* معلومات سياق الدقيقة */}
           {selectedMinute !== null && (() => {
             const ctx = insights.getMinuteContext(selectedMinute);
             if (!ctx) return null;
@@ -92,7 +124,7 @@ export function MatchAnalyticsPanel({ input, className = '' }: Props) {
               >
                 <div className="flex items-center justify-between">
                   <h4 className="text-xs font-semibold text-white/70">
-                    تحليل الدقيقة {selectedMinute}&apos;
+                    تحليل الدقيقة {selectedMinute}'
                   </h4>
                   <button
                     type="button"
@@ -100,7 +132,7 @@ export function MatchAnalyticsPanel({ input, className = '' }: Props) {
                     className="text-[10px] text-white/40 hover:text-white/70 transition"
                     aria-label="إغلاق"
                   >
-                    ×
+                    &times;
                   </button>
                 </div>
                 <p className="text-[11px] text-white/60 leading-relaxed">{ctx.narrative}</p>
