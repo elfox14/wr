@@ -52,7 +52,7 @@ export default function InteractiveShotmap({ matchId, homeTeamName, awayTeamName
         const isGoal = s.isGoal || s.outcome?.toLowerCase().includes('goal') || s.outcome === 'هدف';
         const isOnTarget = isGoal || s.isOnTarget || s.outcome?.toLowerCase().includes('saved');
         
-        let rawX = Number(s.x) || 50;
+        const rawX = Number(s.x) || 50;
         let rawY = Number(s.y) || 25;
         
         // Normalize coordinates if needed (assuming 0-100 scale where 100 is opponent goal)
