@@ -33,7 +33,7 @@ export async function GET(request: Request) {
 
     let processedCount = 0;
     let priceUpdatesCount = 0;
-    let newsGeneratedCount = 0;
+    const newsGeneratedCount = 0;
 
     function mapStage(stage: string): string {
       const s = (stage || '').toUpperCase();
