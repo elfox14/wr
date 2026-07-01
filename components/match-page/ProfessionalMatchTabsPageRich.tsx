@@ -12,8 +12,6 @@ import MatchMomentumChart from '@/components/match-center/visuals/MatchMomentumC
 import CompactStatCell from '@/components/match-center/visuals/CompactStatCell';
 import InteractiveShotmap from '@/components/match-center/visuals/InteractiveShotmap';
 import PlayerHeatmapModal from '@/components/match-center/visuals/PlayerHeatmapModal';
-import { MatchAnalyticsPanel } from '@/components/match-center/MatchAnalyticsPanel';
-import type { MatchInsightsInput } from '@/lib/analytics/match-analytics.types';
 
 type Tab = 'overview' | 'events' | 'lineups' | 'analysis' | 'group' | 'articles';
 const ar = new Intl.NumberFormat('ar-EG');
@@ -56,58 +54,6 @@ function side(e: MatchEventView, d: MatchPageData) {
 }
 function historyOf(d: MatchPageData) { 
   return d.history || { homeRecentForm: [], awayRecentForm: [], headToHead: [], homeWorldCupHistory: `تاريخ مشاركات ${tn(d.homeTeam)} في كأس العالم غير متوفر.`, awayWorldCupHistory: `تاريخ مشاركات ${tn(d.awayTeam)} في كأس العالم غير متوفر.` }; 
-}
-
-function buildAnalyticsInput(d: MatchPageData): any {
-  // Mapping MatchPageData into MatchInsightsInput shape expected by match-insights.ts
-  const homeTeamName = tn(d.homeTeam);
-  const awayTeamName = tn(d.awayTeam);
-
-  const stats = d.stats
-    .filter((s) => s.available && s.home !== null && s.away !== null)
-    .map((s) => ({
-      key: s.key,
-      label: s.label,
-      home: Number(s.home ?? 0),
-      away: Number(s.away ?? 0),
-      suffix: s.suffix || '',
-    }));
-
-  const events = (d.events || []).map((e: any) => {
-    const rawType = String(e.type || '').toLowerCase();
-    const type = ['goal', 'yellow', 'red', 'substitution'].includes(rawType) ? rawType : 'substitution';
-    return {
-      minute: Number(e.minute || 0),
-      team: side(e, d) === 'home' ? 'home' : 'away',
-      type,
-      label: String(e.playerName || e.detail || e.type || ''),
-    };
-  });
-
-  const shots = (d.advanced?.shotmap || []).map((s: any, i: number) => {
-    const isHome = s.teamId === d.homeTeam.id || s.teamName === d.homeTeam.name || s.teamName === d.homeTeam.code;
-    return {
-      id: String(s.id || i),
-      minute: Number(s.minute || 0),
-      team: isHome ? 'home' : 'away',
-      x: Number(s.x || 50),
-      y: Number(s.y || 50),
-      xg: Number(s.xg || s.npxg || 0),
-      outcome: s.isGoal ? 'goal' : s.isOnTarget ? 'onTarget' : s.isBlocked ? 'blocked' : 'offTarget',
-      insideBox: s.situation !== 'Free Kick' && s.situation !== 'Direct Free Kick', // generic approximation if insideBox missing
-      player: s.playerName || undefined,
-    };
-  });
-
-  return {
-    stats,
-    momentum: [],
-    xgFlow: [],
-    shots,
-    events,
-    homeTeamName,
-    awayTeamName,
-  };
 }
 
 function Box({ title, children, hint }: { title?: string; children: React.ReactNode; hint?: string }) { 
@@ -226,12 +172,9 @@ function getTeamHeatmapPoints(isHome: boolean, d: MatchPageData) {
 
 function Overview({ d }: { d: MatchPageData }) { 
   const rows = d.stats.filter((m) => m.available); 
-  const analyticsInput = buildAnalyticsInput(d);
   
   return (
     <div className="space-y-4">
-      <MatchAnalyticsPanel input={analyticsInput} />
-      
       {/* Momentum */}
       <Box title="زخم المباراة (Match Momentum)" hint="يوضح سيطرة الفريقين خلال أوقات المباراة">
         <div className="h-32">

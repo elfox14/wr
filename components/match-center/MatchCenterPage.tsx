@@ -2,7 +2,6 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import prisma from '@/lib/prisma';
 import { getTeamFlagUrl } from '@/lib/teamFlags';
-import { MatchAnalyticsPanel } from '@/components/match-center/MatchAnalyticsPanel';
 import type { MatchInsightsInput, ComparisonStat, MatchEvent, XgFlowPoint } from '@/lib/analytics/match-analytics.types';
 
 export const dynamic = 'force-dynamic';
@@ -312,73 +311,6 @@ async function getMatch(id: string) {
   return { ...match, squadPlayers: players };
 }
 
-function buildAnalyticsInput(params: {
-  match: any;
-  baseSnapshot: any;
-  stats: Record<string, any>;
-}): MatchInsightsInput | null {
-  const { match, baseSnapshot, stats } = params;
-  if (!match) return null;
-
-  const statValue = (key: string) => {
-    const stat = obj(stats[key]);
-    const home = n(stat.home);
-    const away = n(stat.away);
-    return home === null && away === null ? null : { home, away };
-  };
-
-  return {
-    matchId: match.id,
-    status: String(match.status || ''),
-    score: {
-      home: n(match.homeScore),
-      away: n(match.awayScore),
-    },
-    homeTeam: {
-      id: match.homeTeam?.id ?? match.homeTeamId,
-      name: teamName(match.homeTeam, 'المضيف'),
-    },
-    awayTeam: {
-      id: match.awayTeam?.id ?? match.awayTeamId,
-      name: teamName(match.awayTeam, 'الضيف'),
-    },
-    stats: {
-      xg: statValue('xg'),
-      npxg: statValue('npxg'),
-      bigChances: statValue('bigChances'),
-      possession: {
-        home: n(baseSnapshot?.homePossession) ?? n(obj(stats.possession).home),
-        away: n(baseSnapshot?.awayPossession) ?? n(obj(stats.possession).away),
-      },
-      dangerousAttacks: {
-        home: n(baseSnapshot?.homeDangerousAttacks) ?? n(obj(stats.dangerousAttacks).home),
-        away: n(baseSnapshot?.awayDangerousAttacks) ?? n(obj(stats.dangerousAttacks).away),
-      },
-      shots: {
-        home: n(baseSnapshot?.homeShots) ?? n(obj(stats.shots).home),
-        away: n(baseSnapshot?.awayShots) ?? n(obj(stats.shots).away),
-      },
-      shotsOnTarget: {
-        home: n(baseSnapshot?.homeShotsOnTarget) ?? n(obj(stats.shotsOnTarget).home),
-        away: n(baseSnapshot?.awayShotsOnTarget) ?? n(obj(stats.shotsOnTarget).away),
-      },
-    },
-    events: (match.events || []).map((event: any) => ({
-      id: event.id,
-      minute: n(event.minute) ?? 0,
-      type: String(event.type || ''),
-      detail: String(event.detail || event.description || ''),
-      playerName: event.playerName || null,
-      teamSide:
-        event.teamId === match.homeTeamId
-          ? 'home'
-          : event.teamId === match.awayTeamId
-          ? 'away'
-          : null,
-    })),
-  } as MatchInsightsInput;
-}
-
 
 export default async function MatchCenterPage({ params }: { params: Promise<{ id: string }> | { id: string } }) {
   const resolved = await params;
@@ -411,13 +343,5 @@ export default async function MatchCenterPage({ params }: { params: Promise<{ id
     ['الفرص الكبيرة Big Chances', bigChances, ''],
   ] as const;
   
-  const analyticsInput = buildAnalyticsInput({
-    match,
-    baseSnapshot,
-    stats,
-  });
-
-  return <main className="min-h-screen bg-[#02060d] px-3 py-4 text-white sm:px-6" dir="rtl"><section className="mx-auto max-w-7xl space-y-5"><section className="relative overflow-hidden rounded-[1.8rem] border border-white/10 bg-[#030912] px-4 py-6 text-center shadow-[0_0_70px_rgba(0,0,0,.55)] sm:px-6"><div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_16%,rgba(15,240,252,.20),transparent_34%),radial-gradient(circle_at_82%_14%,rgba(255,48,69,.18),transparent_34%),linear-gradient(180deg,rgba(255,215,0,.08),transparent_36%)]" /><div className="relative"><h1 className="text-3xl font-black text-[#FFD700] sm:text-5xl">إحصائيات المباراة</h1><p className="mt-2 text-sm font-bold text-gray-300">عرض موحّد للأرقام والأحداث في مكان واحد</p></div><div className="relative mt-8 grid items-center gap-5 lg:grid-cols-[1fr_auto_1fr]" dir="ltr"><div className="flex items-center justify-center gap-4 lg:justify-start"><FlagBadge team={match.homeTeam} side="home" /><p className="text-2xl font-black text-white sm:text-4xl">{teamName(match.homeTeam, 'Home')}</p></div><div><div className="inline-flex items-center justify-center gap-5 rounded-[1.3rem] border border-white/10 bg-black/45 px-6 py-3"><span className="text-5xl font-black text-[#FFD700] sm:text-7xl">{fmt(match.homeScore)}</span><span className="text-4xl font-black text-white/80 sm:text-6xl">-</span><span className="text-5xl font-black text-white sm:text-7xl">{fmt(match.awayScore)}</span></div><div className="mx-auto mt-3 inline-flex min-h-9 items-center rounded-xl border border-[#FFD700]/30 bg-[#FFD700]/10 px-5 text-sm font-black text-[#FFD700]">{matchClock}</div></div><div className="flex items-center justify-center gap-4 lg:justify-end"><p className="text-2xl font-black text-white sm:text-4xl">{teamName(match.awayTeam, 'Away')}</p><FlagBadge team={match.awayTeam} side="away" /></div></div></section><section className="rounded-[1.6rem] border border-white/10 bg-white/[.035] p-4" dir="ltr"><div className="mb-3 grid grid-cols-[1fr_auto_1fr] items-center gap-3"><h2 className="text-left text-lg font-black text-[#69d7ff]">{teamName(match.homeTeam, 'Home')}</h2><div className="rounded-full border border-white/10 bg-black/35 px-4 py-1 text-[10px] font-black uppercase tracking-[.24em] text-gray-400">Stats Board</div><h2 className="text-right text-lg font-black text-[#ff6b7a]">{teamName(match.awayTeam, 'Away')}</h2></div><div className="rounded-[1.2rem] border border-white/10 bg-black/30 px-2 sm:px-4">{rows.map(([label, value, suffix]) => <StatRow key={label} label={label} value={value} suffix={suffix} />)}</div></section>
-  <MatchAnalyticsPanel input={analyticsInput} />
-  <div className="grid gap-5 xl:grid-cols-[1.15fr_.7fr]"><section className="rounded-[1.45rem] border border-white/10 bg-white/[.035] p-4"><div className="mb-4 flex items-center justify-between"><h2 className="text-xl font-black text-white">التشكيلات المؤكدة</h2></div><div className="grid gap-4 lg:grid-cols-2" dir="ltr"><LineupPanel team={match.homeTeam} lineup={sideLineup(lineup, 'home')} squad={homeSquad} side="home" /><LineupPanel team={match.awayTeam} lineup={sideLineup(lineup, 'away')} squad={awaySquad} side="away" /></div></section><EventPanel events={match.events || []} /></div></section></main>;
+  return <main className="min-h-screen bg-[#02060d] px-3 py-4 text-white sm:px-6" dir="rtl"><section className="mx-auto max-w-7xl space-y-5"><section className="relative overflow-hidden rounded-[1.8rem] border border-white/10 bg-[#030912] px-4 py-6 text-center shadow-[0_0_70px_rgba(0,0,0,.55)] sm:px-6"><div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_16%,rgba(15,240,252,.20),transparent_34%),radial-gradient(circle_at_82%_14%,rgba(255,48,69,.18),transparent_34%),linear-gradient(180deg,rgba(255,215,0,.08),transparent_36%)]" /><div className="relative"><h1 className="text-3xl font-black text-[#FFD700] sm:text-5xl">إحصائيات المباراة</h1><p className="mt-2 text-sm font-bold text-gray-300">عرض موحّد للأرقام والأحداث في مكان واحد</p></div><div className="relative mt-8 grid items-center gap-5 lg:grid-cols-[1fr_auto_1fr]" dir="ltr"><div className="flex items-center justify-center gap-4 lg:justify-start"><FlagBadge team={match.homeTeam} side="home" /><p className="text-2xl font-black text-white sm:text-4xl">{teamName(match.homeTeam, 'Home')}</p></div><div><div className="inline-flex items-center justify-center gap-5 rounded-[1.3rem] border border-white/10 bg-black/45 px-6 py-3"><span className="text-5xl font-black text-[#FFD700] sm:text-7xl">{fmt(match.homeScore)}</span><span className="text-4xl font-black text-white/80 sm:text-6xl">-</span><span className="text-5xl font-black text-white sm:text-7xl">{fmt(match.awayScore)}</span></div><div className="mx-auto mt-3 inline-flex min-h-9 items-center rounded-xl border border-[#FFD700]/30 bg-[#FFD700]/10 px-5 text-sm font-black text-[#FFD700]">{matchClock}</div></div><div className="flex items-center justify-center gap-4 lg:justify-end"><p className="text-2xl font-black text-white sm:text-4xl">{teamName(match.awayTeam, 'Away')}</p><FlagBadge team={match.awayTeam} side="away" /></div></div></section><section className="rounded-[1.6rem] border border-white/10 bg-white/[.035] p-4" dir="ltr"><div className="mb-3 grid grid-cols-[1fr_auto_1fr] items-center gap-3"><h2 className="text-left text-lg font-black text-[#69d7ff]">{teamName(match.homeTeam, 'Home')}</h2><div className="rounded-full border border-white/10 bg-black/35 px-4 py-1 text-[10px] font-black uppercase tracking-[.24em] text-gray-400">Stats Board</div><h2 className="text-right text-lg font-black text-[#ff6b7a]">{teamName(match.awayTeam, 'Away')}</h2></div><div className="rounded-[1.2rem] border border-white/10 bg-black/30 px-2 sm:px-4">{rows.map(([label, value, suffix]) => <StatRow key={label} label={label} value={value} suffix={suffix} />)}</div></section><div className="grid gap-5 xl:grid-cols-[1.15fr_.7fr]"><section className="rounded-[1.45rem] border border-white/10 bg-white/[.035] p-4"><div className="mb-4 flex items-center justify-between"><h2 className="text-xl font-black text-white">التشكيلات المؤكدة</h2></div><div className="grid gap-4 lg:grid-cols-2" dir="ltr"><LineupPanel team={match.homeTeam} lineup={sideLineup(lineup, 'home')} squad={homeSquad} side="home" /><LineupPanel team={match.awayTeam} lineup={sideLineup(lineup, 'away')} squad={awaySquad} side="away" /></div></section><EventPanel events={match.events || []} /></div></section></main>;
 }
