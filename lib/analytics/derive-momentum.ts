@@ -40,12 +40,12 @@ export function deriveMomentum(
 
     if (windowShots.length > 0) {
       const homeShots = windowShots.filter(
-        (s) => s.teamId === insights.homeTeam.id
+        (s) => s.team === 'home'
       );
       const awayShots = windowShots.length - homeShots.length;
       const homeXgSum = homeShots.reduce((acc, s) => acc + (s.xg ?? 0), 0);
       const awayXgSum = windowShots
-        .filter((s) => s.teamId !== insights.homeTeam.id)
+        .filter((s) => s.team === 'away')
         .reduce((acc, s) => acc + (s.xg ?? 0), 0);
 
       const totalXg = homeXgSum + awayXgSum;
@@ -56,7 +56,9 @@ export function deriveMomentum(
       }
     } else {
       // Fallback: use possession
-      const homePoss = insights.homePossession ?? 50;
+      const homePoss = insights.homePossession 
+        ?? insights.stats.find(s => s.key === 'possession')?.home 
+        ?? 50;
       value = (homePoss - 50) / 50; // normalise to [-1, +1]
     }
 
