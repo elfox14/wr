@@ -206,7 +206,7 @@ function unwrapFunctionResponse(body) {
 }
 
 async function postFunctionRequest(functionUrl, mode, body) {
-  const httpTimeout = envNumber('BROWSERLESS_HTTP_TIMEOUT_MS', 8000, 1000, 30000);
+  const httpTimeout = envNumber('BROWSERLESS_HTTP_TIMEOUT_MS', 55000, 1000, 60000);
   const response = await fetchWithTimeout(functionUrl, {
     method: 'POST',
     headers: {
@@ -238,7 +238,7 @@ async function fetchFunctionCaptureFrom(functionUrl, sourceUrl) {
 
 async function fetchFunctionCapture(sourceUrl) {
   const allCandidates = browserlessFunctionCandidates();
-  const maxCandidates = envNumber('BROWSERLESS_FUNCTION_MAX_CANDIDATES', 1, 1, 10);
+  const maxCandidates = envNumber('BROWSERLESS_FUNCTION_MAX_CANDIDATES', 4, 1, 10);
   const candidates = allCandidates.slice(0, maxCandidates);
   if (!candidates.length) return null;
   const errors = [];
@@ -254,7 +254,7 @@ async function fetchFunctionCapture(sourceUrl) {
 }
 
 async function fetchRenderedHtmlFrom(contentUrl, sourceUrl) {
-  const httpTimeout = envNumber('BROWSERLESS_HTTP_TIMEOUT_MS', 8000, 1000, 30000);
+  const httpTimeout = envNumber('BROWSERLESS_HTTP_TIMEOUT_MS', 55000, 1000, 60000);
   const timeoutMs = envNumber('BROWSERLESS_FALLBACK_TIMEOUT_MS', 8000, 5000, 55000);
   const waitForTimeout = envNumber('BROWSERLESS_FALLBACK_WAIT_MS', 2000, 1000, 20000);
   const response = await fetchWithTimeout(contentUrl, {
@@ -286,7 +286,7 @@ async function fetchContentText(sourceUrl) {
 }
 
 export async function fetchISportsAnimationBrowserlessText(providerMatchId) {
-  if (!envBool('LIVE_INGEST_USE_BROWSERLESS_FALLBACK', false)) {
+  if (!envBool('LIVE_INGEST_USE_BROWSERLESS_FALLBACK', true)) {
     return { enabled: false, source: 'ISPORTS_ANIMATION_BROWSERLESS', hasText: false, hasStats: false, skipped: true, reason: 'LIVE_INGEST_USE_BROWSERLESS_FALLBACK is false', error: 'LIVE_INGEST_USE_BROWSERLESS_FALLBACK is false' };
   }
   const maxBrowserlessRequests = envNumber('LIVE_INGEST_MAX_BROWSERLESS_REQUESTS', 1, 0, 10);

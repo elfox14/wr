@@ -190,7 +190,7 @@ async function processMatch(match, latest) {
   let raw = null;
   let analysisError = null;
   try { raw = await fetchIsportsAnalysis(match.animationMatchId); }
-  catch (error) { analysisError = error?.message || String(error); if (!envBool('LIVE_INGEST_USE_BROWSERLESS_FALLBACK', false) || !isQuotaError(error)) throw error; }
+  catch (error) { analysisError = error?.message || String(error); if (!envBool('LIVE_INGEST_USE_BROWSERLESS_FALLBACK', true)) throw error; }
 
   let stats = raw ? normalizeStats(raw) : emptyStats();
   const providerState = raw ? firstProviderState(raw) : null;
@@ -201,7 +201,7 @@ async function processMatch(match, latest) {
   let rawData = raw || { provider: 'WORKER_ISPORTS', error: analysisError };
   let fallbackStatus = null;
 
-  if (!hasUsefulStats(stats) && envBool('LIVE_INGEST_USE_BROWSERLESS_FALLBACK', false)) {
+  if (!hasUsefulStats(stats) && envBool('LIVE_INGEST_USE_BROWSERLESS_FALLBACK', true)) {
     try {
       const fallback = await maybeAnimationBrowserlessFallback(match, stats);
       fallbackStatus = fallback ? { enabled: fallback.enabled, source: fallback.source, hasStats: fallback.hasStats, hasText: fallback.hasText, sourceUrl: fallback.sourceUrl, error: fallback.error || null } : null;

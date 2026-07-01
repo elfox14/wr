@@ -21,7 +21,7 @@ function str(...values: any[]) {
 }
 function n(value: any) { if (value === null || value === undefined || value === '') return null; const number = Number(typeof value === 'string' ? value.replace('%', '').trim() : value); return Number.isFinite(number) ? number : null; }
 function bool(value: any) { if (typeof value === 'boolean') return value; if (value === null || value === undefined || value === '') return null; const s = String(value).trim().toLowerCase(); if (['1', 'true', 'yes', 'y'].includes(s)) return true; if (['0', 'false', 'no', 'n'].includes(s)) return false; return null; }
-function key(value: any) { return String(value || '').toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/&/g, ' and ').replace(/[^a-z0-9\u0600-\u06ff]+/g, ' ').replace(/\s+/g, ' ').trim().replace('czechia', 'czech republic').replace('usa', 'united states').replace('u s a', 'united states').replace('united states of america', 'united states').replace('turkiye', 'turkey').replace('türkiye', 'turkey'); }
+function key(value: any) { return String(value || '').toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/&/g, ' and ').replace(/[^a-z0-9\u0600-\u06ff]+/g, ' ').replace(/\s+/g, ' ').trim().replace('czechia', 'czech republic').replace('usa', 'united states').replace('u s a', 'united states').replace('united states of america', 'united states').replace('turkiye', 'turkey').replace('türkiye', 'turkey').replace('cote d ivoire', 'ivory coast'); }
 function words(value: any) { return key(value).split(' ').filter((w) => w.length > 1); }
 function similarity(a: any, b: any) { const aa = key(a); const bb = key(b); if (!aa || !bb) return 0; if (aa === bb) return 100; if (aa.includes(bb) || bb.includes(aa)) return 88; const aw = new Set(words(aa)); const bw = new Set(words(bb)); if (!aw.size || !bw.size) return 0; const hit = Array.from(aw).filter((w) => bw.has(w)).length; return Math.round((hit / Math.max(aw.size, bw.size)) * 75); }
 function teamScore(providerName: any, localTeam: any) { return Math.max(similarity(providerName, localTeam?.name), similarity(providerName, localTeam?.code)); }
@@ -162,7 +162,7 @@ export async function collectTheStatsMatchExtras(match: any, options: { dryRun?:
   const includeRaw = Boolean(options.includeRaw);
   const timeoutMs = Math.max(3000, Math.min(60000, Number(options.timeoutMs || 15000)));
   const delayMs = Math.max(0, Math.min(5000, Number(options.delayMs || 350)));
-  const resolved = await resolveTheStatsProviderId(match, options.query || {});
+  const resolved = await resolveTheStatsProviderId(match, Object.keys(options.query || {}).length ? options.query! : defaultTheStatsQuery(new URLSearchParams()));
   if (!resolved.id) return { ok: false, matchId: match.id, error: 'Could not resolve provider match id', resolved };
   const id = encodeURIComponent(String(resolved.id));
   const mode = options.endpointMode === 'full' || options.endpointMode === 'all' ? 'full' : 'essential';

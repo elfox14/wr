@@ -44,6 +44,8 @@ async function run(req: Request, matchId: string) {
     matchId,
     endpointMode: 'full',
     dryRun,
+    error: result.error,
+    resolved: result.resolved,
     saved: result.saved,
     snapshotId: result.snapshotId,
     counts: result.counts,
