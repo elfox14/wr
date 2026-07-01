@@ -12,6 +12,8 @@ import MatchMomentumChart from '@/components/match-center/visuals/MatchMomentumC
 import CompactStatCell from '@/components/match-center/visuals/CompactStatCell';
 import InteractiveShotmap from '@/components/match-center/visuals/InteractiveShotmap';
 import PlayerHeatmapModal from '@/components/match-center/visuals/PlayerHeatmapModal';
+import { MatchAnalyticsPanel } from '@/components/match-center/MatchAnalyticsPanel';
+import type { MatchInsightsInput } from '@/lib/analytics/match-analytics.types';
 
 type Tab = 'overview' | 'events' | 'lineups' | 'analysis' | 'group' | 'articles';
 const ar = new Intl.NumberFormat('ar-EG');
@@ -54,6 +56,52 @@ function side(e: MatchEventView, d: MatchPageData) {
 }
 function historyOf(d: MatchPageData) { 
   return d.history || { homeRecentForm: [], awayRecentForm: [], headToHead: [], homeWorldCupHistory: `تاريخ مشاركات ${tn(d.homeTeam)} في كأس العالم غير متوفر.`, awayWorldCupHistory: `تاريخ مشاركات ${tn(d.awayTeam)} في كأس العالم غير متوفر.` }; 
+}
+
+function buildAnalyticsInput(d: MatchPageData): MatchInsightsInput {
+  const statValue = (key: string) => {
+    const s = d.stats.find(x => x.key === key);
+    if (!s || (s.home == null && s.away == null)) return null;
+    return { home: s.home ?? 0, away: s.away ?? 0 };
+  };
+
+  const xgStat = statValue('expected_goals');
+  const xg = d.advanced?.xg?.home != null ? { home: d.advanced.xg.home ?? 0, away: d.advanced.xg.away ?? 0 } : xgStat;
+  const npxg = d.advanced?.npxg?.home != null ? { home: d.advanced.npxg.home ?? 0, away: d.advanced.npxg.away ?? 0 } : statValue('expected_goals');
+
+  return {
+    matchId: d.id,
+    status: d.status.isFinished ? 'finished' : (d.status.isLive ? 'live' : 'scheduled'),
+    score: {
+      home: d.score.home ?? 0,
+      away: d.score.away ?? 0,
+    },
+    homeTeam: {
+      id: d.homeTeam.id,
+      name: tn(d.homeTeam),
+    },
+    awayTeam: {
+      id: d.awayTeam.id,
+      name: tn(d.awayTeam),
+    },
+    stats: {
+      xg,
+      npxg,
+      bigChances: statValue('big_chance'),
+      possession: statValue('ball_possession'),
+      dangerousAttacks: statValue('dangerous_attacks'),
+      shots: statValue('shots'),
+      shotsOnTarget: statValue('shots_on_target'),
+    },
+    events: (d.events || []).map((e: any) => ({
+      id: e.id,
+      minute: e.minute ?? 0,
+      type: e.type,
+      detail: e.detail,
+      playerName: e.playerName,
+      teamSide: side(e, d) === 'home' ? 'home' : side(e, d) === 'away' ? 'away' : null,
+    })),
+  };
 }
 
 function Box({ title, children, hint }: { title?: string; children: React.ReactNode; hint?: string }) { 
@@ -172,8 +220,12 @@ function getTeamHeatmapPoints(isHome: boolean, d: MatchPageData) {
 
 function Overview({ d }: { d: MatchPageData }) { 
   const rows = d.stats.filter((m) => m.available); 
+  const analyticsInput = buildAnalyticsInput(d);
+  
   return (
     <div className="space-y-4">
+      <MatchAnalyticsPanel input={analyticsInput} />
+      
       {/* Momentum */}
       <Box title="زخم المباراة (Match Momentum)" hint="يوضح سيطرة الفريقين خلال أوقات المباراة">
         <div className="h-32">
