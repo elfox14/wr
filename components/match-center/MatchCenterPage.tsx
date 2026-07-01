@@ -58,8 +58,8 @@ const AR_TEAM_NAMES: Record<string, string> = {
   'new zealand': 'نيوزيلندا',
 };
 
-const FINISHED_STATUSES = ['FINISHED', 'FT', 'AET', 'PEN'];
-const HALF_TIME_STATUSES = ['HT', 'HALFTIME', 'HALF_TIME', 'HALF-TIME'];
+const FINISHED_STATUSES = ['FINISHED', 'FT', 'AET', 'PEN', 'COMPLETED', 'ENDED'];
+const HALF_TIME_STATUSES = ['HT', 'HALFTIME', 'HALF_TIME', 'HALF-TIME', 'PAUSED', 'BREAK', 'INTERVAL'];
 const LIVE_STATUSES = ['IN_PLAY', 'LIVE', '1H', '2H', 'ET'];
 const SCHEDULED_STATUSES = ['SCHEDULED', 'TIMED', 'NOT_STARTED', 'NS'];
 
@@ -132,7 +132,7 @@ function snapshotMinute(snapshot: any) {
 
 function matchClockLabel(match: any, ...snapshots: any[]) {
   const statuses = [normalizeStatus(match?.status), ...snapshots.map(snapshotStatus)].filter(Boolean);
-  const status = statuses.find((value) => value) || '';
+  const status = statuses.find((s) => FINISHED_STATUSES.includes(s)) ?? statuses.find((s) => HALF_TIME_STATUSES.includes(s)) ?? statuses.find((s) => s) ?? '';
   if (FINISHED_STATUSES.includes(status)) return 'انتهت';
   if (HALF_TIME_STATUSES.includes(status)) return 'استراحة';
 
