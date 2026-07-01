@@ -1,13 +1,13 @@
 'use client';
 // ============================================================
 // components/analytics/FairnessIndex.tsx
-// Displays the AI-computed match fairness verdict:
-// a tone-coded badge, a short label, and an explanatory
-// text. Renders a skeleton while data loads.
+// يعرض حكم عدالة المباراة المحسوب بالذكاء الاصطناعي:
+// شارة ملونة، تسمية قصيرة، ونص تفسيري.
+// يعرض هيكلًا أثناء تحميل البيانات.
 // ============================================================
 import type { FairnessInsight } from '@/lib/analytics/match-analytics.types';
 
-// ── tone config ───────────────────────────────────────────────
+// ── tone config ─────────────────────────────────────────────
 const TONE_CONFIG = {
   positive: {
     icon: '✅',
@@ -35,7 +35,20 @@ const TONE_CONFIG = {
   },
 } as const;
 
-// ── skeleton ──────────────────────────────────────────────────
+// ── labels map (AR) ─────────────────────────────────────────
+const AR_LABELS: Record<string, string> = {
+  'Fair Result': 'نتيجة عادلة',
+  Fortunate: 'محظوظ',
+};
+
+function arLabel(label: string): string {
+  for (const [en, ar] of Object.entries(AR_LABELS)) {
+    if (label.includes(en)) return label.replace(en, ar);
+  }
+  return label;
+}
+
+// ── skeleton ────────────────────────────────────────────────
 export function FairnessIndexSkeleton() {
   return (
     <div className="rounded-2xl bg-white/5 border border-white/10 p-5 space-y-3 animate-pulse">
@@ -49,17 +62,17 @@ export function FairnessIndexSkeleton() {
   );
 }
 
-// ── null state ────────────────────────────────────────────────
+// ── null state ──────────────────────────────────────────────
 function FairnessNull() {
   return (
-    <div className="rounded-2xl bg-white/5 border border-white/10 p-5">
-      <h3 className="text-sm font-semibold text-white mb-2">Fairness Index</h3>
-      <p className="text-xs text-white/35 italic">Not enough data to assess match fairness.</p>
+    <div className="rounded-2xl bg-white/5 border border-white/10 p-5 space-y-1">
+      <h3 className="text-sm font-semibold text-white/70">مؤشر العدالة</h3>
+      <p className="text-xs text-white/40">لا توجد بيانات كافية لتقييم عدالة المباراة.</p>
     </div>
   );
 }
 
-// ── main component ────────────────────────────────────────────
+// ── main component ──────────────────────────────────────────
 interface Props {
   fairness: FairnessInsight | null | undefined;
   className?: string;
@@ -73,36 +86,27 @@ export function FairnessIndex({ fairness, className = '' }: Props) {
 
   return (
     <div
-      className={`rounded-2xl bg-white/5 border border-white/10 p-5 space-y-3 ${className}`}
-      role="region"
-      aria-label="Match fairness index"
+      className={`rounded-2xl border p-5 space-y-3 ${cfg.bg} ${cfg.border} ${className}`}
+      dir="rtl"
     >
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-white">Fairness Index</h3>
+        <h3 className="text-sm font-semibold text-white/80">مؤشر العدالة</h3>
         {/* Pulse dot */}
-        <span
-          className={`inline-block h-2 w-2 rounded-full ${cfg.dot}`}
-          aria-hidden="true"
-        />
+        <span className={`w-2.5 h-2.5 rounded-full ${cfg.dot} animate-pulse`} />
       </div>
 
       {/* Verdict badge */}
-      <div
-        className={`inline-flex items-center gap-2 rounded-xl px-3 py-1.5 border ${cfg.bg} ${cfg.border}`}
-        role="status"
-        aria-label={`Fairness verdict: ${fairness.label}`}
-      >
-        <span className="text-base leading-none" aria-hidden="true">{cfg.icon}</span>
-        <span className={`text-sm font-semibold ${cfg.badge.split(' ')[1]}`}>
-          {fairness.label}
+      <div className="flex items-center gap-2">
+        <span
+          className={`inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full ${cfg.badge}`}
+        >
+          {cfg.icon}&nbsp;&nbsp;{arLabel(fairness.label)}
         </span>
       </div>
 
       {/* Explanation text */}
-      <p className={`text-xs leading-relaxed ${cfg.text} opacity-80`}>
-        {fairness.text}
-      </p>
+      <p className={`text-xs leading-relaxed ${cfg.text}`}>{fairness.text}</p>
     </div>
   );
 }
