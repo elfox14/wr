@@ -16,6 +16,14 @@ export interface RawMatchExtrasSnapshot {
     homeTeam?: { name?: string; code?: string; score?: number };
     awayTeam?: { name?: string; code?: string; score?: number };
   };
+  homeTeamId?: number | string;
+  awayTeamId?: number | string;
+  homePossession?: number;
+  awayPossession?: number;
+  homeXg?: number;
+  awayXg?: number;
+  minute?: number;
+  matchMinute?: number;
   momentum?: Array<{
     minute?: number;
     home?: number;
