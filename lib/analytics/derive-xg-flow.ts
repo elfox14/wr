@@ -17,7 +17,7 @@ export interface XgFlowPoint {
 export function deriveXgFlow(
   insights: MatchInsightsInput
 ): XgFlowPoint[] {
-  const { homeTeam, awayTeam, shots } = insights;
+  const { shots } = insights;
 
   // If per-shot timeline is available, build from it
   if (shots && shots.length > 0) {
@@ -27,7 +27,7 @@ export function deriveXgFlow(
     let awayCum = 0;
 
     for (const shot of sorted) {
-      const isHome = shot.teamId === homeTeam.id;
+      const isHome = shot.team === 'home';
       const xgValue = shot.xg ?? 0;
       if (isHome) homeCum += xgValue;
       else awayCum += xgValue;
@@ -46,8 +46,8 @@ export function deriveXgFlow(
 
   // Fallback: interpolate from aggregate xG over 90 minutes
   const totalMinutes = insights.minute ?? 90;
-  const homeTotal = insights.homeXg ?? 0;
-  const awayTotal = insights.awayXg ?? 0;
+  const homeTotal = insights.homeXg ?? insights.xgFlow.reduce((s,p) => s + p.homeXg, 0) / (insights.xgFlow.length || 1) * 90;
+  const awayTotal = insights.awayXg ?? insights.xgFlow.reduce((s,p) => s + p.awayXg, 0) / (insights.xgFlow.length || 1) * 90;
   const steps = 10;
   const interval = Math.floor(totalMinutes / steps);
 
