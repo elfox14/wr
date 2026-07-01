@@ -94,6 +94,15 @@ export interface MatchInsightsInput {
   events: MatchEvent[];
   homeTeamName: string;
   awayTeamName: string;
+  
+  // Optional fields for compatibility with derive engines
+  homeTeam?: { id: string; name: string };
+  awayTeam?: { id: string; name: string };
+  homePossession?: number;
+  awayPossession?: number;
+  homeXg?: number;
+  awayXg?: number;
+  minute?: number;
 }
 
 export interface MatchInsightsOutput {
