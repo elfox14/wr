@@ -58,49 +58,55 @@ function historyOf(d: MatchPageData) {
   return d.history || { homeRecentForm: [], awayRecentForm: [], headToHead: [], homeWorldCupHistory: `تاريخ مشاركات ${tn(d.homeTeam)} في كأس العالم غير متوفر.`, awayWorldCupHistory: `تاريخ مشاركات ${tn(d.awayTeam)} في كأس العالم غير متوفر.` }; 
 }
 
-function buildAnalyticsInput(d: MatchPageData): MatchInsightsInput {
-  const statValue = (key: string) => {
-    const s = d.stats.find(x => x.key === key);
-    if (!s || (s.home == null && s.away == null)) return null;
-    return { home: s.home ?? 0, away: s.away ?? 0 };
-  };
+function buildAnalyticsInput(d: MatchPageData): any {
+  // Mapping MatchPageData into MatchInsightsInput shape expected by match-insights.ts
+  const homeTeamName = tn(d.homeTeam);
+  const awayTeamName = tn(d.awayTeam);
 
-  const xgStat = statValue('expected_goals');
-  const xg = d.advanced?.xg?.home != null ? { home: d.advanced.xg.home ?? 0, away: d.advanced.xg.away ?? 0 } : xgStat;
-  const npxg = d.advanced?.npxg?.home != null ? { home: d.advanced.npxg.home ?? 0, away: d.advanced.npxg.away ?? 0 } : statValue('expected_goals');
+  const stats = d.stats
+    .filter((s) => s.available && s.home !== null && s.away !== null)
+    .map((s) => ({
+      key: s.key,
+      label: s.label,
+      home: Number(s.home ?? 0),
+      away: Number(s.away ?? 0),
+      suffix: s.suffix || '',
+    }));
+
+  const events = (d.events || []).map((e: any) => {
+    const rawType = String(e.type || '').toLowerCase();
+    const type = ['goal', 'yellow', 'red', 'substitution'].includes(rawType) ? rawType : 'substitution';
+    return {
+      minute: Number(e.minute || 0),
+      team: side(e, d) === 'home' ? 'home' : 'away',
+      type,
+      label: String(e.playerName || e.detail || e.type || ''),
+    };
+  });
+
+  const shots = (d.advanced?.shotmap || []).map((s: any, i: number) => {
+    const isHome = s.teamId === d.homeTeam.id || s.teamName === d.homeTeam.name || s.teamName === d.homeTeam.code;
+    return {
+      id: String(s.id || i),
+      minute: Number(s.minute || 0),
+      team: isHome ? 'home' : 'away',
+      x: Number(s.x || 50),
+      y: Number(s.y || 50),
+      xg: Number(s.xg || s.npxg || 0),
+      outcome: s.isGoal ? 'goal' : s.isOnTarget ? 'onTarget' : s.isBlocked ? 'blocked' : 'offTarget',
+      insideBox: s.situation !== 'Free Kick' && s.situation !== 'Direct Free Kick', // generic approximation if insideBox missing
+      player: s.playerName || undefined,
+    };
+  });
 
   return {
-    matchId: d.id,
-    status: d.status.isFinished ? 'finished' : (d.status.isLive ? 'live' : 'scheduled'),
-    score: {
-      home: d.score.home ?? 0,
-      away: d.score.away ?? 0,
-    },
-    homeTeam: {
-      id: d.homeTeam.id,
-      name: tn(d.homeTeam),
-    },
-    awayTeam: {
-      id: d.awayTeam.id,
-      name: tn(d.awayTeam),
-    },
-    stats: {
-      xg,
-      npxg,
-      bigChances: statValue('big_chance'),
-      possession: statValue('ball_possession'),
-      dangerousAttacks: statValue('dangerous_attacks'),
-      shots: statValue('shots'),
-      shotsOnTarget: statValue('shots_on_target'),
-    },
-    events: (d.events || []).map((e: any) => ({
-      id: e.id,
-      minute: e.minute ?? 0,
-      type: e.type,
-      detail: e.detail,
-      playerName: e.playerName,
-      teamSide: side(e, d) === 'home' ? 'home' : side(e, d) === 'away' ? 'away' : null,
-    })),
+    stats,
+    momentum: [],
+    xgFlow: [],
+    shots,
+    events,
+    homeTeamName,
+    awayTeamName,
   };
 }
 
