@@ -88,10 +88,19 @@ export function mapMatchExtrasToInsightsInput(
     }))
     .filter((s) => s.minute > 0);
 
+  const stats = mapStats(raw.stats);
+
   return {
     homeTeamName: str(raw.match?.homeTeam?.name, 'Home'),
     awayTeamName: str(raw.match?.awayTeam?.name, 'Away'),
-    stats: mapStats(raw.stats),
+    homeTeam: { id: String(raw.homeTeamId ?? ''), name: str(raw.match?.homeTeam?.name ?? '') },
+    awayTeam: { id: String(raw.awayTeamId ?? ''), name: str(raw.match?.awayTeam?.name ?? '') },
+    homePossession: raw.homePossession ?? stats.find(s => s.key === 'possession')?.home,
+    awayPossession: raw.awayPossession ?? stats.find(s => s.key === 'possession')?.away,
+    homeXg: raw.homeXg,
+    awayXg: raw.awayXg,
+    minute: raw.minute ?? raw.matchMinute,
+    stats,
     momentum, xgFlow, shots, events,
   };
 }
