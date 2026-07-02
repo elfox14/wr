@@ -20,7 +20,6 @@ type HubMatch = {
   id: string;
   href: string;
   liveHref: string;
-
   matchDate: string;
   statusLabel: string;
   isLive: boolean;
@@ -28,6 +27,7 @@ type HubMatch = {
   isScheduled: boolean;
   homeScore: number | null;
   awayScore: number | null;
+  penalties?: { home: number; away: number } | null;
   group: string | null;
   stage: string;
   hasLiveAnimation: boolean;
@@ -67,7 +67,8 @@ function formatDate(value: string) {
 
 function score(match: HubMatch) {
   if (match.isScheduled) return 'vs';
-  return `${match.homeScore ?? 0} - ${match.awayScore ?? 0}`;
+  const base = `${match.homeScore ?? 0} - ${match.awayScore ?? 0}`;
+  return match.penalties ? `${base} | ترجيح ${match.penalties.home}-${match.penalties.away}` : base;
 }
 
 function Flag({ team }: { team: HubTeam }) {
@@ -111,7 +112,8 @@ function MatchCard({ match }: { match: HubMatch }) {
           <p className="text-[11px] font-bold text-slate-500">{match.homeTeam.code || '—'}</p>
         </div>
         <div className="rounded-2xl border border-white/10 bg-black/35 px-3 py-2 text-center">
-          <b className="block text-xl font-black text-[#F8C846] tabular-nums">{score(match)}</b>
+          <b className="block text-lg font-black text-[#F8C846] tabular-nums sm:text-xl">{score(match)}</b>
+          {match.penalties ? <span className="mt-1 block text-[10px] font-black text-[#F8C846]/75">الفائز بركلات الترجيح</span> : null}
           <span className="mt-1 block text-[10px] font-bold text-slate-500">{formatDate(match.matchDate)}</span>
         </div>
         <div className="min-w-0 text-left">
@@ -125,7 +127,6 @@ function MatchCard({ match }: { match: HubMatch }) {
       <div className="mt-3 flex flex-wrap items-center gap-2">
         <Link href={match.href} className="rounded-xl bg-[#18E58F] px-3 py-2 text-xs font-black text-black">صفحة المباراة</Link>
         {match.hasLiveAnimation ? <Link href={match.liveHref} className="rounded-xl border border-sky-300/30 bg-sky-300/10 px-3 py-2 text-xs font-black text-sky-100">الملعب التفاعلي</Link> : null}
-
         {match.hasStats ? <span className="mr-auto rounded-full border border-white/10 bg-black/20 px-2 py-1 text-[10px] font-bold text-slate-400">إحصائيات محفوظة</span> : null}
       </div>
     </article>
