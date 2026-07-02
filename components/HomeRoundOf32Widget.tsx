@@ -5,6 +5,7 @@ import { getArabicTeamName } from '@/lib/teamDisplay';
 import { getTeamFlagUrl } from '@/lib/teamFlags';
 
 type TeamLite = { id?: string | null; name?: string | null; code?: string | null; image?: string | null; group?: string | null };
+type Penalties = { home: number; away: number };
 type KnockoutMatch = {
   id?: string | null;
   externalId?: string | null;
@@ -63,6 +64,29 @@ function dateTime(value?: string | Date | null) {
   if (!Number.isFinite(date.getTime())) return 'موعد غير متوفر';
   return new Intl.DateTimeFormat('ar-EG', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Cairo' }).format(date);
 }
+function asRecord(value: unknown): Record<string, unknown> | null {
+  if (!value) return null;
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value);
+      return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed as Record<string, unknown> : null;
+    } catch { return null; }
+  }
+  return typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : null;
+}
+function numberOrNull(value: unknown) {
+  if (value === null || value === undefined || value === '') return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+function getPenalties(match?: KnockoutMatch | null): Penalties | null {
+  const external = asRecord(match?.externalIds);
+  const penalties = asRecord(external?.penalties) || asRecord(external?.penaltyScore) || asRecord(external?.pens);
+  const home = numberOrNull(penalties?.home ?? penalties?.Home ?? penalties?.homeTeam ?? penalties?.HomeTeam);
+  const away = numberOrNull(penalties?.away ?? penalties?.Away ?? penalties?.awayTeam ?? penalties?.AwayTeam);
+  return home !== null && away !== null ? { home, away } : null;
+}
+function hasPenalties(match?: KnockoutMatch | null) { return Boolean(getPenalties(match)); }
 
 function stageKey(match: KnockoutMatch): 'r32' | 'r16' | 'qf' | 'sf' | 'final' | 'third' | 'other' {
   const raw = `${match.stage || ''} ${match.groupPhase || ''}`.toLowerCase();
@@ -80,7 +104,7 @@ function formatStatus(match?: KnockoutMatch | null) {
   const status = statusValue(match);
   if (HALF.includes(status)) return 'استراحة';
   if (isLive(match)) return 'مباشر';
-  if (isFinished(match)) return status === 'PEN' ? 'حُسمت بركلات الترجيح' : 'انتهت';
+  if (isFinished(match)) return hasPenalties(match) || status === 'PEN' ? 'حُسمت بركلات الترجيح' : 'انتهت';
   if (isScheduled(match)) return 'لم تبدأ';
   return status || 'مباراة';
 }
@@ -90,27 +114,24 @@ function displayTeamFromMatch(team?: TeamLite | null): DisplayTeam {
   return { id: team?.id || null, name, code: team?.code || null, image: team?.image || null };
 }
 
-function emptyTeam(seed: string): DisplayTeam {
-  return { name: 'بانتظار FIFA', code: seed, image: null };
-}
-
+function emptyTeam(seed: string): DisplayTeam { return { name: 'بانتظار FIFA', code: seed, image: null }; }
 function flagUrl(team?: DisplayTeam | null) {
   if (!team) return null;
   return team.image || getTeamFlagUrl({ code: team.code || null, name: team.name, image: null }, 64);
 }
-
 function teamKey(team?: DisplayTeam | TeamLite | null) {
   if (!team) return '';
   const code = codeKey(team.code);
   return code || normalize(team.name);
 }
-
-function pairKey(a?: TeamLite | null, b?: TeamLite | null) {
-  return [teamKey(a), teamKey(b)].filter(Boolean).sort().join('|');
-}
-
+function pairKey(a?: TeamLite | null, b?: TeamLite | null) { return [teamKey(a), teamKey(b)].filter(Boolean).sort().join('|'); }
 function scoreVisible(match?: KnockoutMatch | null) { return Boolean(match) && !isScheduled(match); }
-function scoreText(match?: KnockoutMatch | null) { return scoreVisible(match) ? `${nf.format(Number(match?.homeScore ?? 0))} - ${nf.format(Number(match?.awayScore ?? 0))}` : 'VS'; }
+function scoreText(match?: KnockoutMatch | null) {
+  if (!scoreVisible(match)) return 'VS';
+  const penalties = getPenalties(match);
+  const base = `${nf.format(Number(match?.homeScore ?? 0))} - ${nf.format(Number(match?.awayScore ?? 0))}`;
+  return penalties ? `${base} | ترجيح ${nf.format(penalties.home)}-${nf.format(penalties.away)}` : base;
+}
 
 function winnerSide(match?: KnockoutMatch | null): 'home' | 'away' | null {
   if (!match || !isFinished(match)) return null;
@@ -118,6 +139,11 @@ function winnerSide(match?: KnockoutMatch | null): 'home' | 'away' | null {
   const away = Number(match.awayScore ?? 0);
   if (home > away) return 'home';
   if (away > home) return 'away';
+  const penalties = getPenalties(match);
+  if (penalties) {
+    if (penalties.home > penalties.away) return 'home';
+    if (penalties.away > penalties.home) return 'away';
+  }
   return null;
 }
 
@@ -177,7 +203,7 @@ function makeIndexes(matches: KnockoutMatch[]) {
   return { byNo, byPair };
 }
 
-function TeamLine({ team, score, winner = false, reverse = false }: { team: DisplayTeam; score?: number | null; winner?: boolean; reverse?: boolean }) {
+function TeamLine({ team, score, penalty, winner = false, reverse = false }: { team: DisplayTeam; score?: number | null; penalty?: number | null; winner?: boolean; reverse?: boolean }) {
   const flag = flagUrl(team);
   return (
     <div className={`flex h-8 items-center gap-1.5 rounded-md border px-1.5 ${winner ? 'border-[#FFD700]/45 bg-[#FFD700]/15' : 'border-white/10 bg-white/[0.035]'} ${reverse ? 'flex-row-reverse text-right' : 'text-left'}`}>
@@ -188,7 +214,7 @@ function TeamLine({ team, score, winner = false, reverse = false }: { team: Disp
         <b className="block truncate text-[8px] leading-3 text-white">{team.name}</b>
         <span className="block text-[7px] font-black text-gray-500">{team.code || '—'}</span>
       </span>
-      {score !== null && score !== undefined ? <b className="shrink-0 rounded bg-black/45 px-1.5 py-0.5 text-[10px] text-[#FFD700]">{nf.format(score)}</b> : null}
+      {score !== null && score !== undefined ? <b className="shrink-0 rounded bg-black/45 px-1.5 py-0.5 text-[10px] text-[#FFD700]">{nf.format(score)}{penalty !== null && penalty !== undefined ? <small className="mr-0.5 text-[7px] text-white/70">({nf.format(penalty)})</small> : null}</b> : null}
     </div>
   );
 }
@@ -217,11 +243,12 @@ function R32MatchBlock({ no, side, match }: { no: number; side: 'left' | 'right'
   const away = match ? displayTeamFromMatch(match.awayTeam) : emptyTeam(`FIFA ${no}`);
   const winningSide = winnerSide(match);
   const showScore = scoreVisible(match);
+  const penalties = getPenalties(match);
   const teams = (
     <div className="grid gap-1">
       <div className="flex items-center justify-between gap-1 text-[7px] font-black text-gray-500"><span>{matchLabel(no)}</span><StatusPill match={match} /></div>
-      <TeamLine team={home} score={showScore ? match?.homeScore : null} winner={winningSide === 'home'} reverse={side === 'right'} />
-      <TeamLine team={away} score={showScore ? match?.awayScore : null} winner={winningSide === 'away'} reverse={side === 'right'} />
+      <TeamLine team={home} score={showScore ? match?.homeScore : null} penalty={penalties?.home ?? null} winner={winningSide === 'home'} reverse={side === 'right'} />
+      <TeamLine team={away} score={showScore ? match?.awayScore : null} penalty={penalties?.away ?? null} winner={winningSide === 'away'} reverse={side === 'right'} />
       {match ? <div className="truncate text-[7px] font-bold text-gray-500">{dateTime(match.matchDate)}{match.syncSource ? ` · ${match.syncSource}` : ''}</div> : <div className="truncate text-[7px] font-bold text-gray-500">لا توجد بيانات FIFA محفوظة لهذه المباراة</div>}
     </div>
   );
