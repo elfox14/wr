@@ -1,7 +1,8 @@
 import HomeRoundOf32Widget from '@/components/HomeRoundOf32Widget';
 import { getHomeGroupStandings } from '@/lib/homeGroupStandings';
+import prisma from '@/lib/prisma';
 
-export const revalidate = 60;
+export const dynamic = 'force-dynamic';
 
 export const metadata = {
   title: 'مسار دور الـ32 | كأس العالم 2026',
@@ -10,6 +11,10 @@ export const metadata = {
 
 export default async function RoundOf32Page() {
   const groups = await getHomeGroupStandings().catch(() => []);
+  const matches = await prisma.match.findMany({
+    where: { stage: { notIn: ['group_stage'] } },
+    select: { externalId: true, homeScore: true, awayScore: true, status: true, homeTeamId: true, awayTeamId: true },
+  }).catch(() => []);
 
   return (
     <main dir="rtl" className="mx-auto max-w-7xl px-3 pb-8 pt-4 sm:px-4 sm:py-6 lg:px-6">
@@ -23,7 +28,7 @@ export default async function RoundOf32Page() {
         </p>
       </div>
 
-      <HomeRoundOf32Widget groups={JSON.parse(JSON.stringify(groups))} />
+      <HomeRoundOf32Widget groups={JSON.parse(JSON.stringify(groups))} matches={matches as any} />
     </main>
   );
 }

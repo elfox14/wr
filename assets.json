@@ -1,0 +1,8042 @@
+[
+  {
+    "name": "Uruguay",
+    "group": "TBD",
+    "code": "URU"
+  },
+  {
+    "name": "Fernando Muslera",
+    "group": null,
+    "code": "URU3160"
+  },
+  {
+    "name": "Patrick Beach",
+    "group": null,
+    "code": "PAT"
+  },
+  {
+    "name": "Harry Souttar",
+    "group": null,
+    "code": "HAR"
+  },
+  {
+    "name": "Santiago Mele",
+    "group": null,
+    "code": "URU30210"
+  },
+  {
+    "name": "Sergio Rochet",
+    "group": null,
+    "code": "URU30386"
+  },
+  {
+    "name": "Guillermo Varela",
+    "group": null,
+    "code": "URU3165"
+  },
+  {
+    "name": "Ronald Araújo",
+    "group": null,
+    "code": "URU28292"
+  },
+  {
+    "name": "Sebastían Cáceres",
+    "group": null,
+    "code": "URU28326"
+  },
+  {
+    "name": "Matías Viña",
+    "group": null,
+    "code": "URU28426"
+  },
+  {
+    "name": "Jordan Bos",
+    "group": null,
+    "code": "JOR"
+  },
+  {
+    "name": "Joaquín Piquerez",
+    "group": null,
+    "code": "URU28740"
+  },
+  {
+    "name": "Julio Enciso",
+    "group": null,
+    "code": "JUL"
+  },
+  {
+    "name": "Gustavo Velazquez",
+    "group": null,
+    "code": "GUS"
+  },
+  {
+    "name": "Matias Galarza",
+    "group": null,
+    "code": "MAT"
+  },
+  {
+    "name": "Maximiliano Araújo",
+    "group": null,
+    "code": "URU28770"
+  },
+  {
+    "name": "Orlando Gill",
+    "group": null,
+    "code": "ORL"
+  },
+  {
+    "name": "Mathías Olivera",
+    "group": null,
+    "code": "URU32754"
+  },
+  {
+    "name": "Paul Izzo",
+    "group": null,
+    "code": "PAU"
+  },
+  {
+    "name": "Fabian Balbuena",
+    "group": null,
+    "code": "FAB"
+  },
+  {
+    "name": "Santiago Bueno",
+    "group": null,
+    "code": "URU32767"
+  },
+  {
+    "name": "José Giménez",
+    "group": null,
+    "code": "URU213277"
+  },
+  {
+    "name": "Federico Valverde",
+    "group": null,
+    "code": "URU96"
+  },
+  {
+    "name": "Giorgian De Arrascaeta",
+    "group": null,
+    "code": "URU1244"
+  },
+  {
+    "name": "Rodrigo Bentancur",
+    "group": null,
+    "code": "URU2041"
+  },
+  {
+    "name": "Manuel Ugarte",
+    "group": null,
+    "code": "URU28549"
+  },
+  {
+    "name": "Brian Rodríguez",
+    "group": null,
+    "code": "URU28618"
+  },
+  {
+    "name": "Tani Oluwaseyi",
+    "group": null,
+    "code": "TAN"
+  },
+  {
+    "name": "Aubrey Modiba",
+    "group": null,
+    "code": "AUB"
+  },
+  {
+    "name": "Johan Vasquez",
+    "group": null,
+    "code": "JOH"
+  },
+  {
+    "name": "Kamogelo Sebelebele",
+    "group": null,
+    "code": "KAM"
+  },
+  {
+    "name": "Sipho Chaine",
+    "group": null,
+    "code": "SIP"
+  },
+  {
+    "name": "Chris Richards",
+    "group": null,
+    "code": "CHR"
+  },
+  {
+    "name": "Ermedin Demirovic",
+    "group": null,
+    "code": "ERM"
+  },
+  {
+    "name": "Cho Wi-je",
+    "group": null,
+    "code": "14"
+  },
+  {
+    "name": "N. Saliba",
+    "group": null,
+    "code": "N25"
+  },
+  {
+    "name": "Liam Millar",
+    "group": null,
+    "code": "LIA"
+  },
+  {
+    "name": "Alphonso Davies",
+    "group": null,
+    "code": "ALP"
+  },
+  {
+    "name": "Jovo Lukic",
+    "group": null,
+    "code": "JOV"
+  },
+  {
+    "name": "Lyle Foster",
+    "group": null,
+    "code": "LYL"
+  },
+  {
+    "name": "Martin Zlomislic",
+    "group": null,
+    "code": "MAR"
+  },
+  {
+    "name": "Evidence Makgopa",
+    "group": null,
+    "code": "EVI"
+  },
+  {
+    "name": "Guillermo Ochoa",
+    "group": null,
+    "code": "GUI"
+  },
+  {
+    "name": "Sphephelo Sithole",
+    "group": null,
+    "code": "SPH"
+  },
+  {
+    "name": "Roberto Alvarado",
+    "group": null,
+    "code": "ROB"
+  },
+  {
+    "name": "Guillermo Martinez",
+    "group": null,
+    "code": "GUI"
+  },
+  {
+    "name": "Khuliso Mudau",
+    "group": null,
+    "code": "KHU"
+  },
+  {
+    "name": "Benjamin Tahirovic",
+    "group": null,
+    "code": "BEN"
+  },
+  {
+    "name": "Malik Tillman",
+    "group": null,
+    "code": "MAL"
+  },
+  {
+    "name": "Rodrigo Zalazar",
+    "group": null,
+    "code": "URU121007"
+  },
+  {
+    "name": "Cristian Roldan",
+    "group": null,
+    "code": "CRI"
+  },
+  {
+    "name": "Miguel Almiron",
+    "group": null,
+    "code": "MIG"
+  },
+  {
+    "name": "Patrik Schick",
+    "group": null,
+    "code": "10"
+  },
+  {
+    "name": "Matt Turner",
+    "group": null,
+    "code": "MAT"
+  },
+  {
+    "name": "Edmilson Junior",
+    "group": null,
+    "code": "EDM"
+  },
+  {
+    "name": "Mahmud Abunada",
+    "group": null,
+    "code": "MAH1"
+  },
+  {
+    "name": "Lucas Mendes",
+    "group": null,
+    "code": "LUC"
+  },
+  {
+    "name": "Silvan Widmer",
+    "group": null,
+    "code": "SIL"
+  },
+  {
+    "name": "Yvon Mvogo",
+    "group": null,
+    "code": "YVO"
+  },
+  {
+    "name": "Lucas Paqueta",
+    "group": null,
+    "code": "LUC"
+  },
+  {
+    "name": "Carlens Arcus",
+    "group": null,
+    "code": "CAR"
+  },
+  {
+    "name": "Alex Sandro",
+    "group": null,
+    "code": "ALE"
+  },
+  {
+    "name": "Leo Pereira",
+    "group": null,
+    "code": "LEO"
+  },
+  {
+    "name": "Argentina",
+    "group": "J",
+    "code": "ARG"
+  },
+  {
+    "name": "New Zealand",
+    "group": "G",
+    "code": "NZL"
+  },
+  {
+    "name": "Ayyoub Bouaddi",
+    "group": null,
+    "code": "AYY"
+  },
+  {
+    "name": "Ismael Saibari",
+    "group": null,
+    "code": "ISM"
+  },
+  {
+    "name": "Samir El Mourabet",
+    "group": null,
+    "code": "SAM"
+  },
+  {
+    "name": "Youssef Belammari",
+    "group": null,
+    "code": "YOU"
+  },
+  {
+    "name": "Keito Nakamura",
+    "group": null,
+    "code": "KEI"
+  },
+  {
+    "name": "Nico Schlotterbeck",
+    "group": null,
+    "code": "NIC"
+  },
+  {
+    "name": "Leroy Sane",
+    "group": null,
+    "code": "LER"
+  },
+  {
+    "name": "Daizen Maeda",
+    "group": null,
+    "code": "DAI"
+  },
+  {
+    "name": "Jan Paul van Hecke",
+    "group": null,
+    "code": "JAN"
+  },
+  {
+    "name": "Kai Havertz",
+    "group": null,
+    "code": "KAI"
+  },
+  {
+    "name": "Ayumu Seko",
+    "group": null,
+    "code": "AYU"
+  },
+  {
+    "name": "Memphis Depay",
+    "group": null,
+    "code": "MEM"
+  },
+  {
+    "name": "Ahmed Alaaeldin",
+    "group": null,
+    "code": "7"
+  },
+  {
+    "name": "Antonio Rudiger",
+    "group": null,
+    "code": "ANT"
+  },
+  {
+    "name": "Micky van de Ven",
+    "group": null,
+    "code": "MIC"
+  },
+  {
+    "name": "Jamal Musiala",
+    "group": null,
+    "code": "JAM"
+  },
+  {
+    "name": "Tijjani Reijnders",
+    "group": null,
+    "code": "TIJ"
+  },
+  {
+    "name": "Nick Woltemade",
+    "group": null,
+    "code": "NIC"
+  },
+  {
+    "name": "Nathaniel Brown",
+    "group": null,
+    "code": "NAT"
+  },
+  {
+    "name": "Marten de Roon",
+    "group": null,
+    "code": "MAR"
+  },
+  {
+    "name": "Frenkie de Jong",
+    "group": null,
+    "code": "FRE"
+  },
+  {
+    "name": "Dayne St. Clair",
+    "group": null,
+    "code": "1"
+  },
+  {
+    "name": "Petar Sučić",
+    "group": null,
+    "code": "21"
+  },
+  {
+    "name": "Milad Mohammadi",
+    "group": null,
+    "code": "MIL"
+  },
+  {
+    "name": "Mohamed Kanno",
+    "group": null,
+    "code": "MOH"
+  },
+  {
+    "name": "Abdullah Al Khaibari",
+    "group": null,
+    "code": "ABD"
+  },
+  {
+    "name": "Ali Nemati",
+    "group": null,
+    "code": "ALI"
+  },
+  {
+    "name": "Joe Bell",
+    "group": null,
+    "code": "JOE"
+  },
+  {
+    "name": "Sarpreet Singh",
+    "group": null,
+    "code": "SAR"
+  },
+  {
+    "name": "Aria Yousefi",
+    "group": null,
+    "code": "ARI"
+  },
+  {
+    "name": "Musab Al Juwayr",
+    "group": null,
+    "code": "MUS"
+  },
+  {
+    "name": "Abdulelah Al Amri",
+    "group": null,
+    "code": "ABD"
+  },
+  {
+    "name": "Moussa Niakhate",
+    "group": null,
+    "code": "MOU"
+  },
+  {
+    "name": "Aurelien Tchouameni",
+    "group": null,
+    "code": "AUR"
+  },
+  {
+    "name": "Callum McCowatt",
+    "group": null,
+    "code": "CAL"
+  },
+  {
+    "name": "Krepin Diatta",
+    "group": null,
+    "code": "KRE"
+  },
+  {
+    "name": "Sadio Mane",
+    "group": null,
+    "code": "SAD"
+  },
+  {
+    "name": "Kylian Mbappe",
+    "group": null,
+    "code": "KYL"
+  },
+  {
+    "name": "Shoja Khalilzadeh",
+    "group": null,
+    "code": "SHO"
+  },
+  {
+    "name": "Manu Kone",
+    "group": null,
+    "code": "MAN"
+  },
+  {
+    "name": "Mory Diaw",
+    "group": null,
+    "code": "MOR"
+  },
+  {
+    "name": "Sultan Al-Brake",
+    "group": null,
+    "code": "SUL"
+  },
+  {
+    "name": "Ahmed Al-Ganehi",
+    "group": null,
+    "code": "17"
+  },
+  {
+    "name": "Ø. Nyland",
+    "group": null,
+    "code": "1"
+  },
+  {
+    "name": "Ahmed Fathy",
+    "group": null,
+    "code": "20"
+  },
+  {
+    "name": "Al-Hashmi Al-Hussain",
+    "group": null,
+    "code": "25"
+  },
+  {
+    "name": "Sander Berge",
+    "group": null,
+    "code": "SAN"
+  },
+  {
+    "name": "Alexis Mac Allister",
+    "group": null,
+    "code": "ALE"
+  },
+  {
+    "name": "Munaf Younus",
+    "group": null,
+    "code": "MUN6"
+  },
+  {
+    "name": "Mustafa Saadoon",
+    "group": null,
+    "code": "MUS"
+  },
+  {
+    "name": "Facundo Medina",
+    "group": null,
+    "code": "FAC"
+  },
+  {
+    "name": "Giuliano Simeone",
+    "group": null,
+    "code": "GIU"
+  },
+  {
+    "name": "Ibrahim Maza",
+    "group": null,
+    "code": "IBR"
+  },
+  {
+    "name": "Adrian Leon Barišić",
+    "group": null,
+    "code": "23"
+  },
+  {
+    "name": "Osman Hadzikic",
+    "group": null,
+    "code": "OSM"
+  },
+  {
+    "name": "Elisha Owusu",
+    "group": null,
+    "code": "ELI"
+  },
+  {
+    "name": "Jakhongir Urozov",
+    "group": null,
+    "code": "JAK"
+  },
+  {
+    "name": "Jerome Opoku",
+    "group": null,
+    "code": "JER"
+  },
+  {
+    "name": "Mohammad Al-Daoud",
+    "group": null,
+    "code": "MOH"
+  },
+  {
+    "name": "Joao Cancelo",
+    "group": null,
+    "code": "JOA"
+  },
+  {
+    "name": "Chancel Mbemba",
+    "group": null,
+    "code": "CHA"
+  },
+  {
+    "name": "Timothy Fayulu",
+    "group": null,
+    "code": "TIM"
+  },
+  {
+    "name": "Akmal Mozgovoy",
+    "group": null,
+    "code": "AKM"
+  },
+  {
+    "name": "Pedro Neto",
+    "group": null,
+    "code": "PED"
+  },
+  {
+    "name": "Abdukodir Khusanov",
+    "group": null,
+    "code": "ABD"
+  },
+  {
+    "name": "Andrej Kramaric",
+    "group": null,
+    "code": "AND"
+  },
+  {
+    "name": "Samuel Moutoussamy",
+    "group": null,
+    "code": "SAM"
+  },
+  {
+    "name": "Cristian Martinez",
+    "group": null,
+    "code": "CRI"
+  },
+  {
+    "name": "Florian Grillitsch",
+    "group": null,
+    "code": "FLO"
+  },
+  {
+    "name": "Noor Al-Rawabdeh",
+    "group": null,
+    "code": "NOO"
+  },
+  {
+    "name": "Sherzod Esanov",
+    "group": null,
+    "code": "SHE"
+  },
+  {
+    "name": "Arthur Masuaku",
+    "group": null,
+    "code": "ART"
+  },
+  {
+    "name": "Borna Sosa",
+    "group": null,
+    "code": "21"
+  },
+  {
+    "name": "Dion Drena Beljo",
+    "group": null,
+    "code": "22"
+  },
+  {
+    "name": "Marco Pjaca",
+    "group": null,
+    "code": "13"
+  },
+  {
+    "name": "Yusuf Abdurisag",
+    "group": null,
+    "code": "15"
+  },
+  {
+    "name": "Jayden Adams",
+    "group": null,
+    "code": "JAY"
+  },
+  {
+    "name": "Robin Hranac",
+    "group": null,
+    "code": "ROB"
+  },
+  {
+    "name": "Lukáš Provod",
+    "group": null,
+    "code": "17"
+  },
+  {
+    "name": "Oh Hyeon-gyu",
+    "group": null,
+    "code": "OH"
+  },
+  {
+    "name": "Alexander Bernhardsson",
+    "group": null,
+    "code": "ALE"
+  },
+  {
+    "name": "Yasin Ayari",
+    "group": null,
+    "code": "YAS"
+  },
+  {
+    "name": "Isak Hien",
+    "group": null,
+    "code": "ISA"
+  },
+  {
+    "name": "South Africa",
+    "group": "A",
+    "code": "RSA"
+  },
+  {
+    "name": "Mikel Merino",
+    "group": null,
+    "code": "MIK"
+  },
+  {
+    "name": "David Raya",
+    "group": null,
+    "code": "DAV"
+  },
+  {
+    "name": "Moises Caicedo",
+    "group": null,
+    "code": "MOI"
+  },
+  {
+    "name": "Montassar Talbi",
+    "group": null,
+    "code": "MON"
+  },
+  {
+    "name": "Omar Rekik",
+    "group": null,
+    "code": "OMA"
+  },
+  {
+    "name": "El-Mahdi Soliman",
+    "group": null,
+    "code": "EL"
+  },
+  {
+    "name": "Azarias Londono",
+    "group": null,
+    "code": "AZA"
+  },
+  {
+    "name": "Marco Pasalic",
+    "group": null,
+    "code": "MAR"
+  },
+  {
+    "name": "Jaroslav Zeleny",
+    "group": null,
+    "code": "JAR"
+  },
+  {
+    "name": "Austria",
+    "group": "J",
+    "code": "AUT"
+  },
+  {
+    "name": "Elliot Stroud",
+    "group": null,
+    "code": "ELL"
+  },
+  {
+    "name": "Paul Okon-Engstler",
+    "group": null,
+    "code": "PAU"
+  },
+  {
+    "name": "Tommy Smith",
+    "group": null,
+    "code": "TOM"
+  },
+  {
+    "name": "Amirhossein Hosseinzadeh",
+    "group": null,
+    "code": "AMI"
+  },
+  {
+    "name": "Tunisia",
+    "group": "F",
+    "code": "TUN"
+  },
+  {
+    "name": "Theo Hernandez",
+    "group": null,
+    "code": "THE"
+  },
+  {
+    "name": "Mohammed Al Owais",
+    "group": null,
+    "code": "MOH21"
+  },
+  {
+    "name": "Jules Kounde",
+    "group": null,
+    "code": "JUL"
+  },
+  {
+    "name": "Bradley Barcola",
+    "group": null,
+    "code": "BRA"
+  },
+  {
+    "name": "Adrien Rabiot",
+    "group": null,
+    "code": "ADR"
+  },
+  {
+    "name": "William Saliba",
+    "group": null,
+    "code": "WIL"
+  },
+  {
+    "name": "Dayot Upamecano",
+    "group": null,
+    "code": "DAY"
+  },
+  {
+    "name": "Amir Al Ammari",
+    "group": null,
+    "code": "AMI"
+  },
+  {
+    "name": "Zidane Iqbal",
+    "group": null,
+    "code": "ZID"
+  },
+  {
+    "name": "Ahmed Basil",
+    "group": null,
+    "code": "AHM"
+  },
+  {
+    "name": "Ibrahim Bayesh",
+    "group": null,
+    "code": "IBR"
+  },
+  {
+    "name": "Hussein Ali",
+    "group": null,
+    "code": "HUS"
+  },
+  {
+    "name": "Merchas Doski",
+    "group": null,
+    "code": "MER"
+  },
+  {
+    "name": "Malo Gusto",
+    "group": null,
+    "code": "MAL"
+  },
+  {
+    "name": "Rayan Cherki",
+    "group": null,
+    "code": "RAY"
+  },
+  {
+    "name": "Maghnes Akliouche",
+    "group": null,
+    "code": "MAG"
+  },
+  {
+    "name": "Desire Doue",
+    "group": null,
+    "code": "DES"
+  },
+  {
+    "name": "Marcus Thuram",
+    "group": null,
+    "code": "MAR"
+  },
+  {
+    "name": "Rebin Sulaka",
+    "group": null,
+    "code": "REB"
+  },
+  {
+    "name": "Aimar Sher",
+    "group": null,
+    "code": "AIM"
+  },
+  {
+    "name": "Marko Farji",
+    "group": null,
+    "code": "MAR"
+  },
+  {
+    "name": "Ali Al Hamadi",
+    "group": null,
+    "code": "ALI"
+  },
+  {
+    "name": "Morocco",
+    "group": "C",
+    "code": "MAR"
+  },
+  {
+    "name": "Jordan Ayew",
+    "group": null,
+    "code": "JOR"
+  },
+  {
+    "name": "Netherlands",
+    "group": "F",
+    "code": "NED"
+  },
+  {
+    "name": "Curaçao",
+    "group": "E",
+    "code": "CUW"
+  },
+  {
+    "name": "France",
+    "group": "I",
+    "code": "FRA"
+  },
+  {
+    "name": "Iraq",
+    "group": "I",
+    "code": "IRQ"
+  },
+  {
+    "name": "Norway",
+    "group": "I",
+    "code": "NOR"
+  },
+  {
+    "name": "Senegal",
+    "group": "I",
+    "code": "SEN"
+  },
+  {
+    "name": "Turkey",
+    "group": "D",
+    "code": "TUR"
+  },
+  {
+    "name": "Brazil",
+    "group": "C",
+    "code": "BRA"
+  },
+  {
+    "name": "Haiti",
+    "group": "C",
+    "code": "HAI"
+  },
+  {
+    "name": "United States",
+    "group": "D",
+    "code": "USA"
+  },
+  {
+    "name": "Australia",
+    "group": "D",
+    "code": "AUS"
+  },
+  {
+    "name": "Germany",
+    "group": "E",
+    "code": "GER"
+  },
+  {
+    "name": "Ivory Coast",
+    "group": "E",
+    "code": "CIV"
+  },
+  {
+    "name": "Ecuador",
+    "group": "E",
+    "code": "ECU"
+  },
+  {
+    "name": "Sweden",
+    "group": "F",
+    "code": "SWE"
+  },
+  {
+    "name": "Saudi Arabia",
+    "group": "H",
+    "code": "KSA"
+  },
+  {
+    "name": "Uzbekistan",
+    "group": "K",
+    "code": "UZB"
+  },
+  {
+    "name": "Ghana",
+    "group": "L",
+    "code": "GHA"
+  },
+  {
+    "name": "Scotland",
+    "group": "C",
+    "code": "SCO"
+  },
+  {
+    "name": "Belgium",
+    "group": "G",
+    "code": "BEL"
+  },
+  {
+    "name": "Spain",
+    "group": "H",
+    "code": "ESP"
+  },
+  {
+    "name": "Egypt",
+    "group": "G",
+    "code": "EGY"
+  },
+  {
+    "name": "Cape Verde",
+    "group": "H",
+    "code": "CPV"
+  },
+  {
+    "name": "Colombia",
+    "group": "K",
+    "code": "COL"
+  },
+  {
+    "name": "Croatia",
+    "group": "L",
+    "code": "CRO"
+  },
+  {
+    "name": "England",
+    "group": "L",
+    "code": "ENG"
+  },
+  {
+    "name": "Panama",
+    "group": "L",
+    "code": "PAN"
+  },
+  {
+    "name": "Iran",
+    "group": "G",
+    "code": "IRN"
+  },
+  {
+    "name": "Mexico",
+    "group": "A",
+    "code": "MEX"
+  },
+  {
+    "name": "Canada",
+    "group": "B",
+    "code": "CAN"
+  },
+  {
+    "name": "Jordan",
+    "group": "J",
+    "code": "JOR"
+  },
+  {
+    "name": "Portugal",
+    "group": "K",
+    "code": "POR"
+  },
+  {
+    "name": "Czech Republic",
+    "group": "A",
+    "code": "CZE"
+  },
+  {
+    "name": "Japan",
+    "group": "F",
+    "code": "JPN"
+  },
+  {
+    "name": "Bosnia and Herzegovina",
+    "group": "B",
+    "code": "BIH"
+  },
+  {
+    "name": "Qatar",
+    "group": "B",
+    "code": "QAT"
+  },
+  {
+    "name": "South Korea",
+    "group": "A",
+    "code": "KOR"
+  },
+  {
+    "name": "Paraguay",
+    "group": "D",
+    "code": "PAR"
+  },
+  {
+    "name": "Switzerland",
+    "group": "B",
+    "code": "SUI"
+  },
+  {
+    "name": "Algeria",
+    "group": "J",
+    "code": "ALG"
+  },
+  {
+    "name": "Guillermo Martínez Ayala",
+    "group": null,
+    "code": "22"
+  },
+  {
+    "name": "Raul Rangel",
+    "group": null,
+    "code": "RAU"
+  },
+  {
+    "name": "Lee Ki-hyeok",
+    "group": null,
+    "code": "LEE"
+  },
+  {
+    "name": "Cho Yu-min",
+    "group": null,
+    "code": "CHO"
+  },
+  {
+    "name": "Cho Yumin",
+    "group": null,
+    "code": "CHO YUMI"
+  },
+  {
+    "name": "Park Jinseob",
+    "group": null,
+    "code": "16"
+  },
+  {
+    "name": "Lee Gi-hyuk",
+    "group": null,
+    "code": "3"
+  },
+  {
+    "name": "Tomáš Chorý",
+    "group": null,
+    "code": "19"
+  },
+  {
+    "name": "Zaid Ismail",
+    "group": null,
+    "code": "ZAI"
+  },
+  {
+    "name": "Akam Hashem",
+    "group": null,
+    "code": "AKA"
+  },
+  {
+    "name": "Jalal Hassan",
+    "group": null,
+    "code": "JAL"
+  },
+  {
+    "name": "Ahmed Hassan Makenzie",
+    "group": null,
+    "code": "AHM"
+  },
+  {
+    "name": "Kamal Miller",
+    "group": null,
+    "code": "21"
+  },
+  {
+    "name": "Marcelo Flores",
+    "group": null,
+    "code": "MARCELO "
+  },
+  {
+    "name": "Mathias Laborda",
+    "group": null,
+    "code": "26"
+  },
+  {
+    "name": "Theo Corbeanu",
+    "group": null,
+    "code": "11"
+  },
+  {
+    "name": "Mladen Jurkas",
+    "group": null,
+    "code": "12"
+  },
+  {
+    "name": "Jayden Nelson",
+    "group": null,
+    "code": "JAY"
+  },
+  {
+    "name": "Becir Omeragić",
+    "group": null,
+    "code": "14"
+  },
+  {
+    "name": "Enes Mahmić",
+    "group": null,
+    "code": "6"
+  },
+  {
+    "name": "Nail Omerović",
+    "group": null,
+    "code": "2"
+  },
+  {
+    "name": "Issa Laye",
+    "group": null,
+    "code": "21"
+  },
+  {
+    "name": "Hashmi Hussein",
+    "group": null,
+    "code": "HAS"
+  },
+  {
+    "name": "Ayoub Alawi",
+    "group": null,
+    "code": "AYO"
+  },
+  {
+    "name": "Issa Laaye",
+    "group": null,
+    "code": "ISS"
+  },
+  {
+    "name": "Tahseen Mohammed",
+    "group": null,
+    "code": "TAH"
+  },
+  {
+    "name": "Youssef Abdulrazzaq",
+    "group": null,
+    "code": "YOU"
+  },
+  {
+    "name": "Ahmed Al-Janahi",
+    "group": null,
+    "code": "AHM"
+  },
+  {
+    "name": "Kamal Darwish",
+    "group": null,
+    "code": "26"
+  },
+  {
+    "name": "Mohammed Waad",
+    "group": null,
+    "code": "23"
+  },
+  {
+    "name": "Ró-Ró",
+    "group": null,
+    "code": "16"
+  },
+  {
+    "name": "Homam Al-Amin",
+    "group": null,
+    "code": "HOM"
+  },
+  {
+    "name": "Alisson",
+    "group": null,
+    "code": "ALI"
+  },
+  {
+    "name": "Igor Thiago",
+    "group": null,
+    "code": "IGO"
+  },
+  {
+    "name": "Ederson Moraes",
+    "group": null,
+    "code": "EDE"
+  },
+  {
+    "name": "Ederson Jose",
+    "group": null,
+    "code": "EDE"
+  },
+  {
+    "name": "Vinicius Jr",
+    "group": null,
+    "code": "VIN"
+  },
+  {
+    "name": "Pascal Gross",
+    "group": null,
+    "code": "PAS"
+  },
+  {
+    "name": "Aiden O'Neill",
+    "group": null,
+    "code": "AID"
+  },
+  {
+    "name": "Alejandro Romero Gamarra",
+    "group": null,
+    "code": "ALE"
+  },
+  {
+    "name": "Yassine Gessime",
+    "group": null,
+    "code": "YAS"
+  },
+  {
+    "name": "Ayoub Amaimouni-Echghouyabe",
+    "group": null,
+    "code": "AYO"
+  },
+  {
+    "name": "Simon Dominique",
+    "group": null,
+    "code": "SIM"
+  },
+  {
+    "name": "Mauricio Magalhaes",
+    "group": null,
+    "code": "MAU"
+  },
+  {
+    "name": "Nishan Velupillary",
+    "group": null,
+    "code": "NIS"
+  },
+  {
+    "name": "Clement Akpa",
+    "group": null,
+    "code": "CLE"
+  },
+  {
+    "name": "Odilon Kossonou",
+    "group": null,
+    "code": "ODI"
+  },
+  {
+    "name": "Kento Shoigai",
+    "group": null,
+    "code": "KEN"
+  },
+  {
+    "name": "Aymen Dahman",
+    "group": null,
+    "code": "AYM"
+  },
+  {
+    "name": "Mohamed Amine Ben Hamida",
+    "group": null,
+    "code": "MOH"
+  },
+  {
+    "name": "Sabri Ben Hessen",
+    "group": null,
+    "code": "SAB"
+  },
+  {
+    "name": "Mohamed Hadj Mahmoud",
+    "group": null,
+    "code": "MOH"
+  },
+  {
+    "name": "Abdelmouhib Chamakh",
+    "group": null,
+    "code": "ABD"
+  },
+  {
+    "name": "Shuto Machino",
+    "group": null,
+    "code": "SHU"
+  },
+  {
+    "name": "Mahmoud Hassan Trezeguet",
+    "group": null,
+    "code": "MAH"
+  },
+  {
+    "name": "Mostafa Abdel Raouf",
+    "group": null,
+    "code": "MOS"
+  },
+  {
+    "name": "Nabil Emad",
+    "group": null,
+    "code": "NAB"
+  },
+  {
+    "name": "Hamza Abdel Karim",
+    "group": null,
+    "code": "HAM"
+  },
+  {
+    "name": "Seyed Hossein Hosseini",
+    "group": null,
+    "code": "SEY"
+  },
+  {
+    "name": "Pau Cubarsi",
+    "group": null,
+    "code": "PAU"
+  },
+  {
+    "name": "Roberto Lopes",
+    "group": null,
+    "code": "ROB"
+  },
+  {
+    "name": "Sherzod Nasrullaev",
+    "group": null,
+    "code": "SHE"
+  },
+  {
+    "name": "Oston Urunov",
+    "group": null,
+    "code": "OST"
+  },
+  {
+    "name": "Dennis Dargahi",
+    "group": null,
+    "code": "DEN"
+  },
+  {
+    "name": "Joao Paulo Fernandes",
+    "group": null,
+    "code": "JOA"
+  },
+  {
+    "name": "Alaa Al Hejji",
+    "group": null,
+    "code": "ALA"
+  },
+  {
+    "name": "Rocky Bushiri",
+    "group": null,
+    "code": "ROC"
+  },
+  {
+    "name": "Hossein Kanaani",
+    "group": null,
+    "code": "HOS"
+  },
+  {
+    "name": "Ehsan Hajsafi",
+    "group": null,
+    "code": "EHS"
+  },
+  {
+    "name": "Juan Camilo Hernandez",
+    "group": null,
+    "code": "JUA"
+  },
+  {
+    "name": "Martin Zubimendi",
+    "group": null,
+    "code": "6"
+  },
+  {
+    "name": "Azizjon Ganiev",
+    "group": null,
+    "code": "AZI"
+  },
+  {
+    "name": "Carlos Andres Gomez",
+    "group": null,
+    "code": "CAR"
+  },
+  {
+    "name": "Ahmed Qasim",
+    "group": null,
+    "code": "AHM"
+  },
+  {
+    "name": "Ali Jassim",
+    "group": null,
+    "code": "ALI"
+  },
+  {
+    "name": "Ali Yousef",
+    "group": null,
+    "code": "ALI"
+  },
+  {
+    "name": "Mohanad Ali",
+    "group": null,
+    "code": "MOH"
+  },
+  {
+    "name": "Marcos Senesi",
+    "group": null,
+    "code": "MAR"
+  },
+  {
+    "name": "Orjan Haskjold Nyland",
+    "group": null,
+    "code": "ORJ"
+  },
+  {
+    "name": "Fredrik Bjorkan",
+    "group": null,
+    "code": "FRE"
+  },
+  {
+    "name": "Leo Skiri Ostigard",
+    "group": null,
+    "code": "LEO"
+  },
+  {
+    "name": "Martin Odegaard",
+    "group": null,
+    "code": "MAR"
+  },
+  {
+    "name": "Alexander Sorloth",
+    "group": null,
+    "code": "ALE"
+  },
+  {
+    "name": "Melvin Masstil",
+    "group": null,
+    "code": "MEL"
+  },
+  {
+    "name": "Nadir Benbouali",
+    "group": null,
+    "code": "NAD"
+  },
+  {
+    "name": "Yazeed Abu Laila",
+    "group": null,
+    "code": "YAZ"
+  },
+  {
+    "name": "Noor Bani Attieh",
+    "group": null,
+    "code": "NOO"
+  },
+  {
+    "name": "Abdullah Nasib",
+    "group": null,
+    "code": "ABD"
+  },
+  {
+    "name": "Mohammad Abu Al-Nadi",
+    "group": null,
+    "code": "MOH"
+  },
+  {
+    "name": "Anas Bani",
+    "group": null,
+    "code": "ANA"
+  },
+  {
+    "name": "Mohammad Abu Zraiq",
+    "group": null,
+    "code": "MOH"
+  },
+  {
+    "name": "Dejan Ljubicic",
+    "group": null,
+    "code": "DEJ"
+  },
+  {
+    "name": "Francisco Trincao",
+    "group": null,
+    "code": "FRA"
+  },
+  {
+    "name": "Luis Romo",
+    "group": null,
+    "code": "LUI"
+  },
+  {
+    "name": "Cesar Montes",
+    "group": null,
+    "code": "CES"
+  },
+  {
+    "name": "Carlos Acevedo",
+    "group": null,
+    "code": "CAR"
+  },
+  {
+    "name": "Kojo Oppong Preprah",
+    "group": null,
+    "code": "KOJ"
+  },
+  {
+    "name": "Baba Abdul Rahman",
+    "group": null,
+    "code": "BAB"
+  },
+  {
+    "name": "DR Congo",
+    "group": "K",
+    "code": "COD"
+  },
+  {
+    "name": "Armando Gonzalez",
+    "group": null,
+    "code": "ARM"
+  },
+  {
+    "name": "Orbelin Pineda",
+    "group": null,
+    "code": "ORB"
+  },
+  {
+    "name": "Song Bum-keun",
+    "group": null,
+    "code": "SON"
+  },
+  {
+    "name": "Brian Gutierrez",
+    "group": null,
+    "code": "BRI"
+  },
+  {
+    "name": "Alvaro Fidalgo",
+    "group": null,
+    "code": "ALV"
+  },
+  {
+    "name": "Julian Quinones",
+    "group": null,
+    "code": "JUL"
+  },
+  {
+    "name": "Santiago Gimenez",
+    "group": null,
+    "code": "SAN"
+  },
+  {
+    "name": "Erik Lira",
+    "group": null,
+    "code": "ERI"
+  },
+  {
+    "name": "Israel Reyes",
+    "group": null,
+    "code": "ISR"
+  },
+  {
+    "name": "Abdul Fatawu Issahaku",
+    "group": null,
+    "code": "ABD"
+  },
+  {
+    "name": "Edson Alvarez",
+    "group": null,
+    "code": "EDS"
+  },
+  {
+    "name": "Alexis Vega",
+    "group": null,
+    "code": "ALE"
+  },
+  {
+    "name": "Mateo Chavez",
+    "group": null,
+    "code": "MAT"
+  },
+  {
+    "name": "Jesus Gallardo",
+    "group": null,
+    "code": "JES"
+  },
+  {
+    "name": "Tomas Chory",
+    "group": null,
+    "code": "TOM"
+  },
+  {
+    "name": "Patrik Schick",
+    "group": null,
+    "code": "PAT"
+  },
+  {
+    "name": "Jo Hyeon-woo",
+    "group": null,
+    "code": "JO"
+  },
+  {
+    "name": "Cho Gue-sung",
+    "group": null,
+    "code": "CHO"
+  },
+  {
+    "name": "Son Heung-min",
+    "group": null,
+    "code": "SON"
+  },
+  {
+    "name": "Marcel Sabitzer",
+    "group": null,
+    "code": "MAR"
+  },
+  {
+    "name": "Stepan Chaloupek",
+    "group": null,
+    "code": "STE"
+  },
+  {
+    "name": "Lukas Cerv",
+    "group": null,
+    "code": "LUK"
+  },
+  {
+    "name": "Hwang In-beom",
+    "group": null,
+    "code": "HWA"
+  },
+  {
+    "name": "Kim Moon-hwan",
+    "group": null,
+    "code": "KIM"
+  },
+  {
+    "name": "Cesar Huerta",
+    "group": null,
+    "code": "CES"
+  },
+  {
+    "name": "Kim Jin-gyu",
+    "group": null,
+    "code": "KIM"
+  },
+  {
+    "name": "Kim Tae-hyeon",
+    "group": null,
+    "code": "KIM"
+  },
+  {
+    "name": "Nicolas Seiwald",
+    "group": null,
+    "code": "NIC"
+  },
+  {
+    "name": "Bae Jun-ho",
+    "group": null,
+    "code": "BAE"
+  },
+  {
+    "name": "Hwang Hee-chan",
+    "group": null,
+    "code": "HWA"
+  },
+  {
+    "name": "Lee Kang-in",
+    "group": null,
+    "code": "LEE"
+  },
+  {
+    "name": "Luis Chavez",
+    "group": null,
+    "code": "LUI"
+  },
+  {
+    "name": "Paik Seung-ho",
+    "group": null,
+    "code": "PAI"
+  },
+  {
+    "name": "Seol Young-woo",
+    "group": null,
+    "code": "SEO"
+  },
+  {
+    "name": "Raul Jimenez",
+    "group": null,
+    "code": "RAU"
+  },
+  {
+    "name": "Lee Tae-seok",
+    "group": null,
+    "code": "LEE"
+  },
+  {
+    "name": "Hugo Sochurek",
+    "group": null,
+    "code": "HUG"
+  },
+  {
+    "name": "Jindrich Stanek",
+    "group": null,
+    "code": "JIN"
+  },
+  {
+    "name": "Jan Kuchta",
+    "group": null,
+    "code": "JAN"
+  },
+  {
+    "name": "Vladimir Darida",
+    "group": null,
+    "code": "VLA"
+  },
+  {
+    "name": "Pavel Sulc",
+    "group": null,
+    "code": "PAV"
+  },
+  {
+    "name": "Gilberto Mora",
+    "group": null,
+    "code": "GIL"
+  },
+  {
+    "name": "Adam Hlozek",
+    "group": null,
+    "code": "ADA"
+  },
+  {
+    "name": "Denis Visinsky",
+    "group": null,
+    "code": "DEN"
+  },
+  {
+    "name": "Lukas Hornicek",
+    "group": null,
+    "code": "LUK"
+  },
+  {
+    "name": "Kim Seung-gyu",
+    "group": null,
+    "code": "KIM"
+  },
+  {
+    "name": "Vladimir Coufal",
+    "group": null,
+    "code": "VLA"
+  },
+  {
+    "name": "Oswin Appollis",
+    "group": null,
+    "code": "OSW"
+  },
+  {
+    "name": "Bradley Cross",
+    "group": null,
+    "code": "BRA"
+  },
+  {
+    "name": "Paul Wanner",
+    "group": null,
+    "code": "PAU"
+  },
+  {
+    "name": "Yang Hyun-jun",
+    "group": null,
+    "code": "YAN"
+  },
+  {
+    "name": "Ladislav Krejci",
+    "group": null,
+    "code": "LAD"
+  },
+  {
+    "name": "Tomas Soucek",
+    "group": null,
+    "code": "TOM"
+  },
+  {
+    "name": "David Zima",
+    "group": null,
+    "code": "DAV"
+  },
+  {
+    "name": "Matej Kovar",
+    "group": null,
+    "code": "MAT"
+  },
+  {
+    "name": "Lee Han-beom",
+    "group": null,
+    "code": "LEE"
+  },
+  {
+    "name": "Samukele Kabini",
+    "group": null,
+    "code": "SAM"
+  },
+  {
+    "name": "Noah Okafor",
+    "group": null,
+    "code": "NOA"
+  },
+  {
+    "name": "Alexandr Sojka",
+    "group": null,
+    "code": "ALE"
+  },
+  {
+    "name": "Remo Freuler",
+    "group": null,
+    "code": "REM"
+  },
+  {
+    "name": "Fabian Rieder",
+    "group": null,
+    "code": "FAB"
+  },
+  {
+    "name": "Dan Ndoye",
+    "group": null,
+    "code": "DAN"
+  },
+  {
+    "name": "Gregor Kobel",
+    "group": null,
+    "code": "GRE"
+  },
+  {
+    "name": "Djibril Sow",
+    "group": null,
+    "code": "DJI"
+  },
+  {
+    "name": "Cedric Itten",
+    "group": null,
+    "code": "CED"
+  },
+  {
+    "name": "Ricardo Rodriguez",
+    "group": null,
+    "code": "RIC"
+  },
+  {
+    "name": "Granit Xhaka",
+    "group": null,
+    "code": "GRA"
+  },
+  {
+    "name": "Ruben Vargas",
+    "group": null,
+    "code": "RUB"
+  },
+  {
+    "name": "Johan Manzambi",
+    "group": null,
+    "code": "JOH"
+  },
+  {
+    "name": "Christian Fassnacht",
+    "group": null,
+    "code": "CHR"
+  },
+  {
+    "name": "Nico Elvedi",
+    "group": null,
+    "code": "NIC"
+  },
+  {
+    "name": "Marvin Keller",
+    "group": null,
+    "code": "MAR"
+  },
+  {
+    "name": "Miro Muheim",
+    "group": null,
+    "code": "MIR"
+  },
+  {
+    "name": "David Doudera",
+    "group": null,
+    "code": "DAV"
+  },
+  {
+    "name": "Eom Ji-sung",
+    "group": null,
+    "code": "EOM"
+  },
+  {
+    "name": "Thapelo Maseko",
+    "group": null,
+    "code": "THA"
+  },
+  {
+    "name": "Luca Jaquez",
+    "group": null,
+    "code": "LUC"
+  },
+  {
+    "name": "Aurele Amenda",
+    "group": null,
+    "code": "AUR"
+  },
+  {
+    "name": "Ime Okon",
+    "group": null,
+    "code": "IME"
+  },
+  {
+    "name": "Lee Jae-sung",
+    "group": null,
+    "code": "LEE"
+  },
+  {
+    "name": "Manuel Akanji",
+    "group": null,
+    "code": "MAN"
+  },
+  {
+    "name": "Relebohile Mofokeng",
+    "group": null,
+    "code": "REL"
+  },
+  {
+    "name": "Themba Zwane",
+    "group": null,
+    "code": "THE"
+  },
+  {
+    "name": "Lee Dong-gyeong",
+    "group": null,
+    "code": "LEE"
+  },
+  {
+    "name": "David Jurasek",
+    "group": null,
+    "code": "DAV"
+  },
+  {
+    "name": "Zeki Amdouni",
+    "group": null,
+    "code": "ZEK"
+  },
+  {
+    "name": "Patrick Wimmer",
+    "group": null,
+    "code": "PAT"
+  },
+  {
+    "name": "Mojmir Chytil",
+    "group": null,
+    "code": "MOJ"
+  },
+  {
+    "name": "Mbekezeli Mbokazi",
+    "group": null,
+    "code": "MBE"
+  },
+  {
+    "name": "Nkosinathi Sibisi",
+    "group": null,
+    "code": "NKO"
+  },
+  {
+    "name": "Stephen Eustaquio",
+    "group": null,
+    "code": "STE"
+  },
+  {
+    "name": "Ronwen Williams",
+    "group": null,
+    "code": "RON"
+  },
+  {
+    "name": "Michel Aebischer",
+    "group": null,
+    "code": "MIC"
+  },
+  {
+    "name": "Tshepang Moremi",
+    "group": null,
+    "code": "TSH"
+  },
+  {
+    "name": "Teboho Mokoena",
+    "group": null,
+    "code": "TEB"
+  },
+  {
+    "name": "Iqraam Rayners",
+    "group": null,
+    "code": "IQR"
+  },
+  {
+    "name": "Ricardo Goss",
+    "group": null,
+    "code": "RIC"
+  },
+  {
+    "name": "Almoez Ali",
+    "group": null,
+    "code": "ALM"
+  },
+  {
+    "name": "Nathan Saliba",
+    "group": null,
+    "code": "NAT"
+  },
+  {
+    "name": "Mahmoud Abunada",
+    "group": null,
+    "code": "MAH"
+  },
+  {
+    "name": "Ibrahim Sabra",
+    "group": null,
+    "code": "IBR"
+  },
+  {
+    "name": "Nizar Al-Rashdan",
+    "group": null,
+    "code": "NIZ"
+  },
+  {
+    "name": "Ismael Kone",
+    "group": null,
+    "code": "ISM"
+  },
+  {
+    "name": "Ali Ahmed",
+    "group": null,
+    "code": "ALI"
+  },
+  {
+    "name": "Promise David",
+    "group": null,
+    "code": "PRO"
+  },
+  {
+    "name": "Richie Laryea",
+    "group": null,
+    "code": "RIC"
+  },
+  {
+    "name": "Joel Waterman",
+    "group": null,
+    "code": "JOE"
+  },
+  {
+    "name": "Cyle Larin",
+    "group": null,
+    "code": "CYL"
+  },
+  {
+    "name": "Luc de Fougerolles",
+    "group": null,
+    "code": "LUC"
+  },
+  {
+    "name": "Alfie Jones",
+    "group": null,
+    "code": "ALF"
+  },
+  {
+    "name": "Jonathan David",
+    "group": null,
+    "code": "JON"
+  },
+  {
+    "name": "Kerim Alajbegovic",
+    "group": null,
+    "code": "KER"
+  },
+  {
+    "name": "Jorge Sanchez",
+    "group": null,
+    "code": "JOR"
+  },
+  {
+    "name": "Thabang Matuludi",
+    "group": null,
+    "code": "THA"
+  },
+  {
+    "name": "Michal Sadilek",
+    "group": null,
+    "code": "MIC"
+  },
+  {
+    "name": "Alistair Johnston",
+    "group": null,
+    "code": "ALI"
+  },
+  {
+    "name": "Akram Afif",
+    "group": null,
+    "code": "AKR"
+  },
+  {
+    "name": "Tajon Buchanan",
+    "group": null,
+    "code": "TAJ"
+  },
+  {
+    "name": "Tomas Holes",
+    "group": null,
+    "code": "TOM"
+  },
+  {
+    "name": "A. Tshibola",
+    "group": null,
+    "code": "A15"
+  },
+  {
+    "name": "Luis Suarez",
+    "group": null,
+    "code": "LUI"
+  },
+  {
+    "name": "Nuno Mendes",
+    "group": null,
+    "code": "NUN"
+  },
+  {
+    "name": "Ngal'ayel Mukau",
+    "group": null,
+    "code": "NGA"
+  },
+  {
+    "name": "Diogo Costa",
+    "group": null,
+    "code": "DIO"
+  },
+  {
+    "name": "Camilo Vargas",
+    "group": null,
+    "code": "CAM"
+  },
+  {
+    "name": "Richard Rios",
+    "group": null,
+    "code": "RIC"
+  },
+  {
+    "name": "Gael Kakuta",
+    "group": null,
+    "code": "GAE"
+  },
+  {
+    "name": "Samed Bazdar",
+    "group": null,
+    "code": "SAM"
+  },
+  {
+    "name": "Axel Tuanzebe",
+    "group": null,
+    "code": "AXE"
+  },
+  {
+    "name": "Joris Kayembe",
+    "group": null,
+    "code": "JOR"
+  },
+  {
+    "name": "Theo Bongonda",
+    "group": null,
+    "code": "THE"
+  },
+  {
+    "name": "Juan Camilo Portilla",
+    "group": null,
+    "code": "JUA"
+  },
+  {
+    "name": "Michael Woud",
+    "group": null,
+    "code": "MIC"
+  },
+  {
+    "name": "Meshaal Barsham",
+    "group": null,
+    "code": "MES"
+  },
+  {
+    "name": "Jhon Arias",
+    "group": null,
+    "code": "JHO"
+  },
+  {
+    "name": "Kevin Castano",
+    "group": null,
+    "code": "KEV"
+  },
+  {
+    "name": "Alex Paulsen",
+    "group": null,
+    "code": "ALE"
+  },
+  {
+    "name": "Jhon Lucumi",
+    "group": null,
+    "code": "JHO"
+  },
+  {
+    "name": "Ardon Jashari",
+    "group": null,
+    "code": "ARD"
+  },
+  {
+    "name": "Goncalo Ramos",
+    "group": null,
+    "code": "GON"
+  },
+  {
+    "name": "Matt Garbett",
+    "group": null,
+    "code": "MAT"
+  },
+  {
+    "name": "Eli Just",
+    "group": null,
+    "code": "ELI"
+  },
+  {
+    "name": "Nidal Celik",
+    "group": null,
+    "code": "NID"
+  },
+  {
+    "name": "Mathieu Choiniere",
+    "group": null,
+    "code": "MAT"
+  },
+  {
+    "name": "Nando Pijnaker",
+    "group": null,
+    "code": "NAN"
+  },
+  {
+    "name": "Obed Vargas",
+    "group": null,
+    "code": "OBE"
+  },
+  {
+    "name": "Thalente Mbatha",
+    "group": null,
+    "code": "THA"
+  },
+  {
+    "name": "Callan Elliot",
+    "group": null,
+    "code": "CAL"
+  },
+  {
+    "name": "Kosta Barbarouses",
+    "group": null,
+    "code": "KOS"
+  },
+  {
+    "name": "Tyler Bindon",
+    "group": null,
+    "code": "TYL"
+  },
+  {
+    "name": "Breel Embolo",
+    "group": null,
+    "code": "BRE"
+  },
+  {
+    "name": "Jesse Randall",
+    "group": null,
+    "code": "JES"
+  },
+  {
+    "name": "Lachlan Bayliss",
+    "group": null,
+    "code": "LAC"
+  },
+  {
+    "name": "Alex Rufer",
+    "group": null,
+    "code": "ALE"
+  },
+  {
+    "name": "Eray Comert",
+    "group": null,
+    "code": "ERA"
+  },
+  {
+    "name": "Francis De Vries",
+    "group": null,
+    "code": "FRA"
+  },
+  {
+    "name": "Khulumani Ndamane",
+    "group": null,
+    "code": "KHU"
+  },
+  {
+    "name": "Bruno Fernandes",
+    "group": null,
+    "code": "BRU"
+  },
+  {
+    "name": "Michael Boxall",
+    "group": null,
+    "code": "MIC"
+  },
+  {
+    "name": "Liberato Cacace",
+    "group": null,
+    "code": "LIB"
+  },
+  {
+    "name": "J. Kuchta",
+    "group": null,
+    "code": "J11"
+  },
+  {
+    "name": "Abdulaziz Hatem",
+    "group": null,
+    "code": "ABD"
+  },
+  {
+    "name": "Azizbek Amonov",
+    "group": null,
+    "code": "AZI"
+  },
+  {
+    "name": "Owen Goodman",
+    "group": null,
+    "code": "OWE"
+  },
+  {
+    "name": "Dominik Kotarski",
+    "group": null,
+    "code": "DOM"
+  },
+  {
+    "name": "Mohammed Muntari",
+    "group": null,
+    "code": "MOH"
+  },
+  {
+    "name": "Ivan Basic",
+    "group": null,
+    "code": "IVA"
+  },
+  {
+    "name": "Amir Hadziahmetovic",
+    "group": null,
+    "code": "AMI"
+  },
+  {
+    "name": "Rafael Leao",
+    "group": null,
+    "code": "RAF"
+  },
+  {
+    "name": "Hassan Al-Haydos",
+    "group": null,
+    "code": "HAS"
+  },
+  {
+    "name": "Duje Caleta-Car",
+    "group": null,
+    "code": "DUJ"
+  },
+  {
+    "name": "Josko Gvardiol",
+    "group": null,
+    "code": "JOS"
+  },
+  {
+    "name": "Sead Kolasinac",
+    "group": null,
+    "code": "SEA"
+  },
+  {
+    "name": "Assim Madibo",
+    "group": null,
+    "code": "ASS"
+  },
+  {
+    "name": "Boualem Khoukhi",
+    "group": null,
+    "code": "BOU"
+  },
+  {
+    "name": "Kristijan Jakic",
+    "group": null,
+    "code": "KRI"
+  },
+  {
+    "name": "Dennis Hadzikadunic",
+    "group": null,
+    "code": "DEN"
+  },
+  {
+    "name": "Dzenis Burnic",
+    "group": null,
+    "code": "DZE"
+  },
+  {
+    "name": "Nikola Katic",
+    "group": null,
+    "code": "NIK"
+  },
+  {
+    "name": "Tarik Muharemovic",
+    "group": null,
+    "code": "TAR"
+  },
+  {
+    "name": "Edin Dzeko",
+    "group": null,
+    "code": "EDI"
+  },
+  {
+    "name": "Mateo Kovacic",
+    "group": null,
+    "code": "MAT"
+  },
+  {
+    "name": "Amar Memic",
+    "group": null,
+    "code": "AMA"
+  },
+  {
+    "name": "Abbosbek Fayzullaev",
+    "group": null,
+    "code": "ABB"
+  },
+  {
+    "name": "Armin Gigovic",
+    "group": null,
+    "code": "ARM"
+  },
+  {
+    "name": "Martin Baturina",
+    "group": null,
+    "code": "MAR"
+  },
+  {
+    "name": "Josip Stanisic",
+    "group": null,
+    "code": "JOS"
+  },
+  {
+    "name": "Amar Dedic",
+    "group": null,
+    "code": "AMA"
+  },
+  {
+    "name": "Derek Cornelius",
+    "group": null,
+    "code": "DER"
+  },
+  {
+    "name": "Jacob Shaffelburg",
+    "group": null,
+    "code": "JAC"
+  },
+  {
+    "name": "Dominik Livakovic",
+    "group": null,
+    "code": "DOM"
+  },
+  {
+    "name": "Toni Fruk",
+    "group": null,
+    "code": "TON"
+  },
+  {
+    "name": "Igor Matanovic",
+    "group": null,
+    "code": "IGO"
+  },
+  {
+    "name": "Luka Modric",
+    "group": null,
+    "code": "LUK"
+  },
+  {
+    "name": "Martin Erlic",
+    "group": null,
+    "code": "MAR"
+  },
+  {
+    "name": "Marin Pongracic",
+    "group": null,
+    "code": "MAR"
+  },
+  {
+    "name": "Nikola Moro",
+    "group": null,
+    "code": "NIK"
+  },
+  {
+    "name": "Ante Budimir",
+    "group": null,
+    "code": "ANT"
+  },
+  {
+    "name": "Ivor Pandur",
+    "group": null,
+    "code": "IVO"
+  },
+  {
+    "name": "Esmir Bajraktarevic",
+    "group": null,
+    "code": "ESM"
+  },
+  {
+    "name": "Petar Sucic",
+    "group": null,
+    "code": "PET"
+  },
+  {
+    "name": "Moise Bombito",
+    "group": null,
+    "code": "MOI"
+  },
+  {
+    "name": "D. Doudera",
+    "group": null,
+    "code": "D21"
+  },
+  {
+    "name": "H. Sochurek",
+    "group": null,
+    "code": "H25"
+  },
+  {
+    "name": "J. Stanek",
+    "group": null,
+    "code": "J16"
+  },
+  {
+    "name": "J. Zelený",
+    "group": null,
+    "code": "J20"
+  },
+  {
+    "name": "L. Cerv",
+    "group": null,
+    "code": "L12"
+  },
+  {
+    "name": "L. Hornícek",
+    "group": null,
+    "code": "L23"
+  },
+  {
+    "name": "M. Kovár",
+    "group": null,
+    "code": "M1"
+  },
+  {
+    "name": "M. Sadílek",
+    "group": null,
+    "code": "M18"
+  },
+  {
+    "name": "V. Coufal",
+    "group": null,
+    "code": "V5"
+  },
+  {
+    "name": "V. Darida",
+    "group": null,
+    "code": "V8"
+  },
+  {
+    "name": "A. Ganiyev",
+    "group": null,
+    "code": "A19"
+  },
+  {
+    "name": "G. Mora",
+    "group": null,
+    "code": "G19"
+  },
+  {
+    "name": "B. Cross",
+    "group": null,
+    "code": "B26"
+  },
+  {
+    "name": "E. Makgopa",
+    "group": null,
+    "code": "E99"
+  },
+  {
+    "name": "I. Okon",
+    "group": null,
+    "code": "I21"
+  },
+  {
+    "name": "K. Mudau",
+    "group": null,
+    "code": "K20"
+  },
+  {
+    "name": "L. Foster",
+    "group": null,
+    "code": "L9"
+  },
+  {
+    "name": "O. Appollis",
+    "group": null,
+    "code": "O7"
+  },
+  {
+    "name": "Ivan Perisic",
+    "group": null,
+    "code": "IVA"
+  },
+  {
+    "name": "Denis Zakaria",
+    "group": null,
+    "code": "DEN"
+  },
+  {
+    "name": "Petar Musa",
+    "group": null,
+    "code": "PET"
+  },
+  {
+    "name": "Mario Pasalic",
+    "group": null,
+    "code": "MAR"
+  },
+  {
+    "name": "Dayne St Clair",
+    "group": null,
+    "code": "DAY"
+  },
+  {
+    "name": "D. Cornelius",
+    "group": null,
+    "code": "D13"
+  },
+  {
+    "name": "J. David",
+    "group": null,
+    "code": "J10"
+  },
+  {
+    "name": "J. Waterman",
+    "group": null,
+    "code": "J5"
+  },
+  {
+    "name": "M. Bombito",
+    "group": null,
+    "code": "M15"
+  },
+  {
+    "name": "P. David",
+    "group": null,
+    "code": "P24"
+  },
+  {
+    "name": "R. Laryea",
+    "group": null,
+    "code": "R22"
+  },
+  {
+    "name": "Mohammed Al-Manai",
+    "group": null,
+    "code": "MOH"
+  },
+  {
+    "name": "Finlay Curtis",
+    "group": null,
+    "code": "FIN"
+  },
+  {
+    "name": "Bae Jun-Ho",
+    "group": null,
+    "code": "BAE17"
+  },
+  {
+    "name": "Cho Gue-Sung",
+    "group": null,
+    "code": "CHO9"
+  },
+  {
+    "name": "Cho Wi-Je",
+    "group": null,
+    "code": "CHO14"
+  },
+  {
+    "name": "Eom Ji-Sung",
+    "group": null,
+    "code": "EOM25"
+  },
+  {
+    "name": "Lee Dong-Gyeong",
+    "group": null,
+    "code": "LEE26"
+  },
+  {
+    "name": "Lee Jae-Sung",
+    "group": null,
+    "code": "LEE10"
+  },
+  {
+    "name": "Kim Min-Jae",
+    "group": null,
+    "code": "KIM4"
+  },
+  {
+    "name": "Nikola Vasilj",
+    "group": null,
+    "code": "NIK"
+  },
+  {
+    "name": "Hamdi Fathi",
+    "group": null,
+    "code": "HAM"
+  },
+  {
+    "name": "Bara Sapoko Ndiaye",
+    "group": null,
+    "code": "BAR"
+  },
+  {
+    "name": "Maxime Crepeau",
+    "group": null,
+    "code": "MAX"
+  },
+  {
+    "name": "Kim Min-jae",
+    "group": null,
+    "code": "KIM"
+  },
+  {
+    "name": "Lee Kang-In",
+    "group": null,
+    "code": "LEE19"
+  },
+  {
+    "name": "Oh Hyeon-Gyu",
+    "group": null,
+    "code": "OH18"
+  },
+  {
+    "name": "Yang Hyun-Jun",
+    "group": null,
+    "code": "YAN20"
+  },
+  {
+    "name": "Mohannad Lasheen",
+    "group": null,
+    "code": "MOH"
+  },
+  {
+    "name": "Mohamed Al Owais",
+    "group": null,
+    "code": "MOH"
+  },
+  {
+    "name": "Abdullah Al-Fakhouri",
+    "group": null,
+    "code": "ABD"
+  },
+  {
+    "name": "Mousa Al-Tamari",
+    "group": null,
+    "code": "MOU"
+  },
+  {
+    "name": "Hwang In-Beom",
+    "group": null,
+    "code": "HWA6"
+  },
+  {
+    "name": "D. Hadzikadunic",
+    "group": null,
+    "code": "D3"
+  },
+  {
+    "name": "E. Dzeko",
+    "group": null,
+    "code": "E11"
+  },
+  {
+    "name": "J. Lukic",
+    "group": null,
+    "code": "J25"
+  },
+  {
+    "name": "M. Jurkas",
+    "group": null,
+    "code": "M12"
+  },
+  {
+    "name": "N. Celik",
+    "group": null,
+    "code": "N24"
+  },
+  {
+    "name": "N. Katic",
+    "group": null,
+    "code": "N18"
+  },
+  {
+    "name": "S. Bazdar",
+    "group": null,
+    "code": "S9"
+  },
+  {
+    "name": "T. Muharemovic",
+    "group": null,
+    "code": "T4"
+  },
+  {
+    "name": "Khojiakbar Alijonov",
+    "group": null,
+    "code": "KHO"
+  },
+  {
+    "name": "A. Davies",
+    "group": null,
+    "code": "A19"
+  },
+  {
+    "name": "Haris Tabakovic",
+    "group": null,
+    "code": "HAR"
+  },
+  {
+    "name": "Stjepan Radeljic",
+    "group": null,
+    "code": "STJ"
+  },
+  {
+    "name": "Nihad Mujakic",
+    "group": null,
+    "code": "NIH"
+  },
+  {
+    "name": "A. Gigovic",
+    "group": null,
+    "code": "A8"
+  },
+  {
+    "name": "A. Hadziahmetovic",
+    "group": null,
+    "code": "A16"
+  },
+  {
+    "name": "A. Memic",
+    "group": null,
+    "code": "A15"
+  },
+  {
+    "name": "Jaloliddin Masharipov",
+    "group": null,
+    "code": "JAL"
+  },
+  {
+    "name": "A. Ahmed",
+    "group": null,
+    "code": "A20"
+  },
+  {
+    "name": "Ben Old",
+    "group": null,
+    "code": "BEN"
+  },
+  {
+    "name": "K. Jakic",
+    "group": null,
+    "code": "K18"
+  },
+  {
+    "name": "A. Budimir",
+    "group": null,
+    "code": "A11"
+  },
+  {
+    "name": "Tim Payne",
+    "group": null,
+    "code": "TIM"
+  },
+  {
+    "name": "John Stones",
+    "group": null,
+    "code": "JOH"
+  },
+  {
+    "name": "Jonathan Osorio",
+    "group": null,
+    "code": "JON"
+  },
+  {
+    "name": "Finn Surman",
+    "group": null,
+    "code": "FIN"
+  },
+  {
+    "name": "Ermin Mahmic",
+    "group": null,
+    "code": "ERM"
+  },
+  {
+    "name": "Chris Wood",
+    "group": null,
+    "code": "CHR"
+  },
+  {
+    "name": "Josip Sutalo",
+    "group": null,
+    "code": "JOS"
+  },
+  {
+    "name": "Ezri Konsa",
+    "group": null,
+    "code": "EZR"
+  },
+  {
+    "name": "Niko Sigur",
+    "group": null,
+    "code": "NIK"
+  },
+  {
+    "name": "Djed Spence",
+    "group": null,
+    "code": "DJE"
+  },
+  {
+    "name": "Ivan Sunjic",
+    "group": null,
+    "code": "IVA"
+  },
+  {
+    "name": "Botirali Ergashev",
+    "group": null,
+    "code": "BOT"
+  },
+  {
+    "name": "Ryan Thomas",
+    "group": null,
+    "code": "RYA"
+  },
+  {
+    "name": "D. Caleta-Car",
+    "group": null,
+    "code": "D5"
+  },
+  {
+    "name": "D. Kotarski",
+    "group": null,
+    "code": "D23"
+  },
+  {
+    "name": "A. Al Hussain",
+    "group": null,
+    "code": "A25"
+  },
+  {
+    "name": "A. Amenda",
+    "group": null,
+    "code": "A24"
+  },
+  {
+    "name": "B. Embolo",
+    "group": null,
+    "code": "B7"
+  },
+  {
+    "name": "C. Itten",
+    "group": null,
+    "code": "C26"
+  },
+  {
+    "name": "G. Kobel",
+    "group": null,
+    "code": "G1"
+  },
+  {
+    "name": "L. Jaquez",
+    "group": null,
+    "code": "L25"
+  },
+  {
+    "name": "M. Akanji",
+    "group": null,
+    "code": "M5"
+  },
+  {
+    "name": "M. Keller",
+    "group": null,
+    "code": "M21"
+  },
+  {
+    "name": "M. Muheim",
+    "group": null,
+    "code": "M2"
+  },
+  {
+    "name": "Alisson Becker",
+    "group": null,
+    "code": "ALI1"
+  },
+  {
+    "name": "Danilo",
+    "group": null,
+    "code": "DAN"
+  },
+  {
+    "name": "Ibanez",
+    "group": null,
+    "code": "IBA"
+  },
+  {
+    "name": "Neymar",
+    "group": null,
+    "code": "NEY"
+  },
+  {
+    "name": "Gabriel Magalhaes",
+    "group": null,
+    "code": "GAB"
+  },
+  {
+    "name": "Matheus Cunha",
+    "group": null,
+    "code": "MAT"
+  },
+  {
+    "name": "Luiz Henrique",
+    "group": null,
+    "code": "LUI"
+  },
+  {
+    "name": "Douglas Santos",
+    "group": null,
+    "code": "DOU"
+  },
+  {
+    "name": "Gabriel Martinelli",
+    "group": null,
+    "code": "GAB"
+  },
+  {
+    "name": "Marquinhos",
+    "group": null,
+    "code": "MAR"
+  },
+  {
+    "name": "Thiago",
+    "group": null,
+    "code": "THI25"
+  },
+  {
+    "name": "Danilo Santos",
+    "group": null,
+    "code": "DAN"
+  },
+  {
+    "name": "JK Duverne",
+    "group": null,
+    "code": "JK"
+  },
+  {
+    "name": "D. Simon",
+    "group": null,
+    "code": "D25"
+  },
+  {
+    "name": "Yassin Fortune",
+    "group": null,
+    "code": "YAS"
+  },
+  {
+    "name": "Derrick Etienne",
+    "group": null,
+    "code": "DER"
+  },
+  {
+    "name": "Fabinho",
+    "group": null,
+    "code": "FAB"
+  },
+  {
+    "name": "Josue Casimir",
+    "group": null,
+    "code": "JOS"
+  },
+  {
+    "name": "Jean-Ricner Bellegarde",
+    "group": null,
+    "code": "JEA"
+  },
+  {
+    "name": "Martin Experience",
+    "group": null,
+    "code": "MAR"
+  },
+  {
+    "name": "Josue Duverger",
+    "group": null,
+    "code": "JOS"
+  },
+  {
+    "name": "Ederson",
+    "group": null,
+    "code": "EDE23"
+  },
+  {
+    "name": "Frantzdy Pierrot",
+    "group": null,
+    "code": "FRA"
+  },
+  {
+    "name": "Wilguens Paugain",
+    "group": null,
+    "code": "WIL"
+  },
+  {
+    "name": "Keeto Thermoncy",
+    "group": null,
+    "code": "KEE"
+  },
+  {
+    "name": "Duckens Nazon",
+    "group": null,
+    "code": "DUC"
+  },
+  {
+    "name": "Hannes Delcroix",
+    "group": null,
+    "code": "HAN"
+  },
+  {
+    "name": "Danley Jean-Jacques",
+    "group": null,
+    "code": "DAN"
+  },
+  {
+    "name": "Alexandre Pierre",
+    "group": null,
+    "code": "ALE"
+  },
+  {
+    "name": "Carl-Fred Sainte",
+    "group": null,
+    "code": "CAR"
+  },
+  {
+    "name": "Wilson Isidor",
+    "group": null,
+    "code": "WIL"
+  },
+  {
+    "name": "Munir Mohamedi",
+    "group": null,
+    "code": "MUN"
+  },
+  {
+    "name": "Ahmed Tagnaouti",
+    "group": null,
+    "code": "AHM"
+  },
+  {
+    "name": "Nayef Aguerd",
+    "group": null,
+    "code": "NAY"
+  },
+  {
+    "name": "Abdessamad Ezzalzouli",
+    "group": null,
+    "code": "ABD"
+  },
+  {
+    "name": "M. Pasalic",
+    "group": null,
+    "code": "M24"
+  },
+  {
+    "name": "Chemsdine Talbi",
+    "group": null,
+    "code": "CHE"
+  },
+  {
+    "name": "Soufiane Rahimi",
+    "group": null,
+    "code": "SOU"
+  },
+  {
+    "name": "Azzedine Ounahi",
+    "group": null,
+    "code": "AZZ"
+  },
+  {
+    "name": "Anass Salah-Eddine",
+    "group": null,
+    "code": "ANA"
+  },
+  {
+    "name": "Zakaria El Ouahdi",
+    "group": null,
+    "code": "ZAK"
+  },
+  {
+    "name": "Noussair Mazraoui",
+    "group": null,
+    "code": "NOU"
+  },
+  {
+    "name": "Woodensky Pierre",
+    "group": null,
+    "code": "WOO"
+  },
+  {
+    "name": "Bilal El Khannouss",
+    "group": null,
+    "code": "BIL"
+  },
+  {
+    "name": "Neil El Aynaoui",
+    "group": null,
+    "code": "NEI"
+  },
+  {
+    "name": "Issa Diop",
+    "group": null,
+    "code": "ISS"
+  },
+  {
+    "name": "Ruben Providence",
+    "group": null,
+    "code": "RUB"
+  },
+  {
+    "name": "Ayoub El Kaabi",
+    "group": null,
+    "code": "AYO"
+  },
+  {
+    "name": "Craig Gordon",
+    "group": null,
+    "code": "CRA"
+  },
+  {
+    "name": "Angus Gunn",
+    "group": null,
+    "code": "ANG"
+  },
+  {
+    "name": "Redouane Halhal",
+    "group": null,
+    "code": "RED"
+  },
+  {
+    "name": "Achraf Hakimi",
+    "group": null,
+    "code": "ACH"
+  },
+  {
+    "name": "Dom Hyam",
+    "group": null,
+    "code": "DOM"
+  },
+  {
+    "name": "Andy Robertson",
+    "group": null,
+    "code": "AND"
+  },
+  {
+    "name": "Liam Kelly",
+    "group": null,
+    "code": "LIA"
+  },
+  {
+    "name": "Aaron Hickey",
+    "group": null,
+    "code": "AAR"
+  },
+  {
+    "name": "Tyler Fletcher",
+    "group": null,
+    "code": "TYL"
+  },
+  {
+    "name": "John Souttar",
+    "group": null,
+    "code": "JOH"
+  },
+  {
+    "name": "Lawrence Shankland",
+    "group": null,
+    "code": "LAW"
+  },
+  {
+    "name": "Scott McKenna",
+    "group": null,
+    "code": "SCO"
+  },
+  {
+    "name": "Cristian Volpato",
+    "group": null,
+    "code": "CRI"
+  },
+  {
+    "name": "Lyndon Dykes",
+    "group": null,
+    "code": "LYN"
+  },
+  {
+    "name": "Mathew Ryan",
+    "group": null,
+    "code": "MAT"
+  },
+  {
+    "name": "Anthony Ralston",
+    "group": null,
+    "code": "ANT"
+  },
+  {
+    "name": "Antonio Sanabria",
+    "group": null,
+    "code": "ANT"
+  },
+  {
+    "name": "George Hirst",
+    "group": null,
+    "code": "GEO"
+  },
+  {
+    "name": "Lewis Ferguson",
+    "group": null,
+    "code": "LEW"
+  },
+  {
+    "name": "John McGinn",
+    "group": null,
+    "code": "JOH"
+  },
+  {
+    "name": "Findlay Curtis",
+    "group": null,
+    "code": "FIN25"
+  },
+  {
+    "name": "Scott McTominay",
+    "group": null,
+    "code": "SCO"
+  },
+  {
+    "name": "Jack Hendry",
+    "group": null,
+    "code": "JAC"
+  },
+  {
+    "name": "Kieran Tierney",
+    "group": null,
+    "code": "KIE"
+  },
+  {
+    "name": "Kenny McLean",
+    "group": null,
+    "code": "KEN"
+  },
+  {
+    "name": "A. O Neill",
+    "group": null,
+    "code": "A13"
+  },
+  {
+    "name": "Omar Alderete",
+    "group": null,
+    "code": "OMA"
+  },
+  {
+    "name": "Jacob Italiano",
+    "group": null,
+    "code": "JAC"
+  },
+  {
+    "name": "Bukayo Saka",
+    "group": null,
+    "code": "BUK"
+  },
+  {
+    "name": "Jason Geria",
+    "group": null,
+    "code": "JAS"
+  },
+  {
+    "name": "Alexandro Maidana",
+    "group": null,
+    "code": "ALE"
+  },
+  {
+    "name": "Ajdin Hrustic",
+    "group": null,
+    "code": "AJD"
+  },
+  {
+    "name": "Gustavo Gomez",
+    "group": null,
+    "code": "GUS"
+  },
+  {
+    "name": "Tete Yengi",
+    "group": null,
+    "code": "TET"
+  },
+  {
+    "name": "Kai Trewin",
+    "group": null,
+    "code": "KAI"
+  },
+  {
+    "name": "Juan Caceres",
+    "group": null,
+    "code": "JUA"
+  },
+  {
+    "name": "Cameron Devlin",
+    "group": null,
+    "code": "CAM"
+  },
+  {
+    "name": "Milos Degenek",
+    "group": null,
+    "code": "MIL"
+  },
+  {
+    "name": "Junior Alonso",
+    "group": null,
+    "code": "JUN"
+  },
+  {
+    "name": "Awer Mabil",
+    "group": null,
+    "code": "AWE"
+  },
+  {
+    "name": "Jose Canale",
+    "group": null,
+    "code": "JOS"
+  },
+  {
+    "name": "Mohamed Toure",
+    "group": null,
+    "code": "MOH"
+  },
+  {
+    "name": "Jackson Irvine",
+    "group": null,
+    "code": "JAC"
+  },
+  {
+    "name": "Cameron Burgess",
+    "group": null,
+    "code": "CAM"
+  },
+  {
+    "name": "Alessandro Circati",
+    "group": null,
+    "code": "ALE"
+  },
+  {
+    "name": "Ugurcan Cakir",
+    "group": null,
+    "code": "UGU"
+  },
+  {
+    "name": "Ferdi Kadioglu",
+    "group": null,
+    "code": "FER"
+  },
+  {
+    "name": "Daichi Kamada",
+    "group": null,
+    "code": "DAI"
+  },
+  {
+    "name": "Yukinari Sugawara",
+    "group": null,
+    "code": "YUK"
+  },
+  {
+    "name": "Tomoki Hayakawa",
+    "group": null,
+    "code": "TOM"
+  },
+  {
+    "name": "Keisuke Osako",
+    "group": null,
+    "code": "KEI"
+  },
+  {
+    "name": "Damian Bobadilla",
+    "group": null,
+    "code": "DAM"
+  },
+  {
+    "name": "Mert Gunok",
+    "group": null,
+    "code": "MER"
+  },
+  {
+    "name": "Abdulkerim Bardakci",
+    "group": null,
+    "code": "ABD"
+  },
+  {
+    "name": "Isidro Pitta",
+    "group": null,
+    "code": "ISI"
+  },
+  {
+    "name": "Maurício",
+    "group": null,
+    "code": "MAU11"
+  },
+  {
+    "name": "Takehiro Tomiyasu",
+    "group": null,
+    "code": "TAK"
+  },
+  {
+    "name": "Shogo Taniguchi",
+    "group": null,
+    "code": "SHO"
+  },
+  {
+    "name": "Andres Cubas",
+    "group": null,
+    "code": "AND"
+  },
+  {
+    "name": "Mert Muldur",
+    "group": null,
+    "code": "MER"
+  },
+  {
+    "name": "Kaishu Sano",
+    "group": null,
+    "code": "KAI"
+  },
+  {
+    "name": "Caglar Soyuncu",
+    "group": null,
+    "code": "CAG"
+  },
+  {
+    "name": "Ao Tanaka",
+    "group": null,
+    "code": "AO"
+  },
+  {
+    "name": "Tsuyoshi Watanabe",
+    "group": null,
+    "code": "TSU"
+  },
+  {
+    "name": "Merih Demiral",
+    "group": null,
+    "code": "MER"
+  },
+  {
+    "name": "Gustavo Caballero",
+    "group": null,
+    "code": "GUS"
+  },
+  {
+    "name": "Samet Akaydin",
+    "group": null,
+    "code": "SAM"
+  },
+  {
+    "name": "Baris Alper Yilmaz",
+    "group": null,
+    "code": "BAR"
+  },
+  {
+    "name": "Oguz Aydin",
+    "group": null,
+    "code": "OGU"
+  },
+  {
+    "name": "Max Arfsten",
+    "group": null,
+    "code": "MAX"
+  },
+  {
+    "name": "Joe Scally",
+    "group": null,
+    "code": "JOE"
+  },
+  {
+    "name": "Hakan Calhanoglu",
+    "group": null,
+    "code": "HAK"
+  },
+  {
+    "name": "Irfan Can Kahveci",
+    "group": null,
+    "code": "IRF"
+  },
+  {
+    "name": "Zeki Celik",
+    "group": null,
+    "code": "ZEK"
+  },
+  {
+    "name": "Sebastian Berhalter",
+    "group": null,
+    "code": "SEB"
+  },
+  {
+    "name": "Auston Trusty",
+    "group": null,
+    "code": "AUS"
+  },
+  {
+    "name": "Kerem Akturkoglu",
+    "group": null,
+    "code": "KER"
+  },
+  {
+    "name": "Weston McKennie",
+    "group": null,
+    "code": "WES"
+  },
+  {
+    "name": "Antonee Robinson",
+    "group": null,
+    "code": "ANT"
+  },
+  {
+    "name": "Tim Ream",
+    "group": null,
+    "code": "TIM"
+  },
+  {
+    "name": "Tyler Adams",
+    "group": null,
+    "code": "TYL"
+  },
+  {
+    "name": "Miles Robinson",
+    "group": null,
+    "code": "MIL"
+  },
+  {
+    "name": "Kaan Ayhan",
+    "group": null,
+    "code": "KAA"
+  },
+  {
+    "name": "Ismail Yuksek",
+    "group": null,
+    "code": "ISM"
+  },
+  {
+    "name": "Yunus Akgun",
+    "group": null,
+    "code": "YUN"
+  },
+  {
+    "name": "Deniz Gul",
+    "group": null,
+    "code": "DEN"
+  },
+  {
+    "name": "Arda Guler",
+    "group": null,
+    "code": "ARD"
+  },
+  {
+    "name": "Alejandro Zendejas",
+    "group": null,
+    "code": "ALE"
+  },
+  {
+    "name": "Arjany Martha",
+    "group": null,
+    "code": "ARJ"
+  },
+  {
+    "name": "Christian Pulisic",
+    "group": null,
+    "code": "CHR"
+  },
+  {
+    "name": "Joshua Brenet",
+    "group": null,
+    "code": "JOS"
+  },
+  {
+    "name": "Brenden Aaronson",
+    "group": null,
+    "code": "BRE"
+  },
+  {
+    "name": "Haji Wright",
+    "group": null,
+    "code": "HAJ"
+  },
+  {
+    "name": "Shurandy Sambo",
+    "group": null,
+    "code": "SHU"
+  },
+  {
+    "name": "Salih Ozcan",
+    "group": null,
+    "code": "SAL"
+  },
+  {
+    "name": "Livano Comenencia",
+    "group": null,
+    "code": "LIV"
+  },
+  {
+    "name": "Deveron Fonville",
+    "group": null,
+    "code": "DEV"
+  },
+  {
+    "name": "Tim Weah",
+    "group": null,
+    "code": "TIM"
+  },
+  {
+    "name": "Eloy Room",
+    "group": null,
+    "code": "ELO"
+  },
+  {
+    "name": "Tyrese Noslin",
+    "group": null,
+    "code": "TYR"
+  },
+  {
+    "name": "Kevin Felida",
+    "group": null,
+    "code": "KEV"
+  },
+  {
+    "name": "Jurien Gaari",
+    "group": null,
+    "code": "JUR"
+  },
+  {
+    "name": "Sherel Floranus",
+    "group": null,
+    "code": "SHE"
+  },
+  {
+    "name": "Juninho Bacuna",
+    "group": null,
+    "code": "JUN"
+  },
+  {
+    "name": "Godfried Roemeratoe",
+    "group": null,
+    "code": "GOD"
+  },
+  {
+    "name": "Riechedly Bazoer",
+    "group": null,
+    "code": "RIE"
+  },
+  {
+    "name": "Brandley Kuwas",
+    "group": null,
+    "code": "BRA"
+  },
+  {
+    "name": "Ricardo Pepi",
+    "group": null,
+    "code": "RIC"
+  },
+  {
+    "name": "Pervis Estupinan",
+    "group": null,
+    "code": "PER"
+  },
+  {
+    "name": "Maximilian Beier",
+    "group": null,
+    "code": "MAX"
+  },
+  {
+    "name": "Angelo Preciado",
+    "group": null,
+    "code": "ANG"
+  },
+  {
+    "name": "Hernan Galindez",
+    "group": null,
+    "code": "HER"
+  },
+  {
+    "name": "Jackson Porozo",
+    "group": null,
+    "code": "JAC"
+  },
+  {
+    "name": "Gonzalo Plata",
+    "group": null,
+    "code": "GON"
+  },
+  {
+    "name": "Alan Franco",
+    "group": null,
+    "code": "ALA"
+  },
+  {
+    "name": "Sontje Hansen",
+    "group": null,
+    "code": "SON"
+  },
+  {
+    "name": "Pedro Vite",
+    "group": null,
+    "code": "PED"
+  },
+  {
+    "name": "Willian Pacho",
+    "group": null,
+    "code": "WIL"
+  },
+  {
+    "name": "Jearl Margaritha",
+    "group": null,
+    "code": "JEA"
+  },
+  {
+    "name": "Gonzalo Valle",
+    "group": null,
+    "code": "GON"
+  },
+  {
+    "name": "Deniz Undav",
+    "group": null,
+    "code": "DEN"
+  },
+  {
+    "name": "Kenji Gorre",
+    "group": null,
+    "code": "KEN"
+  },
+  {
+    "name": "Tahith Chong",
+    "group": null,
+    "code": "TAH"
+  },
+  {
+    "name": "Dean Henderson",
+    "group": null,
+    "code": "DEA"
+  },
+  {
+    "name": "Jurgen Locadia",
+    "group": null,
+    "code": "JUR"
+  },
+  {
+    "name": "Jordy Alcivar",
+    "group": null,
+    "code": "JOR"
+  },
+  {
+    "name": "Jordy Caicedo",
+    "group": null,
+    "code": "JOR"
+  },
+  {
+    "name": "Moises Ramirez",
+    "group": null,
+    "code": "MOI"
+  },
+  {
+    "name": "Joel Ordonez",
+    "group": null,
+    "code": "JOE"
+  },
+  {
+    "name": "Lennart Karl",
+    "group": null,
+    "code": "LEN"
+  },
+  {
+    "name": "P. Groß",
+    "group": null,
+    "code": "P13"
+  },
+  {
+    "name": "Aleksandar Pavlovic",
+    "group": null,
+    "code": "ALE"
+  },
+  {
+    "name": "Angelo Stiller",
+    "group": null,
+    "code": "ANG"
+  },
+  {
+    "name": "Denil Castillo",
+    "group": null,
+    "code": "DEN"
+  },
+  {
+    "name": "Leon Goretzka",
+    "group": null,
+    "code": "LEO"
+  },
+  {
+    "name": "Nadiem Amiri",
+    "group": null,
+    "code": "NAD"
+  },
+  {
+    "name": "Simon Adingra",
+    "group": null,
+    "code": "SIM"
+  },
+  {
+    "name": "Kevin Rodriguez",
+    "group": null,
+    "code": "KEV"
+  },
+  {
+    "name": "Oliver Baumann",
+    "group": null,
+    "code": "OLI"
+  },
+  {
+    "name": "Ange-Yoan Bonny",
+    "group": null,
+    "code": "ANG"
+  },
+  {
+    "name": "Yaimar Medina",
+    "group": null,
+    "code": "YAI"
+  },
+  {
+    "name": "Evann Guessand",
+    "group": null,
+    "code": "EVA"
+  },
+  {
+    "name": "Jonathan Tah",
+    "group": null,
+    "code": "JON"
+  },
+  {
+    "name": "Anthony Valencia",
+    "group": null,
+    "code": "ANT"
+  },
+  {
+    "name": "Florian Wirtz",
+    "group": null,
+    "code": "FLO"
+  },
+  {
+    "name": "Waldemar Anton",
+    "group": null,
+    "code": "WAL"
+  },
+  {
+    "name": "Nilson Angulo",
+    "group": null,
+    "code": "NIL"
+  },
+  {
+    "name": "Jeremy Arevalo",
+    "group": null,
+    "code": "JER"
+  },
+  {
+    "name": "Emmanuel Agbadou",
+    "group": null,
+    "code": "EMM"
+  },
+  {
+    "name": "Joshua Kimmich",
+    "group": null,
+    "code": "JOS"
+  },
+  {
+    "name": "C. Operi",
+    "group": null,
+    "code": "C13"
+  },
+  {
+    "name": "Christ Oulai",
+    "group": null,
+    "code": "CHR"
+  },
+  {
+    "name": "O. Kossounou",
+    "group": null,
+    "code": "O7"
+  },
+  {
+    "name": "Junnoske Suzuki",
+    "group": null,
+    "code": "JUN"
+  },
+  {
+    "name": "Keisuke Goto",
+    "group": null,
+    "code": "KEI"
+  },
+  {
+    "name": "Bazoumana Toure",
+    "group": null,
+    "code": "BAZ"
+  },
+  {
+    "name": "Takefusa Kubo",
+    "group": null,
+    "code": "TAK"
+  },
+  {
+    "name": "Oumar Diakite",
+    "group": null,
+    "code": "OUM"
+  },
+  {
+    "name": "Seko Fofana",
+    "group": null,
+    "code": "SEK"
+  },
+  {
+    "name": "Wilfried Singo",
+    "group": null,
+    "code": "WIL"
+  },
+  {
+    "name": "Ghislain Konan",
+    "group": null,
+    "code": "GHI"
+  },
+  {
+    "name": "Guela Doue",
+    "group": null,
+    "code": "GUE"
+  },
+  {
+    "name": "Koki Ogawa",
+    "group": null,
+    "code": "KOK"
+  },
+  {
+    "name": "Elye Wahi",
+    "group": null,
+    "code": "ELY"
+  },
+  {
+    "name": "Elliot Anderson",
+    "group": null,
+    "code": "ELL"
+  },
+  {
+    "name": "Ko Itakura",
+    "group": null,
+    "code": "KO"
+  },
+  {
+    "name": "Junya Ito",
+    "group": null,
+    "code": "JUN"
+  },
+  {
+    "name": "Ayase Ueda",
+    "group": null,
+    "code": "AYA"
+  },
+  {
+    "name": "Parfait Guiagon",
+    "group": null,
+    "code": "PAR"
+  },
+  {
+    "name": "Ibrahim Sangare",
+    "group": null,
+    "code": "IBR"
+  },
+  {
+    "name": "Franck Kessie",
+    "group": null,
+    "code": "FRA"
+  },
+  {
+    "name": "Mohammad Abu Hasheesh",
+    "group": null,
+    "code": "MOH"
+  },
+  {
+    "name": "Jurrien Timber",
+    "group": null,
+    "code": "JUR"
+  },
+  {
+    "name": "W. Endo",
+    "group": null,
+    "code": "W6"
+  },
+  {
+    "name": "Cody Gakpo",
+    "group": null,
+    "code": "COD"
+  },
+  {
+    "name": "Wout Weghorst",
+    "group": null,
+    "code": "WOU"
+  },
+  {
+    "name": "Nathan Ake",
+    "group": null,
+    "code": "NAT"
+  },
+  {
+    "name": "Ritsu Doan",
+    "group": null,
+    "code": "RIT"
+  },
+  {
+    "name": "Justin Kluivert",
+    "group": null,
+    "code": "JUS"
+  },
+  {
+    "name": "Bart Verbruggen",
+    "group": null,
+    "code": "BAR"
+  },
+  {
+    "name": "Virgil van Dijk",
+    "group": null,
+    "code": "VIR"
+  },
+  {
+    "name": "Guus Til",
+    "group": null,
+    "code": "GUU"
+  },
+  {
+    "name": "Quinten Timber",
+    "group": null,
+    "code": "QUI"
+  },
+  {
+    "name": "Teun Koopmeiners",
+    "group": null,
+    "code": "TEU"
+  },
+  {
+    "name": "Noa Lang",
+    "group": null,
+    "code": "NOA"
+  },
+  {
+    "name": "Brian Brobbey",
+    "group": null,
+    "code": "BRI"
+  },
+  {
+    "name": "Antoine Semenyo",
+    "group": null,
+    "code": "ANT"
+  },
+  {
+    "name": "Marcus Rashford",
+    "group": null,
+    "code": "MAR"
+  },
+  {
+    "name": "Crysencio Summerville",
+    "group": null,
+    "code": "CRY"
+  },
+  {
+    "name": "Ryan Gravenberch",
+    "group": null,
+    "code": "RYA"
+  },
+  {
+    "name": "Jacob Widell Zetterstrom",
+    "group": null,
+    "code": "JAC"
+  },
+  {
+    "name": "Jorrel Hato",
+    "group": null,
+    "code": "JOR"
+  },
+  {
+    "name": "Erik Smith",
+    "group": null,
+    "code": "ERI"
+  },
+  {
+    "name": "Hjalmar Ekdal",
+    "group": null,
+    "code": "HJA"
+  },
+  {
+    "name": "Mattias Svanberg",
+    "group": null,
+    "code": "MAT"
+  },
+  {
+    "name": "Jesper Karlstrom",
+    "group": null,
+    "code": "JES"
+  },
+  {
+    "name": "Besfort Zeneli",
+    "group": null,
+    "code": "BES"
+  },
+  {
+    "name": "Adem Arous",
+    "group": null,
+    "code": "ADE"
+  },
+  {
+    "name": "Victor Lindelof",
+    "group": null,
+    "code": "VIC"
+  },
+  {
+    "name": "Elias Saad",
+    "group": null,
+    "code": "ELI"
+  },
+  {
+    "name": "Gabriel Gudmundsson",
+    "group": null,
+    "code": "GAB"
+  },
+  {
+    "name": "Anthony Elanga",
+    "group": null,
+    "code": "ANT"
+  },
+  {
+    "name": "Viktor Gyokeres",
+    "group": null,
+    "code": "VIK"
+  },
+  {
+    "name": "Gustaf Nilsson",
+    "group": null,
+    "code": "GUS"
+  },
+  {
+    "name": "Dylan Bronn",
+    "group": null,
+    "code": "DYL"
+  },
+  {
+    "name": "Gustaf Lagerbielke",
+    "group": null,
+    "code": "GUS"
+  },
+  {
+    "name": "Ken Sema",
+    "group": null,
+    "code": "KEN"
+  },
+  {
+    "name": "Benjamin Nygren",
+    "group": null,
+    "code": "BEN"
+  },
+  {
+    "name": "Lucas Bergvall",
+    "group": null,
+    "code": "LUC"
+  },
+  {
+    "name": "Firas Chaouat",
+    "group": null,
+    "code": "FIR"
+  },
+  {
+    "name": "Daniel Svensson",
+    "group": null,
+    "code": "DAN"
+  },
+  {
+    "name": "Moutaz Neffati",
+    "group": null,
+    "code": "MOU"
+  },
+  {
+    "name": "A. Dahmen",
+    "group": null,
+    "code": "A16"
+  },
+  {
+    "name": "Zeno Debast",
+    "group": null,
+    "code": "ZEN"
+  },
+  {
+    "name": "Elias Achouri",
+    "group": null,
+    "code": "ELI"
+  },
+  {
+    "name": "Matias Fernandez-Pardo",
+    "group": null,
+    "code": "MAT"
+  },
+  {
+    "name": "Rani Khedira",
+    "group": null,
+    "code": "RAN"
+  },
+  {
+    "name": "Khalil Ayari",
+    "group": null,
+    "code": "KHA"
+  },
+  {
+    "name": "Rayan Elloumi",
+    "group": null,
+    "code": "RAY"
+  },
+  {
+    "name": "Thomas Meunier",
+    "group": null,
+    "code": "THO"
+  },
+  {
+    "name": "Sebastian Tounekti",
+    "group": null,
+    "code": "SEB"
+  },
+  {
+    "name": "Anis Ben Slimane",
+    "group": null,
+    "code": "ANI"
+  },
+  {
+    "name": "Dodi Lukebakio",
+    "group": null,
+    "code": "DOD"
+  },
+  {
+    "name": "Maxim De Cuyper",
+    "group": null,
+    "code": "MAX"
+  },
+  {
+    "name": "Joaquin Seys",
+    "group": null,
+    "code": "JOA"
+  },
+  {
+    "name": "Charles De Ketelaere",
+    "group": null,
+    "code": "CHA"
+  },
+  {
+    "name": "Koni De Winter",
+    "group": null,
+    "code": "KON"
+  },
+  {
+    "name": "Diego Moreira",
+    "group": null,
+    "code": "DIE"
+  },
+  {
+    "name": "Mike Penders",
+    "group": null,
+    "code": "MIK"
+  },
+  {
+    "name": "Yan Valery",
+    "group": null,
+    "code": "YAN"
+  },
+  {
+    "name": "Timothy Castagne",
+    "group": null,
+    "code": "TIM"
+  },
+  {
+    "name": "Mortadha Ben Ouanes",
+    "group": null,
+    "code": "MOR"
+  },
+  {
+    "name": "Ellyes Skhiri",
+    "group": null,
+    "code": "ELL"
+  },
+  {
+    "name": "Haitham Hassan",
+    "group": null,
+    "code": "HAI"
+  },
+  {
+    "name": "Al Mahdi Soliman",
+    "group": null,
+    "code": "AL16"
+  },
+  {
+    "name": "Mehdi Ghaedi",
+    "group": null,
+    "code": "MEH"
+  },
+  {
+    "name": "Mohamed Alaa",
+    "group": null,
+    "code": "MOH"
+  },
+  {
+    "name": "Rami Rabia",
+    "group": null,
+    "code": "RAM"
+  },
+  {
+    "name": "Jeremy Doku",
+    "group": null,
+    "code": "JER"
+  },
+  {
+    "name": "Nicolas Raskin",
+    "group": null,
+    "code": "NIC"
+  },
+  {
+    "name": "Arthur Theate",
+    "group": null,
+    "code": "ART"
+  },
+  {
+    "name": "Ahmed Fatouh",
+    "group": null,
+    "code": "AHM13"
+  },
+  {
+    "name": "Mohamed Salah",
+    "group": null,
+    "code": "MOH"
+  },
+  {
+    "name": "Leandro Trossard",
+    "group": null,
+    "code": "LEA"
+  },
+  {
+    "name": "Mohamed Hany",
+    "group": null,
+    "code": "MOH"
+  },
+  {
+    "name": "Emam Ashour",
+    "group": null,
+    "code": "EMA"
+  },
+  {
+    "name": "Amadou Onana",
+    "group": null,
+    "code": "AMA"
+  },
+  {
+    "name": "Mahmoud Saber",
+    "group": null,
+    "code": "MAH"
+  },
+  {
+    "name": "Hossam Abdelmaguid",
+    "group": null,
+    "code": "HOS"
+  },
+  {
+    "name": "Mohamed Abdelmonem",
+    "group": null,
+    "code": "MOH"
+  },
+  {
+    "name": "Kevin De Bruyne",
+    "group": null,
+    "code": "KEV"
+  },
+  {
+    "name": "Axel Witsel",
+    "group": null,
+    "code": "AXE"
+  },
+  {
+    "name": "Yasser Ibrahim",
+    "group": null,
+    "code": "YAS"
+  },
+  {
+    "name": "D. Eckert Ayensa",
+    "group": null,
+    "code": "D24"
+  },
+  {
+    "name": "A. Baba",
+    "group": null,
+    "code": "A17"
+  },
+  {
+    "name": "Rouzbeh Cheshmi",
+    "group": null,
+    "code": "ROU"
+  },
+  {
+    "name": "H. Hosseini",
+    "group": null,
+    "code": "H22"
+  },
+  {
+    "name": "Carlos dos Santos",
+    "group": null,
+    "code": "CAR"
+  },
+  {
+    "name": "Gilson Benchimol",
+    "group": null,
+    "code": "GIL"
+  },
+  {
+    "name": "Diney Borges",
+    "group": null,
+    "code": "DIN"
+  },
+  {
+    "name": "Mohammad Ghorbani",
+    "group": null,
+    "code": "MOH"
+  },
+  {
+    "name": "Saman Ghoddos",
+    "group": null,
+    "code": "SAM"
+  },
+  {
+    "name": "Ramin Rezaeian",
+    "group": null,
+    "code": "RAM"
+  },
+  {
+    "name": "Mehdi Torabi",
+    "group": null,
+    "code": "MEH"
+  },
+  {
+    "name": "Stopira",
+    "group": null,
+    "code": "STO"
+  },
+  {
+    "name": "Mehdi Taremi",
+    "group": null,
+    "code": "MEH"
+  },
+  {
+    "name": "Alireza Jahanbakhsh",
+    "group": null,
+    "code": "ALI"
+  },
+  {
+    "name": "Shahriar Moghanlou",
+    "group": null,
+    "code": "SHA"
+  },
+  {
+    "name": "Wagner Pina",
+    "group": null,
+    "code": "WAG"
+  },
+  {
+    "name": "Logan Costa",
+    "group": null,
+    "code": "LOG"
+  },
+  {
+    "name": "Kelvin Pires",
+    "group": null,
+    "code": "KEL"
+  },
+  {
+    "name": "Jovane Cabral",
+    "group": null,
+    "code": "JOV"
+  },
+  {
+    "name": "Payam Niazmand",
+    "group": null,
+    "code": "PAY"
+  },
+  {
+    "name": "Steven Moreira",
+    "group": null,
+    "code": "STE"
+  },
+  {
+    "name": "Dailon Livramento",
+    "group": null,
+    "code": "DAI"
+  },
+  {
+    "name": "Pico",
+    "group": null,
+    "code": "PIC4"
+  },
+  {
+    "name": "Kevin Pina",
+    "group": null,
+    "code": "KEV"
+  },
+  {
+    "name": "Hassan Tambakti",
+    "group": null,
+    "code": "HAS"
+  },
+  {
+    "name": "Feras Al Brikan",
+    "group": null,
+    "code": "FER"
+  },
+  {
+    "name": "Sultan Mandash",
+    "group": null,
+    "code": "SUL"
+  },
+  {
+    "name": "Abdullah Al Hamdan",
+    "group": null,
+    "code": "ABD"
+  },
+  {
+    "name": "Saleh Al Shehri",
+    "group": null,
+    "code": "SAL"
+  },
+  {
+    "name": "Jehad Thakri",
+    "group": null,
+    "code": "JEH"
+  },
+  {
+    "name": "Jamiro Monteiro",
+    "group": null,
+    "code": "JAM"
+  },
+  {
+    "name": "Nawaf Boushal",
+    "group": null,
+    "code": "NAW"
+  },
+  {
+    "name": "Ryan Mendes",
+    "group": null,
+    "code": "RYA"
+  },
+  {
+    "name": "Ali Majrashi",
+    "group": null,
+    "code": "ALI"
+  },
+  {
+    "name": "Ayman Yahya",
+    "group": null,
+    "code": "AYM"
+  },
+  {
+    "name": "Deroy Duarte",
+    "group": null,
+    "code": "DER"
+  },
+  {
+    "name": "Helio Varela",
+    "group": null,
+    "code": "HEL"
+  },
+  {
+    "name": "João Paulo",
+    "group": null,
+    "code": "JO8"
+  },
+  {
+    "name": "Willy Semedo",
+    "group": null,
+    "code": "WIL"
+  },
+  {
+    "name": "Alidu Seidu",
+    "group": null,
+    "code": "ALI"
+  },
+  {
+    "name": "Telmo Arcanjo",
+    "group": null,
+    "code": "TEL"
+  },
+  {
+    "name": "Hassan Kadesh",
+    "group": null,
+    "code": "HAS"
+  },
+  {
+    "name": "Alex Grimaldo",
+    "group": null,
+    "code": "ALE"
+  },
+  {
+    "name": "Pau Cubarsí Paredes",
+    "group": null,
+    "code": "PAU22"
+  },
+  {
+    "name": "Ziyad Al Johani",
+    "group": null,
+    "code": "ZIY"
+  },
+  {
+    "name": "K. Peprah Oppong",
+    "group": null,
+    "code": "K21"
+  },
+  {
+    "name": "Salem Al Dawsari",
+    "group": null,
+    "code": "SAL"
+  },
+  {
+    "name": "Nico Williams",
+    "group": null,
+    "code": "NIC"
+  },
+  {
+    "name": "Nawaf Al Aqidi",
+    "group": null,
+    "code": "NAW"
+  },
+  {
+    "name": "Ahmed Al Kassar",
+    "group": null,
+    "code": "AHM22"
+  },
+  {
+    "name": "Marc Cucurella",
+    "group": null,
+    "code": "MAR"
+  },
+  {
+    "name": "Mikel Oyarzabal",
+    "group": null,
+    "code": "MIK"
+  },
+  {
+    "name": "Pedri",
+    "group": null,
+    "code": "PED"
+  },
+  {
+    "name": "Dani Olmo",
+    "group": null,
+    "code": "DAN"
+  },
+  {
+    "name": "Lamine Yamal",
+    "group": null,
+    "code": "LAM"
+  },
+  {
+    "name": "Nasser Al Dawsari",
+    "group": null,
+    "code": "NAS"
+  },
+  {
+    "name": "Fabian Ruiz",
+    "group": null,
+    "code": "FAB"
+  },
+  {
+    "name": "Joan Garcia",
+    "group": null,
+    "code": "JOA"
+  },
+  {
+    "name": "Marc Pubill",
+    "group": null,
+    "code": "MAR"
+  },
+  {
+    "name": "Eric Garcia",
+    "group": null,
+    "code": "ERI"
+  },
+  {
+    "name": "Gavi",
+    "group": null,
+    "code": "GAV"
+  },
+  {
+    "name": "Victor Munoz",
+    "group": null,
+    "code": "VIC"
+  },
+  {
+    "name": "Rodri",
+    "group": null,
+    "code": "ROD"
+  },
+  {
+    "name": "Brice Samba",
+    "group": null,
+    "code": "BRI"
+  },
+  {
+    "name": "Mike Maignan",
+    "group": null,
+    "code": "MIK"
+  },
+  {
+    "name": "Alex Baena",
+    "group": null,
+    "code": "ALE"
+  },
+  {
+    "name": "Lucas Hernandez",
+    "group": null,
+    "code": "LUC"
+  },
+  {
+    "name": "Ibrahima Konate",
+    "group": null,
+    "code": "IBR"
+  },
+  {
+    "name": "N'Golo Kante",
+    "group": null,
+    "code": "NG"
+  },
+  {
+    "name": "Jean-Philippe Mateta",
+    "group": null,
+    "code": "JEA"
+  },
+  {
+    "name": "Fahad Talib",
+    "group": null,
+    "code": "FAH"
+  },
+  {
+    "name": "Frans Putros",
+    "group": null,
+    "code": "FRA"
+  },
+  {
+    "name": "Kevin Yakob",
+    "group": null,
+    "code": "KEV"
+  },
+  {
+    "name": "Lucas Digne",
+    "group": null,
+    "code": "LUC"
+  },
+  {
+    "name": "Michael Olise",
+    "group": null,
+    "code": "MIC"
+  },
+  {
+    "name": "Akam Rahman",
+    "group": null,
+    "code": "AKA5"
+  },
+  {
+    "name": "A. Qasem",
+    "group": null,
+    "code": "A11"
+  },
+  {
+    "name": "Marcus Holmgren Pedersen",
+    "group": null,
+    "code": "MAR"
+  },
+  {
+    "name": "Sondre Langas",
+    "group": null,
+    "code": "SON"
+  },
+  {
+    "name": "Henrik Falchener",
+    "group": null,
+    "code": "HEN"
+  },
+  {
+    "name": "A. Sørloth",
+    "group": null,
+    "code": "A7"
+  },
+  {
+    "name": "Patrick Berg",
+    "group": null,
+    "code": "PAT"
+  },
+  {
+    "name": "Egil Selvik",
+    "group": null,
+    "code": "EGI"
+  },
+  {
+    "name": "Fredrik Aursnes",
+    "group": null,
+    "code": "FRE"
+  },
+  {
+    "name": "Sander Tangvik",
+    "group": null,
+    "code": "SAN"
+  },
+  {
+    "name": "David Moller Wolfe",
+    "group": null,
+    "code": "DAV"
+  },
+  {
+    "name": "Erling Haaland",
+    "group": null,
+    "code": "ERL"
+  },
+  {
+    "name": "Morten Thorsby",
+    "group": null,
+    "code": "MOR"
+  },
+  {
+    "name": "Julian Ryerson",
+    "group": null,
+    "code": "JUL"
+  },
+  {
+    "name": "Andreas Schjelderup",
+    "group": null,
+    "code": "AND"
+  },
+  {
+    "name": "Thelo Aasgaard",
+    "group": null,
+    "code": "THE"
+  },
+  {
+    "name": "Kristian Thorstvedt",
+    "group": null,
+    "code": "KRI"
+  },
+  {
+    "name": "Aymen Hussein",
+    "group": null,
+    "code": "AYM"
+  },
+  {
+    "name": "Pathe Ciss",
+    "group": null,
+    "code": "PAT"
+  },
+  {
+    "name": "Bara Ndiaye",
+    "group": null,
+    "code": "BAR22"
+  },
+  {
+    "name": "Achraf Abada",
+    "group": null,
+    "code": "ACH"
+  },
+  {
+    "name": "Zinedine Belaid",
+    "group": null,
+    "code": "ZIN"
+  },
+  {
+    "name": "Samir Chergui",
+    "group": null,
+    "code": "SAM"
+  },
+  {
+    "name": "Mamadou Sarr",
+    "group": null,
+    "code": "MAM"
+  },
+  {
+    "name": "Antoine Mendy",
+    "group": null,
+    "code": "ANT"
+  },
+  {
+    "name": "Idrissa Gana Gueye",
+    "group": null,
+    "code": "IDR"
+  },
+  {
+    "name": "Kalidou Koulibaly",
+    "group": null,
+    "code": "KAL"
+  },
+  {
+    "name": "Ibrahim Mbaye",
+    "group": null,
+    "code": "IBR"
+  },
+  {
+    "name": "Lamine Camara",
+    "group": null,
+    "code": "LAM"
+  },
+  {
+    "name": "Ismaila Sarr",
+    "group": null,
+    "code": "ISM"
+  },
+  {
+    "name": "El Hadji Malick Diouf",
+    "group": null,
+    "code": "EL"
+  },
+  {
+    "name": "Habib Diarra",
+    "group": null,
+    "code": "HAB"
+  },
+  {
+    "name": "Jaouen Hadjam",
+    "group": null,
+    "code": "JAO"
+  },
+  {
+    "name": "Rafik Belghali",
+    "group": null,
+    "code": "RAF"
+  },
+  {
+    "name": "Augustine Boakye",
+    "group": null,
+    "code": "AUG"
+  },
+  {
+    "name": "Pape Gueye",
+    "group": null,
+    "code": "PAP"
+  },
+  {
+    "name": "Ismail Jakobs",
+    "group": null,
+    "code": "ISM"
+  },
+  {
+    "name": "Abdoulaye Seck",
+    "group": null,
+    "code": "ABD"
+  },
+  {
+    "name": "Rayan Ait Nouri",
+    "group": null,
+    "code": "RAY"
+  },
+  {
+    "name": "Mohamed Amine Tougai",
+    "group": null,
+    "code": "MOH"
+  },
+  {
+    "name": "Mohamed Amine Amoura",
+    "group": null,
+    "code": "MOH"
+  },
+  {
+    "name": "Nicolas Paz",
+    "group": null,
+    "code": "NIC"
+  },
+  {
+    "name": "L. Balerdi",
+    "group": null,
+    "code": "L2"
+  },
+  {
+    "name": "Oussama Benbot",
+    "group": null,
+    "code": "OUS"
+  },
+  {
+    "name": "Lionel Messi",
+    "group": null,
+    "code": "LIO"
+  },
+  {
+    "name": "Julian Alvarez",
+    "group": null,
+    "code": "JUL"
+  },
+  {
+    "name": "Yassine Titraoui",
+    "group": null,
+    "code": "YAS"
+  },
+  {
+    "name": "Houssem Aouar",
+    "group": null,
+    "code": "HOU"
+  },
+  {
+    "name": "Amine Gouiri",
+    "group": null,
+    "code": "AMI"
+  },
+  {
+    "name": "Nicolas Gonzalez",
+    "group": null,
+    "code": "NIC"
+  },
+  {
+    "name": "Geronimo Rulli",
+    "group": null,
+    "code": "GER"
+  },
+  {
+    "name": "Adil Boulbina",
+    "group": null,
+    "code": "ADI"
+  },
+  {
+    "name": "Fares Ghedjemis",
+    "group": null,
+    "code": "FAR"
+  },
+  {
+    "name": "Kwasi Sibo",
+    "group": null,
+    "code": "KWA"
+  },
+  {
+    "name": "Jose Manuel Lopez",
+    "group": null,
+    "code": "JOS"
+  },
+  {
+    "name": "Juan Musso",
+    "group": null,
+    "code": "JUA"
+  },
+  {
+    "name": "Riyad Mahrez",
+    "group": null,
+    "code": "RIY"
+  },
+  {
+    "name": "Hicham Boudaoui",
+    "group": null,
+    "code": "HIC"
+  },
+  {
+    "name": "Nabil Bentaleb",
+    "group": null,
+    "code": "NAB"
+  },
+  {
+    "name": "Cristian Romero",
+    "group": null,
+    "code": "CRI"
+  },
+  {
+    "name": "Florian Wiegele",
+    "group": null,
+    "code": "FLO"
+  },
+  {
+    "name": "Jose Fajardo",
+    "group": null,
+    "code": "JOS"
+  },
+  {
+    "name": "Exequiel Palacios",
+    "group": null,
+    "code": "EXE"
+  },
+  {
+    "name": "Giovani Lo Celso",
+    "group": null,
+    "code": "GIO"
+  },
+  {
+    "name": "Kevin Danso",
+    "group": null,
+    "code": "KEV"
+  },
+  {
+    "name": "Valentin Barco",
+    "group": null,
+    "code": "VAL"
+  },
+  {
+    "name": "Michael Svoboda",
+    "group": null,
+    "code": "MIC"
+  },
+  {
+    "name": "Xaver Schlager",
+    "group": null,
+    "code": "XAV"
+  },
+  {
+    "name": "Marko Arnautovic",
+    "group": null,
+    "code": "MAR"
+  },
+  {
+    "name": "Nicolas Otamendi",
+    "group": null,
+    "code": "NIC"
+  },
+  {
+    "name": "Philipp Lienhart",
+    "group": null,
+    "code": "PHI"
+  },
+  {
+    "name": "Alexander Prass",
+    "group": null,
+    "code": "ALE"
+  },
+  {
+    "name": "David Affengruber",
+    "group": null,
+    "code": "DAV"
+  },
+  {
+    "name": "Phillipp Mwene",
+    "group": null,
+    "code": "PHI"
+  },
+  {
+    "name": "Carney Chukwuemeka",
+    "group": null,
+    "code": "CAR"
+  },
+  {
+    "name": "Thiago Almada",
+    "group": null,
+    "code": "THI"
+  },
+  {
+    "name": "Marco Friedl",
+    "group": null,
+    "code": "MAR"
+  },
+  {
+    "name": "Rodrigo De Paul",
+    "group": null,
+    "code": "ROD"
+  },
+  {
+    "name": "Romano Schmid",
+    "group": null,
+    "code": "ROM"
+  },
+  {
+    "name": "David Alaba",
+    "group": null,
+    "code": "DAV"
+  },
+  {
+    "name": "Hossam Abu Al-Dahab",
+    "group": null,
+    "code": "HOS"
+  },
+  {
+    "name": "Ouda Al-Fakhouri",
+    "group": null,
+    "code": "OUD"
+  },
+  {
+    "name": "Ali Azaizeh",
+    "group": null,
+    "code": "ALI"
+  },
+  {
+    "name": "A. Badawi",
+    "group": null,
+    "code": "A26"
+  },
+  {
+    "name": "Yazan Al-Arab",
+    "group": null,
+    "code": "YAZ"
+  },
+  {
+    "name": "M. Abualnadi",
+    "group": null,
+    "code": "M16"
+  },
+  {
+    "name": "Saed Al Rosan",
+    "group": null,
+    "code": "SAE19"
+  },
+  {
+    "name": "Michael Gregoritsch",
+    "group": null,
+    "code": "MIC"
+  },
+  {
+    "name": "Max Crocombe",
+    "group": null,
+    "code": "MAX"
+  },
+  {
+    "name": "Mahmoud Al-Mardi",
+    "group": null,
+    "code": "MAH"
+  },
+  {
+    "name": "Alessandro Schopf",
+    "group": null,
+    "code": "ALE"
+  },
+  {
+    "name": "Abdallah Al Fakhouri",
+    "group": null,
+    "code": "ABD22"
+  },
+  {
+    "name": "Amer Jamous",
+    "group": null,
+    "code": "AME"
+  },
+  {
+    "name": "Jiovany Ramos",
+    "group": null,
+    "code": "JIO"
+  },
+  {
+    "name": "Cesar Samudio",
+    "group": null,
+    "code": "CES"
+  },
+  {
+    "name": "Edgardo Farina",
+    "group": null,
+    "code": "EDG"
+  },
+  {
+    "name": "Ehsan Haddad",
+    "group": null,
+    "code": "EHS"
+  },
+  {
+    "name": "Marko Stamenic",
+    "group": null,
+    "code": "MAR"
+  },
+  {
+    "name": "Mohannad Abu Taha",
+    "group": null,
+    "code": "MOH20"
+  },
+  {
+    "name": "Ali Olwan",
+    "group": null,
+    "code": "ALI"
+  },
+  {
+    "name": "Noureddin Zaid",
+    "group": null,
+    "code": "NOU12"
+  },
+  {
+    "name": "A. Gómez",
+    "group": null,
+    "code": "A26"
+  },
+  {
+    "name": "Cesar Yanis",
+    "group": null,
+    "code": "CES"
+  },
+  {
+    "name": "Rajaei Ayed",
+    "group": null,
+    "code": "RAJ"
+  },
+  {
+    "name": "Matthieu Epolo",
+    "group": null,
+    "code": "MAT"
+  },
+  {
+    "name": "Johan Mojica",
+    "group": null,
+    "code": "JOH"
+  },
+  {
+    "name": "Jefferson Lerma",
+    "group": null,
+    "code": "JEF"
+  },
+  {
+    "name": "James Rodriguez",
+    "group": null,
+    "code": "JAM"
+  },
+  {
+    "name": "Alvaro Montero",
+    "group": null,
+    "code": "ALV"
+  },
+  {
+    "name": "Juan Fernando Quintero",
+    "group": null,
+    "code": "JUA"
+  },
+  {
+    "name": "Willer Ditta",
+    "group": null,
+    "code": "WIL"
+  },
+  {
+    "name": "Davinson Sanchez",
+    "group": null,
+    "code": "DAV"
+  },
+  {
+    "name": "Jhon Cordoba",
+    "group": null,
+    "code": "JHO"
+  },
+  {
+    "name": "Yerry Mina",
+    "group": null,
+    "code": "YER"
+  },
+  {
+    "name": "Mousa Tamari",
+    "group": null,
+    "code": "MOU10"
+  },
+  {
+    "name": "David Ospina",
+    "group": null,
+    "code": "DAV"
+  },
+  {
+    "name": "Santiago Arias",
+    "group": null,
+    "code": "SAN"
+  },
+  {
+    "name": "Jaminton Campaz",
+    "group": null,
+    "code": "JAM"
+  },
+  {
+    "name": "Jorge Carrascal",
+    "group": null,
+    "code": "JOR"
+  },
+  {
+    "name": "Daniel Munoz",
+    "group": null,
+    "code": "DAN"
+  },
+  {
+    "name": "Deiver Machado",
+    "group": null,
+    "code": "DEI"
+  },
+  {
+    "name": "Gedoon Kalulu",
+    "group": null,
+    "code": "GED"
+  },
+  {
+    "name": "Meshack Elia",
+    "group": null,
+    "code": "MES"
+  },
+  {
+    "name": "Simon Banza",
+    "group": null,
+    "code": "SIM"
+  },
+  {
+    "name": "Aaron Wan-Bissaka",
+    "group": null,
+    "code": "AAR"
+  },
+  {
+    "name": "Steve Kapuadi",
+    "group": null,
+    "code": "STE"
+  },
+  {
+    "name": "Edo Kayembe",
+    "group": null,
+    "code": "EDO"
+  },
+  {
+    "name": "Rui Silva",
+    "group": null,
+    "code": "RUI"
+  },
+  {
+    "name": "Diogo Dalot",
+    "group": null,
+    "code": "DIO"
+  },
+  {
+    "name": "Jose Sa",
+    "group": null,
+    "code": "JOS"
+  },
+  {
+    "name": "Noah Sadiki",
+    "group": null,
+    "code": "NOA"
+  },
+  {
+    "name": "Charles Pickel",
+    "group": null,
+    "code": "CHA"
+  },
+  {
+    "name": "Luis Diaz",
+    "group": null,
+    "code": "LUI"
+  },
+  {
+    "name": "Matheus Nunes",
+    "group": null,
+    "code": "MAT"
+  },
+  {
+    "name": "Brian Cipenga",
+    "group": null,
+    "code": "BRI"
+  },
+  {
+    "name": "Dylan Batubinsika",
+    "group": null,
+    "code": "DYL"
+  },
+  {
+    "name": "Fiston Mayele",
+    "group": null,
+    "code": "FIS"
+  },
+  {
+    "name": "Cedric Bakambu",
+    "group": null,
+    "code": "CED"
+  },
+  {
+    "name": "Yoane Wissa",
+    "group": null,
+    "code": "YOA"
+  },
+  {
+    "name": "Nathanael Mbuku",
+    "group": null,
+    "code": "NAT"
+  },
+  {
+    "name": "Lionel Mpasi",
+    "group": null,
+    "code": "LIO"
+  },
+  {
+    "name": "Nelson Semedo",
+    "group": null,
+    "code": "NEL"
+  },
+  {
+    "name": "Abduvohid Nematov",
+    "group": null,
+    "code": "ABD"
+  },
+  {
+    "name": "Umar Eshmurodov",
+    "group": null,
+    "code": "UMA"
+  },
+  {
+    "name": "Avazbek Ulmasaliev",
+    "group": null,
+    "code": "AVA"
+  },
+  {
+    "name": "Rustam Ashurmatov",
+    "group": null,
+    "code": "RUS"
+  },
+  {
+    "name": "Francisco Conceicao",
+    "group": null,
+    "code": "FRA"
+  },
+  {
+    "name": "Goncalo Inacio",
+    "group": null,
+    "code": "GON"
+  },
+  {
+    "name": "Ruben Dias",
+    "group": null,
+    "code": "RUB"
+  },
+  {
+    "name": "Tomas Araujo",
+    "group": null,
+    "code": "TOM"
+  },
+  {
+    "name": "Goncalo Guedes",
+    "group": null,
+    "code": "GON"
+  },
+  {
+    "name": "Joao Neves",
+    "group": null,
+    "code": "JOA"
+  },
+  {
+    "name": "Utkir Yusupov",
+    "group": null,
+    "code": "UTK"
+  },
+  {
+    "name": "Ruben Neves",
+    "group": null,
+    "code": "RUB"
+  },
+  {
+    "name": "Samú Costa",
+    "group": null,
+    "code": "SAM24"
+  },
+  {
+    "name": "Renato Veiga",
+    "group": null,
+    "code": "REN"
+  },
+  {
+    "name": "Bernardo Silva",
+    "group": null,
+    "code": "BER"
+  },
+  {
+    "name": "Bekhruz Karimov",
+    "group": null,
+    "code": "BEK"
+  },
+  {
+    "name": "Farrukh Sayfiev",
+    "group": null,
+    "code": "FAR"
+  },
+  {
+    "name": "Joao Felix",
+    "group": null,
+    "code": "JOA"
+  },
+  {
+    "name": "Vitinha",
+    "group": null,
+    "code": "VIT"
+  },
+  {
+    "name": "Cristiano Ronaldo",
+    "group": null,
+    "code": "CRI"
+  },
+  {
+    "name": "Odiljon Hamrobekov",
+    "group": null,
+    "code": "ODI"
+  },
+  {
+    "name": "Jamshid Iskanderov",
+    "group": null,
+    "code": "JAM"
+  },
+  {
+    "name": "O. Orunov",
+    "group": null,
+    "code": "O11"
+  },
+  {
+    "name": "I. Matanovic",
+    "group": null,
+    "code": "I20"
+  },
+  {
+    "name": "P. Musa",
+    "group": null,
+    "code": "P26"
+  },
+  {
+    "name": "A. Kramaric",
+    "group": null,
+    "code": "A9"
+  },
+  {
+    "name": "Nikola Vlasic",
+    "group": null,
+    "code": "NIK"
+  },
+  {
+    "name": "Dostonbek Khamdamov",
+    "group": null,
+    "code": "DOS"
+  },
+  {
+    "name": "Otabek Shukurov",
+    "group": null,
+    "code": "OTA"
+  },
+  {
+    "name": "Luka Vuskovic",
+    "group": null,
+    "code": "LUK"
+  },
+  {
+    "name": "Nico O'Reilly",
+    "group": null,
+    "code": "NIC"
+  },
+  {
+    "name": "Reece James",
+    "group": null,
+    "code": "REE"
+  },
+  {
+    "name": "Jarell Quansah",
+    "group": null,
+    "code": "JAR"
+  },
+  {
+    "name": "Ivan Toney",
+    "group": null,
+    "code": "IVA"
+  },
+  {
+    "name": "Dan Burn",
+    "group": null,
+    "code": "DAN"
+  },
+  {
+    "name": "Luka Sucic",
+    "group": null,
+    "code": "LUK"
+  },
+  {
+    "name": "Marc Guehi",
+    "group": null,
+    "code": "MAR"
+  },
+  {
+    "name": "James Trafford",
+    "group": null,
+    "code": "JAM"
+  },
+  {
+    "name": "Harry Kane",
+    "group": null,
+    "code": "HAR"
+  },
+  {
+    "name": "Eldor Shomurodov",
+    "group": null,
+    "code": "ELD"
+  },
+  {
+    "name": "Igor Sergeev",
+    "group": null,
+    "code": "IGO"
+  },
+  {
+    "name": "Tino Livramento",
+    "group": null,
+    "code": "TIN"
+  },
+  {
+    "name": "Christopher Bonsu Baah",
+    "group": null,
+    "code": "CHR"
+  },
+  {
+    "name": "A. Hlozek",
+    "group": null,
+    "code": "A9"
+  },
+  {
+    "name": "Denzel Dumfries",
+    "group": null,
+    "code": "DEN"
+  },
+  {
+    "name": "Hiroki Ito",
+    "group": null,
+    "code": "HIR"
+  },
+  {
+    "name": "Declan Rice",
+    "group": null,
+    "code": "DEC"
+  },
+  {
+    "name": "Anthony Gordon",
+    "group": null,
+    "code": "ANT"
+  },
+  {
+    "name": "Jude Bellingham",
+    "group": null,
+    "code": "JUD"
+  },
+  {
+    "name": "Yuito Suzuki",
+    "group": null,
+    "code": "YUI"
+  },
+  {
+    "name": "Jordan Henderson",
+    "group": null,
+    "code": "JOR"
+  },
+  {
+    "name": "Eberechi Eze",
+    "group": null,
+    "code": "EBE"
+  },
+  {
+    "name": "Kobbie Mainoo",
+    "group": null,
+    "code": "KOB"
+  },
+  {
+    "name": "Zion Suzuki",
+    "group": null,
+    "code": "ZIO"
+  },
+  {
+    "name": "Noni Madueke",
+    "group": null,
+    "code": "NON"
+  },
+  {
+    "name": "Inaki Williams",
+    "group": null,
+    "code": "INA"
+  },
+  {
+    "name": "Mats Wieffer",
+    "group": null,
+    "code": "MAT"
+  },
+  {
+    "name": "Morgan Rogers",
+    "group": null,
+    "code": "MOR"
+  },
+  {
+    "name": "Ollie Watkins",
+    "group": null,
+    "code": "OLL"
+  },
+  {
+    "name": "Ernest Nuamah",
+    "group": null,
+    "code": "ERN"
+  },
+  {
+    "name": "Jean-Michael Seri",
+    "group": null,
+    "code": "JEA"
+  },
+  {
+    "name": "Brandon Thomas-Asante",
+    "group": null,
+    "code": "BRA"
+  },
+  {
+    "name": "Taha Ali",
+    "group": null,
+    "code": "TAH"
+  },
+  {
+    "name": "A. Ben Hmida",
+    "group": null,
+    "code": "A21"
+  },
+  {
+    "name": "S. Ben Hsan",
+    "group": null,
+    "code": "S22"
+  },
+  {
+    "name": "Sidny Cabral",
+    "group": null,
+    "code": "SID"
+  },
+  {
+    "name": "Kamal Deen Sulemana",
+    "group": null,
+    "code": "KAM"
+  },
+  {
+    "name": "Jonas Adjetey",
+    "group": null,
+    "code": "JON"
+  },
+  {
+    "name": "A. Fatawu",
+    "group": null,
+    "code": "A7"
+  },
+  {
+    "name": "Amir Murillo",
+    "group": null,
+    "code": "AMI"
+  },
+  {
+    "name": "Derrick Luckassen",
+    "group": null,
+    "code": "DER"
+  },
+  {
+    "name": "Lawrence Ati-Zigi",
+    "group": null,
+    "code": "LAW"
+  },
+  {
+    "name": "Marcio Rosa",
+    "group": null,
+    "code": "MAR"
+  },
+  {
+    "name": "Cesar Blackman",
+    "group": null,
+    "code": "CES"
+  },
+  {
+    "name": "Carl Starfelt",
+    "group": null,
+    "code": "CAR"
+  },
+  {
+    "name": "Jorge Gutierrez",
+    "group": null,
+    "code": "JOR"
+  },
+  {
+    "name": "Abdul Mumin",
+    "group": null,
+    "code": "ABD"
+  },
+  {
+    "name": "Marvin Senaya",
+    "group": null,
+    "code": "MAR"
+  },
+  {
+    "name": "Gideon Mensah",
+    "group": null,
+    "code": "GID"
+  },
+  {
+    "name": "Joseph Anang",
+    "group": null,
+    "code": "JOS"
+  },
+  {
+    "name": "Thomas Partey",
+    "group": null,
+    "code": "THO"
+  },
+  {
+    "name": "Prince Kwabena Adu",
+    "group": null,
+    "code": "PRI"
+  },
+  {
+    "name": "Raed Chikhaoui",
+    "group": null,
+    "code": "RAE"
+  },
+  {
+    "name": "C. Acevedo",
+    "group": null,
+    "code": "C12"
+  },
+  {
+    "name": "A. Modiba",
+    "group": null,
+    "code": "A6"
+  },
+  {
+    "name": "I. Rayners",
+    "group": null,
+    "code": "I15"
+  },
+  {
+    "name": "D. Visinský",
+    "group": null,
+    "code": "D26"
+  },
+  {
+    "name": "T. Soucek",
+    "group": null,
+    "code": "T22"
+  },
+  {
+    "name": "Jose Cordoba",
+    "group": null,
+    "code": "JOS"
+  },
+  {
+    "name": "Carlos Harvey",
+    "group": null,
+    "code": "CAR"
+  },
+  {
+    "name": "Adalberto Carrasquilla",
+    "group": null,
+    "code": "ADA"
+  },
+  {
+    "name": "Yoel Barcenas",
+    "group": null,
+    "code": "YOE"
+  },
+  {
+    "name": "Orlando Mosquera",
+    "group": null,
+    "code": "ORL"
+  },
+  {
+    "name": "Andres Andrade",
+    "group": null,
+    "code": "AND"
+  },
+  {
+    "name": "Cecilio Waterman",
+    "group": null,
+    "code": "CEC"
+  },
+  {
+    "name": "Roderick Miller",
+    "group": null,
+    "code": "ROD"
+  },
+  {
+    "name": "Alberto Quintero",
+    "group": null,
+    "code": "ALB"
+  },
+  {
+    "name": "Tomas Rodriguez",
+    "group": null,
+    "code": "TOM"
+  },
+  {
+    "name": "Eric Davis",
+    "group": null,
+    "code": "ERI"
+  },
+  {
+    "name": "Ismael Diaz",
+    "group": null,
+    "code": "ISM"
+  },
+  {
+    "name": "Fidel Escobar",
+    "group": null,
+    "code": "FID"
+  },
+  {
+    "name": "Anibal Godoy",
+    "group": null,
+    "code": "ANI"
+  },
+  {
+    "name": "Jose Luis Rodriguez",
+    "group": null,
+    "code": "JOS"
+  },
+  {
+    "name": "Luis Mejia",
+    "group": null,
+    "code": "LUI"
+  },
+  {
+    "name": "Hwang Hee-Chan",
+    "group": null,
+    "code": "HWA11"
+  },
+  {
+    "name": "Kim Moon-Hwan",
+    "group": null,
+    "code": "KIM15"
+  },
+  {
+    "name": "Kim Seung-Gyu",
+    "group": null,
+    "code": "KIM1"
+  },
+  {
+    "name": "Kim Tae-Hyeon",
+    "group": null,
+    "code": "KIM5"
+  },
+  {
+    "name": "C. Larin",
+    "group": null,
+    "code": "C9"
+  },
+  {
+    "name": "L. De Fougerolles",
+    "group": null,
+    "code": "L4"
+  },
+  {
+    "name": "A. Dedic",
+    "group": null,
+    "code": "A7"
+  },
+  {
+    "name": "E. Demirovic",
+    "group": null,
+    "code": "E10"
+  },
+  {
+    "name": "S. Kolasinac",
+    "group": null,
+    "code": "S5"
+  },
+  {
+    "name": "Ahmed Alaa",
+    "group": null,
+    "code": "AHM"
+  },
+  {
+    "name": "A. Al Oui",
+    "group": null,
+    "code": "A13"
+  },
+  {
+    "name": "Ahmed Al Ganehi",
+    "group": null,
+    "code": "AHM17"
+  },
+  {
+    "name": "Weverton",
+    "group": null,
+    "code": "WEV"
+  },
+  {
+    "name": "Pedro Miguel",
+    "group": null,
+    "code": "PED"
+  },
+  {
+    "name": "Ahmed Fathi",
+    "group": null,
+    "code": "AHM"
+  },
+  {
+    "name": "Bremer",
+    "group": null,
+    "code": "BRE"
+  },
+  {
+    "name": "Endrick",
+    "group": null,
+    "code": "END"
+  },
+  {
+    "name": "Bruno Guimaraes",
+    "group": null,
+    "code": "BRU"
+  },
+  {
+    "name": "Rayan",
+    "group": null,
+    "code": "RAY"
+  },
+  {
+    "name": "Karim Boudiaf",
+    "group": null,
+    "code": "KAR"
+  },
+  {
+    "name": "Raphinha",
+    "group": null,
+    "code": "RAP"
+  },
+  {
+    "name": "A. Amaimouni",
+    "group": null,
+    "code": "A21"
+  },
+  {
+    "name": "Leverton Pierre",
+    "group": null,
+    "code": "LEV"
+  },
+  {
+    "name": "Louicius Deedson",
+    "group": null,
+    "code": "LOU"
+  },
+  {
+    "name": "Ross Stewart",
+    "group": null,
+    "code": "ROS"
+  },
+  {
+    "name": "Ricardo Ade",
+    "group": null,
+    "code": "RIC"
+  },
+  {
+    "name": "Braian Ojeda",
+    "group": null,
+    "code": "BRA"
+  },
+  {
+    "name": "Ramon Sosa",
+    "group": null,
+    "code": "RAM"
+  },
+  {
+    "name": "Grant Hanley",
+    "group": null,
+    "code": "GRA"
+  },
+  {
+    "name": "Lenny Joseph",
+    "group": null,
+    "code": "LEN"
+  },
+  {
+    "name": "Chadi Riad",
+    "group": null,
+    "code": "CHA"
+  },
+  {
+    "name": "Duke Lacroix",
+    "group": null,
+    "code": "DUK"
+  },
+  {
+    "name": "Gessime Yassine",
+    "group": null,
+    "code": "GES16"
+  },
+  {
+    "name": "Che Adams",
+    "group": null,
+    "code": "CHE"
+  },
+  {
+    "name": "Ben Gannon-Doak",
+    "group": null,
+    "code": "BEN"
+  },
+  {
+    "name": "Johny Placide",
+    "group": null,
+    "code": "JOH"
+  },
+  {
+    "name": "Gaston Olveira",
+    "group": null,
+    "code": "GAS"
+  },
+  {
+    "name": "Gabriel Avalos",
+    "group": null,
+    "code": "GAB"
+  },
+  {
+    "name": "Nathan Patterson",
+    "group": null,
+    "code": "NAT"
+  },
+  {
+    "name": "Ryan Christie",
+    "group": null,
+    "code": "RYA"
+  },
+  {
+    "name": "Brahim Diaz",
+    "group": null,
+    "code": "BRA"
+  },
+  {
+    "name": "Diego Gomez",
+    "group": null,
+    "code": "DIE"
+  },
+  {
+    "name": "A. Romero",
+    "group": null,
+    "code": "A17"
+  },
+  {
+    "name": "Kenan Yildiz",
+    "group": null,
+    "code": "KEN"
+  },
+  {
+    "name": "Alex Freeman",
+    "group": null,
+    "code": "ALE"
+  },
+  {
+    "name": "Gio Reyna",
+    "group": null,
+    "code": "GIO"
+  },
+  {
+    "name": "Altay Bayindir",
+    "group": null,
+    "code": "ALT"
+  },
+  {
+    "name": "Eren Elmali",
+    "group": null,
+    "code": "ERE"
+  },
+  {
+    "name": "Trevor Doornbusch",
+    "group": null,
+    "code": "TRE"
+  },
+  {
+    "name": "Nestory Irankunda",
+    "group": null,
+    "code": "NES"
+  },
+  {
+    "name": "Can Uzun",
+    "group": null,
+    "code": "CAN"
+  },
+  {
+    "name": "Leandro Bacuna",
+    "group": null,
+    "code": "LEA"
+  },
+  {
+    "name": "Mathew Leckie",
+    "group": null,
+    "code": "MAT"
+  },
+  {
+    "name": "Lucas Herrington",
+    "group": null,
+    "code": "LUC"
+  },
+  {
+    "name": "Sergino Dest",
+    "group": null,
+    "code": "SER"
+  },
+  {
+    "name": "Roshon van Eijma",
+    "group": null,
+    "code": "ROS"
+  },
+  {
+    "name": "Mark McKenzie",
+    "group": null,
+    "code": "MAR"
+  },
+  {
+    "name": "Folarin Balogun",
+    "group": null,
+    "code": "FOL"
+  },
+  {
+    "name": "Ozan Kabak",
+    "group": null,
+    "code": "OZA"
+  },
+  {
+    "name": "Connor Metcalfe",
+    "group": null,
+    "code": "CON"
+  },
+  {
+    "name": "Armando Obispo",
+    "group": null,
+    "code": "ARM"
+  },
+  {
+    "name": "Aziz Behich",
+    "group": null,
+    "code": "AZI"
+  },
+  {
+    "name": "Orkun Kokcu",
+    "group": null,
+    "code": "ORK"
+  },
+  {
+    "name": "David Raum",
+    "group": null,
+    "code": "DAV"
+  },
+  {
+    "name": "Amad Diallo",
+    "group": null,
+    "code": "AMA"
+  },
+  {
+    "name": "Ousmane Diomande",
+    "group": null,
+    "code": "OUS"
+  },
+  {
+    "name": "Yahia Fofana",
+    "group": null,
+    "code": "YAH"
+  },
+  {
+    "name": "Felix Nmecha",
+    "group": null,
+    "code": "FEL"
+  },
+  {
+    "name": "Yuto Nagatomo",
+    "group": null,
+    "code": "YUT"
+  },
+  {
+    "name": "Alan Minda",
+    "group": null,
+    "code": "ALA"
+  },
+  {
+    "name": "Donyell Malen",
+    "group": null,
+    "code": "DON"
+  },
+  {
+    "name": "Jeremy Antonisse",
+    "group": null,
+    "code": "JER"
+  },
+  {
+    "name": "Evan Ndicka",
+    "group": null,
+    "code": "EVA"
+  },
+  {
+    "name": "Nicolas Pepe",
+    "group": null,
+    "code": "NIC"
+  },
+  {
+    "name": "Gervane Kastaneer",
+    "group": null,
+    "code": "GER"
+  },
+  {
+    "name": "Alexander Nubel",
+    "group": null,
+    "code": "ALE"
+  },
+  {
+    "name": "Felix Torres",
+    "group": null,
+    "code": "FEL"
+  },
+  {
+    "name": "Enner Valencia",
+    "group": null,
+    "code": "ENN"
+  },
+  {
+    "name": "Piero Hincapie",
+    "group": null,
+    "code": "PIE"
+  },
+  {
+    "name": "Yan Diomande",
+    "group": null,
+    "code": "YAN"
+  },
+  {
+    "name": "Kendry Paez",
+    "group": null,
+    "code": "KEN"
+  },
+  {
+    "name": "Malick Thiaw",
+    "group": null,
+    "code": "MAL"
+  },
+  {
+    "name": "John Yeboah",
+    "group": null,
+    "code": "JOH"
+  },
+  {
+    "name": "Jamie Leweling",
+    "group": null,
+    "code": "JAM"
+  },
+  {
+    "name": "K. Shiogai",
+    "group": null,
+    "code": "K26"
+  },
+  {
+    "name": "Hazem Mastouri",
+    "group": null,
+    "code": "HAZ"
+  },
+  {
+    "name": "Tarek Alaa",
+    "group": null,
+    "code": "TAR"
+  },
+  {
+    "name": "Mohamed El-Shenawy",
+    "group": null,
+    "code": "MOH"
+  },
+  {
+    "name": "Saeid Ezatolahi",
+    "group": null,
+    "code": "SAE"
+  },
+  {
+    "name": "Omar Marmoush",
+    "group": null,
+    "code": "OMA"
+  },
+  {
+    "name": "Nathan Ngoy",
+    "group": null,
+    "code": "NAT"
+  },
+  {
+    "name": "Saleh Hardani",
+    "group": null,
+    "code": "SAL"
+  },
+  {
+    "name": "Brandon Mechele",
+    "group": null,
+    "code": "BRA"
+  },
+  {
+    "name": "Karim Hafez",
+    "group": null,
+    "code": "KAR"
+  },
+  {
+    "name": "Romelu Lukaku",
+    "group": null,
+    "code": "ROM"
+  },
+  {
+    "name": "Marwan Attia",
+    "group": null,
+    "code": "MAR"
+  },
+  {
+    "name": "Hannibal Mejbri",
+    "group": null,
+    "code": "HAN"
+  },
+  {
+    "name": "Senne Lammens",
+    "group": null,
+    "code": "SEN"
+  },
+  {
+    "name": "Viktor Johansson",
+    "group": null,
+    "code": "VIK"
+  },
+  {
+    "name": "Youri Tielemans",
+    "group": null,
+    "code": "YOU"
+  },
+  {
+    "name": "Hans Vanaken",
+    "group": null,
+    "code": "HAN"
+  },
+  {
+    "name": "Ibrahim Adel",
+    "group": null,
+    "code": "IBR"
+  },
+  {
+    "name": "Danial Eiri",
+    "group": null,
+    "code": "DAN"
+  },
+  {
+    "name": "Alexander Isak",
+    "group": null,
+    "code": "ALE"
+  },
+  {
+    "name": "Herman Johansson",
+    "group": null,
+    "code": "HER"
+  },
+  {
+    "name": "Amir Mohammad Razzaghinia",
+    "group": null,
+    "code": "AMI"
+  },
+  {
+    "name": "E. Hajisafi",
+    "group": null,
+    "code": "E3"
+  },
+  {
+    "name": "Lautaro Martinez",
+    "group": null,
+    "code": "LAU"
+  },
+  {
+    "name": "Ben Waine",
+    "group": null,
+    "code": "BEN"
+  },
+  {
+    "name": "Robin Roefs",
+    "group": null,
+    "code": "ROB"
+  },
+  {
+    "name": "Iliman Ndiaye",
+    "group": null,
+    "code": "ILI"
+  },
+  {
+    "name": "Ali Alipour",
+    "group": null,
+    "code": "ALI"
+  },
+  {
+    "name": "Yehvann Diouf",
+    "group": null,
+    "code": "YEH"
+  },
+  {
+    "name": "Cherif Ndiaye",
+    "group": null,
+    "code": "CHE"
+  },
+  {
+    "name": "Nicolas Jackson",
+    "group": null,
+    "code": "NIC"
+  },
+  {
+    "name": "Bamba Dieng",
+    "group": null,
+    "code": "BAM"
+  },
+  {
+    "name": "Anis Hadj Moussa",
+    "group": null,
+    "code": "ANI"
+  },
+  {
+    "name": "Ramy Bensebaini",
+    "group": null,
+    "code": "RAM"
+  },
+  {
+    "name": "Mark Flekken",
+    "group": null,
+    "code": "MAR"
+  },
+  {
+    "name": "Aissa Mandi",
+    "group": null,
+    "code": "AIS"
+  },
+  {
+    "name": "Gonzalo Montiel",
+    "group": null,
+    "code": "GON"
+  },
+  {
+    "name": "Fares Chaibi",
+    "group": null,
+    "code": "FAR"
+  },
+  {
+    "name": "Pape Matar Sarr",
+    "group": null,
+    "code": "PAP"
+  },
+  {
+    "name": "Mohammad Mohebi",
+    "group": null,
+    "code": "MOH"
+  },
+  {
+    "name": "Nuno da Costa",
+    "group": null,
+    "code": "NUN"
+  },
+  {
+    "name": "Oscar Bobb",
+    "group": null,
+    "code": "OSC"
+  },
+  {
+    "name": "A. Benbouali",
+    "group": null,
+    "code": "A12"
+  },
+  {
+    "name": "M. Mastil",
+    "group": null,
+    "code": "M1"
+  },
+  {
+    "name": "Khalid Al Ghannam",
+    "group": null,
+    "code": "KHA"
+  },
+  {
+    "name": "Pedro Porro",
+    "group": null,
+    "code": "PED"
+  },
+  {
+    "name": "Yeremy Pino",
+    "group": null,
+    "code": "YER"
+  },
+  {
+    "name": "Laros Duarte",
+    "group": null,
+    "code": "LAR"
+  },
+  {
+    "name": "Ferran Torres",
+    "group": null,
+    "code": "FER"
+  },
+  {
+    "name": "Marcos Llorente",
+    "group": null,
+    "code": "MAR"
+  },
+  {
+    "name": "Borja Iglesias",
+    "group": null,
+    "code": "BOR"
+  },
+  {
+    "name": "Aymeric Laporte",
+    "group": null,
+    "code": "AYM"
+  },
+  {
+    "name": "Garry Rodrigues",
+    "group": null,
+    "code": "GAR"
+  },
+  {
+    "name": "Yannick Semedo",
+    "group": null,
+    "code": "YAN"
+  },
+  {
+    "name": "Moteb Al Harbi",
+    "group": null,
+    "code": "MOT"
+  },
+  {
+    "name": "Mohammed Abu Al Shamat",
+    "group": null,
+    "code": "MOH26"
+  },
+  {
+    "name": "Ali Lajami",
+    "group": null,
+    "code": "ALI"
+  },
+  {
+    "name": "Saud Abdulhamid",
+    "group": null,
+    "code": "SAU"
+  },
+  {
+    "name": "A. Jasim",
+    "group": null,
+    "code": "A17"
+  },
+  {
+    "name": "Torbjorn Heggem",
+    "group": null,
+    "code": "TOR"
+  },
+  {
+    "name": "Jorgen Strand Larsen",
+    "group": null,
+    "code": "JOR"
+  },
+  {
+    "name": "Kristoffer Ajer",
+    "group": null,
+    "code": "KRI"
+  },
+  {
+    "name": "Youssef Amyn",
+    "group": null,
+    "code": "YOU"
+  },
+  {
+    "name": "Maxence Lacroix",
+    "group": null,
+    "code": "MAX"
+  },
+  {
+    "name": "Enzo Fernandez",
+    "group": null,
+    "code": "ENZ"
+  },
+  {
+    "name": "Antonio Nusa",
+    "group": null,
+    "code": "ANT"
+  },
+  {
+    "name": "Jens Petter Hauge",
+    "group": null,
+    "code": "JEN"
+  },
+  {
+    "name": "Ousmane Dembele",
+    "group": null,
+    "code": "OUS"
+  },
+  {
+    "name": "Nicolas Tagliafico",
+    "group": null,
+    "code": "NIC"
+  },
+  {
+    "name": "Leandro Paredes",
+    "group": null,
+    "code": "LEA"
+  },
+  {
+    "name": "Sasa Kalajdzic",
+    "group": null,
+    "code": "SAS"
+  },
+  {
+    "name": "Nahuel Molina",
+    "group": null,
+    "code": "NAH"
+  },
+  {
+    "name": "Alexander Schlager",
+    "group": null,
+    "code": "ALE"
+  },
+  {
+    "name": "Stefan Posch",
+    "group": null,
+    "code": "STE"
+  },
+  {
+    "name": "Konrad Laimer",
+    "group": null,
+    "code": "KON"
+  },
+  {
+    "name": "C. Baumgartner",
+    "group": null,
+    "code": "C19"
+  },
+  {
+    "name": "A. González",
+    "group": null,
+    "code": "A14"
+  },
+  {
+    "name": "A. Vega",
+    "group": null,
+    "code": "A10"
+  },
+  {
+    "name": "B. Gutiérrez",
+    "group": null,
+    "code": "B26"
+  },
+  {
+    "name": "C. Huerta",
+    "group": null,
+    "code": "C21"
+  },
+  {
+    "name": "C. Montes",
+    "group": null,
+    "code": "C3"
+  },
+  {
+    "name": "E. Álvarez",
+    "group": null,
+    "code": "E4"
+  },
+  {
+    "name": "É. Lira",
+    "group": null,
+    "code": "6"
+  },
+  {
+    "name": "G. Ochoa",
+    "group": null,
+    "code": "G13"
+  },
+  {
+    "name": "I. Reyes",
+    "group": null,
+    "code": "I15"
+  },
+  {
+    "name": "J. Gallardo",
+    "group": null,
+    "code": "J23"
+  },
+  {
+    "name": "J. Quiñones",
+    "group": null,
+    "code": "J16"
+  },
+  {
+    "name": "J. Rangel",
+    "group": null,
+    "code": "J1"
+  },
+  {
+    "name": "J. Sánchez",
+    "group": null,
+    "code": "J2"
+  },
+  {
+    "name": "J. Vásquez",
+    "group": null,
+    "code": "J5"
+  },
+  {
+    "name": "L. Chávez",
+    "group": null,
+    "code": "L24"
+  },
+  {
+    "name": "L. Romo",
+    "group": null,
+    "code": "L7"
+  },
+  {
+    "name": "M. Chávez",
+    "group": null,
+    "code": "M20"
+  },
+  {
+    "name": "O. Pineda",
+    "group": null,
+    "code": "O17"
+  },
+  {
+    "name": "O. Vargas",
+    "group": null,
+    "code": "O18"
+  },
+  {
+    "name": "R. Alvarado",
+    "group": null,
+    "code": "R25"
+  },
+  {
+    "name": "R. Jiménez",
+    "group": null,
+    "code": "R9"
+  },
+  {
+    "name": "S. Giménez",
+    "group": null,
+    "code": "S11"
+  },
+  {
+    "name": "J. Adams",
+    "group": null,
+    "code": "J23"
+  },
+  {
+    "name": "K. Ndamane",
+    "group": null,
+    "code": "K3"
+  },
+  {
+    "name": "K. Sebelebele",
+    "group": null,
+    "code": "K25"
+  },
+  {
+    "name": "M. Mbokazi",
+    "group": null,
+    "code": "M14"
+  },
+  {
+    "name": "N. Sibisi",
+    "group": null,
+    "code": "N19"
+  },
+  {
+    "name": "O. Makhanya",
+    "group": null,
+    "code": "O24"
+  },
+  {
+    "name": "R. Goss",
+    "group": null,
+    "code": "R22"
+  },
+  {
+    "name": "R. Mofokeng",
+    "group": null,
+    "code": "R10"
+  },
+  {
+    "name": "R. Williams",
+    "group": null,
+    "code": "R1"
+  },
+  {
+    "name": "S. Chaine",
+    "group": null,
+    "code": "S16"
+  },
+  {
+    "name": "S. Kabini",
+    "group": null,
+    "code": "S18"
+  },
+  {
+    "name": "S. Sithole",
+    "group": null,
+    "code": "S13"
+  },
+  {
+    "name": "T. Maseko",
+    "group": null,
+    "code": "T12"
+  },
+  {
+    "name": "T. Matuludi",
+    "group": null,
+    "code": "T2"
+  },
+  {
+    "name": "T. Mbatha",
+    "group": null,
+    "code": "T5"
+  },
+  {
+    "name": "T. Mokoena",
+    "group": null,
+    "code": "T4"
+  },
+  {
+    "name": "T. Moremi",
+    "group": null,
+    "code": "T8"
+  },
+  {
+    "name": "T. Zwane",
+    "group": null,
+    "code": "T11"
+  },
+  {
+    "name": "Park Jin-seop",
+    "group": null,
+    "code": "PAR"
+  },
+  {
+    "name": "J. Castrop",
+    "group": null,
+    "code": "J23"
+  },
+  {
+    "name": "Olwethu Makhanya",
+    "group": null,
+    "code": "OLW"
+  },
+  {
+    "name": "Jo Hyeon-Woo",
+    "group": null,
+    "code": "JO21"
+  },
+  {
+    "name": "Kim Jin-Gyu",
+    "group": null,
+    "code": "KIM24"
+  },
+  {
+    "name": "Lee Gi-Hyuk",
+    "group": null,
+    "code": "LEE3"
+  },
+  {
+    "name": "Lee Han-Beom",
+    "group": null,
+    "code": "LEE2"
+  },
+  {
+    "name": "Lee Tae-Seok",
+    "group": null,
+    "code": "LEE13"
+  },
+  {
+    "name": "Paik Seung-Ho",
+    "group": null,
+    "code": "PAI8"
+  },
+  {
+    "name": "Seol Young-Woo",
+    "group": null,
+    "code": "SEO22"
+  },
+  {
+    "name": "Song Bum-Keun",
+    "group": null,
+    "code": "SON12"
+  },
+  {
+    "name": "Son Heung-Min",
+    "group": null,
+    "code": "SON7"
+  },
+  {
+    "name": "Lukas Provod",
+    "group": null,
+    "code": "LUK"
+  },
+  {
+    "name": "A. Sojka",
+    "group": null,
+    "code": "A24"
+  },
+  {
+    "name": "D. Jurásek",
+    "group": null,
+    "code": "D14"
+  },
+  {
+    "name": "D. Zima",
+    "group": null,
+    "code": "D2"
+  },
+  {
+    "name": "L. Krejcí",
+    "group": null,
+    "code": "L7"
+  },
+  {
+    "name": "M. Chytil",
+    "group": null,
+    "code": "M13"
+  },
+  {
+    "name": "P. Sulc",
+    "group": null,
+    "code": "P15"
+  },
+  {
+    "name": "R. Hranác",
+    "group": null,
+    "code": "R4"
+  },
+  {
+    "name": "S. Chaloupek",
+    "group": null,
+    "code": "S6"
+  },
+  {
+    "name": "T. Holes",
+    "group": null,
+    "code": "T3"
+  },
+  {
+    "name": "Ala Al Haji",
+    "group": null,
+    "code": "ALA27"
+  },
+  {
+    "name": "Jens Castrop",
+    "group": null,
+    "code": "JEN"
+  },
+  {
+    "name": "Manaf Younis",
+    "group": null,
+    "code": "MAN"
+  },
+  {
+    "name": "A. Johnston",
+    "group": null,
+    "code": "A2"
+  },
+  {
+    "name": "A. Jones",
+    "group": null,
+    "code": "A3"
+  },
+  {
+    "name": "I. Koné",
+    "group": null,
+    "code": "I8"
+  },
+  {
+    "name": "J. Shaffelburg",
+    "group": null,
+    "code": "J14"
+  },
+  {
+    "name": "M. Choinière",
+    "group": null,
+    "code": "M6"
+  },
+  {
+    "name": "M. Crépeau",
+    "group": null,
+    "code": "M16"
+  },
+  {
+    "name": "M. Flores",
+    "group": null,
+    "code": "M26"
+  },
+  {
+    "name": "O. Goodman",
+    "group": null,
+    "code": "O18"
+  },
+  {
+    "name": "S. Eustáquio",
+    "group": null,
+    "code": "S7"
+  },
+  {
+    "name": "T. Buchanan",
+    "group": null,
+    "code": "T17"
+  },
+  {
+    "name": "B. Tahirovic",
+    "group": null,
+    "code": "B6"
+  },
+  {
+    "name": "D. Burnic",
+    "group": null,
+    "code": "D17"
+  },
+  {
+    "name": "Zaid Tahseen",
+    "group": null,
+    "code": "ZAI"
+  },
+  {
+    "name": "Robin Risser",
+    "group": null,
+    "code": "ROB"
+  },
+  {
+    "name": "Warren Zaire-Emery",
+    "group": null,
+    "code": "WAR"
+  },
+  {
+    "name": "Edouard Mendy",
+    "group": null,
+    "code": "EDO"
+  },
+  {
+    "name": "Assane Diao",
+    "group": null,
+    "code": "ASS"
+  },
+  {
+    "name": "E. Bajraktarevic",
+    "group": null,
+    "code": "E20"
+  },
+  {
+    "name": "I. Basic",
+    "group": null,
+    "code": "I13"
+  },
+  {
+    "name": "Kerim-Sam Alajbegovic",
+    "group": null,
+    "code": "KER19"
+  },
+  {
+    "name": "N. Vasilj",
+    "group": null,
+    "code": "N1"
+  },
+  {
+    "name": "Homam Ahmed",
+    "group": null,
+    "code": "HOM14"
+  },
+  {
+    "name": "Tahsin Jamshid",
+    "group": null,
+    "code": "TAH24"
+  },
+  {
+    "name": "G. Laye",
+    "group": null,
+    "code": "G4"
+  },
+  {
+    "name": "Hassan Al Haydos",
+    "group": null,
+    "code": "HAS10"
+  },
+  {
+    "name": "Mohamed Al Manai",
+    "group": null,
+    "code": "MOH26"
+  },
+  {
+    "name": "Sultan Al Braik",
+    "group": null,
+    "code": "SUL18"
+  },
+  {
+    "name": "Jassem Jaber",
+    "group": null,
+    "code": "JAS"
+  },
+  {
+    "name": "Y. Abdurisag",
+    "group": null,
+    "code": "Y15"
+  },
+  {
+    "name": "A. Jashari",
+    "group": null,
+    "code": "A14"
+  },
+  {
+    "name": "C. Fassnacht",
+    "group": null,
+    "code": "C16"
+  },
+  {
+    "name": "D. Ndoye",
+    "group": null,
+    "code": "D11"
+  },
+  {
+    "name": "D. Sow",
+    "group": null,
+    "code": "D15"
+  },
+  {
+    "name": "D. Zakaria",
+    "group": null,
+    "code": "D6"
+  },
+  {
+    "name": "E. Cömert",
+    "group": null,
+    "code": "E18"
+  },
+  {
+    "name": "F. Rieder",
+    "group": null,
+    "code": "F22"
+  },
+  {
+    "name": "G. Xhaka",
+    "group": null,
+    "code": "G10"
+  },
+  {
+    "name": "Jassem Gaber",
+    "group": null,
+    "code": "JAS5"
+  },
+  {
+    "name": "Salah Zakaria",
+    "group": null,
+    "code": "SAL"
+  },
+  {
+    "name": "J. Manzambi",
+    "group": null,
+    "code": "J9"
+  },
+  {
+    "name": "M. Aebischer",
+    "group": null,
+    "code": "M20"
+  },
+  {
+    "name": "N. Elvedi",
+    "group": null,
+    "code": "N4"
+  },
+  {
+    "name": "N. Okafor",
+    "group": null,
+    "code": "N19"
+  },
+  {
+    "name": "R. Freuler",
+    "group": null,
+    "code": "R8"
+  },
+  {
+    "name": "R. Rodríguez",
+    "group": null,
+    "code": "R13"
+  },
+  {
+    "name": "R. Vargas",
+    "group": null,
+    "code": "R17"
+  },
+  {
+    "name": "S. Widmer",
+    "group": null,
+    "code": "S3"
+  },
+  {
+    "name": "Y. Mvogo",
+    "group": null,
+    "code": "Y12"
+  },
+  {
+    "name": "Z. Amdouni",
+    "group": null,
+    "code": "Z23"
+  },
+  {
+    "name": "Wesley",
+    "group": null,
+    "code": "WES2"
+  },
+  {
+    "name": "Yassine Bounou",
+    "group": null,
+    "code": "YAS"
+  },
+  {
+    "name": "Matt Freese",
+    "group": null,
+    "code": "MAT"
+  },
+  {
+    "name": "Roberto Junior Fernandez",
+    "group": null,
+    "code": "ROB"
+  },
+  {
+    "name": "Sofyan Amrabat",
+    "group": null,
+    "code": "SOF"
+  },
+  {
+    "name": "Chris Brady",
+    "group": null,
+    "code": "CHR"
+  },
+  {
+    "name": "Alex Arce",
+    "group": null,
+    "code": "ALE"
+  },
+  {
+    "name": "Manuel Neuer",
+    "group": null,
+    "code": "MAN"
+  },
+  {
+    "name": "N. Velupillay",
+    "group": null,
+    "code": "N23"
+  },
+  {
+    "name": "Vinícius Júnior",
+    "group": null,
+    "code": "VIN7"
+  },
+  {
+    "name": "Casemiro",
+    "group": null,
+    "code": "CAS"
+  },
+  {
+    "name": "C. Abdelmouhib",
+    "group": null,
+    "code": "C1"
+  },
+  {
+    "name": "H. Mahmoud",
+    "group": null,
+    "code": "H15"
+  },
+  {
+    "name": "Ahmed Fattouh",
+    "group": null,
+    "code": "AHM"
+  },
+  {
+    "name": "H. Abdelkarim",
+    "group": null,
+    "code": "H9"
+  },
+  {
+    "name": "Hamdi Fathy",
+    "group": null,
+    "code": "HAM14"
+  },
+  {
+    "name": "Mostafa Zico",
+    "group": null,
+    "code": "MOS11"
+  },
+  {
+    "name": "Nabil Emad Dunga",
+    "group": null,
+    "code": "NAB18"
+  },
+  {
+    "name": "Thibaut Courtois",
+    "group": null,
+    "code": "THI"
+  },
+  {
+    "name": "Tyrick Bodak",
+    "group": null,
+    "code": "TYR"
+  },
+  {
+    "name": "Alexis Saelemaekers",
+    "group": null,
+    "code": "ALE"
+  },
+  {
+    "name": "Mostafa Shobeir",
+    "group": null,
+    "code": "MOS"
+  },
+  {
+    "name": "Ismael Gharbi",
+    "group": null,
+    "code": "ISM"
+  },
+  {
+    "name": "Ali Abdi",
+    "group": null,
+    "code": "ALI"
+  },
+  {
+    "name": "Mohanad Lasheen",
+    "group": null,
+    "code": "MOH17"
+  },
+  {
+    "name": "Trézéguet",
+    "group": null,
+    "code": "TR7"
+  },
+  {
+    "name": "Kristoffer Nordfeldt",
+    "group": null,
+    "code": "KRI"
+  },
+  {
+    "name": "Alban Lafont",
+    "group": null,
+    "code": "ALB"
+  },
+  {
+    "name": "Alireza Beiranvand",
+    "group": null,
+    "code": "ALI"
+  },
+  {
+    "name": "Ahmed Mostafa Zizo",
+    "group": null,
+    "code": "AHM"
+  },
+  {
+    "name": "Ahmed Zizo",
+    "group": null,
+    "code": "AHM25"
+  },
+  {
+    "name": "Mohamed Kone",
+    "group": null,
+    "code": "MOH"
+  },
+  {
+    "name": "H. Kanani",
+    "group": null,
+    "code": "H13"
+  },
+  {
+    "name": "S. Nasrullayev",
+    "group": null,
+    "code": "S13"
+  },
+  {
+    "name": "C. Hernández",
+    "group": null,
+    "code": "C19"
+  },
+  {
+    "name": "D. Livakovic",
+    "group": null,
+    "code": "D1"
+  },
+  {
+    "name": "I. Pandur",
+    "group": null,
+    "code": "I12"
+  },
+  {
+    "name": "I. Perisic",
+    "group": null,
+    "code": "I14"
+  },
+  {
+    "name": "J. Gvardiol",
+    "group": null,
+    "code": "J4"
+  },
+  {
+    "name": "J. Stanisic",
+    "group": null,
+    "code": "J2"
+  },
+  {
+    "name": "L. Modric",
+    "group": null,
+    "code": "L10"
+  },
+  {
+    "name": "M. Baturina",
+    "group": null,
+    "code": "M16"
+  },
+  {
+    "name": "Ahmed Alkassar",
+    "group": null,
+    "code": "AHM"
+  },
+  {
+    "name": "Mohammed Abu Alshamat",
+    "group": null,
+    "code": "MOH"
+  },
+  {
+    "name": "A. Yahya",
+    "group": null,
+    "code": "A15"
+  },
+  {
+    "name": "A. Y. Hashim",
+    "group": null,
+    "code": "A13"
+  },
+  {
+    "name": "Ibraheem Bayesh",
+    "group": null,
+    "code": "IBR8"
+  },
+  {
+    "name": "Jordan Pickford",
+    "group": null,
+    "code": "JOR"
+  },
+  {
+    "name": "Martin Zubimendi",
+    "group": null,
+    "code": "MAR"
+  },
+  {
+    "name": "Abdulla Abdullaev",
+    "group": null,
+    "code": "ABD"
+  },
+  {
+    "name": "Gustavo Puerta",
+    "group": null,
+    "code": "GUS"
+  },
+  {
+    "name": "Vozinha",
+    "group": null,
+    "code": "VOZ"
+  },
+  {
+    "name": "Unai Simon",
+    "group": null,
+    "code": "UNA"
+  },
+  {
+    "name": "Jalal Hassan Hachim",
+    "group": null,
+    "code": "JAL12"
+  },
+  {
+    "name": "Meme",
+    "group": null,
+    "code": "MEM10"
+  },
+  {
+    "name": "Mustafa Saadoun",
+    "group": null,
+    "code": "MUS25"
+  },
+  {
+    "name": "Rebin Solaka",
+    "group": null,
+    "code": "REB2"
+  },
+  {
+    "name": "Zayed Tahseen",
+    "group": null,
+    "code": "ZAY4"
+  },
+  {
+    "name": "Z. Ismaeel",
+    "group": null,
+    "code": "Z24"
+  },
+  {
+    "name": "F. Bjørkan",
+    "group": null,
+    "code": "F15"
+  },
+  {
+    "name": "L. Østigård",
+    "group": null,
+    "code": "L4"
+  },
+  {
+    "name": "M. Ødegaard",
+    "group": null,
+    "code": "M10"
+  },
+  {
+    "name": "Abdallah Naseeb",
+    "group": null,
+    "code": "ABD3"
+  },
+  {
+    "name": "Ibrahim Sa'deh",
+    "group": null,
+    "code": "IBR15"
+  },
+  {
+    "name": "Mohammed Abu Zurayq",
+    "group": null,
+    "code": "MOH7"
+  },
+  {
+    "name": "Yazid Abu Layla",
+    "group": null,
+    "code": "YAZ1"
+  },
+  {
+    "name": "Saad Al-Rosan",
+    "group": null,
+    "code": "SAA"
+  },
+  {
+    "name": "Saleem Obeid",
+    "group": null,
+    "code": "SAL"
+  },
+  {
+    "name": "Patrick Pentz",
+    "group": null,
+    "code": "PAT"
+  },
+  {
+    "name": "Luca Zidane",
+    "group": null,
+    "code": "LUC"
+  },
+  {
+    "name": "Ramiz Zerrouki",
+    "group": null,
+    "code": "RAM"
+  },
+  {
+    "name": "Lisandro Martinez",
+    "group": null,
+    "code": "LIS"
+  },
+  {
+    "name": "Emiliano Martinez",
+    "group": null,
+    "code": "EMI"
+  },
+  {
+    "name": "Saleem Obaid",
+    "group": null,
+    "code": "SAL17"
+  },
+  {
+    "name": "Muhannad Abu Taha",
+    "group": null,
+    "code": "MUH"
+  },
+  {
+    "name": "Ibrahim Saadeh",
+    "group": null,
+    "code": "IBR"
+  },
+  {
+    "name": "Trincão",
+    "group": null,
+    "code": "TRI16"
+  },
+  {
+    "name": "Caleb Marfo Yirenkyi",
+    "group": null,
+    "code": "CAL3"
+  },
+  {
+    "name": "Samuel Costa",
+    "group": null,
+    "code": "SAM"
+  },
+  {
+    "name": "M. Erlic",
+    "group": null,
+    "code": "M25"
+  },
+  {
+    "name": "M. Kovacic",
+    "group": null,
+    "code": "M8"
+  },
+  {
+    "name": "M. Pongracic",
+    "group": null,
+    "code": "M3"
+  },
+  {
+    "name": "N. Moro",
+    "group": null,
+    "code": "N7"
+  },
+  {
+    "name": "P. Sucic",
+    "group": null,
+    "code": "P17"
+  },
+  {
+    "name": "T. Fruk",
+    "group": null,
+    "code": "T19"
+  },
+  {
+    "name": "Benjamin Asare",
+    "group": null,
+    "code": "BEN"
+  },
+  {
+    "name": "Caleb Yirenkyi",
+    "group": null,
+    "code": "CAL"
+  }
+]
