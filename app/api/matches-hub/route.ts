@@ -7,11 +7,17 @@ export const revalidate = 30;
 
 const LIVE_STATUSES = ['1H', '2H', 'ET', 'BT', 'P', 'IN_PLAY', 'LIVE'];
 const SCHEDULED_STATUSES = ['SCHEDULED', 'TIMED', 'NOT_STARTED', 'NS'];
-const FINISHED_STATUSES = ['FINISHED', 'FT', 'AET', 'PEN', 'COMPLETED', 'ENDED', 'FINAL_VERIFIED'];
+const FINISHED_STATUSES = ['FINISHED', 'FT', 'AET', 'PEN', 'COMPLETED', 'ENDED', 'FINAL_VERIFIED', 'FULL_TIME'];
 const HALF_TIME_STATUSES = ['HT', 'HALFTIME', 'HALF_TIME', 'HALF-TIME', 'PAUSED'];
 const GROUPS = 'ABCDEFGHIJKL'.split('');
 
 type HubFilter = 'today' | 'yesterday' | 'tomorrow' | 'latest' | 'live' | 'group' | 'all' | 'round_of_32' | 'round_of_16' | 'quarter_finals' | 'semi_finals' | 'final';
+
+const ROUND_OF_32_ALIASES = ['round_of_32', 'last_32', 'r32', 'round 32', 'round of 32', 'last 32', 'دور الـ32', 'دور ال32', 'دور 32'];
+const ROUND_OF_16_ALIASES = ['round_of_16', 'last_16', 'r16', 'round 16', 'round of 16', 'last 16', 'دور الـ16', 'دور ال16', 'دور 16'];
+const QUARTER_FINAL_ALIASES = ['quarter_finals', 'quarter_final', 'quarter-finals', 'quarter-final', 'quarterfinals', 'quarterfinal', 'ربع النهائي'];
+const SEMI_FINAL_ALIASES = ['semi_finals', 'semi_final', 'semi-finals', 'semi-final', 'semifinals', 'semifinal', 'نصف النهائي'];
+const FINAL_ALIASES = ['final', 'third_place', 'third-place', 'third place', 'match_for_third_place', 'المباراة النهائية', 'النهائي', 'المركز الثالث'];
 
 function normalizeStatus(status?: string | null) {
   return String(status || '').trim().toUpperCase();
@@ -73,6 +79,21 @@ function groupWhere(group: string) {
   };
 }
 
+function stageWhere(aliases: string[], contains: string[] = []) {
+  return {
+    OR: [
+      ...aliases.flatMap((alias) => [
+        { stage: { equals: alias, mode: 'insensitive' as const } },
+        { groupPhase: { equals: alias, mode: 'insensitive' as const } },
+      ]),
+      ...contains.flatMap((term) => [
+        { stage: { contains: term, mode: 'insensitive' as const } },
+        { groupPhase: { contains: term, mode: 'insensitive' as const } },
+      ]),
+    ],
+  };
+}
+
 function searchWhere(query: string) {
   const q = query.trim();
   if (!q) return {};
@@ -93,11 +114,11 @@ function whereFor(filter: HubFilter, group: string) {
   if (filter === 'live') return { status: { in: [...LIVE_STATUSES, ...HALF_TIME_STATUSES] } };
   if (filter === 'group') return groupWhere(group);
   if (filter === 'all') return {};
-  if (filter === 'round_of_32') return { stage: { in: ['round_of_32', 'last_32'] } };
-  if (filter === 'round_of_16') return { stage: { in: ['round_of_16', 'last_16'] } };
-  if (filter === 'quarter_finals') return { stage: { in: ['quarter_finals', 'quarter_final'] } };
-  if (filter === 'semi_finals') return { stage: { in: ['semi_finals', 'semi_final'] } };
-  if (filter === 'final') return { stage: { in: ['final', 'third_place'] } };
+  if (filter === 'round_of_32') return stageWhere(ROUND_OF_32_ALIASES, ['round of 32', 'last 32', 'r32', 'دور الـ32', 'دور ال32']);
+  if (filter === 'round_of_16') return stageWhere(ROUND_OF_16_ALIASES, ['round of 16', 'last 16', 'r16', 'دور الـ16', 'دور ال16']);
+  if (filter === 'quarter_finals') return stageWhere(QUARTER_FINAL_ALIASES, ['quarter']);
+  if (filter === 'semi_finals') return stageWhere(SEMI_FINAL_ALIASES, ['semi']);
+  if (filter === 'final') return stageWhere(FINAL_ALIASES);
   return { matchDate: dayRangeInEgypt(0) };
 }
 
@@ -142,6 +163,8 @@ export async function GET(req: NextRequest) {
         groupPhase: true,
         stage: true,
         animationMatchId: true,
+        syncSource: true,
+        lastSyncedAt: true,
         homeTeam: { select: { id: true, name: true, code: true, image: true, group: true } },
         awayTeam: { select: { id: true, name: true, code: true, image: true, group: true } },
         _count: { select: { events: true, statsSnapshots: true } },
@@ -154,7 +177,7 @@ export async function GET(req: NextRequest) {
       const groupValue = match.homeTeam.group || match.awayTeam.group || match.groupPhase || match.stage || null;
       return {
         id: match.id,
-        href: `/match-center/${match.id}`,
+        href: `/matches/${match.id}`,
         liveHref: `/live-animation/${match.id}`,
         matchDate: match.matchDate,
         dayKey: matchDateDayKey(match.matchDate),
@@ -167,6 +190,8 @@ export async function GET(req: NextRequest) {
         awayScore: match.awayScore,
         group: groupValue,
         stage: match.stage,
+        syncSource: match.syncSource,
+        lastSyncedAt: match.lastSyncedAt,
         hasLiveAnimation: Boolean(match.animationMatchId || match._count.events > 0),
         hasStats: match._count.statsSnapshots > 0,
         hasEvents: match._count.events > 0,
@@ -182,7 +207,7 @@ export async function GET(req: NextRequest) {
       scheduled: normalized.filter((item) => item.isScheduled).length,
     };
 
-    return NextResponse.json({ ok: true, mode: 'matches_hub_v1', filter, group, q, summary, matches: normalized }, { headers: { 'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=60' } });
+    return NextResponse.json({ ok: true, mode: 'matches_hub_v2', filter, group, q, summary, matches: normalized }, { headers: { 'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=60' } });
   } catch (error) {
     console.error('matches hub error', error);
     return NextResponse.json({ ok: false, error: 'Internal Server Error' }, { status: 500, headers: { 'Cache-Control': 'no-store' } });
