@@ -36,10 +36,10 @@ function isScheduled(status?: string | null) {
   return SCHEDULED_STATUSES.includes(normalizeStatus(status));
 }
 
-function labelForStatus(status?: string | null) {
+function labelForStatus(status?: string | null, hasPenalties = false) {
   const value = normalizeStatus(status);
   if (isLive(value)) return value === 'HT' || value.includes('HALF') ? 'استراحة' : 'مباشر';
-  if (isFinished(value)) return 'انتهت';
+  if (isFinished(value)) return hasPenalties ? 'حُسمت بركلات الترجيح' : 'انتهت';
   if (isScheduled(value)) return 'لم تبدأ';
   return value || 'مباراة';
 }
@@ -52,6 +52,31 @@ function normalizeFilter(value: string | null): HubFilter {
 function normalizeGroup(value: string | null) {
   const key = String(value || 'A').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 1) || 'A';
   return GROUPS.includes(key) ? key : 'A';
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  if (!value) return null;
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value);
+      return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed as Record<string, unknown> : null;
+    } catch { return null; }
+  }
+  return typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : null;
+}
+
+function numberOrNull(value: unknown) {
+  if (value === null || value === undefined || value === '') return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function getPenalties(value: unknown) {
+  const external = asRecord(value);
+  const penalties = asRecord(external?.penalties) || asRecord(external?.penaltyScore) || asRecord(external?.pens);
+  const home = numberOrNull(penalties?.home ?? penalties?.Home ?? penalties?.homeTeam ?? penalties?.HomeTeam);
+  const away = numberOrNull(penalties?.away ?? penalties?.Away ?? penalties?.awayTeam ?? penalties?.AwayTeam);
+  return home !== null && away !== null ? { home, away } : null;
 }
 
 function dayRangeInEgypt(dayOffset: number) {
@@ -174,6 +199,7 @@ export async function GET(req: NextRequest) {
         animationMatchId: true,
         syncSource: true,
         lastSyncedAt: true,
+        externalIds: true,
         homeTeam: { select: { id: true, name: true, code: true, image: true, group: true } },
         awayTeam: { select: { id: true, name: true, code: true, image: true, group: true } },
         _count: { select: { events: true, statsSnapshots: true } },
@@ -184,6 +210,7 @@ export async function GET(req: NextRequest) {
 
     const normalized = matches.map((match) => {
       const groupValue = match.homeTeam.group || match.awayTeam.group || match.groupPhase || match.stage || null;
+      const penalties = getPenalties(match.externalIds);
       return {
         id: match.id,
         href: `/matches/${match.id}`,
@@ -191,12 +218,13 @@ export async function GET(req: NextRequest) {
         matchDate: match.matchDate,
         dayKey: matchDateDayKey(match.matchDate),
         status: match.status,
-        statusLabel: labelForStatus(match.status),
+        statusLabel: labelForStatus(match.status, Boolean(penalties)),
         isLive: isLive(match.status),
         isFinished: isFinished(match.status),
         isScheduled: isScheduled(match.status),
         homeScore: match.homeScore,
         awayScore: match.awayScore,
+        penalties,
         group: groupValue,
         stage: match.stage,
         syncSource: match.syncSource,
@@ -216,7 +244,7 @@ export async function GET(req: NextRequest) {
       scheduled: normalized.filter((item) => item.isScheduled).length,
     };
 
-    return NextResponse.json({ ok: true, mode: 'matches_hub_v3_fifa_r32_only', filter, group, q, summary, matches: normalized }, { headers: { 'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=60' } });
+    return NextResponse.json({ ok: true, mode: 'matches_hub_v4_fifa_r32_penalties', filter, group, q, summary, matches: normalized }, { headers: { 'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=60' } });
   } catch (error) {
     console.error('matches hub error', error);
     return NextResponse.json({ ok: false, error: 'Internal Server Error' }, { status: 500, headers: { 'Cache-Control': 'no-store' } });
