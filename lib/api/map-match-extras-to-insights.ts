@@ -42,6 +42,16 @@ function num(v: unknown, fb = 0): number {
 function str(v: unknown, fb = ''): string {
   return typeof v === 'string' ? v : fb;
 }
+function side(v: unknown): 'home' | 'away' {
+  return v === 'away' ? 'away' : 'home';
+}
+function eventType(v: unknown): MatchEvent['type'] {
+  const value = String(v ?? '').toLowerCase();
+  return value === 'goal' || value === 'yellow' || value === 'red' || value === 'substitution' ? value : 'substitution';
+}
+function shotOutcome(v: unknown): ShotPoint['outcome'] {
+  return v === 'goal' || v === 'onTarget' || v === 'offTarget' || v === 'blocked' ? v : 'offTarget';
+}
 
 function mapStats(
   stats?: Record<string, { home?: number; away?: number } | undefined>,
@@ -63,10 +73,8 @@ export function mapMatchExtrasToInsightsInput(
   const events: MatchEvent[] = (raw.events ?? [])
     .map((e) => ({
       minute: num(e.minute),
-      team: e.team === 'away' ? 'away' : ('home' as const),
-      type: (['goal','yellow','red','substitution'].includes(
-        String(e.type ?? '').toLowerCase()) ? String(e.type).toLowerCase() : 'substitution'
-      ) as MatchEvent['type'],
+      team: side(e.team),
+      type: eventType(e.type),
       label: str(e.label ?? e.playerName ?? e.detail ?? e.type),
     }))
     .filter((e) => e.minute > 0);
@@ -79,10 +87,9 @@ export function mapMatchExtrasToInsightsInput(
     .map((s, i) => ({
       id: str(s.id, `shot-${i}`),
       minute: num(s.minute),
-      team: s.team === 'away' ? 'away' : ('home' as const),
+      team: side(s.team),
       x: num(s.x), y: num(s.y), xg: num(s.xg),
-      outcome: (['goal','onTarget','offTarget','blocked'].includes(String(s.outcome ?? ''))
-        ? s.outcome : 'offTarget') as ShotPoint['outcome'],
+      outcome: shotOutcome(s.outcome),
       insideBox: Boolean(s.insideBox),
       player: s.player,
     }))
