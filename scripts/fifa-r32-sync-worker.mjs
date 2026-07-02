@@ -2,6 +2,24 @@ import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 const R32 = new Set(Array.from({ length: 16 }, (_, index) => 73 + index));
+const FIFA_R32_ID_TO_NO = new Map([
+  ['53452545', 73],
+  ['53452541', 74],
+  ['53452547', 75],
+  ['53452557', 76],
+  ['53452543', 77],
+  ['53452561', 78],
+  ['53452563', 79],
+  ['53452565', 80],
+  ['53452553', 81],
+  ['53452555', 82],
+  ['53452549', 83],
+  ['53452551', 84],
+  ['53452505', 85],
+  ['53452569', 86],
+  ['53452507', 87],
+  ['53452503', 88],
+]);
 
 function env(name, fallback = '') {
   return String(process.env[name] || fallback).trim();
@@ -38,6 +56,8 @@ function normTeam(value) {
   if (['cape verde', 'cabo verde'].includes(name)) return 'cape verde';
   if (['curacao', 'curaçao'].includes(name)) return 'curacao';
   if (['ir iran', 'iran'].includes(name)) return 'iran';
+  if (['south africa', 'rsa'].includes(name)) return 'south africa';
+  if (['algeria', 'alg', 'dza'].includes(name)) return 'algeria';
   return name;
 }
 
@@ -60,11 +80,6 @@ async function getPayload() {
   return { url, payload: JSON.parse(text) };
 }
 
-function listMatches(payload) {
-  if (Array.isArray(payload)) return payload;
-  return payload?.Results || payload?.results || payload?.Matches || payload?.matches || [];
-}
-
 function pick(obj, keys) {
   for (const key of keys) {
     if (obj?.[key] !== undefined && obj?.[key] !== null && obj?.[key] !== '') return obj[key];
@@ -75,11 +90,50 @@ function pick(obj, keys) {
 function desc(value) {
   if (typeof value === 'string' || typeof value === 'number') return String(value);
   if (Array.isArray(value)) return desc(value[0]);
-  if (value && typeof value === 'object') return String(value.Description || value.description || value.Name || value.name || '').trim();
+  if (value && typeof value === 'object') return String(value.Description || value.description || value.Name || value.name || value.Value || value.value || '').trim();
   return '';
 }
 
+function looksLikeMatch(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const keys = Object.keys(value).join(' ').toLowerCase();
+  return /match|fixture|home|away|team|stage|round|score|status|date/.test(keys) && /id|number|home|away|team|stage|round/.test(keys);
+}
+
+function listMatches(payload) {
+  const out = [];
+  const seen = new Set();
+  const stack = [payload];
+  while (stack.length) {
+    const item = stack.pop();
+    if (!item) continue;
+    if (Array.isArray(item)) {
+      for (const child of item) stack.push(child);
+      continue;
+    }
+    if (typeof item !== 'object') continue;
+    const id = String(pick(item, ['IdMatch', 'idMatch', 'MatchId', 'matchId', 'Id', 'id']) || '');
+    if (looksLikeMatch(item)) {
+      const key = id || JSON.stringify(Object.keys(item).slice(0, 12));
+      if (!seen.has(key)) {
+        seen.add(key);
+        out.push(item);
+      }
+    }
+    for (const value of Object.values(item)) {
+      if (value && typeof value === 'object') stack.push(value);
+    }
+  }
+  return out;
+}
+
+function providerId(match) {
+  return String(pick(match, ['IdMatch', 'idMatch', 'MatchId', 'matchId', 'Id', 'id']) || '').trim();
+}
+
 function matchNo(match) {
+  const officialId = providerId(match);
+  if (officialId && FIFA_R32_ID_TO_NO.has(officialId)) return FIFA_R32_ID_TO_NO.get(officialId);
   const value = n(pick(match, ['MatchNumber', 'matchNumber', 'MatchNo', 'matchNo', 'FixtureNumber', 'fixtureNumber', 'Number', 'number']));
   return value && R32.has(value) ? value : null;
 }
@@ -87,7 +141,7 @@ function matchNo(match) {
 function stage(match) {
   return [
     desc(pick(match, ['StageName', 'stageName', 'Stage', 'stage', 'RoundName', 'roundName', 'Round', 'round'])),
-    desc(pick(match, ['GroupName', 'groupName', 'PhaseName', 'phaseName'])),
+    desc(pick(match, ['GroupName', 'groupName', 'PhaseName', 'phaseName', 'CompetitionStage', 'competitionStage'])),
   ].filter(Boolean).join(' ').toLowerCase();
 }
 
@@ -100,9 +154,9 @@ function isR32(match) {
 function team(match, side) {
   const upper = side === 'home' ? 'Home' : 'Away';
   const lower = side;
-  const obj = pick(match, [upper, lower, `${upper}Team`, `${lower}Team`, `Team${upper}`, `team${upper}`]) || {};
-  const code = String(pick(obj, ['Abbreviation', 'abbreviation', 'TLA', 'tla', 'Code', 'code']) || pick(match, [`${upper}TeamCode`, `${lower}TeamCode`, `${upper}Code`, `${lower}Code`]) || '').trim();
-  const name = String(pick(obj, ['Name', 'name', 'ShortClubName', 'shortClubName', 'DisplayName', 'displayName', 'TeamName', 'teamName']) || pick(match, [`${upper}TeamName`, `${lower}TeamName`, `${upper}Name`, `${lower}Name`]) || '').trim();
+  const obj = pick(match, [upper, lower, `${upper}Team`, `${lower}Team`, `Team${upper}`, `team${upper}`, `${upper}Contestant`, `${lower}Contestant`]) || {};
+  const code = String(pick(obj, ['Abbreviation', 'abbreviation', 'TLA', 'tla', 'Code', 'code', 'CountryCode', 'countryCode']) || pick(match, [`${upper}TeamCode`, `${lower}TeamCode`, `${upper}Code`, `${lower}Code`]) || '').trim();
+  const name = String(pick(obj, ['Name', 'name', 'ShortClubName', 'shortClubName', 'DisplayName', 'displayName', 'TeamName', 'teamName', 'CountryName', 'countryName']) || desc(pick(obj, ['Description', 'description'])) || pick(match, [`${upper}TeamName`, `${lower}TeamName`, `${upper}Name`, `${lower}Name`]) || '').trim();
   return { code, name };
 }
 
@@ -110,28 +164,29 @@ function score(match, side) {
   const upper = side === 'home' ? 'Home' : 'Away';
   const lower = side;
   const s = match.Score || match.score || match.Result || match.result || {};
-  const ft = s.FullTime || s.fullTime || {};
-  const value = pick(match, [`${upper}TeamScore`, `${lower}TeamScore`, `${upper}Score`, `${lower}Score`]) ?? pick(ft, [upper, lower]) ?? pick(s, [upper, lower, `${lower}Team`, `${upper}Team`]);
+  const ft = s.FullTime || s.fullTime || s.fulltime || {};
+  const regular = s.RegularTime || s.regularTime || {};
+  const value = pick(match, [`${upper}TeamScore`, `${lower}TeamScore`, `${upper}Score`, `${lower}Score`]) ?? pick(ft, [upper, lower]) ?? pick(regular, [upper, lower]) ?? pick(s, [upper, lower, `${lower}Team`, `${upper}Team`]);
   const number = n(value);
   return number === null ? null : Math.max(0, number);
 }
 
 function status(match) {
   const raw = String(desc(pick(match, ['MatchStatusDescription', 'matchStatusDescription', 'StatusDescription', 'statusDescription'])) || pick(match, ['MatchStatus', 'matchStatus', 'Status', 'status']) || '').toLowerCase();
-  if (raw.includes('finished') || raw.includes('full') || raw.includes('final') || raw.includes('ended') || raw.includes('12')) return 'FINISHED';
+  if (raw.includes('finished') || raw.includes('complete') || raw.includes('full') || raw.includes('final') || raw.includes('ended') || raw.includes('12')) return 'FINISHED';
   if (raw.includes('half') || raw === 'ht') return 'HT';
   if (raw.includes('live') || raw.includes('play')) return 'IN_PLAY';
   return 'SCHEDULED';
 }
 
 function date(match) {
-  const raw = pick(match, ['Date', 'date', 'UTCDate', 'utcDate', 'MatchDate', 'matchDate', 'LocalDate', 'localDate']);
+  const raw = pick(match, ['Date', 'date', 'UTCDate', 'utcDate', 'MatchDate', 'matchDate', 'LocalDate', 'localDate', 'StartDate', 'startDate']);
   const value = raw ? new Date(String(raw)) : null;
   return value && Number.isFinite(value.getTime()) ? value : null;
 }
 
-function providerId(match, no) {
-  return String(pick(match, ['IdMatch', 'idMatch', 'MatchId', 'matchId', 'Id', 'id']) || `r32-${no}`).trim();
+function fifaId(match, no) {
+  return providerId(match) || `r32-${no}`;
 }
 
 function candidates(asset) {
@@ -151,15 +206,15 @@ function findTeam(all, info) {
 
 async function upsert(match, allTeams, sourceUrl, dryRun) {
   const no = matchNo(match);
-  if (!no) return { status: 'skipped_missing_match_number' };
+  if (!no) return { status: 'skipped_missing_match_number', providerId: providerId(match), stage: stage(match) };
   const homeInfo = team(match, 'home');
   const awayInfo = team(match, 'away');
   const home = findTeam(allTeams, homeInfo);
   const away = findTeam(allTeams, awayInfo);
   const matchDate = date(match);
-  if (!home || !away || !matchDate) return { matchNo: no, status: 'skipped_missing_required_data', homeInfo, awayInfo, matchedHome: home?.id || null, matchedAway: away?.id || null, hasDate: Boolean(matchDate) };
+  if (!home || !away || !matchDate) return { matchNo: no, providerId: providerId(match), status: 'skipped_missing_required_data', homeInfo, awayInfo, matchedHome: home?.id || null, matchedAway: away?.id || null, hasDate: Boolean(matchDate) };
 
-  const id = providerId(match, no);
+  const id = fifaId(match, no);
   const externalId = `fifa-${id}`;
   const homeScore = score(match, 'home') ?? 0;
   const awayScore = score(match, 'away') ?? 0;
@@ -189,11 +244,12 @@ async function upsert(match, allTeams, sourceUrl, dryRun) {
 async function run() {
   const dryRun = bool('FIFA_R32_DRY_RUN', false);
   const { url, payload } = await getPayload();
-  const matches = listMatches(payload).filter(isR32);
+  const allMatches = listMatches(payload);
+  const matches = allMatches.filter(isR32);
   const allTeams = await teams();
   const processed = [];
   for (const match of matches) processed.push(await upsert(match, allTeams, url, dryRun));
-  const summary = { ok: true, source: 'FIFA', sourceUrl: url, dryRun, detectedRoundOf32: matches.length, processed };
+  const summary = { ok: true, source: 'FIFA', sourceUrl: url, dryRun, detectedMatches: allMatches.length, detectedRoundOf32: matches.length, processed };
   console.log(JSON.stringify(summary, null, 2));
 }
 
