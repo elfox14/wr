@@ -43,12 +43,12 @@ export async function dryRunImport(
   const fileType = file.name.endsWith('.json') ? 'json' : 'csv';
   const pack = buildSourcePack({ teamName, sourceName, sourceUrl, sourceCategory, reportType, fileType, raw });
 
-  // Try to match Asset by name or alias
+  // Try to match Asset by name or TeamAlias.name.
   const asset = await prisma.asset.findFirst({
     where: {
       OR: [
         { name: { contains: teamName, mode: 'insensitive' } },
-        { teamAliases: { some: { alias: { contains: teamName, mode: 'insensitive' } } } },
+        { teamAliases: { some: { name: { contains: teamName, mode: 'insensitive' } } } },
       ],
     },
     select: { id: true, name: true },
