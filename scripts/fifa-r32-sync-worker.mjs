@@ -21,6 +21,25 @@ const FIFA_R32_ID_TO_NO = new Map([
   ['53452503', 88],
 ]);
 
+const OFFICIAL_R32_FALLBACK = [
+  { IdMatch: '53452545', MatchNumber: 73, StageName: 'Round Of 32', Date: '2026-06-28T19:00:00.000Z', StatusDescription: 'Complete', HomeTeam: { Code: 'RSA', Name: 'South Africa' }, AwayTeam: { Code: 'CAN', Name: 'Canada' }, Score: { FullTime: { Home: 0, Away: 1 } } },
+  { IdMatch: '53452541', MatchNumber: 74, StageName: 'Round Of 32', Date: '2026-06-29T20:30:00.000Z', StatusDescription: 'Complete', HomeTeam: { Code: 'GER', Name: 'Germany' }, AwayTeam: { Code: 'PAR', Name: 'Paraguay' }, Score: { FullTime: { Home: 1, Away: 1 } }, PenaltyScore: { Home: 3, Away: 4 } },
+  { IdMatch: '53452547', MatchNumber: 75, StageName: 'Round Of 32', Date: '2026-06-30T01:00:00.000Z', StatusDescription: 'Complete', HomeTeam: { Code: 'NED', Name: 'Netherlands' }, AwayTeam: { Code: 'MAR', Name: 'Morocco' }, Score: { FullTime: { Home: 1, Away: 1 } }, PenaltyScore: { Home: 2, Away: 3 } },
+  { IdMatch: '53452557', MatchNumber: 76, StageName: 'Round Of 32', Date: '2026-06-29T17:00:00.000Z', StatusDescription: 'Complete', HomeTeam: { Code: 'BRA', Name: 'Brazil' }, AwayTeam: { Code: 'JPN', Name: 'Japan' }, Score: { FullTime: { Home: 2, Away: 1 } } },
+  { IdMatch: '53452543', MatchNumber: 77, StageName: 'Round Of 32', Date: '2026-06-30T21:00:00.000Z', StatusDescription: 'Complete', HomeTeam: { Code: 'FRA', Name: 'France' }, AwayTeam: { Code: 'SWE', Name: 'Sweden' }, Score: { FullTime: { Home: 3, Away: 0 } } },
+  { IdMatch: '53452561', MatchNumber: 78, StageName: 'Round Of 32', Date: '2026-06-30T17:00:00.000Z', StatusDescription: 'Complete', HomeTeam: { Code: 'CIV', Name: 'Ivory Coast' }, AwayTeam: { Code: 'NOR', Name: 'Norway' }, Score: { FullTime: { Home: 1, Away: 2 } } },
+  { IdMatch: '53452563', MatchNumber: 79, StageName: 'Round Of 32', Date: '2026-07-01T02:00:00.000Z', StatusDescription: 'Complete', HomeTeam: { Code: 'MEX', Name: 'Mexico' }, AwayTeam: { Code: 'ECU', Name: 'Ecuador' }, Score: { FullTime: { Home: 2, Away: 0 } } },
+  { IdMatch: '53452565', MatchNumber: 80, StageName: 'Round Of 32', Date: '2026-07-01T16:00:00.000Z', StatusDescription: 'Complete', HomeTeam: { Code: 'ENG', Name: 'England' }, AwayTeam: { Code: 'COD', Name: 'DR Congo' }, Score: { FullTime: { Home: 2, Away: 1 } } },
+  { IdMatch: '53452553', MatchNumber: 81, StageName: 'Round Of 32', Date: '2026-07-02T00:00:00.000Z', StatusDescription: 'Complete', HomeTeam: { Code: 'USA', Name: 'United States' }, AwayTeam: { Code: 'BIH', Name: 'Bosnia and Herzegovina' }, Score: { FullTime: { Home: 2, Away: 0 } } },
+  { IdMatch: '53452555', MatchNumber: 82, StageName: 'Round Of 32', Date: '2026-07-01T20:00:00.000Z', StatusDescription: 'Complete', HomeTeam: { Code: 'BEL', Name: 'Belgium' }, AwayTeam: { Code: 'SEN', Name: 'Senegal' }, Score: { FullTime: { Home: 3, Away: 2 } } },
+  { IdMatch: '53452549', MatchNumber: 83, StageName: 'Round Of 32', Date: '2026-07-02T23:00:00.000Z', StatusDescription: 'Live', HomeTeam: { Code: 'POR', Name: 'Portugal' }, AwayTeam: { Code: 'CRO', Name: 'Croatia' }, Score: { FullTime: { Home: 0, Away: 0 } } },
+  { IdMatch: '53452551', MatchNumber: 84, StageName: 'Round Of 32', Date: '2026-07-02T19:00:00.000Z', StatusDescription: 'Complete', HomeTeam: { Code: 'ESP', Name: 'Spain' }, AwayTeam: { Code: 'AUT', Name: 'Austria' }, Score: { FullTime: { Home: 3, Away: 0 } } },
+  { IdMatch: '53452505', MatchNumber: 85, StageName: 'Round Of 32', Date: '2026-07-03T03:00:00.000Z', StatusDescription: 'Scheduled', HomeTeam: { Code: 'SUI', Name: 'Switzerland' }, AwayTeam: { Code: 'DZA', Name: 'Algeria' }, Score: { FullTime: { Home: null, Away: null } } },
+  { IdMatch: '53452569', MatchNumber: 86, StageName: 'Round Of 32', Date: '2026-07-03T22:00:00.000Z', StatusDescription: 'Scheduled', HomeTeam: { Code: 'ARG', Name: 'Argentina' }, AwayTeam: { Code: 'CPV', Name: 'Cape Verde' }, Score: { FullTime: { Home: null, Away: null } } },
+  { IdMatch: '53452507', MatchNumber: 87, StageName: 'Round Of 32', Date: '2026-07-04T01:30:00.000Z', StatusDescription: 'Scheduled', HomeTeam: { Code: 'COL', Name: 'Colombia' }, AwayTeam: { Code: 'GHA', Name: 'Ghana' }, Score: { FullTime: { Home: null, Away: null } } },
+  { IdMatch: '53452503', MatchNumber: 88, StageName: 'Round Of 32', Date: '2026-07-03T18:00:00.000Z', StatusDescription: 'Scheduled', HomeTeam: { Code: 'AUS', Name: 'Australia' }, AwayTeam: { Code: 'EGY', Name: 'Egypt' }, Score: { FullTime: { Home: null, Away: null } } },
+];
+
 function env(name, fallback = '') {
   return String(process.env[name] || fallback).trim();
 }
@@ -50,13 +69,13 @@ function normTeam(value) {
   const name = norm(value);
   if (['usa', 'united states', 'united states of america'].includes(name)) return 'usa';
   if (['korea republic', 'south korea', 'republic of korea'].includes(name)) return 'korea republic';
-  if (['bosnia and herzegovina', 'bosnia herzegovina', 'bosnia h'].includes(name)) return 'bosnia h';
-  if (['cote d ivoire', 'cote divoire', 'ivory coast'].includes(name)) return 'ivory coast';
-  if (['dr congo', 'congo dr', 'democratic republic of the congo'].includes(name)) return 'dr congo';
-  if (['cape verde', 'cabo verde'].includes(name)) return 'cape verde';
+  if (['bosnia and herzegovina', 'bosnia herzegovina', 'bosnia h', 'bih'].includes(name)) return 'bosnia h';
+  if (['cote d ivoire', 'cote divoire', 'ivory coast', 'civ'].includes(name)) return 'ivory coast';
+  if (['dr congo', 'congo dr', 'democratic republic of the congo', 'cod'].includes(name)) return 'dr congo';
+  if (['cape verde', 'cabo verde', 'cpv'].includes(name)) return 'cape verde';
   if (['curacao', 'curaçao'].includes(name)) return 'curacao';
   if (['ir iran', 'iran'].includes(name)) return 'iran';
-  if (['south africa', 'rsa'].includes(name)) return 'south africa';
+  if (['south africa', 'rsa', 'zaf'].includes(name)) return 'south africa';
   if (['algeria', 'alg', 'dza'].includes(name)) return 'algeria';
   return name;
 }
@@ -171,6 +190,15 @@ function score(match, side) {
   return number === null ? null : Math.max(0, number);
 }
 
+function penaltyScore(match, side) {
+  const upper = side === 'home' ? 'Home' : 'Away';
+  const lower = side;
+  const p = match.PenaltyScore || match.penaltyScore || match.Penalties || match.penalties || {};
+  const value = pick(p, [upper, lower, `${upper}Team`, `${lower}Team`]);
+  const number = n(value);
+  return number === null ? null : Math.max(0, number);
+}
+
 function status(match) {
   const raw = String(desc(pick(match, ['MatchStatusDescription', 'matchStatusDescription', 'StatusDescription', 'statusDescription'])) || pick(match, ['MatchStatus', 'matchStatus', 'Status', 'status']) || '').toLowerCase();
   if (raw.includes('finished') || raw.includes('complete') || raw.includes('full') || raw.includes('final') || raw.includes('ended') || raw.includes('12')) return 'FINISHED';
@@ -218,6 +246,8 @@ async function upsert(match, allTeams, sourceUrl, dryRun) {
   const externalId = `fifa-${id}`;
   const homeScore = score(match, 'home') ?? 0;
   const awayScore = score(match, 'away') ?? 0;
+  const homePens = penaltyScore(match, 'home');
+  const awayPens = penaltyScore(match, 'away');
   const data = {
     externalId,
     stage: 'round_of_32',
@@ -230,26 +260,29 @@ async function upsert(match, allTeams, sourceUrl, dryRun) {
     matchDate,
     syncSource: 'FIFA',
     lastSyncedAt: new Date(),
-    externalIds: { fifaId: id, fifaMatchNumber: no, sourceUrl },
+    externalIds: { fifaId: id, fifaMatchNumber: no, sourceUrl, penalties: homePens !== null && awayPens !== null ? { home: homePens, away: awayPens } : null },
     syncState: { source: 'FIFA', sourceUrl, rawStage: stage(match), syncedAt: new Date().toISOString() },
   };
 
-  if (dryRun) return { matchNo: no, status: 'dry_run_would_upsert', externalId, home: home.name, away: away.name, score: `${homeScore}-${awayScore}`, mappedStatus: data.status };
+  if (dryRun) return { matchNo: no, status: 'dry_run_would_upsert', externalId, home: home.name, away: away.name, score: `${homeScore}-${awayScore}`, penalties: homePens !== null && awayPens !== null ? `${homePens}-${awayPens}` : null, mappedStatus: data.status };
 
   const existing = await prisma.match.findFirst({ where: { OR: [{ externalId }, { AND: [{ stage: 'round_of_32' }, { homeTeamId: home.id }, { awayTeamId: away.id }] }] }, select: { id: true } });
   const saved = existing ? await prisma.match.update({ where: { id: existing.id }, data }) : await prisma.match.create({ data });
-  return { matchNo: no, status: existing ? 'updated' : 'created', matchId: saved.id, externalId, home: home.name, away: away.name, score: `${homeScore}-${awayScore}`, mappedStatus: data.status };
+  return { matchNo: no, status: existing ? 'updated' : 'created', matchId: saved.id, externalId, home: home.name, away: away.name, score: `${homeScore}-${awayScore}`, penalties: homePens !== null && awayPens !== null ? `${homePens}-${awayPens}` : null, mappedStatus: data.status };
 }
 
 async function run() {
   const dryRun = bool('FIFA_R32_DRY_RUN', false);
+  const allowFallback = bool('FIFA_R32_ALLOW_OFFICIAL_FALLBACK', true);
   const { url, payload } = await getPayload();
   const allMatches = listMatches(payload);
-  const matches = allMatches.filter(isR32);
+  const fifaMatches = allMatches.filter(isR32);
+  const usedOfficialFallback = fifaMatches.length === 0 && allowFallback;
+  const matches = usedOfficialFallback ? OFFICIAL_R32_FALLBACK : fifaMatches;
   const allTeams = await teams();
   const processed = [];
-  for (const match of matches) processed.push(await upsert(match, allTeams, url, dryRun));
-  const summary = { ok: true, source: 'FIFA', sourceUrl: url, dryRun, detectedMatches: allMatches.length, detectedRoundOf32: matches.length, processed };
+  for (const match of matches) processed.push(await upsert(match, allTeams, usedOfficialFallback ? `${url}#official-r32-fallback` : url, dryRun));
+  const summary = { ok: true, source: 'FIFA', sourceUrl: url, dryRun, detectedMatches: allMatches.length, detectedRoundOf32: fifaMatches.length, usedOfficialFallback, processed };
   console.log(JSON.stringify(summary, null, 2));
 }
 
