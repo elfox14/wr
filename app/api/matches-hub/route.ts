@@ -12,6 +12,18 @@ const HALF_TIME_STATUSES = ['HT', 'HALFTIME', 'HALF_TIME', 'HALF-TIME', 'PAUSED'
 const GROUPS = 'ABCDEFGHIJKL'.split('');
 
 type HubFilter = 'today' | 'yesterday' | 'tomorrow' | 'latest' | 'live' | 'group' | 'all' | 'round_of_32' | 'round_of_16' | 'quarter_finals' | 'semi_finals' | 'final';
+type CanonicalMatch = {
+  id: string;
+  externalId?: string | null;
+  stage?: string | null;
+  groupPhase?: string | null;
+  syncSource?: string | null;
+  lastSyncedAt?: Date | string | null;
+  matchDate: Date;
+  homeTeam: { id: string; group?: string | null };
+  awayTeam: { id: string; group?: string | null };
+  _count?: { events?: number; statsSnapshots?: number };
+};
 
 const ROUND_OF_32_ALIASES = ['round_of_32', 'last_32', 'r32', 'round 32', 'round of 32', 'last 32', 'دور الـ32', 'دور ال32', 'دور 32'];
 const ROUND_OF_16_ALIASES = ['round_of_16', 'last_16', 'r16', 'round 16', 'round of 16', 'last 16', 'دور الـ16', 'دور ال16', 'دور 16'];
@@ -19,127 +31,24 @@ const QUARTER_FINAL_ALIASES = ['quarter_finals', 'quarter_final', 'quarter-final
 const SEMI_FINAL_ALIASES = ['semi_finals', 'semi_final', 'semi-finals', 'semi-final', 'semifinals', 'semifinal', 'نصف النهائي'];
 const FINAL_ALIASES = ['final', 'third_place', 'third-place', 'third place', 'match_for_third_place', 'المباراة النهائية', 'النهائي', 'المركز الثالث'];
 
-function normalizeStatus(status?: string | null) {
-  return String(status || '').trim().toUpperCase();
-}
+function normalizeStatus(status?: string | null) { return String(status || '').trim().toUpperCase(); }
+function isLive(status?: string | null) { const value = normalizeStatus(status); return LIVE_STATUSES.includes(value) || HALF_TIME_STATUSES.includes(value); }
+function isFinished(status?: string | null) { return FINISHED_STATUSES.includes(normalizeStatus(status)); }
+function isScheduled(status?: string | null) { return SCHEDULED_STATUSES.includes(normalizeStatus(status)); }
+function labelForStatus(status?: string | null, hasPenalties = false) { const value = normalizeStatus(status); if (isLive(value)) return value === 'HT' || value.includes('HALF') ? 'استراحة' : 'مباشر'; if (isFinished(value)) return hasPenalties ? 'حُسمت بركلات الترجيح' : 'انتهت'; if (isScheduled(value)) return 'لم تبدأ'; return value || 'مباراة'; }
+function normalizeFilter(value: string | null): HubFilter { const allowed: HubFilter[] = ['today', 'yesterday', 'tomorrow', 'latest', 'live', 'group', 'all', 'round_of_32', 'round_of_16', 'quarter_finals', 'semi_finals', 'final']; return allowed.includes(value as HubFilter) ? value as HubFilter : 'today'; }
+function normalizeGroup(value: string | null) { const key = String(value || 'A').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 1) || 'A'; return GROUPS.includes(key) ? key : 'A'; }
 
-function isLive(status?: string | null) {
-  const value = normalizeStatus(status);
-  return LIVE_STATUSES.includes(value) || HALF_TIME_STATUSES.includes(value);
-}
+function asRecord(value: unknown): Record<string, unknown> | null { if (!value) return null; if (typeof value === 'string') { try { const parsed = JSON.parse(value); return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed as Record<string, unknown> : null; } catch { return null; } } return typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : null; }
+function numberOrNull(value: unknown) { if (value === null || value === undefined || value === '') return null; const parsed = Number(value); return Number.isFinite(parsed) ? parsed : null; }
+function getPenalties(value: unknown) { const external = asRecord(value); const penalties = asRecord(external?.penalties) || asRecord(external?.penaltyScore) || asRecord(external?.pens); const home = numberOrNull(penalties?.home ?? penalties?.Home ?? penalties?.homeTeam ?? penalties?.HomeTeam); const away = numberOrNull(penalties?.away ?? penalties?.Away ?? penalties?.awayTeam ?? penalties?.AwayTeam); return home !== null && away !== null ? { home, away } : null; }
 
-function isFinished(status?: string | null) {
-  return FINISHED_STATUSES.includes(normalizeStatus(status));
-}
-
-function isScheduled(status?: string | null) {
-  return SCHEDULED_STATUSES.includes(normalizeStatus(status));
-}
-
-function labelForStatus(status?: string | null, hasPenalties = false) {
-  const value = normalizeStatus(status);
-  if (isLive(value)) return value === 'HT' || value.includes('HALF') ? 'استراحة' : 'مباشر';
-  if (isFinished(value)) return hasPenalties ? 'حُسمت بركلات الترجيح' : 'انتهت';
-  if (isScheduled(value)) return 'لم تبدأ';
-  return value || 'مباراة';
-}
-
-function normalizeFilter(value: string | null): HubFilter {
-  const allowed: HubFilter[] = ['today', 'yesterday', 'tomorrow', 'latest', 'live', 'group', 'all', 'round_of_32', 'round_of_16', 'quarter_finals', 'semi_finals', 'final'];
-  return allowed.includes(value as HubFilter) ? value as HubFilter : 'today';
-}
-
-function normalizeGroup(value: string | null) {
-  const key = String(value || 'A').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 1) || 'A';
-  return GROUPS.includes(key) ? key : 'A';
-}
-
-function asRecord(value: unknown): Record<string, unknown> | null {
-  if (!value) return null;
-  if (typeof value === 'string') {
-    try {
-      const parsed = JSON.parse(value);
-      return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed as Record<string, unknown> : null;
-    } catch { return null; }
-  }
-  return typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : null;
-}
-
-function numberOrNull(value: unknown) {
-  if (value === null || value === undefined || value === '') return null;
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : null;
-}
-
-function getPenalties(value: unknown) {
-  const external = asRecord(value);
-  const penalties = asRecord(external?.penalties) || asRecord(external?.penaltyScore) || asRecord(external?.pens);
-  const home = numberOrNull(penalties?.home ?? penalties?.Home ?? penalties?.homeTeam ?? penalties?.HomeTeam);
-  const away = numberOrNull(penalties?.away ?? penalties?.Away ?? penalties?.awayTeam ?? penalties?.AwayTeam);
-  return home !== null && away !== null ? { home, away } : null;
-}
-
-function dayRangeInEgypt(dayOffset: number) {
-  const offsetMs = 3 * 60 * 60 * 1000;
-  const localNow = new Date(Date.now() + offsetMs);
-  const localStart = new Date(Date.UTC(localNow.getUTCFullYear(), localNow.getUTCMonth(), localNow.getUTCDate() + dayOffset, 0, 0, 0, 0));
-  const start = new Date(localStart.getTime() - offsetMs);
-  const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
-  return { gte: start, lt: end };
-}
-
-function groupLabels(group: string) {
-  return [group, `Group ${group}`, `GROUP ${group}`, `GROUP_${group}`, `المجموعة ${group}`];
-}
-
-function groupWhere(group: string) {
-  const labels = groupLabels(group);
-  return {
-    OR: [
-      { homeTeam: { group } },
-      { awayTeam: { group } },
-      { groupPhase: { in: labels } },
-      { stage: { in: labels } },
-    ],
-  };
-}
-
-function stageWhere(aliases: string[], contains: string[] = []) {
-  return {
-    OR: [
-      ...aliases.flatMap((alias) => [
-        { stage: { equals: alias, mode: 'insensitive' as const } },
-        { groupPhase: { equals: alias, mode: 'insensitive' as const } },
-      ]),
-      ...contains.flatMap((term) => [
-        { stage: { contains: term, mode: 'insensitive' as const } },
-        { groupPhase: { contains: term, mode: 'insensitive' as const } },
-      ]),
-    ],
-  };
-}
-
-function fifaTrustedWhere() {
-  return {
-    OR: [
-      { syncSource: { contains: 'FIFA', mode: 'insensitive' as const } },
-      { externalId: { startsWith: 'fifa-', mode: 'insensitive' as const } },
-    ],
-  };
-}
-
-function searchWhere(query: string) {
-  const q = query.trim();
-  if (!q) return {};
-  return {
-    OR: [
-      { homeTeam: { name: { contains: q, mode: 'insensitive' as const } } },
-      { awayTeam: { name: { contains: q, mode: 'insensitive' as const } } },
-      { homeTeam: { code: { contains: q, mode: 'insensitive' as const } } },
-      { awayTeam: { code: { contains: q, mode: 'insensitive' as const } } },
-    ],
-  };
-}
+function dayRangeInEgypt(dayOffset: number) { const offsetMs = 3 * 60 * 60 * 1000; const localNow = new Date(Date.now() + offsetMs); const localStart = new Date(Date.UTC(localNow.getUTCFullYear(), localNow.getUTCMonth(), localNow.getUTCDate() + dayOffset, 0, 0, 0, 0)); const start = new Date(localStart.getTime() - offsetMs); const end = new Date(start.getTime() + 24 * 60 * 60 * 1000); return { gte: start, lt: end }; }
+function groupLabels(group: string) { return [group, `Group ${group}`, `GROUP ${group}`, `GROUP_${group}`, `المجموعة ${group}`]; }
+function groupWhere(group: string) { const labels = groupLabels(group); return { OR: [{ homeTeam: { group } }, { awayTeam: { group } }, { groupPhase: { in: labels } }, { stage: { in: labels } }] }; }
+function stageWhere(aliases: string[], contains: string[] = []) { return { OR: [...aliases.flatMap((alias) => [{ stage: { equals: alias, mode: 'insensitive' as const } }, { groupPhase: { equals: alias, mode: 'insensitive' as const } }]), ...contains.flatMap((term) => [{ stage: { contains: term, mode: 'insensitive' as const } }, { groupPhase: { contains: term, mode: 'insensitive' as const } }])] }; }
+function fifaTrustedWhere() { return { OR: [{ syncSource: { contains: 'FIFA', mode: 'insensitive' as const } }, { externalId: { startsWith: 'fifa-', mode: 'insensitive' as const } }] }; }
+function searchWhere(query: string) { const q = query.trim(); if (!q) return {}; return { OR: [{ homeTeam: { name: { contains: q, mode: 'insensitive' as const } } }, { awayTeam: { name: { contains: q, mode: 'insensitive' as const } } }, { homeTeam: { code: { contains: q, mode: 'insensitive' as const } } }, { awayTeam: { code: { contains: q, mode: 'insensitive' as const } } }] }; }
 
 function whereFor(filter: HubFilter, group: string) {
   if (filter === 'yesterday') return { matchDate: dayRangeInEgypt(-1) };
@@ -155,27 +64,35 @@ function whereFor(filter: HubFilter, group: string) {
   if (filter === 'final') return stageWhere(FINAL_ALIASES);
   return { matchDate: dayRangeInEgypt(0) };
 }
+function orderByFor(filter: HubFilter) { return filter === 'latest' ? { matchDate: 'desc' as const } : { matchDate: 'asc' as const }; }
+function takeFor(filter: HubFilter, limit: number) { if (filter === 'all') return Math.min(limit, 160); if (filter === 'group') return Math.min(limit, 24); if (filter === 'latest') return Math.min(limit, 60); if (filter === 'round_of_32') return 48; if (filter === 'round_of_16') return 24; if (filter === 'quarter_finals') return 12; if (filter === 'semi_finals') return 8; if (filter === 'final') return 4; return Math.min(limit, 36); }
+function matchDateDayKey(value: Date) { const offsetMs = 3 * 60 * 60 * 1000; const local = new Date(value.getTime() + offsetMs); return local.toISOString().slice(0, 10); }
 
-function orderByFor(filter: HubFilter) {
-  return filter === 'latest' ? { matchDate: 'desc' as const } : { matchDate: 'asc' as const };
+function canonicalStage(match: CanonicalMatch) {
+  const raw = `${match.stage || ''} ${match.groupPhase || ''}`.toLowerCase();
+  if (raw.includes('third')) return 'third_place';
+  if (raw.includes('semi')) return 'semi_finals';
+  if (raw.includes('quarter')) return 'quarter_finals';
+  if (raw.includes('round_of_16') || raw.includes('last_16') || raw.includes('r16') || raw.includes('round of 16') || raw.includes('16')) return 'round_of_16';
+  if (raw.includes('round_of_32') || raw.includes('last_32') || raw.includes('r32') || raw.includes('round of 32') || raw.includes('32')) return 'round_of_32';
+  if (raw.includes('final')) return 'final';
+  const group = raw.match(/group[_\s-]*([a-l])/i)?.[1] || raw.match(/المجموعة\s*([a-l])/i)?.[1] || match.homeTeam.group || match.awayTeam.group || 'group';
+  return `group_${String(group).toUpperCase()}`;
 }
-
-function takeFor(filter: HubFilter, limit: number) {
-  if (filter === 'all') return Math.min(limit, 120);
-  if (filter === 'group') return Math.min(limit, 12);
-  if (filter === 'latest') return Math.min(limit, 30);
-  if (filter === 'round_of_32') return 32;
-  if (filter === 'round_of_16') return 16;
-  if (filter === 'quarter_finals') return 8;
-  if (filter === 'semi_finals') return 4;
-  if (filter === 'final') return 2;
-  return Math.min(limit, 24);
+function canonicalKey(match: CanonicalMatch) { return `${canonicalStage(match)}:${[match.homeTeam.id, match.awayTeam.id].sort().join('|')}`; }
+function canonicalPriority(match: CanonicalMatch) {
+  const fifa = String(match.syncSource || '').toUpperCase().includes('FIFA') || String(match.externalId || '').toLowerCase().startsWith('fifa-');
+  const syncedAt = match.lastSyncedAt ? new Date(match.lastSyncedAt).getTime() : 0;
+  return (fifa ? 1_000_000_000_000_000 : 0) + (match._count?.statsSnapshots || 0) * 100_000 + (match._count?.events || 0) * 10_000 + (Number.isFinite(syncedAt) ? syncedAt : 0);
 }
-
-function matchDateDayKey(value: Date) {
-  const offsetMs = 3 * 60 * 60 * 1000;
-  const local = new Date(value.getTime() + offsetMs);
-  return local.toISOString().slice(0, 10);
+function canonicalizeMatches<T extends CanonicalMatch>(matches: T[]) {
+  const map = new Map<string, T>();
+  for (const match of matches) {
+    const key = canonicalKey(match);
+    const current = map.get(key);
+    if (!current || canonicalPriority(match) > canonicalPriority(current)) map.set(key, match);
+  }
+  return [...map.values()];
 }
 
 export async function GET(req: NextRequest) {
@@ -183,13 +100,15 @@ export async function GET(req: NextRequest) {
     const filter = normalizeFilter(req.nextUrl.searchParams.get('filter'));
     const group = normalizeGroup(req.nextUrl.searchParams.get('group'));
     const q = String(req.nextUrl.searchParams.get('q') || '').trim();
-    const limit = Math.max(1, Math.min(80, Number(req.nextUrl.searchParams.get('limit') || 24)));
+    const fallbackLimit = filter === 'all' ? 140 : filter === 'latest' ? 60 : 36;
+    const limit = Math.max(1, Math.min(180, Number(req.nextUrl.searchParams.get('limit') || fallbackLimit)));
     const where = { AND: [whereFor(filter, group), searchWhere(q)].filter((part) => Object.keys(part).length) };
 
     const matches = await prisma.match.findMany({
       where,
       select: {
         id: true,
+        externalId: true,
         matchDate: true,
         status: true,
         homeScore: true,
@@ -208,7 +127,8 @@ export async function GET(req: NextRequest) {
       take: takeFor(filter, limit),
     });
 
-    const normalized = matches.map((match) => {
+    const canonicalMatches = canonicalizeMatches(matches).sort((a, b) => filter === 'latest' ? b.matchDate.getTime() - a.matchDate.getTime() : a.matchDate.getTime() - b.matchDate.getTime());
+    const normalized = canonicalMatches.map((match) => {
       const groupValue = match.homeTeam.group || match.awayTeam.group || match.groupPhase || match.stage || null;
       const penalties = getPenalties(match.externalIds);
       return {
@@ -237,14 +157,8 @@ export async function GET(req: NextRequest) {
       };
     });
 
-    const summary = {
-      total: normalized.length,
-      live: normalized.filter((item) => item.isLive).length,
-      finished: normalized.filter((item) => item.isFinished).length,
-      scheduled: normalized.filter((item) => item.isScheduled).length,
-    };
-
-    return NextResponse.json({ ok: true, mode: 'matches_hub_v4_fifa_r32_penalties', filter, group, q, summary, matches: normalized }, { headers: { 'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=60' } });
+    const summary = { total: normalized.length, live: normalized.filter((item) => item.isLive).length, finished: normalized.filter((item) => item.isFinished).length, scheduled: normalized.filter((item) => item.isScheduled).length };
+    return NextResponse.json({ ok: true, mode: 'matches_hub_v5_canonical_deduped', filter, group, q, summary, matches: normalized }, { headers: { 'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=60' } });
   } catch (error) {
     console.error('matches hub error', error);
     return NextResponse.json({ ok: false, error: 'Internal Server Error' }, { status: 500, headers: { 'Cache-Control': 'no-store' } });
