@@ -1,15 +1,22 @@
 import Link from 'next/link';
+import { unstable_cache } from 'next/cache';
 import prisma from '@/lib/prisma';
 import { getTeamFlagUrl } from '@/lib/teamFlags';
 import { getArabicTeamName } from '@/lib/teamDisplay';
 
+export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-export const revalidate = 0;
+export const revalidate = 120;
 
 export const metadata = {
   title: 'إحصائيات كأس العالم 2026 | الأهداف، المنتخبات واللاعبون',
   description: 'لوحة إحصائيات كأس العالم 2026: أرقام البطولة، ترتيب المنتخبات، الهدافون، صناعة اللعب، التسديدات، الحراس والانضباط.',
 };
+
+const STATS_CACHE_SECONDS = 120;
+const SNAPSHOT_LIMIT = 360;
+const PERFORMANCE_LIMIT = 1600;
+const EVENT_LIMIT = 2000;
 
 const FINISHED = ['FINISHED', 'FT', 'AET', 'PEN', 'COMPLETED', 'ENDED', 'FINAL_VERIFIED', 'FULL_TIME'];
 const LIVE = ['LIVE', 'IN_PLAY', '1H', '2H', 'HT', 'ET', 'BT', 'P', 'PEN_LIVE'];
@@ -21,6 +28,18 @@ const nfPercent = new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 1 });
 
 type TeamLite = { id: string; name: string; code: string | null; image: string | null };
 type Penalties = { home: number; away: number };
+type MatchRow = {
+  id: string;
+  date: Date;
+  stage: string | null;
+  status: string | null;
+  homeScore: number;
+  awayScore: number;
+  totalGoals: number;
+  penalties: Penalties | null;
+  homeTeam: TeamLite;
+  awayTeam: TeamLite;
+};
 type TeamStats = TeamLite & {
   played: number;
   won: number;
@@ -60,14 +79,21 @@ type PlayerStats = {
   ratingTotal: number;
   ratingCount: number;
 };
-type MatchRow = { id: string; date: Date; stage: string | null; status: string | null; homeScore: number; awayScore: number; totalGoals: number; penalties: Penalties | null; homeTeam: TeamLite; awayTeam: TeamLite };
-type CanonicalSource = { id: string; externalId?: string | null; syncSource?: string | null; stage?: string | null; groupPhase?: string | null; lastSyncedAt?: Date | string | null; matchDate: Date; homeTeam: { id: string }; awayTeam: { id: string } };
-
-type SnapshotLike = {
+type CanonicalSource = {
+  id: string;
+  externalId?: string | null;
+  syncSource?: string | null;
+  stage?: string | null;
+  groupPhase?: string | null;
+  lastSyncedAt?: Date | string | null;
+  matchDate: Date;
+  homeTeam: { id: string };
+  awayTeam: { id: string };
+};
+type SnapshotLite = {
   matchId: string;
   provider: string;
   capturedAt: Date;
-  rawData: unknown;
   homePossession: number | null;
   awayPossession: number | null;
   homeShots: number | null;
@@ -92,27 +118,26 @@ function statusKind(status?: string | null) {
   if (SCHEDULED.includes(raw)) return 'scheduled' as const;
   return 'scheduled' as const;
 }
-function isFinished(status?: string | null) { return statusKind(status) === 'finished'; }
 function isLive(status?: string | null) { return statusKind(status) === 'live'; }
 function num(value: number | null | undefined) { return typeof value === 'number' && Number.isFinite(value) ? nf.format(value) : '—'; }
 function decimal(value: number | null | undefined) { return typeof value === 'number' && Number.isFinite(value) ? nfDecimal.format(value) : '—'; }
 function percent(value: number | null | undefined) { return typeof value === 'number' && Number.isFinite(value) ? `${nfPercent.format(value)}%` : '—'; }
 function safe(value: unknown) { const number = Number(value ?? 0); return Number.isFinite(number) ? number : 0; }
-function safeDate(value: unknown) { const date = value ? new Date(String(value)) : null; return date && Number.isFinite(date.getTime()) ? date : null; }
-function asRecord(value: unknown): Record<string, unknown> | null {
-  if (!value) return null;
-  if (typeof value === 'string') {
-    try {
-      const parsed = JSON.parse(value);
-      return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed as Record<string, unknown> : null;
-    } catch { return null; }
-  }
-  return typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : null;
-}
 function numberOrNull(value: unknown) {
   if (value === null || value === undefined || value === '') return null;
   const parsed = Number(typeof value === 'string' ? value.replace('%', '').trim() : value);
   return Number.isFinite(parsed) ? parsed : null;
+}
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : null;
+}
+function safeDate(value: unknown) {
+  const date = value ? new Date(String(value)) : null;
+  return date && Number.isFinite(date.getTime()) ? date : null;
+}
+function formatDate(value: Date | string | null | undefined) {
+  const date = safeDate(value) || new Date();
+  return new Intl.DateTimeFormat('ar-EG', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }).format(date);
 }
 function penaltiesFromExternalIds(value: unknown): Penalties | null {
   const external = asRecord(value);
@@ -120,15 +145,6 @@ function penaltiesFromExternalIds(value: unknown): Penalties | null {
   const home = numberOrNull(penalties?.home ?? penalties?.Home ?? penalties?.homeTeam ?? penalties?.HomeTeam);
   const away = numberOrNull(penalties?.away ?? penalties?.Away ?? penalties?.awayTeam ?? penalties?.AwayTeam);
   return home !== null && away !== null ? { home, away } : null;
-}
-function winnerSide(match: MatchRow): 'home' | 'away' | 'draw' {
-  if (match.homeScore > match.awayScore) return 'home';
-  if (match.awayScore > match.homeScore) return 'away';
-  if (match.penalties) {
-    if (match.penalties.home > match.penalties.away) return 'home';
-    if (match.penalties.away > match.penalties.home) return 'away';
-  }
-  return 'draw';
 }
 function teamDisplayName(team?: { name?: string | null; code?: string | null } | null) {
   return team ? getArabicTeamName(team.code || null, team.name || '') : '—';
@@ -141,6 +157,7 @@ function flagFor(team?: { name?: string | null; code?: string | null; image?: st
   const name = teamDisplayName(team);
   return getTeamFlagUrl({ code: team.code || null, name, image: null }, width) || team.image || null;
 }
+function teamSlug(team: TeamLite) { return `/teams/${encodeURIComponent(team.id)}`; }
 function stageLabel(stage?: string | null) {
   const raw = String(stage || '').toLowerCase();
   if (raw.includes('third')) return 'المركز الثالث';
@@ -152,53 +169,40 @@ function stageLabel(stage?: string | null) {
   return 'دور المجموعات';
 }
 function statusLabel(status?: string | null) {
-  if (isFinished(status)) return 'انتهت';
+  if (statusKind(status) === 'finished') return 'انتهت';
   if (isLive(status)) return upper(status) === 'HT' ? 'استراحة' : 'مباشر';
   return 'لم تبدأ';
 }
-function teamSlug(team: TeamLite) { return `/teams/${encodeURIComponent(team.id)}`; }
 function scoreLabel(match: MatchRow) {
   const base = `${num(match.homeScore)} - ${num(match.awayScore)}`;
   return match.penalties ? `${base} | ترجيح ${num(match.penalties.home)}-${num(match.penalties.away)}` : base;
 }
-
-function rawStats(snapshot?: SnapshotLike | null) {
-  const raw = asRecord(snapshot?.rawData);
-  const normalized = asRecord(raw?.normalized);
-  const liveStats = asRecord(normalized?.liveStats);
-  const stats = asRecord(liveStats?.stats) || asRecord(normalized?.stats) || asRecord(raw?.stats);
-  return stats || {};
+function canonicalStage(match: CanonicalSource) {
+  const raw = `${match.stage || ''} ${match.groupPhase || ''}`.toLowerCase();
+  if (raw.includes('third')) return 'third_place';
+  if (raw.includes('semi')) return 'semi_finals';
+  if (raw.includes('quarter')) return 'quarter_finals';
+  if (raw.includes('round_of_16') || raw.includes('last_16') || raw.includes('r16') || raw.includes('round of 16') || raw.includes('16')) return 'round_of_16';
+  if (raw.includes('round_of_32') || raw.includes('last_32') || raw.includes('r32') || raw.includes('round of 32') || raw.includes('32')) return 'round_of_32';
+  if (raw.includes('final')) return 'final';
+  const group = raw.match(/group[_\s-]*([a-l])/i)?.[1] || raw.match(/المجموعة\s*([a-l])/i)?.[1] || raw || 'group';
+  return `group_${String(group).toUpperCase()}`;
 }
-function rawPair(snapshot: SnapshotLike | null | undefined, key: string) {
-  const pair = asRecord(rawStats(snapshot)[key]);
-  const home = numberOrNull(pair?.home ?? pair?.Home ?? pair?.homeTeam ?? pair?.home_team);
-  const away = numberOrNull(pair?.away ?? pair?.Away ?? pair?.awayTeam ?? pair?.away_team);
-  return home === null && away === null ? null : { home: home ?? 0, away: away ?? 0 };
+function canonicalKey(match: CanonicalSource) { return `${canonicalStage(match)}:${[match.homeTeam.id, match.awayTeam.id].sort().join('|')}`; }
+function canonicalPriority(match: CanonicalSource) {
+  const fifa = String(match.syncSource || '').toUpperCase().includes('FIFA') || String(match.externalId || '').toLowerCase().startsWith('fifa-');
+  const syncedAt = match.lastSyncedAt ? new Date(match.lastSyncedAt).getTime() : 0;
+  return (fifa ? 1_000_000_000_000_000 : 0) + (Number.isFinite(syncedAt) ? syncedAt : 0);
 }
-function statPair(snapshot: SnapshotLike | null | undefined, key: string, homeColumn: keyof SnapshotLike, awayColumn: keyof SnapshotLike) {
-  const homeColumnValue = numberOrNull(snapshot?.[homeColumn]);
-  const awayColumnValue = numberOrNull(snapshot?.[awayColumn]);
-  if (homeColumnValue !== null || awayColumnValue !== null) return { home: homeColumnValue ?? 0, away: awayColumnValue ?? 0 };
-  return rawPair(snapshot, key) || { home: 0, away: 0 };
-}
-function snapshotScore(snapshot: SnapshotLike) {
-  const direct = [snapshot.homeShots, snapshot.awayShots, snapshot.homeShotsOnTarget, snapshot.awayShotsOnTarget, snapshot.homePossession, snapshot.awayPossession, snapshot.homeCorners, snapshot.awayCorners].filter((value) => value !== null && value !== undefined).length;
-  const raw = ['shots', 'shotsOnTarget', 'possession', 'corners', 'yellowCards', 'redCards'].filter((key) => rawPair(snapshot, key)).length;
-  const providerBoost = String(snapshot.provider || '').startsWith('THE_STATS_API') ? 20 : 0;
-  return direct * 2 + raw * 5 + providerBoost;
-}
-function bestSnapshotsByMatch(snapshots: SnapshotLike[]) {
-  const map = new Map<string, SnapshotLike>();
-  for (const snapshot of snapshots) {
-    const current = map.get(snapshot.matchId);
-    if (!current) { map.set(snapshot.matchId, snapshot); continue; }
-    const score = snapshotScore(snapshot);
-    const currentScore = snapshotScore(current);
-    if (score > currentScore || (score === currentScore && snapshot.capturedAt.getTime() > current.capturedAt.getTime())) map.set(snapshot.matchId, snapshot);
+function canonicalizeMatches<T extends CanonicalSource>(matches: T[]) {
+  const map = new Map<string, T>();
+  for (const match of matches) {
+    const key = canonicalKey(match);
+    const current = map.get(key);
+    if (!current || canonicalPriority(match) > canonicalPriority(current)) map.set(key, match);
   }
-  return map;
+  return [...map.values()];
 }
-
 function makeTeamRow(team: TeamLite): TeamStats {
   return { ...team, played: 0, won: 0, drawn: 0, lost: 0, points: 0, goalsFor: 0, goalsAgainst: 0, goalDifference: 0, cleanSheets: 0, shots: 0, shotsOnTarget: 0, corners: 0, yellowCards: 0, redCards: 0, possessionTotal: 0, possessionCount: 0 };
 }
@@ -228,42 +232,40 @@ function addSnapshotStats(row: TeamStats, stats: { shots: number; shotsOnTarget:
     row.possessionCount += 1;
   }
 }
+function winnerSide(match: MatchRow): 'home' | 'away' | 'draw' {
+  if (match.homeScore > match.awayScore) return 'home';
+  if (match.awayScore > match.homeScore) return 'away';
+  if (match.penalties) {
+    if (match.penalties.home > match.penalties.away) return 'home';
+    if (match.penalties.away > match.penalties.home) return 'away';
+  }
+  return 'draw';
+}
 function teamComparator(a: TeamStats, b: TeamStats) {
   return b.points - a.points || b.goalDifference - a.goalDifference || b.goalsFor - a.goalsFor || a.goalsAgainst - b.goalsAgainst;
 }
-function playerRating(player: PlayerStats) { return player.ratingCount > 0 ? player.ratingTotal / player.ratingCount : null; }
 function topBy<T>(rows: T[], picker: (item: T) => number | null | undefined, limit = 8, positiveOnly = true) {
   return [...rows]
     .filter((item) => !positiveOnly || safe(picker(item)) > 0)
     .sort((a, b) => safe(picker(b)) - safe(picker(a)))
     .slice(0, limit);
 }
-
-function canonicalStage(match: CanonicalSource) {
-  const raw = `${match.stage || ''} ${match.groupPhase || ''}`.toLowerCase();
-  if (raw.includes('third')) return 'third_place';
-  if (raw.includes('semi')) return 'semi_finals';
-  if (raw.includes('quarter')) return 'quarter_finals';
-  if (raw.includes('round_of_16') || raw.includes('last_16') || raw.includes('r16') || raw.includes('round of 16') || raw.includes('16')) return 'round_of_16';
-  if (raw.includes('round_of_32') || raw.includes('last_32') || raw.includes('r32') || raw.includes('round of 32') || raw.includes('32')) return 'round_of_32';
-  if (raw.includes('final')) return 'final';
-  const group = raw.match(/group[_\s-]*([a-l])/i)?.[1] || raw.match(/المجموعة\s*([a-l])/i)?.[1] || raw || 'group';
-  return `group_${String(group).toUpperCase()}`;
+function playerRating(player: PlayerStats) { return player.ratingCount > 0 ? player.ratingTotal / player.ratingCount : null; }
+function snapshotScore(snapshot: SnapshotLite) {
+  const direct = [snapshot.homeShots, snapshot.awayShots, snapshot.homeShotsOnTarget, snapshot.awayShotsOnTarget, snapshot.homePossession, snapshot.awayPossession, snapshot.homeCorners, snapshot.awayCorners].filter((value) => value !== null && value !== undefined).length;
+  const providerBoost = String(snapshot.provider || '').startsWith('THE_STATS_API') ? 20 : 0;
+  return direct * 2 + providerBoost;
 }
-function canonicalKey(match: CanonicalSource) { return `${canonicalStage(match)}:${[match.homeTeam.id, match.awayTeam.id].sort().join('|')}`; }
-function canonicalPriority(match: CanonicalSource) {
-  const fifa = String(match.syncSource || '').toUpperCase().includes('FIFA') || String(match.externalId || '').toLowerCase().startsWith('fifa-');
-  const syncedAt = match.lastSyncedAt ? new Date(match.lastSyncedAt).getTime() : 0;
-  return (fifa ? 1_000_000_000_000_000 : 0) + (Number.isFinite(syncedAt) ? syncedAt : 0);
-}
-function canonicalizeMatches<T extends CanonicalSource>(matches: T[]) {
-  const map = new Map<string, T>();
-  for (const match of matches) {
-    const key = canonicalKey(match);
-    const current = map.get(key);
-    if (!current || canonicalPriority(match) > canonicalPriority(current)) map.set(key, match);
+function bestSnapshotsByMatch(snapshots: SnapshotLite[]) {
+  const map = new Map<string, SnapshotLite>();
+  for (const snapshot of snapshots) {
+    const current = map.get(snapshot.matchId);
+    if (!current) { map.set(snapshot.matchId, snapshot); continue; }
+    const score = snapshotScore(snapshot);
+    const currentScore = snapshotScore(current);
+    if (score > currentScore || (score === currentScore && snapshot.capturedAt.getTime() > current.capturedAt.getTime())) map.set(snapshot.matchId, snapshot);
   }
-  return [...map.values()];
+  return map;
 }
 function eventPlayerKey(name: string, teamId?: string | null) {
   return `event:${teamId || 'team'}:${name.toLowerCase()}`;
@@ -274,8 +276,8 @@ function ensureEventPlayer(map: Map<string, PlayerStats>, name: string, teamName
   return map.get(id)!;
 }
 
-async function loadStatistics() {
-  const [rawMatches, latestSnapshotsRaw, performances, events, teamsCount, playersCount] = await Promise.all([
+async function loadStatisticsUncached() {
+  const [rawMatches, snapshots, performances, events, teamsCount, playersCount, totalSnapshots] = await Promise.all([
     prisma.match.findMany({
       select: {
         id: true,
@@ -295,11 +297,11 @@ async function loadStatistics() {
       orderBy: { matchDate: 'asc' },
     }),
     prisma.matchStatsSnapshot.findMany({
+      where: { provider: { startsWith: 'THE_STATS_API' } },
       select: {
         matchId: true,
         provider: true,
         capturedAt: true,
-        rawData: true,
         homePossession: true,
         awayPossession: true,
         homeShots: true,
@@ -314,8 +316,24 @@ async function loadStatistics() {
         awayRedCards: true,
       },
       orderBy: { capturedAt: 'desc' },
+      take: SNAPSHOT_LIMIT,
     }),
     prisma.playerPerformance.findMany({
+      where: {
+        OR: [
+          { goals: { gt: 0 } },
+          { assists: { gt: 0 } },
+          { shotsTotal: { gt: 0 } },
+          { shotsOnTarget: { gt: 0 } },
+          { keyPasses: { gt: 0 } },
+          { tackles: { gt: 0 } },
+          { interceptions: { gt: 0 } },
+          { saves: { gt: 0 } },
+          { yellowCards: { gt: 0 } },
+          { redCards: { gt: 0 } },
+          { apiRating: { not: null } },
+        ],
+      },
       select: {
         minutes: true,
         goals: true,
@@ -334,20 +352,23 @@ async function loadStatistics() {
         updatedAt: true,
         asset: { select: { id: true, name: true, code: true, image: true, team: { select: { id: true, name: true, code: true, image: true } } } },
       },
+      orderBy: { updatedAt: 'desc' },
+      take: PERFORMANCE_LIMIT,
     }),
     prisma.matchEvent.findMany({
       where: { type: { in: ['goal', 'yellow_card', 'red_card'] } },
-      select: { matchId: true, type: true, playerName: true, teamId: true, sourceName: true },
+      select: { matchId: true, type: true, playerName: true, teamId: true, sourceName: true, createdAt: true },
+      orderBy: { createdAt: 'desc' },
+      take: EVENT_LIMIT,
     }),
     prisma.asset.count({ where: { type: 'TEAM' } }),
     prisma.asset.count({ where: { type: 'PLAYER' } }),
+    prisma.matchStatsSnapshot.count({ where: { provider: { startsWith: 'THE_STATS_API' } } }),
   ]);
 
   const matches = canonicalizeMatches(rawMatches).sort((a, b) => a.matchDate.getTime() - b.matchDate.getTime());
   const canonicalMatchIds = new Set(matches.map((match) => match.id));
-  const bestSnapshots = bestSnapshotsByMatch(latestSnapshotsRaw as SnapshotLike[]);
-  const latestUsefulSnapshotDate = [...bestSnapshots.values()].sort((a, b) => b.capturedAt.getTime() - a.capturedAt.getTime())[0]?.capturedAt || null;
-
+  const bestSnapshots = bestSnapshotsByMatch(snapshots as SnapshotLite[]);
   const matchRows: MatchRow[] = matches.map((match) => ({
     id: match.id,
     date: match.matchDate,
@@ -360,11 +381,11 @@ async function loadStatistics() {
     homeTeam: match.homeTeam,
     awayTeam: match.awayTeam,
   }));
+
   const finishedRows = matchRows.filter((match) => statusKind(match.status) === 'finished');
   const liveRows = matchRows.filter((match) => statusKind(match.status) === 'live');
   const scheduledRows = matchRows.filter((match) => statusKind(match.status) === 'scheduled');
   const scoredRows = [...finishedRows, ...liveRows];
-
   const teamMap = new Map<string, TeamStats>();
   const teamNameById = new Map<string, string>();
   function teamRow(team: TeamLite) {
@@ -387,14 +408,22 @@ async function loadStatistics() {
   for (const match of scoredRows) {
     const snapshot = bestSnapshots.get(match.id);
     if (!snapshot) continue;
-    const shots = statPair(snapshot, 'shots', 'homeShots', 'awayShots');
-    const shotsOnTarget = statPair(snapshot, 'shotsOnTarget', 'homeShotsOnTarget', 'awayShotsOnTarget');
-    const corners = statPair(snapshot, 'corners', 'homeCorners', 'awayCorners');
-    const yellow = statPair(snapshot, 'yellowCards', 'homeYellowCards', 'awayYellowCards');
-    const red = statPair(snapshot, 'redCards', 'homeRedCards', 'awayRedCards');
-    const possession = statPair(snapshot, 'possession', 'homePossession', 'awayPossession');
-    addSnapshotStats(teamRow(match.homeTeam), { shots: shots.home, shotsOnTarget: shotsOnTarget.home, corners: corners.home, yellow: yellow.home, red: red.home, possession: possession.home });
-    addSnapshotStats(teamRow(match.awayTeam), { shots: shots.away, shotsOnTarget: shotsOnTarget.away, corners: corners.away, yellow: yellow.away, red: red.away, possession: possession.away });
+    addSnapshotStats(teamRow(match.homeTeam), {
+      shots: safe(snapshot.homeShots),
+      shotsOnTarget: safe(snapshot.homeShotsOnTarget),
+      corners: safe(snapshot.homeCorners),
+      yellow: safe(snapshot.homeYellowCards),
+      red: safe(snapshot.homeRedCards),
+      possession: numberOrNull(snapshot.homePossession),
+    });
+    addSnapshotStats(teamRow(match.awayTeam), {
+      shots: safe(snapshot.awayShots),
+      shotsOnTarget: safe(snapshot.awayShotsOnTarget),
+      corners: safe(snapshot.awayCorners),
+      yellow: safe(snapshot.awayYellowCards),
+      red: safe(snapshot.awayRedCards),
+      possession: numberOrNull(snapshot.awayPossession),
+    });
   }
 
   const playerMap = new Map<string, PlayerStats>();
@@ -424,8 +453,7 @@ async function loadStatistics() {
   const shotmapGoalMatches = new Set(events.filter((event) => event.type === 'goal' && event.sourceName === 'THE_STATS_API_FINAL_SHOTMAP').map((event) => event.matchId));
   if (performanceGoalTotal === 0) {
     for (const event of events) {
-      if (!event.playerName || !canonicalMatchIds.has(event.matchId)) continue;
-      if (event.type !== 'goal') continue;
+      if (!event.playerName || !canonicalMatchIds.has(event.matchId) || event.type !== 'goal') continue;
       if (shotmapGoalMatches.has(event.matchId) && event.sourceName !== 'THE_STATS_API_FINAL_SHOTMAP') continue;
       const row = ensureEventPlayer(playerMap, event.playerName, teamNameById.get(event.teamId || '') || '—', event.teamId);
       row.goals += 1;
@@ -449,14 +477,15 @@ async function loadStatistics() {
   const liveGoals = liveRows.reduce((sum, match) => sum + match.totalGoals, 0);
   const totalShots = teams.reduce((sum, team) => sum + team.shots, 0);
   const totalShotsOnTarget = teams.reduce((sum, team) => sum + team.shotsOnTarget, 0);
-  const totalCorners = teams.reduce((sum, team) => sum + team.corners, 0);
   const yellowCards = teams.reduce((sum, team) => sum + team.yellowCards, 0);
   const redCards = teams.reduce((sum, team) => sum + team.redCards, 0);
   const cleanSheets = teams.reduce((sum, team) => sum + team.cleanSheets, 0);
   const possessionTeams = teams.filter((team) => team.possessionCount > 0);
   const averagePossession = possessionTeams.length ? possessionTeams.reduce((sum, team) => sum + team.possessionTotal / team.possessionCount, 0) / possessionTeams.length : null;
+  const latestSnapshotDate = snapshots[0]?.capturedAt || null;
+  const latestPerformanceDate = performances.reduce<Date | null>((latest, row) => !latest || row.updatedAt > latest ? row.updatedAt : latest, null);
   const latestMatchSync = matches.map((match) => safeDate(match.lastSyncedAt)).filter(Boolean).sort((a, b) => b!.getTime() - a!.getTime())[0] || null;
-  const updatedAt = latestUsefulSnapshotDate || performances[0]?.updatedAt || latestMatchSync || new Date();
+  const updatedAt = latestSnapshotDate || latestPerformanceDate || latestMatchSync || new Date();
 
   return {
     totalMatches: matches.length,
@@ -467,6 +496,7 @@ async function loadStatistics() {
     playersCount,
     playerPerformanceRows: performances.length,
     usefulSnapshotCount: bestSnapshots.size,
+    totalSnapshots,
     totalGoals,
     finishedGoals,
     liveGoals,
@@ -474,14 +504,12 @@ async function loadStatistics() {
     totalShots,
     totalShotsOnTarget,
     shotAccuracy: totalShots ? (totalShotsOnTarget / totalShots) * 100 : null,
-    totalCorners,
     yellowCards,
     redCards,
     cleanSheets,
     averagePossession,
     updatedAt,
     teams,
-    players,
     topAttack: topBy(teams, (team) => team.goalsFor, 1, false)[0] || null,
     bestDefense: [...teams].filter((team) => team.played > 0).sort((a, b) => a.goalsAgainst - b.goalsAgainst || b.cleanSheets - a.cleanSheets)[0] || null,
     bestPossessionTeam: [...teams].filter((team) => team.possessionCount > 0).sort((a, b) => (b.possessionTotal / b.possessionCount) - (a.possessionTotal / a.possessionCount))[0] || null,
@@ -498,6 +526,11 @@ async function loadStatistics() {
     liveMatchRows: [...liveRows].sort((a, b) => a.date.getTime() - b.date.getTime()).slice(0, 8),
   };
 }
+
+const loadStatistics = unstable_cache(loadStatisticsUncached, ['statistics-page-v3'], {
+  revalidate: STATS_CACHE_SECONDS,
+  tags: ['statistics-page', 'home-dashboard'],
+});
 
 function StatCard({ label, value, note, tone = 'neutral' }: { label: string; value: string; note?: string; tone?: 'neutral' | 'gold' | 'green' | 'cyan' | 'red' }) {
   const toneClass = { neutral: 'border-white/10 bg-white/[0.045] text-white', gold: 'border-[#FFD700]/25 bg-[#FFD700]/10 text-[#FFD700]', green: 'border-[#00FF88]/25 bg-[#00FF88]/10 text-[#00FF88]', cyan: 'border-[#0FF0FC]/25 bg-[#0FF0FC]/10 text-[#0FF0FC]', red: 'border-red-300/25 bg-red-400/10 text-red-100' }[tone];
@@ -525,35 +558,33 @@ function PlayerRanking({ title, players, metricLabel, value, empty = 'لم تت�
 }
 function MatchTable({ matches, empty = 'لا توجد مباريات متاحة الآن' }: { matches: MatchRow[]; empty?: string }) {
   if (!matches.length) return <div className="rounded-3xl border border-dashed border-white/10 bg-white/[0.025] p-6 text-center text-sm font-bold text-gray-500">{empty}</div>;
-  return <div className="overflow-hidden rounded-3xl border border-white/10 bg-white/[0.035]"><div className="overflow-x-auto"><table className="min-w-[760px] w-full text-right text-xs"><thead className="bg-white/[0.05] text-[10px] font-black text-gray-400"><tr><th className="px-4 py-3">المباراة</th><th>الدور</th><th>الحالة</th><th>النتيجة</th><th>الأهداف</th><th>التاريخ</th></tr></thead><tbody className="divide-y divide-white/10">{matches.map((match) => <tr key={match.id} className="transition hover:bg-white/[0.04]"><td className="px-4 py-3"><Link href={`/matches/${match.id}`} className="flex items-center gap-3"><TeamIdentity team={match.homeTeam} compact /><span className="text-[10px] font-black text-gray-500">ضد</span><TeamIdentity team={match.awayTeam} compact /></Link></td><td>{stageLabel(match.stage)}</td><td className={isLive(match.status) ? 'font-black text-[#00FF88]' : 'text-gray-300'}>{statusLabel(match.status)}</td><td className="font-black text-white">{scoreLabel(match)}</td><td className="text-[#FFD700] font-black">{num(match.totalGoals)}</td><td>{new Intl.DateTimeFormat('ar-EG', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }).format(match.date)}</td></tr>)}</tbody></table></div></div>;
+  return <div className="overflow-hidden rounded-3xl border border-white/10 bg-white/[0.035]"><div className="overflow-x-auto"><table className="min-w-[760px] w-full text-right text-xs"><thead className="bg-white/[0.05] text-[10px] font-black text-gray-400"><tr><th className="px-4 py-3">المباراة</th><th>الدور</th><th>الحالة</th><th>النتيجة</th><th>الأهداف</th><th>التاريخ</th></tr></thead><tbody className="divide-y divide-white/10">{matches.map((match) => <tr key={match.id} className="transition hover:bg-white/[0.04]"><td className="px-4 py-3"><Link href={`/matches/${match.id}`} className="flex items-center gap-3"><TeamIdentity team={match.homeTeam} compact /><span className="text-[10px] font-black text-gray-500">ضد</span><TeamIdentity team={match.awayTeam} compact /></Link></td><td>{stageLabel(match.stage)}</td><td className={isLive(match.status) ? 'font-black text-[#00FF88]' : 'text-gray-300'}>{statusLabel(match.status)}</td><td className="font-black text-white">{scoreLabel(match)}</td><td className="text-[#FFD700] font-black">{num(match.totalGoals)}</td><td>{formatDate(match.date)}</td></tr>)}</tbody></table></div></div>;
 }
 
 export default async function StatisticsPage() {
   const data = await loadStatistics();
-  const countedMatches = data.finishedMatchesCount + data.liveMatchesCount;
   const completion = data.totalMatches ? (data.finishedMatchesCount / data.totalMatches) * 100 : null;
   const topAttackMetric = data.topAttack ? `${num(data.topAttack.goalsFor)} هدف · ${num(data.topAttack.shots)} تسديدة` : '—';
   const bestDefenseMetric = data.bestDefense ? `${num(data.bestDefense.goalsAgainst)} هدف مستقبَل · ${num(data.bestDefense.cleanSheets)} شباك نظيفة` : '—';
   const possessionMetric = data.bestPossessionTeam && data.bestPossessionTeam.possessionCount ? `${percent(data.bestPossessionTeam.possessionTotal / data.bestPossessionTeam.possessionCount)} استحواذ` : '—';
-  const updatedLabel = new Intl.DateTimeFormat('ar-EG', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }).format(data.updatedAt);
 
   return (
     <main dir="rtl" className="mx-auto max-w-7xl space-y-7 px-3 py-5 text-white sm:px-4 lg:px-6">
       <section className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(15,240,252,0.16),transparent_32%),linear-gradient(135deg,#061313,#050505)] p-5 shadow-[0_24px_70px_rgba(0,0,0,0.32)]">
         <div className="absolute -left-20 -top-20 h-52 w-52 rounded-full bg-[#FFD700]/10 blur-3xl" />
         <div className="relative z-10 flex flex-wrap items-end justify-between gap-5">
-          <div><p className="inline-flex rounded-full border border-[#FFD700]/25 bg-[#FFD700]/10 px-3 py-1 text-[10px] font-black tracking-[0.16em] text-[#FFD700]">LIVE DATA CENTER</p><h1 className="mt-4 text-3xl font-black leading-tight md:text-5xl">إحصائيات كأس العالم 2026</h1><p className="mt-3 max-w-3xl text-sm font-bold leading-7 text-gray-400">لوحة محدثة مباشرة من قاعدة البيانات. تقرأ الآن من أعمدة snapshots ومن rawData الخاصة بـ TheStats، مع fallback للأهداف من أحداث المباراة عند نقص PlayerPerformance.</p></div>
-          <div className="rounded-3xl border border-white/10 bg-black/25 p-4 text-sm font-bold text-gray-300"><div className="text-[10px] font-black text-gray-500">آخر تحديث</div><div className="mt-1 text-lg font-black text-white">{updatedLabel}</div><div className="mt-3 h-1.5 w-44 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-[#00FF88]" style={{ width: `${Math.min(100, completion || 0)}%` }} /></div><div className="mt-1 text-[10px] text-gray-500">اكتمال المباريات: {percent(completion)}</div></div>
+          <div><p className="inline-flex rounded-full border border-[#FFD700]/25 bg-[#FFD700]/10 px-3 py-1 text-[10px] font-black tracking-[0.16em] text-[#FFD700]">CACHED DATA CENTER</p><h1 className="mt-4 text-3xl font-black leading-tight md:text-5xl">إحصائيات كأس العالم 2026</h1><p className="mt-3 max-w-3xl text-sm font-bold leading-7 text-gray-400">الصفحة لا تجلب من TheStats API أثناء زيارة المستخدم. يتم تجميع الأرقام من قاعدة البيانات فقط داخل كاش قصير لتجنب ضغط Refresh ورسائل 502.</p></div>
+          <div className="rounded-3xl border border-white/10 bg-black/25 p-4 text-sm font-bold text-gray-300"><div className="text-[10px] font-black text-gray-500">آخر تحديث بيانات</div><div className="mt-1 text-lg font-black text-white">{formatDate(data.updatedAt)}</div><div className="mt-3 h-1.5 w-44 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-[#00FF88]" style={{ width: `${Math.min(100, completion || 0)}%` }} /></div><div className="mt-1 text-[10px] text-gray-500">كاش الصفحة: {nf.format(STATS_CACHE_SECONDS)} ثانية</div></div>
         </div>
       </section>
 
       <nav className="sticky top-2 z-20 flex gap-2 overflow-x-auto rounded-3xl border border-white/10 bg-black/65 p-2 backdrop-blur-xl">{[['#overview', 'نظرة عامة'], ['#live', 'مباشر الآن'], ['#teams', 'المنتخبات'], ['#players', 'اللاعبون'], ['#matches', 'المباريات'], ['#discipline', 'الانضباط']].map(([href, label]) => <a key={href} href={href} className="shrink-0 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-2 text-xs font-black text-gray-300 transition hover:border-[#FFD700]/30 hover:text-[#FFD700]">{label}</a>)}</nav>
 
-      <section id="overview" className="scroll-mt-24 space-y-4"><SectionTitle id="overview-title" kicker="OVERVIEW" title="نظرة عامة محدثة" description="الأرقام تجمع المباريات المنتهية والمباشرة، وتقرأ الإحصائيات التفصيلية من snapshots الخام عند غياب الأعمدة المباشرة." /><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"><StatCard label="المباريات المنتهية" value={`${num(data.finishedMatchesCount)} / ${num(data.totalMatches)}`} note={`${num(data.liveMatchesCount)} مباشر · ${num(data.scheduledMatchesCount)} قادمة`} tone="gold" /><StatCard label="إجمالي الأهداف" value={num(data.totalGoals)} note={`${num(data.finishedGoals)} مكتملة · ${num(data.liveGoals)} مباشرة`} tone="green" /><StatCard label="إجمالي التسديدات" value={num(data.totalShots)} note={`${percent(data.shotAccuracy)} دقة على المرمى`} tone="cyan" /><StatCard label="مصادر الإحصائيات" value={num(data.usefulSnapshotCount)} note={`${num(data.playerPerformanceRows)} سجل لاعب`} /></div><div className="grid gap-3 md:grid-cols-3"><FeatureTeamCard title="أقوى هجوم" team={data.topAttack} metric={topAttackMetric} /><FeatureTeamCard title="أفضل دفاع" team={data.bestDefense} metric={bestDefenseMetric} /><FeatureTeamCard title="الأكثر استحواذًا" team={data.bestPossessionTeam} metric={possessionMetric} /></div></section>
+      <section id="overview" className="scroll-mt-24 space-y-4"><SectionTitle id="overview-title" kicker="OVERVIEW" title="نظرة عامة محدثة" description="الأرقام تجمع المباريات المنتهية والمباشرة من قاعدة البيانات، مع استخدام Snapshot من TheStats عند توفره." /><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"><StatCard label="المباريات المنتهية" value={`${num(data.finishedMatchesCount)} / ${num(data.totalMatches)}`} note={`${num(data.liveMatchesCount)} مباشر · ${num(data.scheduledMatchesCount)} قادمة`} tone="gold" /><StatCard label="إجمالي الأهداف" value={num(data.totalGoals)} note={`${num(data.finishedGoals)} مكتملة · ${num(data.liveGoals)} مباشرة`} tone="green" /><StatCard label="إجمالي التسديدات" value={num(data.totalShots)} note={`${percent(data.shotAccuracy)} دقة على المرمى`} tone="cyan" /><StatCard label="مصادر TheStats" value={num(data.usefulSnapshotCount)} note={`${num(data.totalSnapshots)} Snapshot محفوظ`} /></div><div className="grid gap-3 md:grid-cols-3"><FeatureTeamCard title="أقوى هجوم" team={data.topAttack} metric={topAttackMetric} /><FeatureTeamCard title="أفضل دفاع" team={data.bestDefense} metric={bestDefenseMetric} /><FeatureTeamCard title="الأكثر استحواذًا" team={data.bestPossessionTeam} metric={possessionMetric} /></div></section>
 
-      <section id="live" className="scroll-mt-24 space-y-4"><SectionTitle id="live-title" kicker="LIVE" title="المباريات المباشرة الآن" description="أي نتيجة مباشرة محفوظة في قاعدة البيانات تظهر هنا فورًا." /><MatchTable matches={data.liveMatchRows} empty="لا توجد مباريات مباشرة الآن" /></section>
+      <section id="live" className="scroll-mt-24 space-y-4"><SectionTitle id="live-title" kicker="LIVE" title="المباريات المباشرة الآن" description="أي نتيجة مباشرة محفوظة في قاعدة البيانات تظهر هنا بدون جلب خارجي من الصفحة." /><MatchTable matches={data.liveMatchRows} empty="لا توجد مباريات مباشرة الآن" /></section>
 
-      <section className="space-y-4"><SectionTitle id="teams" kicker="TEAMS" title="ترتيب المنتخبات بالأرقام" description="جدول يجمع نتائج المنتخبات في المباريات المكتملة، مع إحصائيات TheStats الخام مثل التسديدات والاستحواذ والبطاقات." /><TeamTable teams={data.teams} /></section>
+      <section className="space-y-4"><SectionTitle id="teams" kicker="TEAMS" title="ترتيب المنتخبات بالأرقام" description="جدول يجمع نتائج المنتخبات في المباريات المكتملة، مع إحصائيات TheStats المحفوظة في snapshots." /><TeamTable teams={data.teams} /></section>
 
       <section className="space-y-4"><SectionTitle id="players" kicker="PLAYERS" title="أبرز اللاعبين" description="قوائم الهدافين وصناع اللعب والتسديدات والتصديات من PlayerPerformance، مع fallback للأهداف من أحداث المباراة عند الحاجة." /><div className="grid gap-3 lg:grid-cols-2"><PlayerRanking title="الهدافون" players={data.topScorers} metricLabel="هدف" value={(player) => player.goals} /><PlayerRanking title="صناعة الأهداف" players={data.topAssists} metricLabel="أسيست" value={(player) => player.assists} /><PlayerRanking title="الأكثر تسديدًا" players={data.topShooters} metricLabel="تسديدة" value={(player) => player.shots} /><PlayerRanking title="صناعة الفرص" players={data.topCreators} metricLabel="تمريرة مفتاحية" value={(player) => player.keyPasses} /><PlayerRanking title="الحراس" players={data.topSaves} metricLabel="تصدي" value={(player) => player.saves} /><PlayerRanking title="الأعلى تقييمًا" players={data.topRated} metricLabel="تقييم" value={(player) => playerRating(player)} /></div></section>
 
