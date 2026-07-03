@@ -18,7 +18,7 @@ export function BroadcastClient({ nextMatch, stats }: { nextMatch: BroadcastMatc
   useEffect(() => { const timer = window.setInterval(() => setNow(Date.now()), 1000); return () => window.clearInterval(timer); }, []);
   const countdown = useMemo(() => getCountdown(nextMatch?.matchDate, now), [nextMatch?.matchDate, now]);
   const groupKey = normalizeGroupKey(nextMatch?.groupPhase || nextMatch?.group || nextMatch?.homeTeam?.group || nextMatch?.awayTeam?.group);
-  const statCards = [{ label: 'منتخب', value: stats.teamsCount || 48, icon: Trophy }, { label: 'لاعب', value: stats.playersCount || 1249, icon: Users }, { label: 'مباراة', value: stats.matchesCount || 72, icon: CalendarDays }];
+  const statCards = [{ label: 'منتخب', value: stats.teamsCount || 48, icon: Trophy }, { label: 'لاعب', value: stats.playersCount || 1248, icon: Users }, { label: 'مباراة', value: stats.matchesCount || 72, icon: CalendarDays }];
 
   return (
     <div className="fixed inset-0 z-[9999] overflow-hidden bg-[#030712] text-white">
