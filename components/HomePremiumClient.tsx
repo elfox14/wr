@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import HomeLiveMatchTicker from '@/components/HomeLiveMatchTicker';
 import HomeGroupStandingsWidget from '@/components/HomeGroupStandingsWidget';
 import { getTeamFlagUrl } from '@/lib/teamFlags';
@@ -28,6 +28,31 @@ function isHalfTime(match?: HomeMatch | null) { return HALF_TIME_STATUSES.includ
 function isScheduled(match?: HomeMatch | null) { return !isFinished(match) && SCHEDULED_STATUSES.includes(status(match)); }
 function isConfirmedLive(match?: HomeMatch | null) { return !isFinished(match) && !isHalfTime(match) && (LIVE_STATUSES.includes(status(match)) || Boolean(match?.isLiveNow) || Boolean(match?.isLikelyLiveByTime)); }
 function isLiveOrBreak(match?: HomeMatch | null) { return isConfirmedLive(match) || isHalfTime(match); }
+function matchTime(match?: HomeMatch | null) { const date = match?.matchDate ? new Date(match.matchDate) : null; return date && Number.isFinite(date.getTime()) ? date.getTime() : Number.MAX_SAFE_INTEGER; }
+function matchKey(match?: HomeMatch | null) { return String(match?.id || match?.animationMatchId || `${teamLabel(match?.homeTeam)}-${teamLabel(match?.awayTeam)}-${match?.matchDate || ''}`); }
+function normalizeTeam(value?: string | number | null) { return String(value || '').trim().toLowerCase().replace(/[^a-z0-9\u0600-\u06ff]+/g, ''); }
+function teamIdentity(team?: Team | null) { return normalizeTeam(team?.code || team?.name || ''); }
+function pairKey(match?: HomeMatch | null) { return [teamIdentity(match?.homeTeam), teamIdentity(match?.awayTeam)].filter(Boolean).sort().join('|'); }
+function isSameMatch(a?: HomeMatch | null, b?: HomeMatch | null) {
+  if (!a || !b) return false;
+  const aId = matchKey(a);
+  const bId = matchKey(b);
+  if (aId && bId && aId === bId) return true;
+  const aPair = pairKey(a);
+  const bPair = pairKey(b);
+  return Boolean(aPair && bPair && aPair === bPair);
+}
+function choosePrimaryMatch(tickerMatches: HomeMatch[], upcomingMatches: HomeMatch[], nextMatch: HomeMatch | null) {
+  const tickerSorted = [...tickerMatches].sort((a, b) => {
+    const liveDelta = Number(isLiveOrBreak(b)) - Number(isLiveOrBreak(a));
+    if (liveDelta) return liveDelta;
+    return matchTime(a) - matchTime(b);
+  });
+  const sameAsNext = nextMatch ? tickerSorted.find((match) => isSameMatch(match, nextMatch)) : null;
+  const liveTicker = tickerSorted.find(isLiveOrBreak);
+  const activeTicker = tickerSorted.find((match) => !isFinished(match) && !isScheduled(match));
+  return sameAsNext || liveTicker || activeTicker || nextMatch || upcomingMatches[0] || tickerSorted[0] || null;
+}
 
 // --- Subcomponents ---
 
@@ -35,14 +60,14 @@ function HeroMatchCard({ match, now }: { match: HomeMatch; now: Date }) {
   const isLive = isLiveOrBreak(match);
   const homeName = teamLabel(match.homeTeam);
   const awayName = teamLabel(match.awayTeam);
-  
+
   return (
-    <motion.div 
+    <motion.div
       initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}
       className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-black/40 p-6 shadow-2xl backdrop-blur-xl sm:p-10"
     >
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(255,215,0,0.15)_0%,transparent_70%)] opacity-50" />
-      
+
       <div className="relative z-10 flex flex-col items-center justify-center text-center">
         {isLive ? (
           <motion.div animate={{ opacity: [1, 0.5, 1] }} transition={{ repeat: Infinity, duration: 1.5 }} className="mb-4 inline-flex items-center gap-2 rounded-full border border-red-500/50 bg-red-500/10 px-4 py-1.5 text-xs font-black text-red-500">
@@ -62,10 +87,10 @@ function HeroMatchCard({ match, now }: { match: HomeMatch; now: Date }) {
 
           <div className="flex flex-col items-center justify-center">
             {isLive || isFinished(match) ? (
-              <div className="flex items-center gap-3 text-4xl font-black text-[#FFD700] sm:text-6xl" dir="ltr">
-                <span>{match.homeScore || 0}</span>
+              <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 text-4xl font-black text-[#FFD700] sm:text-6xl" dir="ltr" aria-label="النتيجة: رقم اليسار للمنتخب الأيسر، ورقم اليمين للمنتخب الأيمن">
+                <span>{match.awayScore ?? 0}</span>
                 <span className="text-gray-600">-</span>
-                <span>{match.awayScore || 0}</span>
+                <span>{match.homeScore ?? 0}</span>
               </div>
             ) : (
               <div className="text-2xl font-black text-gray-500 sm:text-4xl">VS</div>
@@ -110,20 +135,23 @@ function BentoCard({ children, title, subtitle, className, href }: { children: R
 
 export default function HomePremiumClient({ upcomingMatches = [], tickerMatches = [], nextMarqueeMatch = null, groupStandings = [], playersCount = 0, teamsCount = 0, upcomingMatchesCount = 0 }: Props) {
   const [now, setNow] = useState(() => new Date());
-  
+
   useEffect(() => {
     const timer = window.setInterval(() => setNow(new Date()), 60000);
     return () => window.clearInterval(timer);
   }, []);
 
-  const primaryMatch = nextMarqueeMatch as HomeMatch | null || (upcomingMatches[0] as HomeMatch) || null;
+  const safeTickerMatches = Array.isArray(tickerMatches) ? tickerMatches as HomeMatch[] : [];
+  const safeUpcomingMatches = Array.isArray(upcomingMatches) ? upcomingMatches as HomeMatch[] : [];
+  const safeNextMatch = nextMarqueeMatch as HomeMatch | null;
+  const primaryMatch = useMemo(() => choosePrimaryMatch(safeTickerMatches, safeUpcomingMatches, safeNextMatch), [safeTickerMatches, safeUpcomingMatches, safeNextMatch]);
 
   return (
     <main dir="rtl" className="mx-auto flex max-w-7xl flex-col gap-6 px-3 pb-12 pt-4 sm:px-4 sm:pt-6 lg:px-6">
-      
+
       {/* Ticker Section */}
       <div className="relative -mx-3 mb-2 sm:mx-0">
-        <HomeLiveMatchTicker matches={Array.isArray(tickerMatches) ? tickerMatches as HomeMatch[] : []} />
+        <HomeLiveMatchTicker matches={safeTickerMatches} />
       </div>
 
       {/* Hero Section */}
@@ -140,8 +168,8 @@ export default function HomePremiumClient({ upcomingMatches = [], tickerMatches 
       {/* Bento Grid */}
       <section className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
         {/* Knockout Path */}
-        <BentoCard 
-          title="مسار البطولة" 
+        <BentoCard
+          title="مسار البطولة"
           subtitle="تتبع طريق الكأس من دور الـ 32"
           href="/round-of-32"
           className="lg:col-span-2"
@@ -157,8 +185,8 @@ export default function HomePremiumClient({ upcomingMatches = [], tickerMatches 
         </BentoCard>
 
         {/* Top Standings */}
-        <BentoCard 
-          title="ترتيب المجموعات" 
+        <BentoCard
+          title="ترتيب المجموعات"
           subtitle="أبرز المنافسات في دور المجموعات"
           href="/groups"
         >
@@ -168,8 +196,8 @@ export default function HomePremiumClient({ upcomingMatches = [], tickerMatches 
         </BentoCard>
 
         {/* Global Stats */}
-        <BentoCard 
-          title="أرقام وإحصائيات" 
+        <BentoCard
+          title="أرقام وإحصائيات"
           subtitle="نظرة عامة على البطولة"
           className="lg:col-span-1"
         >
@@ -190,8 +218,8 @@ export default function HomePremiumClient({ upcomingMatches = [], tickerMatches 
         </BentoCard>
 
         {/* Additional CTA */}
-        <BentoCard 
-          title="أحدث النتائج" 
+        <BentoCard
+          title="أحدث النتائج"
           subtitle="تفاصيل جميع المباريات"
           href="/matches"
           className="lg:col-span-2"
