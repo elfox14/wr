@@ -44,6 +44,7 @@ async function run(req: Request) {
   const limit = intParam(url, 'limit', 5, 1, 25);
   const offset = matchId ? 0 : intParam(url, 'offset', 0, 0, 500);
   const lookbackDays = intParam(url, 'lookbackDays', 30, 1, 365);
+  const maxScan = matchId ? 50 : intParam(url, 'maxScan', 1000, 50, 3000);
   const dryRun = boolParam(url, 'dryRun', false);
   const since = new Date(Date.now() - lookbackDays * 24 * 60 * 60 * 1000);
 
@@ -54,8 +55,7 @@ async function run(req: Request) {
       ...(matchId ? { matchId } : {}),
     },
     orderBy: { capturedAt: 'desc' },
-    skip: offset,
-    take: matchId ? 10 : limit * 8,
+    take: maxScan,
     include: {
       match: {
         include: {
@@ -66,22 +66,31 @@ async function run(req: Request) {
     },
   });
 
-  const processed: any[] = [];
+  const uniqueSnapshots: any[] = [];
   const seen = new Set<string>();
-  const skippedDuplicateSnapshots: any[] = [];
+  let snapshotsWithoutPlayerStats = 0;
+  let duplicateSnapshotsSkipped = 0;
+
   for (const snapshot of snapshots) {
-    if (processed.length >= limit) break;
-    const dedupeKey = providerKey(snapshot);
-    if (seen.has(dedupeKey)) {
-      skippedDuplicateSnapshots.push({ matchId: snapshot.matchId, snapshotId: snapshot.id, providerMatchId: snapshot.providerMatchId });
+    const playerStats = snapshotPlayerStats(snapshot);
+    if (!playerStats.length) {
+      snapshotsWithoutPlayerStats += 1;
       continue;
     }
-    seen.add(dedupeKey);
+    const key = providerKey(snapshot);
+    if (seen.has(key)) {
+      duplicateSnapshotsSkipped += 1;
+      continue;
+    }
+    seen.add(key);
+    uniqueSnapshots.push(snapshot);
+  }
 
+  const selectedSnapshots = matchId ? uniqueSnapshots.slice(0, limit) : uniqueSnapshots.slice(offset, offset + limit);
+  const processed: any[] = [];
+  for (const snapshot of selectedSnapshots) {
     const normalized = (snapshot.rawData as any)?.normalized || {};
     const playerStats = snapshotPlayerStats(snapshot);
-    if (!playerStats.length) continue;
-
     const result = await syncTheStatsPlayerPerformances({
       match: snapshot.match,
       normalized,
@@ -102,20 +111,34 @@ async function run(req: Request) {
 
   const changed = processed.some((item) => Number(item.result?.upserted || 0) > 0);
   const revalidation = changed && !dryRun ? revalidateStatsViews('the-stats-player-performance-sync') : null;
-  const nextOffset = matchId ? null : offset + snapshots.length;
+  const nextOffset = matchId ? null : offset + processed.length;
+  const hasMoreUniqueSnapshots = !matchId && nextOffset !== null && nextOffset < uniqueSnapshots.length;
 
   return json({
     ok: true,
-    mode: 'the_stats_player_performance_sync_v3_deduped_offset',
+    mode: 'the_stats_player_performance_sync_v4_unique_offset',
     durationMs: Date.now() - startedAt,
     dryRun,
-    scope: { matchId, limit, offset, nextOffset, lookbackDays, snapshotsScanned: snapshots.length, duplicateSnapshotsSkipped: skippedDuplicateSnapshots.length },
+    scope: {
+      matchId,
+      limit,
+      offset,
+      nextOffset,
+      lookbackDays,
+      maxScan,
+      snapshotsScanned: snapshots.length,
+      uniqueSnapshotsWithPlayerStats: uniqueSnapshots.length,
+      duplicateSnapshotsSkipped,
+      snapshotsWithoutPlayerStats,
+      hasMoreUniqueSnapshots,
+    },
     processed,
-    skippedDuplicateSnapshots: skippedDuplicateSnapshots.slice(0, 12),
     cache: { revalidated: Boolean(revalidation), revalidation },
     nextRunHint: matchId
       ? 'Match-specific sync complete. Open /statistics after cache revalidation.'
-      : `Run again with offset=${nextOffset} to process the next snapshot batch without repeating duplicate rows.`,
+      : hasMoreUniqueSnapshots
+        ? `Run again with offset=${nextOffset}. Offset now paginates unique matches, not raw duplicate snapshots.`
+        : 'No more unique TheStats snapshots with playerStats inside the scanned window.',
   });
 }
 
