@@ -1,6 +1,5 @@
 'use client';
 
-import { usePathname } from 'next/navigation';
 import { getArabicTeamName } from '@/lib/teamDisplay';
 import { getTeamFlagUrl } from '@/lib/teamFlags';
 
@@ -300,8 +299,6 @@ function CenterColumn({ finalMatch, thirdMatch }: { finalMatch?: KnockoutMatch |
 }
 
 export default function HomeRoundOf32Widget({ knockoutMatches = [] }: Props) {
-  const pathname = usePathname();
-  if (pathname === '/') return null;
   const safeMatches = isMatches(knockoutMatches) ? knockoutMatches : [];
   const buckets = groupMatches(safeMatches);
   const { byNo } = makeIndexes(safeMatches);

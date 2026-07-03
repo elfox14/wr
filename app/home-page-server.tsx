@@ -3,11 +3,12 @@ import HomePremiumClient from '@/components/HomePremiumClient';
 import prisma from '@/lib/prisma';
 import { getHomeGroupStandings } from '@/lib/homeGroupStandings';
 
-export const revalidate = 60;
+export const revalidate = 30;
 
 const LIVE_STATUSES = ['LIVE', 'IN_PLAY', '1H', '2H', 'ET', 'HT'];
 const SCHEDULED_STATUSES = ['SCHEDULED', 'TIMED', 'NOT_STARTED', 'NS'];
 const ACTIVE_HOME_STATUSES = [...SCHEDULED_STATUSES, ...LIVE_STATUSES];
+const KNOCKOUT_STAGES = ['ROUND_OF_32', 'LAST_32', 'R32', 'ROUND_OF_16', 'LAST_16', 'R16', 'QUARTER_FINALS', 'QUARTER_FINAL', 'QF', 'SEMI_FINALS', 'SEMI_FINAL', 'SF', 'FINAL', 'THIRD_PLACE', 'THIRD'];
 const GROUP_STAGE_MAX_LIVE_MINUTES = 115;
 const KNOCKOUT_MAX_LIVE_MINUTES = 150;
 const STALE_FINAL_SNAPSHOT_MS = 7 * 60 * 1000;
@@ -23,6 +24,14 @@ type MatchCandidate = {
 };
 
 const teamSelect = {
+  id: true,
+  name: true,
+  code: true,
+  image: true,
+  group: true,
+} as const;
+
+const knockoutTeamSelect = {
   id: true,
   name: true,
   code: true,
@@ -144,7 +153,7 @@ const getHomeData = unstable_cache(
     const liveWindowStart = new Date(now.getTime() - 3 * 60 * 60 * 1000);
     const upcomingUntil = new Date(now.getTime() + 24 * 60 * 60 * 1000);
 
-    const [totalPlayers, totalTeams, totalUpcomingMatches, upcomingMatchesRaw, tickerMatchesRaw, liveCandidatesRaw, nextMatchRaw, groupStandingsRaw] = await Promise.all([
+    const [totalPlayers, totalTeams, totalUpcomingMatches, upcomingMatchesRaw, tickerMatchesRaw, liveCandidatesRaw, nextMatchRaw, groupStandingsRaw, knockoutMatchesRaw] = await Promise.all([
       prisma.asset.count({ where: { type: 'PLAYER' } }),
       prisma.asset.count({ where: { type: 'TEAM' } }),
       prisma.match.count({
@@ -230,6 +239,44 @@ const getHomeData = unstable_cache(
         },
       }),
       getHomeGroupStandings().catch(() => []),
+      // Knockout bracket — fetch all knockout stage matches
+      prisma.match.findMany({
+        where: {
+          OR: [
+            { stage: { in: KNOCKOUT_STAGES } },
+            { groupPhase: { in: KNOCKOUT_STAGES } },
+            { stage: { contains: '32' } },
+            { stage: { contains: '16' } },
+            { stage: { contains: 'FINAL' } },
+            { stage: { contains: 'SEMI' } },
+            { stage: { contains: 'QUARTER' } },
+            { stage: { contains: 'THIRD' } },
+            { groupPhase: { contains: '32' } },
+            { groupPhase: { contains: '16' } },
+            { groupPhase: { contains: 'FINAL' } },
+            { groupPhase: { contains: 'SEMI' } },
+            { groupPhase: { contains: 'QUARTER' } },
+            { groupPhase: { contains: 'THIRD' } },
+          ],
+        },
+        orderBy: { matchDate: 'asc' },
+        take: 64,
+        select: {
+          id: true,
+          matchDate: true,
+          status: true,
+          homeScore: true,
+          awayScore: true,
+          groupPhase: true,
+          stage: true,
+          syncSource: true,
+          lastSyncedAt: true,
+          externalId: true,
+          externalIds: true,
+          homeTeam: { select: knockoutTeamSelect },
+          awayTeam: { select: knockoutTeamSelect },
+        },
+      }),
     ]);
 
     const freshLiveMatch = await findFreshLiveCandidate(liveCandidatesRaw, now);
@@ -241,10 +288,11 @@ const getHomeData = unstable_cache(
       tickerMatches: JSON.parse(JSON.stringify(tickerMatchesRaw)),
       nextMarqueeMatch: freshLiveMatch || nextMatchRaw ? JSON.parse(JSON.stringify(freshLiveMatch || nextMatchRaw)) : null,
       groupStandings: JSON.parse(JSON.stringify(groupStandingsRaw)),
+      knockoutMatches: JSON.parse(JSON.stringify(knockoutMatchesRaw)),
     };
   },
-  ['home-dashboard-v6'],
-  { revalidate: 60, tags: ['home-dashboard'] },
+  ['home-dashboard-v8'],
+  { revalidate: 30, tags: ['home-dashboard'] },
 );
 
 export default async function Home() {
@@ -256,6 +304,7 @@ export default async function Home() {
     tickerMatches: [] as unknown[],
     nextMarqueeMatch: null as any,
     groupStandings: [] as unknown[],
+    knockoutMatches: [] as unknown[],
   };
 
   try {
@@ -274,6 +323,7 @@ export default async function Home() {
         playersCount={data.playersCount}
         teamsCount={data.teamsCount}
         upcomingMatchesCount={data.upcomingMatchesCount}
+        knockoutMatches={data.knockoutMatches}
       />
     </>
   );

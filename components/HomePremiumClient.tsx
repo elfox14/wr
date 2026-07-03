@@ -4,14 +4,23 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import HomeLiveMatchTicker from '@/components/HomeLiveMatchTicker';
-import HomeGroupStandingsWidget from '@/components/HomeGroupStandingsWidget';
+import HomeRoundOf32Widget from '@/components/HomeRoundOf32Widget';
 import { getTeamFlagUrl } from '@/lib/teamFlags';
 import { getArabicTeamName } from '@/lib/teamDisplay';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type Team = { id?: string | number | null; name?: string | null; code?: string | null; image?: string | null; flagUrl?: string | null; };
 type HomeMatch = { id?: string | number | null; animationMatchId?: string | number | null; matchDate?: string | Date | null; status?: string | null; displayStatus?: string | null; stage?: string | null; group?: string | null; groupPhase?: string | null; homeScore?: number | null; awayScore?: number | null; homeTeam?: Team | null; awayTeam?: Team | null; isLiveNow?: boolean; isHalfTime?: boolean; isLikelyLiveByTime?: boolean; isStaleAutoFinished?: boolean; minute?: number | null; liveLabel?: string | null; };
-type Props = { upcomingMatches?: HomeMatch[] | unknown[]; tickerMatches?: HomeMatch[] | unknown[]; nextMarqueeMatch?: HomeMatch | null | unknown; groupStandings?: unknown[]; playersCount?: number; teamsCount?: number; upcomingMatchesCount?: number; };
+type Props = {
+  upcomingMatches?: HomeMatch[] | unknown[];
+  tickerMatches?: HomeMatch[] | unknown[];
+  nextMarqueeMatch?: HomeMatch | null | unknown;
+  groupStandings?: unknown[];
+  playersCount?: number;
+  teamsCount?: number;
+  upcomingMatchesCount?: number;
+  knockoutMatches?: unknown[];
+};
 
 // ─── Status helpers ───────────────────────────────────────────────────────────
 const LIVE_STATUSES = ['1H', '2H', 'ET', 'BT', 'P', 'PEN', 'IN_PLAY', 'LIVE'];
@@ -49,13 +58,13 @@ function choosePrimaryMatch(ticker: HomeMatch[], upcoming: HomeMatch[], next: Ho
   return sameNext || live || active || next || upcoming[0] || sorted[0] || null;
 }
 
-// ─── Hex to RGB helper ───────────────────────────────────────────────────────
+// ─── Hex to RGB ───────────────────────────────────────────────────────────────
 function hexToRgb(hex: string) {
   const r = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
   return r ? `${parseInt(r[1], 16)},${parseInt(r[2], 16)},${parseInt(r[3], 16)}` : '255,255,255';
 }
 
-// ─── Animated Counter ─────────────────────────────────────────────────────────
+// ─── Animated Counter (SSR safe) ─────────────────────────────────────────────
 function AnimatedCounter({ value, duration = 1.8 }: { value: number; duration?: number }) {
   const ref = useRef<HTMLSpanElement>(null);
   const [display, setDisplay] = useState(0);
@@ -73,7 +82,6 @@ function AnimatedCounter({ value, duration = 1.8 }: { value: number; duration?: 
         const step = (now: number) => {
           const elapsed = now - startTime;
           const progress = Math.min(elapsed / durationMs, 1);
-          // ease-out cubic
           const eased = 1 - Math.pow(1 - progress, 3);
           setDisplay(Math.round(eased * value));
           if (progress < 1) requestAnimationFrame(step);
@@ -89,44 +97,52 @@ function AnimatedCounter({ value, duration = 1.8 }: { value: number; duration?: 
   return <span ref={ref}>{display.toLocaleString('ar-EG')}</span>;
 }
 
+// ─── Live pulse dot ───────────────────────────────────────────────────────────
+function LiveDot() {
+  return (
+    <span className="relative flex h-2.5 w-2.5 shrink-0">
+      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-60" />
+      <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-red-500 shadow-[0_0_6px_#ef4444]" />
+    </span>
+  );
+}
+
 // ─── Tournament Stats Bar ─────────────────────────────────────────────────────
 function TournamentStatsBar({ playersCount, teamsCount, upcomingMatchesCount, groupStandings }: {
   playersCount: number; teamsCount: number; upcomingMatchesCount: number; groupStandings: unknown[];
 }) {
   const totalGoals = useMemo(() => {
     if (!Array.isArray(groupStandings)) return 0;
-    const allTeams = groupStandings.flatMap((g: any) => g?.standings || []);
-    const raw = allTeams.reduce((s: number, t: any) => s + (Number(t?.goalsFor) || 0), 0);
-    return Math.round(raw / 2);
+    const all = groupStandings.flatMap((g: any) => g?.standings || []);
+    return Math.round(all.reduce((s: number, t: any) => s + (Number(t?.goalsFor) || 0), 0) / 2);
   }, [groupStandings]);
 
   const playedMatches = useMemo(() => {
     if (!Array.isArray(groupStandings)) return 0;
-    const allTeams = groupStandings.flatMap((g: any) => g?.standings || []);
-    return Math.floor(allTeams.reduce((s: number, t: any) => s + (Number(t?.played) || 0), 0) / 2);
+    const all = groupStandings.flatMap((g: any) => g?.standings || []);
+    return Math.floor(all.reduce((s: number, t: any) => s + (Number(t?.played) || 0), 0) / 2);
   }, [groupStandings]);
 
   const stats = [
-    { label: 'منتخب مشارك', value: teamsCount || 48, color: '#18E58F', icon: '🏳️', glow: 'rgba(24,229,143,0.4)' },
-    { label: 'لاعب مسجل', value: playersCount || 1344, color: '#F8C846', icon: '⚽', glow: 'rgba(248,200,70,0.4)' },
-    { label: 'مباراة في البطولة', value: 104, color: '#7DD3FC', icon: '📅', glow: 'rgba(125,211,252,0.4)' },
-    { label: 'هدف سُجّل', value: totalGoals, color: '#FF4D5E', icon: '🥅', glow: 'rgba(255,77,94,0.4)' },
-    { label: 'مباراة لُعبت', value: playedMatches, color: '#C084FC', icon: '🏟️', glow: 'rgba(192,132,252,0.4)' },
-    { label: 'مباراة قادمة', value: upcomingMatchesCount, color: '#34D399', icon: '⏳', glow: 'rgba(52,211,153,0.4)' },
+    { label: 'منتخب مشارك', value: teamsCount || 48, color: '#18E58F', icon: '🏳️' },
+    { label: 'لاعب مسجل', value: playersCount || 1248, color: '#F8C846', icon: '⚽' },
+    { label: 'مباراة في البطولة', value: 104, color: '#7DD3FC', icon: '📅' },
+    { label: 'هدف سُجّل', value: totalGoals, color: '#FF4D5E', icon: '🥅' },
+    { label: 'مباراة لُعبت', value: playedMatches, color: '#C084FC', icon: '🏟️' },
+    { label: 'مباراة قادمة', value: upcomingMatchesCount, color: '#34D399', icon: '⏳' },
   ];
 
   return (
     <motion.section
-      initial={{ opacity: 0, y: 28 }}
+      initial={{ opacity: 0, y: 24 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.6, delay: 0.12 }}
+      transition={{ duration: 0.6, delay: 0.1 }}
       className="relative overflow-hidden rounded-[1.75rem] border border-white/[0.08]"
       style={{
         background: 'linear-gradient(145deg, rgba(7,24,18,0.98) 0%, rgba(3,10,7,0.99) 100%)',
         boxShadow: '0 24px 64px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.06)',
       }}
     >
-      {/* Blobs */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="absolute -left-24 -top-24 h-80 w-80 rounded-full bg-[#18E58F] opacity-[0.06] blur-3xl" />
         <div className="absolute -bottom-16 -right-24 h-72 w-72 rounded-full bg-[#F8C846] opacity-[0.06] blur-3xl" />
@@ -134,7 +150,7 @@ function TournamentStatsBar({ playersCount, teamsCount, upcomingMatchesCount, gr
       </div>
 
       <div className="relative p-5 sm:p-6">
-        {/* Header row */}
+        {/* Header */}
         <div className="mb-5 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <motion.div
@@ -142,30 +158,31 @@ function TournamentStatsBar({ playersCount, teamsCount, upcomingMatchesCount, gr
               transition={{ repeat: Infinity, duration: 5, ease: 'easeInOut' }}
               className="flex h-10 w-10 items-center justify-center rounded-xl text-xl"
               style={{ background: 'linear-gradient(135deg,rgba(248,200,70,0.2),rgba(248,200,70,0.08))' }}
-            >
-              🏆
-            </motion.div>
+            >🏆</motion.div>
             <div>
-              <h2 className="text-base font-black text-white sm:text-lg">أرقام كأس العالم 2026</h2>
-              <p className="text-[10px] font-bold text-gray-500">إحصائيات البطولة مباشرةً</p>
+              <div className="flex items-center gap-2">
+                <h2 className="text-base font-black text-white sm:text-lg">أرقام كأس العالم 2026</h2>
+                <span className="flex items-center gap-1 rounded-full border border-[#18E58F]/30 bg-[#18E58F]/10 px-2 py-0.5 text-[9px] font-black text-[#18E58F]">
+                  <LiveDot />
+                  يتحدث كل ٣٠ ث
+                </span>
+              </div>
+              <p className="text-[10px] font-bold text-gray-500">آخر تحديث: {new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}</p>
             </div>
           </div>
-          <Link
-            href="/statistics"
-            className="flex shrink-0 items-center gap-1.5 rounded-full border border-[#F8C846]/25 bg-[#F8C846]/10 px-3 py-1.5 text-[10px] font-black text-[#F8C846] transition-all hover:bg-[#F8C846]/20"
-          >
+          <Link href="/statistics" className="flex shrink-0 items-center gap-1 rounded-full border border-[#F8C846]/25 bg-[#F8C846]/10 px-3 py-1.5 text-[10px] font-black text-[#F8C846] transition-all hover:bg-[#F8C846]/20">
             كل الإحصائيات <span>←</span>
           </Link>
         </div>
 
-        {/* Stats cards */}
+        {/* Stats grid */}
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
           {stats.map((stat, i) => (
             <motion.div
               key={stat.label}
-              initial={{ opacity: 0, y: 18, scale: 0.92 }}
+              initial={{ opacity: 0, y: 16, scale: 0.94 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
-              transition={{ duration: 0.45, delay: 0.18 + i * 0.07 }}
+              transition={{ duration: 0.4, delay: 0.16 + i * 0.06 }}
               whileHover={{ y: -5, scale: 1.04 }}
               className="group relative overflow-hidden rounded-2xl border border-white/[0.06] p-3 text-center sm:p-4"
               style={{
@@ -173,12 +190,10 @@ function TournamentStatsBar({ playersCount, teamsCount, upcomingMatchesCount, gr
                 boxShadow: `inset 0 0 0 1px rgba(${hexToRgb(stat.color)},0.13)`,
               }}
             >
-              {/* Glow */}
               <div
                 className="absolute inset-0 rounded-2xl opacity-0 transition-opacity duration-500 group-hover:opacity-100"
-                style={{ background: `radial-gradient(circle at 50% 0%, ${stat.glow}, transparent 70%)` }}
+                style={{ background: `radial-gradient(circle at 50% 0%, rgba(${hexToRgb(stat.color)},0.35), transparent 70%)` }}
               />
-              {/* Top line */}
               <div
                 className="absolute inset-x-0 top-0 h-px opacity-0 transition-opacity duration-500 group-hover:opacity-100"
                 style={{ background: `linear-gradient(90deg, transparent, ${stat.color}, transparent)` }}
@@ -211,9 +226,9 @@ const NAV_LINKS = [
 function QuickNavStrip() {
   return (
     <motion.div
-      initial={{ opacity: 0, y: 12 }}
+      initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.45, delay: 0.22 }}
+      transition={{ duration: 0.4, delay: 0.2 }}
       className="flex gap-2 overflow-x-auto pb-0.5"
       style={{ scrollbarWidth: 'none' }}
     >
@@ -222,14 +237,14 @@ function QuickNavStrip() {
           key={link.href}
           initial={{ opacity: 0, x: -8 }}
           animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.28 + i * 0.05 }}
+          transition={{ delay: 0.25 + i * 0.05 }}
           whileHover={{ y: -3, scale: 1.06 }}
           whileTap={{ scale: 0.96 }}
           className="shrink-0"
         >
           <Link
             href={link.href}
-            className="flex items-center gap-2 rounded-xl border border-white/[0.07] bg-white/[0.03] px-4 py-2.5 text-xs font-black text-white backdrop-blur-sm transition-colors hover:bg-white/[0.07]"
+            className="flex items-center gap-2 rounded-xl border border-white/[0.07] bg-white/[0.03] px-4 py-2.5 text-xs font-black text-white transition-colors hover:bg-white/[0.07]"
             style={{ borderColor: `rgba(${hexToRgb(link.color)},0.22)` }}
           >
             <span className="text-sm">{link.icon}</span>
@@ -258,21 +273,20 @@ function HeroMatchCard({ match }: { match: HomeMatch }) {
     <motion.div
       initial={{ opacity: 0, y: 22 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.65 }}
+      transition={{ duration: 0.6 }}
       className="relative w-full overflow-hidden rounded-[1.75rem] border border-white/10"
       style={{
         background: 'linear-gradient(160deg, rgba(10,28,20,0.97) 0%, rgba(4,12,8,0.99) 100%)',
         boxShadow: '0 32px 80px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.08)',
       }}
     >
-      {/* Background gradients */}
       <div className="pointer-events-none absolute inset-0">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_15%_50%,rgba(24,229,143,0.13),transparent_55%)]" />
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_85%_50%,rgba(248,200,70,0.10),transparent_55%)]" />
         <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
         {live && (
           <motion.div
-            animate={{ opacity: [0.25, 0.6, 0.25] }}
+            animate={{ opacity: [0.2, 0.55, 0.2] }}
             transition={{ repeat: Infinity, duration: 2.5 }}
             className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(255,50,50,0.07),transparent_60%)]"
           />
@@ -288,7 +302,7 @@ function HeroMatchCard({ match }: { match: HomeMatch }) {
               transition={{ repeat: Infinity, duration: 1.8 }}
               className="inline-flex items-center gap-2 rounded-full border border-red-500/40 bg-red-500/10 px-5 py-2 text-xs font-black text-red-400"
             >
-              <motion.span animate={{ opacity: [1, 0.25, 1] }} transition={{ repeat: Infinity, duration: 1 }} className="h-2.5 w-2.5 rounded-full bg-red-500 shadow-[0_0_10px_#ef4444]" />
+              <LiveDot />
               {ht ? 'استراحة النصف' : 'مباشر الآن'}
               {match.minute && !ht && <span className="text-red-300 opacity-80">{match.minute}'</span>}
             </motion.div>
@@ -305,7 +319,6 @@ function HeroMatchCard({ match }: { match: HomeMatch }) {
 
         {/* Teams + Score */}
         <div className="flex items-center justify-center gap-3 sm:gap-8">
-          {/* Home Team */}
           <motion.div whileHover={{ scale: 1.04 }} className="flex min-w-0 flex-1 flex-col items-center gap-3">
             {homeF ? (
               <img src={homeF} alt={homeName} className="h-20 w-28 rounded-2xl border border-white/10 object-cover shadow-2xl sm:h-24 sm:w-36" />
@@ -315,7 +328,6 @@ function HeroMatchCard({ match }: { match: HomeMatch }) {
             <span className="text-center text-sm font-black leading-snug text-white sm:text-lg">{homeName}</span>
           </motion.div>
 
-          {/* Score / VS */}
           <div className="flex shrink-0 flex-col items-center gap-2">
             {live || done ? (
               <div
@@ -347,7 +359,6 @@ function HeroMatchCard({ match }: { match: HomeMatch }) {
             )}
           </div>
 
-          {/* Away Team */}
           <motion.div whileHover={{ scale: 1.04 }} className="flex min-w-0 flex-1 flex-col items-center gap-3">
             {awayF ? (
               <img src={awayF} alt={awayName} className="h-20 w-28 rounded-2xl border border-white/10 object-cover shadow-2xl sm:h-24 sm:w-36" />
@@ -358,7 +369,7 @@ function HeroMatchCard({ match }: { match: HomeMatch }) {
           </motion.div>
         </div>
 
-        {/* CTA buttons */}
+        {/* CTA */}
         <div className="mt-8 flex flex-wrap justify-center gap-3">
           <Link
             href={match.id ? `/matches/${match.id}` : '#'}
@@ -370,7 +381,7 @@ function HeroMatchCard({ match }: { match: HomeMatch }) {
           {match.id && (
             <Link
               href={`/live-animation/${match.id}`}
-              className="rounded-2xl border border-white/15 bg-white/[0.06] px-7 py-3 text-sm font-black text-white backdrop-blur-sm transition-all hover:bg-white/10 active:scale-95"
+              className="rounded-2xl border border-white/15 bg-white/[0.06] px-7 py-3 text-sm font-black text-white transition-all hover:bg-white/10 active:scale-95"
             >
               الملعب التفاعلي
             </Link>
@@ -381,30 +392,6 @@ function HeroMatchCard({ match }: { match: HomeMatch }) {
   );
 }
 
-// ─── Bento Card ───────────────────────────────────────────────────────────────
-function BentoCard({ children, title, subtitle, className, href, accent }: {
-  children: React.ReactNode; title: string; subtitle?: string; className?: string; href?: string; accent?: string;
-}) {
-  const rgb = accent ? hexToRgb(accent) : '255,255,255';
-  const inner = (
-    <motion.div
-      whileHover={{ y: -5, scale: 1.01 }}
-      transition={{ type: 'spring', stiffness: 280, damping: 20 }}
-      className={`group relative flex h-full flex-col overflow-hidden rounded-[1.5rem] border border-white/[0.07] p-5 shadow-xl ${className || ''}`}
-      style={{ background: 'linear-gradient(145deg, rgba(7,24,18,0.96) 0%, rgba(3,10,7,0.98) 100%)' }}
-    >
-      {accent && <div className="absolute inset-x-0 top-0 h-px opacity-50 transition-opacity duration-500 group-hover:opacity-100" style={{ background: `linear-gradient(90deg, transparent, rgba(${rgb},0.85), transparent)` }} />}
-      <div className="absolute inset-0 rounded-[1.5rem] opacity-0 transition-opacity duration-500 group-hover:opacity-100" style={accent ? { background: `radial-gradient(circle at 50% 0%, rgba(${rgb},0.08), transparent 60%)` } : {}} />
-      <div className="relative z-10 mb-4">
-        <h3 className="text-base font-black text-white sm:text-lg">{title}</h3>
-        {subtitle && <p className="mt-0.5 text-[10px] font-bold text-gray-500">{subtitle}</p>}
-      </div>
-      <div className="relative z-10 flex-1">{children}</div>
-    </motion.div>
-  );
-  return href ? <Link href={href} className="block h-full">{inner}</Link> : inner;
-}
-
 // ─── Top Teams Strip ──────────────────────────────────────────────────────────
 function TopTeamsStrip({ groupStandings }: { groupStandings: unknown[] }) {
   const teams = useMemo(() => {
@@ -413,7 +400,7 @@ function TopTeamsStrip({ groupStandings }: { groupStandings: unknown[] }) {
       .flatMap((g: any) => g?.standings || [])
       .filter((t: any) => t && ((t.goalsFor || 0) > 0 || (t.points || 0) > 0))
       .sort((a: any, b: any) => (b.points || 0) - (a.points || 0) || (b.goalsFor || 0) - (a.goalsFor || 0))
-      .slice(0, 5);
+      .slice(0, 6);
   }, [groupStandings]);
 
   if (!teams.length) return (
@@ -427,17 +414,23 @@ function TopTeamsStrip({ groupStandings }: { groupStandings: unknown[] }) {
           key={`${team.code || team.team}-${i}`}
           initial={{ opacity: 0, x: 10 }}
           animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.08 + i * 0.07 }}
-          className="flex items-center gap-3 rounded-xl border border-white/[0.06] bg-white/[0.03] px-3 py-2.5"
+          transition={{ delay: 0.08 + i * 0.06 }}
+          className="flex items-center gap-3 rounded-xl border border-white/[0.06] bg-white/[0.03] px-3 py-2"
         >
-          <span className="w-4 shrink-0 text-center text-[10px] font-black text-gray-600">{i + 1}</span>
+          <span
+            className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[9px] font-black"
+            style={{
+              background: i === 0 ? 'linear-gradient(135deg,#F8C846,#ffde6b)' : i === 1 ? 'rgba(255,255,255,0.12)' : i === 2 ? 'rgba(205,127,50,0.3)' : 'rgba(255,255,255,0.05)',
+              color: i === 0 ? '#000' : '#fff',
+            }}
+          >{i + 1}</span>
           <div className="min-w-0 flex-1 truncate text-xs font-black text-white">{team.team || team.code || '—'}</div>
-          <div className="flex shrink-0 items-center gap-3">
-            <div className="text-right">
+          <div className="flex shrink-0 items-center gap-3 text-right">
+            <div>
               <div className="text-xs font-black text-[#18E58F]">{team.goalsFor ?? 0}</div>
               <div className="text-[8px] text-gray-600">هدف</div>
             </div>
-            <div className="text-right">
+            <div>
               <div className="text-xs font-black text-[#F8C846]">{team.points ?? 0}</div>
               <div className="text-[8px] text-gray-600">نقطة</div>
             </div>
@@ -445,6 +438,48 @@ function TopTeamsStrip({ groupStandings }: { groupStandings: unknown[] }) {
         </motion.div>
       ))}
     </div>
+  );
+}
+
+// ─── Section Header ───────────────────────────────────────────────────────────
+function SectionHeader({ title, subtitle, href, accentColor = '#F8C846' }: { title: string; subtitle?: string; href?: string; accentColor?: string }) {
+  return (
+    <div className="mb-4 flex items-center justify-between gap-3">
+      <div>
+        <h3 className="text-base font-black text-white sm:text-lg">{title}</h3>
+        {subtitle && <p className="mt-0.5 text-[10px] font-bold text-gray-500">{subtitle}</p>}
+      </div>
+      {href && (
+        <Link
+          href={href}
+          className="flex shrink-0 items-center gap-1 rounded-full border px-3 py-1.5 text-[10px] font-black transition-all hover:opacity-80"
+          style={{ borderColor: `rgba(${hexToRgb(accentColor)},0.3)`, background: `rgba(${hexToRgb(accentColor)},0.1)`, color: accentColor }}
+        >
+          عرض الكل ←
+        </Link>
+      )}
+    </div>
+  );
+}
+
+// ─── Card wrapper ─────────────────────────────────────────────────────────────
+function Card({ children, className, accent }: { children: React.ReactNode; className?: string; accent?: string }) {
+  const rgb = accent ? hexToRgb(accent) : '255,255,255';
+  return (
+    <motion.div
+      whileHover={{ y: -3 }}
+      transition={{ type: 'spring', stiffness: 280, damping: 22 }}
+      className={`group relative overflow-hidden rounded-[1.5rem] border border-white/[0.07] p-5 ${className || ''}`}
+      style={{ background: 'linear-gradient(145deg, rgba(7,24,18,0.96) 0%, rgba(3,10,7,0.98) 100%)' }}
+    >
+      {accent && (
+        <div
+          className="absolute inset-x-0 top-0 h-px opacity-40 transition-opacity duration-500 group-hover:opacity-100"
+          style={{ background: `linear-gradient(90deg, transparent, rgba(${rgb},0.9), transparent)` }}
+        />
+      )}
+      {children}
+    </motion.div>
   );
 }
 
@@ -457,10 +492,11 @@ export default function HomePremiumClient({
   playersCount = 0,
   teamsCount = 0,
   upcomingMatchesCount = 0,
+  knockoutMatches = [],
 }: Props) {
   const [, setNow] = useState(() => new Date());
   useEffect(() => {
-    const t = window.setInterval(() => setNow(new Date()), 60000);
+    const t = window.setInterval(() => setNow(new Date()), 30000);
     return () => window.clearInterval(t);
   }, []);
 
@@ -468,6 +504,9 @@ export default function HomePremiumClient({
   const safeUpcoming = Array.isArray(upcomingMatches) ? upcomingMatches as HomeMatch[] : [];
   const safeNext = nextMarqueeMatch as HomeMatch | null;
   const primaryMatch = useMemo(() => choosePrimaryMatch(safeTicker, safeUpcoming, safeNext), [safeTicker, safeUpcoming, safeNext]);
+
+  // Use actual DB count, fallback to 1248
+  const actualPlayers = playersCount > 0 ? playersCount : 1248;
 
   return (
     <main dir="rtl" className="mx-auto flex max-w-7xl flex-col gap-5 px-3 pb-14 pt-4 sm:px-4 sm:pt-6 lg:px-6">
@@ -480,16 +519,17 @@ export default function HomePremiumClient({
       {/* ② Quick Nav */}
       <QuickNavStrip />
 
-      {/* ③ Tournament Stats — hero numbers section */}
+      {/* ③ Tournament Stats — الأرقام الكبيرة */}
       <TournamentStatsBar
-        playersCount={playersCount}
+        playersCount={actualPlayers}
         teamsCount={teamsCount}
         upcomingMatchesCount={upcomingMatchesCount}
         groupStandings={groupStandings}
       />
 
-      {/* ④ Hero Match + Group Standings side panel */}
-      <section className="grid grid-cols-1 gap-5 lg:grid-cols-[1fr_340px]">
+      {/* ④ Hero Match + Top Teams */}
+      <section className="grid grid-cols-1 gap-5 lg:grid-cols-[1fr_300px]">
+        {/* Hero Match */}
         <div>
           {primaryMatch ? (
             <HeroMatchCard match={primaryMatch} />
@@ -504,77 +544,77 @@ export default function HomePremiumClient({
             </motion.div>
           )}
         </div>
-        <BentoCard title="ترتيب المجموعات" subtitle="أبرز المنافسات في دور المجموعات" href="/groups" accent="#18E58F">
-          <div className="h-full overflow-hidden rounded-xl border border-white/[0.05] bg-black/30">
-            <HomeGroupStandingsWidget compact initialGroups={Array.isArray(groupStandings) ? groupStandings : []} />
-          </div>
-        </BentoCard>
-      </section>
-
-      {/* ⑤ Bento Grid */}
-      <section className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-
-        {/* Knockout Path */}
-        <BentoCard title="مسار البطولة" subtitle="الشجرة التفاعلية من دور الـ 32" href="/round-of-32" className="sm:col-span-2 lg:col-span-2" accent="#FF4D5E">
-          <div className="relative flex min-h-[150px] items-center justify-center overflow-hidden rounded-xl">
-            <div
-              className="absolute inset-0 opacity-[0.07]"
-              style={{ backgroundImage: 'linear-gradient(rgba(255,255,255,0.2) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.2) 1px, transparent 1px)', backgroundSize: '32px 32px' }}
-            />
-            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(248,200,70,0.12),transparent_70%)]" />
-            <div className="relative z-10 flex flex-col items-center gap-4 text-center">
-              <motion.div animate={{ scale: [1, 1.1, 1], rotate: [0, 4, -4, 0] }} transition={{ repeat: Infinity, duration: 4.5, ease: 'easeInOut' }} className="text-6xl">🏆</motion.div>
-              <div>
-                <div className="text-base font-black text-white">اكتشف مسار الكأس</div>
-                <div className="mt-1 text-[10px] text-gray-500">شجرة تفاعلية لجميع الأدوار</div>
-              </div>
-              <span className="inline-block rounded-full px-5 py-2 text-xs font-black text-black" style={{ background: 'linear-gradient(135deg,#F8C846,#ffde6b)', boxShadow: '0 6px 20px rgba(248,200,70,0.35)' }}>
-                استعرض الشجرة ←
-              </span>
-            </div>
-          </div>
-        </BentoCard>
 
         {/* Top Teams */}
-        <BentoCard title="أفضل المنتخبات" subtitle="ترتيب حسب النقاط" href="/groups" accent="#F8C846">
+        <Card accent="#F8C846">
+          <SectionHeader title="أفضل المنتخبات" subtitle="ترتيب حسب النقاط والأهداف" href="/groups" accentColor="#F8C846" />
           <TopTeamsStrip groupStandings={groupStandings} />
-        </BentoCard>
+        </Card>
+      </section>
 
-        {/* Matches CTA */}
-        <BentoCard title="مركز المباريات" subtitle="كل النتائج والإحصائيات" href="/matches" className="sm:col-span-2 lg:col-span-2" accent="#7DD3FC">
-          <div className="flex min-h-[110px] items-center justify-between gap-4 rounded-xl p-5" style={{ background: 'linear-gradient(135deg, rgba(125,211,252,0.07) 0%, rgba(0,0,0,0.15) 100%)' }}>
-            <div className="space-y-2">
-              <div className="text-lg font-black text-white">شاهد الجميع</div>
-              <p className="max-w-xs text-[11px] font-bold leading-relaxed text-gray-400">كل الأهداف، الملخصات، التشكيلات، والإحصائيات التفصيلية لكل مباراة.</p>
-              <div className="flex flex-wrap gap-2 pt-1">
-                {['الأهداف', 'الإحصائيات', 'التشكيلات'].map((tag, i) => {
-                  const colors = ['#7DD3FC', '#18E58F', '#F8C846'];
-                  const c = colors[i];
-                  return (
-                    <span key={tag} className="rounded-full px-2.5 py-1 text-[9px] font-black" style={{ border: `1px solid rgba(${hexToRgb(c)},0.25)`, background: `rgba(${hexToRgb(c)},0.1)`, color: c }}>{tag}</span>
-                  );
-                })}
+      {/* ⑤ Bracket Section — شجرة البطولة كاملة */}
+      <section>
+        <Card accent="#FF4D5E" className="p-0 overflow-hidden">
+          {/* Card header */}
+          <div className="flex items-center justify-between gap-3 p-5 pb-3">
+            <div className="flex items-center gap-3">
+              <motion.div
+                animate={{ scale: [1, 1.1, 1], rotate: [0, 4, -4, 0] }}
+                transition={{ repeat: Infinity, duration: 4.5, ease: 'easeInOut' }}
+                className="text-3xl"
+              >🏆</motion.div>
+              <div>
+                <h2 className="text-base font-black text-white sm:text-lg">مسار البطولة — كأس العالم 2026</h2>
+                <p className="mt-0.5 text-[10px] font-bold text-gray-500">الشجرة التفاعلية الكاملة من دور الـ 32 حتى النهائي</p>
               </div>
             </div>
-            <motion.div whileHover={{ x: -4, scale: 1.12 }} transition={{ type: 'spring', stiffness: 300 }} className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl text-2xl" style={{ background: 'rgba(125,211,252,0.12)', border: '1px solid rgba(125,211,252,0.2)' }}>←</motion.div>
+            <Link
+              href="/round-of-32"
+              className="flex shrink-0 items-center gap-1 rounded-full border border-[#FF4D5E]/30 bg-[#FF4D5E]/10 px-3 py-1.5 text-[10px] font-black text-[#FF4D5E] transition-all hover:bg-[#FF4D5E]/20"
+            >
+              عرض كامل ←
+            </Link>
           </div>
-        </BentoCard>
+
+          {/* Embedded bracket */}
+          <div className="px-2 pb-4">
+            <HomeRoundOf32Widget knockoutMatches={knockoutMatches} />
+          </div>
+        </Card>
+      </section>
+
+      {/* ⑥ Bottom row: Players + Matches */}
+      <section className="grid grid-cols-1 gap-5 sm:grid-cols-2">
 
         {/* Players */}
-        <BentoCard title="دليل اللاعبين" subtitle="تصفح لاعبي المونديال" href="/players" accent="#C084FC">
-          <div className="flex flex-col items-center justify-center gap-3 py-3 text-center">
-            <div className="text-4xl">🏃</div>
-            <div>
-              <div className="text-3xl font-black" style={{ color: '#C084FC', filter: 'drop-shadow(0 0 10px rgba(192,132,252,0.5))' }}>
-                <AnimatedCounter value={playersCount} />
+        <Link href="/players" className="block">
+          <Card accent="#C084FC" className="transition-all hover:border-[#C084FC]/30">
+            <div className="flex items-center gap-4">
+              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl text-3xl" style={{ background: 'rgba(192,132,252,0.12)', border: '1px solid rgba(192,132,252,0.2)' }}>🏃</div>
+              <div>
+                <div className="text-3xl font-black" style={{ color: '#C084FC', filter: 'drop-shadow(0 0 10px rgba(192,132,252,0.5))' }}>
+                  <AnimatedCounter value={actualPlayers} />
+                </div>
+                <div className="mt-0.5 text-xs font-bold text-gray-500">لاعب مسجل في البطولة</div>
+                <div className="mt-2 text-[10px] font-black text-[#C084FC] opacity-70">استعرض دليل اللاعبين ←</div>
               </div>
-              <div className="mt-1 text-[10px] font-bold text-gray-500">لاعب مسجل</div>
             </div>
-            <span className="inline-block rounded-full border px-4 py-1.5 text-[10px] font-black text-[#C084FC]" style={{ borderColor: 'rgba(192,132,252,0.3)', background: 'rgba(192,132,252,0.1)' }}>
-              استعرض اللاعبين
-            </span>
-          </div>
-        </BentoCard>
+          </Card>
+        </Link>
+
+        {/* All Matches */}
+        <Link href="/matches" className="block">
+          <Card accent="#7DD3FC" className="transition-all hover:border-[#7DD3FC]/30">
+            <div className="flex items-center gap-4">
+              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl text-3xl" style={{ background: 'rgba(125,211,252,0.12)', border: '1px solid rgba(125,211,252,0.2)' }}>📋</div>
+              <div>
+                <div className="text-3xl font-black" style={{ color: '#7DD3FC', filter: 'drop-shadow(0 0 10px rgba(125,211,252,0.5))' }}>104</div>
+                <div className="mt-0.5 text-xs font-bold text-gray-500">مباراة في البطولة</div>
+                <div className="mt-2 text-[10px] font-black text-[#7DD3FC] opacity-70">نتائج وإحصائيات المباريات ←</div>
+              </div>
+            </div>
+          </Card>
+        </Link>
 
       </section>
     </main>
