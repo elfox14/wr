@@ -138,7 +138,7 @@ function MiniTable({ teams }: { teams: TeamStanding[] }) {
 }
 
 export default function HomeTournamentStatsCard({ playersCount = 0, teamsCount = 0, upcomingMatchesCount = 0, groupStandings = [] }: Props) {
-  const summary = buildSummary(groupStandings, teamsCount, playersCount);
+  const summary = buildSummary(groupStandings, teamsCount, 1248);
   if (!summary.teams.length) return null;
 
   const topAttackMetric = summary.topAttack ? `${format(safeNumber(summary.topAttack.goalsFor))} هدف` : 'غير متوفر';

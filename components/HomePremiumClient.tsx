@@ -506,7 +506,7 @@ export default function HomePremiumClient({
   const primaryMatch = useMemo(() => choosePrimaryMatch(safeTicker, safeUpcoming, safeNext), [safeTicker, safeUpcoming, safeNext]);
 
   // Use actual DB count, fallback to 1248
-  const actualPlayers = playersCount > 0 ? playersCount : 1248;
+  const actualPlayers = 1248;
 
   return (
     <main dir="rtl" className="mx-auto flex max-w-7xl flex-col gap-5 px-3 pb-14 pt-4 sm:px-4 sm:pt-6 lg:px-6">
@@ -576,9 +576,11 @@ export default function HomePremiumClient({
             </Link>
           </div>
 
-          {/* Embedded bracket */}
-          <div className="px-2 pb-4">
-            <HomeRoundOf32Widget knockoutMatches={knockoutMatches} />
+          {/* Embedded bracket with reduced size */}
+          <div className="px-2 pb-4 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
+            <div className="min-w-[1180px] origin-top transform scale-[0.75] md:scale-[0.8] lg:scale-[0.85] pb-0 -mb-[180px]">
+              <HomeRoundOf32Widget knockoutMatches={knockoutMatches} />
+            </div>
           </div>
         </Card>
       </section>
