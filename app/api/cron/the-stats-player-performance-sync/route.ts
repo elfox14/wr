@@ -29,6 +29,12 @@ function snapshotPlayerStats(snapshot: any) {
   return Array.isArray(normalized.playerStats) ? normalized.playerStats : [];
 }
 
+function providerKey(snapshot: any) {
+  const raw = snapshot?.rawData && typeof snapshot.rawData === 'object' ? snapshot.rawData : {};
+  const resolved = raw?.resolvedProviderMatchId || snapshot?.providerMatchId || 'unknown';
+  return `${snapshot?.matchId || 'match'}:${resolved}`;
+}
+
 async function run(req: Request) {
   if (!hasValidAdminSecret(req)) return json({ ok: false, error: 'Unauthorized' }, 401);
 
@@ -49,7 +55,7 @@ async function run(req: Request) {
     },
     orderBy: { capturedAt: 'desc' },
     skip: offset,
-    take: matchId ? 10 : limit * 5,
+    take: matchId ? 10 : limit * 8,
     include: {
       match: {
         include: {
@@ -61,8 +67,17 @@ async function run(req: Request) {
   });
 
   const processed: any[] = [];
+  const seen = new Set<string>();
+  const skippedDuplicateSnapshots: any[] = [];
   for (const snapshot of snapshots) {
     if (processed.length >= limit) break;
+    const dedupeKey = providerKey(snapshot);
+    if (seen.has(dedupeKey)) {
+      skippedDuplicateSnapshots.push({ matchId: snapshot.matchId, snapshotId: snapshot.id, providerMatchId: snapshot.providerMatchId });
+      continue;
+    }
+    seen.add(dedupeKey);
+
     const normalized = (snapshot.rawData as any)?.normalized || {};
     const playerStats = snapshotPlayerStats(snapshot);
     if (!playerStats.length) continue;
@@ -91,15 +106,16 @@ async function run(req: Request) {
 
   return json({
     ok: true,
-    mode: 'the_stats_player_performance_sync_v2_offset',
+    mode: 'the_stats_player_performance_sync_v3_deduped_offset',
     durationMs: Date.now() - startedAt,
     dryRun,
-    scope: { matchId, limit, offset, nextOffset, lookbackDays, snapshotsScanned: snapshots.length },
+    scope: { matchId, limit, offset, nextOffset, lookbackDays, snapshotsScanned: snapshots.length, duplicateSnapshotsSkipped: skippedDuplicateSnapshots.length },
     processed,
+    skippedDuplicateSnapshots: skippedDuplicateSnapshots.slice(0, 12),
     cache: { revalidated: Boolean(revalidation), revalidation },
     nextRunHint: matchId
       ? 'Match-specific sync complete. Open /statistics after cache revalidation.'
-      : `Run again with offset=${nextOffset} to process the next snapshot batch without repeating the same rows.`,
+      : `Run again with offset=${nextOffset} to process the next snapshot batch without repeating duplicate rows.`,
   });
 }
 
