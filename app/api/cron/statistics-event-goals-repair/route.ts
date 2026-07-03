@@ -22,8 +22,23 @@ function intParam(url: URL, name: string, fallback: number, min: number, max: nu
   return Number.isFinite(parsed) ? Math.max(min, Math.min(max, Math.floor(parsed))) : fallback;
 }
 
+function latinFold(value: string) {
+  return value
+    .replace(/[Øø]/g, 'o')
+    .replace(/[Ðð]/g, 'd')
+    .replace(/[Þþ]/g, 'th')
+    .replace(/[Łł]/g, 'l')
+    .replace(/[Đđ]/g, 'd')
+    .replace(/[İIı]/g, 'i')
+    .replace(/[Şş]/g, 's')
+    .replace(/[Ğğ]/g, 'g')
+    .replace(/[Çç]/g, 'c')
+    .replace(/[Öö]/g, 'o')
+    .replace(/[Üü]/g, 'u');
+}
+
 function normalizeText(value: unknown) {
-  return String(value || '')
+  return latinFold(String(value || ''))
     .toLowerCase()
     .normalize('NFKD')
     .replace(/[\u0300-\u036f\u064B-\u065F\u0670]/g, '')
@@ -47,6 +62,25 @@ function similarity(a: unknown, b: unknown) {
   if (!aw.size || !bw.size) return 0;
   const hits = Array.from(aw).filter((word) => bw.has(word)).length;
   return Math.round((hits / Math.max(aw.size, bw.size)) * 75);
+}
+
+function playerMatchScore(eventName: string, assetName: string) {
+  const base = similarity(eventName, assetName);
+  const eventWords = words(eventName);
+  const assetWords = words(assetName);
+  if (!eventWords.length || !assetWords.length) return base;
+
+  const eventSet = new Set(eventWords);
+  const assetSet = new Set(assetWords);
+  const eventInsideAsset = eventWords.every((word) => assetSet.has(word));
+  const assetInsideEvent = assetWords.every((word) => eventSet.has(word));
+  if (eventInsideAsset || assetInsideEvent) return Math.max(base, 88);
+
+  const eventLast = eventWords[eventWords.length - 1];
+  const assetLast = assetWords[assetWords.length - 1];
+  if (eventLast && assetLast && eventLast === assetLast) return Math.max(base, 70);
+
+  return base;
 }
 
 function safeNumber(value: unknown, fallback = 0) {
@@ -138,7 +172,7 @@ async function run(req: Request) {
     if (!match) continue;
     const candidates = playerAssets
       .filter((asset) => !group.teamId || asset.teamId === group.teamId)
-      .map((asset) => ({ asset, score: similarity(group.playerName, asset.name) }))
+      .map((asset) => ({ asset, score: playerMatchScore(group.playerName, asset.name) }))
       .sort((a, b) => b.score - a.score);
     let selected = candidates[0]?.score >= 65 ? candidates[0].asset : null;
 
@@ -170,7 +204,7 @@ async function run(req: Request) {
 
     if (!selected) {
       unmatched += 1;
-      details.push({ status: 'unmatched', playerName: group.playerName, teamName: teamNameFor(match, group.teamId), eventGoals: group.goals, bestScore: candidates[0]?.score || 0 });
+      details.push({ status: 'unmatched', playerName: group.playerName, teamName: teamNameFor(match, group.teamId), eventGoals: group.goals, bestScore: candidates[0]?.score || 0, bestCandidate: candidates[0]?.asset?.name || null });
       continue;
     }
 
@@ -187,7 +221,7 @@ async function run(req: Request) {
     }
 
     repaired += 1;
-    details.push({ status: dryRun ? 'would_repair' : 'repaired', playerName: selected.name, teamName: teamNameFor(match, selected.teamId), fromGoals: currentGoals, toGoals: group.goals });
+    details.push({ status: dryRun ? 'would_repair' : 'repaired', playerName: selected.name, teamName: teamNameFor(match, selected.teamId), fromGoals: currentGoals, toGoals: group.goals, matchScore: candidates[0]?.score || 0 });
     if (dryRun) continue;
 
     const rating = Math.max(50, Math.min(100, 50 + group.goals * 12));
@@ -204,13 +238,13 @@ async function run(req: Request) {
         internalRating: rating,
         momentumImpact: Math.round((rating - 50) * 10) / 10,
         marketImpact: Math.round((rating - 50) * 6) / 10,
-        rawData: { source: 'MatchEvent goal repair', eventGoals: group.goals, playerName: group.playerName, teamId: group.teamId },
+        rawData: { source: 'MatchEvent goal repair', eventGoals: group.goals, playerName: group.playerName, teamId: group.teamId, matchScore: candidates[0]?.score || 0 },
         matchDate: match.matchDate,
       },
       update: {
         goals: group.goals,
         provider: 'MATCH_EVENT_GOAL_REPAIR',
-        rawData: { source: 'MatchEvent goal repair', eventGoals: group.goals, previousGoals: currentGoals, playerName: group.playerName, teamId: group.teamId },
+        rawData: { source: 'MatchEvent goal repair', eventGoals: group.goals, previousGoals: currentGoals, playerName: group.playerName, teamId: group.teamId, matchScore: candidates[0]?.score || 0 },
       },
     });
   }
@@ -219,7 +253,7 @@ async function run(req: Request) {
 
   return json({
     ok: true,
-    mode: 'statistics_event_goals_repair_v1',
+    mode: 'statistics_event_goals_repair_v2_better_name_matching',
     durationMs: Date.now() - startedAt,
     dryRun,
     createMissingAssets,
