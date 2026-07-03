@@ -36,6 +36,7 @@ async function run(req: Request) {
   const startedAt = Date.now();
   const matchId = String(url.searchParams.get('matchId') || '').trim() || null;
   const limit = intParam(url, 'limit', 5, 1, 25);
+  const offset = matchId ? 0 : intParam(url, 'offset', 0, 0, 500);
   const lookbackDays = intParam(url, 'lookbackDays', 30, 1, 365);
   const dryRun = boolParam(url, 'dryRun', false);
   const since = new Date(Date.now() - lookbackDays * 24 * 60 * 60 * 1000);
@@ -47,6 +48,7 @@ async function run(req: Request) {
       ...(matchId ? { matchId } : {}),
     },
     orderBy: { capturedAt: 'desc' },
+    skip: offset,
     take: matchId ? 10 : limit * 5,
     include: {
       match: {
@@ -85,16 +87,19 @@ async function run(req: Request) {
 
   const changed = processed.some((item) => Number(item.result?.upserted || 0) > 0);
   const revalidation = changed && !dryRun ? revalidateStatsViews('the-stats-player-performance-sync') : null;
+  const nextOffset = matchId ? null : offset + snapshots.length;
 
   return json({
     ok: true,
-    mode: 'the_stats_player_performance_sync_v1',
+    mode: 'the_stats_player_performance_sync_v2_offset',
     durationMs: Date.now() - startedAt,
     dryRun,
-    scope: { matchId, limit, lookbackDays, snapshotsScanned: snapshots.length },
+    scope: { matchId, limit, offset, nextOffset, lookbackDays, snapshotsScanned: snapshots.length },
     processed,
     cache: { revalidated: Boolean(revalidation), revalidation },
-    nextRunHint: 'Run after TheStats safe backfill when player tables in /statistics need to be refreshed.',
+    nextRunHint: matchId
+      ? 'Match-specific sync complete. Open /statistics after cache revalidation.'
+      : `Run again with offset=${nextOffset} to process the next snapshot batch without repeating the same rows.`,
   });
 }
 
