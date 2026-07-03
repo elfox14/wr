@@ -167,6 +167,16 @@ async function fetchIsportsAnalysis(providerMatchId) {
 function n(value) { const number = Number(value); return Number.isFinite(number) ? number : null; }
 function teamName(match, side) { const team = side === 'home' ? match.homeTeam : match.awayTeam; return team?.name || team?.code || (side === 'home' ? 'الفريق الأول' : 'الفريق الثاني'); }
 function deltaEvent(previous, stats, field, side, type, label, minDelta = 1) { if (!previous) return null; const before = n(previous[field]); const after = n(stats[field]); if (after === null || before === null || after - before < minDelta) return null; const diff = after - before; return { minute: stats.minute, type, teamSide: side, detail: `${label}${diff > 1 ? ` +${diff}` : ''} (الإجمالي ${after})`, sourceName: 'Live Ingest' }; }
+function liveHeartbeatEvent(match, previous, stats, providerStatus) {
+  const minute = n(stats.minute);
+  const previousMinute = n(previous?.minute);
+  const liveStatus = ['1H', '2H', 'HT', 'ET', 'P', 'IN_PLAY', 'LIVE'].includes(String(providerStatus || '').toUpperCase());
+  const shouldEmit = liveStatus && minute !== null && (previousMinute === null || minute > previousMinute);
+  if (!shouldEmit) return null;
+  const home = stats.homeScore ?? previous?.homeScore ?? match.homeScore ?? 0;
+  const away = stats.awayScore ?? previous?.awayScore ?? match.awayScore ?? 0;
+  return { minute, type: 'live_tick', teamSide: null, detail: `متابعة مباشرة — الدقيقة ${minute} — النتيجة ${home}-${away}`, sourceName: 'Live Ingest Heartbeat' };
+}
 function generateEvents(match, previous, stats, providerStatus) {
   const events = [];
   const prevHomeScore = previous ? n(previous.homeScore) : n(match.homeScore);
@@ -176,6 +186,10 @@ function generateEvents(match, previous, stats, providerStatus) {
   if (prevAwayScore !== null && stats.awayScore !== null && stats.awayScore > prevAwayScore) events.push({ minute: stats.minute, type: 'goal', teamSide: 'away', detail: `هدف لـ ${teamName(match, 'away')} — النتيجة ${stats.homeScore ?? prevHomeScore ?? 0}-${stats.awayScore}`, sourceName: 'Live Ingest' });
   const candidates = [deltaEvent(previous, stats, 'homeShotsOnTarget', 'home', 'shot_on_target', `تسديدة على المرمى لـ ${teamName(match, 'home')}`), deltaEvent(previous, stats, 'awayShotsOnTarget', 'away', 'shot_on_target', `تسديدة على المرمى لـ ${teamName(match, 'away')}`), deltaEvent(previous, stats, 'homeCorners', 'home', 'corner', `ركنية لـ ${teamName(match, 'home')}`), deltaEvent(previous, stats, 'awayCorners', 'away', 'corner', `ركنية لـ ${teamName(match, 'away')}`), deltaEvent(previous, stats, 'homeDangerousAttacks', 'home', 'dangerous_attack', `هجمة خطيرة لـ ${teamName(match, 'home')}`, 3), deltaEvent(previous, stats, 'awayDangerousAttacks', 'away', 'dangerous_attack', `هجمة خطيرة لـ ${teamName(match, 'away')}`, 3), deltaEvent(previous, stats, 'homeYellowCards', 'home', 'yellow_card', `بطاقة صفراء على ${teamName(match, 'home')}`), deltaEvent(previous, stats, 'awayYellowCards', 'away', 'yellow_card', `بطاقة صفراء على ${teamName(match, 'away')}`), deltaEvent(previous, stats, 'homeRedCards', 'home', 'red_card', `بطاقة حمراء على ${teamName(match, 'home')}`), deltaEvent(previous, stats, 'awayRedCards', 'away', 'red_card', `بطاقة حمراء على ${teamName(match, 'away')}`)];
   for (const event of candidates) if (event) events.push(event);
+  if (!events.length || events.every((event) => event.type === 'live_state')) {
+    const heartbeat = liveHeartbeatEvent(match, previous, stats, providerStatus);
+    if (heartbeat) events.push(heartbeat);
+  }
   return events.slice(0, 20);
 }
 
