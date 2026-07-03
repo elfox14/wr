@@ -19,6 +19,7 @@
     "worker:match-extras-sync": "node --env-file=.env scripts/match-extras-sync-worker.mjs",
     "worker:live-animation-sync": "node --env-file=.env scripts/live-animation-sync-worker.mjs",
     "worker:finished-matches-backfill": "node --env-file=.env scripts/finished-matches-backfill-worker.mjs",
+    "worker:finished-matches-backfill-all": "node --env-file=.env scripts/finished-matches-backfill-all-worker.mjs",
     "test": "vitest run",
     "lint": "eslint .",
     "lint:ai": "eslint features/analysis app/ai-analyst app/api/ai-analyst app/api/ai-analyst/alerts/route.ts --max-warnings=0",
