@@ -1,7 +1,7 @@
 import { revalidatePath, revalidateTag } from 'next/cache';
 
 const STATS_RELATED_PATHS = ['/', '/statistics', '/groups', '/round-of-32'];
-const STATS_RELATED_TAGS = ['home-dashboard'];
+const STATS_RELATED_TAGS = ['home-dashboard', 'statistics-page'];
 
 export function revalidateStatsViews(reason = 'stats-updated') {
   const result = {
