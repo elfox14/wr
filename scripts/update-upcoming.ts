@@ -9,7 +9,7 @@ async function updateUpcoming() {
   console.log(`Found ${matches.length} scheduled matches.`);
   
   // Shift them to start from 2 hours from now, spaced by 4 hours
-  let now = new Date();
+  const now = new Date();
   
   for (let i = 0; i < matches.length; i++) {
     const m = matches[i];
