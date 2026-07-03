@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { hasValidAdminSecret } from '@/lib/adminAuth';
+import { revalidateStatsViews } from '@/lib/revalidateStatsViews';
 import { collectTheStatsMatchExtras, defaultTheStatsQuery } from '@/lib/theStatsMatchExtras';
 
 export const runtime = 'nodejs';
@@ -138,7 +139,7 @@ async function saveSnapshot(match: any, collected: any, includeRaw: boolean) {
       ...columns(normalized),
       rawData: {
         provider: 'THE_STATS_API',
-        mode: 'safe_backfill_snapshot_only_skip_404_v2_precise_status',
+        mode: 'safe_backfill_snapshot_only_skip_404_v3_single_match_default',
         importedAt: new Date().toISOString(),
         resolvedProviderMatchId: collected?.resolvedProviderMatchId,
         resolvedBy: collected?.resolvedBy,
@@ -187,13 +188,13 @@ async function run(req: Request) {
   const startedAt = Date.now();
   const from = dateParam(url, 'from', process.env.WORLD_CUP_TOURNAMENT_START_DATE || '2026-06-14');
   const to = dateParam(url, 'to', todayIso());
-  const limit = intParam(url, 'limit', 5, 1, 5);
-  const requestsPerMinute = intParam(url, 'requestsPerMinute', 30, 10, 120);
+  const limit = intParam(url, 'limit', 1, 1, 2);
+  const requestsPerMinute = intParam(url, 'requestsPerMinute', 30, 10, 60);
   const delayMs = Math.max(intParam(url, 'delayMs', 2500, 0, 15000), Math.ceil(60000 / requestsPerMinute));
-  const betweenMatchesDelayMs = intParam(url, 'betweenMatchesDelayMs', 3000, 0, 30000);
-  const timeoutMs = intParam(url, 'timeoutMs', 20000, 3000, 60000);
+  const betweenMatchesDelayMs = intParam(url, 'betweenMatchesDelayMs', 2500, 0, 30000);
+  const timeoutMs = intParam(url, 'timeoutMs', 15000, 3000, 45000);
   const includeRaw = boolParam(url, 'includeRaw', false);
-  const requireEvents = boolParam(url, 'requireEvents', true);
+  const requireEvents = boolParam(url, 'requireEvents', false);
   const dryRun = boolParam(url, 'dryRun', false);
   const skip404 = boolParam(url, 'skip404', true);
   const skipHours = intParam(url, 'skipHours', 12, 1, 72);
@@ -246,18 +247,22 @@ async function run(req: Request) {
     if (betweenMatchesDelayMs) await sleep(betweenMatchesDelayMs);
   }
 
+  const savedCount = processed.filter((item) => item.status === 'saved_snapshot_only_no_duplicate_events').length;
+  const revalidation = savedCount > 0 ? revalidateStatsViews('the-stats-safe-backfill') : null;
+
   return json({
     ok: true,
-    mode: 'the_stats_backfill_finals_safe_v2_precise_404_before_429',
+    mode: 'the_stats_backfill_finals_safe_v3_single_match_default_cached_stats',
     durationMs: Date.now() - startedAt,
     dryRun,
     stoppedEarly,
     scope: { from, to, limit, selected: candidates.length, requireEvents, skip404, skipHours },
     rateLimit: { requestsPerMinute, delayMs, betweenMatchesDelayMs, estimatedProviderRequests, stopOn429 },
     noDuplicatePolicy: { writeMatchEvents: false, storage: 'THE_STATS_API_EXTRAS snapshot only', deletesOldTheStatsMatchEventRows: true },
+    cache: { revalidated: Boolean(revalidation), revalidation },
     skippedActive,
     processed,
-    nextRunHint: stoppedEarly ? 'Wait 10-20 minutes, then run again.' : 'Run again to process the next batch. 404 matches will be skipped until retryAfter.',
+    nextRunHint: stoppedEarly ? 'Wait 10-20 minutes, then run again with limit=1.' : 'Run again to process the next match. Default is intentionally one match per request to avoid Render 502.',
   });
 }
 
