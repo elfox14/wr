@@ -14,7 +14,7 @@ interface PlayerHeatmapModalProps {
 }
 
 export default function PlayerHeatmapModal({ isOpen, onClose, playerName, playerImage, isHome, points = [] }: PlayerHeatmapModalProps) {
-  if (!isOpen) return null;
+  if (!isOpen || !points.length) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm" onClick={onClose}>
@@ -58,3 +58,4 @@ export default function PlayerHeatmapModal({ isOpen, onClose, playerName, player
     </div>
   );
 }
+
