@@ -8,7 +8,6 @@ import { getTeamFlagUrl } from '@/lib/teamFlags';
 import type { MatchEventView, MatchPageData, MatchPlayerStatItem } from '@/lib/match-page/types';
 
 import TeamHeatmap from '@/components/match-center/visuals/TeamHeatmap';
-import MatchMomentumChart from '@/components/match-center/visuals/MatchMomentumChart';
 import CompactStatCell from '@/components/match-center/visuals/CompactStatCell';
 import InteractiveShotmap from '@/components/match-center/visuals/InteractiveShotmap';
 import PlayerHeatmapModal from '@/components/match-center/visuals/PlayerHeatmapModal';
@@ -172,27 +171,21 @@ function getTeamHeatmapPoints(isHome: boolean, d: MatchPageData) {
 
 function Overview({ d }: { d: MatchPageData }) { 
   const rows = d.stats.filter((m) => m.available); 
+  const homeHeatmapPoints = getTeamHeatmapPoints(true, d);
+  const awayHeatmapPoints = getTeamHeatmapPoints(false, d);
+  const hasVerifiedHeatmaps = homeHeatmapPoints.length > 0 || awayHeatmapPoints.length > 0;
   
   return (
     <div className="space-y-4">
-      {/* Momentum */}
-      <Box title="زخم المباراة (Match Momentum)" hint="يوضح سيطرة الفريقين خلال أوقات المباراة">
-        <div className="h-32">
-          <MatchMomentumChart matchId={d.id} events={d.events} homeTeamId={d.homeTeam.id} />
-        </div>
-      </Box>
-
-      {/* Heatmaps */}
-      <Box title="الخريطة الحرارية (Heatmaps)">
-        <div className="flex justify-center gap-4">
-          <div className="w-1/2 max-w-[200px]">
-             <TeamHeatmap teamName={tn(d.homeTeam)} isHome={true} points={getTeamHeatmapPoints(true, d)} />
+      {/* Verified heatmaps only */}
+      {hasVerifiedHeatmaps && (
+        <Box title="الخريطة الحرارية">
+          <div className="flex justify-center gap-4">
+            {homeHeatmapPoints.length > 0 && <div className="w-1/2 max-w-[200px]"><TeamHeatmap teamName={tn(d.homeTeam)} isHome={true} points={homeHeatmapPoints} /></div>}
+            {awayHeatmapPoints.length > 0 && <div className="w-1/2 max-w-[200px]"><TeamHeatmap teamName={tn(d.awayTeam)} isHome={false} points={awayHeatmapPoints} /></div>}
           </div>
-          <div className="w-1/2 max-w-[200px]">
-             <TeamHeatmap teamName={tn(d.awayTeam)} isHome={false} points={getTeamHeatmapPoints(false, d)} />
-          </div>
-        </div>
-      </Box>
+        </Box>
+      )}
 
       {/* Stats Grid */}
       <Box title="إحصائيات المواجهة">
@@ -268,8 +261,10 @@ function groupPlayersByLine(players: any[]) {
 }
 
 function PitchPlayer({ p, isHome, color, d, onHeatmap }: { p: any, isHome: boolean, color: string, d: MatchPageData, onHeatmap: any }) {
+  const heatmapPoints = d.advanced.playerHeatmaps?.find((h:any) => h.playerId === p.playerId || h.playerName === p.playerName)?.points || [];
+  const hasVerifiedHeatmap = heatmapPoints.length > 0;
   return (
-    <div className="flex flex-col items-center group relative cursor-pointer hover:scale-110 transition-transform" onClick={() => onHeatmap(p.playerName || '', p.image, isHome, d.advanced.playerHeatmaps?.find((h:any) => h.playerId === p.playerId)?.points || [])}>
+    <div className={`flex flex-col items-center group relative transition-transform ${hasVerifiedHeatmap ? 'cursor-pointer hover:scale-110' : 'cursor-default'}`} onClick={hasVerifiedHeatmap ? () => onHeatmap(p.playerName || '', p.image, isHome, heatmapPoints) : undefined}>
        <div className="relative">
           <div className="w-8 h-8 md:w-10 md:h-10 border-2 shadow-lg bg-black/50 rounded-full flex items-center justify-center overflow-hidden" style={{ borderColor: color }}>
              <Avatar name={p.playerName} image={p.image} number={p.number} />
@@ -348,19 +343,13 @@ function Lineups({ d, onHeatmap }: { d: MatchPageData, onHeatmap: (name: string,
          {homeSubs.map(p => <PitchPlayer key={p.playerId || p.playerName} p={p} isHome={true} color="#9CA3AF" d={d} onHeatmap={onHeatmap} />)}
       </div>
 
-      {/* Team Heatmaps */}
-      <div className="w-full grid md:grid-cols-2 gap-4 mt-8">
-         <Box title={`تمركز ${tn(d.homeTeam)}`}>
-            <div className="w-full flex justify-center">
-               <TeamHeatmap teamName="" isHome={true} points={homeHeatmapPoints} />
-            </div>
-         </Box>
-         <Box title={`تمركز ${tn(d.awayTeam)}`}>
-            <div className="w-full flex justify-center">
-               <TeamHeatmap teamName="" isHome={false} points={awayHeatmapPoints} />
-            </div>
-         </Box>
-      </div>
+      {/* Verified team heatmaps only */}
+      {(homeHeatmapPoints.length > 0 || awayHeatmapPoints.length > 0) && (
+        <div className="w-full grid md:grid-cols-2 gap-4 mt-8">
+          {homeHeatmapPoints.length > 0 && <Box title={`تمركز ${tn(d.homeTeam)}`}><TeamHeatmap teamName="" isHome={true} points={homeHeatmapPoints} /></Box>}
+          {awayHeatmapPoints.length > 0 && <Box title={`تمركز ${tn(d.awayTeam)}`}><TeamHeatmap teamName="" isHome={false} points={awayHeatmapPoints} /></Box>}
+        </div>
+      )}
     </div>
   ); 
 }
@@ -369,7 +358,7 @@ function Analysis({ d }: { d: MatchPageData }) {
   const h = historyOf(d); 
   return (
     <div className="space-y-4">
-      <InteractiveShotmap matchId={d.id} homeTeamName={tn(d.homeTeam)} awayTeamName={tn(d.awayTeam)} shots={d.advanced?.shotmap} homeTeamId={d.homeTeam.id} />
+      <InteractiveShotmap homeTeamName={tn(d.homeTeam)} awayTeamName={tn(d.awayTeam)} shots={d.advanced?.shotmap} homeTeamId={d.homeTeam.id} />
       
       <Box title="المواجهات السابقة وتحليل الأداء">
         <div className="grid gap-4 lg:grid-cols-2">
@@ -480,3 +469,4 @@ export default function ProfessionalMatchTabsPageRich({ data }: { data: MatchPag
     </main>
   ); 
 }
+

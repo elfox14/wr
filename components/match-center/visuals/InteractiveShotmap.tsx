@@ -4,81 +4,42 @@ import React from 'react';
 import type { MatchShotMapItem } from '@/lib/match-page/types';
 
 interface InteractiveShotmapProps {
-  matchId: string;
   homeTeamName: string;
   awayTeamName: string;
   shots?: MatchShotMapItem[];
   homeTeamId?: string;
 }
 
-export default function InteractiveShotmap({ matchId, homeTeamName, awayTeamName, shots = [], homeTeamId }: InteractiveShotmapProps) {
-  // Deterministic random generator based on matchId
-  const seed = Array.from(matchId).reduce((acc, char) => acc + char.charCodeAt(0), 0);
-  
-  const generateShots = (teamSeedOffset: number, count: number, isHome: boolean) => {
-    return Array(count).fill(0).map((_, i) => {
-      const s = seed + teamSeedOffset + i;
-      const x = (Math.sin(s) * 10000) % 100; 
-      const y = (Math.cos(s) * 10000) % 50;  
-      
-      const weightedX = 20 + Math.abs(x) * 0.6; 
-      const weightedY = Math.abs(y) * 0.8;
-      
-      const isGoal = (s % 10) > 8; 
-      const isOnTarget = (s % 10) > 5 && !isGoal; 
-      
+export default function InteractiveShotmap({ homeTeamName, awayTeamName, shots = [], homeTeamId }: InteractiveShotmapProps) {
+  if (!shots.length) return null;
+
+  const allShots = shots
+    .map((s, i) => {
+      const isHome = s.teamId === homeTeamId || Boolean(s.teamName && homeTeamName && String(s.teamName).includes(homeTeamName));
+      const outcome = String(s.outcome || '').toLowerCase();
+      const isGoal = Boolean(s.isGoal || outcome.includes('goal') || outcome === 'هدف');
+      const isOnTarget = Boolean(isGoal || s.isOnTarget || outcome.includes('saved'));
+      const rawX = Number(s.x);
+      const sourceY = Number(s.y);
+      if (!Number.isFinite(rawX) || !Number.isFinite(sourceY)) return null;
+      const rawY = sourceY > 50 ? 100 - sourceY : sourceY;
+      const xgValue = s.xg === null || s.xg === undefined ? null : Number(s.xg);
       return {
-        id: `shot-${isHome ? 'h' : 'a'}-${i}`,
-        x: weightedX,
-        y: weightedY, 
-        xg: 0.05 + (Math.abs(Math.sin(s)) * 0.4), 
+        id: s.id || `real-shot-${i}`,
+        x: rawX,
+        y: rawY,
+        xg: Number.isFinite(xgValue) ? xgValue : null,
         isGoal,
         isOnTarget,
         isHome,
-        playerName: `لاعب ${i+1}`,
-        minute: Math.floor(Math.abs(Math.sin(s * 2)) * 90) + 1
+        playerName: s.playerName || 'غير معروف',
+        minute: s.minute ?? '؟'
       };
-    });
-  };
+    })
+    .filter((shot): shot is NonNullable<typeof shot> => shot !== null)
+    .sort((a: any, b: any) => Number(b.xg || 0) - Number(a.xg || 0));
 
-  const hasRealShots = shots.length > 0;
-  
-  let allShots = [];
-  
-  if (hasRealShots) {
-     allShots = shots.map((s, i) => {
-        // Simple logic to detect if it's home or away. Using teamId or name matching.
-        const isHome = s.teamId === homeTeamId || (s.teamName && homeTeamName && String(s.teamName).includes(homeTeamName));
-        const isGoal = s.isGoal || s.outcome?.toLowerCase().includes('goal') || s.outcome === 'هدف';
-        const isOnTarget = isGoal || s.isOnTarget || s.outcome?.toLowerCase().includes('saved');
-        
-        const rawX = Number(s.x) || 50;
-        let rawY = Number(s.y) || 25;
-        
-        // Normalize coordinates if needed (assuming 0-100 scale where 100 is opponent goal)
-        // For half pitch representation, we map X from 0-100 (left-right) and Y from 50-100 to 0-50 (depth)
-        // This mapping logic can be refined based on actual API coordinates format.
-        if (rawY > 50) rawY = 100 - rawY; // Mirror everything to one half
-
-        return {
-           id: s.id || `real-shot-${i}`,
-           x: rawX,
-           y: rawY,
-           xg: Number(s.xg) || 0.1,
-           isGoal,
-           isOnTarget,
-           isHome,
-           playerName: s.playerName || 'غير معروف',
-           minute: s.minute || '؟'
-        };
-     });
-  } else {
-     const homeShots = generateShots(100, 12, true);
-     const awayShots = generateShots(200, 9, false);
-     allShots = [...homeShots, ...awayShots];
-  }
-
-  allShots = allShots.sort((a, b) => b.xg - a.xg);
+  if (!allShots.length) return null;
 
   return (
     <div className="relative w-full aspect-square md:aspect-[4/3] bg-[#0A0A0C] border border-white/10 rounded-2xl p-4 overflow-hidden flex flex-col">
@@ -110,7 +71,7 @@ export default function InteractiveShotmap({ matchId, homeTeamName, awayTeamName
          
          {/* Plot Shots */}
          {allShots.map((shot) => {
-            const size = Math.max(8, shot.xg * 40);
+            const size = shot.xg === null ? 10 : Math.max(8, shot.xg * 40);
             const color = shot.isHome ? '#0FF0FC' : '#F8C846';
             
             return (
@@ -154,10 +115,7 @@ export default function InteractiveShotmap({ matchId, homeTeamName, awayTeamName
                         <span className="text-gray-400">النتيجة:</span>
                         <span className="font-bold text-white">{shot.isGoal ? 'هدف ⚽' : shot.isOnTarget ? 'على المرمى' : 'خارج المرمى'}</span>
                      </div>
-                     <div className="flex justify-between text-[10px]">
-                        <span className="text-gray-400">xG:</span>
-                        <span className="font-bold text-[#F8C846]">{shot.xg.toFixed(2)}</span>
-                     </div>
+                     {shot.xg !== null && <div className="flex justify-between text-[10px]"><span className="text-gray-400">xG:</span><span className="font-bold text-[#F8C846]">{shot.xg.toFixed(2)}</span></div>}
                   </div>
                </div>
             );
