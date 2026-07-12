@@ -152,7 +152,8 @@ async function loadArticles(matchIds: string[]) {
     `SELECT "matchId", "slug", "status", "infographicImageUrl" FROM "MatchArticle" WHERE "matchId" = ANY($1::text[]) AND "language" = 'ar'`,
     matchIds,
   ).catch(() => []);
-  return new Map(rows.map((row) => [row.matchId, row]));
+  const entries: Array<[string, any]> = rows.map((row) => [row.matchId, row]);
+  return new Map<string, any>(entries);
 }
 
 async function loadMatchCandidates(options: { matchId?: string | null; lookbackDays: number; lookaheadHours: number; take: number }) {
