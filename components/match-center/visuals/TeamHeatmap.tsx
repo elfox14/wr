@@ -14,6 +14,7 @@ export default function TeamHeatmap({ teamName, isHome, points = [] }: TeamHeatm
   const hasPoints = points && points.length > 0;
   
   const analysis = useMemo(() => analyzeHeatmap(points), [points]);
+  if (!hasPoints) return null;
 
   // Grid approach for accurate density
   const gridRows = 16;
@@ -125,3 +126,4 @@ export default function TeamHeatmap({ teamName, isHome, points = [] }: TeamHeatm
     </div>
   );
 }
+
