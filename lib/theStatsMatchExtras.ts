@@ -227,53 +227,6 @@ export async function collectTheStatsMatchExtras(match: any, options: { dryRun?:
       }
     });
 
-    // Fallback: Generate synthetic heatmaps if provider doesn't have them
-    if (playerHeatmaps.length === 0 && playerStats.length > 0) {
-      playerStats.forEach((p: any) => {
-        const side = String(p.teamId) === String(match?.homeTeam?.id) || String(p.teamId) === String(match?.homeTeam?.code) || (match?.homeTeam?.name && String(p.teamName).includes(match.homeTeam.name)) ? 'home' : 'away';
-        const position = String(p.position || '').toLowerCase();
-        const pts: { x: number, y: number }[] = [];
-        
-        // Generate 30-50 synthetic points based on position
-        const count = 30 + Math.floor(Math.random() * 20);
-        for (let i = 0; i < count; i++) {
-          let x = 50, y = 50;
-          if (position.includes('gk') || position.includes('حارس') || position.includes('goalkeeper')) {
-             x = side === 'home' ? 5 + Math.random() * 15 : 80 + Math.random() * 15;
-             y = 35 + Math.random() * 30;
-          } else if (position.includes('d') || position.includes('مدافع')) {
-             x = side === 'home' ? 15 + Math.random() * 30 : 55 + Math.random() * 30;
-             y = 10 + Math.random() * 80;
-          } else if (position.includes('m') || position.includes('وسط')) {
-             x = 30 + Math.random() * 40;
-             y = 10 + Math.random() * 80;
-          } else if (position.includes('f') || position.includes('a') || position.includes('مهاجم')) {
-             x = side === 'home' ? 60 + Math.random() * 30 : 10 + Math.random() * 30;
-             y = 20 + Math.random() * 60;
-          } else {
-             x = 20 + Math.random() * 60;
-             y = 20 + Math.random() * 60;
-          }
-          pts.push({ x, y });
-        }
-
-        playerHeatmaps.push({
-          playerId: p.playerId,
-          playerName: p.playerName,
-          teamId: p.teamId,
-          side,
-          points: pts
-        });
-
-        if (side === 'home') {
-           teamHeatmaps.home.teamId = p.teamId;
-           teamHeatmaps.home.points.push(...pts);
-        } else {
-           teamHeatmaps.away.teamId = p.teamId;
-           teamHeatmaps.away.points.push(...pts);
-        }
-      });
-    }
   }
 
   const normalized = { matchInfo: compactMatchInfo(byKey.matchInfo?.payload, byKey.stats?.payload), liveStats: stats, lineups: byKey.lineups?.ok ? dataOf(byKey.lineups.payload) : null, eventsDetailed: { all: events }, shotmap, playerStats, playerHeatmaps, teamHeatmaps };
