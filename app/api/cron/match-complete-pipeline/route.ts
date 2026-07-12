@@ -99,7 +99,7 @@ function hasSnapshotColumnStats(snapshot: any) {
 }
 
 function articleMapRows(rows: any[]) {
-  return new Map(rows.map((row) => [row.matchId, row]));
+  return new Map<string, any>(rows.map((row): [string, any] => [row.matchId, row]));
 }
 
 async function ensurePipelineStateTable() {
@@ -547,4 +547,3 @@ async function run(req: Request) {
 
 export async function GET(req: Request) { return run(req); }
 export async function POST(req: Request) { return run(req); }
-
