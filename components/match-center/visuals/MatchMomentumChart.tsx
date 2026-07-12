@@ -1,68 +1,19 @@
 'use client';
 
-import React from 'react';
-import type { MatchEventView } from '@/lib/match-page/types';
+export type VerifiedMomentumPoint = { minute: number; value: number };
 
-interface MatchMomentumChartProps {
-  matchId: string;
-  events?: MatchEventView[];
-  homeTeamId?: string;
-}
-
-export default function MatchMomentumChart({ matchId, events = [], homeTeamId }: MatchMomentumChartProps) {
-  const seed = Array.from(matchId).reduce((acc, char) => acc + char.charCodeAt(0), 0);
-  const maxMinute = Math.max(90, ...(events || []).map(e => Number(e.minute) || 0));
-  
-  const momentum = Array(maxMinute).fill(0).map((_, i) => {
-    const x = Math.sin(seed + i * 0.1) * Math.cos(seed * 0.5 + i * 0.05) * 10000;
-    return ((x - Math.floor(x)) - 0.5) * 200;
-  });
-  
-  const smoothed = momentum.map((v, i, arr) => {
-    if (i === 0 || i === arr.length - 1) return v;
-    return (arr[i-1] + v + arr[i+1]) / 3;
-  });
-
+export default function MatchMomentumChart({ points = [] }: { points?: VerifiedMomentumPoint[] }) {
+  const verified = points.filter((point) => Number.isFinite(point.minute) && Number.isFinite(point.value));
+  if (!verified.length) return null;
+  const maxMinute = Math.max(90, ...verified.map((point) => point.minute));
   return (
-    <div className="relative w-full h-full flex flex-col mt-6 mb-4">
-      <div className="relative flex-1 flex items-center justify-between gap-[2px] md:gap-1">
-        <div className="absolute top-1/2 left-0 right-0 h-px bg-white/20 z-0" />
-        {smoothed.map((val, i) => {
-          const isHome = val > 0;
-          const heightPct = Math.min(100, Math.abs(val));
-          
-          return (
-             <div key={i} className="flex-1 h-full flex flex-col z-10 relative group/col">
-                <div className="flex-1 flex flex-col justify-end">
-                   {isHome && <div className="w-full bg-[#0FF0FC] rounded-t-sm opacity-90 transition-all duration-500" style={{ height: `${heightPct}%` }} />}
-                </div>
-                <div className="flex-1 flex flex-col justify-start">
-                   {!isHome && <div className="w-full bg-[#F8C846] rounded-b-sm opacity-90 transition-all duration-500" style={{ height: `${heightPct}%` }} />}
-                </div>
-             </div>
-          );
-        })}
-      </div>
-      <div className="relative w-full h-4 mt-3">
-         {(() => {
-           const quarters = [1];
-           for (let m = 15; m <= maxMinute; m += 15) quarters.push(m);
-           if (!quarters.includes(maxMinute)) quarters.push(maxMinute);
-           
-           return quarters.map((q, idx) => {
-             const leftPct = ((q - 1) / Math.max(1, maxMinute - 1)) * 100;
-             return (
-               <span 
-                 key={idx} 
-                 className="absolute text-[10px] font-bold text-gray-500 -translate-x-1/2" 
-                 style={{ left: `${leftPct}%` }}
-               >
-                 {q}'
-               </span>
-             );
-           });
-         })()}
-      </div>
+    <div className="relative h-full w-full">
+      <div className="absolute inset-x-0 top-1/2 h-px bg-white/20" />
+      {verified.map((point, index) => {
+        const height = Math.min(100, Math.abs(point.value));
+        return <div key={`${point.minute}-${index}`} className="absolute top-0 h-full" style={{ left: `${(point.minute / maxMinute) * 100}%` }}><div className="flex h-full w-1 flex-col"><div className="flex flex-1 items-end">{point.value > 0 && <i className="w-full bg-[#0FF0FC]" style={{ height: `${height}%` }} />}</div><div className="flex flex-1 items-start">{point.value < 0 && <i className="w-full bg-[#F8C846]" style={{ height: `${height}%` }} />}</div></div></div>;
+      })}
     </div>
   );
 }
+
