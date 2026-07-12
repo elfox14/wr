@@ -147,7 +147,12 @@ function nextProviderResetDate() {
 }
 
 async function loadArticles(matchIds: string[]) {
-  return new Map<string, any>();
+  if (!matchIds.length) return new Map<string, any>();
+  const rows = await prisma.$queryRawUnsafe<Array<{ matchId: string; slug: string; status: string; infographicImageUrl: string | null }>>(
+    `SELECT "matchId", "slug", "status", "infographicImageUrl" FROM "MatchArticle" WHERE "matchId" = ANY($1::text[]) AND "language" = 'ar'`,
+    matchIds,
+  ).catch(() => []);
+  return new Map(rows.map((row) => [row.matchId, row]));
 }
 
 async function loadMatchCandidates(options: { matchId?: string | null; lookbackDays: number; lookaheadHours: number; take: number }) {
@@ -542,3 +547,4 @@ async function run(req: Request) {
 
 export async function GET(req: Request) { return run(req); }
 export async function POST(req: Request) { return run(req); }
+
