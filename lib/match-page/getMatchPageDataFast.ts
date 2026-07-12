@@ -307,7 +307,12 @@ function extractPlayerStats(snapshots: any[], homeTeam: MatchTeamLite, awayTeam:
   }).slice(0, 70);
 }
 
-function extractLineupFromPlayers(players: MatchPlayerStatItem[], homeTeam: MatchTeamLite, awayTeam: MatchTeamLite): OfficialLineupView {
+function extractLineupFromPlayers(players: MatchPlayerStatItem[], homeTeam: MatchTeamLite, awayTeam: MatchTeamLite, snapshots: any[] = []): OfficialLineupView {
+  const snapshotLineups = snapshots
+    .filter(isTheStatsSnapshot)
+    .map((snapshot) => rawData(snapshot)?.normalized?.lineups || rawData(snapshot)?.lineups)
+    .find(Boolean);
+  const formationFor = (side: 'home' | 'away') => cleanText(snapshotLineups?.[side]?.formation || snapshotLineups?.[side]?.formation_name);
   const toLineupPlayer = (player: MatchPlayerStatItem): OfficialLineupPlayer => ({
     id: player.playerId || null,
     name: player.playerName || 'لاعب غير معروف',
@@ -317,14 +322,14 @@ function extractLineupFromPlayers(players: MatchPlayerStatItem[], homeTeam: Matc
     rating: player.rating ?? null,
     isCaptain: player.isCaptain || null,
   });
-  const byTeam = (team: MatchTeamLite) => {
+  const byTeam = (team: MatchTeamLite, side: 'home' | 'away') => {
     const rows = players.filter((player) => player.teamId === team.id || teamKey(player.teamName).includes(teamKey(team.name)));
     const starting = rows.filter((player) => player.started === true).map(toLineupPlayer);
     const substitutes = rows.filter((player) => player.started !== true && (Number(player.minutes || 0) > 0 || player.playerSubbedOn || player.playerSubbedOff || player.played)).map(toLineupPlayer);
-    return { teamName: team.name, formation: null, startingXi: starting.slice(0, 11), substitutes: substitutes.slice(0, 12) };
+    return { teamName: team.name, formation: formationFor(side), startingXi: starting.slice(0, 11), substitutes: substitutes.slice(0, 12) };
   };
-  const home = byTeam(homeTeam);
-  const away = byTeam(awayTeam);
+  const home = byTeam(homeTeam, 'home');
+  const away = byTeam(awayTeam, 'away');
   if (!home.startingXi.length && !away.startingXi.length && !home.substitutes.length && !away.substitutes.length) return null;
   return { confirmed: true, source: 'THE_STATS_API_EXTRAS', home, away };
 }
@@ -352,16 +357,20 @@ function extractAdvancedData(snapshots: any[], homeTeam: MatchTeamLite, awayTeam
   const normalized = theStats?.rawData && typeof theStats.rawData === 'object' ? (theStats.rawData as any).normalized || {} : {};
   const matchInfo = normalized.matchInfo || {};
   const npxgRaw = matchInfo.npxgSummary?.live || matchInfo.npxgSummary?.stored || null;
+  const xgRaw = normalized.liveStats?.stats?.xg || normalized.liveStats?.xg || null;
+  const shotmap = asList(normalized.shotmap)
+    .map((row: any) => ({ ...row, x: coord(row?.x), y: coord(row?.y) }))
+    .filter((row: any) => row.x !== null && row.y !== null);
   const playerStats = enrichPlayersFromDb(extractPlayerStats(snapshots, homeTeam, awayTeam), dbPlayers);
   return {
     venue: cleanVenue(matchInfo.venue),
     city: cleanText(matchInfo.city),
     referee: cleanText(matchInfo.referee),
     finalScore: matchInfo.finalScore || null,
-    xg: null,
+    xg: xgRaw ? { home: toNumber(xgRaw.home), away: toNumber(xgRaw.away) } : null,
     npxg: npxgRaw ? { home: toNumber(npxgRaw.home_team ?? npxgRaw.home), away: toNumber(npxgRaw.away_team ?? npxgRaw.away) } : null,
     events: enrichEventsWithPlayers(finalTheStatsEvents(snapshots, homeTeam, awayTeam), playerStats),
-    shotmap: [],
+    shotmap,
     playerStats,
     playerHeatmaps: normalized.playerHeatmaps,
     teamHeatmaps: normalized.teamHeatmaps,
@@ -491,7 +500,7 @@ export async function getMatchPageDataFast(matchId: string): Promise<MatchPageDa
   const thirdPlaceTable = buildBestThirdsTable(matchesUntilKickoff as any[]);
   const dbEvents: MatchEventView[] = (match.events || []).map(buildEventView);
   const pageEvents = enrichEventsWithPlayers(mergeEventViews(dbEvents, advanced.events || [], status), advanced.playerStats);
-  const officialLineup = extractLineupFromPlayers(advanced.playerStats, homeTeam, awayTeam);
+  const officialLineup = extractLineupFromPlayers(advanced.playerStats, homeTeam, awayTeam, snapshots);
   const basicInfo = extractBasicInfo(snapshots);
   const groupLabelValue = groupKey ? `المجموعة ${groupKey}` : null;
   const stageLabelValue = groupKey ? `المجموعة ${groupKey}` : stageLabel(match.stage, null);
@@ -539,3 +548,4 @@ export async function getMatchPageDataFast(matchId: string): Promise<MatchPageDa
     },
   };
 }
+
