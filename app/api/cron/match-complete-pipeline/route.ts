@@ -1,3 +1,4 @@
+
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { hasValidAdminSecret } from '@/lib/adminAuth';
@@ -99,7 +100,7 @@ function hasSnapshotColumnStats(snapshot: any) {
 }
 
 function articleMapRows(rows: any[]) {
-  return new Map(rows.map((row) => [row.matchId, row]));
+  return new Map<string, any>(rows.map((row): [string, any] => [row.matchId, row]));
 }
 
 async function ensurePipelineStateTable() {
@@ -147,7 +148,13 @@ function nextProviderResetDate() {
 }
 
 async function loadArticles(matchIds: string[]) {
-  return new Map<string, any>();
+  if (!matchIds.length) return new Map<string, any>();
+  const rows = await prisma.$queryRawUnsafe<Array<{ matchId: string; slug: string; status: string; infographicImageUrl: string | null }>>(
+    `SELECT "matchId", "slug", "status", "infographicImageUrl" FROM "MatchArticle" WHERE "matchId" = ANY($1::text[]) AND "language" = 'ar'`,
+    matchIds,
+  ).catch(() => []);
+  const entries = rows.map((row) => [row.matchId, row] as [string, any]);
+  return new Map<string, any>(entries);
 }
 
 async function loadMatchCandidates(options: { matchId?: string | null; lookbackDays: number; lookaheadHours: number; take: number }) {
