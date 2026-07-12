@@ -1,3 +1,4 @@
+
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { hasValidAdminSecret } from '@/lib/adminAuth';
@@ -152,7 +153,7 @@ async function loadArticles(matchIds: string[]) {
     `SELECT "matchId", "slug", "status", "infographicImageUrl" FROM "MatchArticle" WHERE "matchId" = ANY($1::text[]) AND "language" = 'ar'`,
     matchIds,
   ).catch(() => []);
-  const entries: Array<[string, any]> = rows.map((row) => [row.matchId, row]);
+  const entries = rows.map((row) => [row.matchId, row] as [string, any]);
   return new Map<string, any>(entries);
 }
 
