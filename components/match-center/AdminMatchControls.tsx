@@ -56,6 +56,8 @@ export default function AdminMatchControls({ matchId }: { matchId: string }) {
       const data = await res.json().catch(() => ({}));
       const heatmaps = Number(data?.counts?.playerHeatmaps || 0);
       const points = Number(data?.counts?.heatmapPoints || 0);
+      const directHeatmaps = Number(data?.heatmapDiagnostics?.directHeatmaps || 0);
+      const derivedHeatmaps = Number(data?.heatmapDiagnostics?.derivedHeatmaps || 0);
       if (!res.ok || !data.ok) {
         setInfographicMessage({ type: 'error', text: String(data.error || 'تعذر جلب بيانات TheStats الكاملة.') });
         return;
@@ -71,11 +73,11 @@ export default function AdminMatchControls({ matchId }: { matchId: string }) {
               ? 'المزود لا يوفّر endpoint الخريطة لهذه المباراة أو هؤلاء اللاعبين.'
               : Number(codes.EMPTY_HEATMAP || 0) > 0
                 ? 'المزود أعاد استجابات ناجحة بلا نقاط تمركز، ما يعني أن التغطية غير متاحة لهذه المباراة.'
-                : 'لم يُرجع المزود نقاط خرائط حرارية صالحة.';
+                : 'لم يُرجع المزود خريطة مباشرة، ولم تتوفر ٦ إحداثيات أحداث موثقة على الأقل لأي لاعب.';
         setInfographicMessage({ type: 'error', text: `${reason} (طُلبت ${Number(diagnostics.requestedPlayers || 0).toLocaleString('ar-EG')} خريطة، المتاح ${heatmaps.toLocaleString('ar-EG')}).` });
         return;
       }
-      setInfographicMessage({ type: 'success', text: `تم حفظ ${heatmaps.toLocaleString('ar-EG')} خريطة حرارية موثقة بإجمالي ${points.toLocaleString('ar-EG')} نقطة.` });
+      setInfographicMessage({ type: 'success', text: `تم حفظ ${heatmaps.toLocaleString('ar-EG')} خريطة حرارية موثقة بإجمالي ${points.toLocaleString('ar-EG')} نقطة (${directHeatmaps.toLocaleString('ar-EG')} مباشرة من المزود، ${derivedHeatmaps.toLocaleString('ar-EG')} مشتقة من أحداث موثقة).` });
       router.refresh();
     } catch {
       setInfographicMessage({ type: 'error', text: 'تعذر الاتصال بالخادم أثناء جلب الخرائط.' });
