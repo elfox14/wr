@@ -27,8 +27,9 @@ export type MatchPlayerStatItem = {
 };
 
 export type HeatmapPoint = { x: number; y: number; count?: number; };
-export type PlayerHeatmap = { playerId: string; playerName?: string; teamId?: string; side?: 'home' | 'away'; points: HeatmapPoint[]; };
-export type TeamHeatmapData = { teamId: string; points: HeatmapPoint[]; };
+export type HeatmapSource = 'PROVIDER_HEATMAP' | 'VERIFIED_ACTION_COORDINATES';
+export type PlayerHeatmap = { playerId: string; playerName?: string; teamId?: string; side?: 'home' | 'away'; source?: HeatmapSource; points: HeatmapPoint[]; };
+export type TeamHeatmapData = { teamId: string; source?: HeatmapSource; points: HeatmapPoint[]; };
 export type MatchMomentumPoint = { minute: number; home: number; away: number; source: 'PROVIDER' | 'DERIVED_FROM_VERIFIED_SHOTS'; sampleSize: number; };
 
 export type MatchAdvancedData = {
