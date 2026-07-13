@@ -7,6 +7,7 @@ const logoSrc = '/brand/borsa-mondial-sport-logo-icon.svg?v=20260616sport';
 const links = [
   ['/', 'الرئيسية'],
   ['/matches', 'المباريات'],
+  ['/articles', 'المقالات'],
   ['/groups', 'المجموعات'],
   ['/teams', 'المنتخبات'],
   ['/players', 'اللاعبون'],
