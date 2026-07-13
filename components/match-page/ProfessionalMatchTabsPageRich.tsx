@@ -176,7 +176,7 @@ function getTeamHeatmapPoints(isHome: boolean, d: MatchPageData) {
 
 
 function PostMatchCoverage({ d, compact = false }: { d: MatchPageData; compact?: boolean }) {
-  const { article, infographic } = d.postMatchContent;
+  const { article, infographic } = d.postMatchContent || { article: null, infographic: null };
   if (!article && !infographic) return null;
   return (
     <Box title="تغطية ما بعد المباراة" hint="لا يظهر هنا إلا المحتوى الذي اكتملت مراجعته واعتماده.">
@@ -488,7 +488,7 @@ function Group({ d }: { d: MatchPageData }) {
 }
 
 function Articles({ d }: { d: MatchPageData }) {
-  const hasApprovedCoverage = Boolean(d.postMatchContent.article || d.postMatchContent.infographic);
+  const hasApprovedCoverage = Boolean(d.postMatchContent?.article || d.postMatchContent?.infographic);
   return (
     <div className="space-y-4">
       {hasApprovedCoverage ? <PostMatchCoverage d={d} /> : (
