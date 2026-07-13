@@ -267,7 +267,8 @@ export async function collectTheStatsMatchExtras(match: any, options: { dryRun?:
   const failureCodes = heatmapFailures.reduce((counts: Record<string, number>, failure: any) => { const code = String(failure.code || failure.status || 'UNKNOWN'); counts[code] = (counts[code] || 0) + 1; return counts; }, {});
   const directHeatmaps = playerHeatmaps.filter((heatmap: any) => heatmap.source === 'PROVIDER_HEATMAP').length;
   const derivedHeatmaps = playerHeatmaps.filter((heatmap: any) => heatmap.source === 'VERIFIED_ACTION_COORDINATES').length;
-  const heatmapMeta = { source: derivedHeatmaps ? 'MIXED_VERIFIED_COORDINATES' : 'THE_STATS_API_PLAYER_HEATMAP', requestedPlayers: requestedHeatmapPlayers, availablePlayers: playerHeatmaps.length, directHeatmaps, derivedHeatmaps, failedPlayers: heatmapFailures.length, pointCount: heatmapPointCount, verifiedCoordinates: true, failureCodes };
+  const heatmapSource = directHeatmaps > 0 && derivedHeatmaps > 0 ? 'MIXED_VERIFIED_COORDINATES' : derivedHeatmaps > 0 ? 'VERIFIED_ACTION_COORDINATES' : 'THE_STATS_API_PLAYER_HEATMAP';
+  const heatmapMeta = { source: heatmapSource, requestedPlayers: requestedHeatmapPlayers, availablePlayers: playerHeatmaps.length, directHeatmaps, derivedHeatmaps, failedPlayers: heatmapFailures.length, pointCount: heatmapPointCount, verifiedCoordinates: true, failureCodes };
   const normalized = { matchInfo: compactMatchInfo(byKey.matchInfo?.payload, byKey.stats?.payload), liveStats: stats, lineups: byKey.lineups?.ok ? dataOf(byKey.lineups.payload) : null, eventsDetailed: { all: events }, shotmap, playerStats, playerHeatmaps, teamHeatmaps, heatmapMeta };
   const endpointSummaries = results.map((item) => ({ key: item.key, path: item.path, ok: item.ok, error: item.ok ? null : item.error, keySummary: item.ok ? null : item.error?.message || null }));
   let snapshotId: string | null = null;
