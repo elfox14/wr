@@ -2,7 +2,7 @@
 
 import React from 'react';
 import TeamHeatmap from './TeamHeatmap';
-import type { HeatmapPoint, MatchPlayerStatItem } from '@/lib/match-page/types';
+import type { HeatmapPoint, HeatmapSource, MatchPlayerStatItem } from '@/lib/match-page/types';
 
 interface PlayerHeatmapModalProps {
   isOpen: boolean;
@@ -11,6 +11,7 @@ interface PlayerHeatmapModalProps {
   playerImage?: string | null;
   isHome: boolean;
   points?: HeatmapPoint[];
+  heatmapSource?: HeatmapSource;
   stats?: MatchPlayerStatItem | null;
 }
 
@@ -31,7 +32,7 @@ function displayValue(value: unknown) {
   return Number.isInteger(value) ? value.toLocaleString('ar-EG') : value.toLocaleString('ar-EG', { maximumFractionDigits: 2 });
 }
 
-export default function PlayerHeatmapModal({ isOpen, onClose, playerName, playerImage, isHome, points = [], stats }: PlayerHeatmapModalProps) {
+export default function PlayerHeatmapModal({ isOpen, onClose, playerName, playerImage, isHome, points = [], heatmapSource, stats }: PlayerHeatmapModalProps) {
   if (!isOpen) return null;
   const availableStats = stats
     ? STAT_DEFINITIONS.map(([key, label]) => ({ key, label, value: stats[key] })).filter((item) => item.value !== null && item.value !== undefined && item.value !== '')
@@ -64,8 +65,8 @@ export default function PlayerHeatmapModal({ isOpen, onClose, playerName, player
             <h4 className="text-sm font-black text-white">الخريطة الحرارية الموثقة</h4>
             {points.length ? (
               <>
-                <div className="mt-4 flex justify-center"><TeamHeatmap teamName="" isHome={isHome} points={points} /></div>
-                <p className="mt-3 text-center text-[11px] font-bold leading-5 text-white/45">تعتمد الخريطة على {points.length.toLocaleString('ar-EG')} نقطة تمركز محفوظة لهذا اللاعب.</p>
+                <div className="mt-4 flex justify-center"><TeamHeatmap teamName="" isHome={isHome} points={points} source={heatmapSource} /></div>
+                <p className="mt-3 text-center text-[11px] font-bold leading-5 text-white/45">تعتمد الخريطة على {points.length.toLocaleString('ar-EG')} إحداثية {heatmapSource === 'VERIFIED_ACTION_COORDINATES' ? 'مستخرجة من أحداث اللاعب الموثقة' : heatmapSource === 'PROVIDER_HEATMAP' ? 'مرسلة مباشرة من المزود' : 'موثقة'} لهذا اللاعب.</p>
               </>
             ) : (
               <div className="mt-4 rounded-xl border border-dashed border-white/10 p-8 text-center text-xs font-bold text-slate-500">لم تصل نقاط خريطة حرارية موثقة لهذا اللاعب، لذلك لا نعرض خريطة تقديرية.</div>
