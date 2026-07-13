@@ -396,7 +396,7 @@ function enrichEventsWithPlayers(events: MatchEventView[], players: MatchPlayerS
   });
 }
 
-function normalizePlayerHeatmaps(value: any, players: MatchPlayerStatItem[], homeTeam: MatchTeamLite, awayTeam: MatchTeamLite) {
+export function normalizePlayerHeatmaps(value: any, players: MatchPlayerStatItem[], homeTeam: MatchTeamLite, awayTeam: MatchTeamLite) {
   const rows = asList(value);
   return rows.map((row: any) => {
     const playerId = cleanText(row?.playerId || row?.player_id || row?.player?.id);
