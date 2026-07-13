@@ -21,7 +21,7 @@ const tabs: { id: Tab; label: string }[] = [
   { id: 'lineups', label: 'التشكيلات' },
   { id: 'analysis', label: 'التحليل' },
   { id: 'group', label: 'المجموعة' },
-  { id: 'articles', label: 'المقالات' },
+  { id: 'articles', label: 'بعد المباراة' },
 ];
 
 function f(v: any, s = '') { 
@@ -175,6 +175,40 @@ function getTeamHeatmapPoints(isHome: boolean, d: MatchPageData) {
 }
 
 
+function PostMatchCoverage({ d, compact = false }: { d: MatchPageData; compact?: boolean }) {
+  const { article, infographic } = d.postMatchContent;
+  if (!article && !infographic) return null;
+  return (
+    <Box title="تغطية ما بعد المباراة" hint="لا يظهر هنا إلا المحتوى الذي اكتملت مراجعته واعتماده.">
+      <div className={`grid gap-3 ${article && infographic ? 'lg:grid-cols-2' : ''}`}>
+        {article && (
+          <a href={`/articles/${article.slug}`} className="group flex flex-col justify-between rounded-3xl border border-[#18E58F]/20 bg-gradient-to-br from-[#18E58F]/10 to-transparent p-5 transition hover:-translate-y-0.5 hover:border-[#18E58F]/40">
+            <div>
+              <span className="rounded-full bg-[#18E58F]/10 px-3 py-1 text-[10px] font-black text-[#18E58F]">المقال التحليلي المعتمد</span>
+              <h3 className="mt-4 text-xl font-black leading-8 text-white group-hover:text-[#18E58F]">{article.title}</h3>
+              {!compact && <p className="mt-3 line-clamp-3 text-sm font-bold leading-7 text-slate-400">{article.excerpt}</p>}
+            </div>
+            <span className="mt-5 text-sm font-black text-[#18E58F]">اقرأ التحليل الكامل ←</span>
+          </a>
+        )}
+        {infographic && (
+          <a href={infographic.href} className="group relative min-h-52 overflow-hidden rounded-3xl border border-[#F8C846]/20 bg-[#08140f] p-5 transition hover:-translate-y-0.5 hover:border-[#F8C846]/40">
+            <div className="absolute inset-0 opacity-40" style={{ backgroundImage: 'linear-gradient(rgba(248,200,70,.08) 1px, transparent 1px), linear-gradient(90deg, rgba(15,240,252,.08) 1px, transparent 1px)', backgroundSize: '28px 28px' }} />
+            <div className="relative flex h-full flex-col justify-between">
+              <div>
+                <span className="rounded-full bg-[#F8C846]/10 px-3 py-1 text-[10px] font-black text-[#F8C846]">الإنفوجرافيك المعتمد</span>
+                <h3 className="mt-4 text-2xl font-black text-white">قصة المباراة بالأرقام</h3>
+                <p className="mt-2 text-xs font-bold leading-6 text-slate-400">الزخم، xG، المقارنات، خرائط التمركز وأعلى اللاعبين تقييمًا من البيانات الموثقة.</p>
+              </div>
+              <span className="mt-5 text-sm font-black text-[#F8C846]">افتح الإنفوجرافيك ←</span>
+            </div>
+          </a>
+        )}
+      </div>
+    </Box>
+  );
+}
+
 function Overview({ d }: { d: MatchPageData }) { 
   const rows = d.stats.filter((m) => m.available); 
   const homeHeatmapPoints = getTeamHeatmapPoints(true, d);
@@ -201,6 +235,7 @@ function Overview({ d }: { d: MatchPageData }) {
           ))}
         </div>
       </Box>
+      <PostMatchCoverage d={d} compact />
     </div>
   ); 
 }
@@ -452,16 +487,24 @@ function Group({ d }: { d: MatchPageData }) {
   ); 
 }
 
-function Articles({ d }: { d: MatchPageData }) { 
+function Articles({ d }: { d: MatchPageData }) {
+  const hasApprovedCoverage = Boolean(d.postMatchContent.article || d.postMatchContent.infographic);
   return (
-    <Box title="المقالات والأخبار">
-      {d.relatedArticles.map((a) => (
-        <a key={a.id} href={a.href} className="block rounded-xl border border-white/10 p-3 mb-2 hover:bg-white/5 transition">
-          {a.title}
-        </a>
-      ))}
-    </Box>
-  ); 
+    <div className="space-y-4">
+      {hasApprovedCoverage ? <PostMatchCoverage d={d} /> : (
+        <Box title="تغطية ما بعد المباراة">
+          <div className="rounded-2xl border border-dashed border-white/10 bg-black/20 p-10 text-center text-sm font-bold text-slate-500">لم يتم نشر مقال أو اعتماد إنفوجرافيك لهذه المباراة بعد.</div>
+        </Box>
+      )}
+      {d.relatedArticles.length > 0 && (
+        <Box title="أخبار مرتبطة">
+          <div className="grid gap-2">
+            {d.relatedArticles.map((article) => <a key={article.id} href={article.href} className="rounded-xl border border-white/10 p-3 font-bold transition hover:bg-white/5">{article.title}</a>)}
+          </div>
+        </Box>
+      )}
+    </div>
+  );
 }
 
 export default function ProfessionalMatchTabsPageRich({ data }: { data: MatchPageData }) { 
