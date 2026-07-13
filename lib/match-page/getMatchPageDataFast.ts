@@ -416,7 +416,7 @@ export function normalizePlayerHeatmaps(value: any, players: MatchPlayerStatItem
       playerName: playerName || player?.playerName || undefined,
       teamId: player?.teamId || cleanText(row?.teamId || row?.team_id) || undefined,
       side,
-      source: row?.source === 'VERIFIED_ACTION_COORDINATES' ? 'VERIFIED_ACTION_COORDINATES' : 'PROVIDER_HEATMAP',
+      source: row?.source === 'VERIFIED_ACTION_COORDINATES' ? 'VERIFIED_ACTION_COORDINATES' as const : 'PROVIDER_HEATMAP' as const,
       points,
     } : null;
   }).filter(Boolean);
