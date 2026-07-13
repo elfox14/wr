@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildVerifiedMomentum, normalizePlayerStat } from './getMatchPageDataFast';
+import { approvedPostMatchContent, buildVerifiedMomentum, normalizePlayerStat } from './getMatchPageDataFast';
 
 const home = { id: 'home', name: 'Home', code: 'HOM' } as any;
 const away = { id: 'away', name: 'Away', code: 'AWY' } as any;
@@ -65,5 +65,48 @@ describe('verified match momentum', () => {
       { minute: 5, home: 4, away: 2, source: 'PROVIDER', sampleSize: 1 },
       { minute: 10, home: 1, away: 5, source: 'PROVIDER', sampleSize: 1 },
     ]);
+  });
+});
+
+
+describe('approved post-match coverage', () => {
+  const article = {
+    id: 'article-1',
+    title: 'تحليل المباراة',
+    excerpt: 'قراءة فنية موثقة',
+    slug: 'match-analysis-1',
+    publishedAt: new Date('2026-07-14T10:00:00Z'),
+  };
+
+  it('hides an infographic draft while keeping a published article visible', () => {
+    const coverage = approvedPostMatchContent('match-1', {
+      version: 2,
+      status: 'DRAFT_READY',
+      source: { snapshotId: 'snapshot-1' },
+    }, [article]);
+
+    expect(coverage.article?.slug).toBe('match-analysis-1');
+    expect(coverage.infographic).toBeNull();
+  });
+
+  it('exposes only an approved infographic bound to a source snapshot', () => {
+    const coverage = approvedPostMatchContent('match-1', {
+      version: 2,
+      status: 'APPROVED',
+      approvedAt: '2026-07-14T11:00:00Z',
+      source: { snapshotId: 'snapshot-1' },
+    }, []);
+
+    expect(coverage.article).toBeNull();
+    expect(coverage.infographic).toEqual({
+      href: '/match-center/match-1/infographic',
+      approvedAt: '2026-07-14T11:00:00.000Z',
+      sourceSnapshotId: 'snapshot-1',
+    });
+  });
+
+  it('rejects legacy or source-less infographic payloads', () => {
+    expect(approvedPostMatchContent('match-1', { status: 'APPROVED', approvedAt: '2026-07-14T11:00:00Z' }, []).infographic).toBeNull();
+    expect(approvedPostMatchContent('match-1', { version: 2, status: 'APPROVED', approvedAt: '2026-07-14T11:00:00Z' }, []).infographic).toBeNull();
   });
 });
