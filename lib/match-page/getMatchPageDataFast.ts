@@ -589,7 +589,7 @@ function buildTacticalKeys(homeName: string, awayName: string, statsAvailable: b
   return keys.slice(0, 4);
 }
 
-function approvedPostMatchContent(matchId: string, infographicValue: unknown, articleRows: any[]) {
+export function approvedPostMatchContent(matchId: string, infographicValue: unknown, articleRows: any[]) {
   const info = infographicValue && typeof infographicValue === 'object' && !Array.isArray(infographicValue)
     ? infographicValue as Record<string, any>
     : null;
