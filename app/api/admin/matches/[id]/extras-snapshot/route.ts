@@ -49,6 +49,7 @@ async function run(req: Request, matchId: string) {
     saved: result.saved,
     snapshotId: result.snapshotId,
     counts: result.counts,
+    heatmapDiagnostics: result.heatmapDiagnostics,
     endpointsOk: result.endpointsOk,
     endpointsFailed: result.endpointsFailed,
     rateLimited: result.rateLimited,

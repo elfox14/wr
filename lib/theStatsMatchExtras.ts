@@ -182,6 +182,7 @@ export async function collectTheStatsMatchExtras(match: any, options: { dryRun?:
   const playerStats = byKey.playerStats?.ok ? listFrom(byKey.playerStats.payload, ['data', 'players', 'player_stats', 'items', 'results']).map(compactPlayerStat) : [];
 
   const playerHeatmaps: any[] = [];
+  const heatmapFailures: any[] = [];
   const teamHeatmaps: any = { home: { points: [] }, away: { points: [] } };
 
   if (mode === 'full') {
@@ -210,31 +211,34 @@ export async function collectTheStatsMatchExtras(match: any, options: { dryRun?:
              teamHeatmaps.away.points.push(...points);
           }
 
-          return {
+          return { ok: true, heatmap: {
             playerId: p.playerId,
             playerName: p.playerName,
             teamId: p.teamId,
             side,
             points
-          };
+          } };
         }
+        return { ok: false, failure: { playerId: p.playerId, playerName: p.playerName, status: 200, code: 'EMPTY_HEATMAP', message: 'The provider returned no valid heatmap points.' } };
       } catch (err: any) {
-        // Ignore 404 or other errors for individual players
+        const failure = safeError(err);
+        return { ok: false, failure: { playerId: p.playerId, playerName: p.playerName, status: failure.status, code: failure.code || 'HEATMAP_REQUEST_FAILED', message: failure.message } };
       }
-      return null;
     });
 
     const heatmapsResult = await Promise.allSettled(heatmapPromises);
-    heatmapsResult.forEach(res => {
-      if (res.status === 'fulfilled' && res.value) {
-        playerHeatmaps.push(res.value);
-      }
+    heatmapsResult.forEach((res) => {
+      if (res.status === 'fulfilled' && res.value?.ok && res.value.heatmap) playerHeatmaps.push(res.value.heatmap);
+      else if (res.status === 'fulfilled' && res.value?.failure) heatmapFailures.push(res.value.failure);
+      else if (res.status === 'rejected') heatmapFailures.push({ status: null, code: 'HEATMAP_PROMISE_REJECTED', message: String(res.reason || 'Unknown heatmap error') });
     });
 
   }
 
   const heatmapPointCount = playerHeatmaps.reduce((total: number, heatmap: any) => total + (Array.isArray(heatmap.points) ? heatmap.points.length : 0), 0);
-  const heatmapMeta = { source: 'THE_STATS_API_PLAYER_HEATMAP', requestedPlayers: mode === 'full' ? playerStats.filter((p: any) => p.playerId && (p.started === true || p.played === true || (p.minutes !== null && p.minutes > 0))).length : 0, availablePlayers: playerHeatmaps.length, pointCount: heatmapPointCount, verifiedCoordinates: true };
+  const requestedHeatmapPlayers = mode === 'full' ? playerStats.filter((p: any) => p.playerId && (p.started === true || p.played === true || (p.minutes !== null && p.minutes > 0))).length : 0;
+  const failureCodes = heatmapFailures.reduce((counts: Record<string, number>, failure: any) => { const code = String(failure.code || failure.status || 'UNKNOWN'); counts[code] = (counts[code] || 0) + 1; return counts; }, {});
+  const heatmapMeta = { source: 'THE_STATS_API_PLAYER_HEATMAP', requestedPlayers: requestedHeatmapPlayers, availablePlayers: playerHeatmaps.length, failedPlayers: heatmapFailures.length, pointCount: heatmapPointCount, verifiedCoordinates: true, failureCodes };
   const normalized = { matchInfo: compactMatchInfo(byKey.matchInfo?.payload, byKey.stats?.payload), liveStats: stats, lineups: byKey.lineups?.ok ? dataOf(byKey.lineups.payload) : null, eventsDetailed: { all: events }, shotmap, playerStats, playerHeatmaps, teamHeatmaps, heatmapMeta };
   const endpointSummaries = results.map((item) => ({ key: item.key, path: item.path, ok: item.ok, error: item.ok ? null : item.error, keySummary: item.ok ? null : item.error?.message || null }));
   let snapshotId: string | null = null;
@@ -246,5 +250,5 @@ export async function collectTheStatsMatchExtras(match: any, options: { dryRun?:
     snapshotId = snapshot.id;
   }
   const rateLimited = results.some((item) => Number(item.error?.status) === 429);
-  return { ok: useful, matchId: match.id, endpointMode: mode, resolvedProviderMatchId: resolved.id, resolvedBy: resolved.by, rateLimited, endpointsOk: results.filter((item) => item.ok).map((item) => item.key), endpointsFailed: results.filter((item) => !item.ok).map((item) => ({ key: item.key, status: item.error?.status, code: item.error?.code, message: item.error?.message })), counts: { stats: Object.keys(stats.stats || {}).length, detailedEvents: events.length, shots: shotmap.length, playerStats: playerStats.length, lineups: normalized.lineups ? 1 : 0, playerHeatmaps: playerHeatmaps.length, heatmapPoints: heatmapPointCount }, matchInfo: normalized.matchInfo, saved: Boolean(snapshotId), snapshotId, debug: { endpointSummaries, normalizedPreview: normalized, endpoints: includeRaw ? Object.fromEntries(results.map((item) => [item.key, item])) : undefined } };
+  return { ok: useful, matchId: match.id, endpointMode: mode, resolvedProviderMatchId: resolved.id, resolvedBy: resolved.by, rateLimited, heatmapDiagnostics: { ...heatmapMeta, failures: heatmapFailures.slice(0, 12) }, endpointsOk: results.filter((item) => item.ok).map((item) => item.key), endpointsFailed: results.filter((item) => !item.ok).map((item) => ({ key: item.key, status: item.error?.status, code: item.error?.code, message: item.error?.message })), counts: { stats: Object.keys(stats.stats || {}).length, detailedEvents: events.length, shots: shotmap.length, playerStats: playerStats.length, lineups: normalized.lineups ? 1 : 0, playerHeatmaps: playerHeatmaps.length, heatmapPoints: heatmapPointCount }, matchInfo: normalized.matchInfo, saved: Boolean(snapshotId), snapshotId, debug: { endpointSummaries, normalizedPreview: normalized, endpoints: includeRaw ? Object.fromEntries(results.map((item) => [item.key, item])) : undefined } };
 }

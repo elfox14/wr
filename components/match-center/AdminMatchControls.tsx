@@ -61,7 +61,18 @@ export default function AdminMatchControls({ matchId }: { matchId: string }) {
         return;
       }
       if (!heatmaps || !points) {
-        setInfographicMessage({ type: 'error', text: 'تم تحديث المباراة، لكن المزود لم يُرجع خرائط حرارية للاعبين المشاركين.' });
+        const diagnostics = data?.heatmapDiagnostics || {};
+        const codes = diagnostics.failureCodes || {};
+        const reason = Number(diagnostics.requestedPlayers || 0) === 0
+          ? 'لم نجد معرفات لاعبين مشاركين صالحة لطلب الخرائط.'
+          : Number(codes['429'] || codes.RATE_LIMITED || 0) > 0
+            ? 'وصل المزود إلى حد الطلبات. أعد المحاولة بعد فترة.'
+            : Number(codes['404'] || codes.NOT_FOUND || 0) > 0
+              ? 'المزود لا يوفّر endpoint الخريطة لهذه المباراة أو هؤلاء اللاعبين.'
+              : Number(codes.EMPTY_HEATMAP || 0) > 0
+                ? 'المزود أعاد استجابات ناجحة بلا نقاط تمركز، ما يعني أن التغطية غير متاحة لهذه المباراة.'
+                : 'لم يُرجع المزود نقاط خرائط حرارية صالحة.';
+        setInfographicMessage({ type: 'error', text: `${reason} (طُلبت ${Number(diagnostics.requestedPlayers || 0).toLocaleString('ar-EG')} خريطة، المتاح ${heatmaps.toLocaleString('ar-EG')}).` });
         return;
       }
       setInfographicMessage({ type: 'success', text: `تم حفظ ${heatmaps.toLocaleString('ar-EG')} خريطة حرارية موثقة بإجمالي ${points.toLocaleString('ar-EG')} نقطة.` });
