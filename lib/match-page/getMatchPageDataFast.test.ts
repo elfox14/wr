@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { approvedPostMatchContent, buildVerifiedMomentum, normalizePlayerStat } from './getMatchPageDataFast';
+import { approvedPostMatchContent, buildVerifiedMomentum, normalizePlayerHeatmaps, normalizePlayerStat } from './getMatchPageDataFast';
 
 const home = { id: 'home', name: 'Home', code: 'HOM' } as any;
 const away = { id: 'away', name: 'Away', code: 'AWY' } as any;
@@ -35,6 +35,34 @@ describe('verified match player normalization', () => {
     expect(player?.accurateLongBalls).toBe(5);
     expect(player?.duelWon).toBe(7);
     expect(player?.possessionLost).toBe(9);
+  });
+});
+
+describe('verified player heatmaps', () => {
+  it('preserves action-derived provenance and removes invalid coordinates', () => {
+    const heatmaps = normalizePlayerHeatmaps([{
+      playerId: 'p1',
+      playerName: 'Verified Player',
+      source: 'VERIFIED_ACTION_COORDINATES',
+      points: [{ x: 24, y: 67 }, { x: -1, y: 50 }, { x: 30, y: 101 }],
+    }], [{ playerId: 'p1', playerName: 'Verified Player', teamId: 'home' }] as any, home, away);
+
+    expect(heatmaps).toEqual([expect.objectContaining({
+      playerId: 'p1',
+      side: 'home',
+      source: 'VERIFIED_ACTION_COORDINATES',
+      points: [{ x: 24, y: 67, count: undefined }],
+    })]);
+  });
+
+  it('labels direct provider heatmaps separately', () => {
+    const heatmaps = normalizePlayerHeatmaps([{
+      playerId: 'p2',
+      source: 'PROVIDER_HEATMAP',
+      points: [{ x: 50, y: 50, count: 3 }],
+    }], [{ playerId: 'p2', playerName: 'Direct Player', teamId: 'away' }] as any, home, away);
+
+    expect(heatmaps[0]).toEqual(expect.objectContaining({ side: 'away', source: 'PROVIDER_HEATMAP' }));
   });
 });
 

@@ -139,8 +139,8 @@ export default function InfographicClient({ matchData, info, isPreview = false }
             <section className="mt-5 rounded-[2rem] border border-white/10 bg-white/[0.035] p-5 sm:p-7">
               <div><h3 className="text-xl font-black">الخريطة الحرارية الموثقة</h3><p className="mt-1 text-[11px] font-bold text-slate-500">خرائط مجمعة من نقاط اللاعبين الفعلية فقط</p></div>
               <div className="mt-5 grid gap-5 sm:grid-cols-2">
-                {homeHeatmapPoints.length > 0 && <div className="flex justify-center"><TeamHeatmap teamName={matchData.homeTeam.name} isHome points={homeHeatmapPoints} /></div>}
-                {awayHeatmapPoints.length > 0 && <div className="flex justify-center"><TeamHeatmap teamName={matchData.awayTeam.name} isHome={false} points={awayHeatmapPoints} /></div>}
+                {homeHeatmapPoints.length > 0 && <div className="flex justify-center"><TeamHeatmap teamName={matchData.homeTeam.name} isHome points={homeHeatmapPoints} source={matchData.advanced.teamHeatmaps?.home?.source} /></div>}
+                {awayHeatmapPoints.length > 0 && <div className="flex justify-center"><TeamHeatmap teamName={matchData.awayTeam.name} isHome={false} points={awayHeatmapPoints} source={matchData.advanced.teamHeatmaps?.away?.source} /></div>}
               </div>
             </section>
           )}

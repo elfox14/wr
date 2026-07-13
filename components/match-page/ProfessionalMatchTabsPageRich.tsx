@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import type { HeatmapPoint } from '@/lib/match-page/types';
+import type { HeatmapPoint, HeatmapSource } from '@/lib/match-page/types';
 import MatchAutoRefresh from '@/components/match-center/MatchAutoRefresh';
 import { getArabicTeamName } from '@/lib/teamDisplay';
 import { getTeamFlagUrl } from '@/lib/teamFlags';
@@ -219,10 +219,10 @@ function Overview({ d }: { d: MatchPageData }) {
     <div className="space-y-4">
       {/* Verified heatmaps only */}
       {hasVerifiedHeatmaps && (
-        <Box title="الخريطة الحرارية الموثقة" hint="نقاط تمركز محفوظة من مزود البيانات؛ لا توجد نقاط تقديرية.">
+        <Box title="الخريطة الحرارية الموثقة" hint="إحداثيات مباشرة من المزود أو مشتقة من أحداث مكانية موثقة؛ لا توجد نقاط تقديرية.">
           <div className="flex justify-center gap-4">
-            {homeHeatmapPoints.length > 0 && <div className="w-1/2 max-w-[200px]"><TeamHeatmap teamName={tn(d.homeTeam)} isHome={true} points={homeHeatmapPoints} /></div>}
-            {awayHeatmapPoints.length > 0 && <div className="w-1/2 max-w-[200px]"><TeamHeatmap teamName={tn(d.awayTeam)} isHome={false} points={awayHeatmapPoints} /></div>}
+            {homeHeatmapPoints.length > 0 && <div className="w-1/2 max-w-[200px]"><TeamHeatmap teamName={tn(d.homeTeam)} isHome={true} points={homeHeatmapPoints} source={d.advanced.teamHeatmaps?.home?.source} /></div>}
+            {awayHeatmapPoints.length > 0 && <div className="w-1/2 max-w-[200px]"><TeamHeatmap teamName={tn(d.awayTeam)} isHome={false} points={awayHeatmapPoints} source={d.advanced.teamHeatmaps?.away?.source} /></div>}
           </div>
         </Box>
       )}
@@ -336,11 +336,12 @@ function groupPlayersByLine(players: any[]) {
   return [gks, defs, mids, fwds];
 }
 
-function PitchPlayer({ p, isHome, color, d, onHeatmap }: { p: MatchPlayerStatItem, isHome: boolean, color: string, d: MatchPageData, onHeatmap: (name: string, image: string | null | undefined, isHome: boolean, points: HeatmapPoint[], stats: MatchPlayerStatItem) => void }) {
-  const heatmapPoints = d.advanced.playerHeatmaps?.find((h:any) => h.playerId === p.playerId || h.playerName === p.playerName)?.points || [];
+function PitchPlayer({ p, isHome, color, d, onHeatmap }: { p: MatchPlayerStatItem, isHome: boolean, color: string, d: MatchPageData, onHeatmap: (name: string, image: string | null | undefined, isHome: boolean, points: HeatmapPoint[], source: HeatmapSource | undefined, stats: MatchPlayerStatItem) => void }) {
+  const heatmap = d.advanced.playerHeatmaps?.find((h:any) => h.playerId === p.playerId || h.playerName === p.playerName);
+  const heatmapPoints = heatmap?.points || [];
   const hasVerifiedHeatmap = heatmapPoints.length > 0;
   return (
-    <button type="button" className="group relative flex cursor-pointer flex-col items-center transition-transform hover:scale-110" onClick={() => onHeatmap(p.playerName || '', p.image, isHome, heatmapPoints, p)} aria-label={`عرض إحصاءات ${p.playerName || 'اللاعب'}${hasVerifiedHeatmap ? ' وخريطته الحرارية' : ''}`}>
+    <button type="button" className="group relative flex cursor-pointer flex-col items-center transition-transform hover:scale-110" onClick={() => onHeatmap(p.playerName || '', p.image, isHome, heatmapPoints, heatmap?.source, p)} aria-label={`عرض إحصاءات ${p.playerName || 'اللاعب'}${hasVerifiedHeatmap ? ' وخريطته الحرارية' : ''}`}>
        <div className="relative">
           <div className="w-8 h-8 md:w-10 md:h-10 border-2 shadow-lg bg-black/50 rounded-full flex items-center justify-center overflow-hidden" style={{ borderColor: color }}>
              <Avatar name={p.playerName} image={p.image} number={p.number} />
@@ -356,7 +357,7 @@ function PitchPlayer({ p, isHome, color, d, onHeatmap }: { p: MatchPlayerStatIte
 }
 
 
-function Lineups({ d, onHeatmap }: { d: MatchPageData, onHeatmap: (name: string, img: string|null|undefined, isHome: boolean, points: HeatmapPoint[], stats: MatchPlayerStatItem) => void }) { 
+function Lineups({ d, onHeatmap }: { d: MatchPageData, onHeatmap: (name: string, img: string|null|undefined, isHome: boolean, points: HeatmapPoint[], source: HeatmapSource | undefined, stats: MatchPlayerStatItem) => void }) { 
   const allStats = d.advanced.playerStats || [];
   const homeStats = allStats.filter((player) => playerSide(player, d) === 'home');
   const awayStats = allStats.filter((player) => playerSide(player, d) === 'away');
@@ -423,8 +424,8 @@ function Lineups({ d, onHeatmap }: { d: MatchPageData, onHeatmap: (name: string,
       {/* Verified team heatmaps only */}
       {(homeHeatmapPoints.length > 0 || awayHeatmapPoints.length > 0) && (
         <div className="w-full grid md:grid-cols-2 gap-4 mt-8">
-          {homeHeatmapPoints.length > 0 && <Box title={`تمركز ${tn(d.homeTeam)}`}><TeamHeatmap teamName="" isHome={true} points={homeHeatmapPoints} /></Box>}
-          {awayHeatmapPoints.length > 0 && <Box title={`تمركز ${tn(d.awayTeam)}`}><TeamHeatmap teamName="" isHome={false} points={awayHeatmapPoints} /></Box>}
+          {homeHeatmapPoints.length > 0 && <Box title={`تمركز ${tn(d.homeTeam)}`}><TeamHeatmap teamName="" isHome={true} points={homeHeatmapPoints} source={d.advanced.teamHeatmaps?.home?.source} /></Box>}
+          {awayHeatmapPoints.length > 0 && <Box title={`تمركز ${tn(d.awayTeam)}`}><TeamHeatmap teamName="" isHome={false} points={awayHeatmapPoints} source={d.advanced.teamHeatmaps?.away?.source} /></Box>}
         </div>
       )}
     </div>
@@ -511,10 +512,10 @@ export default function ProfessionalMatchTabsPageRich({ data }: { data: MatchPag
   const [tab, setTab] = useState<Tab>('overview'); 
   const events = useMemo(() => data.events || [], [data.events]); 
   
-  const [heatmapModal, setHeatmapModal] = useState<{isOpen: boolean, name: string, img?: string|null, isHome: boolean, points: HeatmapPoint[], stats: MatchPlayerStatItem | null}>({ isOpen: false, name: '', isHome: true, points: [], stats: null });
+  const [heatmapModal, setHeatmapModal] = useState<{isOpen: boolean, name: string, img?: string|null, isHome: boolean, points: HeatmapPoint[], source?: HeatmapSource, stats: MatchPlayerStatItem | null}>({ isOpen: false, name: '', isHome: true, points: [], stats: null });
 
-  const openHeatmap = (name: string, img: string|null|undefined, isHome: boolean, points: HeatmapPoint[], stats: MatchPlayerStatItem) => {
-     setHeatmapModal({ isOpen: true, name, img, isHome, points, stats });
+  const openHeatmap = (name: string, img: string|null|undefined, isHome: boolean, points: HeatmapPoint[], source: HeatmapSource | undefined, stats: MatchPlayerStatItem) => {
+     setHeatmapModal({ isOpen: true, name, img, isHome, points, source, stats });
   };
 
   return (
@@ -551,6 +552,7 @@ export default function ProfessionalMatchTabsPageRich({ data }: { data: MatchPag
          playerImage={heatmapModal.img}
          isHome={heatmapModal.isHome}
          points={heatmapModal.points}
+         heatmapSource={heatmapModal.source}
          stats={heatmapModal.stats}
       />
     </main>
