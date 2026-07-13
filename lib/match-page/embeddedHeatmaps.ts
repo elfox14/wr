@@ -66,7 +66,7 @@ export function extractEmbeddedProviderHeatmaps(payload: any, sourceEndpoint: Em
   const seenObjects = new WeakSet<object>();
   const seenPlayers = new Set<string>();
 
-  function visit(value: any, context: { side?: 'home' | 'away' } = {}, depth = 0) {
+  function visit(value: any, context: { side?: 'home' | 'away'; playerId?: string | null; playerName?: string | null; teamId?: string | null; teamName?: string | null } = {}, depth = 0) {
     if (!value || typeof value !== 'object' || depth > 10) return;
     if (seenObjects.has(value)) return;
     seenObjects.add(value);
@@ -76,7 +76,13 @@ export function extractEmbeddedProviderHeatmaps(payload: any, sourceEndpoint: Em
       return;
     }
 
-    const player = identity(value);
+    const current = identity(value);
+    const player = {
+      playerId: current.playerId || context.playerId || null,
+      playerName: current.playerName || context.playerName || null,
+      teamId: current.teamId || context.teamId || null,
+      teamName: current.teamName || context.teamName || null,
+    };
     for (const field of HEATMAP_FIELDS) {
       if (!(field in value)) continue;
       const points = pointArray(value[field]);
@@ -94,7 +100,7 @@ export function extractEmbeddedProviderHeatmaps(payload: any, sourceEndpoint: Em
         : /^(away|away_team|awayTeam)$/i.test(field)
           ? 'away'
           : context.side;
-      visit(child, { side }, depth + 1);
+      visit(child, { ...player, side }, depth + 1);
     }
   }
 
