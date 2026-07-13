@@ -31,6 +31,7 @@ function sleep(ms: number) { return new Promise((resolve) => setTimeout(resolve,
 function dataOf(payload: any) { return payload?.data || payload?.response || payload?.result || payload || {}; }
 function extractList(payload: any) { if (Array.isArray(payload)) return payload; for (const field of ['data', 'matches', 'fixtures', 'response', 'results', 'items']) if (Array.isArray(payload?.[field])) return payload[field]; if (Array.isArray(payload?.data?.matches)) return payload.data.matches; return []; }
 function listFrom(payload: any, fields: string[]) { if (Array.isArray(payload)) return payload; const data = dataOf(payload); if (Array.isArray(data)) return data; for (const field of fields) if (Array.isArray(data?.[field])) return data[field]; for (const field of fields) if (Array.isArray(payload?.[field])) return payload[field]; return []; }
+function heatmapPointsFrom(payload: any) { const roots = [payload, payload?.data, payload?.response, payload?.result, payload?.heatmap, payload?.data?.heatmap, payload?.data?.player_heatmap, payload?.response?.heatmap].filter(Boolean); for (const root of roots) { if (Array.isArray(root)) return root; for (const field of ['points', 'coordinates', 'positions', 'items', 'data']) if (Array.isArray(root?.[field])) return root[field]; } return []; }
 function providerMatch(row: any) { const fixture = row?.fixture || row?.match || row; const teams = row?.teams || row?.participants || {}; const home = teams?.home || row?.home || row?.homeTeam || row?.home_team || {}; const away = teams?.away || row?.away || row?.awayTeam || row?.away_team || {}; return { id: str(fixture?.id, fixture?.matchId, fixture?.match_id, row?.id, row?.matchId, row?.match_id, row?.fixtureId, row?.fixture_id), home: str(home?.name, row?.homeName, row?.home_team_name, home), away: str(away?.name, row?.awayName, row?.away_team_name, away), date: str(fixture?.utc_date, fixture?.date, row?.utc_date, row?.date, row?.matchDate, row?.kickoff, row?.start_time), raw: row }; }
 function candidateScore(candidate: any, match: any) { const directHome = teamScore(candidate.home, match.homeTeam); const directAway = teamScore(candidate.away, match.awayTeam); const swappedHome = teamScore(candidate.home, match.awayTeam); const swappedAway = teamScore(candidate.away, match.homeTeam); const direct = (directHome + directAway) / 2; const swapped = (swappedHome + swappedAway) / 2; const reversed = swapped > direct; const team = Math.max(direct, swapped); const hours = hoursApart(candidate.date, match.matchDate); const time = hours <= 4 ? 25 : hours <= 12 ? 15 : hours <= 30 ? 8 : candidate.date ? -15 : 0; return { ...candidate, score: Math.round(team + time), teamScore: Math.round(team), timeHours: hours === 999 ? null : Number(hours.toFixed(2)), reversed }; }
 function normalizeProviderId(value: any) { 
@@ -91,7 +92,8 @@ function compactStats(payload: any) {
   return { meta: { source: 'match-stats' }, stats: out };
 }
 function compactMatchInfo(matchInfoPayload: any, statsPayload: any) { const data = dataOf(matchInfoPayload); const stats = dataOf(statsPayload); const venue = data?.venue || data?.fixture?.venue || data?.match?.venue || {}; const referee = data?.referee || data?.fixture?.referee || data?.match?.referee || {}; return { status: str(data?.status, stats?.status), venue: str(venue?.name, venue), city: str(venue?.city, data?.city), referee: str(referee?.name, referee), finalScore: data?.score?.final_score || data?.score || null, xgAvailable: Boolean(data?.xg_available || stats?.overview?.expected_goals) }; }
-function compactEvent(row: any) { const team = row?.team || {}; const player = row?.player || row?.athlete || row?.scorer || {}; return { sequence: n(row?.sequence), period: str(row?.period), type: str(row?.type, row?.event_type, row?.incident_type, row?.name) || 'event', minute: n(row?.minute ?? row?.time?.minute ?? row?.elapsed ?? row?.match_minute ?? row?.event_minute), extraTime: n(row?.extra_time ?? row?.extraTime ?? row?.stoppage_time), teamId: str(team?.id, row?.team_id, row?.teamId), teamName: str(team?.name, row?.team_name, row?.teamName), playerId: str(player?.id, row?.player_id, row?.playerId), playerName: str(player?.name, row?.player_name, row?.playerName, row?.scorer?.name), detail: str(row?.detail, row?.description, row?.comment, row?.text, row?.message) }; }
+function compactEvent(row: any) { const team = row?.team || {}; const player = row?.player || row?.athlete || row?.scorer || {}; return { sequence: n(row?.sequence), period: str(row?.period), type: str(row?.type, row?.event_type, row?.incident_type, row?.name) || 'event', minute: n(row?.minute ?? row?.time?.minute ?? row?.elapsed ?? row?.match_minute ?? row?.event_minute), extraTime: n(row?.extra_time ?? row?.extraTime ?? row?.stoppage_time), teamId: str(team?.id, row?.team_id, row?.teamId), teamName: str(team?.name, row?.team_name, row?.teamName), playerId: str(player?.id, row?.player_id, row?.playerId), playerName: str(player?.name, row?.player_name, row?.playerName, row?.scorer?.name), detail: str(row?.detail, row?.description, row?.comment, row?.text, row?.message), x: pitchCoord(row?.x ?? row?.pitchX ?? row?.location?.x ?? row?.coordinates?.x ?? row?.position?.x), y: pitchCoord(row?.y ?? row?.pitchY ?? row?.location?.y ?? row?.coordinates?.y ?? row?.position?.y) }; }
+
 function compactShot(row: any) { const player = row?.player || row?.athlete || row?.shooter || {}; const team = row?.team || {}; const outcome = str(row?.outcome, row?.result, row?.shot_outcome, row?.status, row?.type); return { id: str(row?.id), minute: n(row?.minute ?? row?.time?.minute ?? row?.elapsed), playerId: str(player?.id, row?.player_id, row?.playerId), playerName: str(player?.name, row?.player_name, row?.playerName), teamId: str(team?.id, row?.team_id, row?.teamId), teamName: str(team?.name, row?.team_name, row?.teamName), x: n(row?.x ?? row?.pitchX ?? row?.location?.x), y: n(row?.y ?? row?.pitchY ?? row?.location?.y), xg: n(row?.xg ?? row?.expected_goals ?? row?.expectedGoals), npxg: n(row?.npxg ?? row?.non_penalty_xg ?? row?.nonPenaltyXg), outcome, situation: str(row?.situation), bodyPart: str(row?.body_part, row?.bodyPart), isOnTarget: bool(row?.is_on_target) ?? /on target|saved|goal/i.test(String(outcome || '')), isGoal: bool(row?.is_goal) ?? /goal|scored/i.test(String(outcome || row?.type || '')), isBlocked: bool(row?.is_blocked_shot), isPenalty: bool(row?.is_penalty) };
 }
 function compactPlayerStat(row: any) {
@@ -191,7 +193,7 @@ export async function collectTheStatsMatchExtras(match: any, options: { dryRun?:
       if (delayMs > 0 && i > 0) await sleep((i % 5) * Math.max(50, delayMs / 2)); // Stagger requests slightly
       try {
         const payload = await theStatsApiFetch(`/api/football/matches/${id}/players/${p.playerId}/heatmap`, {}, { timeoutMs: Math.min(timeoutMs, 8000) });
-        const rawPoints = Array.isArray(payload?.data?.points) ? payload.data.points : listFrom(payload, ['data', 'points', 'heatmap', 'items']);
+        const rawPoints = heatmapPointsFrom(payload);
         const points = rawPoints.map((pt: any) => ({
           x: pitchCoord(pt.x ?? pt.pitchX ?? pt.location?.x),
           y: pitchCoord(pt.y ?? pt.pitchY ?? pt.location?.y),
@@ -216,6 +218,7 @@ export async function collectTheStatsMatchExtras(match: any, options: { dryRun?:
             playerName: p.playerName,
             teamId: p.teamId,
             side,
+            source: 'PROVIDER_HEATMAP',
             points
           } };
         }
@@ -233,12 +236,38 @@ export async function collectTheStatsMatchExtras(match: any, options: { dryRun?:
       else if (res.status === 'rejected') heatmapFailures.push({ status: null, code: 'HEATMAP_PROMISE_REJECTED', message: String(res.reason || 'Unknown heatmap error') });
     });
 
+    const directPlayerKeys = new Set(playerHeatmaps.flatMap((heatmap: any) => [heatmap.playerId ? `id:${heatmap.playerId}` : '', heatmap.playerName ? `name:${key(heatmap.playerName)}` : '']).filter(Boolean));
+    const actionGroups = new Map<string, { player: any; points: any[] }>();
+    for (const event of events) {
+      if (event.x === null || event.y === null || (!event.playerId && !event.playerName)) continue;
+      const player = playerStats.find((candidate: any) => (event.playerId && String(candidate.playerId) === String(event.playerId)) || (event.playerName && key(candidate.playerName) === key(event.playerName)));
+      if (!player || !(player.started === true || player.played === true || Number(player.minutes || 0) > 0)) continue;
+      const groupKey = player.playerId ? `id:${player.playerId}` : `name:${key(player.playerName)}`;
+      const group = actionGroups.get(groupKey) || { player, points: [] };
+      group.points.push({ x: event.x, y: event.y });
+      actionGroups.set(groupKey, group);
+    }
+    for (const [groupKey, group] of actionGroups) {
+      if (directPlayerKeys.has(groupKey) || group.points.length < 6) continue;
+      const p = group.player;
+      const homeMatch = String(p.teamId) === String(match?.homeTeam?.id) || String(p.teamId) === String(match?.homeTeam?.code) || (key(p.teamName) && key(p.teamName) === key(match?.homeTeam?.name));
+      const awayMatch = String(p.teamId) === String(match?.awayTeam?.id) || String(p.teamId) === String(match?.awayTeam?.code) || (key(p.teamName) && key(p.teamName) === key(match?.awayTeam?.name));
+      const side = homeMatch ? 'home' : awayMatch ? 'away' : undefined;
+      if (!side) continue;
+      const heatmap = { playerId: p.playerId || groupKey, playerName: p.playerName, teamId: p.teamId, side, source: 'VERIFIED_ACTION_COORDINATES', points: group.points };
+      playerHeatmaps.push(heatmap);
+      teamHeatmaps[side].teamId = p.teamId;
+      teamHeatmaps[side].points.push(...group.points);
+    }
+
   }
 
   const heatmapPointCount = playerHeatmaps.reduce((total: number, heatmap: any) => total + (Array.isArray(heatmap.points) ? heatmap.points.length : 0), 0);
   const requestedHeatmapPlayers = mode === 'full' ? playerStats.filter((p: any) => p.playerId && (p.started === true || p.played === true || (p.minutes !== null && p.minutes > 0))).length : 0;
   const failureCodes = heatmapFailures.reduce((counts: Record<string, number>, failure: any) => { const code = String(failure.code || failure.status || 'UNKNOWN'); counts[code] = (counts[code] || 0) + 1; return counts; }, {});
-  const heatmapMeta = { source: 'THE_STATS_API_PLAYER_HEATMAP', requestedPlayers: requestedHeatmapPlayers, availablePlayers: playerHeatmaps.length, failedPlayers: heatmapFailures.length, pointCount: heatmapPointCount, verifiedCoordinates: true, failureCodes };
+  const directHeatmaps = playerHeatmaps.filter((heatmap: any) => heatmap.source === 'PROVIDER_HEATMAP').length;
+  const derivedHeatmaps = playerHeatmaps.filter((heatmap: any) => heatmap.source === 'VERIFIED_ACTION_COORDINATES').length;
+  const heatmapMeta = { source: derivedHeatmaps ? 'MIXED_VERIFIED_COORDINATES' : 'THE_STATS_API_PLAYER_HEATMAP', requestedPlayers: requestedHeatmapPlayers, availablePlayers: playerHeatmaps.length, directHeatmaps, derivedHeatmaps, failedPlayers: heatmapFailures.length, pointCount: heatmapPointCount, verifiedCoordinates: true, failureCodes };
   const normalized = { matchInfo: compactMatchInfo(byKey.matchInfo?.payload, byKey.stats?.payload), liveStats: stats, lineups: byKey.lineups?.ok ? dataOf(byKey.lineups.payload) : null, eventsDetailed: { all: events }, shotmap, playerStats, playerHeatmaps, teamHeatmaps, heatmapMeta };
   const endpointSummaries = results.map((item) => ({ key: item.key, path: item.path, ok: item.ok, error: item.ok ? null : item.error, keySummary: item.ok ? null : item.error?.message || null }));
   let snapshotId: string | null = null;
