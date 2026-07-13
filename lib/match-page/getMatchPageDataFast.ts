@@ -202,39 +202,82 @@ function finalTheStatsEvents(snapshots: any[], homeTeam: MatchTeamLite, awayTeam
 
 function normalizePlayerStat(row: any, homeTeam: MatchTeamLite, awayTeam: MatchTeamLite): MatchPlayerStatItem | null {
   const player = row?.player || row?.athlete || row;
+  const stats = row?.stats || row?.statistics || row;
   const playerName = cleanText(player?.name || row?.playerName || row?.player_name || row?.name);
   if (!playerName) return null;
-  const teamId = row?.teamId === homeTeam.id || looksLikeTeam(row, homeTeam) ? homeTeam.id : row?.teamId === awayTeam.id || looksLikeTeam(row, awayTeam) ? awayTeam.id : cleanText(row?.teamId || row?.team_id);
+  const teamId = row?.teamId === homeTeam.id || looksLikeTeam(row, homeTeam)
+    ? homeTeam.id
+    : row?.teamId === awayTeam.id || looksLikeTeam(row, awayTeam)
+      ? awayTeam.id
+      : cleanText(row?.teamId || row?.team_id);
+  const minutes = toNumber(stats?.minutes ?? stats?.minutesPlayed ?? stats?.minutes_played ?? row?.minutesPlayed ?? row?.minutes_played);
+  const started = typeof row?.started === 'boolean'
+    ? row.started
+    : typeof stats?.started === 'boolean'
+      ? stats.started
+      : row?.starting === true || row?.isStarter === true || row?.starter === true || row?.lineup === 'start'
+        ? true
+        : null;
+  const playerSubbedOn = cleanText(row?.playerSubbedOn || row?.subbedOn || row?.subbed_on);
+  const playerSubbedOff = cleanText(row?.playerSubbedOff || row?.subbedOff || row?.subbed_off);
+  const explicitPlayed = typeof row?.played === 'boolean' ? row.played : typeof stats?.played === 'boolean' ? stats.played : null;
+  const played = explicitPlayed ?? (started === true || Number(minutes || 0) > 0 || Boolean(playerSubbedOn || playerSubbedOff) ? true : null);
+  const value = (...keys: string[]) => {
+    for (const key of keys) {
+      const parsed = toNumber(stats?.[key] ?? row?.[key]);
+      if (parsed !== null) return parsed;
+    }
+    return null;
+  };
   return {
     playerId: cleanText(player?.id || row?.playerId || row?.player_id || row?.id),
     playerName,
     teamId,
     teamName: teamId === homeTeam.id ? homeTeam.name : teamId === awayTeam.id ? awayTeam.name : cleanText(row?.teamName || row?.team_name || row?.team?.name),
     position: cleanText(player?.position || row?.position),
-    rating: toNumber(row?.rating || row?.score),
-    started: typeof row?.started === 'boolean' ? row.started : Boolean(row?.starting || row?.isStarter || row?.starter || row?.lineup === 'start'),
-    played: row?.played === false ? false : true,
-    minutes: toNumber(row?.minutes || row?.minutesPlayed || row?.minutes_played),
+    rating: value('rating', 'score'),
+    started,
+    played,
+    minutes,
     image: usableImage(player?.image || player?.photo || row?.image || row?.photo || row?.playerImage || row?.player_image),
     number: cleanText(player?.number || player?.shirtNumber || row?.number || row?.shirtNumber || row?.shirt_number || row?.jerseyNumber || row?.jersey_number),
-    isCaptain: Boolean(row?.captain || row?.isCaptain || player?.captain),
-    goals: toNumber(row?.goals),
-    assists: toNumber(row?.assists),
-    shots: toNumber(row?.shots),
-    shotsOnTarget: toNumber(row?.shotsOnTarget || row?.shots_on_target),
-    shotsOffTarget: toNumber(row?.shotsOffTarget || row?.shots_off_target),
-    passes: toNumber(row?.passes),
-    accuratePasses: toNumber(row?.accuratePasses || row?.accurate_passes),
-    keyPasses: toNumber(row?.keyPasses || row?.key_passes),
-    tackles: toNumber(row?.tackles),
-    interceptions: toNumber(row?.interceptions),
-    clearances: toNumber(row?.clearances),
-    saves: toNumber(row?.saves),
-    touches: toNumber(row?.touches),
-    yellowCards: toNumber(row?.yellowCards || row?.yellow_cards),
-    redCards: toNumber(row?.redCards || row?.red_cards),
-    playerSubbedOn: cleanText(row?.playerSubbedOn || row?.subbedOn || row?.subbed_on),
-    playerSubbedOff: cleanText(row?.playerSubbedOff || row?.subbedOff || row?.subbed_off),
+    isCaptain: row?.captain === true || row?.isCaptain === true || player?.captain === true,
+    goals: value('goals'),
+    assists: value('assists'),
+    shots: value('shots', 'totalShots', 'total_shots'),
+    shotsOnTarget: value('shotsOnTarget', 'shots_on_target'),
+    shotsOffTarget: value('shotsOffTarget', 'shots_off_target'),
+    blockedShots: value('blockedShots', 'blocked_shots'),
+    bigChancesCreated: value('bigChancesCreated', 'big_chances_created'),
+    expectedGoals: value('expectedGoals', 'expected_goals', 'xg'),
+    expectedAssists: value('expectedAssists', 'expected_assists', 'xa'),
+    npExpectedGoals: value('npExpectedGoals', 'np_expected_goals', 'npxg'),
+    passes: value('passes', 'totalPasses', 'total_passes'),
+    accuratePasses: value('accuratePasses', 'accurate_passes'),
+    keyPasses: value('keyPasses', 'key_passes'),
+    crosses: value('crosses'),
+    accurateCrosses: value('accurateCrosses', 'accurate_crosses'),
+    longBalls: value('longBalls', 'long_balls'),
+    accurateLongBalls: value('accurateLongBalls', 'accurate_long_balls'),
+    tackles: value('tackles'),
+    interceptions: value('interceptions'),
+    clearances: value('clearances'),
+    saves: value('saves'),
+    duelWon: value('duelWon', 'duelsWon', 'duels_won'),
+    duelLost: value('duelLost', 'duelsLost', 'duels_lost'),
+    aerialWon: value('aerialWon', 'aerialsWon', 'aerials_won'),
+    challengeLost: value('challengeLost', 'challenge_lost'),
+    wonContest: value('wonContest', 'successfulDribbles', 'successful_dribbles'),
+    dispossessed: value('dispossessed'),
+    touches: value('touches'),
+    foulsCommitted: value('foulsCommitted', 'fouls_committed'),
+    foulsWon: value('foulsWon', 'fouls_won'),
+    offsides: value('offsides'),
+    yellowCards: value('yellowCards', 'yellow_cards'),
+    redCards: value('redCards', 'red_cards'),
+    possessionLost: value('possessionLost', 'possession_lost'),
+    playerSubbedOn,
+    playerSubbedOff,
   };
 }
 
@@ -352,6 +395,68 @@ function enrichEventsWithPlayers(events: MatchEventView[], players: MatchPlayerS
   });
 }
 
+function normalizePlayerHeatmaps(value: any, players: MatchPlayerStatItem[], homeTeam: MatchTeamLite, awayTeam: MatchTeamLite) {
+  const rows = asList(value);
+  return rows.map((row: any) => {
+    const playerId = cleanText(row?.playerId || row?.player_id || row?.player?.id);
+    const playerName = cleanText(row?.playerName || row?.player_name || row?.player?.name);
+    const player = players.find((item) =>
+      (playerId && item.playerId === playerId) ||
+      (playerName && playerKey(item.playerName) === playerKey(playerName))
+    );
+    const points = asList(row?.points || row?.heatmap).map((point: any) => ({
+      x: coord(point?.x ?? point?.pitchX ?? point?.location?.x),
+      y: coord(point?.y ?? point?.pitchY ?? point?.location?.y),
+      count: toNumber(point?.count ?? point?.value ?? point?.weight) || undefined,
+    })).filter((point: any) => point.x !== null && point.y !== null);
+    const side = player?.teamId === homeTeam.id ? 'home' : player?.teamId === awayTeam.id ? 'away' : row?.side === 'home' || row?.side === 'away' ? row.side : undefined;
+    return playerId && points.length ? {
+      playerId,
+      playerName: playerName || player?.playerName || undefined,
+      teamId: player?.teamId || cleanText(row?.teamId || row?.team_id) || undefined,
+      side,
+      points,
+    } : null;
+  }).filter(Boolean);
+}
+
+function buildVerifiedMomentum(normalized: any, shotmap: MatchShotMapItem[], homeTeam: MatchTeamLite, awayTeam: MatchTeamLite) {
+  const provider = asList(normalized?.momentum || normalized?.matchMomentum || normalized?.pressure).map((row: any) => ({
+    minute: toNumber(row?.minute),
+    home: toNumber(row?.home ?? row?.homeValue ?? row?.home_value),
+    away: toNumber(row?.away ?? row?.awayValue ?? row?.away_value),
+  })).filter((row: any) => row.minute !== null && row.home !== null && row.away !== null);
+  if (provider.length >= 2) {
+    return provider.map((row: any) => ({ minute: row.minute, home: row.home, away: row.away, source: 'PROVIDER' as const, sampleSize: 1 }));
+  }
+
+  const verifiedShots = shotmap.map((shot) => {
+    const team = shot.teamId === homeTeam.id || teamKey(shot.teamName).includes(teamKey(homeTeam.name))
+      ? 'home'
+      : shot.teamId === awayTeam.id || teamKey(shot.teamName).includes(teamKey(awayTeam.name))
+        ? 'away'
+        : null;
+    return { shot, team };
+  }).filter((row): row is { shot: MatchShotMapItem; team: 'home' | 'away' } => Boolean(row.team && row.shot.minute !== null && row.shot.minute !== undefined));
+
+  if (verifiedShots.length < 2) return [];
+  const lastMinute = Math.max(90, ...verifiedShots.map((row) => Number(row.shot.minute || 0)));
+  const points = [];
+  for (let minute = 5; minute <= Math.ceil(lastMinute / 5) * 5; minute += 5) {
+    const window = verifiedShots.filter((row) => Number(row.shot.minute) > minute - 5 && Number(row.shot.minute) <= minute);
+    if (!window.length) {
+      points.push({ minute, home: 0, away: 0, source: 'DERIVED_FROM_VERIFIED_SHOTS' as const, sampleSize: 0 });
+      continue;
+    }
+    const score = (side: 'home' | 'away') => window.filter((row) => row.team === side).reduce((sum, row) => {
+      const xg = Number(row.shot.xg || 0);
+      return sum + 0.2 + Math.min(1, xg) * 4 + (row.shot.isOnTarget ? 0.7 : 0) + (row.shot.isGoal ? 2 : 0);
+    }, 0);
+    points.push({ minute, home: Number(score('home').toFixed(2)), away: Number(score('away').toFixed(2)), source: 'DERIVED_FROM_VERIFIED_SHOTS' as const, sampleSize: window.length });
+  }
+  return points;
+}
+
 function extractAdvancedData(snapshots: any[], homeTeam: MatchTeamLite, awayTeam: MatchTeamLite, dbPlayers: any[] = []): MatchAdvancedData {
   const theStats = snapshots.find(isTheStatsSnapshot);
   const normalized = theStats?.rawData && typeof theStats.rawData === 'object' ? (theStats.rawData as any).normalized || {} : {};
@@ -362,6 +467,9 @@ function extractAdvancedData(snapshots: any[], homeTeam: MatchTeamLite, awayTeam
     .map((row: any) => ({ ...row, x: coord(row?.x), y: coord(row?.y) }))
     .filter((row: any) => row.x !== null && row.y !== null);
   const playerStats = enrichPlayersFromDb(extractPlayerStats(snapshots, homeTeam, awayTeam), dbPlayers);
+  const playerHeatmaps = normalizePlayerHeatmaps(normalized.playerHeatmaps, playerStats, homeTeam, awayTeam);
+  const homeHeatmapPoints = playerHeatmaps.filter((heatmap: any) => heatmap.side === 'home').flatMap((heatmap: any) => heatmap.points);
+  const awayHeatmapPoints = playerHeatmaps.filter((heatmap: any) => heatmap.side === 'away').flatMap((heatmap: any) => heatmap.points);
   return {
     venue: cleanVenue(matchInfo.venue),
     city: cleanText(matchInfo.city),
@@ -372,8 +480,12 @@ function extractAdvancedData(snapshots: any[], homeTeam: MatchTeamLite, awayTeam
     events: enrichEventsWithPlayers(finalTheStatsEvents(snapshots, homeTeam, awayTeam), playerStats),
     shotmap,
     playerStats,
-    playerHeatmaps: normalized.playerHeatmaps,
-    teamHeatmaps: normalized.teamHeatmaps,
+    playerHeatmaps,
+    teamHeatmaps: {
+      home: homeHeatmapPoints.length ? { teamId: homeTeam.id, points: homeHeatmapPoints } : undefined,
+      away: awayHeatmapPoints.length ? { teamId: awayTeam.id, points: awayHeatmapPoints } : undefined,
+    },
+    momentum: buildVerifiedMomentum(normalized, shotmap, homeTeam, awayTeam),
   };
 }
 
