@@ -219,7 +219,7 @@ function Overview({ d }: { d: MatchPageData }) {
     <div className="space-y-4">
       {/* Verified heatmaps only */}
       {hasVerifiedHeatmaps && (
-        <Box title="الخريطة الحرارية">
+        <Box title="الخريطة الحرارية الموثقة" hint="نقاط تمركز محفوظة من مزود البيانات؛ لا توجد نقاط تقديرية.">
           <div className="flex justify-center gap-4">
             {homeHeatmapPoints.length > 0 && <div className="w-1/2 max-w-[200px]"><TeamHeatmap teamName={tn(d.homeTeam)} isHome={true} points={homeHeatmapPoints} /></div>}
             {awayHeatmapPoints.length > 0 && <div className="w-1/2 max-w-[200px]"><TeamHeatmap teamName={tn(d.awayTeam)} isHome={false} points={awayHeatmapPoints} /></div>}

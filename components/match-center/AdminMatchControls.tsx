@@ -15,6 +15,7 @@ function articleErrorMessage(code: string) {
 
 export default function AdminMatchControls({ matchId }: { matchId: string }) {
   const [infographicLoading, setInfographicLoading] = useState(false);
+  const [heatmapLoading, setHeatmapLoading] = useState(false);
   const [articleLoading, setArticleLoading] = useState(false);
   const [approvalLoading, setApprovalLoading] = useState(false);
   const [articleMessage, setArticleMessage] = useState<Message | null>(null);
@@ -43,6 +44,32 @@ export default function AdminMatchControls({ matchId }: { matchId: string }) {
       setArticleMessage({ type: 'error', text: 'تعذر الاتصال بالخادم.' });
     } finally {
       setArticleLoading(false);
+    }
+  };
+
+  const collectVerifiedHeatmaps = async () => {
+    if (heatmapLoading) return;
+    setHeatmapLoading(true);
+    setInfographicMessage(null);
+    try {
+      const res = await fetch(`/api/admin/matches/${matchId}/extras-snapshot?timeoutMs=60000`, { method: 'POST' });
+      const data = await res.json().catch(() => ({}));
+      const heatmaps = Number(data?.counts?.playerHeatmaps || 0);
+      const points = Number(data?.counts?.heatmapPoints || 0);
+      if (!res.ok || !data.ok) {
+        setInfographicMessage({ type: 'error', text: String(data.error || 'تعذر جلب بيانات TheStats الكاملة.') });
+        return;
+      }
+      if (!heatmaps || !points) {
+        setInfographicMessage({ type: 'error', text: 'تم تحديث المباراة، لكن المزود لم يُرجع خرائط حرارية للاعبين المشاركين.' });
+        return;
+      }
+      setInfographicMessage({ type: 'success', text: `تم حفظ ${heatmaps.toLocaleString('ar-EG')} خريطة حرارية موثقة بإجمالي ${points.toLocaleString('ar-EG')} نقطة.` });
+      router.refresh();
+    } catch {
+      setInfographicMessage({ type: 'error', text: 'تعذر الاتصال بالخادم أثناء جلب الخرائط.' });
+    } finally {
+      setHeatmapLoading(false);
     }
   };
 
@@ -98,6 +125,9 @@ export default function AdminMatchControls({ matchId }: { matchId: string }) {
       <div className="flex flex-wrap items-center gap-3">
         <button type="button" onClick={generateArticle} disabled={articleLoading} aria-busy={articleLoading} className="rounded-xl bg-[#18E58F] px-4 py-2 text-sm font-black text-black transition hover:bg-[#18E58F]/80 disabled:cursor-wait disabled:opacity-60">
           {articleLoading ? 'جاري توليد المقال…' : 'توليد مقال تحليلي'}
+        </button>
+        <button type="button" onClick={collectVerifiedHeatmaps} disabled={heatmapLoading} className="rounded-xl border border-[#0FF0FC]/30 bg-[#0FF0FC]/10 px-4 py-2 text-sm font-black text-[#0FF0FC] hover:bg-[#0FF0FC]/20 disabled:opacity-50">
+          {heatmapLoading ? 'جاري جلب خرائط اللاعبين…' : 'جلب الخرائط الحرارية الموثقة'}
         </button>
         <button type="button" onClick={generateInfographicData} disabled={infographicLoading} className="rounded-xl bg-[#F8C846] px-4 py-2 text-sm font-black text-black hover:bg-[#F8C846]/80 disabled:opacity-50">
           {infographicLoading ? 'جاري تجميع البيانات…' : 'إنشاء إنفوجرافيك موثّق'}

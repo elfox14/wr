@@ -20,6 +20,7 @@ function str(...values: any[]) {
   return null;
 }
 function n(value: any) { if (value === null || value === undefined || value === '') return null; const number = Number(typeof value === 'string' ? value.replace('%', '').trim() : value); return Number.isFinite(number) ? number : null; }
+function pitchCoord(value: any) { const number = n(value); if (number === null) return null; if (number >= 0 && number <= 1) return Number((number * 100).toFixed(3)); if (number >= 0 && number <= 100) return Number(number.toFixed(3)); return null; }
 function bool(value: any) { if (typeof value === 'boolean') return value; if (value === null || value === undefined || value === '') return null; const s = String(value).trim().toLowerCase(); if (['1', 'true', 'yes', 'y'].includes(s)) return true; if (['0', 'false', 'no', 'n'].includes(s)) return false; return null; }
 function key(value: any) { return String(value || '').toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/&/g, ' and ').replace(/[^a-z0-9\u0600-\u06ff]+/g, ' ').replace(/\s+/g, ' ').trim().replace('czechia', 'czech republic').replace('usa', 'united states').replace('u s a', 'united states').replace('united states of america', 'united states').replace('turkiye', 'turkey').replace('türkiye', 'turkey').replace('cote d ivoire', 'ivory coast'); }
 function words(value: any) { return key(value).split(' ').filter((w) => w.length > 1); }
@@ -184,15 +185,16 @@ export async function collectTheStatsMatchExtras(match: any, options: { dryRun?:
   const teamHeatmaps: any = { home: { points: [] }, away: { points: [] } };
 
   if (mode === 'full') {
-    const playersToFetch = playerStats.filter((p: any) => p.started === true || p.played === true || (p.minutes !== null && p.minutes > 0));
+    const playersToFetch = playerStats.filter((p: any) => p.playerId && (p.started === true || p.played === true || (p.minutes !== null && p.minutes > 0)));
     const heatmapPromises = playersToFetch.map(async (p: any, i: number) => {
       if (delayMs > 0 && i > 0) await sleep((i % 5) * Math.max(50, delayMs / 2)); // Stagger requests slightly
       try {
         const payload = await theStatsApiFetch(`/api/football/matches/${id}/players/${p.playerId}/heatmap`, {}, { timeoutMs: Math.min(timeoutMs, 8000) });
         const rawPoints = Array.isArray(payload?.data?.points) ? payload.data.points : listFrom(payload, ['data', 'points', 'heatmap', 'items']);
         const points = rawPoints.map((pt: any) => ({
-          x: n(pt.x ?? pt.pitchX ?? pt.location?.x),
-          y: n(pt.y ?? pt.pitchY ?? pt.location?.y),
+          x: pitchCoord(pt.x ?? pt.pitchX ?? pt.location?.x),
+          y: pitchCoord(pt.y ?? pt.pitchY ?? pt.location?.y),
+          count: n(pt.count ?? pt.value ?? pt.weight) || undefined,
         })).filter((pt: any) => pt.x !== null && pt.y !== null);
 
         if (points.length > 0) {
@@ -231,7 +233,9 @@ export async function collectTheStatsMatchExtras(match: any, options: { dryRun?:
 
   }
 
-  const normalized = { matchInfo: compactMatchInfo(byKey.matchInfo?.payload, byKey.stats?.payload), liveStats: stats, lineups: byKey.lineups?.ok ? dataOf(byKey.lineups.payload) : null, eventsDetailed: { all: events }, shotmap, playerStats, playerHeatmaps, teamHeatmaps };
+  const heatmapPointCount = playerHeatmaps.reduce((total: number, heatmap: any) => total + (Array.isArray(heatmap.points) ? heatmap.points.length : 0), 0);
+  const heatmapMeta = { source: 'THE_STATS_API_PLAYER_HEATMAP', requestedPlayers: mode === 'full' ? playerStats.filter((p: any) => p.playerId && (p.started === true || p.played === true || (p.minutes !== null && p.minutes > 0))).length : 0, availablePlayers: playerHeatmaps.length, pointCount: heatmapPointCount, verifiedCoordinates: true };
+  const normalized = { matchInfo: compactMatchInfo(byKey.matchInfo?.payload, byKey.stats?.payload), liveStats: stats, lineups: byKey.lineups?.ok ? dataOf(byKey.lineups.payload) : null, eventsDetailed: { all: events }, shotmap, playerStats, playerHeatmaps, teamHeatmaps, heatmapMeta };
   const endpointSummaries = results.map((item) => ({ key: item.key, path: item.path, ok: item.ok, error: item.ok ? null : item.error, keySummary: item.ok ? null : item.error?.message || null }));
   let snapshotId: string | null = null;
   const useful = Object.keys(stats.stats || {}).length > 0 || events.length > 0 || shotmap.length > 0 || playerStats.length > 0 || Boolean(normalized.lineups) || Boolean(normalized.matchInfo?.venue || normalized.matchInfo?.referee);
@@ -242,5 +246,5 @@ export async function collectTheStatsMatchExtras(match: any, options: { dryRun?:
     snapshotId = snapshot.id;
   }
   const rateLimited = results.some((item) => Number(item.error?.status) === 429);
-  return { ok: useful, matchId: match.id, endpointMode: mode, resolvedProviderMatchId: resolved.id, resolvedBy: resolved.by, rateLimited, endpointsOk: results.filter((item) => item.ok).map((item) => item.key), endpointsFailed: results.filter((item) => !item.ok).map((item) => ({ key: item.key, status: item.error?.status, code: item.error?.code, message: item.error?.message })), counts: { stats: Object.keys(stats.stats || {}).length, detailedEvents: events.length, shots: shotmap.length, playerStats: playerStats.length, lineups: normalized.lineups ? 1 : 0 }, matchInfo: normalized.matchInfo, saved: Boolean(snapshotId), snapshotId, debug: { endpointSummaries, normalizedPreview: normalized, endpoints: includeRaw ? Object.fromEntries(results.map((item) => [item.key, item])) : undefined } };
+  return { ok: useful, matchId: match.id, endpointMode: mode, resolvedProviderMatchId: resolved.id, resolvedBy: resolved.by, rateLimited, endpointsOk: results.filter((item) => item.ok).map((item) => item.key), endpointsFailed: results.filter((item) => !item.ok).map((item) => ({ key: item.key, status: item.error?.status, code: item.error?.code, message: item.error?.message })), counts: { stats: Object.keys(stats.stats || {}).length, detailedEvents: events.length, shots: shotmap.length, playerStats: playerStats.length, lineups: normalized.lineups ? 1 : 0, playerHeatmaps: playerHeatmaps.length, heatmapPoints: heatmapPointCount }, matchInfo: normalized.matchInfo, saved: Boolean(snapshotId), snapshotId, debug: { endpointSummaries, normalizedPreview: normalized, endpoints: includeRaw ? Object.fromEntries(results.map((item) => [item.key, item])) : undefined } };
 }
