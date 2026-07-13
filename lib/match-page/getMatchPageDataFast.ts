@@ -201,7 +201,7 @@ function finalTheStatsEvents(snapshots: any[], homeTeam: MatchTeamLite, awayTeam
   return rows.sort((a, b) => Number(a.minute ?? 999) - Number(b.minute ?? 999)).slice(0, 120);
 }
 
-function normalizePlayerStat(row: any, homeTeam: MatchTeamLite, awayTeam: MatchTeamLite): MatchPlayerStatItem | null {
+export function normalizePlayerStat(row: any, homeTeam: MatchTeamLite, awayTeam: MatchTeamLite): MatchPlayerStatItem | null {
   const player = row?.player || row?.athlete || row;
   const stats = row?.stats || row?.statistics || row;
   const playerName = cleanText(player?.name || row?.playerName || row?.player_name || row?.name);
@@ -421,7 +421,7 @@ function normalizePlayerHeatmaps(value: any, players: MatchPlayerStatItem[], hom
   }).filter(Boolean);
 }
 
-function buildVerifiedMomentum(normalized: any, shotmap: MatchShotMapItem[], homeTeam: MatchTeamLite, awayTeam: MatchTeamLite) {
+export function buildVerifiedMomentum(normalized: any, shotmap: MatchShotMapItem[], homeTeam: MatchTeamLite, awayTeam: MatchTeamLite) {
   const provider = asList(normalized?.momentum || normalized?.matchMomentum || normalized?.pressure).map((row: any) => ({
     minute: toNumber(row?.minute),
     home: toNumber(row?.home ?? row?.homeValue ?? row?.home_value),
