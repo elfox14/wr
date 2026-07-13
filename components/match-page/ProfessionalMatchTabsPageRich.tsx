@@ -170,7 +170,7 @@ function getTeamHeatmapPoints(isHome: boolean, d: MatchPageData) {
   const playerHeatmaps = d.advanced.playerHeatmaps || [];
   return playerHeatmaps.filter(h => {
      const p = allStats.find(s => s.playerId === h.playerId || s.playerName === h.playerName);
-     return p ? (isHome ? isHomePlayer(p, d) : !isHomePlayer(p, d)) : (h.side === (isHome ? 'home' : 'away'));
+     return p ? playerSide(p, d) === (isHome ? 'home' : 'away') : h.side === (isHome ? 'home' : 'away');
   }).flatMap(h => h.points);
 }
 
@@ -310,7 +310,7 @@ function PitchPlayer({ p, isHome, color, d, onHeatmap }: { p: MatchPlayerStatIte
           <div className="w-8 h-8 md:w-10 md:h-10 border-2 shadow-lg bg-black/50 rounded-full flex items-center justify-center overflow-hidden" style={{ borderColor: color }}>
              <Avatar name={p.playerName} image={p.image} number={p.number} />
           </div>
-          {p.goals > 0 && <span className="absolute -top-2 -right-2 text-xs md:text-sm drop-shadow">⚽</span>}
+          {Number(p.goals || 0) > 0 && <span className="absolute -top-2 -right-2 text-xs md:text-sm drop-shadow">⚽</span>}
           {p.rating && <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-black/90 border border-white/20 text-[8px] md:text-[9px] px-1 rounded text-white">{p.rating.toFixed(1)}</span>}
        </div>
        <div className="mt-1 md:mt-1.5 bg-black/70 px-1.5 py-0.5 rounded border border-white/10 text-center max-w-[60px] md:max-w-[70px]">
@@ -325,10 +325,10 @@ function Lineups({ d, onHeatmap }: { d: MatchPageData, onHeatmap: (name: string,
   const allStats = d.advanced.playerStats || [];
   const homeStats = allStats.filter((player) => playerSide(player, d) === 'home');
   const awayStats = allStats.filter((player) => playerSide(player, d) === 'away');
-  const homeStarters = homeStats.filter(p => isStarterPlayer(p, d)).length ? homeStats.filter(p => isStarterPlayer(p, d)) : homeStats.slice(0, 11);
+  const homeStarters = homeStats.filter((player) => isStarterPlayer(player, d)).slice(0, 11);
   const homeSubs = homeStats.filter(p => !isStarterPlayer(p, d) && (p.played === true || (p.minutes && p.minutes > 0) || p.playerSubbedOn));
 
-  const awayStarters = awayStats.filter(p => isStarterPlayer(p, d)).length ? awayStats.filter(p => isStarterPlayer(p, d)) : awayStats.slice(0, 11);
+  const awayStarters = awayStats.filter((player) => isStarterPlayer(player, d)).slice(0, 11);
   const awaySubs = awayStats.filter(p => !isStarterPlayer(p, d) && (p.played === true || (p.minutes && p.minutes > 0) || p.playerSubbedOn));
 
   const homeLines = groupPlayersByLine(homeStarters).filter(l => l.length > 0);
@@ -339,7 +339,8 @@ function Lineups({ d, onHeatmap }: { d: MatchPageData, onHeatmap: (name: string,
 
   return (
     <div className="flex flex-col items-center bg-black/20 rounded-2xl p-4 border border-white/5">
-      
+      <div className="mb-5 w-full rounded-2xl border border-[#18E58F]/20 bg-[#18E58F]/5 p-3 text-center text-xs font-bold text-slate-300">نعرض الأساسيين والبدلاء الذين ثبتت مشاركتهم فقط. اضغط على أي لاعب لعرض كل إحصاءاته وخريطته الحرارية الموثقة.</div>
+      {!homeStarters.length && !awayStarters.length && <div className="mb-5 w-full rounded-2xl border border-dashed border-white/10 p-8 text-center text-sm font-bold text-slate-500">لم يصل تشكيل أساسي موثق، لذلك لا نعرض توزيعًا تقديريًا للاعبين.</div>}
       {/* Away Subs */}
       <div className="mb-6 w-full flex flex-wrap justify-center gap-3 px-2">
          <div className="w-full text-center mb-2">
