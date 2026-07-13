@@ -11,9 +11,13 @@ interface TeamHeatmapProps {
 }
 
 export default function TeamHeatmap({ teamName, isHome, points = [] }: TeamHeatmapProps) {
-  const hasPoints = points && points.length > 0;
-  
-  const analysis = useMemo(() => analyzeHeatmap(points), [points]);
+  const verifiedPoints = useMemo(() => points.map((point) => ({
+    x: Number(point.x),
+    y: Number(point.y),
+    count: point.count,
+  })).filter((point) => Number.isFinite(point.x) && Number.isFinite(point.y) && point.x >= 0 && point.x <= 100 && point.y >= 0 && point.y <= 100), [points]);
+  const hasPoints = verifiedPoints.length > 0;
+  const analysis = useMemo(() => analyzeHeatmap(verifiedPoints), [verifiedPoints]);
   if (!hasPoints) return null;
 
   // Grid approach for accurate density
@@ -26,7 +30,7 @@ export default function TeamHeatmap({ teamName, isHome, points = [] }: TeamHeatm
   let maxCount = 0;
 
   if (hasPoints) {
-    points.forEach(pt => {
+    verifiedPoints.forEach(pt => {
       const x = Number(pt.x);
       const y = Number(pt.y);
       if (isNaN(x) || isNaN(y)) return;
@@ -52,6 +56,7 @@ export default function TeamHeatmap({ teamName, isHome, points = [] }: TeamHeatm
   return (
     <div className="flex flex-col items-center flex-1 w-full mx-auto">
       {teamName && <div className="text-sm font-bold mb-2 text-center truncate w-full px-1 text-white">{teamName}</div>}
+      <div className="mb-2 inline-flex items-center gap-1.5 rounded-full border border-[#18E58F]/25 bg-[#18E58F]/10 px-2.5 py-1 text-[9px] font-black text-[#18E58F]"><span className="h-1.5 w-1.5 rounded-full bg-[#18E58F]" />موثقة · {verifiedPoints.length.toLocaleString('ar-EG')} نقطة</div>
       {/* Horizontal Pitch */}
       <div className="relative w-full aspect-[1.5/1] sm:aspect-[1.6/1] bg-[#7ec850] rounded-sm overflow-hidden flex flex-col group border-2 border-white/80">
         
