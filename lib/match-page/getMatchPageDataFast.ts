@@ -416,6 +416,7 @@ function normalizePlayerHeatmaps(value: any, players: MatchPlayerStatItem[], hom
       playerName: playerName || player?.playerName || undefined,
       teamId: player?.teamId || cleanText(row?.teamId || row?.team_id) || undefined,
       side,
+      source: row?.source === 'VERIFIED_ACTION_COORDINATES' ? 'VERIFIED_ACTION_COORDINATES' : 'PROVIDER_HEATMAP',
       points,
     } : null;
   }).filter(Boolean);
@@ -471,6 +472,8 @@ function extractAdvancedData(snapshots: any[], homeTeam: MatchTeamLite, awayTeam
   const playerHeatmaps = normalizePlayerHeatmaps(normalized.playerHeatmaps, playerStats, homeTeam, awayTeam);
   const homeHeatmapPoints = playerHeatmaps.filter((heatmap: any) => heatmap.side === 'home').flatMap((heatmap: any) => heatmap.points);
   const awayHeatmapPoints = playerHeatmaps.filter((heatmap: any) => heatmap.side === 'away').flatMap((heatmap: any) => heatmap.points);
+  const homeHeatmapSource = playerHeatmaps.some((heatmap: any) => heatmap.side === 'home' && heatmap.source === 'VERIFIED_ACTION_COORDINATES') ? 'VERIFIED_ACTION_COORDINATES' as const : 'PROVIDER_HEATMAP' as const;
+  const awayHeatmapSource = playerHeatmaps.some((heatmap: any) => heatmap.side === 'away' && heatmap.source === 'VERIFIED_ACTION_COORDINATES') ? 'VERIFIED_ACTION_COORDINATES' as const : 'PROVIDER_HEATMAP' as const;
   return {
     venue: cleanVenue(matchInfo.venue),
     city: cleanText(matchInfo.city),
@@ -483,8 +486,8 @@ function extractAdvancedData(snapshots: any[], homeTeam: MatchTeamLite, awayTeam
     playerStats,
     playerHeatmaps,
     teamHeatmaps: {
-      home: homeHeatmapPoints.length ? { teamId: homeTeam.id, points: homeHeatmapPoints } : undefined,
-      away: awayHeatmapPoints.length ? { teamId: awayTeam.id, points: awayHeatmapPoints } : undefined,
+      home: homeHeatmapPoints.length ? { teamId: homeTeam.id, source: homeHeatmapSource, points: homeHeatmapPoints } : undefined,
+      away: awayHeatmapPoints.length ? { teamId: awayTeam.id, source: awayHeatmapSource, points: awayHeatmapPoints } : undefined,
     },
     momentum: buildVerifiedMomentum(normalized, shotmap, homeTeam, awayTeam),
   };
