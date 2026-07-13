@@ -37,11 +37,15 @@ export type MatchAdvancedData = {
 
 export type StandingRow = { rank: number; teamId: string; teamName: string; code?: string | null; image?: string | null; played: number; won: number; drawn: number; lost: number; goalsFor: number; goalsAgainst: number; goalDifference: number; points: number; qualifies?: boolean; };
 export type RelatedArticle = { id: string; title: string; summary: string; href: string; label: string; };
+export type MatchPostMatchContent = {
+  article: { id: string; title: string; excerpt: string; slug: string; publishedAt: string | null } | null;
+  infographic: { href: string; approvedAt: string; sourceSnapshotId: string } | null;
+};
 export type SourceChecklistItem = { label: string; status: 'ready' | 'missing' | 'optional'; note: string; };
 export type MatchFormItem = { id: string; date: string; opponentName: string; opponentCode?: string | null; homeAway: 'home' | 'away'; teamScore: number | null; opponentScore: number | null; result: 'W' | 'D' | 'L' | 'N'; status: string; stage?: string | null; };
 export type HeadToHeadItem = { id: string; date: string; homeTeamName: string; awayTeamName: string; homeScore: number | null; awayScore: number | null; status: string; stage?: string | null; };
 export type MatchHistoryContext = { homeRecentForm: MatchFormItem[]; awayRecentForm: MatchFormItem[]; headToHead: HeadToHeadItem[]; homeWorldCupHistory?: string | null; awayWorldCupHistory?: string | null; };
 
 export type MatchPageData = {
-  id: string; title: string; matchDate: string; venue: string | null; city?: string | null; referee?: string | null; competition: string; groupLabel: string | null; stageLabel: string; homeTeam: MatchTeamLite; awayTeam: MatchTeamLite; score: MatchScore; status: MatchStatusView; stats: MatchStatMetric[]; events: MatchEventView[]; homePlayers: MatchPlayerLite[]; awayPlayers: MatchPlayerLite[]; officialLineup: OfficialLineupView; advanced: MatchAdvancedData; voteEndpoint: string; groupStandings: StandingRow[]; thirdPlaceTable: StandingRow[]; tacticalKeys: string[]; matchImpact: string[]; digest: { summary?: string | null; turningPoint?: string | null; scoreLine?: string | null; href?: string | null; } | null; relatedArticles: RelatedArticle[]; sources: MatchSourceView[]; sourceChecklist: SourceChecklistItem[]; lastUpdatedAt: string; history?: MatchHistoryContext;
+  id: string; title: string; matchDate: string; venue: string | null; city?: string | null; referee?: string | null; competition: string; groupLabel: string | null; stageLabel: string; homeTeam: MatchTeamLite; awayTeam: MatchTeamLite; score: MatchScore; status: MatchStatusView; stats: MatchStatMetric[]; events: MatchEventView[]; homePlayers: MatchPlayerLite[]; awayPlayers: MatchPlayerLite[]; officialLineup: OfficialLineupView; advanced: MatchAdvancedData; voteEndpoint: string; groupStandings: StandingRow[]; thirdPlaceTable: StandingRow[]; tacticalKeys: string[]; matchImpact: string[]; digest: { summary?: string | null; turningPoint?: string | null; scoreLine?: string | null; href?: string | null; } | null; relatedArticles: RelatedArticle[]; postMatchContent?: MatchPostMatchContent; sources: MatchSourceView[]; sourceChecklist: SourceChecklistItem[]; lastUpdatedAt: string; history?: MatchHistoryContext;
 };

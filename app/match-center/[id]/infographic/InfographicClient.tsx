@@ -1,167 +1,179 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import Image from 'next/image';
-import { 
-  PieChart, 
-  Shield, 
-  Goal, 
-  Target, 
-  Flag, 
-  Square, 
-  CheckCircle2, 
-  LineChart, 
-  Activity,
-  Users
-} from 'lucide-react';
-import type { MatchPageData } from '@/lib/match-page/types';
+import type { MatchPageData, MatchPlayerStatItem } from '@/lib/match-page/types';
 import TeamHeatmap from '@/components/match-center/visuals/TeamHeatmap';
 import CompactStatCell from '@/components/match-center/visuals/CompactStatCell';
 
 interface InfographicProps {
   matchData: MatchPageData;
-  info: any;
+  info: Record<string, any>;
+  isPreview?: boolean;
 }
 
-const containerVariants = {
-  hidden: { opacity: 0 },
-  visible: { 
-    opacity: 1,
-    transition: { staggerChildren: 0.05 }
-  }
-};
+const ar = new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 2 });
 
-const itemVariants = {
-  hidden: { opacity: 0, y: 15 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.5 } }
-};
+function value(input: number | null | undefined, suffix = '') {
+  return input === null || input === undefined ? '—' : `${ar.format(input)}${suffix}`;
+}
 
-const HexagonImage = ({ src, alt, glowColor }: { src: string; alt: string; glowColor: string }) => (
-  <div className="relative flex h-16 w-16 items-center justify-center p-[2px] md:h-20 md:w-20" style={{ clipPath: 'polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%)', background: `linear-gradient(to bottom, ${glowColor}, transparent)` }}>
-    <div className="flex h-full w-full items-center justify-center bg-[#0a0a0c]" style={{ clipPath: 'polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%)' }}>
-      <Image src={src} alt={alt} width={50} height={50} className="object-contain p-1" />
-    </div>
-  </div>
-);
-
-// Components imported from visuals/
-
-export default function InfographicClient({ matchData, info }: InfographicProps) {
-  
-  const getStat = (key: string) => {
-    const s = matchData.stats.find((m) => m.key === key && m.available);
-    return { home: s?.home ?? null, away: s?.away ?? null };
-  };
-
-  const poss = getStat('possession');
-  const attacks = getStat('attacks');
-  const dangAttacks = getStat('dangerousAttacks');
-  const shots = getStat('shots');
-  const onTarget = getStat('shotsOnTarget');
-  const offTarget = getStat('shotsOffTarget');
-  const corners = getStat('corners');
-  const yellow = getStat('yellowCards');
-  const red = getStat('redCards');
-
-  const providerAnalytics = info?.advancedAnalytics || {};
-  const homeXG = matchData.advanced?.xg?.home ?? providerAnalytics.homeXG ?? null;
-  const awayXG = matchData.advanced?.xg?.away ?? providerAnalytics.awayXG ?? null;
-  const homeNPXG = matchData.advanced?.npxg?.home ?? null;
-  const awayNPXG = matchData.advanced?.npxg?.away ?? null;
-  const bigChances = getStat('bigChances');
-  const homeHeatmapPoints = matchData.advanced?.teamHeatmaps?.home?.points || [];
-  const awayHeatmapPoints = matchData.advanced?.teamHeatmaps?.away?.points || [];
-  const hasVerifiedHeatmaps = homeHeatmapPoints.length > 0 || awayHeatmapPoints.length > 0;
-
+function TeamIdentity({ team, accent }: { team: MatchPageData['homeTeam']; accent: string }) {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#050505] p-2 md:p-8" dir="rtl">
-      
-      {/* 1080x1920 Poster Container */}
-      <motion.div 
-        className="relative flex w-full max-w-[1080px] flex-col overflow-hidden bg-[#0a0a0c] font-sans"
-        style={{ aspectRatio: '1080/1920', border: '1px solid rgba(255,255,255,0.05)', boxShadow: '0 0 100px rgba(0,0,0,0.8)' }}
-        variants={containerVariants}
-        initial="hidden"
-        animate="visible"
-      >
-        {/* Background Grids & Glows */}
-        <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-[0.03]"></div>
-        <div className="absolute top-[-20%] left-[-20%] w-[60%] h-[40%] bg-[#0FF0FC]/10 blur-[120px] rounded-full mix-blend-screen pointer-events-none"></div>
-        <div className="absolute top-[-20%] right-[-20%] w-[60%] h-[40%] bg-[#F8C846]/10 blur-[120px] rounded-full mix-blend-screen pointer-events-none"></div>
-
-        {/* --- HEADER --- */}
-        <motion.div variants={itemVariants} className="relative z-10 flex flex-col items-center pt-[4%] px-8">
-          <h1 className="text-3xl md:text-5xl font-black text-[#F8C846] drop-shadow-[0_0_20px_rgba(248,200,70,0.4)]">
-            إحصائيات المباراة
-          </h1>
-          <p className="mt-2 text-sm md:text-lg text-gray-400 font-medium tracking-wide">
-            عرض موحد للأرقام والاحداث في مكان واحد
-          </p>
-        </motion.div>
-
-        {/* --- SCORE & TEAMS --- */}
-        <motion.div variants={itemVariants} className="relative z-10 mt-[3%] flex items-center justify-center px-12">
-          {/* Home Team */}
-          <div className="flex flex-1 items-center justify-end gap-4">
-            <span className="text-3xl md:text-4xl font-black text-white">{matchData.homeTeam.name}</span>
-            <HexagonImage src={matchData.homeTeam.image || ''} alt={matchData.homeTeam.name} glowColor="#0FF0FC" />
-          </div>
-
-          {/* Score */}
-          <div className="flex flex-col items-center justify-center mx-8">
-            <div className="flex items-center gap-4 text-5xl md:text-7xl font-black text-[#F8C846] drop-shadow-xl">
-              <span>{matchData.score.home}</span>
-              <span className="text-white/30">-</span>
-              <span>{matchData.score.away}</span>
-            </div>
-            <div className="mt-2 border border-[#F8C846]/50 bg-[#F8C846]/10 text-[#F8C846] rounded-full px-4 py-1 font-bold text-xs md:text-sm">
-              {matchData.status.shortLabel || matchData.status.label}
-            </div>
-          </div>
-
-          {/* Away Team */}
-          <div className="flex flex-1 items-center justify-start gap-4">
-            <HexagonImage src={matchData.awayTeam.image || ''} alt={matchData.awayTeam.name} glowColor="#F8C846" />
-            <span className="text-3xl md:text-4xl font-black text-white">{matchData.awayTeam.name}</span>
-          </div>
-        </motion.div>
-
-        {/* --- COMPACT STATS GRID --- */}
-        <motion.div variants={itemVariants} className="relative z-10 mt-6 mx-8 md:mx-16 grid grid-cols-1 md:grid-cols-3 gap-3">
-          {[
-            { label: 'الاستحواذ', h: poss.home === null ? null : `${poss.home}%`, a: poss.away === null ? null : `${poss.away}%` },
-            { label: 'الأهداف المتوقعة xG', h: homeXG === null ? null : Number(homeXG).toFixed(2), a: awayXG === null ? null : Number(awayXG).toFixed(2) },
-            { label: 'xG بدون ركلات جزاء', h: homeNPXG === null ? null : Number(homeNPXG).toFixed(2), a: awayNPXG === null ? null : Number(awayNPXG).toFixed(2) },
-            { label: 'فرص كبيرة', h: bigChances.home, a: bigChances.away },
-            { label: 'التسديدات', h: shots.home, a: shots.away },
-            { label: 'على المرمى', h: onTarget.home, a: onTarget.away },
-            { label: 'خارج المرمى', h: offTarget.home, a: offTarget.away },
-            { label: 'الركنيات', h: corners.home, a: corners.away },
-            { label: 'الهجمات', h: attacks.home, a: attacks.away },
-            { label: 'هجمات خطيرة', h: dangAttacks.home, a: dangAttacks.away },
-            { label: 'بطاقات صفراء', h: yellow.home, a: yellow.away },
-            { label: 'بطاقات حمراء', h: red.home, a: red.away },
-            { label: 'التسللات', h: getStat('offsides').home, a: getStat('offsides').away },
-            { label: 'الأخطاء', h: getStat('fouls').home, a: getStat('fouls').away },
-            { label: 'تصديات الحارس', h: getStat('saves').home, a: getStat('saves').away }
-          ].map((st, i) => st.h !== null && st.a !== null ? (
-            <CompactStatCell key={i} label={st.label} h={st.h} a={st.a} />
-          ) : null)}
-        </motion.div>
-
-        {/* --- VERIFIED HEATMAPS ONLY --- */}
-        {hasVerifiedHeatmaps && (
-          <motion.div variants={itemVariants} className="relative z-10 mt-6 mx-8 md:mx-16 flex flex-col rounded-3xl border border-white/10 bg-white/5 p-6 shadow-lg">
-            <h3 className="text-center text-white font-bold text-lg md:text-xl mb-4">الخريطة الحرارية</h3>
-            <div className="flex gap-8 items-center justify-center max-w-[600px] mx-auto w-full">
-              {homeHeatmapPoints.length > 0 && <TeamHeatmap teamName={matchData.homeTeam.name} isHome={true} points={homeHeatmapPoints} />}
-              {awayHeatmapPoints.length > 0 && <TeamHeatmap teamName={matchData.awayTeam.name} isHome={false} points={awayHeatmapPoints} />}
-            </div>
-          </motion.div>
-        )}
-
-      </motion.div>
+    <div className="flex min-w-0 flex-1 flex-col items-center text-center">
+      <div className="flex h-20 w-24 items-center justify-center overflow-hidden rounded-3xl border bg-black/30 p-2 sm:h-24 sm:w-28" style={{ borderColor: `${accent}55` }}>
+        {team.image ? <img src={team.image} alt={team.name} className="h-full w-full object-contain" /> : <span className="text-xl font-black" style={{ color: accent }}>{team.code || team.name.slice(0, 3)}</span>}
+      </div>
+      <h2 className="mt-3 max-w-full truncate text-lg font-black text-white sm:text-3xl">{team.name}</h2>
     </div>
   );
 }
 
+function playerSide(player: MatchPlayerStatItem, matchData: MatchPageData) {
+  if (player.teamId === matchData.homeTeam.id || player.teamId === matchData.homeTeam.code) return 'home';
+  if (player.teamId === matchData.awayTeam.id || player.teamId === matchData.awayTeam.code) return 'away';
+  return null;
+}
+
+export default function InfographicClient({ matchData, info, isPreview = false }: InfographicProps) {
+  const availableStats = matchData.stats.filter((metric) => metric.available && metric.home !== null && metric.away !== null).slice(0, 15);
+  const momentum = matchData.advanced.momentum || [];
+  const momentumMax = Math.max(1, ...momentum.flatMap((point) => [point.home, point.away]));
+  const homeHeatmapPoints = matchData.advanced.teamHeatmaps?.home?.points || [];
+  const awayHeatmapPoints = matchData.advanced.teamHeatmaps?.away?.points || [];
+  const topPlayers = (matchData.advanced.playerStats || [])
+    .filter((player) => (player.started === true || player.played === true || Number(player.minutes || 0) > 0) && typeof player.rating === 'number')
+    .sort((a, b) => Number(b.rating) - Number(a.rating))
+    .slice(0, 3);
+  const source = info?.source || {};
+  const xg = matchData.advanced.xg;
+  const npxg = matchData.advanced.npxg;
+
+  return (
+    <main className="min-h-screen bg-[#020604] px-2 py-5 text-white sm:px-5" dir="rtl">
+      {isPreview && (
+        <div className="sticky top-2 z-50 mx-auto mb-3 max-w-[1080px] rounded-2xl border border-amber-300/30 bg-amber-300/15 px-4 py-3 text-center text-sm font-black text-amber-100 backdrop-blur">
+          معاينة إدارية — هذا الإنفوجرافيك غير ظاهر للجمهور حتى يتم اعتماده.
+        </div>
+      )}
+
+      <motion.article
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="relative mx-auto max-w-[1080px] overflow-hidden rounded-[2rem] border border-white/10 bg-[#07110d] shadow-[0_30px_100px_rgba(0,0,0,.65)]"
+      >
+        <div className="pointer-events-none absolute inset-0 opacity-25" style={{ backgroundImage: 'linear-gradient(rgba(255,255,255,.035) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.035) 1px, transparent 1px)', backgroundSize: '42px 42px' }} />
+        <div className="pointer-events-none absolute -right-40 -top-40 h-96 w-96 rounded-full bg-[#F8C846]/15 blur-[110px]" />
+        <div className="pointer-events-none absolute -left-40 top-52 h-96 w-96 rounded-full bg-[#0FF0FC]/15 blur-[110px]" />
+
+        <div className="relative p-4 sm:p-8 lg:p-12">
+          <header className="flex flex-wrap items-start justify-between gap-4 border-b border-white/10 pb-6">
+            <div>
+              <div className="inline-flex rounded-full border border-[#18E58F]/25 bg-[#18E58F]/10 px-3 py-1 text-xs font-black text-[#18E58F]">MATCH INTELLIGENCE · بيانات موثقة</div>
+              <h1 className="mt-4 text-3xl font-black leading-tight sm:text-5xl">قصة المباراة بالأرقام</h1>
+              <p className="mt-2 text-sm font-bold text-slate-400">{matchData.competition} · {matchData.stageLabel}</p>
+            </div>
+            <div className="rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-left text-[10px] font-bold leading-5 text-slate-500" dir="ltr">
+              <div>Source: {source.provider || 'THE_STATS'}</div>
+              <div>Snapshot: {String(source.snapshotId || '').slice(0, 12) || '—'}</div>
+            </div>
+          </header>
+
+          <section className="mt-7 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 rounded-[2rem] border border-white/10 bg-black/20 p-4 sm:gap-8 sm:p-8">
+            <TeamIdentity team={matchData.homeTeam} accent="#0FF0FC" />
+            <div className="text-center">
+              <div className="flex items-center gap-3 text-4xl font-black tabular-nums sm:text-7xl">
+                <span className="text-[#0FF0FC]">{value(matchData.score.home)}</span>
+                <span className="text-white/25">–</span>
+                <span className="text-[#F8C846]">{value(matchData.score.away)}</span>
+              </div>
+              <span className="mt-3 inline-flex rounded-full border border-white/10 bg-white/[0.05] px-3 py-1 text-[10px] font-black text-slate-300">{matchData.status.shortLabel || matchData.status.label}</span>
+            </div>
+            <TeamIdentity team={matchData.awayTeam} accent="#F8C846" />
+          </section>
+
+          {(xg?.home !== null && xg?.home !== undefined && xg?.away !== null && xg?.away !== undefined) && (
+            <section className="mt-5 grid gap-3 sm:grid-cols-2">
+              <div className="rounded-3xl border border-[#0FF0FC]/20 bg-[#0FF0FC]/5 p-5">
+                <p className="text-xs font-black text-[#0FF0FC]">جودة الفرص · xG</p>
+                <div className="mt-3 flex items-end justify-between"><b className="text-4xl font-black">{value(xg.home)}</b><span className="text-slate-500">مقابل</span><b className="text-4xl font-black">{value(xg.away)}</b></div>
+              </div>
+              {(npxg?.home !== null && npxg?.home !== undefined && npxg?.away !== null && npxg?.away !== undefined) && (
+                <div className="rounded-3xl border border-[#F8C846]/20 bg-[#F8C846]/5 p-5">
+                  <p className="text-xs font-black text-[#F8C846]">xG دون ركلات الجزاء · npxG</p>
+                  <div className="mt-3 flex items-end justify-between"><b className="text-4xl font-black">{value(npxg.home)}</b><span className="text-slate-500">مقابل</span><b className="text-4xl font-black">{value(npxg.away)}</b></div>
+                </div>
+              )}
+            </section>
+          )}
+
+          {momentum.length >= 2 && (
+            <section className="mt-5 rounded-[2rem] border border-white/10 bg-white/[0.035] p-5 sm:p-7">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div><h3 className="text-xl font-black">زخم المباراة</h3><p className="mt-1 text-[11px] font-bold text-slate-500">{momentum.some((point) => point.source === 'PROVIDER') ? 'سلسلة المزود' : 'محسوب من التسديدات وxG الموثقة'}</p></div>
+                <div className="flex gap-3 text-xs font-black"><span className="text-[#0FF0FC]">{matchData.homeTeam.name}</span><span className="text-[#F8C846]">{matchData.awayTeam.name}</span></div>
+              </div>
+              <div className="mt-5 overflow-x-auto">
+                <div className="flex h-48 min-w-[650px] items-center gap-1">
+                  {momentum.map((point) => (
+                    <div key={point.minute} className="flex flex-1 flex-col items-center justify-center">
+                      <div className="flex h-[80px] w-full items-end justify-center"><div className="w-3/4 rounded-t bg-[#0FF0FC]" style={{ height: Math.max(2, point.home / momentumMax * 76) }} /></div>
+                      <span className="my-1 text-[8px] font-black text-slate-600">{point.minute}′</span>
+                      <div className="flex h-[80px] w-full items-start justify-center"><div className="w-3/4 rounded-b bg-[#F8C846]" style={{ height: Math.max(2, point.away / momentumMax * 76) }} /></div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </section>
+          )}
+
+          {availableStats.length > 0 && (
+            <section className="mt-5 rounded-[2rem] border border-white/10 bg-white/[0.035] p-5 sm:p-7">
+              <h3 className="text-xl font-black">المقارنة الكاملة</h3>
+              <div className="mt-5 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                {availableStats.map((metric) => <CompactStatCell key={metric.key} label={metric.label} h={value(metric.home, metric.suffix)} a={value(metric.away, metric.suffix)} />)}
+              </div>
+            </section>
+          )}
+
+          {(homeHeatmapPoints.length > 0 || awayHeatmapPoints.length > 0) && (
+            <section className="mt-5 rounded-[2rem] border border-white/10 bg-white/[0.035] p-5 sm:p-7">
+              <div><h3 className="text-xl font-black">بصمة التمركز</h3><p className="mt-1 text-[11px] font-bold text-slate-500">خرائط مجمعة من نقاط اللاعبين الفعلية فقط</p></div>
+              <div className="mt-5 grid gap-5 sm:grid-cols-2">
+                {homeHeatmapPoints.length > 0 && <div className="flex justify-center"><TeamHeatmap teamName={matchData.homeTeam.name} isHome points={homeHeatmapPoints} /></div>}
+                {awayHeatmapPoints.length > 0 && <div className="flex justify-center"><TeamHeatmap teamName={matchData.awayTeam.name} isHome={false} points={awayHeatmapPoints} /></div>}
+              </div>
+            </section>
+          )}
+
+          {topPlayers.length > 0 && (
+            <section className="mt-5 rounded-[2rem] border border-white/10 bg-white/[0.035] p-5 sm:p-7">
+              <div><h3 className="text-xl font-black">الأعلى تقييمًا</h3><p className="mt-1 text-[11px] font-bold text-slate-500">ترتيب مباشر من تقييمات مزود البيانات، وليس اختيارًا مولدًا.</p></div>
+              <div className="mt-5 grid gap-3 sm:grid-cols-3">
+                {topPlayers.map((player, index) => {
+                  const side = playerSide(player, matchData);
+                  return (
+                    <article key={player.playerId || player.playerName} className="rounded-2xl border border-white/10 bg-black/25 p-4">
+                      <div className="flex items-center justify-between"><span className="text-xs font-black text-slate-500">#{index + 1}</span><b className="rounded-full bg-[#18E58F]/10 px-3 py-1 text-lg font-black text-[#18E58F]">{value(player.rating)}</b></div>
+                      <h4 className="mt-4 text-lg font-black">{player.playerName}</h4>
+                      <p className="mt-1 text-[11px] font-bold text-slate-500">{side === 'home' ? matchData.homeTeam.name : side === 'away' ? matchData.awayTeam.name : player.teamName || ''}</p>
+                      <div className="mt-4 flex flex-wrap gap-2 text-[10px] font-black text-slate-300">
+                        {player.minutes !== null && player.minutes !== undefined && <span>{value(player.minutes)} دقيقة</span>}
+                        {Number(player.goals || 0) > 0 && <span>{value(player.goals)} هدف</span>}
+                        {Number(player.assists || 0) > 0 && <span>{value(player.assists)} أسيست</span>}
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            </section>
+          )}
+
+          <footer className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-5 text-[10px] font-bold text-slate-600">
+            <span>لا يعرض هذا الإنفوجرافيك أي رقم غير موجود في Snapshot الموثق.</span>
+            <span>{info?.approvedAt ? `اعتمد في ${new Date(info.approvedAt).toLocaleDateString('ar-EG', { timeZone: 'UTC' })}` : 'بانتظار الاعتماد التحريري'}</span>
+          </footer>
+        </div>
+      </motion.article>
+    </main>
+  );
+}

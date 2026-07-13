@@ -589,13 +589,36 @@ function buildTacticalKeys(homeName: string, awayName: string, statsAvailable: b
   return keys.slice(0, 4);
 }
 
+export function approvedPostMatchContent(matchId: string, infographicValue: unknown, articleRows: any[]) {
+  const info = infographicValue && typeof infographicValue === 'object' && !Array.isArray(infographicValue)
+    ? infographicValue as Record<string, any>
+    : null;
+  const article = articleRows[0] || null;
+  const infographicApproved = info?.version === 2 && info?.status === 'APPROVED' && Boolean(info?.source?.snapshotId) && Boolean(info?.approvedAt);
+  return {
+    article: article ? {
+      id: String(article.id),
+      title: String(article.title),
+      excerpt: String(article.excerpt || ''),
+      slug: String(article.slug),
+      publishedAt: article.publishedAt ? new Date(article.publishedAt).toISOString() : null,
+    } : null,
+    infographic: infographicApproved ? {
+      href: `/match-center/${matchId}/infographic`,
+      approvedAt: new Date(info.approvedAt).toISOString(),
+      sourceSnapshotId: String(info.source.snapshotId),
+    } : null,
+  };
+}
+
 export async function getMatchPageDataFast(matchId: string): Promise<MatchPageData | null> {
   const match = await prisma.match.findUnique({ where: { id: matchId }, include: { homeTeam: true, awayTeam: true, events: { orderBy: [{ minute: 'asc' }, { createdAt: 'asc' }], take: 80 }, statsSnapshots: { orderBy: { capturedAt: 'desc' }, take: 24 } } });
   if (!match) return null;
 
-  const [players, allMatches] = await Promise.all([
+  const [players, allMatches, publishedArticleRows] = await Promise.all([
     prisma.asset.findMany({ where: { type: 'PLAYER', teamId: { in: [match.homeTeamId, match.awayTeamId] } }, select: { id: true, name: true, code: true, image: true, position: true, teamId: true }, take: 80, orderBy: [{ position: 'asc' }, { name: 'asc' }] }),
     prisma.match.findMany({ select: { id: true, homeTeamId: true, awayTeamId: true, homeScore: true, awayScore: true, status: true, matchDate: true, groupPhase: true, stage: true, homeTeam: { select: { id: true, name: true, code: true, image: true, group: true } }, awayTeam: { select: { id: true, name: true, code: true, image: true, group: true } } }, orderBy: { matchDate: 'asc' } }),
+    prisma.$queryRawUnsafe<any[]>(`SELECT "id","title","excerpt","slug","publishedAt" FROM "MatchArticle" WHERE "matchId"=$1 AND "language"='ar' AND "status"='PUBLISHED' LIMIT 1`, matchId).catch(() => []),
   ]);
 
   const snapshots = [...(match.statsSnapshots || [])].sort((a, b) => providerPriority(a) - providerPriority(b) || new Date(b.capturedAt).getTime() - new Date(a.capturedAt).getTime());
@@ -649,6 +672,7 @@ export async function getMatchPageDataFast(matchId: string): Promise<MatchPageDa
     matchImpact: buildMatchImpact(match.homeTeamId, match.awayTeamId, groupStandings, thirdPlaceTable),
     digest: null,
     relatedArticles: [],
+    postMatchContent: approvedPostMatchContent(match.id, match.infographicData, publishedArticleRows),
     sources,
     sourceChecklist: sourceChecklist(match, statsAvailable, pageEvents.length, Boolean(officialLineup?.home?.startingXi?.length || officialLineup?.away?.startingXi?.length), advanced.playerStats.length),
     lastUpdatedAt: maxDateIso([...(match.statsSnapshots || []).map((snapshot) => snapshot.capturedAt), ...(match.events || []).map((event) => event.updatedAt), match.matchDate]),
