@@ -8,6 +8,7 @@ import type {
   MatchPageData,
   MatchPlayerLite,
   MatchPlayerStatItem,
+  MatchShotMapItem,
   MatchSourceView,
   MatchStatMetric,
   MatchStatusView,
