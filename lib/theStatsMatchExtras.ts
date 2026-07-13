@@ -184,7 +184,7 @@ export async function collectTheStatsMatchExtras(match: any, options: { dryRun?:
   const teamHeatmaps: any = { home: { points: [] }, away: { points: [] } };
 
   if (mode === 'full') {
-    const playersToFetch = playerStats.filter((p: any) => p.played === true || (p.minutes !== null && p.minutes > 0));
+    const playersToFetch = playerStats.filter((p: any) => p.started === true || p.played === true || (p.minutes !== null && p.minutes > 0));
     const heatmapPromises = playersToFetch.map(async (p: any, i: number) => {
       if (delayMs > 0 && i > 0) await sleep((i % 5) * Math.max(50, delayMs / 2)); // Stagger requests slightly
       try {
@@ -196,12 +196,14 @@ export async function collectTheStatsMatchExtras(match: any, options: { dryRun?:
         })).filter((pt: any) => pt.x !== null && pt.y !== null);
 
         if (points.length > 0) {
-          const side = String(p.teamId) === String(match?.homeTeam?.id) || String(p.teamId) === String(match?.homeTeam?.code) || (match?.homeTeam?.name && String(p.teamName).includes(match.homeTeam.name)) ? 'home' : 'away';
-          
+          const homeMatch = String(p.teamId) === String(match?.homeTeam?.id) || String(p.teamId) === String(match?.homeTeam?.code) || (key(p.teamName) && key(p.teamName) === key(match?.homeTeam?.name));
+          const awayMatch = String(p.teamId) === String(match?.awayTeam?.id) || String(p.teamId) === String(match?.awayTeam?.code) || (key(p.teamName) && key(p.teamName) === key(match?.awayTeam?.name));
+          const side = homeMatch ? 'home' : awayMatch ? 'away' : undefined;
+
           if (side === 'home') {
              teamHeatmaps.home.teamId = p.teamId;
              teamHeatmaps.home.points.push(...points);
-          } else {
+          } else if (side === 'away') {
              teamHeatmaps.away.teamId = p.teamId;
              teamHeatmaps.away.points.push(...points);
           }

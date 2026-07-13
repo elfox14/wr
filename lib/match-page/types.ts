@@ -29,9 +29,10 @@ export type MatchPlayerStatItem = {
 export type HeatmapPoint = { x: number; y: number; count?: number; };
 export type PlayerHeatmap = { playerId: string; playerName?: string; teamId?: string; side?: 'home' | 'away'; points: HeatmapPoint[]; };
 export type TeamHeatmapData = { teamId: string; points: HeatmapPoint[]; };
+export type MatchMomentumPoint = { minute: number; home: number; away: number; source: 'PROVIDER' | 'DERIVED_FROM_VERIFIED_SHOTS'; sampleSize: number; };
 
 export type MatchAdvancedData = {
-  venue?: string | null; city?: string | null; referee?: string | null; finalScore?: { home: number | null; away: number | null } | null; xg?: { home: number | null; away: number | null } | null; npxg?: { home: number | null; away: number | null } | null; events: MatchEventView[]; shotmap: MatchShotMapItem[]; playerStats: MatchPlayerStatItem[]; playerHeatmaps?: PlayerHeatmap[]; teamHeatmaps?: { home?: TeamHeatmapData; away?: TeamHeatmapData };
+  venue?: string | null; city?: string | null; referee?: string | null; finalScore?: { home: number | null; away: number | null } | null; xg?: { home: number | null; away: number | null } | null; npxg?: { home: number | null; away: number | null } | null; events: MatchEventView[]; shotmap: MatchShotMapItem[]; playerStats: MatchPlayerStatItem[]; playerHeatmaps?: PlayerHeatmap[]; teamHeatmaps?: { home?: TeamHeatmapData; away?: TeamHeatmapData }; momentum?: MatchMomentumPoint[];
 };
 
 export type StandingRow = { rank: number; teamId: string; teamName: string; code?: string | null; image?: string | null; played: number; won: number; drawn: number; lost: number; goalsFor: number; goalsAgainst: number; goalDifference: number; points: number; qualifies?: boolean; };
