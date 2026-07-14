@@ -16,6 +16,31 @@ const STALE_FINAL_SNAPSHOT_MS = 7 * 60 * 1000;
 const FINAL_MINUTE_FLOOR = 85;
 const FINAL_LOCAL_MINUTE_FALLBACK = 100;
 
+function knockoutStageWhere() {
+  const contains = ['32', '16', 'FINAL', 'SEMI', 'QUARTER', 'THIRD'];
+  return {
+    OR: [
+      ...KNOCKOUT_STAGES.flatMap((stage) => [
+        { stage: { equals: stage, mode: 'insensitive' as const } },
+        { groupPhase: { equals: stage, mode: 'insensitive' as const } },
+      ]),
+      ...contains.flatMap((term) => [
+        { stage: { contains: term, mode: 'insensitive' as const } },
+        { groupPhase: { contains: term, mode: 'insensitive' as const } },
+      ]),
+    ],
+  };
+}
+
+function fifaTrustedWhere() {
+  return {
+    OR: [
+      { syncSource: { contains: 'FIFA', mode: 'insensitive' as const } },
+      { externalId: { startsWith: 'fifa-', mode: 'insensitive' as const } },
+    ],
+  };
+}
+
 type TournamentMatchSummaryRow = {
   id: string;
   externalId?: string | null;
@@ -274,21 +299,9 @@ async function loadHomeDataUncached() {
       // Knockout bracket — fetch all knockout stage matches
       prisma.match.findMany({
         where: {
-          OR: [
-            { stage: { in: KNOCKOUT_STAGES } },
-            { groupPhase: { in: KNOCKOUT_STAGES } },
-            { stage: { contains: '32' } },
-            { stage: { contains: '16' } },
-            { stage: { contains: 'FINAL' } },
-            { stage: { contains: 'SEMI' } },
-            { stage: { contains: 'QUARTER' } },
-            { stage: { contains: 'THIRD' } },
-            { groupPhase: { contains: '32' } },
-            { groupPhase: { contains: '16' } },
-            { groupPhase: { contains: 'FINAL' } },
-            { groupPhase: { contains: 'SEMI' } },
-            { groupPhase: { contains: 'QUARTER' } },
-            { groupPhase: { contains: 'THIRD' } },
+          AND: [
+            knockoutStageWhere(),
+            fifaTrustedWhere(),
           ],
         },
         orderBy: { matchDate: 'asc' },

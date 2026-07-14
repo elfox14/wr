@@ -302,23 +302,34 @@ export default function HomeRoundOf32Widget({ knockoutMatches = [] }: Props) {
   const safeMatches = isMatches(knockoutMatches) ? knockoutMatches : [];
   const buckets = groupMatches(safeMatches);
   const { byNo } = makeIndexes(safeMatches);
-  const ready = buckets.r32.length > 0;
+  const stageCards = [
+    { key: 'r32', label: 'دور الـ٣٢', count: buckets.r32.length, expected: 16, tone: 'text-[#FFD700]' },
+    { key: 'r16', label: 'دور الـ١٦', count: buckets.r16.length, expected: 8, tone: 'text-[#00FF88]' },
+    { key: 'qf', label: 'ربع النهائي', count: buckets.qf.length, expected: 4, tone: 'text-[#0FF0FC]' },
+    { key: 'sf', label: 'نصف النهائي', count: buckets.sf.length, expected: 2, tone: 'text-fuchsia-300' },
+  ];
+  const ready = stageCards.some((stage) => stage.count > 0);
   const latestSync = safeMatches.map((match) => match.lastSyncedAt || match.matchDate).filter(Boolean).sort((a, b) => new Date(String(b)).getTime() - new Date(String(a)).getTime())[0] || null;
   const finalMatch = byNo.get(104) || buckets.final[0] || null;
   const thirdMatch = byNo.get(103) || buckets.third[0] || null;
 
   return (
     <section className="overflow-hidden rounded-[2rem] border border-white/10 bg-black p-2 shadow-[0_20px_70px_rgba(0,0,0,.38)]" aria-label="مسار التصفيات النهائية">
-      <div className="mb-2 grid gap-2 rounded-[1.35rem] border border-white/10 bg-white/[0.035] p-3 text-xs font-bold text-gray-400 sm:grid-cols-3">
-        <span><b className="text-[#FFD700]">دور الـ٣٢:</b> {nf.format(buckets.r32.length)} مباراة من FIFA</span>
-        <span><b className="text-[#00FF88]">النتائج:</b> {nf.format(buckets.r32.filter(isFinished).length)} مؤكدة/منتهية</span>
-        <span><b className="text-[#0FF0FC]">آخر مزامنة:</b> {latestSync ? dateTime(latestSync) : 'غير متوفر'}</span>
+      <div className="mb-2 grid grid-cols-2 gap-2 rounded-[1.35rem] border border-white/10 bg-white/[0.035] p-3 text-[11px] font-bold text-gray-400 sm:grid-cols-3 lg:grid-cols-6">
+        {stageCards.map((stage) => (
+          <span key={stage.key} className="rounded-xl border border-white/10 bg-black/25 px-3 py-2">
+            <b className={stage.tone}>{stage.label}:</b>{' '}
+            {nf.format(stage.count)} / {nf.format(stage.expected)}
+          </span>
+        ))}
+        <span className="rounded-xl border border-white/10 bg-black/25 px-3 py-2"><b className="text-white">المصدر:</b> FIFA فقط</span>
+        <span className="rounded-xl border border-white/10 bg-black/25 px-3 py-2"><b className="text-[#0FF0FC]">آخر مزامنة:</b> {latestSync ? dateTime(latestSync) : 'غير متوفر'}</span>
       </div>
       <div className="relative mx-auto min-h-[760px] w-full max-w-[1240px] overflow-auto rounded-[1.7rem] bg-[radial-gradient(circle_at_center,rgba(255,255,255,.06),transparent_38%),linear-gradient(180deg,#151515,#070707)] px-4 py-8">
         <PosterCorners />
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,rgba(0,0,0,.25)_42%,rgba(0,0,0,.72)_100%)]" />
         <div className="relative z-10 mb-5 grid min-w-[1180px] grid-cols-9 px-4 text-center text-[9px] font-black text-gray-400"><span>دور الـ٣٢</span><span>R16</span><span>QF</span><span>SF</span><span>FINAL</span><span>SF</span><span>QF</span><span>R16</span><span>دور الـ٣٢</span></div>
-        {!ready ? <div className="relative z-10 mt-32 rounded-2xl border border-dashed border-white/10 bg-black/35 p-6 text-center text-sm font-bold text-gray-400">لا توجد مباريات دور الـ٣٢ من FIFA محفوظة في قاعدة البيانات الآن. شغّل مزامنة FIFA أولًا.</div> : <div className="relative z-10 grid h-[650px] min-w-[1180px] grid-cols-[500px_180px_500px] gap-3"><SideBracket side="left" buckets={buckets} byNo={byNo} /><CenterColumn finalMatch={finalMatch} thirdMatch={thirdMatch} /><SideBracket side="right" buckets={buckets} byNo={byNo} /></div>}
+        {!ready ? <div className="relative z-10 mt-32 rounded-2xl border border-dashed border-white/10 bg-black/35 p-6 text-center text-sm font-bold text-gray-400">لا توجد مباريات موثقة للأدوار الإقصائية من FIFA في قاعدة البيانات الآن. شغّل مزامنة FIFA أولًا.</div> : <div className="relative z-10 grid h-[650px] min-w-[1180px] grid-cols-[500px_180px_500px] gap-3"><SideBracket side="left" buckets={buckets} byNo={byNo} /><CenterColumn finalMatch={finalMatch} thirdMatch={thirdMatch} /><SideBracket side="right" buckets={buckets} byNo={byNo} /></div>}
       </div>
     </section>
   );

@@ -58,10 +58,10 @@ function whereFor(filter: HubFilter, group: string) {
   if (filter === 'group') return groupWhere(group);
   if (filter === 'all') return {};
   if (filter === 'round_of_32') return { AND: [stageWhere(ROUND_OF_32_ALIASES, ['round of 32', 'last 32', 'r32', 'دور الـ32', 'دور ال32']), fifaTrustedWhere()] };
-  if (filter === 'round_of_16') return stageWhere(ROUND_OF_16_ALIASES, ['round of 16', 'last 16', 'r16', 'دور الـ16', 'دور ال16']);
-  if (filter === 'quarter_finals') return stageWhere(QUARTER_FINAL_ALIASES, ['quarter']);
-  if (filter === 'semi_finals') return stageWhere(SEMI_FINAL_ALIASES, ['semi']);
-  if (filter === 'final') return stageWhere(FINAL_ALIASES);
+  if (filter === 'round_of_16') return { AND: [stageWhere(ROUND_OF_16_ALIASES, ['round of 16', 'last 16', 'r16', 'دور الـ16', 'دور ال16']), fifaTrustedWhere()] };
+  if (filter === 'quarter_finals') return { AND: [stageWhere(QUARTER_FINAL_ALIASES, ['quarter']), fifaTrustedWhere()] };
+  if (filter === 'semi_finals') return { AND: [stageWhere(SEMI_FINAL_ALIASES, ['semi']), fifaTrustedWhere()] };
+  if (filter === 'final') return { AND: [stageWhere(FINAL_ALIASES), fifaTrustedWhere()] };
   return { matchDate: dayRangeInEgypt(0) };
 }
 function orderByFor(filter: HubFilter) { return filter === 'latest' ? { matchDate: 'desc' as const } : { matchDate: 'asc' as const }; }
@@ -158,7 +158,7 @@ export async function GET(req: NextRequest) {
     });
 
     const summary = { total: normalized.length, live: normalized.filter((item) => item.isLive).length, finished: normalized.filter((item) => item.isFinished).length, scheduled: normalized.filter((item) => item.isScheduled).length };
-    return NextResponse.json({ ok: true, mode: 'matches_hub_v5_canonical_deduped', filter, group, q, summary, matches: normalized }, { headers: { 'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=60' } });
+    return NextResponse.json({ ok: true, mode: 'matches_hub_v6_official_knockout', filter, group, q, summary, matches: normalized }, { headers: { 'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=60' } });
   } catch (error) {
     console.error('matches hub error', error);
     return NextResponse.json({ ok: false, error: 'Internal Server Error' }, { status: 500, headers: { 'Cache-Control': 'no-store' } });
