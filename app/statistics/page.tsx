@@ -20,7 +20,7 @@ const PERFORMANCE_LIMIT = 6000;
 const EVENT_LIMIT = 8000;
 
 const FINISHED = ['FINISHED', 'FT', 'AET', 'PEN', 'COMPLETED', 'ENDED', 'FINAL_VERIFIED', 'FULL_TIME'];
-const LIVE = ['LIVE', 'IN_PLAY', '1H', '2H', 'HT', 'ET', 'BT', 'P', 'PEN_LIVE'];
+const LIVE = ['LIVE', 'IN_PLAY', '1H', '2H', 'HT', 'HALFTIME', 'HALF_TIME', 'ET', 'BT', 'P', 'PEN_LIVE'];
 const SCHEDULED = ['SCHEDULED', 'TIMED', 'NOT_STARTED', 'NS'];
 
 const nf = new Intl.NumberFormat('ar-EG');
