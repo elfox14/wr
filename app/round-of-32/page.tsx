@@ -5,8 +5,8 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 60;
 
 export const metadata = {
-  title: 'مسار دور الـ32 | كأس العالم 2026',
-  description: 'مسار التصفيات النهائية من دور الـ32 حتى النهائي حسب نتائج FIFA الرسمية المحفوظة في قاعدة البيانات.',
+  title: 'مسار الأدوار الإقصائية | كأس العالم 2026',
+  description: 'مسار دور الـ32 ودور الـ16 وربع النهائي ونصف النهائي حسب مباريات ونتائج FIFA الرسمية المحفوظة في قاعدة البيانات.',
 };
 
 const R32 = ['round_of_32', 'last_32', 'r32', 'round 32', 'round of 32', 'last 32', 'دور الـ32', 'دور ال32', 'دور 32'];
@@ -82,9 +82,9 @@ export default async function RoundOf32Page() {
         <div className="inline-flex rounded-full border border-[#FFD700]/25 bg-[#FFD700]/10 px-3 py-1 text-[10px] font-black text-[#FFD700]">
           FIFA WORLD CUP 2026 KNOCKOUT PATH
         </div>
-        <h1 className="mt-3 text-2xl font-black md:text-3xl">مسار دور الـ32 حتى النهائي</h1>
+        <h1 className="mt-3 text-2xl font-black md:text-3xl">مسار الأدوار الإقصائية حتى النهائي</h1>
         <p className="mt-2 max-w-3xl text-sm font-bold leading-7 text-gray-400">
-          هذه الصفحة تعرض مباريات خروج المغلوب المحفوظة من مصدر FIFA فقط. لا يتم بناء مباريات دور الـ32 من ترتيب المجموعات القديم أو أي seed يدوي.
+          تعرض الصفحة دور الـ32 ودور الـ16 وربع النهائي ونصف النهائي من مصدر FIFA فقط. لا تُنشأ أي مواجهة قبل وصول طرفيها رسميًا أو حسمهما من نتائج الدور السابق الموثقة.
         </p>
       </div>
 
