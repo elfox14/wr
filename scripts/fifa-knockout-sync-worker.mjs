@@ -2,6 +2,10 @@ import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
+const FIFA_WORLD_CUP_COMPETITION_ID = '17';
+const FIFA_WORLD_CUP_2026_SEASON_ID = '285023';
+const FIFA_WORLD_CUP_2026_MATCH_COUNT = 104;
+
 const STAGE_CONFIGS = [
   {
     key: 'r32',
@@ -64,14 +68,14 @@ const DERIVED_BRACKETS = {
     sourceLabel: 'R32',
     allowEnv: 'FIFA_R16_ALLOW_DERIVED_FROM_R32',
     fixtures: [
-      { MatchNumber: 89, winners: [73, 75], Date: '2026-07-04T19:00:00.000Z' },
-      { MatchNumber: 90, winners: [74, 77], Date: '2026-07-04T22:00:00.000Z' },
-      { MatchNumber: 91, winners: [76, 78], Date: '2026-07-05T19:00:00.000Z' },
-      { MatchNumber: 92, winners: [79, 80], Date: '2026-07-05T22:00:00.000Z' },
-      { MatchNumber: 93, winners: [83, 84], Date: '2026-07-06T19:00:00.000Z' },
-      { MatchNumber: 94, winners: [81, 82], Date: '2026-07-06T22:00:00.000Z' },
-      { MatchNumber: 95, winners: [86, 88], Date: '2026-07-07T19:00:00.000Z' },
-      { MatchNumber: 96, winners: [85, 87], Date: '2026-07-07T22:00:00.000Z' },
+      { MatchNumber: 89, winners: [73, 75] },
+      { MatchNumber: 90, winners: [74, 77] },
+      { MatchNumber: 91, winners: [76, 78] },
+      { MatchNumber: 92, winners: [79, 80] },
+      { MatchNumber: 93, winners: [83, 84] },
+      { MatchNumber: 94, winners: [81, 82] },
+      { MatchNumber: 95, winners: [86, 88] },
+      { MatchNumber: 96, winners: [85, 87] },
     ],
   },
   qf: {
@@ -136,14 +140,28 @@ function normTeam(value) {
   return name;
 }
 
+function fifaSeasonId() {
+  const configured = env('FIFA_SEASON_ID');
+  // Older deployments used the calendar year, but FIFA requires its internal edition id.
+  if (!configured || configured === '2026') return FIFA_WORLD_CUP_2026_SEASON_ID;
+  return configured;
+}
+
 function fifaUrl() {
   const configured = env('FIFA_MATCHES_SOURCE_URL');
-  if (configured) return configured;
+  if (configured) {
+    const url = new URL(configured);
+    for (const key of ['idSeason', 'IdSeason']) {
+      if (url.searchParams.get(key) === '2026') url.searchParams.set(key, FIFA_WORLD_CUP_2026_SEASON_ID);
+    }
+    return url.toString();
+  }
+
   const url = new URL(env('FIFA_MATCHES_BASE_URL', 'https://api.fifa.com/api/v3/calendar/matches'));
   url.searchParams.set('language', env('FIFA_LANGUAGE', 'en'));
   url.searchParams.set('count', env('FIFA_MATCHES_COUNT', '500'));
-  url.searchParams.set('idCompetition', env('FIFA_COMPETITION_ID', '17'));
-  url.searchParams.set('idSeason', env('FIFA_SEASON_ID', '2026'));
+  url.searchParams.set('idCompetition', env('FIFA_COMPETITION_ID', FIFA_WORLD_CUP_COMPETITION_ID));
+  url.searchParams.set('idSeason', fifaSeasonId());
   return url.toString();
 }
 
@@ -286,13 +304,27 @@ function penaltyScore(match, side) {
   const upper = side === 'home' ? 'Home' : 'Away';
   const lower = side;
   const p = match.PenaltyScore || match.penaltyScore || match.Penalties || match.penalties || {};
-  const value = pick(p, [upper, lower, `${upper}Team`, `${lower}Team`]);
+  const direct = pick(match, [
+    `${upper}TeamPenaltyScore`,
+    `${lower}TeamPenaltyScore`,
+    `${upper}PenaltyScore`,
+    `${lower}PenaltyScore`,
+  ]);
+  const value = direct ?? pick(p, [upper, lower, `${upper}Team`, `${lower}Team`]);
   const number = n(value);
   return number === null ? null : Math.max(0, number);
 }
 
 function status(match) {
-  const raw = String(desc(pick(match, ['MatchStatusDescription', 'matchStatusDescription', 'StatusDescription', 'statusDescription'])) || pick(match, ['MatchStatus', 'matchStatus', 'Status', 'status']) || '').toLowerCase();
+  const value = pick(match, ['MatchStatus', 'matchStatus', 'Status', 'status']);
+  const numeric = typeof value === 'number' || /^\d+$/.test(String(value || '').trim()) ? Number(value) : null;
+
+  // FIFA calendar enum: 0 = completed, 1 = scheduled. Text statuses remain supported
+  // for compatible feeds and live-state variants.
+  if (numeric === 0) return 'FINISHED';
+  if (numeric === 1) return 'SCHEDULED';
+
+  const raw = String(desc(pick(match, ['MatchStatusDescription', 'matchStatusDescription', 'StatusDescription', 'statusDescription'])) || value || '').toLowerCase();
   if (raw.includes('finished') || raw.includes('complete') || raw.includes('full') || raw.includes('final') || raw.includes('ended') || raw.includes('12')) return 'FINISHED';
   if (raw.includes('half') || raw === 'ht') return 'HT';
   if (raw.includes('live') || raw.includes('play')) return 'IN_PLAY';
@@ -374,12 +406,11 @@ async function buildDerivedStageMatches(config, officialMatches, allTeams) {
     }
 
     const official = officialByNo.get(fixture.MatchNumber) || null;
-    const officialDate = official ? date(official) : null;
-    const matchDate = officialDate || (fixture.Date ? new Date(fixture.Date) : null);
-    if (!matchDate || !Number.isFinite(matchDate.getTime())) {
+    const matchDate = official ? date(official) : null;
+    if (!official || !matchDate || !Number.isFinite(matchDate.getTime())) {
       diagnostics.push({
         matchNo: fixture.MatchNumber,
-        status: 'skipped_missing_official_schedule',
+        status: 'skipped_missing_official_fixture',
         winners: fixture.winners,
       });
       continue;
@@ -473,7 +504,7 @@ async function upsert(match, config, allTeams, sourceUrl, dryRun) {
 async function processStage(config, allMatches, allTeams, sourceUrl, dryRun) {
   const detectedMatches = assignMissingMatchNumbers(allMatches.filter((match) => isStageMatch(match, config)), config);
   const bracket = DERIVED_BRACKETS[config.key];
-  const allowDerived = Boolean(bracket) && bool(bracket.allowEnv, true);
+  const allowDerived = Boolean(bracket) && bool(bracket.allowEnv, false);
   const prepared = allowDerived
     ? await buildDerivedStageMatches(config, detectedMatches, allTeams)
     : { matches: detectedMatches, diagnostics: [], usedDerived: false };
@@ -521,7 +552,27 @@ async function coverage() {
 async function run() {
   const dryRun = bool('FIFA_KNOCKOUT_DRY_RUN', bool('FIFA_R32_DRY_RUN', false));
   const { url, payload } = await getPayload();
-  const allMatches = listMatches(payload);
+  const payloadMatches = Array.isArray(payload?.Results) ? payload.Results : listMatches(payload);
+  const competitionId = env('FIFA_COMPETITION_ID', FIFA_WORLD_CUP_COMPETITION_ID);
+  const seasonId = fifaSeasonId();
+  const allMatches = payloadMatches.filter((match) => {
+    const matchCompetition = String(pick(match, ['IdCompetition', 'idCompetition', 'CompetitionId', 'competitionId']) || '').trim();
+    const matchSeason = String(pick(match, ['IdSeason', 'idSeason', 'SeasonId', 'seasonId']) || '').trim();
+    return (!matchCompetition || matchCompetition === competitionId) && (!matchSeason || matchSeason === seasonId);
+  });
+  const detectedByStage = STAGE_CONFIGS.map((config) => ({
+    stage: config.stage,
+    expected: config.matchNumbers.size,
+    detected: assignMissingMatchNumbers(allMatches.filter((match) => isStageMatch(match, config)), config).length,
+  }));
+  const detectedKnockoutMatches = detectedByStage.reduce((sum, stage) => sum + stage.detected, 0);
+
+  if (detectedKnockoutMatches === 0) {
+    throw new Error(
+      `FIFA_EMPTY_KNOCKOUT_PAYLOAD: no R32/R16/QF/SF matches for competition ${competitionId}, season ${seasonId}. Refusing to derive or persist fixtures from an empty official feed.`,
+    );
+  }
+
   const allTeams = await teams();
   const processedStages = [];
 
@@ -536,6 +587,14 @@ async function run() {
     sourceUrl: url,
     dryRun,
     detectedMatches: allMatches.length,
+    sourceDiagnostics: {
+      competitionId,
+      seasonId,
+      expectedTournamentMatches: FIFA_WORLD_CUP_2026_MATCH_COUNT,
+      payloadMatches: payloadMatches.length,
+      knockoutMatchesDetected: detectedKnockoutMatches,
+      stageDetection: detectedByStage,
+    },
     requestedStagesComplete: stageCoverage.every((stage) => stage.complete),
     stageCoverage,
     processedStages,
