@@ -86,6 +86,9 @@ jobs:
       - name: Lint team intelligence admin
         run: npm run lint:team-intelligence-admin
 
+      - name: Verify FIFA knockout sync entrypoints
+        run: npm run verify:knockout-sync
+
       - name: Type-check
         run: npx tsc --noEmit
 
