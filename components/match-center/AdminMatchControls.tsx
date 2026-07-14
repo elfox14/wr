@@ -57,6 +57,8 @@ export default function AdminMatchControls({ matchId }: { matchId: string }) {
       const heatmaps = Number(data?.counts?.playerHeatmaps || 0);
       const points = Number(data?.counts?.heatmapPoints || 0);
       const directHeatmaps = Number(data?.heatmapDiagnostics?.directHeatmaps || 0);
+      const embeddedHeatmaps = Number(data?.heatmapDiagnostics?.embeddedHeatmaps || 0);
+      const endpointHeatmaps = Number(data?.heatmapDiagnostics?.endpointHeatmaps || 0);
       const derivedHeatmaps = Number(data?.heatmapDiagnostics?.derivedHeatmaps || 0);
       if (!res.ok || !data.ok) {
         setInfographicMessage({ type: 'error', text: String(data.error || 'تعذر جلب بيانات TheStats الكاملة.') });
@@ -74,10 +76,11 @@ export default function AdminMatchControls({ matchId }: { matchId: string }) {
               : Number(codes.EMPTY_HEATMAP || 0) > 0
                 ? 'المزود أعاد استجابات ناجحة بلا نقاط تمركز، ما يعني أن التغطية غير متاحة لهذه المباراة.'
                 : 'لم يُرجع المزود خريطة مباشرة، ولم تتوفر ٦ إحداثيات أحداث موثقة على الأقل لأي لاعب.';
-        setInfographicMessage({ type: 'error', text: `${reason} (طُلبت ${Number(diagnostics.requestedPlayers || 0).toLocaleString('ar-EG')} خريطة، المتاح ${heatmaps.toLocaleString('ar-EG')}).` });
+        const codeSummary = Object.entries(codes).map(([code, count]) => `${code}: ${Number(count).toLocaleString('ar-EG')}`).join('، ');
+        setInfographicMessage({ type: 'error', text: `${reason} (طُلبت ${Number(diagnostics.requestedPlayers || 0).toLocaleString('ar-EG')} خريطة، المتاح ${heatmaps.toLocaleString('ar-EG')})${codeSummary ? ` — التشخيص: ${codeSummary}` : ''}.` });
         return;
       }
-      setInfographicMessage({ type: 'success', text: `تم حفظ ${heatmaps.toLocaleString('ar-EG')} خريطة حرارية موثقة بإجمالي ${points.toLocaleString('ar-EG')} نقطة (${directHeatmaps.toLocaleString('ar-EG')} مباشرة من المزود، ${derivedHeatmaps.toLocaleString('ar-EG')} مشتقة من أحداث موثقة).` });
+      setInfographicMessage({ type: 'success', text: `تم حفظ ${heatmaps.toLocaleString('ar-EG')} خريطة حرارية موثقة بإجمالي ${points.toLocaleString('ar-EG')} نقطة (${embeddedHeatmaps.toLocaleString('ar-EG')} مضمّنة في بيانات المباراة، ${endpointHeatmaps.toLocaleString('ar-EG')} من المسار الفردي، ${derivedHeatmaps.toLocaleString('ar-EG')} مشتقة من أحداث موثقة؛ إجمالي المباشرة ${directHeatmaps.toLocaleString('ar-EG')}).` });
       router.refresh();
     } catch {
       setInfographicMessage({ type: 'error', text: 'تعذر الاتصال بالخادم أثناء جلب الخرائط.' });

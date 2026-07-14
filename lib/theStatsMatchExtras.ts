@@ -1,6 +1,7 @@
 import { randomUUID } from 'crypto';
 import prisma from '@/lib/prisma';
 import { theStatsApiFetch } from '@/lib/theStatsApi';
+import { extractEmbeddedProviderHeatmaps } from '@/lib/match-page/embeddedHeatmaps';
 
 export type TheStatsExtrasEndpointMode = 'essential' | 'full' | 'events' | 'shots' | 'players' | 'lineups' | 'info' | 'stats' | string;
 
@@ -181,14 +182,46 @@ export async function collectTheStatsMatchExtras(match: any, options: { dryRun?:
   const stats = byKey.stats?.ok ? compactStats(byKey.stats.payload) : { meta: {}, stats: {} };
   const events = byKey.timeline?.ok ? listFrom(byKey.timeline.payload, ['timeline', 'events', 'incidents', 'commentary', 'items', 'results']).map(compactEvent) : [];
   const shotmap = byKey.shotmap?.ok ? listFrom(byKey.shotmap.payload, ['data', 'shotmap', 'shots', 'events', 'items', 'results']).map(compactShot) : [];
-  const playerStats = byKey.playerStats?.ok ? listFrom(byKey.playerStats.payload, ['data', 'players', 'player_stats', 'items', 'results']).map(compactPlayerStat) : [];
+  const playerStatRows = byKey.playerStats?.ok ? listFrom(byKey.playerStats.payload, ['data', 'players', 'player_stats', 'items', 'results']) : [];
+  const playerStats = playerStatRows.map(compactPlayerStat);
 
   const playerHeatmaps: any[] = [];
   const heatmapFailures: any[] = [];
   const teamHeatmaps: any = { home: { points: [] }, away: { points: [] } };
+  let requestedHeatmapPlayers = 0;
+  let embeddedHeatmaps = 0;
 
   if (mode === 'full') {
-    const playersToFetch = playerStats.filter((p: any) => p.playerId && (p.started === true || p.played === true || (p.minutes !== null && p.minutes > 0)));
+    const embeddedCandidates = [
+      ...extractEmbeddedProviderHeatmaps(byKey.playerStats?.payload, 'playerStats'),
+      ...extractEmbeddedProviderHeatmaps(byKey.lineups?.payload, 'lineups'),
+    ];
+    const embeddedPlayerKeys = new Set<string>();
+    for (const candidate of embeddedCandidates) {
+      const player = playerStats.find((item: any) =>
+        (candidate.playerId && String(item.playerId) === String(candidate.playerId)) ||
+        (candidate.playerName && key(item.playerName) === key(candidate.playerName))
+      );
+      const playerId = candidate.playerId || player?.playerId;
+      const playerName = candidate.playerName || player?.playerName;
+      if (!playerId || !candidate.points.length) continue;
+      const candidateKey = `id:${playerId}`;
+      if (embeddedPlayerKeys.has(candidateKey)) continue;
+      const teamId = candidate.teamId || player?.teamId;
+      const teamName = candidate.teamName || player?.teamName;
+      const homeMatch = candidate.side === 'home' || String(teamId) === String(match?.homeTeam?.id) || String(teamId) === String(match?.homeTeam?.code) || (key(teamName) && key(teamName) === key(match?.homeTeam?.name));
+      const awayMatch = candidate.side === 'away' || String(teamId) === String(match?.awayTeam?.id) || String(teamId) === String(match?.awayTeam?.code) || (key(teamName) && key(teamName) === key(match?.awayTeam?.name));
+      const side = homeMatch && !awayMatch ? 'home' : awayMatch && !homeMatch ? 'away' : candidate.side;
+      if (!side) continue;
+      embeddedPlayerKeys.add(candidateKey);
+      embeddedHeatmaps += 1;
+      playerHeatmaps.push({ playerId, playerName, teamId, side, source: 'PROVIDER_HEATMAP', sourceEndpoint: candidate.sourceEndpoint, points: candidate.points });
+      teamHeatmaps[side].teamId = teamId;
+      teamHeatmaps[side].points.push(...candidate.points);
+    }
+
+    const playersToFetch = playerStats.filter((p: any) => p.playerId && !embeddedPlayerKeys.has(`id:${p.playerId}`) && (p.started === true || p.played === true || (p.minutes !== null && p.minutes > 0)));
+    requestedHeatmapPlayers = playersToFetch.length;
     const heatmapPromises = playersToFetch.map(async (p: any, i: number) => {
       if (delayMs > 0 && i > 0) await sleep((i % 5) * Math.max(50, delayMs / 2)); // Stagger requests slightly
       try {
@@ -263,12 +296,12 @@ export async function collectTheStatsMatchExtras(match: any, options: { dryRun?:
   }
 
   const heatmapPointCount = playerHeatmaps.reduce((total: number, heatmap: any) => total + (Array.isArray(heatmap.points) ? heatmap.points.length : 0), 0);
-  const requestedHeatmapPlayers = mode === 'full' ? playerStats.filter((p: any) => p.playerId && (p.started === true || p.played === true || (p.minutes !== null && p.minutes > 0))).length : 0;
   const failureCodes = heatmapFailures.reduce((counts: Record<string, number>, failure: any) => { const code = String(failure.code || failure.status || 'UNKNOWN'); counts[code] = (counts[code] || 0) + 1; return counts; }, {});
   const directHeatmaps = playerHeatmaps.filter((heatmap: any) => heatmap.source === 'PROVIDER_HEATMAP').length;
   const derivedHeatmaps = playerHeatmaps.filter((heatmap: any) => heatmap.source === 'VERIFIED_ACTION_COORDINATES').length;
+  const endpointHeatmaps = Math.max(0, directHeatmaps - embeddedHeatmaps);
   const heatmapSource = directHeatmaps > 0 && derivedHeatmaps > 0 ? 'MIXED_VERIFIED_COORDINATES' : derivedHeatmaps > 0 ? 'VERIFIED_ACTION_COORDINATES' : 'THE_STATS_API_PLAYER_HEATMAP';
-  const heatmapMeta = { source: heatmapSource, requestedPlayers: requestedHeatmapPlayers, availablePlayers: playerHeatmaps.length, directHeatmaps, derivedHeatmaps, failedPlayers: heatmapFailures.length, pointCount: heatmapPointCount, verifiedCoordinates: true, failureCodes };
+  const heatmapMeta = { source: heatmapSource, requestedPlayers: requestedHeatmapPlayers, availablePlayers: playerHeatmaps.length, directHeatmaps, embeddedHeatmaps, endpointHeatmaps, derivedHeatmaps, failedPlayers: heatmapFailures.length, pointCount: heatmapPointCount, verifiedCoordinates: true, failureCodes };
   const normalized = { matchInfo: compactMatchInfo(byKey.matchInfo?.payload, byKey.stats?.payload), liveStats: stats, lineups: byKey.lineups?.ok ? dataOf(byKey.lineups.payload) : null, eventsDetailed: { all: events }, shotmap, playerStats, playerHeatmaps, teamHeatmaps, heatmapMeta };
   const endpointSummaries = results.map((item) => ({ key: item.key, path: item.path, ok: item.ok, error: item.ok ? null : item.error, keySummary: item.ok ? null : item.error?.message || null }));
   let snapshotId: string | null = null;
