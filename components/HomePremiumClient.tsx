@@ -11,6 +11,18 @@ import { getArabicTeamName } from '@/lib/teamDisplay';
 // ─── Types ────────────────────────────────────────────────────────────────────
 type Team = { id?: string | number | null; name?: string | null; code?: string | null; image?: string | null; flagUrl?: string | null; };
 type HomeMatch = { id?: string | number | null; animationMatchId?: string | number | null; matchDate?: string | Date | null; status?: string | null; displayStatus?: string | null; stage?: string | null; group?: string | null; groupPhase?: string | null; homeScore?: number | null; awayScore?: number | null; homeTeam?: Team | null; awayTeam?: Team | null; isLiveNow?: boolean; isHalfTime?: boolean; isLikelyLiveByTime?: boolean; isStaleAutoFinished?: boolean; minute?: number | null; liveLabel?: string | null; };
+type TournamentStatsSummary = {
+  totalMatches: number;
+  playedMatches: number;
+  liveMatches: number;
+  upcomingMatches: number;
+  totalGoals: number;
+  cleanSheets: number;
+  playersCount: number;
+  teamsCount: number;
+  updatedAt: string | null;
+};
+
 type Props = {
   upcomingMatches?: HomeMatch[] | unknown[];
   tickerMatches?: HomeMatch[] | unknown[];
@@ -20,6 +32,7 @@ type Props = {
   teamsCount?: number;
   upcomingMatchesCount?: number;
   knockoutMatches?: unknown[];
+  tournamentStats?: TournamentStatsSummary | null;
 };
 
 // ─── Status helpers ───────────────────────────────────────────────────────────
@@ -108,13 +121,13 @@ function LiveDot() {
 }
 
 // ─── Tournament Stats Bar ─────────────────────────────────────────────────────
-function TournamentStatsBar({ playersCount, teamsCount, upcomingMatchesCount, groupStandings }: {
-  playersCount: number; teamsCount: number; upcomingMatchesCount: number; groupStandings: unknown[];
+function TournamentStatsBar({ playersCount, teamsCount, upcomingMatchesCount, groupStandings, tournamentStats }: {
+  playersCount: number; teamsCount: number; upcomingMatchesCount: number; groupStandings: unknown[]; tournamentStats?: TournamentStatsSummary | null;
 }) {
   const totalGoals = useMemo(() => {
     if (!Array.isArray(groupStandings)) return 0;
     const all = groupStandings.flatMap((g: any) => g?.standings || []);
-    return Math.round(all.reduce((s: number, t: any) => s + (Number(t?.goalsFor) || 0), 0) / 2);
+    return all.reduce((sum: number, team: any) => sum + (Number(team?.goalsFor) || 0), 0);
   }, [groupStandings]);
 
   const playedMatches = useMemo(() => {
@@ -124,13 +137,16 @@ function TournamentStatsBar({ playersCount, teamsCount, upcomingMatchesCount, gr
   }, [groupStandings]);
 
   const stats = [
-    { label: 'منتخب مشارك', value: teamsCount || 48, color: '#18E58F', icon: '🏳️' },
-    { label: 'لاعب مسجل', value: playersCount || 1248, color: '#F8C846', icon: '⚽' },
-    { label: 'مباراة في البطولة', value: 104, color: '#7DD3FC', icon: '📅' },
-    { label: 'هدف سُجّل', value: totalGoals, color: '#FF4D5E', icon: '🥅' },
-    { label: 'مباراة لُعبت', value: playedMatches, color: '#C084FC', icon: '🏟️' },
-    { label: 'مباراة قادمة', value: upcomingMatchesCount, color: '#34D399', icon: '⏳' },
+    { label: 'منتخب مشارك', value: tournamentStats?.teamsCount ?? teamsCount, color: '#18E58F', icon: '🏳️' },
+    { label: 'لاعب مسجل', value: tournamentStats?.playersCount ?? playersCount, color: '#F8C846', icon: '⚽' },
+    { label: 'مباراة في البطولة', value: tournamentStats?.totalMatches ?? 0, color: '#7DD3FC', icon: '📅' },
+    { label: 'هدف سُجّل', value: tournamentStats?.totalGoals ?? totalGoals, color: '#FF4D5E', icon: '🥅' },
+    { label: 'مباراة لُعبت', value: tournamentStats?.playedMatches ?? playedMatches, color: '#C084FC', icon: '🏟️' },
+    { label: 'مباراة قادمة', value: tournamentStats?.upcomingMatches ?? upcomingMatchesCount, color: '#34D399', icon: '⏳' },
   ];
+  const updatedLabel = tournamentStats?.updatedAt
+    ? new Date(tournamentStats.updatedAt).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })
+    : 'غير متوفر';
 
   return (
     <motion.section
@@ -167,7 +183,7 @@ function TournamentStatsBar({ playersCount, teamsCount, upcomingMatchesCount, gr
                   يتحدث كل ٣٠ ث
                 </span>
               </div>
-              <p className="text-[10px] font-bold text-gray-500">آخر تحديث: {new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}</p>
+              <p className="text-[10px] font-bold text-gray-500">آخر تحديث موثق: {updatedLabel}</p>
             </div>
           </div>
           <Link href="/statistics" className="flex shrink-0 items-center gap-1 rounded-full border border-[#F8C846]/25 bg-[#F8C846]/10 px-3 py-1.5 text-[10px] font-black text-[#F8C846] transition-all hover:bg-[#F8C846]/20">
@@ -493,6 +509,7 @@ export default function HomePremiumClient({
   teamsCount = 0,
   upcomingMatchesCount = 0,
   knockoutMatches = [],
+  tournamentStats = null,
 }: Props) {
   const [, setNow] = useState(() => new Date());
   useEffect(() => {
@@ -504,9 +521,6 @@ export default function HomePremiumClient({
   const safeUpcoming = Array.isArray(upcomingMatches) ? upcomingMatches as HomeMatch[] : [];
   const safeNext = nextMarqueeMatch as HomeMatch | null;
   const primaryMatch = useMemo(() => choosePrimaryMatch(safeTicker, safeUpcoming, safeNext), [safeTicker, safeUpcoming, safeNext]);
-
-  // Use actual DB count, fallback to 1248
-  const actualPlayers = 1248;
 
   return (
     <main dir="rtl" className="mx-auto flex max-w-7xl flex-col gap-5 px-3 pb-14 pt-4 sm:px-4 sm:pt-6 lg:px-6">
@@ -521,10 +535,11 @@ export default function HomePremiumClient({
 
       {/* ③ Tournament Stats — الأرقام الكبيرة */}
       <TournamentStatsBar
-        playersCount={actualPlayers}
+        playersCount={playersCount}
         teamsCount={teamsCount}
         upcomingMatchesCount={upcomingMatchesCount}
         groupStandings={groupStandings}
+        tournamentStats={tournamentStats}
       />
 
       {/* ④ Hero Match + Top Teams */}
