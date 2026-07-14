@@ -25,6 +25,8 @@ const stageLabels: Record<string, string> = {
   round_of_16: 'دور الـ16',
   quarter_finals: 'ربع النهائي',
   semi_finals: 'نصف النهائي',
+  third_place: 'المركز الثالث',
+  final: 'النهائي',
 };
 
 const nf = new Intl.NumberFormat('ar-EG');
@@ -81,9 +83,9 @@ export default function KnockoutSyncDashboard() {
       <section className="rounded-3xl border border-white/10 bg-black/30 p-5">
         <div className="grid gap-4 md:grid-cols-[1fr_auto] md:items-center">
           <div>
-            <h2 className="text-xl font-black text-white">تحديث دور الـ32 حتى نصف النهائي</h2>
+            <h2 className="text-xl font-black text-white">تحديث جميع الأدوار الإقصائية</h2>
             <p className="mt-2 text-sm font-bold leading-7 text-gray-400">
-              العدد المتوقع: 16 مباراة في دور الـ32، و8 في دور الـ16، و4 في ربع النهائي، ومباراتان في نصف النهائي.
+              العدد المتوقع: 16 مباراة في دور الـ32، و8 في دور الـ16، و4 في ربع النهائي، ومباراتان في نصف النهائي، ثم مباراة المركز الثالث والنهائي.
             </p>
           </div>
           <button
@@ -114,7 +116,7 @@ export default function KnockoutSyncDashboard() {
           {response.error ? <p className="rounded-2xl border border-red-300/20 bg-black/25 p-4 text-sm font-bold text-red-100">{response.error}</p> : null}
 
           {coverage.length ? (
-            <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
               {coverage.map((stage) => (
                 <article key={stage.stage} className="rounded-2xl border border-white/10 bg-black/25 p-4 text-center">
                   <p className="text-xs font-black text-gray-400">{stageLabels[stage.stage] || stage.stage}</p>
