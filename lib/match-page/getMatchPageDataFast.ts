@@ -638,9 +638,8 @@ function headToHead(allMatches: any[], homeTeamId: string, awayTeamId: string, c
 }
 
 function worldCupHistory(team: MatchTeamLite) {
-  if (team.participations !== null && team.participations !== undefined) return `${team.name} شارك في كأس العالم ${team.participations} مرة حسب قاعدة البيانات.`;
-  if (team.worldCupLegacy !== null && team.worldCupLegacy !== undefined) return `${team.name} لديه مؤشر إرث عالمي محفوظ بقيمة ${team.worldCupLegacy}.`;
-  return `تاريخ مشاركات ${team.name} في كأس العالم غير متوفر في قاعدة البيانات الحالية.`;
+  if (team.participations !== null && team.participations !== undefined) return `${team.name} شارك في كأس العالم ${team.participations} مرة، وفق سجل المنتخب المحفوظ في قاعدة البيانات.`;
+  return `لا تتوفر حاليًا بيانات موثقة عن مشاركات ${team.name} في كأس العالم؛ لذلك لا نعرض رقمًا تقديريًا.`;
 }
 
 function buildTacticalKeys(homeName: string, awayName: string, statsAvailable: boolean, digest?: any | null) {
