@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 const FINISHED = ['FINISHED', 'FT', 'AET', 'PEN', 'COMPLETED', 'ENDED', 'FINAL_VERIFIED', 'FULL_TIME'];
-const LIVE = ['LIVE', 'IN_PLAY', '1H', '2H', 'HT', 'HALFTIME', 'HALF_TIME', 'PAUSED'];
+const LIVE = ['LIVE', 'IN_PLAY', '1H', '2H', 'HT', 'HALFTIME', 'HALF_TIME', 'PAUSED', 'ET', 'BT', 'P', 'PEN_LIVE'];
 const LIVE_SNAPSHOT_PROVIDERS = ['WORKER_ISPORTS', 'ISPORTS_ANIMATION_BROWSERLESS', 'AUTOMATED_LIVE_INGEST', 'ISPORTS_QUOTA_FALLBACK'];
 
 type MatchWithData = Awaited<ReturnType<typeof loadMatchCandidates>>[number];
@@ -73,6 +73,17 @@ function isUpcomingSoon(match: { status: string; matchDate: Date }, hours = 6) {
 
 function normalizedOf(snapshot: any) {
   return snapshot?.rawData?.normalized || {};
+}
+
+function resolvedProviderMatchId(snapshot: any) {
+  if (!snapshot) return null;
+  const raw = snapshot?.rawData && typeof snapshot.rawData === 'object' ? snapshot.rawData : {};
+  const value = raw.resolvedProviderMatchId || raw.providerMatchId || snapshot.providerMatchId;
+  const text = String(value || '').trim();
+  if (!text) return null;
+  if (text.startsWith('mt_')) return text;
+  const digits = text.replace(/\D/g, '');
+  return digits ? `mt_${digits}` : null;
 }
 
 function snapshotCounts(snapshot: any) {
@@ -240,6 +251,7 @@ function completeness(match: MatchWithData) {
   return {
     percent: Math.max(0, Math.min(100, score)),
     finalSnapshotId: finalSnapshot?.id || null,
+    finalProviderMatchId: resolvedProviderMatchId(finalSnapshot),
     liveSnapshotId: liveSnapshot?.id || null,
     finalCounts,
     flags: { liveLinked, liveSnapshotReady, resultSynced, finalStatsReady, finalEventsReady, playerRatingsReady, articleReady, infographicReady },
@@ -377,7 +389,7 @@ async function refreshMatch(matchId: string) {
   return matches[0] || null;
 }
 
-async function runNextStep(req: Request, match: MatchWithData, key: string, options: { includeResults: boolean; maxStepTimeoutMs: number; preSyncHours: number; iSportsBlocked: boolean; iSportsBlockedUntil: string | null }) {
+async function runNextStep(req: Request, match: MatchWithData, key: string, options: { includeResults: boolean; includeContent: boolean; maxStepTimeoutMs: number; preSyncHours: number; iSportsBlocked: boolean; iSportsBlockedUntil: string | null }) {
   const c = completeness(match);
   const date = dateOnly(match.matchDate);
 
@@ -447,10 +459,10 @@ async function runNextStep(req: Request, match: MatchWithData, key: string, opti
     }, req), undefined, Math.max(options.maxStepTimeoutMs, 55000));
   }
 
-  if (isFinished(match.status) && (!c.flags.finalEventsReady || !c.flags.playerRatingsReady) && match.externalId) {
+  if (isFinished(match.status) && (!c.flags.finalEventsReady || !c.flags.playerRatingsReady) && c.finalProviderMatchId) {
     return callJson('manual-final-import', withKey('/api/cron/manual-final-import', key, {
       matchId: match.id,
-      providerMatchId: match.externalId,
+      providerMatchId: c.finalProviderMatchId,
       scope: 'full',
       dryRun: false,
       includeRaw: false,
@@ -460,7 +472,7 @@ async function runNextStep(req: Request, match: MatchWithData, key: string, opti
     }, req), undefined, Math.max(options.maxStepTimeoutMs, 55000));
   }
 
-  if (isFinished(match.status) && c.flags.finalStatsReady && !c.flags.articleReady) {
+  if (options.includeContent && isFinished(match.status) && c.flags.finalStatsReady && !c.flags.articleReady) {
     return callJson('generate-match-content', withKey('/api/admin/match-content', key, {}, req), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -492,6 +504,7 @@ async function run(req: Request) {
   const take = intParam(url, 'candidateLimit', 80, 1, 200);
   const maxStepTimeoutMs = intParam(url, 'stepTimeoutMs', 45000, 5000, 90000);
   const includeResults = boolParam(url, 'includeResults', true);
+  const includeContent = boolParam(url, 'includeContent', true);
 
   const iSportsBlock = await getProviderBlock('ISPORTS');
   let iSportsBlocked = isBlockActive(iSportsBlock);
@@ -508,7 +521,7 @@ async function run(req: Request) {
   let current = picked.match;
 
   for (let index = 0; index < maxSteps; index += 1) {
-    const step = await runNextStep(req, current, key, { includeResults: includeResults && index === 0, maxStepTimeoutMs, preSyncHours, iSportsBlocked, iSportsBlockedUntil });
+    const step = await runNextStep(req, current, key, { includeResults: includeResults && index === 0, includeContent, maxStepTimeoutMs, preSyncHours, iSportsBlocked, iSportsBlockedUntil });
     steps.push(step);
 
     if (syncStepHasQuota(step)) {
@@ -540,6 +553,7 @@ async function run(req: Request) {
       priority: picked.priority,
     },
     providerState: { iSportsBlocked, iSportsBlockedUntil },
+    policy: { includeResults, includeContent },
     before: picked.completeness,
     after: finalCompleteness,
     steps,
