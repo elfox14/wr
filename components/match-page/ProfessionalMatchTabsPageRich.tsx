@@ -217,6 +217,153 @@ function formationLines(players: MatchPlayerStatItem[], formation?: string | nul
   return [gks, defs, mids, fwds].filter((line) => line.length > 0);
 }
 
+function PostMatchCoverage({ d, compact = false }: { d: MatchPageData; compact?: boolean }) {
+  const { article, infographic } = d.postMatchContent || { article: null, infographic: null };
+  if (!article && !infographic) return null;
+  return (
+    <Box title="تغطية ما بعد المباراة" hint="لا يظهر هنا إلا المحتوى الذي اكتملت مراجعته واعتماده.">
+      <div className={`grid gap-3 ${article && infographic ? 'lg:grid-cols-2' : ''}`}>
+        {article && (
+          <a href={`/articles/${article.slug}`} className="group flex flex-col justify-between rounded-3xl border border-[#18E58F]/20 bg-gradient-to-br from-[#18E58F]/10 to-transparent p-5 transition hover:-translate-y-0.5 hover:border-[#18E58F]/40">
+            <div>
+              <span className="rounded-full bg-[#18E58F]/10 px-3 py-1 text-[10px] font-black text-[#18E58F]">المقال التحليلي المعتمد</span>
+              <h3 className="mt-4 text-xl font-black leading-8 text-white group-hover:text-[#18E58F]">{article.title}</h3>
+              {!compact && <p className="mt-3 line-clamp-3 text-sm font-bold leading-7 text-slate-400">{article.excerpt}</p>}
+            </div>
+            <span className="mt-5 text-sm font-black text-[#18E58F]">اقرأ التحليل الكامل ←</span>
+          </a>
+        )}
+        {infographic && (
+          <a href={infographic.href} className="group relative min-h-52 overflow-hidden rounded-3xl border border-[#F8C846]/20 bg-[#08140f] p-5 transition hover:-translate-y-0.5 hover:border-[#F8C846]/40">
+            <div className="absolute inset-0 opacity-40" style={{ backgroundImage: 'linear-gradient(rgba(248,200,70,.08) 1px, transparent 1px), linear-gradient(90deg, rgba(15,240,252,.08) 1px, transparent 1px)', backgroundSize: '28px 28px' }} />
+            <div className="relative flex h-full flex-col justify-between">
+              <div>
+                <span className="rounded-full bg-[#F8C846]/10 px-3 py-1 text-[10px] font-black text-[#F8C846]">الإنفوجرافيك المعتمد</span>
+                <h3 className="mt-4 text-2xl font-black text-white">قصة المباراة بالأرقام</h3>
+                <p className="mt-2 text-xs font-bold leading-6 text-slate-400">الزخم، xG، المقارنات، خرائط التمركز وأعلى اللاعبين تقييمًا من البيانات الموثقة.</p>
+              </div>
+              <span className="mt-5 text-sm font-black text-[#F8C846]">افتح الإنفوجرافيك ←</span>
+            </div>
+          </a>
+        )}
+      </div>
+    </Box>
+  );
+}
+
+function Overview({ d }: { d: MatchPageData }) { 
+  const rows = d.stats.filter((m) => m.available); 
+  const homeHeatmapPoints = getTeamHeatmapPoints(true, d);
+  const awayHeatmapPoints = getTeamHeatmapPoints(false, d);
+  const hasVerifiedHeatmaps = homeHeatmapPoints.length > 0 || awayHeatmapPoints.length > 0;
+  
+  return (
+    <div className="space-y-4">
+      {/* Verified heatmaps only */}
+      {hasVerifiedHeatmaps && (
+        <Box title="الخريطة الحرارية الموثقة" hint="إحداثيات مباشرة من المزود أو مشتقة من أحداث مكانية موثقة؛ لا توجد نقاط تقديرية.">
+          <div className="flex justify-center gap-4">
+            {homeHeatmapPoints.length > 0 && <div className="w-1/2 max-w-[200px]"><TeamHeatmap teamName={tn(d.homeTeam)} isHome={true} points={homeHeatmapPoints} source={d.advanced.teamHeatmaps?.home?.source} /></div>}
+            {awayHeatmapPoints.length > 0 && <div className="w-1/2 max-w-[200px]"><TeamHeatmap teamName={tn(d.awayTeam)} isHome={false} points={awayHeatmapPoints} source={d.advanced.teamHeatmaps?.away?.source} /></div>}
+          </div>
+        </Box>
+      )}
+
+      {/* Stats Grid */}
+      <Box title="إحصائيات المواجهة">
+        <div className="grid gap-2 sm:grid-cols-2">
+          {rows.map((m) => (
+            <CompactStatCell key={m.key} label={m.label} h={f(m.home, m.suffix)} a={f(m.away, m.suffix)} />
+          ))}
+        </div>
+      </Box>
+      <PostMatchCoverage d={d} compact />
+    </div>
+  ); 
+}
+
+function Momentum({ d }: { d: MatchPageData }) {
+  const points = d.advanced.momentum || [];
+  if (points.length < 2) {
+    return (
+      <Box title="زخم المباراة" hint="لا نعرض منحنى تقديريًا عند غياب التسديدات الزمنية أو سلسلة الزخم من المزود.">
+        <div className="rounded-2xl border border-dashed border-white/10 bg-black/20 p-10 text-center text-sm font-bold text-slate-500">لا تتوفر بيانات كافية لإنشاء مؤشر زخم موثق لهذه المباراة.</div>
+      </Box>
+    );
+  }
+  const max = Math.max(1, ...points.flatMap((point) => [point.home, point.away]));
+  const provider = points.some((point) => point.source === 'PROVIDER');
+  return (
+    <Box title="زخم المباراة" hint={provider ? 'سلسلة الزخم كما وردت من مزود البيانات.' : 'مؤشر محسوب من التسديدات وxG الموثقة في نوافذ زمنية مدتها ٥ دقائق؛ لا يستخدم استحواذًا افتراضيًا.'}>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2 text-xs font-black">
+        <span className="text-[#0FF0FC]">{tn(d.homeTeam)}</span>
+        <span className="rounded-full border border-white/10 bg-black/25 px-3 py-1 text-slate-400">{provider ? 'المصدر: مزود البيانات' : 'المصدر: تسديدات المباراة الموثقة'}</span>
+        <span className="text-[#F8C846]">{tn(d.awayTeam)}</span>
+      </div>
+      <div className="overflow-x-auto pb-2">
+        <div className="flex h-64 min-w-[680px] items-center gap-1 rounded-2xl border border-white/10 bg-black/25 px-4 py-5">
+          {points.map((point) => {
+            const homeHeight = Math.max(2, (point.home / max) * 104);
+            const awayHeight = Math.max(2, (point.away / max) * 104);
+            return (
+              <div key={point.minute} className="group relative flex min-w-0 flex-1 flex-col items-center justify-center">
+                <div className="flex h-[108px] w-full items-end justify-center"><div className="w-[72%] rounded-t bg-[#0FF0FC] transition group-hover:brightness-125" style={{ height: homeHeight }} /></div>
+                <div className="my-1 text-[9px] font-black text-slate-500">{point.minute}′</div>
+                <div className="flex h-[108px] w-full items-start justify-center"><div className="w-[72%] rounded-b bg-[#F8C846] transition group-hover:brightness-125" style={{ height: awayHeight }} /></div>
+                <div className="pointer-events-none absolute left-1/2 top-1/2 z-10 hidden -translate-x-1/2 -translate-y-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-[#07110D] px-2 py-1 text-[10px] font-black shadow-xl group-hover:block">
+                  {tn(d.homeTeam)} {f(point.home)} · {tn(d.awayTeam)} {f(point.away)} · {ar.format(point.sampleSize)} تسديدة
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </Box>
+  );
+}
+
+function Events({ d, e }: { d: MatchPageData; e: MatchEventView[] }) { 
+  return (
+    <Box title="خط أحداث المباراة (Timeline)">
+      <div className="relative space-y-5 rounded-2xl border border-white/10 bg-black/20 p-4">
+        <div className="absolute inset-y-0 left-1/2 w-px bg-white/10" />
+        {e.map((ev) => { 
+          const [label, icon] = k(ev);
+          const s = side(ev, d); 
+          const card = (
+            <div className="rounded-2xl border border-white/10 bg-black/35 p-3">
+              <div className="flex items-center gap-3">
+                <Avatar name={ev.playerName} image={ev.playerImage} number={ev.playerNumber} />
+                <div>
+                  <b className="text-sm">{label}{ev.playerName ? ` — ${ev.playerName}` : ''}</b>
+                  <p className="text-xs text-slate-400">{s === 'home' ? tn(d.homeTeam) : s === 'away' ? tn(d.awayTeam) : 'المباراة'}</p>
+                </div>
+              </div>
+            </div>
+          ); 
+          return (
+            <article key={ev.id} className="relative grid items-center gap-3 md:grid-cols-[1fr_56px_1fr]">
+              <div className={s === 'away' ? 'invisible' : ''}>{card}</div>
+              <div className="z-10 mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-[#070b18] border-2 border-white/5">{icon}</div>
+              <div className={s === 'home' ? 'invisible' : ''}>{card}</div>
+              <span className="absolute left-1/2 top-0 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/10 bg-[#07110D] px-2 py-0.5 text-xs font-bold text-[#F8C846]">
+                {ev.minuteLabel}
+              </span>
+            </article>
+          ); 
+        })}
+      </div>
+    </Box>
+  ); 
+}
+
+function teamRows(d: MatchPageData, team: 'home' | 'away') { 
+  const t = team === 'home' ? d.homeTeam : d.awayTeam; 
+  const all = d.advanced.playerStats || []; 
+  return all.filter((p) => playerSide(p, d) === team); 
+}
+
+
 function PitchPlayer({ p, isHome, color, d, onHeatmap, isSubstitute = false }: { p: MatchPlayerStatItem, isHome: boolean, color: string, d: MatchPageData, isSubstitute?: boolean, onHeatmap: (name: string, image: string | null | undefined, isHome: boolean, points: HeatmapPoint[], source: HeatmapSource | undefined, stats: MatchPlayerStatItem) => void }) {
   const playerHeatmaps = d.advanced.playerHeatmaps?.filter((heatmap) =>
     (p.playerId && heatmap.playerId === p.playerId) ||
