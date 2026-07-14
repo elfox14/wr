@@ -418,10 +418,16 @@ function extractLineupFromPlayers(players: MatchPlayerStatItem[], homeTeam: Matc
 
 function enrichPlayersFromDb(stats: MatchPlayerStatItem[], dbPlayers: any[]) {
   const byName = new Map<string, any>();
-  for (const p of dbPlayers) byName.set(playerKey(p.name), p);
+  const byId = new Map<string, any>();
+  for (const player of dbPlayers) {
+    byName.set(playerKey(player.name), player);
+    if (player.id) byId.set(String(player.id), player);
+    if (player.externalId) byId.set(String(player.externalId), player);
+    if (player.providerId) byId.set(String(player.providerId), player);
+  }
   return stats.map((player) => {
-    const asset = byName.get(playerKey(player.playerName));
-    return asset ? { ...player, playerId: player.playerId || asset.id, image: player.image || usableImage(asset.image), position: player.position || asset.position || null, number: player.number || asset.code || null } : player;
+    const asset = (player.playerId && byId.get(String(player.playerId))) || byName.get(playerKey(player.playerName));
+    return asset ? { ...player, playerId: player.playerId || asset.id, image: player.image || usableImage(asset.image || asset.photo), position: player.position || asset.position || null, number: player.number || asset.code || asset.jerseyNumber || null } : player;
   });
 }
 
@@ -504,10 +510,16 @@ function extractAdvancedData(snapshots: any[], homeTeam: MatchTeamLite, awayTeam
   const matchInfo = normalized.matchInfo || {};
   const npxgRaw = matchInfo.npxgSummary?.live || matchInfo.npxgSummary?.stored || null;
   const xgRaw = normalized.liveStats?.stats?.xg || normalized.liveStats?.xg || null;
-  const shotmap = asList(normalized.shotmap)
+  const rawShotmap = asList(normalized.shotmap)
     .map((row: any) => ({ ...row, x: coord(row?.x), y: coord(row?.y) }))
     .filter((row: any) => row.x !== null && row.y !== null);
   const playerStats = enrichPlayersFromDb(extractPlayerStats(snapshots, homeTeam, awayTeam), dbPlayers);
+  const shotmap = rawShotmap.map((shot: any) => {
+    const playerId = cleanText(shot?.playerId || shot?.player_id || shot?.player?.id);
+    const playerName = cleanText(shot?.playerName || shot?.player_name || shot?.player?.name);
+    const player = playerStats.find((row) => (playerId && row.playerId === playerId) || (playerName && playerKey(row.playerName) === playerKey(playerName)));
+    return { ...shot, playerName: playerName || player?.playerName || null, playerImage: usableImage(shot?.playerImage || shot?.player_image || shot?.player?.image || shot?.player?.photo) || player?.image || null, playerNumber: shot?.playerNumber ?? shot?.player_number ?? shot?.player?.jersey_number ?? player?.number ?? null };
+  });
   const playerHeatmaps = normalizePlayerHeatmaps(normalized.playerHeatmaps, playerStats, homeTeam, awayTeam);
   const teamHeatmapFor = (side: 'home' | 'away', teamId: string) => {
     const sideMaps = playerHeatmaps.filter((heatmap: any) => heatmap.side === side);
