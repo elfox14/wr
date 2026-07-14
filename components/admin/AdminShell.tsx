@@ -1,11 +1,12 @@
 import type { ReactNode } from 'react';
 import Link from 'next/link';
-import { Activity, Database, Home, ShieldCheck, Sparkles, Wrench } from 'lucide-react';
+import { Activity, Database, Home, ShieldCheck, Sparkles, Trophy, Wrench } from 'lucide-react';
 
 const navItems = [
   { href: '/admin', label: 'الرئيسية', icon: Home },
   { href: '/admin/apis', label: 'اختبارات API', icon: Activity },
   { href: '/admin/worldcup-bootstrap', label: 'إعادة بناء كأس العالم', icon: Database },
+  { href: '/admin/knockout-sync', label: 'مزامنة الأدوار', icon: Trophy },
 ];
 
 export default function AdminShell({

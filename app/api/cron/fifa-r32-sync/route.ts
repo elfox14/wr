@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { hasValidAdminSecret } from '@/lib/adminAuth';
+import { requireAdmin } from '@/lib/adminAuth';
 import { revalidateStatsViews } from '@/lib/revalidateStatsViews';
 
 export const runtime = 'nodejs';
@@ -62,7 +62,8 @@ async function runWorker(req: Request) {
 }
 
 async function run(req: Request) {
-  if (!hasValidAdminSecret(req)) return jsonResponse({ ok: false, error: 'Unauthorized' }, 401);
+  const auth = await requireAdmin(req);
+  if (!auth.authorized) return auth.error;
   const startedAt = Date.now();
 
   try {
