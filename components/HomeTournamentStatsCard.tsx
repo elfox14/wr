@@ -68,7 +68,7 @@ function buildSummary(groups: unknown[], fallbackTeams = 0, fallbackPlayers = 0)
     .filter((team) => safeNumber(team.played) > 0)
     .sort((a, b) => safeNumber(a.goalsAgainst) - safeNumber(b.goalsAgainst) || safeNumber(b.goalDifference) - safeNumber(a.goalDifference))[0] || null;
   const bestPoints = [...teams].sort((a, b) => safeNumber(b.points) - safeNumber(a.points) || safeNumber(b.goalDifference) - safeNumber(a.goalDifference))[0] || null;
-  const cleanSheetsEstimate = teams.reduce((sum, team) => sum + (safeNumber(team.goalsAgainst) === 0 && safeNumber(team.played) > 0 ? 1 : 0), 0);
+  const teamsWithoutConceding = teams.reduce((sum, team) => sum + (safeNumber(team.goalsAgainst) === 0 && safeNumber(team.played) > 0 ? 1 : 0), 0);
 
   return {
     teams,
@@ -78,7 +78,7 @@ function buildSummary(groups: unknown[], fallbackTeams = 0, fallbackPlayers = 0)
     topAttack,
     bestDefense,
     bestPoints,
-    cleanSheetsEstimate,
+    teamsWithoutConceding,
     teamsCount: fallbackTeams || teams.length,
     playersCount: fallbackPlayers,
   };
@@ -138,7 +138,7 @@ function MiniTable({ teams }: { teams: TeamStanding[] }) {
 }
 
 export default function HomeTournamentStatsCard({ playersCount = 0, teamsCount = 0, upcomingMatchesCount = 0, groupStandings = [] }: Props) {
-  const summary = buildSummary(groupStandings, teamsCount, 1248);
+  const summary = buildSummary(groupStandings, teamsCount, playersCount);
   if (!summary.teams.length) return null;
 
   const topAttackMetric = summary.topAttack ? `${format(safeNumber(summary.topAttack.goalsFor))} هدف` : 'غير متوفر';
@@ -163,7 +163,7 @@ export default function HomeTournamentStatsCard({ playersCount = 0, teamsCount =
         <StatTile label="المباريات الملعوبة" value={format(summary.playedMatches)} note={`${format(upcomingMatchesCount)} قادمة / جارية`} tone="gold" />
         <StatTile label="إجمالي الأهداف" value={format(summary.totalGoals)} note={`${formatDecimal(summary.avgGoals)} هدف في المباراة`} tone="green" />
         <StatTile label="المنتخبات" value={format(summary.teamsCount)} note={`${format(summary.playersCount)} لاعب في قاعدة البيانات`} tone="cyan" />
-        <StatTile label="شباك نظيفة" value={format(summary.cleanSheetsEstimate)} note="حسب ترتيب المجموعات الحالي" />
+        <StatTile label="منتخبات لم تستقبل" value={format(summary.teamsWithoutConceding)} note="وفق نتائج المجموعة الحالية" />
       </div>
 
       <div className="mt-3 grid gap-2 lg:grid-cols-3">

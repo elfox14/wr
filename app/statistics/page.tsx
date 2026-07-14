@@ -13,10 +13,10 @@ export const metadata = {
   description: 'لوحة إحصائيات كأس العالم 2026: أرقام البطولة، ترتيب المنتخبات، الهدافون، صناعة اللعب، التسديدات، الحراس والانضباط.',
 };
 
-const STATS_CACHE_SECONDS = 120;
-const SNAPSHOT_LIMIT = 360;
-const PERFORMANCE_LIMIT = 1600;
-const EVENT_LIMIT = 2000;
+const STATS_CACHE_SECONDS = 60;
+const SNAPSHOT_LIMIT = 4000;
+const PERFORMANCE_LIMIT = 6000;
+const EVENT_LIMIT = 8000;
 
 const FINISHED = ['FINISHED', 'FT', 'AET', 'PEN', 'COMPLETED', 'ENDED', 'FINAL_VERIFIED', 'FULL_TIME'];
 const LIVE = ['LIVE', 'IN_PLAY', '1H', '2H', 'HT', 'ET', 'BT', 'P', 'PEN_LIVE'];
@@ -449,25 +449,23 @@ async function loadStatisticsUncached() {
     if (Number.isFinite(rating) && rating > 0) { row.ratingTotal += rating; row.ratingCount += 1; }
   }
 
-  const performanceGoalTotal = [...playerMap.values()].reduce((sum, player) => sum + player.goals, 0);
   const shotmapGoalMatches = new Set(events.filter((event) => event.type === 'goal' && event.sourceName === 'THE_STATS_API_FINAL_SHOTMAP').map((event) => event.matchId));
-  if (performanceGoalTotal === 0) {
-    for (const event of events) {
-      if (!event.playerName || !canonicalMatchIds.has(event.matchId) || event.type !== 'goal') continue;
-      if (shotmapGoalMatches.has(event.matchId) && event.sourceName !== 'THE_STATS_API_FINAL_SHOTMAP') continue;
-      const row = ensureEventPlayer(playerMap, event.playerName, teamNameById.get(event.teamId || '') || '—', event.teamId);
-      row.goals += 1;
-    }
+  const eventPlayerStats = new Map<string, { name: string; teamId: string | null; teamName: string; goals: number; yellowCards: number; redCards: number }>();
+  for (const event of events) {
+    if (!event.playerName || !canonicalMatchIds.has(event.matchId)) continue;
+    if (event.type === 'goal' && shotmapGoalMatches.has(event.matchId) && event.sourceName !== 'THE_STATS_API_FINAL_SHOTMAP') continue;
+    const key = eventPlayerKey(event.playerName, event.teamId);
+    const current = eventPlayerStats.get(key) || { name: event.playerName, teamId: event.teamId, teamName: teamNameById.get(event.teamId || '') || '—', goals: 0, yellowCards: 0, redCards: 0 };
+    if (event.type === 'goal') current.goals += 1;
+    if (event.type === 'yellow_card') current.yellowCards += 1;
+    if (event.type === 'red_card') current.redCards += 1;
+    eventPlayerStats.set(key, current);
   }
-  const performanceCardTotal = [...playerMap.values()].reduce((sum, player) => sum + player.yellowCards + player.redCards, 0);
-  if (performanceCardTotal === 0) {
-    for (const event of events) {
-      if (!event.playerName || !canonicalMatchIds.has(event.matchId)) continue;
-      if (event.type !== 'yellow_card' && event.type !== 'red_card') continue;
-      const row = ensureEventPlayer(playerMap, event.playerName, teamNameById.get(event.teamId || '') || '—', event.teamId);
-      if (event.type === 'yellow_card') row.yellowCards += 1;
-      if (event.type === 'red_card') row.redCards += 1;
-    }
+  for (const eventStat of eventPlayerStats.values()) {
+    const row = ensureEventPlayer(playerMap, eventStat.name, eventStat.teamName, eventStat.teamId);
+    row.goals = Math.max(row.goals, eventStat.goals);
+    row.yellowCards = Math.max(row.yellowCards, eventStat.yellowCards);
+    row.redCards = Math.max(row.redCards, eventStat.redCards);
   }
 
   const teams = [...teamMap.values()].sort(teamComparator);
@@ -485,7 +483,9 @@ async function loadStatisticsUncached() {
   const latestSnapshotDate = snapshots[0]?.capturedAt || null;
   const latestPerformanceDate = performances.reduce<Date | null>((latest, row) => !latest || row.updatedAt > latest ? row.updatedAt : latest, null);
   const latestMatchSync = matches.map((match) => safeDate(match.lastSyncedAt)).filter(Boolean).sort((a, b) => b!.getTime() - a!.getTime())[0] || null;
-  const updatedAt = latestSnapshotDate || latestPerformanceDate || latestMatchSync || new Date();
+  const updatedAt = [latestSnapshotDate, latestPerformanceDate, latestMatchSync]
+    .filter((value): value is Date => Boolean(value))
+    .sort((a, b) => b.getTime() - a.getTime())[0] || new Date();
 
   return {
     totalMatches: matches.length,
@@ -527,7 +527,7 @@ async function loadStatisticsUncached() {
   };
 }
 
-const loadStatistics = unstable_cache(loadStatisticsUncached, ['statistics-page-v3'], {
+const loadStatistics = unstable_cache(loadStatisticsUncached, ['statistics-page-v4-full-tournament'], {
   revalidate: STATS_CACHE_SECONDS,
   tags: ['statistics-page', 'home-dashboard'],
 });
@@ -551,7 +551,7 @@ function SectionTitle({ id, kicker, title, description }: { id: string; kicker: 
   return <header id={id} className="scroll-mt-24"><p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#0FF0FC]">{kicker}</p><h2 className="mt-2 text-xl font-black text-white md:text-2xl">{title}</h2><p className="mt-1 max-w-3xl text-sm font-bold leading-6 text-gray-400">{description}</p></header>;
 }
 function TeamTable({ teams }: { teams: TeamStats[] }) {
-  return <div className="overflow-hidden rounded-3xl border border-white/10 bg-white/[0.035]"><div className="overflow-x-auto"><table className="min-w-[900px] w-full text-right text-xs"><thead className="bg-white/[0.05] text-[10px] font-black text-gray-400"><tr><th className="px-4 py-3">المنتخب</th><th>لعب</th><th>فاز</th><th>تعادل</th><th>خسر</th><th>له</th><th>عليه</th><th>فارق</th><th>نقاط</th><th>تسديدات</th><th>على المرمى</th><th>استحواذ</th></tr></thead><tbody className="divide-y divide-white/10">{teams.slice(0, 16).map((team, index) => { const possession = team.possessionCount ? team.possessionTotal / team.possessionCount : null; return <tr key={team.id} className="transition hover:bg-white/[0.04]"><td className="px-4 py-3"><Link href={teamSlug(team)} className="flex items-center gap-3"><span className="w-5 text-center text-[10px] font-black text-gray-500">{nf.format(index + 1)}</span><TeamIdentity team={team} compact /></Link></td><td>{num(team.played)}</td><td>{num(team.won)}</td><td>{num(team.drawn)}</td><td>{num(team.lost)}</td><td>{num(team.goalsFor)}</td><td>{num(team.goalsAgainst)}</td><td>{num(team.goalDifference)}</td><td className="font-black text-[#FFD700]">{num(team.points)}</td><td>{num(team.shots)}</td><td>{num(team.shotsOnTarget)}</td><td>{percent(possession)}</td></tr>; })}</tbody></table></div></div>;
+  return <div className="overflow-hidden rounded-3xl border border-white/10 bg-white/[0.035]"><div className="overflow-x-auto"><table className="min-w-[900px] w-full text-right text-xs"><thead className="bg-white/[0.05] text-[10px] font-black text-gray-400"><tr><th className="px-4 py-3">المنتخب</th><th>لعب</th><th>فاز</th><th>تعادل</th><th>خسر</th><th>له</th><th>عليه</th><th>فارق</th><th>نقاط</th><th>تسديدات</th><th>على المرمى</th><th>استحواذ</th></tr></thead><tbody className="divide-y divide-white/10">{teams.map((team, index) => { const possession = team.possessionCount ? team.possessionTotal / team.possessionCount : null; return <tr key={team.id} className="transition hover:bg-white/[0.04]"><td className="px-4 py-3"><Link href={teamSlug(team)} className="flex items-center gap-3"><span className="w-5 text-center text-[10px] font-black text-gray-500">{nf.format(index + 1)}</span><TeamIdentity team={team} compact /></Link></td><td>{num(team.played)}</td><td>{num(team.won)}</td><td>{num(team.drawn)}</td><td>{num(team.lost)}</td><td>{num(team.goalsFor)}</td><td>{num(team.goalsAgainst)}</td><td>{num(team.goalDifference)}</td><td className="font-black text-[#FFD700]">{num(team.points)}</td><td>{num(team.shots)}</td><td>{num(team.shotsOnTarget)}</td><td>{percent(possession)}</td></tr>; })}</tbody></table></div></div>;
 }
 function PlayerRanking({ title, players, metricLabel, value, empty = 'لم تتوفر بيانات كافية بعد' }: { title: string; players: PlayerStats[]; metricLabel: string; value: (player: PlayerStats) => number | null | undefined; empty?: string }) {
   return <article className="rounded-3xl border border-white/10 bg-white/[0.035] p-3"><h3 className="text-sm font-black text-white">{title}</h3>{players.length ? <div className="mt-3 space-y-2">{players.slice(0, 6).map((player, index) => <div key={player.id} className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-black/20 p-2"><div className="flex min-w-0 items-center gap-2"><span className="w-5 text-center text-[10px] font-black text-gray-500">{nf.format(index + 1)}</span><PlayerIdentity player={player} /></div><div className="shrink-0 rounded-xl border border-[#FFD700]/20 bg-[#FFD700]/10 px-2 py-1 text-center text-[10px] font-black text-[#FFD700]"><b className="block text-base leading-none">{num(value(player))}</b><span>{metricLabel}</span></div></div>)}</div> : <p className="mt-4 rounded-2xl border border-dashed border-white/10 bg-black/20 p-4 text-center text-xs font-bold text-gray-500">{empty}</p>}</article>;
