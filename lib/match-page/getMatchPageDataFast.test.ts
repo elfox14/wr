@@ -55,6 +55,21 @@ describe('verified player heatmaps', () => {
     })]);
   });
 
+  it('marks tournament fallback maps as season-scoped', () => {
+    const heatmaps = normalizePlayerHeatmaps([{
+      playerId: 'p3',
+      source: 'PROVIDER_SEASON_HEATMAP',
+      scope: 'SEASON',
+      points: [{ x: 42, y: 68, count: 4 }],
+    }], [{ playerId: 'p3', playerName: 'Tournament Player', teamId: 'home' }] as any, home, away);
+
+    expect(heatmaps[0]).toEqual(expect.objectContaining({
+      source: 'PROVIDER_SEASON_HEATMAP',
+      scope: 'SEASON',
+      side: 'home',
+    }));
+  });
+
   it('labels direct provider heatmaps separately', () => {
     const heatmaps = normalizePlayerHeatmaps([{
       playerId: 'p2',

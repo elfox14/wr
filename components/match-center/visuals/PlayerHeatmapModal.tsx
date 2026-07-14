@@ -62,11 +62,11 @@ export default function PlayerHeatmapModal({ isOpen, onClose, playerName, player
 
         <div className="mt-6 grid gap-5 lg:grid-cols-[minmax(260px,0.75fr)_1.25fr]">
           <section className="rounded-2xl border border-white/10 bg-black/20 p-4">
-            <h4 className="text-sm font-black text-white">الخريطة الحرارية الموثقة</h4>
+            <h4 className="text-sm font-black text-white">{heatmapSource === 'PROVIDER_SEASON_HEATMAP' ? 'خريطة البطولة المجمعة' : 'الخريطة الحرارية الموثقة للمباراة'}</h4>
             {points.length ? (
               <>
                 <div className="mt-4 flex justify-center"><TeamHeatmap teamName="" isHome={isHome} points={points} source={heatmapSource} /></div>
-                <p className="mt-3 text-center text-[11px] font-bold leading-5 text-white/45">تعتمد الخريطة على {points.length.toLocaleString('ar-EG')} إحداثية {heatmapSource === 'VERIFIED_ACTION_COORDINATES' ? 'مستخرجة من أحداث اللاعب الموثقة' : heatmapSource === 'PROVIDER_HEATMAP' ? 'مرسلة مباشرة من المزود' : 'موثقة'} لهذا اللاعب.</p>
+                <p className="mt-3 text-center text-[11px] font-bold leading-5 text-white/45">تعتمد الخريطة على {points.length.toLocaleString('ar-EG')} إحداثية {heatmapSource === 'VERIFIED_ACTION_COORDINATES' ? 'مستخرجة من أحداث اللاعب الموثقة' : heatmapSource === 'PROVIDER_SEASON_HEATMAP' ? 'مجمعة لكل مباريات اللاعب في البطولة حتى الآن، وليست خاصة بهذه المباراة' : heatmapSource === 'PROVIDER_HEATMAP' ? 'مرسلة مباشرة من المزود لهذه المباراة' : 'موثقة'} لهذا اللاعب.</p>
               </>
             ) : (
               <div className="mt-4 rounded-xl border border-dashed border-white/10 p-8 text-center text-xs font-bold text-slate-500">لم تصل نقاط خريطة حرارية موثقة لهذا اللاعب، لذلك لا نعرض خريطة تقديرية.</div>

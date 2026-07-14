@@ -169,6 +169,7 @@ function getTeamHeatmapPoints(isHome: boolean, d: MatchPageData) {
   const allStats = d.advanced.playerStats || [];
   const playerHeatmaps = d.advanced.playerHeatmaps || [];
   return playerHeatmaps.filter(h => {
+     if (h.scope === 'SEASON' || h.source === 'PROVIDER_SEASON_HEATMAP') return false;
      const p = allStats.find(s => s.playerId === h.playerId || s.playerName === h.playerName);
      return p ? playerSide(p, d) === (isHome ? 'home' : 'away') : h.side === (isHome ? 'home' : 'away');
   }).flatMap(h => h.points);
@@ -337,7 +338,8 @@ function groupPlayersByLine(players: any[]) {
 }
 
 function PitchPlayer({ p, isHome, color, d, onHeatmap }: { p: MatchPlayerStatItem, isHome: boolean, color: string, d: MatchPageData, onHeatmap: (name: string, image: string | null | undefined, isHome: boolean, points: HeatmapPoint[], source: HeatmapSource | undefined, stats: MatchPlayerStatItem) => void }) {
-  const heatmap = d.advanced.playerHeatmaps?.find((h:any) => h.playerId === p.playerId || h.playerName === p.playerName);
+  const playerHeatmaps = d.advanced.playerHeatmaps?.filter((h:any) => h.playerId === p.playerId || h.playerName === p.playerName) || [];
+  const heatmap = playerHeatmaps.find((h:any) => h.scope !== 'SEASON' && h.source !== 'PROVIDER_SEASON_HEATMAP') || playerHeatmaps.find((h:any) => h.scope === 'SEASON' || h.source === 'PROVIDER_SEASON_HEATMAP');
   const heatmapPoints = heatmap?.points || [];
   const hasVerifiedHeatmap = heatmapPoints.length > 0;
   return (

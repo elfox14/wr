@@ -30,6 +30,33 @@ function similarity(a: any, b: any) { const aa = key(a); const bb = key(b); if (
 function teamScore(providerName: any, localTeam: any) { return Math.max(similarity(providerName, localTeam?.name), similarity(providerName, localTeam?.code)); }
 function hoursApart(a?: string | Date | null, b?: string | Date | null) { const aa = a ? new Date(a).getTime() : NaN; const bb = b ? new Date(b).getTime() : NaN; if (!Number.isFinite(aa) || !Number.isFinite(bb)) return 999; return Math.abs(aa - bb) / 36e5; }
 function sleep(ms: number) { return new Promise((resolve) => setTimeout(resolve, ms)); }
+function transientProviderStatus(status: number | null) { return status === 408 || status === 429 || status === 502 || status === 503 || status === 504; }
+async function fetchWithRetry(path: string, timeoutMs: number, attempts = 3) {
+  let lastError: any;
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try { return await theStatsApiFetch(path, {}, { timeoutMs }); }
+    catch (error: any) {
+      lastError = error;
+      const status = Number(error?.status || error?.payload?.error?.status_code || 0) || null;
+      if (!transientProviderStatus(status) || attempt === attempts) throw error;
+      await sleep(700 * attempt + Math.floor(Math.random() * 250));
+    }
+  }
+  throw lastError;
+}
+async function mapWithConcurrency<T, R>(items: T[], limit: number, worker: (item: T, index: number) => Promise<R>) {
+  const output = new Array<R>(items.length);
+  let nextIndex = 0;
+  async function run() {
+    while (nextIndex < items.length) {
+      const index = nextIndex;
+      nextIndex += 1;
+      output[index] = await worker(items[index], index);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(Math.max(1, limit), items.length) }, () => run()));
+  return output;
+}
 function dataOf(payload: any) { return payload?.data || payload?.response || payload?.result || payload || {}; }
 function extractList(payload: any) { if (Array.isArray(payload)) return payload; for (const field of ['data', 'matches', 'fixtures', 'response', 'results', 'items']) if (Array.isArray(payload?.[field])) return payload[field]; if (Array.isArray(payload?.data?.matches)) return payload.data.matches; return []; }
 function listFrom(payload: any, fields: string[]) { if (Array.isArray(payload)) return payload; const data = dataOf(payload); if (Array.isArray(data)) return data; for (const field of fields) if (Array.isArray(data?.[field])) return data[field]; for (const field of fields) if (Array.isArray(payload?.[field])) return payload[field]; return []; }
@@ -167,7 +194,8 @@ export async function collectTheStatsMatchExtras(match: any, options: { dryRun?:
   const includeRaw = Boolean(options.includeRaw);
   const timeoutMs = Math.max(3000, Math.min(60000, Number(options.timeoutMs || 15000)));
   const delayMs = Math.max(0, Math.min(5000, Number(options.delayMs || 350)));
-  const resolved = await resolveTheStatsProviderId(match, Object.keys(options.query || {}).length ? options.query! : defaultTheStatsQuery(new URLSearchParams()));
+  const providerQuery = Object.keys(options.query || {}).length ? options.query! : defaultTheStatsQuery(new URLSearchParams());
+  const resolved = await resolveTheStatsProviderId(match, providerQuery);
   if (!resolved.id) return { ok: false, matchId: match.id, error: 'Could not resolve provider match id', resolved };
   const id = encodeURIComponent(String(resolved.id));
   const mode = options.endpointMode === 'full' || options.endpointMode === 'all' ? 'full' : 'essential';
@@ -190,7 +218,9 @@ export async function collectTheStatsMatchExtras(match: any, options: { dryRun?:
   const heatmapFailures: any[] = [];
   const teamHeatmaps: any = { home: { points: [] }, away: { points: [] } };
   let requestedHeatmapPlayers = 0;
+  let seasonRequestedPlayers = 0;
   let embeddedHeatmaps = 0;
+  const seasonHeatmapFailures: any[] = [];
 
   if (mode === 'full') {
     const embeddedCandidates = [
@@ -223,54 +253,56 @@ export async function collectTheStatsMatchExtras(match: any, options: { dryRun?:
 
     const playersToFetch = playerStats.filter((p: any) => p.playerId && !embeddedPlayerKeys.has(`id:${p.playerId}`) && (p.started === true || p.played === true || (p.minutes !== null && p.minutes > 0)));
     requestedHeatmapPlayers = playersToFetch.length;
-    const heatmapPromises = playersToFetch.map(async (p: any, i: number) => {
-      if (delayMs > 0 && i > 0) await sleep((i % 5) * Math.max(50, delayMs / 2)); // Stagger requests slightly
+
+    const fetchPlayerMap = async (p: any, endpointPath: string, source: 'PROVIDER_HEATMAP' | 'PROVIDER_SEASON_HEATMAP') => {
       try {
-        const payload = await theStatsApiFetch(`/api/football/matches/${id}/players/${p.playerId}/heatmap`, {}, { timeoutMs: Math.min(timeoutMs, 8000) });
+        const payload = await fetchWithRetry(endpointPath, Math.min(timeoutMs, 10000));
         const rawPoints = heatmapPointsFrom(payload);
         const points = rawPoints.map((pt: any) => ({
           x: pitchCoord(pt.x ?? pt.pitchX ?? pt.location?.x),
           y: pitchCoord(pt.y ?? pt.pitchY ?? pt.location?.y),
           count: n(pt.count ?? pt.value ?? pt.weight) || undefined,
         })).filter((pt: any) => pt.x !== null && pt.y !== null);
-
-        if (points.length > 0) {
-          const homeMatch = String(p.teamId) === String(match?.homeTeam?.id) || String(p.teamId) === String(match?.homeTeam?.code) || (key(p.teamName) && key(p.teamName) === key(match?.homeTeam?.name));
-          const awayMatch = String(p.teamId) === String(match?.awayTeam?.id) || String(p.teamId) === String(match?.awayTeam?.code) || (key(p.teamName) && key(p.teamName) === key(match?.awayTeam?.name));
-          const side = homeMatch ? 'home' : awayMatch ? 'away' : undefined;
-
-          if (side === 'home') {
-             teamHeatmaps.home.teamId = p.teamId;
-             teamHeatmaps.home.points.push(...points);
-          } else if (side === 'away') {
-             teamHeatmaps.away.teamId = p.teamId;
-             teamHeatmaps.away.points.push(...points);
-          }
-
-          return { ok: true, heatmap: {
-            playerId: p.playerId,
-            playerName: p.playerName,
-            teamId: p.teamId,
-            side,
-            source: 'PROVIDER_HEATMAP',
-            points
-          } };
-        }
-        return { ok: false, failure: { playerId: p.playerId, playerName: p.playerName, status: 200, code: 'EMPTY_HEATMAP', message: 'The provider returned no valid heatmap points.' } };
+        if (!points.length) return { ok: false, failure: { playerId: p.playerId, playerName: p.playerName, status: 200, code: 'EMPTY_HEATMAP', message: 'The provider returned no valid heatmap points.' } };
+        const homeMatch = String(p.teamId) === String(match?.homeTeam?.id) || String(p.teamId) === String(match?.homeTeam?.code) || (key(p.teamName) && key(p.teamName) === key(match?.homeTeam?.name));
+        const awayMatch = String(p.teamId) === String(match?.awayTeam?.id) || String(p.teamId) === String(match?.awayTeam?.code) || (key(p.teamName) && key(p.teamName) === key(match?.awayTeam?.name));
+        const side = homeMatch ? 'home' : awayMatch ? 'away' : undefined;
+        return { ok: true, heatmap: { playerId: p.playerId, playerName: p.playerName, teamId: p.teamId, side, source, scope: source === 'PROVIDER_SEASON_HEATMAP' ? 'SEASON' : 'MATCH', points } };
       } catch (err: any) {
         const failure = safeError(err);
         return { ok: false, failure: { playerId: p.playerId, playerName: p.playerName, status: failure.status, code: failure.code || 'HEATMAP_REQUEST_FAILED', message: failure.message } };
       }
-    });
+    };
 
-    const heatmapsResult = await Promise.allSettled(heatmapPromises);
-    heatmapsResult.forEach((res) => {
-      if (res.status === 'fulfilled' && res.value?.ok && res.value.heatmap) playerHeatmaps.push(res.value.heatmap);
-      else if (res.status === 'fulfilled' && res.value?.failure) heatmapFailures.push(res.value.failure);
-      else if (res.status === 'rejected') heatmapFailures.push({ status: null, code: 'HEATMAP_PROMISE_REJECTED', message: String(res.reason || 'Unknown heatmap error') });
+    const matchHeatmapResults = await mapWithConcurrency(playersToFetch, 3, async (p: any, index: number) => {
+      if (delayMs > 0 && index > 0) await sleep(Math.max(75, delayMs));
+      return fetchPlayerMap(p, `/api/football/matches/${id}/players/${p.playerId}/heatmap`, 'PROVIDER_HEATMAP');
     });
+    for (const result of matchHeatmapResults) {
+      if (result?.ok && result.heatmap) {
+        playerHeatmaps.push(result.heatmap);
+        const side = result.heatmap.side;
+        if (side === 'home' || side === 'away') {
+          teamHeatmaps[side].teamId = result.heatmap.teamId;
+          teamHeatmaps[side].points.push(...result.heatmap.points);
+        }
+      } else if (result?.failure) heatmapFailures.push(result.failure);
+    }
 
-    const directPlayerKeys = new Set(playerHeatmaps.flatMap((heatmap: any) => [heatmap.playerId ? `id:${heatmap.playerId}` : '', heatmap.playerName ? `name:${key(heatmap.playerName)}` : '']).filter(Boolean));
+    const competitionId = str(providerQuery.competition_id);
+    const seasonId = str(providerQuery.season_id);
+    const seasonCandidates = competitionId && seasonId ? heatmapFailures.filter((failure: any) => Number(failure.status) === 404).map((failure: any) => playerStats.find((p: any) => String(p.playerId) === String(failure.playerId))).filter(Boolean) : [];
+    seasonRequestedPlayers = seasonCandidates.length;
+    const seasonResults = await mapWithConcurrency(seasonCandidates, 2, async (p: any, index: number) => {
+      if (delayMs > 0 && index > 0) await sleep(Math.max(150, delayMs * 2));
+      return fetchPlayerMap(p, `/api/football/players/${p.playerId}/competitions/${encodeURIComponent(String(competitionId))}/seasons/${encodeURIComponent(String(seasonId))}/heatmap`, 'PROVIDER_SEASON_HEATMAP');
+    });
+    for (const result of seasonResults) {
+      if (result?.ok && result.heatmap) playerHeatmaps.push(result.heatmap);
+      else if (result?.failure) seasonHeatmapFailures.push(result.failure);
+    }
+
+    const directPlayerKeys = new Set(playerHeatmaps.filter((heatmap: any) => heatmap.scope !== 'SEASON' && heatmap.source !== 'PROVIDER_SEASON_HEATMAP').flatMap((heatmap: any) => [heatmap.playerId ? `id:${heatmap.playerId}` : '', heatmap.playerName ? `name:${key(heatmap.playerName)}` : '']).filter(Boolean));
     const actionGroups = new Map<string, { player: any; points: any[] }>();
     for (const event of events) {
       if (event.x === null || event.y === null || (!event.playerId && !event.playerName)) continue;
@@ -298,11 +330,13 @@ export async function collectTheStatsMatchExtras(match: any, options: { dryRun?:
 
   const heatmapPointCount = playerHeatmaps.reduce((total: number, heatmap: any) => total + (Array.isArray(heatmap.points) ? heatmap.points.length : 0), 0);
   const { failureCodes, failureStatuses, allNotFound, rateLimited: heatmapsRateLimited, authorizationFailed } = summarizeHeatmapFailures(heatmapFailures);
+  const seasonDiagnostics = summarizeHeatmapFailures(seasonHeatmapFailures);
   const directHeatmaps = playerHeatmaps.filter((heatmap: any) => heatmap.source === 'PROVIDER_HEATMAP').length;
+  const seasonHeatmaps = playerHeatmaps.filter((heatmap: any) => heatmap.source === 'PROVIDER_SEASON_HEATMAP').length;
   const derivedHeatmaps = playerHeatmaps.filter((heatmap: any) => heatmap.source === 'VERIFIED_ACTION_COORDINATES').length;
   const endpointHeatmaps = Math.max(0, directHeatmaps - embeddedHeatmaps);
-  const heatmapSource = directHeatmaps > 0 && derivedHeatmaps > 0 ? 'MIXED_VERIFIED_COORDINATES' : derivedHeatmaps > 0 ? 'VERIFIED_ACTION_COORDINATES' : 'THE_STATS_API_PLAYER_HEATMAP';
-  const heatmapMeta = { source: heatmapSource, requestedPlayers: requestedHeatmapPlayers, availablePlayers: playerHeatmaps.length, directHeatmaps, embeddedHeatmaps, endpointHeatmaps, derivedHeatmaps, failedPlayers: heatmapFailures.length, pointCount: heatmapPointCount, verifiedCoordinates: true, failureCodes, failureStatuses, coverageUnavailable: allNotFound, authorizationFailed };
+  const heatmapSource = directHeatmaps > 0 && derivedHeatmaps > 0 ? 'MIXED_VERIFIED_COORDINATES' : derivedHeatmaps > 0 ? 'VERIFIED_ACTION_COORDINATES' : directHeatmaps > 0 ? 'THE_STATS_API_PLAYER_HEATMAP' : seasonHeatmaps > 0 ? 'THE_STATS_API_SEASON_HEATMAP_FALLBACK' : 'NONE';
+  const heatmapMeta = { source: heatmapSource, requestedPlayers: requestedHeatmapPlayers, seasonRequestedPlayers, availablePlayers: playerHeatmaps.length, directHeatmaps, embeddedHeatmaps, endpointHeatmaps, seasonHeatmaps, derivedHeatmaps, failedPlayers: heatmapFailures.length, seasonFailedPlayers: seasonHeatmapFailures.length, pointCount: heatmapPointCount, verifiedCoordinates: true, failureCodes, failureStatuses, seasonFailureCodes: seasonDiagnostics.failureCodes, seasonFailureStatuses: seasonDiagnostics.failureStatuses, coverageUnavailable: allNotFound && seasonRequestedPlayers > 0 && seasonDiagnostics.allNotFound && seasonHeatmaps === 0, authorizationFailed };
   const normalized = { matchInfo: compactMatchInfo(byKey.matchInfo?.payload, byKey.stats?.payload), liveStats: stats, lineups: byKey.lineups?.ok ? dataOf(byKey.lineups.payload) : null, eventsDetailed: { all: events }, shotmap, playerStats, playerHeatmaps, teamHeatmaps, heatmapMeta };
   const endpointSummaries = results.map((item) => ({ key: item.key, path: item.path, ok: item.ok, error: item.ok ? null : item.error, keySummary: item.ok ? null : item.error?.message || null }));
   let snapshotId: string | null = null;
@@ -313,6 +347,6 @@ export async function collectTheStatsMatchExtras(match: any, options: { dryRun?:
     const snapshot = await prisma.matchStatsSnapshot.create({ data: { id: randomUUID(), matchId: match.id, provider: 'THE_STATS_API_EXTRAS', providerMatchId: Number(String(resolved.id).replace(/\D/g, '')) || 0, rawData }, select: { id: true } });
     snapshotId = snapshot.id;
   }
-  const rateLimited = heatmapsRateLimited || results.some((item) => Number(item.error?.status) === 429);
-  return { ok: useful, matchId: match.id, endpointMode: mode, resolvedProviderMatchId: resolved.id, resolvedBy: resolved.by, rateLimited, heatmapDiagnostics: { ...heatmapMeta, failures: heatmapFailures.slice(0, 12) }, endpointsOk: results.filter((item) => item.ok).map((item) => item.key), endpointsFailed: results.filter((item) => !item.ok).map((item) => ({ key: item.key, status: item.error?.status, code: item.error?.code, message: item.error?.message })), counts: { stats: Object.keys(stats.stats || {}).length, detailedEvents: events.length, shots: shotmap.length, playerStats: playerStats.length, lineups: normalized.lineups ? 1 : 0, playerHeatmaps: playerHeatmaps.length, heatmapPoints: heatmapPointCount }, matchInfo: normalized.matchInfo, saved: Boolean(snapshotId), snapshotId, debug: { endpointSummaries, normalizedPreview: normalized, endpoints: includeRaw ? Object.fromEntries(results.map((item) => [item.key, item])) : undefined } };
+  const rateLimited = heatmapsRateLimited || seasonDiagnostics.rateLimited || results.some((item) => Number(item.error?.status) === 429);
+  return { ok: useful, matchId: match.id, endpointMode: mode, resolvedProviderMatchId: resolved.id, resolvedBy: resolved.by, rateLimited, heatmapDiagnostics: { ...heatmapMeta, failures: heatmapFailures.slice(0, 12), seasonFailures: seasonHeatmapFailures.slice(0, 12) }, endpointsOk: results.filter((item) => item.ok).map((item) => item.key), endpointsFailed: results.filter((item) => !item.ok).map((item) => ({ key: item.key, status: item.error?.status, code: item.error?.code, message: item.error?.message })), counts: { stats: Object.keys(stats.stats || {}).length, detailedEvents: events.length, shots: shotmap.length, playerStats: playerStats.length, lineups: normalized.lineups ? 1 : 0, playerHeatmaps: playerHeatmaps.length, heatmapPoints: heatmapPointCount }, matchInfo: normalized.matchInfo, saved: Boolean(snapshotId), snapshotId, debug: { endpointSummaries, normalizedPreview: normalized, endpoints: includeRaw ? Object.fromEntries(results.map((item) => [item.key, item])) : undefined } };
 }

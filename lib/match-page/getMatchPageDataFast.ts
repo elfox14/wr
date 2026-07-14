@@ -416,7 +416,8 @@ export function normalizePlayerHeatmaps(value: any, players: MatchPlayerStatItem
       playerName: playerName || player?.playerName || undefined,
       teamId: player?.teamId || cleanText(row?.teamId || row?.team_id) || undefined,
       side,
-      source: row?.source === 'VERIFIED_ACTION_COORDINATES' ? 'VERIFIED_ACTION_COORDINATES' as const : 'PROVIDER_HEATMAP' as const,
+      source: row?.source === 'VERIFIED_ACTION_COORDINATES' ? 'VERIFIED_ACTION_COORDINATES' as const : row?.source === 'PROVIDER_SEASON_HEATMAP' ? 'PROVIDER_SEASON_HEATMAP' as const : 'PROVIDER_HEATMAP' as const,
+      scope: row?.scope === 'SEASON' || row?.source === 'PROVIDER_SEASON_HEATMAP' ? 'SEASON' as const : 'MATCH' as const,
       points,
     } : null;
   }).filter(Boolean);
@@ -470,8 +471,8 @@ function extractAdvancedData(snapshots: any[], homeTeam: MatchTeamLite, awayTeam
     .filter((row: any) => row.x !== null && row.y !== null);
   const playerStats = enrichPlayersFromDb(extractPlayerStats(snapshots, homeTeam, awayTeam), dbPlayers);
   const playerHeatmaps = normalizePlayerHeatmaps(normalized.playerHeatmaps, playerStats, homeTeam, awayTeam);
-  const homeHeatmapPoints = playerHeatmaps.filter((heatmap: any) => heatmap.side === 'home').flatMap((heatmap: any) => heatmap.points);
-  const awayHeatmapPoints = playerHeatmaps.filter((heatmap: any) => heatmap.side === 'away').flatMap((heatmap: any) => heatmap.points);
+  const homeHeatmapPoints = playerHeatmaps.filter((heatmap: any) => heatmap.side === 'home' && heatmap.scope !== 'SEASON').flatMap((heatmap: any) => heatmap.points);
+  const awayHeatmapPoints = playerHeatmaps.filter((heatmap: any) => heatmap.side === 'away' && heatmap.scope !== 'SEASON').flatMap((heatmap: any) => heatmap.points);
   const homeHeatmapSource = playerHeatmaps.some((heatmap: any) => heatmap.side === 'home' && heatmap.source === 'VERIFIED_ACTION_COORDINATES') ? 'VERIFIED_ACTION_COORDINATES' as const : 'PROVIDER_HEATMAP' as const;
   const awayHeatmapSource = playerHeatmaps.some((heatmap: any) => heatmap.side === 'away' && heatmap.source === 'VERIFIED_ACTION_COORDINATES') ? 'VERIFIED_ACTION_COORDINATES' as const : 'PROVIDER_HEATMAP' as const;
   return {
