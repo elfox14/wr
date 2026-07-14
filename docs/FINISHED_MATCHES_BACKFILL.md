@@ -70,7 +70,7 @@ curl -X POST \
 | `matchId` | empty | Run for a single match only |
 | `limit` | `5` | Max non-skipped matches to process |
 | `lookbackDays` | `14` | Candidate finished match lookback |
-| `freshnessHours` | `24` | Skip if a recent full TheStats extras snapshot exists |
+| `freshnessHours` | `24` | Retained for worker compatibility; a finished match with a complete verified snapshot is not fetched again unless `force=true` |
 | `timeoutMs` | `30000` | Per-request provider timeout |
 | `force` | `false` | Ignore recent/full snapshot skip rules |
 | `dryRun` | `false` | Fetch/analyze without saving |
@@ -78,6 +78,8 @@ curl -X POST \
 | `stopOnRateLimit` | `true` | Stop early on 429/rate limit |
 | `syncAnimation` | `true` | Rebuild `LiveAnimationEvent` after saving events |
 | `markVerified` | `true` | Mark useful matches as `FINAL_VERIFIED` |
+| `retryCooldownHours` | `6` | Avoid retrying the same incomplete provider response in every batch |
+| `fetchPlayerHeatmaps` | `false` | Keep bulk repair within quota; direct/derived heatmaps already present in payloads are still retained |
 
 ## Render Cron
 
@@ -101,8 +103,12 @@ FINISHED_MATCHES_BACKFILL_INCLUDE_RAW=false
 FINISHED_MATCHES_BACKFILL_STOP_ON_RATE_LIMIT=true
 FINISHED_MATCHES_BACKFILL_SYNC_ANIMATION=true
 FINISHED_MATCHES_BACKFILL_MARK_VERIFIED=true
+FINISHED_MATCHES_BACKFILL_RETRY_COOLDOWN_HOURS=6
+FINISHED_MATCHES_BACKFILL_FETCH_PLAYER_HEATMAPS=false
 ADMIN_API_SECRET=SECRET_NEW
 ```
+
+For tournament-wide repair, use `npm run worker:finished-matches-backfill-all`. Do not leave `worker:match-extras-snapshot` pinned to an old match id.
 
 ## Safe schedule
 

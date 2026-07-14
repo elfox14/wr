@@ -40,4 +40,8 @@ MATCH_EXTRAS_MATCH_ID=
 MATCH_EXTRAS_TIMEOUT_MS=15000
 MATCH_EXTRAS_INCLUDE_RAW=false
 MATCH_EXTRAS_DRY_RUN=false
+MATCH_EXTRAS_MAX_FINISHED_AGE_HOURS=48
+MATCH_EXTRAS_ALLOW_STALE_TARGET=false
 ```
+
+The single-match worker refuses to call the provider for a finished match older than the configured age. This protects the provider quota when a stale `MATCH_EXTRAS_MATCH_ID` remains pinned in a scheduler. Use the finished-matches backfill worker for historical coverage instead.

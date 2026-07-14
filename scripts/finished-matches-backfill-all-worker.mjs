@@ -46,9 +46,11 @@ const delaySeconds = numberFrom(process.env.FINISHED_MATCHES_BACKFILL_BATCH_DELA
 const includeRaw = boolFrom(process.env.FINISHED_MATCHES_BACKFILL_INCLUDE_RAW, true);
 const syncAnimation = boolFrom(process.env.FINISHED_MATCHES_BACKFILL_SYNC_ANIMATION, false);
 const markVerified = boolFrom(process.env.FINISHED_MATCHES_BACKFILL_MARK_VERIFIED, true);
+const retryCooldownHours = numberFrom(process.env.FINISHED_MATCHES_BACKFILL_RETRY_COOLDOWN_HOURS, 6, 1, 72);
+const fetchPlayerHeatmaps = boolFrom(process.env.FINISHED_MATCHES_BACKFILL_FETCH_PLAYER_HEATMAPS, false);
 
 console.log('[finished-matches-backfill-all-worker] Running in all-matches mode. FINISHED_MATCHES_BACKFILL_MATCH_ID is intentionally ignored.');
-console.log(JSON.stringify({ origin, batches, limit, lookbackDays, freshnessHours, timeoutMs, delaySeconds, includeRaw, syncAnimation, markVerified }, null, 2));
+console.log(JSON.stringify({ origin, batches, limit, lookbackDays, freshnessHours, timeoutMs, delaySeconds, includeRaw, syncAnimation, markVerified, retryCooldownHours, fetchPlayerHeatmaps }, null, 2));
 
 for (let batch = 1; batch <= batches; batch += 1) {
   const url = new URL('/api/cron/finished-matches-backfill', origin);
@@ -61,6 +63,8 @@ for (let batch = 1; batch <= batches; batch += 1) {
   url.searchParams.set('includeRaw', String(includeRaw));
   url.searchParams.set('syncAnimation', String(syncAnimation));
   url.searchParams.set('markVerified', String(markVerified));
+  url.searchParams.set('retryCooldownHours', String(retryCooldownHours));
+  url.searchParams.set('fetchPlayerHeatmaps', String(fetchPlayerHeatmaps));
   url.searchParams.set('stopOnRateLimit', 'true');
 
   console.log(`[finished-matches-backfill-all-worker] Batch ${batch}/${batches}: ${url.href}`);

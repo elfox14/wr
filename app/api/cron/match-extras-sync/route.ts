@@ -29,10 +29,12 @@ function snapshotHasFullExtras(snapshot: any) {
   const raw = snapshot?.rawData || {};
   const normalized = raw.normalized || {};
   const counts = raw.counts || {};
-  const shots = Array.isArray(normalized.shotmap) ? normalized.shotmap.length : Number(counts.shots || 0);
+  const stats = normalized?.liveStats?.stats && typeof normalized.liveStats.stats === 'object'
+    ? Object.keys(normalized.liveStats.stats).length
+    : Number(counts.stats || 0);
   const playerStats = Array.isArray(normalized.playerStats) ? normalized.playerStats.length : Number(counts.playerStats || 0);
-  const lineups = normalized.lineups ? Number(counts.lineups || 1) : Number(counts.lineups || 0);
-  return shots > 0 || playerStats > 0 || lineups > 0;
+  const detailedEvents = Array.isArray(normalized?.eventsDetailed?.all) ? normalized.eventsDetailed.all.length : Number(counts.detailedEvents || 0);
+  return stats > 0 && playerStats > 0 && detailedEvents > 0;
 }
 
 function isRateLimitError(error: any) {

@@ -1,5 +1,6 @@
 import { randomUUID } from 'crypto';
 import prisma from '@/lib/prisma';
+import { canonicalizeTournamentMatches } from '@/lib/canonicalTournamentMatches';
 import { collectTheStatsMatchExtras } from '@/lib/theStatsMatchExtras';
 import { runLiveAnimationSync } from '@/lib/liveAnimationSync';
 
@@ -17,6 +18,8 @@ export type FinishedMatchesBackfillOptions = {
   stopOnRateLimit?: boolean;
   syncAnimation?: boolean;
   markVerified?: boolean;
+  retryCooldownHours?: number;
+  fetchPlayerHeatmaps?: boolean;
 };
 
 type BackfillMatch = {
@@ -89,27 +92,38 @@ function snapshotHasFullExtras(snapshot: any) {
   const raw = snapshot?.rawData || {};
   const normalized = raw.normalized || {};
   const counts = raw.counts || {};
-  const shots = Array.isArray(normalized.shotmap) ? normalized.shotmap.length : Number(counts.shots || 0);
+  const stats = normalized?.liveStats?.stats && typeof normalized.liveStats.stats === 'object'
+    ? Object.keys(normalized.liveStats.stats).length
+    : Number(counts.stats || 0);
   const playerStats = Array.isArray(normalized.playerStats) ? normalized.playerStats.length : Number(counts.playerStats || 0);
-  const lineups = normalized.lineups ? Number(counts.lineups || 1) : Number(counts.lineups || 0);
   const detailedEvents = Array.isArray(normalized?.eventsDetailed?.all) ? normalized.eventsDetailed.all.length : Number(counts.detailedEvents || 0);
-  return shots > 0 || playerStats > 0 || lineups > 0 || detailedEvents > 0;
+  return stats > 0 && playerStats > 0 && detailedEvents > 0;
 }
 
-async function alreadyHasRecentFullExtras(matchId: string, freshnessHours: number) {
-  const since = new Date(Date.now() - freshnessHours * 60 * 60 * 1000);
+async function alreadyHasFullExtras(matchId: string) {
   const snapshots = await prisma.matchStatsSnapshot.findMany({
     where: {
       matchId,
       provider: { startsWith: 'THE_STATS_API' },
-      capturedAt: { gte: since },
     },
     orderBy: { capturedAt: 'desc' },
-    take: 10,
+    take: 100,
     select: { rawData: true, capturedAt: true, provider: true },
   }).catch(() => []);
 
   return snapshots.some(snapshotHasFullExtras);
+}
+
+async function hasRecentBackfillAttempt(matchId: string, retryCooldownHours: number) {
+  const since = new Date(Date.now() - retryCooldownHours * 60 * 60 * 1000);
+  const count = await prisma.matchStatsSnapshot.count({
+    where: {
+      matchId,
+      provider: 'FINISHED_MATCHES_BACKFILL_SUMMARY',
+      capturedAt: { gte: since },
+    },
+  }).catch(() => 0);
+  return count > 0;
 }
 
 function teamIdFromProviderName(match: BackfillMatch, providerTeamName?: string | null) {
@@ -319,8 +333,17 @@ async function savePlayerPerformances(match: BackfillMatch, normalized: any, fix
 
 async function saveQualitySnapshot(match: BackfillMatch, fixtureId: number | null, result: any, projections: any, dryRun: boolean) {
   const counts = result?.counts || {};
-  const dataQuality = counts.playerStats || counts.lineups || counts.shots || counts.detailedEvents ? (counts.playerStats && counts.lineups ? 'complete' : 'partial') : 'missing';
-  if (dryRun) return { dataQuality, saved: false };
+  const coverage = {
+    teamStatistics: Number(counts.stats || 0) > 0,
+    playerStatistics: Number(counts.playerStats || 0) > 0,
+    events: Number(counts.detailedEvents || 0) > 0,
+    shotmap: Number(counts.shots || 0) > 0,
+    lineups: Number(counts.lineups || 0) > 0,
+  };
+  const coreComplete = coverage.teamStatistics && coverage.playerStatistics && coverage.events;
+  const hasUsefulData = Object.values(coverage).some(Boolean);
+  const dataQuality = coreComplete ? 'complete' : hasUsefulData ? 'partial' : 'missing';
+  if (dryRun) return { dataQuality, coverage, saved: false };
 
   await prisma.matchStatsSnapshot.create({
     data: {
@@ -344,17 +367,15 @@ async function saveQualitySnapshot(match: BackfillMatch, fixtureId: number | nul
     },
   });
 
-  return { dataQuality, saved: true };
+  return { dataQuality, coverage, saved: true };
 }
 
 async function processMatch(match: BackfillMatch, options: Required<Omit<FinishedMatchesBackfillOptions, 'matchId'>>) {
-  if (match.status === 'FINAL_VERIFIED' && !options.force) {
-    return { matchId: match.id, title: `${match.homeTeam?.name} ضد ${match.awayTeam?.name}`, skipped: true, reason: 'already_final_verified' };
-  }
-
   if (!options.force) {
-    const hasRecent = await alreadyHasRecentFullExtras(match.id, options.freshnessHours);
-    if (hasRecent) return { matchId: match.id, title: `${match.homeTeam?.name} ضد ${match.awayTeam?.name}`, skipped: true, reason: 'recent_full_the_stats_snapshot_exists' };
+    const hasCompleteSnapshot = await alreadyHasFullExtras(match.id);
+    if (hasCompleteSnapshot) return { matchId: match.id, title: `${match.homeTeam?.name} ضد ${match.awayTeam?.name}`, skipped: true, reason: 'complete_the_stats_snapshot_exists' };
+    const attemptedRecently = await hasRecentBackfillAttempt(match.id, options.retryCooldownHours);
+    if (attemptedRecently) return { matchId: match.id, title: `${match.homeTeam?.name} ضد ${match.awayTeam?.name}`, skipped: true, reason: 'recent_incomplete_backfill_attempt_waiting_for_retry' };
   }
 
   const result = await collectTheStatsMatchExtras(match, {
@@ -363,6 +384,7 @@ async function processMatch(match: BackfillMatch, options: Required<Omit<Finishe
     includeRaw: options.includeRaw,
     endpointMode: 'full',
     timeoutMs: options.timeoutMs,
+    fetchPlayerHeatmaps: options.fetchPlayerHeatmaps,
   });
 
   const normalized = result?.debug?.normalizedPreview || {};
@@ -376,7 +398,7 @@ async function processMatch(match: BackfillMatch, options: Required<Omit<Finishe
     animationSync = await runLiveAnimationSync({ matchId: match.id, allowFinished: true, dryRun: false, limit: 1 });
   }
 
-  if (options.markVerified && !options.dryRun && result.ok && quality.dataQuality !== 'missing') {
+  if (options.markVerified && !options.dryRun && result.ok && quality.dataQuality === 'complete') {
     await prisma.match.update({ where: { id: match.id }, data: { status: 'FINAL_VERIFIED' } });
   }
 
@@ -393,7 +415,7 @@ async function processMatch(match: BackfillMatch, options: Required<Omit<Finishe
     quality,
     projections: { events: eventsProjection, players: playersProjection },
     animationSync: animationSync ? { ok: animationSync.ok, results: animationSync.results } : null,
-    markedFinalVerified: Boolean(options.markVerified && !options.dryRun && result.ok && quality.dataQuality !== 'missing'),
+    markedFinalVerified: Boolean(options.markVerified && !options.dryRun && result.ok && quality.dataQuality === 'complete'),
   };
 }
 
@@ -408,9 +430,11 @@ export async function runFinishedMatchesBackfill(options: FinishedMatchesBackfil
   const stopOnRateLimit = options.stopOnRateLimit !== false;
   const syncAnimation = options.syncAnimation !== false;
   const markVerified = options.markVerified !== false;
+  const retryCooldownHours = numberFrom(options.retryCooldownHours, 6, 1, 72);
+  const fetchPlayerHeatmaps = Boolean(options.fetchPlayerHeatmaps);
 
   const since = new Date(Date.now() - lookbackDays * 24 * 60 * 60 * 1000);
-  const matches = await prisma.match.findMany({
+  const rawMatches = await prisma.match.findMany({
     where: options.matchId
       ? { id: String(options.matchId) }
       : {
@@ -419,8 +443,9 @@ export async function runFinishedMatchesBackfill(options: FinishedMatchesBackfil
         },
     include: { homeTeam: true, awayTeam: true },
     orderBy: { matchDate: 'desc' },
-    take: options.matchId ? 1 : limit * 3,
+    take: options.matchId ? 1 : Math.min(160, Math.max(64, limit * 8)),
   }) as BackfillMatch[];
+  const matches = options.matchId ? rawMatches : canonicalizeTournamentMatches(rawMatches);
 
   const processed: any[] = [];
   let stoppedEarly: string | null = null;
@@ -430,7 +455,7 @@ export async function runFinishedMatchesBackfill(options: FinishedMatchesBackfil
     if (stoppedEarly) break;
 
     try {
-      const result = await processMatch(match, { limit, lookbackDays, freshnessHours, timeoutMs, force, dryRun, includeRaw, stopOnRateLimit, syncAnimation, markVerified });
+      const result = await processMatch(match, { limit, lookbackDays, freshnessHours, timeoutMs, force, dryRun, includeRaw, stopOnRateLimit, syncAnimation, markVerified, retryCooldownHours, fetchPlayerHeatmaps });
       processed.push(result);
       if (stopOnRateLimit && isRateLimitResult(result)) stoppedEarly = 'rate_limited';
     } catch (error: any) {
@@ -455,6 +480,8 @@ export async function runFinishedMatchesBackfill(options: FinishedMatchesBackfil
     stopOnRateLimit,
     syncAnimation,
     markVerified,
+    retryCooldownHours,
+    fetchPlayerHeatmaps,
     candidates: matches.length,
     processed,
     stoppedEarly,
