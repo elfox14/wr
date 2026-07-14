@@ -60,6 +60,24 @@ const STAGE_CONFIGS = [
     aliases: ['semi finals', 'semi final', 'semi_finals', 'semi_final', 'semi-finals', 'semi-final', 'semifinals', 'semifinal', 'sf', 'نصف النهائي'],
     idToMatchNo: new Map(),
   },
+  {
+    key: 'third',
+    stage: 'third_place',
+    label: 'Third Place',
+    envPrefix: 'FIFA_THIRD',
+    matchNumbers: new Set([103]),
+    aliases: ['bronze final', 'bronze medal match', 'third place', 'third-place', 'third_place', 'المركز الثالث'],
+    idToMatchNo: new Map(),
+  },
+  {
+    key: 'final',
+    stage: 'final',
+    label: 'Final',
+    envPrefix: 'FIFA_FINAL',
+    matchNumbers: new Set([104]),
+    aliases: ['final', 'world cup final', 'championship match', 'النهائي'],
+    idToMatchNo: new Map(),
+  },
 ];
 
 const DERIVED_BRACKETS = {
@@ -241,6 +259,7 @@ function matchNo(match, config) {
 function isStageMatch(match, config) {
   if (matchNo(match, config)) return true;
   const text = stageText(match);
+  if (config.key === 'final' && /(semi|quarter|bronze|third|round|last)/i.test(text)) return false;
   return config.aliases.some((alias) => text.includes(alias));
 }
 
@@ -569,7 +588,7 @@ async function run() {
 
   if (detectedKnockoutMatches === 0) {
     throw new Error(
-      `FIFA_EMPTY_KNOCKOUT_PAYLOAD: no R32/R16/QF/SF matches for competition ${competitionId}, season ${seasonId}. Refusing to derive or persist fixtures from an empty official feed.`,
+      `FIFA_EMPTY_KNOCKOUT_PAYLOAD: no R32/R16/QF/SF/third-place/final matches for competition ${competitionId}, season ${seasonId}. Refusing to derive or persist fixtures from an empty official feed.`,
     );
   }
 
