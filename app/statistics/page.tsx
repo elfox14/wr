@@ -15,10 +15,6 @@ export const metadata = {
 };
 
 const LIVE_STATS_CACHE_SECONDS = 30;
-const SNAPSHOT_LIMIT = 4000;
-const PERFORMANCE_LIMIT = 6000;
-const EVENT_LIMIT = 8000;
-
 const FINISHED = ['FINISHED', 'FT', 'AET', 'PEN', 'COMPLETED', 'ENDED', 'FINAL_VERIFIED', 'FULL_TIME'];
 const LIVE = ['LIVE', 'IN_PLAY', '1H', '2H', 'HT', 'HALFTIME', 'HALF_TIME', 'ET', 'BT', 'P', 'PEN_LIVE'];
 const SCHEDULED = ['SCHEDULED', 'TIMED', 'NOT_STARTED', 'NS'];
@@ -317,7 +313,6 @@ async function loadStatisticsUncached() {
         awayRedCards: true,
       },
       orderBy: { capturedAt: 'desc' },
-      take: SNAPSHOT_LIMIT,
     }),
     prisma.playerPerformance.findMany({
       where: {
@@ -354,13 +349,11 @@ async function loadStatisticsUncached() {
         asset: { select: { id: true, name: true, code: true, image: true, team: { select: { id: true, name: true, code: true, image: true } } } },
       },
       orderBy: { updatedAt: 'desc' },
-      take: PERFORMANCE_LIMIT,
     }),
     prisma.matchEvent.findMany({
       where: { type: { in: ['goal', 'yellow_card', 'red_card'] } },
       select: { matchId: true, type: true, playerName: true, teamId: true, sourceName: true, createdAt: true },
       orderBy: { createdAt: 'desc' },
-      take: EVENT_LIMIT,
     }),
     prisma.asset.count({ where: { type: 'TEAM' } }),
     prisma.asset.count({ where: { type: 'PLAYER' } }),
@@ -528,11 +521,11 @@ async function loadStatisticsUncached() {
   };
 }
 
-const loadLiveStatistics = unstable_cache(loadStatisticsUncached, ['statistics-page-v5-live'], {
+const loadLiveStatistics = unstable_cache(loadStatisticsUncached, ['statistics-page-v6-live'], {
   revalidate: LIVE_STATS_CACHE_SECONDS,
   tags: ['statistics-page', 'home-dashboard'],
 });
-const loadIdleStatistics = unstable_cache(loadStatisticsUncached, ['statistics-page-v5-idle'], {
+const loadIdleStatistics = unstable_cache(loadStatisticsUncached, ['statistics-page-v6-idle'], {
   revalidate: false,
   tags: ['statistics-page', 'home-dashboard'],
 });
@@ -580,7 +573,7 @@ export default async function StatisticsPage() {
       <section className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(15,240,252,0.16),transparent_32%),linear-gradient(135deg,#061313,#050505)] p-5 shadow-[0_24px_70px_rgba(0,0,0,0.32)]">
         <div className="absolute -left-20 -top-20 h-52 w-52 rounded-full bg-[#FFD700]/10 blur-3xl" />
         <div className="relative z-10 flex flex-wrap items-end justify-between gap-5">
-          <div><p className="inline-flex rounded-full border border-[#FFD700]/25 bg-[#FFD700]/10 px-3 py-1 text-[10px] font-black tracking-[0.16em] text-[#FFD700]">CACHED DATA CENTER</p><h1 className="mt-4 text-3xl font-black leading-tight md:text-5xl">إحصائيات كأس العالم 2026</h1><p className="mt-3 max-w-3xl text-sm font-bold leading-7 text-gray-400">الصفحة لا تجلب من TheStats API أثناء زيارة المستخدم. يتم تجميع الأرقام من قاعدة البيانات فقط داخل كاش قصير لتجنب ضغط Refresh ورسائل 502.</p></div>
+          <div><p className="inline-flex rounded-full border border-[#FFD700]/25 bg-[#FFD700]/10 px-3 py-1 text-[10px] font-black tracking-[0.16em] text-[#FFD700]">CACHED DATA CENTER</p><h1 className="mt-4 text-3xl font-black leading-tight md:text-5xl">إحصائيات كأس العالم 2026</h1><p className="mt-3 max-w-3xl text-sm font-bold leading-7 text-gray-400">الصفحة لا تجلب من TheStats API أثناء زيارة المستخدم. يتم تجميع جميع السجلات الموثقة المحفوظة في قاعدة البيانات، ويعمل التحديث التلقائي أثناء المباريات المباشرة فقط.</p></div>
           <div className="rounded-3xl border border-white/10 bg-black/25 p-4 text-sm font-bold text-gray-300"><div className="text-[10px] font-black text-gray-500">آخر تحديث بيانات</div><div className="mt-1 text-lg font-black text-white">{formatDate(data.updatedAt)}</div><div className="mt-3 h-1.5 w-44 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-[#00FF88]" style={{ width: `${Math.min(100, completion || 0)}%` }} /></div><div className="mt-1 text-[10px] text-gray-500">{hasLiveMatches ? `تحديث مباشر كل ${nf.format(LIVE_STATS_CACHE_SECONDS)} ثانية` : 'التحديث متوقف لعدم وجود مباراة مباشرة'}</div></div>
         </div>
       </section>
