@@ -54,7 +54,8 @@ https://worldcup.mcprim.com/api/cron/live-autopilot?key={CRON_SECRET}
 | iSports live timeline | كل دقيقة | أحداث ولقطات live |
 | football-data confirmation | كل 5 دقائق | تأكيد الحالة والنتيجة |
 | iSports postmatch confirm | كل 10 دقائق | تأكيد ما بعد المباراة |
-| TheStats enrichment | كل 15 دقيقة | إثراء بعدي وتدقيق |
+| FIFA knockout fixtures | كل 30 دقيقة حول المباريات | إضافة الأدوار من دور الـ32 حتى النهائي بعد اعتماد الطرفين رسميًا |
+| TheStats completeness | كل 5 دقائق أثناء المباراة أو خلال 4 ساعات بعد نهايتها | استكمال إحصاءات الفرق واللاعبين والأحداث لمباراة ناقصة واحدة |
 | live sources status | كل 5 دقائق | مراقبة صحة المصادر |
 
 ## Provider Retry + Resume Guard
