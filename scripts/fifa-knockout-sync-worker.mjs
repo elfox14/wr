@@ -35,21 +35,66 @@ const STAGE_CONFIGS = [
     label: 'Round Of 16',
     envPrefix: 'FIFA_R16',
     matchNumbers: new Set(Array.from({ length: 8 }, (_, index) => 89 + index)),
-    aliases: ['round of 16', 'last 16', 'r16', 'دور الـ16', 'دور ال16'],
+    aliases: ['round of 16', 'round_of_16', 'last 16', 'last_16', 'r16', 'دور الـ16', 'دور ال16'],
+    idToMatchNo: new Map(),
+  },
+  {
+    key: 'qf',
+    stage: 'quarter_finals',
+    label: 'Quarter Finals',
+    envPrefix: 'FIFA_QF',
+    matchNumbers: new Set(Array.from({ length: 4 }, (_, index) => 97 + index)),
+    aliases: ['quarter finals', 'quarter final', 'quarter_finals', 'quarter_final', 'quarter-finals', 'quarter-final', 'quarterfinals', 'quarterfinal', 'qf', 'ربع النهائي'],
+    idToMatchNo: new Map(),
+  },
+  {
+    key: 'sf',
+    stage: 'semi_finals',
+    label: 'Semi Finals',
+    envPrefix: 'FIFA_SF',
+    matchNumbers: new Set(Array.from({ length: 2 }, (_, index) => 101 + index)),
+    aliases: ['semi finals', 'semi final', 'semi_finals', 'semi_final', 'semi-finals', 'semi-final', 'semifinals', 'semifinal', 'sf', 'نصف النهائي'],
     idToMatchNo: new Map(),
   },
 ];
 
-const R16_BRACKET = [
-  { MatchNumber: 89, winners: [73, 75], Date: '2026-07-04T19:00:00.000Z' },
-  { MatchNumber: 90, winners: [74, 77], Date: '2026-07-04T22:00:00.000Z' },
-  { MatchNumber: 91, winners: [76, 78], Date: '2026-07-05T19:00:00.000Z' },
-  { MatchNumber: 92, winners: [79, 80], Date: '2026-07-05T22:00:00.000Z' },
-  { MatchNumber: 93, winners: [83, 84], Date: '2026-07-06T19:00:00.000Z' },
-  { MatchNumber: 94, winners: [81, 82], Date: '2026-07-06T22:00:00.000Z' },
-  { MatchNumber: 95, winners: [86, 88], Date: '2026-07-07T19:00:00.000Z' },
-  { MatchNumber: 96, winners: [85, 87], Date: '2026-07-07T22:00:00.000Z' },
-];
+const DERIVED_BRACKETS = {
+  r16: {
+    sourceStage: 'round_of_32',
+    sourceLabel: 'R32',
+    allowEnv: 'FIFA_R16_ALLOW_DERIVED_FROM_R32',
+    fixtures: [
+      { MatchNumber: 89, winners: [73, 75], Date: '2026-07-04T19:00:00.000Z' },
+      { MatchNumber: 90, winners: [74, 77], Date: '2026-07-04T22:00:00.000Z' },
+      { MatchNumber: 91, winners: [76, 78], Date: '2026-07-05T19:00:00.000Z' },
+      { MatchNumber: 92, winners: [79, 80], Date: '2026-07-05T22:00:00.000Z' },
+      { MatchNumber: 93, winners: [83, 84], Date: '2026-07-06T19:00:00.000Z' },
+      { MatchNumber: 94, winners: [81, 82], Date: '2026-07-06T22:00:00.000Z' },
+      { MatchNumber: 95, winners: [86, 88], Date: '2026-07-07T19:00:00.000Z' },
+      { MatchNumber: 96, winners: [85, 87], Date: '2026-07-07T22:00:00.000Z' },
+    ],
+  },
+  qf: {
+    sourceStage: 'round_of_16',
+    sourceLabel: 'R16',
+    allowEnv: 'FIFA_QF_ALLOW_DERIVED_FROM_R16',
+    fixtures: [
+      { MatchNumber: 97, winners: [89, 90] },
+      { MatchNumber: 98, winners: [93, 94] },
+      { MatchNumber: 99, winners: [91, 92] },
+      { MatchNumber: 100, winners: [95, 96] },
+    ],
+  },
+  sf: {
+    sourceStage: 'quarter_finals',
+    sourceLabel: 'QF',
+    allowEnv: 'FIFA_SF_ALLOW_DERIVED_FROM_QF',
+    fixtures: [
+      { MatchNumber: 101, winners: [97, 98] },
+      { MatchNumber: 102, winners: [99, 100] },
+    ],
+  },
+};
 
 function env(name, fallback = '') {
   return String(process.env[name] || fallback).trim();
@@ -181,6 +226,42 @@ function isStageMatch(match, config) {
   return config.aliases.some((alias) => text.includes(alias));
 }
 
+function matchQuality(match) {
+  const home = team(match, 'home');
+  const away = team(match, 'away');
+  return (providerId(match) ? 8 : 0) + (date(match) ? 4 : 0) + (home.code || home.name ? 2 : 0) + (away.code || away.name ? 2 : 0);
+}
+
+function assignMissingMatchNumbers(matches, config) {
+  const byNumber = new Map();
+  const unnumbered = [];
+
+  for (const match of matches) {
+    const no = matchNo(match, config);
+    if (!no) {
+      unnumbered.push(match);
+      continue;
+    }
+    const current = byNumber.get(no);
+    if (!current || matchQuality(match) > matchQuality(current)) byNumber.set(no, match);
+  }
+
+  const available = [...config.matchNumbers].filter((no) => !byNumber.has(no)).sort((a, b) => a - b);
+  unnumbered
+    .sort((a, b) => {
+      const dateA = date(a)?.getTime() ?? Number.MAX_SAFE_INTEGER;
+      const dateB = date(b)?.getTime() ?? Number.MAX_SAFE_INTEGER;
+      return dateA - dateB || providerId(a).localeCompare(providerId(b));
+    })
+    .slice(0, available.length)
+    .forEach((match, index) => {
+      const no = available[index];
+      byNumber.set(no, { ...match, MatchNumber: no });
+    });
+
+  return [...byNumber.entries()].sort(([a], [b]) => a - b).map(([, match]) => match);
+}
+
 function team(match, side) {
   const upper = side === 'home' ? 'Home' : 'Away';
   const lower = side;
@@ -244,6 +325,8 @@ function findTeam(all, info) {
 }
 
 function winner(match) {
+  const finished = ['FINISHED', 'FT', 'AET', 'PEN', 'COMPLETED', 'ENDED', 'FINAL_VERIFIED', 'FULL_TIME'];
+  if (!finished.includes(String(match.status || '').trim().toUpperCase())) return null;
   if (match.homeScore > match.awayScore) return match.homeTeam;
   if (match.awayScore > match.homeScore) return match.awayTeam;
   const penalties = match.externalIds?.penalties;
@@ -252,12 +335,14 @@ function winner(match) {
   return null;
 }
 
-async function buildDerivedR16Matches() {
+async function buildDerivedStageMatches(config, officialMatches, allTeams) {
+  const bracket = DERIVED_BRACKETS[config.key];
+  if (!bracket) return { matches: officialMatches, diagnostics: [], usedDerived: false };
+
   const rows = await prisma.match.findMany({
     where: {
-      stage: 'round_of_32',
+      stage: bracket.sourceStage,
       syncSource: { contains: 'FIFA', mode: 'insensitive' },
-      externalIds: { path: ['fifaMatchNumber'], not: null },
     },
     select: {
       id: true,
@@ -270,36 +355,67 @@ async function buildDerivedR16Matches() {
     },
   });
 
-  const byNo = new Map(rows.map((match) => [Number(match.externalIds?.fifaMatchNumber), match]));
-  const derived = [];
+  const bySourceNo = new Map(rows.map((match) => [Number(match.externalIds?.fifaMatchNumber), match]));
+  const officialByNo = new Map(officialMatches.map((match) => [matchNo(match, config), match]).filter(([no]) => no));
+  const synthesized = [];
+  const diagnostics = [];
+  let usedDerived = false;
 
-  for (const fixture of R16_BRACKET) {
-    const sourceMatches = fixture.winners.map((no) => byNo.get(no));
+  for (const fixture of bracket.fixtures) {
+    const sourceMatches = fixture.winners.map((no) => bySourceNo.get(no));
     const sourceWinners = sourceMatches.map((match) => (match ? winner(match) : null));
     if (!sourceWinners[0] || !sourceWinners[1]) {
-      derived.push({ MatchNumber: fixture.MatchNumber, status: 'skipped_waiting_for_r32_winners', winners: fixture.winners });
+      diagnostics.push({
+        matchNo: fixture.MatchNumber,
+        status: `skipped_waiting_for_${bracket.sourceLabel.toLowerCase()}_official_winners`,
+        winners: fixture.winners,
+      });
       continue;
     }
 
-    derived.push({
-      IdMatch: `derived-r16-${fixture.MatchNumber}`,
+    const official = officialByNo.get(fixture.MatchNumber) || null;
+    const officialDate = official ? date(official) : null;
+    const matchDate = officialDate || (fixture.Date ? new Date(fixture.Date) : null);
+    if (!matchDate || !Number.isFinite(matchDate.getTime())) {
+      diagnostics.push({
+        matchNo: fixture.MatchNumber,
+        status: 'skipped_missing_official_schedule',
+        winners: fixture.winners,
+      });
+      continue;
+    }
+
+    const officialHome = official ? findTeam(allTeams, team(official, 'home')) : null;
+    const officialAway = official ? findTeam(allTeams, team(official, 'away')) : null;
+    const derivedHome = sourceWinners[0];
+    const derivedAway = sourceWinners[1];
+    if (!official || !officialHome || !officialAway) usedDerived = true;
+
+    synthesized.push({
+      ...(official || {
+        IdMatch: `derived-${config.key}-${fixture.MatchNumber}`,
+        StatusDescription: 'Scheduled',
+        Score: { FullTime: { Home: null, Away: null } },
+      }),
       MatchNumber: fixture.MatchNumber,
-      StageName: 'Round Of 16',
-      Date: fixture.Date,
-      StatusDescription: 'Scheduled',
-      HomeTeam: { Code: sourceWinners[0].code, Name: sourceWinners[0].name },
-      AwayTeam: { Code: sourceWinners[1].code, Name: sourceWinners[1].name },
-      Score: { FullTime: { Home: null, Away: null } },
+      StageName: config.label,
+      Date: matchDate.toISOString(),
+      HomeTeam: { Code: (officialHome || derivedHome).code, Name: (officialHome || derivedHome).name },
+      AwayTeam: { Code: (officialAway || derivedAway).code, Name: (officialAway || derivedAway).name },
       DerivedFrom: fixture.winners,
     });
   }
 
-  return derived;
+  const synthesizedByNo = new Map(synthesized.map((match) => [match.MatchNumber, match]));
+  const merged = officialMatches.map((match) => synthesizedByNo.get(matchNo(match, config)) || match);
+  for (const match of synthesized) {
+    if (!officialByNo.has(match.MatchNumber)) merged.push(match);
+  }
+
+  return { matches: assignMissingMatchNumbers(merged, config), diagnostics, usedDerived };
 }
 
 async function upsert(match, config, allTeams, sourceUrl, dryRun) {
-  if (match.status === 'skipped_waiting_for_r32_winners') return match;
-
   const no = matchNo(match, config);
   if (!no) return { status: 'skipped_missing_match_number', providerId: providerId(match), stage: stageText(match) };
   const homeInfo = team(match, 'home');
@@ -315,7 +431,7 @@ async function upsert(match, config, allTeams, sourceUrl, dryRun) {
   const awayScore = score(match, 'away') ?? 0;
   const homePens = penaltyScore(match, 'home');
   const awayPens = penaltyScore(match, 'away');
-  const isDerived = String(id).startsWith('derived-r16-');
+  const isDerived = String(id).startsWith('derived-');
   const data = {
     externalId,
     stage: config.stage,
@@ -326,7 +442,7 @@ async function upsert(match, config, allTeams, sourceUrl, dryRun) {
     homeScore,
     awayScore,
     matchDate,
-    syncSource: isDerived ? 'FIFA_DERIVED_FROM_R32' : 'FIFA',
+    syncSource: isDerived ? `FIFA_DERIVED_FROM_${String(DERIVED_BRACKETS[config.key]?.sourceLabel || 'OFFICIAL_RESULT').toUpperCase()}` : 'FIFA',
     lastSyncedAt: new Date(),
     externalIds: {
       fifaId: id,
@@ -335,7 +451,7 @@ async function upsert(match, config, allTeams, sourceUrl, dryRun) {
       derivedFrom: match.DerivedFrom || null,
       penalties: homePens !== null && awayPens !== null ? { home: homePens, away: awayPens } : null,
     },
-    syncState: { source: isDerived ? 'FIFA_DERIVED_FROM_R32' : 'FIFA', sourceUrl, rawStage: stageText(match), syncedAt: new Date().toISOString() },
+    syncState: { source: isDerived ? `FIFA_DERIVED_FROM_${String(DERIVED_BRACKETS[config.key]?.sourceLabel || 'OFFICIAL_RESULT').toUpperCase()}` : 'FIFA', sourceUrl, rawStage: stageText(match), syncedAt: new Date().toISOString() },
   };
 
   if (dryRun) return { matchNo: no, stage: config.stage, status: 'dry_run_would_upsert', externalId, home: home.name, away: away.name, score: `${homeScore}-${awayScore}`, penalties: homePens !== null && awayPens !== null ? `${homePens}-${awayPens}` : null, mappedStatus: data.status };
@@ -355,22 +471,51 @@ async function upsert(match, config, allTeams, sourceUrl, dryRun) {
 }
 
 async function processStage(config, allMatches, allTeams, sourceUrl, dryRun) {
-  const fifaMatches = allMatches.filter((match) => isStageMatch(match, config));
-  const allowDerivedR16 = config.key === 'r16' && bool('FIFA_R16_ALLOW_DERIVED_FROM_R32', true);
-  const usedDerivedR16 = fifaMatches.length === 0 && allowDerivedR16;
-  const matches = usedDerivedR16 ? await buildDerivedR16Matches() : fifaMatches;
-  const processed = [];
+  const detectedMatches = assignMissingMatchNumbers(allMatches.filter((match) => isStageMatch(match, config)), config);
+  const bracket = DERIVED_BRACKETS[config.key];
+  const allowDerived = Boolean(bracket) && bool(bracket.allowEnv, true);
+  const prepared = allowDerived
+    ? await buildDerivedStageMatches(config, detectedMatches, allTeams)
+    : { matches: detectedMatches, diagnostics: [], usedDerived: false };
+  const processed = [...prepared.diagnostics];
 
-  for (const match of matches) {
-    processed.push(await upsert(match, config, allTeams, usedDerivedR16 ? `${sourceUrl}#derived-r16-from-r32` : sourceUrl, dryRun));
+  for (const match of prepared.matches) {
+    processed.push(await upsert(match, config, allTeams, sourceUrl, dryRun));
   }
 
   return {
     stage: config.stage,
-    detected: fifaMatches.length,
-    usedDerivedR16,
+    expected: config.matchNumbers.size,
+    detected: detectedMatches.length,
+    usedDerived: prepared.usedDerived,
     processed,
   };
+}
+
+async function coverage() {
+  const rows = await prisma.match.findMany({
+    where: {
+      stage: { in: STAGE_CONFIGS.map((config) => config.stage) },
+      syncSource: { contains: 'FIFA', mode: 'insensitive' },
+    },
+    select: { id: true, stage: true, externalIds: true },
+  });
+
+  return STAGE_CONFIGS.map((config) => {
+    const stageRows = rows.filter((match) => match.stage === config.stage);
+    const numbered = new Set(
+      stageRows
+        .map((match) => Number(match.externalIds?.fifaMatchNumber))
+        .filter((no) => config.matchNumbers.has(no)),
+    );
+    const persisted = numbered.size || stageRows.length;
+    return {
+      stage: config.stage,
+      expected: config.matchNumbers.size,
+      persisted,
+      complete: persisted >= config.matchNumbers.size,
+    };
+  });
 }
 
 async function run() {
@@ -384,7 +529,17 @@ async function run() {
     processedStages.push(await processStage(config, allMatches, allTeams, url, dryRun));
   }
 
-  const summary = { ok: true, source: 'FIFA', sourceUrl: url, dryRun, detectedMatches: allMatches.length, processedStages };
+  const stageCoverage = await coverage();
+  const summary = {
+    ok: true,
+    source: 'FIFA',
+    sourceUrl: url,
+    dryRun,
+    detectedMatches: allMatches.length,
+    requestedStagesComplete: stageCoverage.every((stage) => stage.complete),
+    stageCoverage,
+    processedStages,
+  };
   console.log(JSON.stringify(summary, null, 2));
 }
 
