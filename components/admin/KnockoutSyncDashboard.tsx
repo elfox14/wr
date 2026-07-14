@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { CheckCircle2, Database, Loader2, RefreshCcw, ShieldCheck, TriangleAlert } from 'lucide-react';
+import { CheckCircle2, Database, Loader2, RefreshCcw, ShieldCheck, CircleAlert } from 'lucide-react';
 
 type StageCoverage = {
   stage: string;
@@ -101,7 +101,7 @@ export default function KnockoutSyncDashboard() {
       {response ? (
         <section className={`rounded-3xl border p-5 ${succeeded ? 'border-emerald-400/20 bg-emerald-400/10' : 'border-red-400/25 bg-red-400/10'}`}>
           <div className="mb-4 flex items-center gap-3">
-            {succeeded ? <CheckCircle2 className="text-emerald-300" size={22} /> : <TriangleAlert className="text-red-300" size={22} />}
+            {succeeded ? <CheckCircle2 className="text-emerald-300" size={22} /> : <CircleAlert className="text-red-300" size={22} />}
             <div>
               <h2 className="font-black text-white">{succeeded ? 'اكتملت عملية المزامنة' : 'تعذرت عملية المزامنة'}</h2>
               <p className="mt-1 text-xs font-bold text-gray-300">
