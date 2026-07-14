@@ -20,6 +20,25 @@ const checks = [
     label: `complete worker contains ${stage}`,
     passed: knockoutWorker.includes(`stage: '${stage}'`),
   })),
+  {
+    label: 'worker uses the FIFA internal World Cup 2026 season id',
+    passed: knockoutWorker.includes("FIFA_WORLD_CUP_2026_SEASON_ID = '285023'")
+      && knockoutWorker.includes("configured === '2026'"),
+  },
+  {
+    label: 'worker refuses an empty official knockout payload',
+    passed: knockoutWorker.includes('FIFA_EMPTY_KNOCKOUT_PAYLOAD'),
+  },
+  {
+    label: 'worker maps FIFA completed status and penalty shoot-outs',
+    passed: knockoutWorker.includes("if (numeric === 0) return 'FINISHED'")
+      && knockoutWorker.includes('${upper}TeamPenaltyScore'),
+  },
+  {
+    label: 'unverified derived fixtures are disabled by default',
+    passed: knockoutWorker.includes('bool(bracket.allowEnv, false)')
+      && !knockoutWorker.includes("Date: '2026-07-0"),
+  },
 ];
 
 const failed = checks.filter((check) => !check.passed);
