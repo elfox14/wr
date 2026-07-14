@@ -137,11 +137,10 @@ export async function GET() {
               OR s."homeShots" IS NOT NULL OR s."awayShots" IS NOT NULL
               OR s."homeShotsOnTarget" IS NOT NULL OR s."awayShotsOnTarget" IS NOT NULL
               OR s."homeCorners" IS NOT NULL OR s."awayCorners" IS NOT NULL
-              OR CASE
-                WHEN jsonb_typeof(COALESCE(s."rawData"::jsonb, '{}'::jsonb) #> '{normalized,liveStats,stats}') = 'object'
-                THEN jsonb_object_length(COALESCE(s."rawData"::jsonb, '{}'::jsonb) #> '{normalized,liveStats,stats}')
-                ELSE 0
-              END > 0
+              OR (
+                jsonb_typeof(COALESCE(s."rawData"::jsonb, '{}'::jsonb) #> '{normalized,liveStats,stats}') = 'object'
+                AND COALESCE(s."rawData"::jsonb, '{}'::jsonb) #> '{normalized,liveStats,stats}' <> '{}'::jsonb
+              )
             )
           ) AS "hasTeamStats",
           BOOL_OR(
