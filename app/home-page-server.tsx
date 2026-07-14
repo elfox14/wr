@@ -2,8 +2,8 @@ import { unstable_cache } from 'next/cache';
 import HomePremiumClient from '@/components/HomePremiumClient';
 import prisma from '@/lib/prisma';
 import { getHomeGroupStandings } from '@/lib/homeGroupStandings';
+import LiveOnlyRefresh from '@/components/LiveOnlyRefresh';
 
-export const revalidate = 30;
 
 const FINISHED_STATUSES = ['FINISHED', 'FT', 'AET', 'PEN', 'FULL_TIME', 'ENDED', 'COMPLETED', 'FINAL_VERIFIED'];
 const LIVE_STATUSES = ['LIVE', 'IN_PLAY', '1H', '2H', 'ET', 'HT'];
@@ -178,8 +178,7 @@ async function findFreshLiveCandidate<T extends MatchCandidate>(candidates: T[],
   return candidate ? decorateLiveCandidateWithSnapshot(candidate, latestByMatch.get(candidate.id)) : null;
 }
 
-const getHomeData = unstable_cache(
-  async () => {
+async function loadHomeDataUncached() {
     const now = new Date();
     const tickerStart = new Date(now.getTime() - 12 * 60 * 60 * 1000);
     const tickerEnd = new Date(now.getTime() + 36 * 60 * 60 * 1000);
@@ -362,12 +361,19 @@ const getHomeData = unstable_cache(
         updatedAt: updatedAt?.toISOString() || null,
       },
     };
-  },
-  ['home-dashboard-v9-tournament-statistics'],
-  { revalidate: 30, tags: ['home-dashboard'] },
-);
+}
+
+const getHomeDataLive = unstable_cache(loadHomeDataUncached, ['home-dashboard-v10-live'], {
+  revalidate: 30,
+  tags: ['home-dashboard'],
+});
+const getHomeDataIdle = unstable_cache(loadHomeDataUncached, ['home-dashboard-v10-idle'], {
+  revalidate: false,
+  tags: ['home-dashboard'],
+});
 
 export default async function Home() {
+  let hasLiveMatches = false;
   let data = {
     playersCount: 0,
     teamsCount: 0,
@@ -391,13 +397,15 @@ export default async function Home() {
   };
 
   try {
-    data = await getHomeData();
+    hasLiveMatches = Boolean(await prisma.match.findFirst({ where: { status: { in: LIVE_STATUSES } }, select: { id: true } }));
+    data = await (hasLiveMatches ? getHomeDataLive() : getHomeDataIdle());
   } catch (error) {
     console.error('Error fetching dashboard data:', error);
   }
 
   return (
     <>
+      <LiveOnlyRefresh active={hasLiveMatches} intervalMs={30_000} />
       <HomePremiumClient
         upcomingMatches={data.upcomingMatches}
         tickerMatches={data.tickerMatches}
