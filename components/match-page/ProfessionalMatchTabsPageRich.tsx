@@ -9,17 +9,16 @@ import type { MatchEventView, MatchPageData, MatchPlayerStatItem, OfficialLineup
 
 import TeamHeatmap from '@/components/match-center/visuals/TeamHeatmap';
 import CompactStatCell from '@/components/match-center/visuals/CompactStatCell';
-import InteractiveShotmap from '@/components/match-center/visuals/InteractiveShotmap';
 import PlayerHeatmapModal from '@/components/match-center/visuals/PlayerHeatmapModal';
 
-type Tab = 'overview' | 'momentum' | 'events' | 'lineups' | 'analysis' | 'group' | 'articles';
+type Tab = 'overview' | 'momentum' | 'events' | 'lineups' | 'history' | 'group' | 'articles';
 const ar = new Intl.NumberFormat('ar-EG');
 const tabs: { id: Tab; label: string }[] = [
   { id: 'overview', label: 'نظرة عامة' },
-  { id: 'momentum', label: 'الزخم' },
+  { id: 'momentum', label: 'الزخم والخريطة' },
   { id: 'events', label: 'الأحداث' },
   { id: 'lineups', label: 'التشكيلات' },
-  { id: 'analysis', label: 'التحليل' },
+  { id: 'history', label: 'التاريخ' },
   { id: 'group', label: 'المجموعة' },
   { id: 'articles', label: 'بعد المباراة' },
 ];
@@ -284,44 +283,53 @@ function Overview({ d }: { d: MatchPageData }) {
 
 function Momentum({ d }: { d: MatchPageData }) {
   const points = d.advanced.momentum || [];
-  if (points.length < 2) {
-    return (
-      <Box title="زخم المباراة" hint="لا نعرض منحنى تقديريًا عند غياب التسديدات الزمنية أو سلسلة الزخم من المزود.">
-        <div className="rounded-2xl border border-dashed border-white/10 bg-black/20 p-10 text-center text-sm font-bold text-slate-500">لا تتوفر بيانات كافية لإنشاء مؤشر زخم موثق لهذه المباراة.</div>
-      </Box>
-    );
-  }
-  const max = Math.max(1, ...points.flatMap((point) => [point.home, point.away]));
+  const homeHeatmap = d.advanced.teamHeatmaps?.home;
+  const awayHeatmap = d.advanced.teamHeatmaps?.away;
+  const max = points.length ? Math.max(1, ...points.flatMap((point) => [point.home, point.away])) : 1;
   const provider = points.some((point) => point.source === 'PROVIDER');
   return (
-    <Box title="زخم المباراة" hint={provider ? 'سلسلة الزخم كما وردت من مزود البيانات.' : 'مؤشر محسوب من التسديدات وxG الموثقة في نوافذ زمنية مدتها ٥ دقائق؛ لا يستخدم استحواذًا افتراضيًا.'}>
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-2 text-xs font-black">
-        <span className="text-[#0FF0FC]">{tn(d.homeTeam)}</span>
-        <span className="rounded-full border border-white/10 bg-black/25 px-3 py-1 text-slate-400">{provider ? 'المصدر: مزود البيانات' : 'المصدر: تسديدات المباراة الموثقة'}</span>
-        <span className="text-[#F8C846]">{tn(d.awayTeam)}</span>
-      </div>
-      <div className="overflow-x-auto pb-2">
-        <div className="flex h-64 min-w-[680px] items-center gap-1 rounded-2xl border border-white/10 bg-black/25 px-4 py-5">
-          {points.map((point) => {
-            const homeHeight = Math.max(2, (point.home / max) * 104);
-            const awayHeight = Math.max(2, (point.away / max) * 104);
-            return (
-              <div key={point.minute} className="group relative flex min-w-0 flex-1 flex-col items-center justify-center">
-                <div className="flex h-[108px] w-full items-end justify-center"><div className="w-[72%] rounded-t bg-[#0FF0FC] transition group-hover:brightness-125" style={{ height: homeHeight }} /></div>
-                <div className="my-1 text-[9px] font-black text-slate-500">{point.minute}′</div>
-                <div className="flex h-[108px] w-full items-start justify-center"><div className="w-[72%] rounded-b bg-[#F8C846] transition group-hover:brightness-125" style={{ height: awayHeight }} /></div>
-                <div className="pointer-events-none absolute left-1/2 top-1/2 z-10 hidden -translate-x-1/2 -translate-y-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-[#07110D] px-2 py-1 text-[10px] font-black shadow-xl group-hover:block">
-                  {tn(d.homeTeam)} {f(point.home)} · {tn(d.awayTeam)} {f(point.away)} · {ar.format(point.sampleSize)} تسديدة
-                </div>
+    <div className="space-y-6">
+      <Box title="زخم المباراة" hint={points.length >= 2 ? (provider ? 'سلسلة الزخم كما وردت من مزود البيانات.' : 'محسوب من التسديدات وxG الموثقة في نوافذ زمنية مدتها ٥ دقائق.') : 'لا نعرض منحنى تقديريًا عند غياب بيانات زمنية موثقة.'}>
+        {points.length >= 2 ? (
+          <>
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-2 text-xs font-black">
+              <span className="text-[#0FF0FC]">{tn(d.homeTeam)}</span>
+              <span className="rounded-full border border-white/10 bg-black/25 px-3 py-1 text-slate-400">{provider ? 'المصدر: مزود البيانات' : 'المصدر: تسديدات المباراة الموثقة'}</span>
+              <span className="text-[#F8C846]">{tn(d.awayTeam)}</span>
+            </div>
+            <div className="overflow-x-auto pb-2">
+              <div className="flex h-64 min-w-[680px] items-center gap-1 rounded-2xl border border-white/10 bg-black/25 px-4 py-5">
+                {points.map((point) => {
+                  const homeHeight = Math.max(2, (point.home / max) * 104);
+                  const awayHeight = Math.max(2, (point.away / max) * 104);
+                  return (
+                    <div key={point.minute} className="group relative flex min-w-0 flex-1 flex-col items-center justify-center">
+                      <div className="flex h-[108px] w-full items-end justify-center"><div className="w-[72%] rounded-t bg-[#0FF0FC] transition group-hover:brightness-125" style={{ height: homeHeight }} /></div>
+                      <div className="my-1 text-[9px] font-black text-slate-500">{point.minute}′</div>
+                      <div className="flex h-[108px] w-full items-start justify-center"><div className="w-[72%] rounded-b bg-[#F8C846] transition group-hover:brightness-125" style={{ height: awayHeight }} /></div>
+                      <div className="pointer-events-none absolute left-1/2 top-1/2 z-10 hidden -translate-x-1/2 -translate-y-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-[#07110D] px-2 py-1 text-[10px] font-black shadow-xl group-hover:block">
+                        {tn(d.homeTeam)} {f(point.home)} · {tn(d.awayTeam)} {f(point.away)} · {ar.format(point.sampleSize)} تسديدة
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-            );
-          })}
-        </div>
-      </div>
-    </Box>
+            </div>
+          </>
+        ) : <div className="rounded-2xl border border-dashed border-white/10 bg-black/20 p-10 text-center text-sm font-bold text-slate-500">لا تتوفر بيانات كافية لإنشاء مؤشر زخم موثق لهذه المباراة.</div>}
+      </Box>
+
+      <Box title="الخرائط الحرارية للمنتخبين" hint="تظهر خريطة المباراة أولًا، أو خريطة البطولة المجمعة عند غيابها مع وسم المصدر بوضوح.">
+        {(homeHeatmap?.points.length || awayHeatmap?.points.length) ? (
+          <div className="grid gap-4 md:grid-cols-2">
+            {homeHeatmap?.points.length ? <article className="rounded-2xl border border-[#0FF0FC]/20 bg-[#0FF0FC]/5 p-3"><div className="mb-3 flex items-center justify-between gap-2"><b className="text-sm text-[#0FF0FC]">{tn(d.homeTeam)}</b><span className="text-[9px] font-black text-slate-500">{homeHeatmap.scope === 'SEASON' ? 'البطولة المجمعة' : 'هذه المباراة'}</span></div><div className="flex justify-center"><TeamHeatmap teamName={tn(d.homeTeam)} isHome points={homeHeatmap.points} source={homeHeatmap.source} /></div></article> : null}
+            {awayHeatmap?.points.length ? <article className="rounded-2xl border border-[#F8C846]/20 bg-[#F8C846]/5 p-3"><div className="mb-3 flex items-center justify-between gap-2"><b className="text-sm text-[#F8C846]">{tn(d.awayTeam)}</b><span className="text-[9px] font-black text-slate-500">{awayHeatmap.scope === 'SEASON' ? 'البطولة المجمعة' : 'هذه المباراة'}</span></div><div className="flex justify-center"><TeamHeatmap teamName={tn(d.awayTeam)} isHome={false} points={awayHeatmap.points} source={awayHeatmap.source} /></div></article> : null}
+          </div>
+        ) : <div className="rounded-2xl border border-dashed border-white/10 bg-black/20 p-10 text-center text-sm font-bold text-slate-500">لم تصل نقاط موثقة تكفي لإظهار خريطة أي منتخب.</div>}
+      </Box>
+    </div>
   );
 }
-
 function Events({ d, e }: { d: MatchPageData; e: MatchEventView[] }) {
   if (!e.length) return <Box title="أحداث المباراة"><p className="py-8 text-center text-sm font-bold text-slate-500">لم تصل أحداث موثقة لهذه المباراة.</p></Box>;
   return (
@@ -462,47 +470,33 @@ function Lineups({ d, onHeatmap }: { d: MatchPageData, onHeatmap: (name: string,
   );
 }
 
-function Analysis({ d }: { d: MatchPageData }) {
+function History({ d }: { d: MatchPageData }) {
   const history = historyOf(d);
-  const homeHeatmap = d.advanced.teamHeatmaps?.home;
-  const awayHeatmap = d.advanced.teamHeatmaps?.away;
+  const recentCard = (side: 'home' | 'away') => {
+    const team = side === 'home' ? d.homeTeam : d.awayTeam;
+    const rows = side === 'home' ? history.homeRecentForm : history.awayRecentForm;
+    const color = side === 'home' ? '#0FF0FC' : '#F8C846';
+    return (
+      <article className="rounded-3xl border bg-black/25 p-4" style={{ borderColor: `${color}35` }}>
+        <div className="mb-4 flex items-center gap-3"><TeamFlag team={team} small /><div><h3 className="text-sm font-black" style={{ color }}>آخر ٥ مباريات</h3><p className="text-xs font-bold text-slate-500">{tn(team)}</p></div></div>
+        <div className="space-y-2">
+          {rows.length ? rows.map((row) => <div key={row.id} className="grid grid-cols-[1fr_auto] items-center gap-3 rounded-xl border border-white/5 bg-white/[0.035] p-3"><div><b className="block text-xs text-white">{row.opponentName}</b><span className="mt-1 block text-[10px] text-slate-500">{dt(row.date)}</span></div><strong className="rounded-lg bg-black/30 px-3 py-1 text-sm">{f(row.teamScore)} - {f(row.opponentScore)}</strong></div>) : <p className="rounded-xl border border-dashed border-white/10 p-6 text-center text-xs text-slate-500">لا توجد مباريات سابقة موثقة في قاعدة البيانات.</p>}
+        </div>
+      </article>
+    );
+  };
   return (
     <div className="space-y-6">
-      <section className="rounded-[1.75rem] border border-white/10 bg-black/20 p-3 sm:p-5">
-        <div className="mb-4">
-          <span className="text-[10px] font-black tracking-widest text-[#18E58F]">MATCH ANALYSIS</span>
-          <h2 className="mt-1 text-2xl font-black text-white">التحليل الفني الموثق</h2>
-          <p className="mt-1 text-xs font-bold text-slate-500">التسديدات، تمركز المنتخبين، وكل أحداث المباراة بألوان ثابتة.</p>
-        </div>
-        <InteractiveShotmap homeTeamName={tn(d.homeTeam)} awayTeamName={tn(d.awayTeam)} shots={d.advanced?.shotmap} homeTeamId={d.homeTeam.id} />
-      </section>
+      <Box title="تاريخ لقاءات المنتخبين" hint="النتائج أدناه مأخوذة فقط من المباريات المحفوظة والمنتهية قبل هذه المباراة.">
+        {history.headToHead.length ? <div className="grid gap-3 md:grid-cols-2">{history.headToHead.map((row) => <article key={row.id} className="rounded-2xl border border-[#18E58F]/15 bg-[#18E58F]/5 p-4"><div className="flex items-center justify-between gap-3"><div className="min-w-0"><b className="block truncate text-sm">{row.homeTeamName}</b><b className="mt-2 block truncate text-sm">{row.awayTeamName}</b></div><div className="rounded-xl border border-white/10 bg-black/30 px-4 py-2 text-center text-xl font-black">{f(row.homeScore)}<span className="px-2 text-white/30">-</span>{f(row.awayScore)}</div></div><div className="mt-3 flex justify-between text-[10px] font-bold text-slate-500"><span>{dt(row.date)}</span><span>{row.stage || 'مباراة موثقة'}</span></div></article>)}</div> : <div className="rounded-2xl border border-dashed border-white/10 bg-black/20 p-10 text-center text-sm font-bold text-slate-500">لا توجد مواجهات مباشرة موثقة في قاعدة البيانات الحالية.</div>}
+      </Box>
 
-      {(homeHeatmap?.points.length || awayHeatmap?.points.length) && (
-        <section className="rounded-[1.75rem] border border-[#18E58F]/15 bg-[#18E58F]/[0.035] p-4 sm:p-6">
-          <div className="mb-5"><h3 className="text-xl font-black">خرائط تمركز المنتخبين</h3><p className="mt-1 text-[11px] font-bold text-slate-500">خريطة المباراة إن توفرت، وإلا خريطة البطولة المجمعة مع توضيح المصدر داخل كل خريطة.</p></div>
-          <div className="grid gap-4 md:grid-cols-2">
-            {homeHeatmap?.points.length ? <div className="rounded-2xl border border-[#0FF0FC]/20 bg-black/25 p-3"><div className="mb-3 text-center text-sm font-black text-[#0FF0FC]">{tn(d.homeTeam)}</div><div className="flex justify-center"><TeamHeatmap teamName={tn(d.homeTeam)} isHome points={homeHeatmap.points} source={homeHeatmap.source} /></div></div> : null}
-            {awayHeatmap?.points.length ? <div className="rounded-2xl border border-[#F8C846]/20 bg-black/25 p-3"><div className="mb-3 text-center text-sm font-black text-[#F8C846]">{tn(d.awayTeam)}</div><div className="flex justify-center"><TeamHeatmap teamName={tn(d.awayTeam)} isHome={false} points={awayHeatmap.points} source={awayHeatmap.source} /></div></div> : null}
-          </div>
-        </section>
-      )}
+      <section className="grid gap-4 lg:grid-cols-2">{recentCard('home')}{recentCard('away')}</section>
 
-      <Events d={d} e={d.events || []} />
-
-      <Box title="السياق التاريخي والأداء الحديث">
-        <div className="grid gap-4 lg:grid-cols-3">
-          <section className="rounded-2xl border border-[#0FF0FC]/15 bg-[#0FF0FC]/5 p-4">
-            <h3 className="mb-3 text-sm font-black text-[#0FF0FC]">آخر ٥ مباريات · {tn(d.homeTeam)}</h3>
-            {history.homeRecentForm.length ? history.homeRecentForm.map((row) => <p key={row.id} className="mb-2 rounded-xl bg-black/25 p-2 text-xs text-slate-300">{row.opponentName} · {f(row.teamScore)}-{f(row.opponentScore)} · {dt(row.date)}</p>) : <p className="text-xs text-slate-500">لا توجد مباريات.</p>}
-          </section>
-          <section className="rounded-2xl border border-[#F8C846]/15 bg-[#F8C846]/5 p-4">
-            <h3 className="mb-3 text-sm font-black text-[#F8C846]">آخر ٥ مباريات · {tn(d.awayTeam)}</h3>
-            {history.awayRecentForm.length ? history.awayRecentForm.map((row) => <p key={row.id} className="mb-2 rounded-xl bg-black/25 p-2 text-xs text-slate-300">{row.opponentName} · {f(row.teamScore)}-{f(row.opponentScore)} · {dt(row.date)}</p>) : <p className="text-xs text-slate-500">لا توجد مباريات.</p>}
-          </section>
-          <section className="rounded-2xl border border-[#18E58F]/15 bg-[#18E58F]/5 p-4">
-            <h3 className="mb-3 text-sm font-black text-[#18E58F]">المواجهات المباشرة</h3>
-            {history.headToHead.length ? history.headToHead.map((row) => <p key={row.id} className="mb-2 rounded-xl bg-black/25 p-2 text-xs text-slate-300">{row.homeTeamName} {f(row.homeScore)}-{f(row.awayScore)} {row.awayTeamName}</p>) : <p className="text-xs text-slate-500">لا توجد مواجهات مباشرة.</p>}
-          </section>
+      <Box title="تاريخ المنتخبين في كأس العالم" hint="لا يظهر رقم مشاركات إلا إذا كان محفوظًا في سجل المنتخب داخل قاعدة البيانات.">
+        <div className="grid gap-4 md:grid-cols-2">
+          <article className="rounded-3xl border border-[#0FF0FC]/20 bg-[#0FF0FC]/5 p-5"><div className="mb-4 flex items-center gap-3"><TeamFlag team={d.homeTeam} /><h3 className="text-lg font-black text-[#0FF0FC]">{tn(d.homeTeam)}</h3></div><p className="text-sm font-bold leading-7 text-slate-300">{history.homeWorldCupHistory}</p><span className="mt-4 inline-flex rounded-full border border-white/10 bg-black/25 px-3 py-1 text-[10px] font-black text-slate-500">المصدر: سجل المنتخب في قاعدة البيانات</span></article>
+          <article className="rounded-3xl border border-[#F8C846]/20 bg-[#F8C846]/5 p-5"><div className="mb-4 flex items-center gap-3"><TeamFlag team={d.awayTeam} /><h3 className="text-lg font-black text-[#F8C846]">{tn(d.awayTeam)}</h3></div><p className="text-sm font-bold leading-7 text-slate-300">{history.awayWorldCupHistory}</p><span className="mt-4 inline-flex rounded-full border border-white/10 bg-black/25 px-3 py-1 text-[10px] font-black text-slate-500">المصدر: سجل المنتخب في قاعدة البيانات</span></article>
         </div>
       </Box>
     </div>
@@ -587,7 +581,7 @@ export default function ProfessionalMatchTabsPageRich({ data }: { data: MatchPag
         {tab === 'momentum' && <Momentum d={data} />}
         {tab === 'events' && <Events d={data} e={events} />}
         {tab === 'lineups' && <Lineups d={data} onHeatmap={openHeatmap} />}
-        {tab === 'analysis' && <Analysis d={data} />}
+        {tab === 'history' && <History d={data} />}
         {tab === 'group' && <Group d={data} />}
         {tab === 'articles' && <Articles d={data} />}
       </div>
