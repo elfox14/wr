@@ -147,6 +147,7 @@ function TournamentStatsBar({ playersCount, teamsCount, upcomingMatchesCount, gr
   const updatedLabel = tournamentStats?.updatedAt
     ? new Date(tournamentStats.updatedAt).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })
     : 'غير متوفر';
+  const hasLiveMatches = Number(tournamentStats?.liveMatches || 0) > 0;
 
   return (
     <motion.section
@@ -178,9 +179,9 @@ function TournamentStatsBar({ playersCount, teamsCount, upcomingMatchesCount, gr
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-base font-black text-white sm:text-lg">أرقام كأس العالم 2026</h2>
-                <span className="flex items-center gap-1 rounded-full border border-[#18E58F]/30 bg-[#18E58F]/10 px-2 py-0.5 text-[9px] font-black text-[#18E58F]">
-                  <LiveDot />
-                  يتحدث كل ٣٠ ث
+                <span className={`flex items-center gap-1 rounded-full border px-2 py-0.5 text-[9px] font-black ${hasLiveMatches ? 'border-[#18E58F]/30 bg-[#18E58F]/10 text-[#18E58F]' : 'border-white/10 bg-white/[0.04] text-gray-500'}`}>
+                  {hasLiveMatches ? <LiveDot /> : null}
+                  {hasLiveMatches ? 'تحديث مباشر كل ٣٠ ث' : 'التحديث متوقف'}
                 </span>
               </div>
               <p className="text-[10px] font-bold text-gray-500">آخر تحديث موثق: {updatedLabel}</p>
@@ -511,12 +512,6 @@ export default function HomePremiumClient({
   knockoutMatches = [],
   tournamentStats = null,
 }: Props) {
-  const [, setNow] = useState(() => new Date());
-  useEffect(() => {
-    const t = window.setInterval(() => setNow(new Date()), 30000);
-    return () => window.clearInterval(t);
-  }, []);
-
   const safeTicker = Array.isArray(tickerMatches) ? tickerMatches as HomeMatch[] : [];
   const safeUpcoming = Array.isArray(upcomingMatches) ? upcomingMatches as HomeMatch[] : [];
   const safeNext = nextMarqueeMatch as HomeMatch | null;
