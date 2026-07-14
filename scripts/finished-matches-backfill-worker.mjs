@@ -20,6 +20,7 @@ for (const [envName, paramName] of [
   ['FINISHED_MATCHES_BACKFILL_LOOKBACK_DAYS', 'lookbackDays'],
   ['FINISHED_MATCHES_BACKFILL_FRESHNESS_HOURS', 'freshnessHours'],
   ['FINISHED_MATCHES_BACKFILL_TIMEOUT_MS', 'timeoutMs'],
+  ['FINISHED_MATCHES_BACKFILL_RETRY_COOLDOWN_HOURS', 'retryCooldownHours'],
 ]) {
   if (process.env[envName]) url.searchParams.set(paramName, process.env[envName]);
 }
@@ -31,6 +32,7 @@ for (const [envName, paramName] of [
   ['FINISHED_MATCHES_BACKFILL_STOP_ON_RATE_LIMIT', 'stopOnRateLimit'],
   ['FINISHED_MATCHES_BACKFILL_SYNC_ANIMATION', 'syncAnimation'],
   ['FINISHED_MATCHES_BACKFILL_MARK_VERIFIED', 'markVerified'],
+  ['FINISHED_MATCHES_BACKFILL_FETCH_PLAYER_HEATMAPS', 'fetchPlayerHeatmaps'],
 ]) {
   if (process.env[envName]) url.searchParams.set(paramName, process.env[envName]);
 }

@@ -35,6 +35,8 @@ async function run(req: Request) {
     stopOnRateLimit: boolFrom(url.searchParams.get('stopOnRateLimit') || process.env.FINISHED_MATCHES_BACKFILL_STOP_ON_RATE_LIMIT, true),
     syncAnimation: boolFrom(url.searchParams.get('syncAnimation') || process.env.FINISHED_MATCHES_BACKFILL_SYNC_ANIMATION, true),
     markVerified: boolFrom(url.searchParams.get('markVerified') || process.env.FINISHED_MATCHES_BACKFILL_MARK_VERIFIED, true),
+    retryCooldownHours: numberFrom(url.searchParams.get('retryCooldownHours') || process.env.FINISHED_MATCHES_BACKFILL_RETRY_COOLDOWN_HOURS, 6, 1, 72),
+    fetchPlayerHeatmaps: boolFrom(url.searchParams.get('fetchPlayerHeatmaps') || process.env.FINISHED_MATCHES_BACKFILL_FETCH_PLAYER_HEATMAPS, false),
   });
 
   return NextResponse.json(result, { headers: { 'Cache-Control': 'no-store' } });

@@ -2,6 +2,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { hasValidAdminSecret } from '@/lib/adminAuth';
+import { canonicalizeTournamentMatches } from '@/lib/canonicalTournamentMatches';
 
 
 export const runtime = 'nodejs';
@@ -181,7 +182,7 @@ async function loadMatchCandidates(options: { matchId?: string | null; lookbackD
 
   const matches = await prisma.match.findMany({
     where: where as any,
-    orderBy: { matchDate: 'asc' },
+    orderBy: { matchDate: 'desc' },
     take: options.matchId ? 1 : options.take,
     include: {
       homeTeam: { select: { id: true, name: true, code: true } },
@@ -208,8 +209,9 @@ async function loadMatchCandidates(options: { matchId?: string | null; lookbackD
     },
   });
 
-  const articles = await loadArticles(matches.map((match) => match.id));
-  return matches.map((match) => ({ ...match, article: articles.get(match.id) || null }));
+  const canonicalMatches = options.matchId ? matches : canonicalizeTournamentMatches(matches);
+  const articles = await loadArticles(canonicalMatches.map((match) => match.id));
+  return canonicalMatches.map((match) => ({ ...match, article: articles.get(match.id) || null }));
 }
 
 function completeness(match: MatchWithData) {
@@ -264,8 +266,8 @@ function candidatePriority(match: MatchWithData, options: { preSyncHours: number
   if (!options.iSportsBlocked && isNearLive(match) && !c.flags.liveLinked) return 1000;
   if (!options.iSportsBlocked && isNearLive(match) && c.flags.liveLinked) return 950;
   if (!options.iSportsBlocked && isUpcomingSoon(match, options.preSyncHours) && !c.flags.liveLinked) return 850;
+  if (isFinished(match.status) && (!c.flags.finalEventsReady || !c.flags.playerRatingsReady) && c.finalProviderMatchId) return 825;
   if (isFinished(match.status) && !c.flags.finalStatsReady) return 800;
-  if (isFinished(match.status) && (!c.flags.finalEventsReady || !c.flags.playerRatingsReady) && match.externalId) return 760;
   if (isFinished(match.status) && c.flags.finalStatsReady && !c.flags.articleReady) return 700;
   if (isFinished(match.status) && c.flags.articleReady && !c.flags.infographicReady) return 680;
   return 100 - c.percent;
@@ -274,7 +276,7 @@ function candidatePriority(match: MatchWithData, options: { preSyncHours: number
 function pickMatch(matches: MatchWithData[], options: { preSyncHours: number; iSportsBlocked: boolean }) {
   return [...matches]
     .map((match) => ({ match, priority: candidatePriority(match, options), completeness: completeness(match) }))
-    .sort((a, b) => b.priority - a.priority || new Date(a.match.matchDate).getTime() - new Date(b.match.matchDate).getTime())[0] || null;
+    .sort((a, b) => b.priority - a.priority || new Date(b.match.matchDate).getTime() - new Date(a.match.matchDate).getTime())[0] || null;
 }
 
 function maskSensitiveUrl(value: string) {
