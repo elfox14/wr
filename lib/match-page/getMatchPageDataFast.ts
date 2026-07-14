@@ -520,7 +520,17 @@ function extractAdvancedData(snapshots: any[], homeTeam: MatchTeamLite, awayTeam
     const player = playerStats.find((row) => (playerId && row.playerId === playerId) || (playerName && playerKey(row.playerName) === playerKey(playerName)));
     return { ...shot, playerName: playerName || player?.playerName || null, playerImage: usableImage(shot?.playerImage || shot?.player_image || shot?.player?.image || shot?.player?.photo) || player?.image || null, playerNumber: shot?.playerNumber ?? shot?.player_number ?? shot?.player?.jersey_number ?? player?.number ?? null };
   });
-  const playerHeatmaps = normalizePlayerHeatmaps(normalized.playerHeatmaps, playerStats, homeTeam, awayTeam);
+  const heatmapRows = snapshots.filter(isTheStatsSnapshot).flatMap((snapshot) => {
+    const data = rawData(snapshot);
+    const snapshotNormalized = data?.normalized || {};
+    return asList(snapshotNormalized.playerHeatmaps || snapshotNormalized.player_heatmaps || data?.playerHeatmaps || data?.player_heatmaps);
+  });
+  const dedupedHeatmaps = new Map<string, any>();
+  for (const heatmap of normalizePlayerHeatmaps(heatmapRows, playerStats, homeTeam, awayTeam)) {
+    const key = `${heatmap.playerId}:${heatmap.scope || 'MATCH'}:${heatmap.source || ''}`;
+    if (!dedupedHeatmaps.has(key)) dedupedHeatmaps.set(key, heatmap);
+  }
+  const playerHeatmaps = [...dedupedHeatmaps.values()];
   const teamHeatmapFor = (side: 'home' | 'away', teamId: string) => {
     const sideMaps = playerHeatmaps.filter((heatmap: any) => heatmap.side === side);
     const matchMaps = sideMaps.filter((heatmap: any) => heatmap.scope !== 'SEASON');
@@ -637,9 +647,18 @@ function headToHead(allMatches: any[], homeTeamId: string, awayTeamId: string, c
     .map((m) => ({ id: m.id, date: m.matchDate.toISOString(), homeTeamName: m.homeTeam?.name || 'غير معروف', awayTeamName: m.awayTeam?.name || 'غير معروف', homeScore: m.homeScore, awayScore: m.awayScore, status: m.status, stage: m.stage || m.groupPhase || null }));
 }
 
+const FIFA_WORLD_CUP_PROFILES: Record<string, { appearances: number; years: string; url: string }> = {
+  MEX: { appearances: 18, years: '1930، 1950، 1954، 1958، 1962، 1966، 1970، 1978، 1986، 1994، 1998، 2002، 2006، 2010، 2014، 2018، 2022، 2026', url: 'https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/mexico-team-profile-history' },
+  RSA: { appearances: 4, years: '1998، 2002، 2010، 2026', url: 'https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/south-africa-team-profile-history' },
+};
+
 function worldCupHistory(team: MatchTeamLite) {
-  if (team.participations !== null && team.participations !== undefined) return `${team.name} شارك في كأس العالم ${team.participations} مرة، وفق سجل المنتخب المحفوظ في قاعدة البيانات.`;
-  return `لا تتوفر حاليًا بيانات موثقة عن مشاركات ${team.name} في كأس العالم؛ لذلك لا نعرض رقمًا تقديريًا.`;
+  const code = String(team.code || '').toUpperCase();
+  const official = FIFA_WORLD_CUP_PROFILES[code];
+  if (official) return { summary: `${team.name}: ${official.appearances} مشاركات في كأس العالم (${official.years}) وفق الملف الرسمي للمنتخب لدى FIFA.`, url: official.url };
+  const associationUrl = code ? `https://inside.fifa.com/associations/${code}` : 'https://www.fifa.com/en/archive';
+  if (team.participations !== null && team.participations !== undefined) return { summary: `${team.name} شارك في كأس العالم ${team.participations} مرة، وفق سجل المنتخب المحفوظ في قاعدة البيانات.`, url: associationUrl };
+  return { summary: `لا تتوفر حاليًا في قاعدة البيانات تفاصيل مكتملة وموثقة عن مشاركات ${team.name}؛ يمكن مراجعة سجل الاتحاد الرسمي لدى FIFA.`, url: associationUrl };
 }
 
 function buildTacticalKeys(homeName: string, awayName: string, statsAvailable: boolean, digest?: any | null) {
@@ -707,6 +726,9 @@ export async function getMatchPageDataFast(matchId: string): Promise<MatchPageDa
     ...buildSourceList(snapshots),
   ];
 
+  const homeWorldCupHistory = worldCupHistory(homeTeam);
+  const awayWorldCupHistory = worldCupHistory(awayTeam);
+
   return {
     id: match.id,
     title: `${homeTeam.name} ضد ${awayTeam.name}`,
@@ -742,8 +764,10 @@ export async function getMatchPageDataFast(matchId: string): Promise<MatchPageDa
       homeRecentForm: recentForm(allMatches as any[], match.homeTeamId, match.id, currentDate),
       awayRecentForm: recentForm(allMatches as any[], match.awayTeamId, match.id, currentDate),
       headToHead: headToHead(allMatches as any[], match.homeTeamId, match.awayTeamId, match.id, currentDate),
-      homeWorldCupHistory: worldCupHistory(homeTeam),
-      awayWorldCupHistory: worldCupHistory(awayTeam),
+      homeWorldCupHistory: homeWorldCupHistory.summary,
+      awayWorldCupHistory: awayWorldCupHistory.summary,
+      homeWorldCupHistoryUrl: homeWorldCupHistory.url,
+      awayWorldCupHistoryUrl: awayWorldCupHistory.url,
     },
   };
 }
