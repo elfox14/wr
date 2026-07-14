@@ -3,17 +3,18 @@ import { unstable_cache } from 'next/cache';
 import prisma from '@/lib/prisma';
 import { getTeamFlagUrl } from '@/lib/teamFlags';
 import { getArabicTeamName } from '@/lib/teamDisplay';
+import LiveOnlyRefresh from '@/components/LiveOnlyRefresh';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-export const revalidate = 120;
+export const revalidate = 0;
 
 export const metadata = {
   title: 'إحصائيات كأس العالم 2026 | الأهداف، المنتخبات واللاعبون',
   description: 'لوحة إحصائيات كأس العالم 2026: أرقام البطولة، ترتيب المنتخبات، الهدافون، صناعة اللعب، التسديدات، الحراس والانضباط.',
 };
 
-const STATS_CACHE_SECONDS = 60;
+const LIVE_STATS_CACHE_SECONDS = 30;
 const SNAPSHOT_LIMIT = 4000;
 const PERFORMANCE_LIMIT = 6000;
 const EVENT_LIMIT = 8000;
@@ -527,8 +528,12 @@ async function loadStatisticsUncached() {
   };
 }
 
-const loadStatistics = unstable_cache(loadStatisticsUncached, ['statistics-page-v4-full-tournament'], {
-  revalidate: STATS_CACHE_SECONDS,
+const loadLiveStatistics = unstable_cache(loadStatisticsUncached, ['statistics-page-v5-live'], {
+  revalidate: LIVE_STATS_CACHE_SECONDS,
+  tags: ['statistics-page', 'home-dashboard'],
+});
+const loadIdleStatistics = unstable_cache(loadStatisticsUncached, ['statistics-page-v5-idle'], {
+  revalidate: false,
   tags: ['statistics-page', 'home-dashboard'],
 });
 
@@ -562,7 +567,8 @@ function MatchTable({ matches, empty = 'لا توجد مباريات متاحة 
 }
 
 export default async function StatisticsPage() {
-  const data = await loadStatistics();
+  const hasLiveMatches = Boolean(await prisma.match.findFirst({ where: { status: { in: LIVE } }, select: { id: true } }));
+  const data = await (hasLiveMatches ? loadLiveStatistics() : loadIdleStatistics());
   const completion = data.totalMatches ? (data.finishedMatchesCount / data.totalMatches) * 100 : null;
   const topAttackMetric = data.topAttack ? `${num(data.topAttack.goalsFor)} هدف · ${num(data.topAttack.shots)} تسديدة` : '—';
   const bestDefenseMetric = data.bestDefense ? `${num(data.bestDefense.goalsAgainst)} هدف مستقبَل · ${num(data.bestDefense.cleanSheets)} شباك نظيفة` : '—';
@@ -570,11 +576,12 @@ export default async function StatisticsPage() {
 
   return (
     <main dir="rtl" className="mx-auto max-w-7xl space-y-7 px-3 py-5 text-white sm:px-4 lg:px-6">
+      <LiveOnlyRefresh active={hasLiveMatches} intervalMs={30_000} />
       <section className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(15,240,252,0.16),transparent_32%),linear-gradient(135deg,#061313,#050505)] p-5 shadow-[0_24px_70px_rgba(0,0,0,0.32)]">
         <div className="absolute -left-20 -top-20 h-52 w-52 rounded-full bg-[#FFD700]/10 blur-3xl" />
         <div className="relative z-10 flex flex-wrap items-end justify-between gap-5">
           <div><p className="inline-flex rounded-full border border-[#FFD700]/25 bg-[#FFD700]/10 px-3 py-1 text-[10px] font-black tracking-[0.16em] text-[#FFD700]">CACHED DATA CENTER</p><h1 className="mt-4 text-3xl font-black leading-tight md:text-5xl">إحصائيات كأس العالم 2026</h1><p className="mt-3 max-w-3xl text-sm font-bold leading-7 text-gray-400">الصفحة لا تجلب من TheStats API أثناء زيارة المستخدم. يتم تجميع الأرقام من قاعدة البيانات فقط داخل كاش قصير لتجنب ضغط Refresh ورسائل 502.</p></div>
-          <div className="rounded-3xl border border-white/10 bg-black/25 p-4 text-sm font-bold text-gray-300"><div className="text-[10px] font-black text-gray-500">آخر تحديث بيانات</div><div className="mt-1 text-lg font-black text-white">{formatDate(data.updatedAt)}</div><div className="mt-3 h-1.5 w-44 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-[#00FF88]" style={{ width: `${Math.min(100, completion || 0)}%` }} /></div><div className="mt-1 text-[10px] text-gray-500">كاش الصفحة: {nf.format(STATS_CACHE_SECONDS)} ثانية</div></div>
+          <div className="rounded-3xl border border-white/10 bg-black/25 p-4 text-sm font-bold text-gray-300"><div className="text-[10px] font-black text-gray-500">آخر تحديث بيانات</div><div className="mt-1 text-lg font-black text-white">{formatDate(data.updatedAt)}</div><div className="mt-3 h-1.5 w-44 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-[#00FF88]" style={{ width: `${Math.min(100, completion || 0)}%` }} /></div><div className="mt-1 text-[10px] text-gray-500">{hasLiveMatches ? `تحديث مباشر كل ${nf.format(LIVE_STATS_CACHE_SECONDS)} ثانية` : 'التحديث متوقف لعدم وجود مباراة مباشرة'}</div></div>
         </div>
       </section>
 
