@@ -38,8 +38,11 @@ export default function InfographicClient({ matchData, info, isPreview = false }
   const availableStats = matchData.stats.filter((metric) => metric.available && metric.home !== null && metric.away !== null).slice(0, 15);
   const momentum = matchData.advanced.momentum || [];
   const momentumMax = Math.max(1, ...momentum.flatMap((point) => [point.home, point.away]));
-  const homeHeatmapPoints = matchData.advanced.teamHeatmaps?.home?.points || [];
-  const awayHeatmapPoints = matchData.advanced.teamHeatmaps?.away?.points || [];
+  const homeHeatmap = matchData.advanced.teamHeatmaps?.home;
+  const awayHeatmap = matchData.advanced.teamHeatmaps?.away;
+  const homeHeatmapPoints = homeHeatmap?.points || [];
+  const awayHeatmapPoints = awayHeatmap?.points || [];
+  const hasTournamentHeatmap = homeHeatmap?.scope === 'SEASON' || awayHeatmap?.scope === 'SEASON';
   const topPlayers = (matchData.advanced.playerStats || [])
     .filter((player) => (player.started === true || player.played === true || Number(player.minutes || 0) > 0) && typeof player.rating === 'number')
     .sort((a, b) => Number(b.rating) - Number(a.rating))
@@ -136,11 +139,14 @@ export default function InfographicClient({ matchData, info, isPreview = false }
           )}
 
           {(homeHeatmapPoints.length > 0 || awayHeatmapPoints.length > 0) && (
-            <section className="mt-5 rounded-[2rem] border border-white/10 bg-white/[0.035] p-5 sm:p-7">
-              <div><h3 className="text-xl font-black">الخريطة الحرارية الموثقة</h3><p className="mt-1 text-[11px] font-bold text-slate-500">خرائط مجمعة من نقاط اللاعبين الفعلية فقط</p></div>
+            <section className="mt-5 overflow-hidden rounded-[2rem] border border-[#18E58F]/15 bg-gradient-to-br from-[#18E58F]/[0.06] to-white/[0.025] p-5 sm:p-7">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div><h3 className="text-xl font-black">بصمة تمركز المنتخبين</h3><p className="mt-1 max-w-2xl text-[11px] font-bold leading-5 text-slate-500">{hasTournamentHeatmap ? 'نعرض خريطة المباراة حين تتوفر؛ والخريطة المجمعة للبطولة كبديل موثق وموسوم بوضوح.' : 'مجمعة حصريًا من نقاط لاعبي هذه المباراة.'}</p></div>
+                <span className="rounded-full border border-[#18E58F]/20 bg-[#18E58F]/10 px-3 py-1 text-[10px] font-black text-[#18E58F]">{hasTournamentHeatmap ? 'نطاق مختلط موضح لكل منتخب' : 'نطاق المباراة'}</span>
+              </div>
               <div className="mt-5 grid gap-5 sm:grid-cols-2">
-                {homeHeatmapPoints.length > 0 && <div className="flex justify-center"><TeamHeatmap teamName={matchData.homeTeam.name} isHome points={homeHeatmapPoints} source={matchData.advanced.teamHeatmaps?.home?.source} /></div>}
-                {awayHeatmapPoints.length > 0 && <div className="flex justify-center"><TeamHeatmap teamName={matchData.awayTeam.name} isHome={false} points={awayHeatmapPoints} source={matchData.advanced.teamHeatmaps?.away?.source} /></div>}
+                {homeHeatmapPoints.length > 0 && <article className="rounded-3xl border border-[#0FF0FC]/20 bg-black/20 p-3"><div className="mb-3 flex items-center justify-between px-2"><b className="text-sm text-[#0FF0FC]">{matchData.homeTeam.name}</b><span className="text-[9px] font-black text-slate-500">{homeHeatmap?.scope === 'SEASON' ? 'البطولة حتى الآن' : 'هذه المباراة'} · {homeHeatmapPoints.length} نقطة</span></div><div className="flex justify-center"><TeamHeatmap teamName={matchData.homeTeam.name} isHome points={homeHeatmapPoints} source={homeHeatmap?.source} /></div></article>}
+                {awayHeatmapPoints.length > 0 && <article className="rounded-3xl border border-[#F8C846]/20 bg-black/20 p-3"><div className="mb-3 flex items-center justify-between px-2"><b className="text-sm text-[#F8C846]">{matchData.awayTeam.name}</b><span className="text-[9px] font-black text-slate-500">{awayHeatmap?.scope === 'SEASON' ? 'البطولة حتى الآن' : 'هذه المباراة'} · {awayHeatmapPoints.length} نقطة</span></div><div className="flex justify-center"><TeamHeatmap teamName={matchData.awayTeam.name} isHome={false} points={awayHeatmapPoints} source={awayHeatmap?.source} /></div></article>}
               </div>
             </section>
           )}
@@ -154,8 +160,11 @@ export default function InfographicClient({ matchData, info, isPreview = false }
                   return (
                     <article key={player.playerId || player.playerName} className="rounded-2xl border border-white/10 bg-black/25 p-4">
                       <div className="flex items-center justify-between"><span className="text-xs font-black text-slate-500">#{index + 1}</span><b className="rounded-full bg-[#18E58F]/10 px-3 py-1 text-lg font-black text-[#18E58F]">{value(player.rating)}</b></div>
-                      <h4 className="mt-4 text-lg font-black">{player.playerName}</h4>
-                      <p className="mt-1 text-[11px] font-bold text-slate-500">{side === 'home' ? matchData.homeTeam.name : side === 'away' ? matchData.awayTeam.name : player.teamName || ''}</p>
+                      <div className="mt-4 flex items-center gap-3">
+                        <div className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-full border border-white/15 bg-white/[0.06]">{player.image ? <img src={player.image} alt={player.playerName} className="h-full w-full object-cover" /> : <span className="text-sm font-black text-slate-400">{player.number || player.playerName.slice(0, 2)}</span>}</div>
+                        <div className="min-w-0"><h4 className="truncate text-lg font-black">{player.playerName}</h4><p className="mt-1 text-[10px] font-bold text-slate-500">{player.position || 'المركز غير متوفر'}{player.number ? ` · رقم ${player.number}` : ''}</p></div>
+                      </div>
+                      <p className="mt-3 text-[11px] font-bold text-slate-500">{side === 'home' ? matchData.homeTeam.name : side === 'away' ? matchData.awayTeam.name : player.teamName || ''}</p>
                       <div className="mt-4 flex flex-wrap gap-2 text-[10px] font-black text-slate-300">
                         {player.minutes !== null && player.minutes !== undefined && <span>{value(player.minutes)} دقيقة</span>}
                         {Number(player.goals || 0) > 0 && <span>{value(player.goals)} هدف</span>}
