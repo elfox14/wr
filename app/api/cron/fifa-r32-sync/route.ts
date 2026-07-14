@@ -8,6 +8,7 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 const execFileAsync = promisify(execFile);
+const KNOCKOUT_WORKER_PATH = 'scripts/fifa-knockout-sync-worker.mjs';
 
 function jsonResponse(payload: unknown, status = 200) {
   return Response.json(payload, {
@@ -51,7 +52,7 @@ function buildWorkerEnv(req: Request) {
 async function runWorker(req: Request) {
   const timeoutRaw = Number(process.env.FIFA_KNOCKOUT_SYNC_HTTP_PROCESS_TIMEOUT_MS || process.env.FIFA_R32_SYNC_HTTP_PROCESS_TIMEOUT_MS || 55000);
   const timeout = Math.max(15000, Math.min(90000, timeoutRaw));
-  const { stdout, stderr } = await execFileAsync(process.execPath, ['scripts/fifa-r32-sync-worker.mjs'], {
+  const { stdout, stderr } = await execFileAsync(process.execPath, [KNOCKOUT_WORKER_PATH], {
     cwd: process.cwd(),
     env: buildWorkerEnv(req),
     timeout,
