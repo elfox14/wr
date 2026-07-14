@@ -25,6 +25,7 @@
     "worker:fifa-r16-sync": "node --env-file=.env scripts/fifa-knockout-sync-worker.mjs",
     "worker:fifa-qf-sync": "node --env-file=.env scripts/fifa-knockout-sync-worker.mjs",
     "worker:fifa-sf-sync": "node --env-file=.env scripts/fifa-knockout-sync-worker.mjs",
+    "verify:knockout-sync": "node scripts/verify-knockout-sync-entrypoints.mjs",
     "test": "vitest run",
     "lint": "eslint .",
     "lint:ai": "eslint features/analysis app/ai-analyst app/api/ai-analyst app/api/ai-analyst/alerts/route.ts --max-warnings=0",
