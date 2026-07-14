@@ -521,6 +521,7 @@ export default function HomePremiumClient({
   const safeUpcoming = Array.isArray(upcomingMatches) ? upcomingMatches as HomeMatch[] : [];
   const safeNext = nextMarqueeMatch as HomeMatch | null;
   const primaryMatch = useMemo(() => choosePrimaryMatch(safeTicker, safeUpcoming, safeNext), [safeTicker, safeUpcoming, safeNext]);
+  const verifiedPlayersCount = tournamentStats?.playersCount ?? playersCount;
 
   return (
     <main dir="rtl" className="mx-auto flex max-w-7xl flex-col gap-5 px-3 pb-14 pt-4 sm:px-4 sm:pt-6 lg:px-6">
@@ -610,7 +611,7 @@ export default function HomePremiumClient({
               <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl text-3xl" style={{ background: 'rgba(192,132,252,0.12)', border: '1px solid rgba(192,132,252,0.2)' }}>🏃</div>
               <div>
                 <div className="text-3xl font-black" style={{ color: '#C084FC', filter: 'drop-shadow(0 0 10px rgba(192,132,252,0.5))' }}>
-                  <AnimatedCounter value={actualPlayers} />
+                  <AnimatedCounter value={verifiedPlayersCount} />
                 </div>
                 <div className="mt-0.5 text-xs font-bold text-gray-500">لاعب مسجل في البطولة</div>
                 <div className="mt-2 text-[10px] font-black text-[#C084FC] opacity-70">استعرض دليل اللاعبين ←</div>
