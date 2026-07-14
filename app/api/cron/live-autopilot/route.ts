@@ -172,10 +172,6 @@ async function run(req: Request) {
 
   const steps: StepResult[] = [];
 
-  steps.push(await callStep('fifa_knockout_sync', '/api/cron/fifa-knockout-sync', {
-    dryRun,
-  }, { origin, secret, timeoutMs, due: due.knockout }));
-
   steps.push(await callStep('isports_live_ingest', '/api/cron/live-ingest', {
     dbMatchId: dbMatchId || undefined,
     providerMatchId: providerMatchId || undefined,
@@ -207,6 +203,10 @@ async function run(req: Request) {
     quick: boolParam(url, 'footballQuick', true),
     dryRun,
   }, { origin, secret, timeoutMs, due: due.footballData }));
+
+  steps.push(await callStep('fifa_knockout_sync', '/api/cron/fifa-knockout-sync', {
+    dryRun,
+  }, { origin, secret, timeoutMs, due: due.knockout }));
 
   const statisticsCompletion = await callStep('the_stats_completion', '/api/cron/match-complete-pipeline', {
     matchId: dbMatchId || undefined,
