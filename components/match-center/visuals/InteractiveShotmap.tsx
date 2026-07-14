@@ -33,6 +33,8 @@ export default function InteractiveShotmap({ homeTeamName, awayTeamName, shots =
         isOnTarget,
         isHome,
         playerName: s.playerName || 'غير معروف',
+        playerImage: s.playerImage || null,
+        playerNumber: s.playerNumber || null,
         minute: s.minute ?? '؟'
       };
     })
@@ -103,11 +105,11 @@ export default function InteractiveShotmap({ homeTeamName, awayTeamName, shots =
                   {/* Tooltip */}
                   <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max min-w-[120px] bg-black/95 border border-white/20 p-2 rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none z-50 shadow-2xl transition-opacity">
                      <div className="flex items-center gap-2 mb-1 border-b border-white/10 pb-1">
-                        <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-xs font-bold overflow-hidden border border-white/20">
-                           {shot.playerName.charAt(0)}
+                        <div className="w-9 h-9 rounded-full bg-white/10 flex items-center justify-center text-xs font-bold overflow-hidden border border-white/20">
+                           {shot.playerImage ? <img src={shot.playerImage} alt={shot.playerName} className="h-full w-full object-cover" /> : shot.playerName.charAt(0)}
                         </div>
                         <div>
-                           <div className="text-[10px] font-bold text-white truncate max-w-[80px]">{shot.playerName}</div>
+                           <div className="text-[10px] font-bold text-white truncate max-w-[100px]">{shot.playerName}{shot.playerNumber ? ` · #${shot.playerNumber}` : ''}</div>
                            <div className="text-[9px] text-[#18E58F]">{shot.minute}'</div>
                         </div>
                      </div>
