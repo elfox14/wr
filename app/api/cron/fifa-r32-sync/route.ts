@@ -40,13 +40,16 @@ function buildWorkerEnv(req: Request) {
   if (sourceUrl) env.FIFA_MATCHES_SOURCE_URL = sourceUrl;
   if (seasonId) env.FIFA_SEASON_ID = seasonId;
   if (competitionId) env.FIFA_COMPETITION_ID = competitionId;
-  if (dryRun !== null) env.FIFA_R32_DRY_RUN = boolFrom(dryRun) ? 'true' : 'false';
+  if (dryRun !== null) {
+    env.FIFA_KNOCKOUT_DRY_RUN = boolFrom(dryRun) ? 'true' : 'false';
+    env.FIFA_R32_DRY_RUN = env.FIFA_KNOCKOUT_DRY_RUN;
+  }
 
   return env;
 }
 
 async function runWorker(req: Request) {
-  const timeoutRaw = Number(process.env.FIFA_R32_SYNC_HTTP_PROCESS_TIMEOUT_MS || 55000);
+  const timeoutRaw = Number(process.env.FIFA_KNOCKOUT_SYNC_HTTP_PROCESS_TIMEOUT_MS || process.env.FIFA_R32_SYNC_HTTP_PROCESS_TIMEOUT_MS || 55000);
   const timeout = Math.max(15000, Math.min(90000, timeoutRaw));
   const { stdout, stderr } = await execFileAsync(process.execPath, ['scripts/fifa-r32-sync-worker.mjs'], {
     cwd: process.cwd(),
@@ -63,11 +66,11 @@ async function run(req: Request) {
 
   try {
     const worker = await runWorker(req);
-    const revalidated = revalidateStatsViews('fifa-r32-sync');
-    return jsonResponse({ ok: true, mode: 'fifa_r32_sync_cron_v1', durationMs: Date.now() - startedAt, result: worker.summary, revalidated, stderr: worker.stderr || undefined });
+    const revalidated = revalidateStatsViews('fifa-knockout-sync');
+    return jsonResponse({ ok: true, mode: 'fifa_knockout_sync_cron_v2', durationMs: Date.now() - startedAt, result: worker.summary, revalidated, stderr: worker.stderr || undefined });
   } catch (error: unknown) {
     const anyError = error as { message?: string; stdout?: string; stderr?: string };
-    return jsonResponse({ ok: false, mode: 'fifa_r32_sync_cron_v1', durationMs: Date.now() - startedAt, error: anyError?.message || String(error), result: anyError?.stdout ? parseWorkerSummary(String(anyError.stdout)) : undefined, stderr: anyError?.stderr ? String(anyError.stderr).slice(-4000) : undefined }, 500);
+    return jsonResponse({ ok: false, mode: 'fifa_knockout_sync_cron_v2', durationMs: Date.now() - startedAt, error: anyError?.message || String(error), result: anyError?.stdout ? parseWorkerSummary(String(anyError.stdout)) : undefined, stderr: anyError?.stderr ? String(anyError.stderr).slice(-4000) : undefined }, 500);
   }
 }
 
