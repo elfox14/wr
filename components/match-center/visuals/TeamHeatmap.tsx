@@ -57,7 +57,7 @@ export default function TeamHeatmap({ teamName, isHome, points = [], source }: T
   return (
     <div className="flex flex-col items-center flex-1 w-full mx-auto">
       {teamName && <div className="text-sm font-bold mb-2 text-center truncate w-full px-1 text-white">{teamName}</div>}
-      <div className="mb-2 inline-flex items-center gap-1.5 rounded-full border border-[#18E58F]/25 bg-[#18E58F]/10 px-2.5 py-1 text-[9px] font-black text-[#18E58F]"><span className="h-1.5 w-1.5 rounded-full bg-[#18E58F]" />{source === 'VERIFIED_ACTION_COORDINATES' ? 'مشتقة من أحداث موثقة' : source === 'PROVIDER_HEATMAP' ? 'نقاط المزود المباشرة' : 'إحداثيات موثقة'} · {verifiedPoints.length.toLocaleString('ar-EG')} نقطة</div>
+      <div className="mb-2 inline-flex items-center gap-1.5 rounded-full border border-[#18E58F]/25 bg-[#18E58F]/10 px-2.5 py-1 text-[9px] font-black text-[#18E58F]"><span className="h-1.5 w-1.5 rounded-full bg-[#18E58F]" />{source === 'VERIFIED_ACTION_COORDINATES' ? 'مشتقة من أحداث موثقة' : source === 'PROVIDER_SEASON_HEATMAP' ? 'خريطة البطولة المجمعة' : source === 'PROVIDER_HEATMAP' ? 'نقاط المزود المباشرة' : 'إحداثيات موثقة'} · {verifiedPoints.length.toLocaleString('ar-EG')} نقطة</div>
       {/* Horizontal Pitch */}
       <div className="relative w-full aspect-[1.5/1] sm:aspect-[1.6/1] bg-[#7ec850] rounded-sm overflow-hidden flex flex-col group border-2 border-white/80">
         
