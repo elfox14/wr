@@ -15,6 +15,20 @@ const STALE_FINAL_SNAPSHOT_MS = 7 * 60 * 1000;
 const FINAL_MINUTE_FLOOR = 85;
 const FINAL_LOCAL_MINUTE_FALLBACK = 100;
 
+type TournamentMatchSummaryRow = {
+  id: string;
+  externalId?: string | null;
+  syncSource?: string | null;
+  status?: string | null;
+  stage?: string | null;
+  groupPhase?: string | null;
+  homeScore?: number | null;
+  awayScore?: number | null;
+  lastSyncedAt?: Date | null;
+  homeTeam: { id: string };
+  awayTeam: { id: string };
+};
+
 type MatchCandidate = {
   id: string;
   matchDate: Date;
@@ -47,6 +61,24 @@ function validMinute(value: unknown) {
 
 function normalizeStatus(value?: string | null) {
   return String(value || []).toUpperCase();
+}
+
+function tournamentStageKey(match: TournamentMatchSummaryRow) {
+  const raw = String(match.stage || match.groupPhase || 'GROUP').trim().toUpperCase();
+  return raw.replace(/[^A-Z0-9]+/g, '_');
+}
+
+function canonicalTournamentMatches(matches: TournamentMatchSummaryRow[]) {
+  const canonical = new Map<string, TournamentMatchSummaryRow>();
+  for (const match of matches) {
+    const pair = [match.homeTeam.id, match.awayTeam.id].sort().join('|');
+    const key = `${tournamentStageKey(match)}:${pair}`;
+    const current = canonical.get(key);
+    const priority = (String(match.syncSource || '').toUpperCase().includes('FIFA') ? 1_000_000_000_000_000 : 0) + Number(match.lastSyncedAt?.getTime() || 0);
+    const currentPriority = current ? (String(current.syncSource || '').toUpperCase().includes('FIFA') ? 1_000_000_000_000_000 : 0) + Number(current.lastSyncedAt?.getTime() || 0) : -1;
+    if (!current || priority > currentPriority) canonical.set(key, match);
+  }
+  return [...canonical.values()];
 }
 
 function isHalfTimeStatus(value?: string | null) {
@@ -279,6 +311,34 @@ const getHomeData = unstable_cache(
       }),
     ]);
 
+    const [tournamentMatchesRaw, latestStatisticsSnapshot] = await Promise.all([
+      prisma.match.findMany({
+        select: {
+          id: true,
+          externalId: true,
+          syncSource: true,
+          status: true,
+          stage: true,
+          groupPhase: true,
+          homeScore: true,
+          awayScore: true,
+          lastSyncedAt: true,
+          homeTeam: { select: { id: true } },
+          awayTeam: { select: { id: true } },
+        },
+      }),
+      prisma.matchStatsSnapshot.findFirst({ orderBy: { capturedAt: 'desc' }, select: { capturedAt: true } }),
+    ]);
+    const tournamentMatches = canonicalTournamentMatches(tournamentMatchesRaw);
+    const finishedTournamentMatches = tournamentMatches.filter((match) => FINISHED_STATUSES.includes(normalizeStatus(match.status)));
+    const liveTournamentMatches = tournamentMatches.filter((match) => LIVE_STATUSES.includes(normalizeStatus(match.status)));
+    const upcomingTournamentMatches = tournamentMatches.filter((match) => SCHEDULED_STATUSES.includes(normalizeStatus(match.status)));
+    const scoredTournamentMatches = [...finishedTournamentMatches, ...liveTournamentMatches];
+    const totalTournamentGoals = scoredTournamentMatches.reduce((sum, match) => sum + Number(match.homeScore || 0) + Number(match.awayScore || 0), 0);
+    const cleanSheets = finishedTournamentMatches.reduce((sum, match) => sum + (Number(match.awayScore || 0) === 0 ? 1 : 0) + (Number(match.homeScore || 0) === 0 ? 1 : 0), 0);
+    const latestMatchSync = tournamentMatches.reduce<Date | null>((latest, match) => !match.lastSyncedAt || (latest && latest >= match.lastSyncedAt) ? latest : match.lastSyncedAt, null);
+    const updatedAt = [latestStatisticsSnapshot?.capturedAt || null, latestMatchSync].filter((date): date is Date => Boolean(date)).sort((a, b) => b.getTime() - a.getTime())[0] || null;
+
     const freshLiveMatch = await findFreshLiveCandidate(liveCandidatesRaw, now);
     return {
       playersCount: totalPlayers,
@@ -289,9 +349,20 @@ const getHomeData = unstable_cache(
       nextMarqueeMatch: freshLiveMatch || nextMatchRaw ? JSON.parse(JSON.stringify(freshLiveMatch || nextMatchRaw)) : null,
       groupStandings: JSON.parse(JSON.stringify(groupStandingsRaw)),
       knockoutMatches: JSON.parse(JSON.stringify(knockoutMatchesRaw)),
+      tournamentStats: {
+        totalMatches: tournamentMatches.length,
+        playedMatches: finishedTournamentMatches.length,
+        liveMatches: liveTournamentMatches.length,
+        upcomingMatches: upcomingTournamentMatches.length,
+        totalGoals: totalTournamentGoals,
+        cleanSheets,
+        playersCount: totalPlayers,
+        teamsCount: totalTeams,
+        updatedAt: updatedAt?.toISOString() || null,
+      },
     };
   },
-  ['home-dashboard-v8'],
+  ['home-dashboard-v9-tournament-statistics'],
   { revalidate: 30, tags: ['home-dashboard'] },
 );
 
@@ -305,6 +376,17 @@ export default async function Home() {
     nextMarqueeMatch: null as any,
     groupStandings: [] as unknown[],
     knockoutMatches: [] as unknown[],
+    tournamentStats: null as {
+      totalMatches: number;
+      playedMatches: number;
+      liveMatches: number;
+      upcomingMatches: number;
+      totalGoals: number;
+      cleanSheets: number;
+      playersCount: number;
+      teamsCount: number;
+      updatedAt: string | null;
+    } | null,
   };
 
   try {
@@ -324,6 +406,7 @@ export default async function Home() {
         teamsCount={data.teamsCount}
         upcomingMatchesCount={data.upcomingMatchesCount}
         knockoutMatches={data.knockoutMatches}
+        tournamentStats={data.tournamentStats}
       />
     </>
   );
