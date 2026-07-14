@@ -67,17 +67,27 @@ export default function AdminMatchControls({ matchId }: { matchId: string }) {
       if (!heatmaps || !points) {
         const diagnostics = data?.heatmapDiagnostics || {};
         const codes = diagnostics.failureCodes || {};
+        const statuses = diagnostics.failureStatuses || {};
+        const serverFailures = Object.entries(statuses).some(([status, count]) => Number(status) >= 500 && Number(count) > 0);
         const reason = Number(diagnostics.requestedPlayers || 0) === 0
           ? 'لم نجد معرفات لاعبين مشاركين صالحة لطلب الخرائط.'
-          : Number(codes['429'] || codes.RATE_LIMITED || 0) > 0
-            ? 'وصل المزود إلى حد الطلبات. أعد المحاولة بعد فترة.'
-            : Number(codes['404'] || codes.NOT_FOUND || 0) > 0
-              ? 'المزود لا يوفّر endpoint الخريطة لهذه المباراة أو هؤلاء اللاعبين.'
-              : Number(codes.EMPTY_HEATMAP || 0) > 0
-                ? 'المزود أعاد استجابات ناجحة بلا نقاط تمركز، ما يعني أن التغطية غير متاحة لهذه المباراة.'
-                : 'لم يُرجع المزود خريطة مباشرة، ولم تتوفر ٦ إحداثيات أحداث موثقة على الأقل لأي لاعب.';
+          : Number(statuses['401'] || statuses['403'] || 0) > 0
+            ? 'رفض المزود طلبات الخريطة بسبب صلاحية المفتاح أو الخطة.'
+            : Number(statuses['429'] || 0) > 0
+              ? 'وصل المزود إلى حد الطلبات. أعد المحاولة بعد فترة.'
+              : diagnostics.coverageUnavailable || Number(statuses['404'] || 0) === Number(diagnostics.requestedPlayers || 0)
+                ? 'أكد المزود أن تغطية حركة اللاعبين غير متاحة لهذه المباراة؛ لذلك لن نعرض خرائط تقديرية.'
+                : Number(statuses['409'] || 0) > 0
+                  ? 'حالة المباراة لدى المزود لا تسمح بطلب الخرائط من هذا المسار الآن.'
+                  : serverFailures
+                    ? 'تعطل مسار الخرائط لدى المزود مؤقتًا.'
+                    : Number(codes.EMPTY_HEATMAP || 0) > 0
+                      ? 'المزود أعاد استجابات ناجحة بلا نقاط تمركز، ما يعني أن التغطية غير متاحة لهذه المباراة.'
+                      : 'لم يُرجع المزود خريطة مباشرة، ولم تتوفر ٦ إحداثيات أحداث موثقة على الأقل لأي لاعب.';
+        const statusSummary = Object.entries(statuses).map(([status, count]) => `HTTP ${status}: ${Number(count).toLocaleString('ar-EG')}`).join('، ');
         const codeSummary = Object.entries(codes).map(([code, count]) => `${code}: ${Number(count).toLocaleString('ar-EG')}`).join('، ');
-        setInfographicMessage({ type: 'error', text: `${reason} (طُلبت ${Number(diagnostics.requestedPlayers || 0).toLocaleString('ar-EG')} خريطة، المتاح ${heatmaps.toLocaleString('ar-EG')})${codeSummary ? ` — التشخيص: ${codeSummary}` : ''}.` });
+        const diagnosticsSummary = [statusSummary, codeSummary].filter(Boolean).join('؛ ');
+        setInfographicMessage({ type: 'error', text: `${reason} (طُلبت ${Number(diagnostics.requestedPlayers || 0).toLocaleString('ar-EG')} خريطة، المتاح ${heatmaps.toLocaleString('ar-EG')})${diagnosticsSummary ? ` — التشخيص: ${diagnosticsSummary}` : ''}.` });
         return;
       }
       setInfographicMessage({ type: 'success', text: `تم حفظ ${heatmaps.toLocaleString('ar-EG')} خريطة حرارية موثقة بإجمالي ${points.toLocaleString('ar-EG')} نقطة (${embeddedHeatmaps.toLocaleString('ar-EG')} مضمّنة في بيانات المباراة، ${endpointHeatmaps.toLocaleString('ar-EG')} من المسار الفردي، ${derivedHeatmaps.toLocaleString('ar-EG')} مشتقة من أحداث موثقة؛ إجمالي المباشرة ${directHeatmaps.toLocaleString('ar-EG')}).` });

@@ -2,6 +2,7 @@ import { randomUUID } from 'crypto';
 import prisma from '@/lib/prisma';
 import { theStatsApiFetch } from '@/lib/theStatsApi';
 import { extractEmbeddedProviderHeatmaps } from '@/lib/match-page/embeddedHeatmaps';
+import { summarizeHeatmapFailures } from '@/lib/match-page/heatmapDiagnostics';
 
 export type TheStatsExtrasEndpointMode = 'essential' | 'full' | 'events' | 'shots' | 'players' | 'lineups' | 'info' | 'stats' | string;
 
@@ -296,12 +297,12 @@ export async function collectTheStatsMatchExtras(match: any, options: { dryRun?:
   }
 
   const heatmapPointCount = playerHeatmaps.reduce((total: number, heatmap: any) => total + (Array.isArray(heatmap.points) ? heatmap.points.length : 0), 0);
-  const failureCodes = heatmapFailures.reduce((counts: Record<string, number>, failure: any) => { const code = String(failure.code || failure.status || 'UNKNOWN'); counts[code] = (counts[code] || 0) + 1; return counts; }, {});
+  const { failureCodes, failureStatuses, allNotFound, rateLimited: heatmapsRateLimited, authorizationFailed } = summarizeHeatmapFailures(heatmapFailures);
   const directHeatmaps = playerHeatmaps.filter((heatmap: any) => heatmap.source === 'PROVIDER_HEATMAP').length;
   const derivedHeatmaps = playerHeatmaps.filter((heatmap: any) => heatmap.source === 'VERIFIED_ACTION_COORDINATES').length;
   const endpointHeatmaps = Math.max(0, directHeatmaps - embeddedHeatmaps);
   const heatmapSource = directHeatmaps > 0 && derivedHeatmaps > 0 ? 'MIXED_VERIFIED_COORDINATES' : derivedHeatmaps > 0 ? 'VERIFIED_ACTION_COORDINATES' : 'THE_STATS_API_PLAYER_HEATMAP';
-  const heatmapMeta = { source: heatmapSource, requestedPlayers: requestedHeatmapPlayers, availablePlayers: playerHeatmaps.length, directHeatmaps, embeddedHeatmaps, endpointHeatmaps, derivedHeatmaps, failedPlayers: heatmapFailures.length, pointCount: heatmapPointCount, verifiedCoordinates: true, failureCodes };
+  const heatmapMeta = { source: heatmapSource, requestedPlayers: requestedHeatmapPlayers, availablePlayers: playerHeatmaps.length, directHeatmaps, embeddedHeatmaps, endpointHeatmaps, derivedHeatmaps, failedPlayers: heatmapFailures.length, pointCount: heatmapPointCount, verifiedCoordinates: true, failureCodes, failureStatuses, coverageUnavailable: allNotFound, authorizationFailed };
   const normalized = { matchInfo: compactMatchInfo(byKey.matchInfo?.payload, byKey.stats?.payload), liveStats: stats, lineups: byKey.lineups?.ok ? dataOf(byKey.lineups.payload) : null, eventsDetailed: { all: events }, shotmap, playerStats, playerHeatmaps, teamHeatmaps, heatmapMeta };
   const endpointSummaries = results.map((item) => ({ key: item.key, path: item.path, ok: item.ok, error: item.ok ? null : item.error, keySummary: item.ok ? null : item.error?.message || null }));
   let snapshotId: string | null = null;
@@ -312,6 +313,6 @@ export async function collectTheStatsMatchExtras(match: any, options: { dryRun?:
     const snapshot = await prisma.matchStatsSnapshot.create({ data: { id: randomUUID(), matchId: match.id, provider: 'THE_STATS_API_EXTRAS', providerMatchId: Number(String(resolved.id).replace(/\D/g, '')) || 0, rawData }, select: { id: true } });
     snapshotId = snapshot.id;
   }
-  const rateLimited = results.some((item) => Number(item.error?.status) === 429);
+  const rateLimited = heatmapsRateLimited || results.some((item) => Number(item.error?.status) === 429);
   return { ok: useful, matchId: match.id, endpointMode: mode, resolvedProviderMatchId: resolved.id, resolvedBy: resolved.by, rateLimited, heatmapDiagnostics: { ...heatmapMeta, failures: heatmapFailures.slice(0, 12) }, endpointsOk: results.filter((item) => item.ok).map((item) => item.key), endpointsFailed: results.filter((item) => !item.ok).map((item) => ({ key: item.key, status: item.error?.status, code: item.error?.code, message: item.error?.message })), counts: { stats: Object.keys(stats.stats || {}).length, detailedEvents: events.length, shots: shotmap.length, playerStats: playerStats.length, lineups: normalized.lineups ? 1 : 0, playerHeatmaps: playerHeatmaps.length, heatmapPoints: heatmapPointCount }, matchInfo: normalized.matchInfo, saved: Boolean(snapshotId), snapshotId, debug: { endpointSummaries, normalizedPreview: normalized, endpoints: includeRaw ? Object.fromEntries(results.map((item) => [item.key, item])) : undefined } };
 }
