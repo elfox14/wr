@@ -11,7 +11,7 @@ export type MatchSourceView = { key: string; name: string; status: 'active' | 'f
 export type MatchStatMetric = { key: string; label: string; home: number | null; away: number | null; suffix?: string; source: string; available: boolean; };
 
 export type MatchShotMapItem = {
-  id?: string | null; minute?: number | null; playerName?: string | null; teamName?: string | null; teamId?: string | null; x?: number | null; y?: number | null; xg?: number | null; npxg?: number | null; outcome?: string | null; situation?: string | null; bodyPart?: string | null; isGoal?: boolean | null; isOnTarget?: boolean | null; isBlocked?: boolean | null; isPenalty?: boolean | null;
+  id?: string | null; minute?: number | null; playerName?: string | null; teamName?: string | null; teamId?: string | null; x?: number | null; y?: number | null; xg?: number | null; npxg?: number | null; outcome?: string | null; situation?: string | null; bodyPart?: string | null; isGoal?: boolean | null; isOnTarget?: boolean | null; isBlocked?: boolean | null; isPenalty?: boolean | null; playerImage?: string | null; playerNumber?: string | number | null;
 };
 
 export type MatchEventView = { id: string; minute: number | null; extraTime?: number | null; minuteLabel: string; type: string; icon: string; teamId?: string | null; playerName?: string | null; detail: string; sourceName?: string | null; sourceUrl?: string | null; x?: number | null; y?: number | null; shot?: MatchShotMapItem | null; playerImage?: string | null; playerNumber?: string | number | null; };
