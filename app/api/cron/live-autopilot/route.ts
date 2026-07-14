@@ -1,9 +1,12 @@
 import { NextResponse } from 'next/server';
 import { hasValidAdminSecret } from '@/lib/adminAuth';
+import prisma from '@/lib/prisma';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
+
+const LIVE_MATCH_STATUSES = ['IN_PLAY', 'LIVE', '1H', '2H', 'HT', 'HALFTIME', 'HALF_TIME', 'ET', 'BT', 'P', 'PEN_LIVE'];
 
 type StepResult = {
   step: string;
@@ -118,6 +121,12 @@ async function callStep(step: string, endpoint: string, params: Record<string, s
   }
 }
 
+function selectedMatchId(step: StepResult) {
+  if (!step.result || typeof step.result !== 'object') return '';
+  const selected = (step.result as { selected?: { matchId?: unknown } }).selected;
+  return typeof selected?.matchId === 'string' ? selected.matchId.trim() : '';
+}
+
 async function run(req: Request) {
   if (!hasValidAdminSecret(req)) return json({ ok: false, error: 'Unauthorized' }, 401);
 
@@ -126,6 +135,14 @@ async function run(req: Request) {
   const origin = publicOrigin(req);
   const secret = secretFrom(req, url);
   const now = new Date();
+  const nearUntil = new Date(now.getTime() + 3 * 60 * 60 * 1000);
+  const recentSince = new Date(now.getTime() - 4 * 60 * 60 * 1000);
+  const [liveMatches, nearMatches, recentlyFinishedMatches] = await Promise.all([
+    prisma.match.count({ where: { status: { in: LIVE_MATCH_STATUSES } } }),
+    prisma.match.count({ where: { status: 'SCHEDULED', matchDate: { gte: now, lte: nearUntil } } }),
+    prisma.match.count({ where: { status: 'FINISHED', matchDate: { gte: recentSince, lte: now } } }),
+  ]);
+  const activeOrNear = liveMatches > 0 || nearMatches > 0 || recentlyFinishedMatches > 0;
 
   const force = boolParam(url, 'force', false);
   const dryRun = boolParam(url, 'dryRun', false);
@@ -146,12 +163,18 @@ async function run(req: Request) {
 
   const due = {
     liveIngest: true,
-    animation: force || Boolean(dbMatchId || providerMatchId) || shouldRunEvery(30, now),
-    footballData: force || shouldRunEvery(5, now),
-    theStats: theStatsEnrichment && (force || lineups || shouldRunEvery(15, now)),
+    animation: force || Boolean(dbMatchId || providerMatchId) || (activeOrNear && shouldRunEvery(30, now)),
+    footballData: force || (activeOrNear && shouldRunEvery(5, now)),
+    knockout: force || (activeOrNear && shouldRunEvery(30, now)),
+    theStats: theStatsEnrichment
+      && (force || lineups || ((liveMatches > 0 || recentlyFinishedMatches > 0) && shouldRunEvery(5, now))),
   };
 
   const steps: StepResult[] = [];
+
+  steps.push(await callStep('fifa_knockout_sync', '/api/cron/fifa-knockout-sync', {
+    dryRun,
+  }, { origin, secret, timeoutMs, due: due.knockout }));
 
   steps.push(await callStep('isports_live_ingest', '/api/cron/live-ingest', {
     dbMatchId: dbMatchId || undefined,
@@ -185,19 +208,25 @@ async function run(req: Request) {
     dryRun,
   }, { origin, secret, timeoutMs, due: due.footballData }));
 
-  steps.push(await callStep('the_stats_enrichment', '/api/cron/the-stats-finalize-matches', {
+  const statisticsCompletion = await callStep('the_stats_completion', '/api/cron/match-complete-pipeline', {
     matchId: dbMatchId || undefined,
-    apply: !dryRun,
+    includeResults: false,
+    includeContent: false,
+    maxSteps: 1,
+    lookbackDays: numberParam(url, 'theStatsDays', 60, 1, 60),
+    lookaheadHours: 6,
+    candidateLimit: 120,
+    stepTimeoutMs: numberParam(url, 'theStatsTimeoutMs', 18000, 3000, 55000),
+  }, { origin, secret, timeoutMs, due: due.theStats });
+  steps.push(statisticsCompletion);
+
+  const statisticsMatchId = selectedMatchId(statisticsCompletion);
+  steps.push(await callStep('player_performance_materialization', '/api/cron/the-stats-player-performance-sync-safe', {
+    matchId: statisticsMatchId || undefined,
+    limit: 1,
+    lookbackDays: 365,
     dryRun,
-    limit: dbMatchId ? 1 : 1,
-    days: numberParam(url, 'theStatsDays', 3, 1, 30),
-    requestsPerMinute: numberParam(url, 'theStatsRequestsPerMinute', 45, 10, 90),
-    timeoutMs: numberParam(url, 'theStatsTimeoutMs', 18000, 3000, 60000),
-    includeRaw: false,
-    writeMatchEvents: boolParam(url, 'writeMatchEvents', false),
-    purgeISportsSnapshots: false,
-    endpointMode: lineups ? 'essential' : (url.searchParams.get('endpointMode') || 'essential'),
-  }, { origin, secret, timeoutMs, due: due.theStats }));
+  }, { origin, secret, timeoutMs, due: due.theStats && Boolean(statisticsMatchId) }));
 
   const ran = steps.filter((step) => step.due);
   const failed = ran.filter((step) => step.ok === false);
@@ -211,10 +240,12 @@ async function run(req: Request) {
     cadence: {
       liveIngest: 'every_run',
       animation: 'every_30_minutes_or_priority_match',
-      footballData: 'every_5_minutes',
-      theStats: 'every_15_minutes_or_lineups',
+      footballData: 'every_5_minutes_around_matches',
+      knockout: 'every_30_minutes_around_matches',
+      theStats: 'every_5_minutes_during_live_or_recent_postmatch',
     },
     scope: { dbMatchId: dbMatchId || null, providerMatchId: providerMatchId || null, isportsVisual, lineups, dryRun },
+    syncWindow: { liveMatches, nearMatches, recentlyFinishedMatches, activeOrNear },
     summary: { total: steps.length, ran: ran.length, skipped: steps.length - ran.length, failed: failed.length },
     steps,
   }, failed.length ? 207 : 200);
