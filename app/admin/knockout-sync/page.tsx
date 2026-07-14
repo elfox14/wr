@@ -20,7 +20,7 @@ export default async function KnockoutSyncAdminPage() {
   return (
     <AdminShell
       title="مزامنة الأدوار الإقصائية"
-      subtitle="تشغيل العامل الرسمي ومراجعة اكتمال دور الـ32 ودور الـ16 وربع النهائي ونصف النهائي من مكان واحد."
+      subtitle="تشغيل العامل الرسمي ومراجعة اكتمال جميع الأدوار من دور الـ32 حتى مباراة المركز الثالث والنهائي."
       badge="FIFA Knockout Sync"
     >
       <KnockoutSyncDashboard />
