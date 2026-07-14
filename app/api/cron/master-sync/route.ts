@@ -26,6 +26,8 @@ type SyncWindow = {
   recentWindowHours: number;
 };
 
+const LIVE_MATCH_STATUSES = ['IN_PLAY', 'LIVE', '1H', '2H', 'HT', 'HALFTIME', 'HALF_TIME', 'ET', 'BT', 'P', 'PEN_LIVE'];
+
 function configuredSecrets() {
   return [process.env.CRON_SECRET, process.env.ADMIN_API_SECRET]
     .map((value) => String(value || '').trim())
@@ -78,7 +80,7 @@ async function getSyncWindow(req: Request): Promise<SyncWindow> {
   const recentSince = new Date(now.getTime() - recentWindowHours * 60 * 60 * 1000);
 
   const [liveOrInPlayMatches, nearUpcomingMatches, recentlyFinishedMatches] = await Promise.all([
-    prisma.match.count({ where: { status: { in: ['IN_PLAY', 'LIVE'] } } }),
+    prisma.match.count({ where: { status: { in: LIVE_MATCH_STATUSES } } }),
     prisma.match.count({ where: { status: 'SCHEDULED', matchDate: { gte: now, lte: nearUntil } } }),
     prisma.match.count({ where: { status: 'FINISHED', matchDate: { gte: recentSince, lte: now } } }),
   ]);
@@ -132,6 +134,24 @@ function shouldRunFootballAuto(req: Request, window: SyncWindow) {
   if (!window.activeOrNear) return false;
 
   const interval = Math.min(Math.max(Number(url.searchParams.get('footballAutoInterval') || 120), 30), 720);
+  return minuteModulo(interval);
+}
+
+function shouldRunKnockoutSync(req: Request, window: SyncWindow) {
+  const url = new URL(req.url);
+  if (url.searchParams.get('knockout') === 'false') return false;
+  if (url.searchParams.get('forceKnockout') === 'true') return true;
+  if (!window.activeOrNear) return false;
+  const interval = Math.min(Math.max(Number(url.searchParams.get('knockoutInterval') || 30), 15), 180);
+  return minuteModulo(interval);
+}
+
+function shouldRunStatisticsCompletion(req: Request, window: SyncWindow) {
+  const url = new URL(req.url);
+  if (url.searchParams.get('completeStatistics') === 'false') return false;
+  if (url.searchParams.get('forceCompleteStatistics') === 'true') return true;
+  if (window.liveOrInPlayMatches === 0 && window.recentlyFinishedMatches === 0) return false;
+  const interval = Math.min(Math.max(Number(url.searchParams.get('statisticsInterval') || 5), 5), 60);
   return minuteModulo(interval);
 }
 
@@ -240,6 +260,12 @@ function shouldReturnVerbose(req: Request) {
   return url.searchParams.get('verbose') === 'true' || url.searchParams.get('full') === 'true';
 }
 
+function selectedMatchId(step: StepResult | null) {
+  if (!step?.payload || typeof step.payload !== 'object') return '';
+  const selected = (step.payload as { selected?: { matchId?: unknown } }).selected;
+  return typeof selected?.matchId === 'string' ? selected.matchId.trim() : '';
+}
+
 export async function GET(req: Request) {
   const auth = getAuth(req);
   if (!auth.valid) {
@@ -261,6 +287,20 @@ export async function GET(req: Request) {
   const runLive = shouldRunLiveMarket(req, syncWindow);
   const runDemand = shouldRunDemandUpdate(req, syncWindow);
   const runFootballAuto = shouldRunFootballAuto(req, syncWindow);
+  const runKnockout = shouldRunKnockoutSync(req, syncWindow);
+  const runStatisticsCompletion = shouldRunStatisticsCompletion(req, syncWindow);
+
+  if (runKnockout) {
+    steps.push(await runStep(baseUrl, 'fifa-knockout-sync', '/api/cron/fifa-knockout-sync', secret, {
+      dryRun: 'false',
+    }));
+  } else {
+    steps.push(skippedStep(
+      'fifa-knockout-sync',
+      '/api/cron/fifa-knockout-sync',
+      syncWindow.activeOrNear ? 'Runs every 30 minutes by default around matches. Use forceKnockout=true to run now.' : 'No live, near, or recently finished local matches.'
+    ));
+  }
 
   if (runAnimation) {
     steps.push(await runStep(baseUrl, 'sync-animation-matches', '/api/cron/sync-animation-matches', secret, {
@@ -295,6 +335,41 @@ export async function GET(req: Request) {
     steps.push(skippedStep('live-market-sync', '/api/cron/live-market-sync', 'No live, near, or recently finished local matches.'));
   }
 
+  let statisticsCompletionStep: StepResult | null = null;
+  if (runStatisticsCompletion) {
+    statisticsCompletionStep = await runStep(baseUrl, 'match-complete-statistics', '/api/cron/match-complete-pipeline', secret, {
+      includeResults: 'false',
+      includeContent: 'false',
+      maxSteps: '1',
+      lookbackDays: '60',
+      lookaheadHours: '6',
+      candidateLimit: '120',
+      stepTimeoutMs: '50000',
+    });
+    steps.push(statisticsCompletionStep);
+
+    const completedMatchId = selectedMatchId(statisticsCompletionStep);
+    if (completedMatchId) {
+      steps.push(await runStep(baseUrl, 'player-performance-materialization', '/api/cron/the-stats-player-performance-sync-safe', secret, {
+        matchId: completedMatchId,
+        limit: '1',
+        lookbackDays: '365',
+        dryRun: 'false',
+      }));
+    } else {
+      steps.push(skippedStep('player-performance-materialization', '/api/cron/the-stats-player-performance-sync-safe', 'The completion pipeline did not select a match.'));
+    }
+  } else {
+    steps.push(skippedStep(
+      'match-complete-statistics',
+      '/api/cron/match-complete-pipeline',
+      syncWindow.liveOrInPlayMatches > 0 || syncWindow.recentlyFinishedMatches > 0
+        ? 'Runs every 5 minutes by default. Use forceCompleteStatistics=true to run now.'
+        : 'No live or recently finished local matches.'
+    ));
+    steps.push(skippedStep('player-performance-materialization', '/api/cron/the-stats-player-performance-sync-safe', 'Statistics completion did not run.'));
+  }
+
   if (runDemand) {
     steps.push(await runStep(baseUrl, 'update-demand', '/api/cron/update-demand', secret));
   } else {
@@ -314,6 +389,8 @@ export async function GET(req: Request) {
     syncWindow,
     animationSyncRan: runAnimation,
     footballAutoSyncRan: runFootballAuto,
+    knockoutSyncRan: runKnockout,
+    statisticsCompletionRan: runStatisticsCompletion,
     liveMarketSyncRan: runLive,
     demandUpdateRan: runDemand,
     forceAnimation,
@@ -324,6 +401,11 @@ export async function GET(req: Request) {
       defaultBehavior: 'football-auto-sync is skipped unless includeFootballAuto=true or ENABLE_API_FOOTBALL_CRON=true',
       liveFallbackDefault: 'disabled unless allowApiFootballFallback=true is passed',
       dailyLimitTarget: 100,
+    },
+    completenessPolicy: {
+      fifaRounds: 'R32 through third-place and final are checked every 30 minutes around matches.',
+      matchStatistics: 'One incomplete live/recent match is advanced every 5 minutes without generating editorial content.',
+      playerPerformances: 'Materialized from the selected verified TheStats snapshot.',
     },
     steps: verbose ? steps : steps.map(compactStep),
     hint: verbose ? undefined : 'Compact output is enabled by default for cron-job.org. Add verbose=true manually when you need full downstream payloads.',

@@ -16,10 +16,15 @@ const checks = [
     label: 'legacy R32 entrypoint redirects to the complete worker',
     passed: legacyWorker.includes("await import('./fifa-knockout-sync-worker.mjs')"),
   },
-  ...['round_of_32', 'round_of_16', 'quarter_finals', 'semi_finals'].map((stage) => ({
+  ...['round_of_32', 'round_of_16', 'quarter_finals', 'semi_finals', 'third_place', 'final'].map((stage) => ({
     label: `complete worker contains ${stage}`,
     passed: knockoutWorker.includes(`stage: '${stage}'`),
   })),
+  {
+    label: 'worker maps the official third-place and final match numbers',
+    passed: knockoutWorker.includes("matchNumbers: new Set([103])")
+      && knockoutWorker.includes("matchNumbers: new Set([104])"),
+  },
   {
     label: 'worker uses the FIFA internal World Cup 2026 season id',
     passed: knockoutWorker.includes("FIFA_WORLD_CUP_2026_SEASON_ID = '285023'")
