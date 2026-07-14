@@ -296,8 +296,8 @@ function extractPlayerStats(snapshots: any[], homeTeam: MatchTeamLite, awayTeam:
       const as = asList(normalized.lineups.away?.starting_xi || normalized.lineups.away?.startingXi);
       const hsub = asList(normalized.lineups.home?.substitutes);
       const asub = asList(normalized.lineups.away?.substitutes);
-      hs.concat(as).forEach((p: any) => { if(p.id) starterIds.add(String(p.id)); if(p.name) starterIds.add(String(p.name)); });
-      hsub.concat(asub).forEach((p: any) => { if(p.id) subIds.add(String(p.id)); if(p.name) subIds.add(String(p.name)); });
+      hs.concat(as).forEach((p: any) => { if (p.id) starterIds.add(String(p.id)); if (p.name) starterIds.add(playerKey(p.name)); });
+      hsub.concat(asub).forEach((p: any) => { if (p.id) subIds.add(String(p.id)); if (p.name) subIds.add(playerKey(p.name)); });
     }
   }
 
@@ -309,8 +309,8 @@ function extractPlayerStats(snapshots: any[], homeTeam: MatchTeamLite, awayTeam:
       const parsed = normalizePlayerStat(item, homeTeam, awayTeam);
       if (!parsed?.playerName) continue;
       
-      if (starterIds.has(String(parsed.playerId)) || starterIds.has(String(parsed.playerName))) parsed.started = true;
-      else if (subIds.has(String(parsed.playerId)) || subIds.has(String(parsed.playerName))) parsed.started = false;
+      if (starterIds.has(String(parsed.playerId)) || starterIds.has(playerKey(parsed.playerName))) parsed.started = true;
+      else if (subIds.has(String(parsed.playerId)) || subIds.has(playerKey(parsed.playerName))) parsed.started = false;
 
       const key = `${parsed.playerId || ''}:${parsed.playerName}:${parsed.teamId || parsed.teamName || ''}`;
       if (seen.has(key)) continue;
@@ -329,7 +329,7 @@ function extractPlayerStats(snapshots: any[], homeTeam: MatchTeamLite, awayTeam:
             rows.push({
               playerId: p.id ? String(p.id) : null,
               playerName: String(p.name),
-              teamId, teamName, position: p.position || null, number: p.number || null,
+              teamId, teamName, position: p.position || null, number: p.jersey_number ?? p.jerseyNumber ?? p.shirt_number ?? p.shirtNumber ?? p.number ?? null,
               started: isStarter, played: isStarter ? true : null, minutes: isStarter ? 0 : null,
               image: p.image || null, isCaptain: p.is_captain || p.captain || false,
             });
@@ -356,8 +356,29 @@ function extractLineupFromPlayers(players: MatchPlayerStatItem[], homeTeam: Matc
     .filter(isTheStatsSnapshot)
     .map((snapshot) => rawData(snapshot)?.normalized?.lineups || rawData(snapshot)?.lineups)
     .find(Boolean);
-  const formationFor = (side: 'home' | 'away') => cleanText(snapshotLineups?.[side]?.formation || snapshotLineups?.[side]?.formation_name);
-  const toLineupPlayer = (player: MatchPlayerStatItem): OfficialLineupPlayer => ({
+
+  const participated = (player: MatchPlayerStatItem | undefined) => Boolean(
+    player && (player.played === true || Number(player.minutes || 0) > 0 || player.playerSubbedOn || player.playerSubbedOff)
+  );
+  const findStat = (raw: any, team: MatchTeamLite) => players.find((player) => {
+    const sameTeam = player.teamId === team.id || teamKey(player.teamName).includes(teamKey(team.name));
+    if (!sameTeam) return false;
+    const rawId = cleanText(raw?.id || raw?.player_id || raw?.playerId);
+    return Boolean((rawId && player.playerId === rawId) || (raw?.name && playerKey(player.playerName) === playerKey(raw.name)));
+  });
+  const fromOfficial = (raw: any, team: MatchTeamLite): OfficialLineupPlayer => {
+    const stat = findStat(raw, team);
+    return {
+      id: cleanText(raw?.id || raw?.player_id || raw?.playerId) || stat?.playerId || null,
+      name: cleanText(raw?.name || raw?.player_name || raw?.playerName) || stat?.playerName || 'لاعب غير معروف',
+      number: raw?.jersey_number ?? raw?.jerseyNumber ?? raw?.shirt_number ?? raw?.shirtNumber ?? raw?.number ?? stat?.number ?? null,
+      image: usableImage(raw?.image || raw?.photo) || stat?.image || null,
+      position: cleanText(raw?.position) || stat?.position || null,
+      rating: stat?.rating ?? toNumber(raw?.rating),
+      isCaptain: raw?.is_captain === true || raw?.isCaptain === true || raw?.captain === true || stat?.isCaptain || null,
+    };
+  };
+  const fromStat = (player: MatchPlayerStatItem): OfficialLineupPlayer => ({
     id: player.playerId || null,
     name: player.playerName || 'لاعب غير معروف',
     number: player.number || null,
@@ -367,15 +388,32 @@ function extractLineupFromPlayers(players: MatchPlayerStatItem[], homeTeam: Matc
     isCaptain: player.isCaptain || null,
   });
   const byTeam = (team: MatchTeamLite, side: 'home' | 'away') => {
+    const official = snapshotLineups?.[side];
+    const rawStarting = asList(official?.starting_xi || official?.startingXi);
+    const rawSubstitutes = asList(official?.substitutes);
+    if (rawStarting.length || rawSubstitutes.length) {
+      return {
+        teamName: cleanText(official?.name) || team.name,
+        formation: cleanText(official?.formation || official?.formation_name),
+        startingXi: rawStarting.map((player: any) => fromOfficial(player, team)).slice(0, 11),
+        substitutes: rawSubstitutes
+          .filter((player: any) => participated(findStat(player, team)))
+          .map((player: any) => fromOfficial(player, team))
+          .slice(0, 12),
+      };
+    }
     const rows = players.filter((player) => player.teamId === team.id || teamKey(player.teamName).includes(teamKey(team.name)));
-    const starting = rows.filter((player) => player.started === true).map(toLineupPlayer);
-    const substitutes = rows.filter((player) => player.started !== true && (Number(player.minutes || 0) > 0 || player.playerSubbedOn || player.playerSubbedOff || player.played)).map(toLineupPlayer);
-    return { teamName: team.name, formation: formationFor(side), startingXi: starting.slice(0, 11), substitutes: substitutes.slice(0, 12) };
+    return {
+      teamName: team.name,
+      formation: null,
+      startingXi: rows.filter((player) => player.started === true).map(fromStat).slice(0, 11),
+      substitutes: rows.filter((player) => player.started !== true && participated(player)).map(fromStat).slice(0, 12),
+    };
   };
   const home = byTeam(homeTeam, 'home');
   const away = byTeam(awayTeam, 'away');
   if (!home.startingXi.length && !away.startingXi.length && !home.substitutes.length && !away.substitutes.length) return null;
-  return { confirmed: true, source: 'THE_STATS_API_EXTRAS', home, away };
+  return { confirmed: snapshotLineups?.confirmed !== false, source: 'THE_STATS_API_EXTRAS', home, away };
 }
 
 function enrichPlayersFromDb(stats: MatchPlayerStatItem[], dbPlayers: any[]) {
@@ -471,10 +509,22 @@ function extractAdvancedData(snapshots: any[], homeTeam: MatchTeamLite, awayTeam
     .filter((row: any) => row.x !== null && row.y !== null);
   const playerStats = enrichPlayersFromDb(extractPlayerStats(snapshots, homeTeam, awayTeam), dbPlayers);
   const playerHeatmaps = normalizePlayerHeatmaps(normalized.playerHeatmaps, playerStats, homeTeam, awayTeam);
-  const homeHeatmapPoints = playerHeatmaps.filter((heatmap: any) => heatmap.side === 'home' && heatmap.scope !== 'SEASON').flatMap((heatmap: any) => heatmap.points);
-  const awayHeatmapPoints = playerHeatmaps.filter((heatmap: any) => heatmap.side === 'away' && heatmap.scope !== 'SEASON').flatMap((heatmap: any) => heatmap.points);
-  const homeHeatmapSource = playerHeatmaps.some((heatmap: any) => heatmap.side === 'home' && heatmap.source === 'VERIFIED_ACTION_COORDINATES') ? 'VERIFIED_ACTION_COORDINATES' as const : 'PROVIDER_HEATMAP' as const;
-  const awayHeatmapSource = playerHeatmaps.some((heatmap: any) => heatmap.side === 'away' && heatmap.source === 'VERIFIED_ACTION_COORDINATES') ? 'VERIFIED_ACTION_COORDINATES' as const : 'PROVIDER_HEATMAP' as const;
+  const teamHeatmapFor = (side: 'home' | 'away', teamId: string) => {
+    const sideMaps = playerHeatmaps.filter((heatmap: any) => heatmap.side === side);
+    const matchMaps = sideMaps.filter((heatmap: any) => heatmap.scope !== 'SEASON');
+    const selected = matchMaps.length ? matchMaps : sideMaps.filter((heatmap: any) => heatmap.scope === 'SEASON');
+    const points = selected.flatMap((heatmap: any) => heatmap.points);
+    if (!points.length) return undefined;
+    const seasonFallback = !matchMaps.length;
+    const source = seasonFallback
+      ? 'PROVIDER_SEASON_HEATMAP' as const
+      : selected.some((heatmap: any) => heatmap.source === 'VERIFIED_ACTION_COORDINATES')
+        ? 'VERIFIED_ACTION_COORDINATES' as const
+        : 'PROVIDER_HEATMAP' as const;
+    return { teamId, source, scope: seasonFallback ? 'SEASON' as const : 'MATCH' as const, points };
+  };
+  const homeTeamHeatmap = teamHeatmapFor('home', homeTeam.id);
+  const awayTeamHeatmap = teamHeatmapFor('away', awayTeam.id);
   return {
     venue: cleanVenue(matchInfo.venue),
     city: cleanText(matchInfo.city),
@@ -486,10 +536,7 @@ function extractAdvancedData(snapshots: any[], homeTeam: MatchTeamLite, awayTeam
     shotmap,
     playerStats,
     playerHeatmaps,
-    teamHeatmaps: {
-      home: homeHeatmapPoints.length ? { teamId: homeTeam.id, source: homeHeatmapSource, points: homeHeatmapPoints } : undefined,
-      away: awayHeatmapPoints.length ? { teamId: awayTeam.id, source: awayHeatmapSource, points: awayHeatmapPoints } : undefined,
-    },
+    teamHeatmaps: { home: homeTeamHeatmap, away: awayTeamHeatmap },
     momentum: buildVerifiedMomentum(normalized, shotmap, homeTeam, awayTeam),
   };
 }

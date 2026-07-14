@@ -5,7 +5,7 @@ import type { HeatmapPoint, HeatmapSource } from '@/lib/match-page/types';
 import MatchAutoRefresh from '@/components/match-center/MatchAutoRefresh';
 import { getArabicTeamName } from '@/lib/teamDisplay';
 import { getTeamFlagUrl } from '@/lib/teamFlags';
-import type { MatchEventView, MatchPageData, MatchPlayerStatItem } from '@/lib/match-page/types';
+import type { MatchEventView, MatchPageData, MatchPlayerStatItem, OfficialLineupPlayer } from '@/lib/match-page/types';
 
 import TeamHeatmap from '@/components/match-center/visuals/TeamHeatmap';
 import CompactStatCell from '@/components/match-center/visuals/CompactStatCell';
@@ -166,15 +166,56 @@ function isStarterPlayer(p: any, d: MatchPageData) {
 }
 
 function getTeamHeatmapPoints(isHome: boolean, d: MatchPageData) {
-  const allStats = d.advanced.playerStats || [];
-  const playerHeatmaps = d.advanced.playerHeatmaps || [];
-  return playerHeatmaps.filter(h => {
-     if (h.scope === 'SEASON' || h.source === 'PROVIDER_SEASON_HEATMAP') return false;
-     const p = allStats.find(s => s.playerId === h.playerId || s.playerName === h.playerName);
-     return p ? playerSide(p, d) === (isHome ? 'home' : 'away') : h.side === (isHome ? 'home' : 'away');
-  }).flatMap(h => h.points);
+  return d.advanced.teamHeatmaps?.[isHome ? 'home' : 'away']?.points || [];
 }
 
+function officialPlayerStat(player: OfficialLineupPlayer, stats: MatchPlayerStatItem[], teamId: string, teamName: string, started: boolean): MatchPlayerStatItem {
+  const stat = stats.find((row) =>
+    (player.id && row.playerId === player.id) ||
+    (player.name && clean(row.playerName) === clean(player.name))
+  );
+  return {
+    ...(stat || {}),
+    playerId: player.id || stat?.playerId || null,
+    playerName: player.name || stat?.playerName || 'لاعب غير معروف',
+    teamId,
+    teamName,
+    position: player.position || stat?.position || null,
+    number: player.number ?? stat?.number ?? null,
+    image: player.image || stat?.image || null,
+    rating: player.rating ?? stat?.rating ?? null,
+    isCaptain: player.isCaptain ?? stat?.isCaptain ?? false,
+    started,
+    played: started ? true : stat?.played ?? true,
+  };
+}
+
+function formationLines(players: MatchPlayerStatItem[], formation?: string | null) {
+  if (!players.length) return [];
+  const goalkeeper = players.find((player) => /^(g|gk|goalkeeper)$/i.test(String(player.position || ''))) || players[0];
+  const outfield = players.filter((player) => player !== goalkeeper);
+  const shape = String(formation || '').match(/\d+/g)?.map(Number) || [];
+  if (shape.length >= 2 && shape.reduce((sum, count) => sum + count, 0) === outfield.length) {
+    const lines: MatchPlayerStatItem[][] = [[goalkeeper]];
+    let cursor = 0;
+    for (const count of shape) {
+      lines.push(outfield.slice(cursor, cursor + count));
+      cursor += count;
+    }
+    return lines.filter((line) => line.length > 0);
+  }
+  const gks: MatchPlayerStatItem[] = [], defs: MatchPlayerStatItem[] = [], mids: MatchPlayerStatItem[] = [], fwds: MatchPlayerStatItem[] = [], others: MatchPlayerStatItem[] = [];
+  players.forEach((player) => {
+    const position = String(player.position || '').toUpperCase();
+    if (/^(G|GK)$/.test(position)) gks.push(player);
+    else if (/^(D|CB|LB|RB|LWB|RWB)$/.test(position)) defs.push(player);
+    else if (/^(M|DM|CM|AM|CDM|CAM|LM|RM)$/.test(position)) mids.push(player);
+    else if (/^(F|FW|CF|ST|LW|RW)$/.test(position)) fwds.push(player);
+    else others.push(player);
+  });
+  mids.push(...others);
+  return [gks, defs, mids, fwds].filter((line) => line.length > 0);
+}
 
 function PostMatchCoverage({ d, compact = false }: { d: MatchPageData; compact?: boolean }) {
   const { article, infographic } = d.postMatchContent || { article: null, infographic: null };
@@ -322,116 +363,98 @@ function teamRows(d: MatchPageData, team: 'home' | 'away') {
   return all.filter((p) => playerSide(p, d) === team); 
 }
 
-function groupPlayersByLine(players: any[]) {
-  const gks: any[] = [], defs: any[] = [], mids: any[] = [], fwds: any[] = [], others: any[] = [];
-  players.forEach(p => {
-    const pos = String(p.position || '').toLowerCase();
-    if (pos.includes('gk') || pos.includes('حارس') || pos.includes('goalkeeper')) gks.push(p);
-    else if (pos.includes('d') || pos.includes('مدافع') || pos.includes('back')) defs.push(p);
-    else if (pos.includes('m') || pos.includes('وسط')) mids.push(p);
-    else if (pos.includes('f') || pos.includes('a') || pos.includes('مهاجم') || pos.includes('wing')) fwds.push(p);
-    else others.push(p);
-  });
-  
-  if (others.length > 0) mids.push(...others);
-  return [gks, defs, mids, fwds];
-}
 
-function PitchPlayer({ p, isHome, color, d, onHeatmap }: { p: MatchPlayerStatItem, isHome: boolean, color: string, d: MatchPageData, onHeatmap: (name: string, image: string | null | undefined, isHome: boolean, points: HeatmapPoint[], source: HeatmapSource | undefined, stats: MatchPlayerStatItem) => void }) {
-  const playerHeatmaps = d.advanced.playerHeatmaps?.filter((h:any) => h.playerId === p.playerId || h.playerName === p.playerName) || [];
-  const heatmap = playerHeatmaps.find((h:any) => h.scope !== 'SEASON' && h.source !== 'PROVIDER_SEASON_HEATMAP') || playerHeatmaps.find((h:any) => h.scope === 'SEASON' || h.source === 'PROVIDER_SEASON_HEATMAP');
+function PitchPlayer({ p, isHome, color, d, onHeatmap, isSubstitute = false }: { p: MatchPlayerStatItem, isHome: boolean, color: string, d: MatchPageData, isSubstitute?: boolean, onHeatmap: (name: string, image: string | null | undefined, isHome: boolean, points: HeatmapPoint[], source: HeatmapSource | undefined, stats: MatchPlayerStatItem) => void }) {
+  const playerHeatmaps = d.advanced.playerHeatmaps?.filter((heatmap) =>
+    (p.playerId && heatmap.playerId === p.playerId) ||
+    (heatmap.playerName && clean(heatmap.playerName) === clean(p.playerName))
+  ) || [];
+  const heatmap = playerHeatmaps.find((item) => item.scope !== 'SEASON' && item.source !== 'PROVIDER_SEASON_HEATMAP') || playerHeatmaps.find((item) => item.scope === 'SEASON' || item.source === 'PROVIDER_SEASON_HEATMAP');
   const heatmapPoints = heatmap?.points || [];
   const hasVerifiedHeatmap = heatmapPoints.length > 0;
   return (
-    <button type="button" className="group relative flex cursor-pointer flex-col items-center transition-transform hover:scale-110" onClick={() => onHeatmap(p.playerName || '', p.image, isHome, heatmapPoints, heatmap?.source, p)} aria-label={`عرض إحصاءات ${p.playerName || 'اللاعب'}${hasVerifiedHeatmap ? ' وخريطته الحرارية' : ''}`}>
-       <div className="relative">
-          <div className="w-8 h-8 md:w-10 md:h-10 border-2 shadow-lg bg-black/50 rounded-full flex items-center justify-center overflow-hidden" style={{ borderColor: color }}>
-             <Avatar name={p.playerName} image={p.image} number={p.number} />
-          </div>
-          {Number(p.goals || 0) > 0 && <span className="absolute -top-2 -right-2 text-xs md:text-sm drop-shadow">⚽</span>}
-          {p.rating && <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-black/90 border border-white/20 text-[8px] md:text-[9px] px-1 rounded text-white">{p.rating.toFixed(1)}</span>}
-       </div>
-       <div className="mt-1 md:mt-1.5 bg-black/70 px-1.5 py-0.5 rounded border border-white/10 text-center max-w-[60px] md:max-w-[70px]">
-          <p className="text-[8px] md:text-[10px] font-bold text-white truncate">{p.playerName}</p>
-       </div>
+    <button type="button" className="group relative flex min-w-[58px] cursor-pointer flex-col items-center transition-transform hover:scale-105" onClick={() => onHeatmap(p.playerName || '', p.image, isHome, heatmapPoints, heatmap?.source, p)} aria-label={`عرض إحصاءات ${p.playerName || 'اللاعب'}${hasVerifiedHeatmap ? ' وخريطته الحرارية' : ''}`}>
+      <div className="relative">
+        <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full border-2 bg-black/60 shadow-lg md:h-12 md:w-12" style={{ borderColor: color }}>
+          <Avatar name={p.playerName} image={p.image} number={p.number} />
+        </div>
+        {p.number !== null && p.number !== undefined && <span className="absolute -right-2 -top-2 grid h-5 min-w-5 place-items-center rounded-full border border-white/20 bg-[#07110d] px-1 text-[9px] font-black text-white">{p.number}</span>}
+        {Number(p.goals || 0) > 0 && <span className="absolute -left-2 -top-2 text-xs drop-shadow">⚽</span>}
+        {p.rating && <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 rounded border border-white/20 bg-black/90 px-1 text-[8px] text-white">{p.rating.toFixed(1)}</span>}
+      </div>
+      <div className="mt-2 max-w-[76px] rounded-lg border border-white/10 bg-black/75 px-1.5 py-1 text-center">
+        <p className="truncate text-[9px] font-black text-white md:text-[10px]">{p.playerName}</p>
+        <p className="mt-0.5 text-[7px] font-bold text-white/55">{p.position || '—'}{isSubstitute ? ' · بديل مشارك' : ''}</p>
+      </div>
     </button>
-  )
+  );
 }
 
-
-function Lineups({ d, onHeatmap }: { d: MatchPageData, onHeatmap: (name: string, img: string|null|undefined, isHome: boolean, points: HeatmapPoint[], source: HeatmapSource | undefined, stats: MatchPlayerStatItem) => void }) { 
+function Lineups({ d, onHeatmap }: { d: MatchPageData, onHeatmap: (name: string, img: string|null|undefined, isHome: boolean, points: HeatmapPoint[], source: HeatmapSource | undefined, stats: MatchPlayerStatItem) => void }) {
   const allStats = d.advanced.playerStats || [];
+  const official = d.officialLineup;
   const homeStats = allStats.filter((player) => playerSide(player, d) === 'home');
   const awayStats = allStats.filter((player) => playerSide(player, d) === 'away');
-  const homeStarters = homeStats.filter((player) => isStarterPlayer(player, d)).slice(0, 11);
-  const homeSubs = homeStats.filter(p => !isStarterPlayer(p, d) && (p.played === true || (p.minutes && p.minutes > 0) || p.playerSubbedOn));
 
-  const awayStarters = awayStats.filter((player) => isStarterPlayer(player, d)).slice(0, 11);
-  const awaySubs = awayStats.filter(p => !isStarterPlayer(p, d) && (p.played === true || (p.minutes && p.minutes > 0) || p.playerSubbedOn));
+  const homeStarters = official?.home.startingXi.length
+    ? official.home.startingXi.map((player) => officialPlayerStat(player, homeStats, d.homeTeam.id, d.homeTeam.name, true))
+    : homeStats.filter((player) => isStarterPlayer(player, d)).slice(0, 11);
+  const awayStarters = official?.away.startingXi.length
+    ? official.away.startingXi.map((player) => officialPlayerStat(player, awayStats, d.awayTeam.id, d.awayTeam.name, true))
+    : awayStats.filter((player) => isStarterPlayer(player, d)).slice(0, 11);
+  const homeSubs = official?.home.substitutes.length
+    ? official.home.substitutes.map((player) => officialPlayerStat(player, homeStats, d.homeTeam.id, d.homeTeam.name, false))
+    : homeStats.filter((player) => !isStarterPlayer(player, d) && (player.played === true || Number(player.minutes || 0) > 0 || player.playerSubbedOn));
+  const awaySubs = official?.away.substitutes.length
+    ? official.away.substitutes.map((player) => officialPlayerStat(player, awayStats, d.awayTeam.id, d.awayTeam.name, false))
+    : awayStats.filter((player) => !isStarterPlayer(player, d) && (player.played === true || Number(player.minutes || 0) > 0 || player.playerSubbedOn));
 
-  const homeLines = groupPlayersByLine(homeStarters).filter(l => l.length > 0);
-  const awayLines = groupPlayersByLine(awayStarters).filter(l => l.length > 0);
-
+  const homeLines = formationLines(homeStarters, official?.home.formation);
+  const awayLines = formationLines(awayStarters, official?.away.formation);
   const homeHeatmapPoints = getTeamHeatmapPoints(true, d);
   const awayHeatmapPoints = getTeamHeatmapPoints(false, d);
 
   return (
-    <div className="flex flex-col items-center bg-black/20 rounded-2xl p-4 border border-white/5">
-      <div className="mb-5 w-full rounded-2xl border border-[#18E58F]/20 bg-[#18E58F]/5 p-3 text-center text-xs font-bold text-slate-300">نعرض الأساسيين والبدلاء الذين ثبتت مشاركتهم فقط. اضغط على أي لاعب لعرض كل إحصاءاته وخريطته الحرارية الموثقة.</div>
+    <div className="flex flex-col items-center rounded-2xl border border-white/5 bg-black/20 p-4">
+      <div className="mb-5 w-full rounded-2xl border border-[#18E58F]/20 bg-[#18E58F]/5 p-3 text-center text-xs font-bold text-slate-300">التوزيع مطابق للخطة الرسمية، ويعرض الأساسيين والبدلاء الذين ثبتت مشاركتهم فقط. اضغط على اللاعب لإحصاءاته وخريطته.</div>
+      <div className="mb-4 grid w-full max-w-2xl grid-cols-2 gap-3 text-center">
+        <div className="rounded-xl border border-[#0FF0FC]/20 bg-[#0FF0FC]/5 p-2 text-xs font-black text-[#0FF0FC]">{tn(d.homeTeam)} · {official?.home.formation || 'الخطة غير متوفرة'}</div>
+        <div className="rounded-xl border border-[#F8C846]/20 bg-[#F8C846]/5 p-2 text-xs font-black text-[#F8C846]">{tn(d.awayTeam)} · {official?.away.formation || 'الخطة غير متوفرة'}</div>
+      </div>
       {!homeStarters.length && !awayStarters.length && <div className="mb-5 w-full rounded-2xl border border-dashed border-white/10 p-8 text-center text-sm font-bold text-slate-500">لم يصل تشكيل أساسي موثق، لذلك لا نعرض توزيعًا تقديريًا للاعبين.</div>}
-      {/* Away Subs */}
-      <div className="mb-6 w-full flex flex-wrap justify-center gap-3 px-2">
-         <div className="w-full text-center mb-2">
-            <span className="text-xs font-black text-gray-400 bg-black/40 px-3 py-1 rounded-full border border-white/10">بدلاء {tn(d.awayTeam)} المشاركين</span>
-         </div>
-         {awaySubs.map(p => <PitchPlayer key={p.playerId || p.playerName} p={p} isHome={false} color="#9CA3AF" d={d} onHeatmap={onHeatmap} />)}
-      </div>
-      
-      {/* The Pitch */}
-      <div className="relative w-full max-w-2xl mx-auto bg-gradient-to-b from-[#316a2b] to-[#2b5e25] border-[3px] md:border-4 border-white/70 rounded-md aspect-[2/3] overflow-hidden shadow-2xl flex flex-col">
-        {/* Field Markings */}
-        <div className="absolute top-1/2 left-0 w-full h-[2px] bg-white/50 -translate-y-1/2" />
-        <div className="absolute top-1/2 left-1/2 w-16 h-16 md:w-24 md:h-24 border-2 border-white/50 rounded-full -translate-x-1/2 -translate-y-1/2" />
-        <div className="absolute top-1/2 left-1/2 w-1 h-1 md:w-2 md:h-2 bg-white/50 rounded-full -translate-x-1/2 -translate-y-1/2" />
-        <div className="absolute top-0 left-1/2 w-32 h-20 md:w-48 md:h-32 border-2 border-white/50 border-t-0 -translate-x-1/2" />
-        <div className="absolute bottom-0 left-1/2 w-32 h-20 md:w-48 md:h-32 border-2 border-white/50 border-b-0 -translate-x-1/2" />
-        
-        {/* Away Half (Top) - Defends top */}
-        <div className="flex-1 flex flex-col justify-evenly py-2 md:py-6 z-10 w-full">
-          {awayLines.map((line, i) => (
-             <div key={i} className="flex justify-around w-full px-2 md:px-8">
-               {line.map(p => <PitchPlayer key={p.playerId || p.playerName} p={p} isHome={false} color="#F8C846" d={d} onHeatmap={onHeatmap} />)}
-             </div>
-          ))}
-        </div>
 
-        {/* Home Half (Bottom) - Defends bottom */}
-        <div className="flex-1 flex flex-col justify-evenly py-2 md:py-6 z-10 w-full">
-          {[...homeLines].reverse().map((line, i) => (
-             <div key={i} className="flex justify-around w-full px-2 md:px-8">
-               {line.map(p => <PitchPlayer key={p.playerId || p.playerName} p={p} isHome={true} color="#0FF0FC" d={d} onHeatmap={onHeatmap} />)}
-             </div>
-          ))}
+      {awaySubs.length > 0 && <div className="mb-6 flex w-full flex-wrap justify-center gap-3 px-2">
+        <div className="mb-2 w-full text-center"><span className="rounded-full border border-white/10 bg-black/40 px-3 py-1 text-xs font-black text-gray-400">بدلاء {tn(d.awayTeam)} المشاركون</span></div>
+        {awaySubs.map((player) => <PitchPlayer key={player.playerId || player.playerName} p={player} isHome={false} isSubstitute color="#9CA3AF" d={d} onHeatmap={onHeatmap} />)}
+      </div>}
+
+      <div className="relative mx-auto flex aspect-[2/3] w-full max-w-2xl flex-col overflow-hidden rounded-md border-[3px] border-white/70 bg-gradient-to-b from-[#316a2b] to-[#2b5e25] shadow-2xl md:border-4">
+        <div className="absolute left-0 top-1/2 h-[2px] w-full -translate-y-1/2 bg-white/50" />
+        <div className="absolute left-1/2 top-1/2 h-16 w-16 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white/50 md:h-24 md:w-24" />
+        <div className="absolute left-1/2 top-0 h-20 w-32 -translate-x-1/2 border-2 border-t-0 border-white/50 md:h-32 md:w-48" />
+        <div className="absolute bottom-0 left-1/2 h-20 w-32 -translate-x-1/2 border-2 border-b-0 border-white/50 md:h-32 md:w-48" />
+
+        <div className="z-10 flex flex-1 flex-col justify-evenly py-2 md:py-5">
+          {awayLines.map((line, index) => <div key={index} className="flex w-full justify-around px-1 md:px-7">{line.map((player) => <PitchPlayer key={player.playerId || player.playerName} p={player} isHome={false} color="#F8C846" d={d} onHeatmap={onHeatmap} />)}</div>)}
+        </div>
+        <div className="z-10 flex flex-1 flex-col justify-evenly py-2 md:py-5">
+          {[...homeLines].reverse().map((line, index) => <div key={index} className="flex w-full justify-around px-1 md:px-7">{line.map((player) => <PitchPlayer key={player.playerId || player.playerName} p={player} isHome color="#0FF0FC" d={d} onHeatmap={onHeatmap} />)}</div>)}
         </div>
       </div>
 
-      {/* Home Subs */}
-      <div className="mt-6 w-full flex flex-wrap justify-center gap-3 px-2">
-         <div className="w-full text-center mb-2">
-            <span className="text-xs font-black text-gray-400 bg-black/40 px-3 py-1 rounded-full border border-white/10">بدلاء {tn(d.homeTeam)} المشاركين</span>
-         </div>
-         {homeSubs.map(p => <PitchPlayer key={p.playerId || p.playerName} p={p} isHome={true} color="#9CA3AF" d={d} onHeatmap={onHeatmap} />)}
-      </div>
+      {homeSubs.length > 0 && <div className="mt-6 flex w-full flex-wrap justify-center gap-3 px-2">
+        <div className="mb-2 w-full text-center"><span className="rounded-full border border-white/10 bg-black/40 px-3 py-1 text-xs font-black text-gray-400">بدلاء {tn(d.homeTeam)} المشاركون</span></div>
+        {homeSubs.map((player) => <PitchPlayer key={player.playerId || player.playerName} p={player} isHome isSubstitute color="#9CA3AF" d={d} onHeatmap={onHeatmap} />)}
+      </div>}
 
-      {/* Verified team heatmaps only */}
       {(homeHeatmapPoints.length > 0 || awayHeatmapPoints.length > 0) && (
-        <div className="w-full grid md:grid-cols-2 gap-4 mt-8">
-          {homeHeatmapPoints.length > 0 && <Box title={`تمركز ${tn(d.homeTeam)}`}><TeamHeatmap teamName="" isHome={true} points={homeHeatmapPoints} source={d.advanced.teamHeatmaps?.home?.source} /></Box>}
+        <div className="mt-8 grid w-full gap-4 md:grid-cols-2">
+          {homeHeatmapPoints.length > 0 && <Box title={`تمركز ${tn(d.homeTeam)}`}><TeamHeatmap teamName="" isHome points={homeHeatmapPoints} source={d.advanced.teamHeatmaps?.home?.source} /></Box>}
           {awayHeatmapPoints.length > 0 && <Box title={`تمركز ${tn(d.awayTeam)}`}><TeamHeatmap teamName="" isHome={false} points={awayHeatmapPoints} source={d.advanced.teamHeatmaps?.away?.source} /></Box>}
         </div>
       )}
     </div>
-  ); 
+  );
 }
 
 function Analysis({ d }: { d: MatchPageData }) { 
