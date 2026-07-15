@@ -4,6 +4,12 @@ import prisma from '@/lib/prisma';
 import { getTeamFlagUrl } from '@/lib/teamFlags';
 import { getArabicTeamName } from '@/lib/teamDisplay';
 import LiveOnlyRefresh from '@/components/LiveOnlyRefresh';
+import {
+  dedupeStatisticsPlayers,
+  ensureStatisticsEventPlayer,
+  normalizeStatisticsPlayerText,
+  type StatisticsPlayerRow as PlayerStats,
+} from '@/lib/statisticsPlayerDedupe';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -54,27 +60,6 @@ type TeamStats = TeamLite & {
   redCards: number;
   possessionTotal: number;
   possessionCount: number;
-};
-type PlayerStats = {
-  id: string;
-  name: string;
-  code: string | null;
-  image: string | null;
-  teamName: string;
-  minutes: number;
-  goals: number;
-  assists: number;
-  shots: number;
-  shotsOnTarget: number;
-  keyPasses: number;
-  tackles: number;
-  interceptions: number;
-  saves: number;
-  goalsConceded: number;
-  yellowCards: number;
-  redCards: number;
-  ratingTotal: number;
-  ratingCount: number;
 };
 type CanonicalSource = {
   id: string;
@@ -264,15 +249,6 @@ function bestSnapshotsByMatch(snapshots: SnapshotLite[]) {
   }
   return map;
 }
-function eventPlayerKey(name: string, teamId?: string | null) {
-  return `event:${teamId || 'team'}:${name.toLowerCase()}`;
-}
-function ensureEventPlayer(map: Map<string, PlayerStats>, name: string, teamName: string, teamId?: string | null) {
-  const id = eventPlayerKey(name, teamId);
-  if (!map.has(id)) map.set(id, { id, name, code: null, image: null, teamName, minutes: 0, goals: 0, assists: 0, shots: 0, shotsOnTarget: 0, keyPasses: 0, tackles: 0, interceptions: 0, saves: 0, goalsConceded: 0, yellowCards: 0, redCards: 0, ratingTotal: 0, ratingCount: 0 });
-  return map.get(id)!;
-}
-
 async function loadStatisticsUncached() {
   const [rawMatches, snapshots, performances, events, teamsCount, playersCount, totalSnapshots] = await Promise.all([
     prisma.match.findMany({
@@ -424,7 +400,7 @@ async function loadStatisticsUncached() {
   for (const performance of performances) {
     const asset = performance.asset;
     if (!playerMap.has(asset.id)) {
-      playerMap.set(asset.id, { id: asset.id, name: asset.name, code: asset.code, image: asset.image, teamName: asset.team ? teamDisplayName(asset.team) : '—', minutes: 0, goals: 0, assists: 0, shots: 0, shotsOnTarget: 0, keyPasses: 0, tackles: 0, interceptions: 0, saves: 0, goalsConceded: 0, yellowCards: 0, redCards: 0, ratingTotal: 0, ratingCount: 0 });
+      playerMap.set(asset.id, { id: asset.id, name: asset.name, code: asset.code, image: asset.image, teamId: asset.team?.id || null, teamName: asset.team ? teamDisplayName(asset.team) : '—', minutes: 0, goals: 0, assists: 0, shots: 0, shotsOnTarget: 0, keyPasses: 0, tackles: 0, interceptions: 0, saves: 0, goalsConceded: 0, yellowCards: 0, redCards: 0, ratingTotal: 0, ratingCount: 0 });
     }
     const row = playerMap.get(asset.id)!;
     row.minutes += safe(performance.minutes);
@@ -448,7 +424,7 @@ async function loadStatisticsUncached() {
   for (const event of events) {
     if (!event.playerName || !canonicalMatchIds.has(event.matchId)) continue;
     if (event.type === 'goal' && shotmapGoalMatches.has(event.matchId) && event.sourceName !== 'THE_STATS_API_FINAL_SHOTMAP') continue;
-    const key = eventPlayerKey(event.playerName, event.teamId);
+    const key = `event:${event.teamId || 'team'}:${normalizeStatisticsPlayerText(event.playerName)}`;
     const current = eventPlayerStats.get(key) || { name: event.playerName, teamId: event.teamId, teamName: teamNameById.get(event.teamId || '') || '—', goals: 0, yellowCards: 0, redCards: 0 };
     if (event.type === 'goal') current.goals += 1;
     if (event.type === 'yellow_card') current.yellowCards += 1;
@@ -456,14 +432,14 @@ async function loadStatisticsUncached() {
     eventPlayerStats.set(key, current);
   }
   for (const eventStat of eventPlayerStats.values()) {
-    const row = ensureEventPlayer(playerMap, eventStat.name, eventStat.teamName, eventStat.teamId);
+    const row = ensureStatisticsEventPlayer(playerMap, eventStat);
     row.goals = Math.max(row.goals, eventStat.goals);
     row.yellowCards = Math.max(row.yellowCards, eventStat.yellowCards);
     row.redCards = Math.max(row.redCards, eventStat.redCards);
   }
 
   const teams = [...teamMap.values()].sort(teamComparator);
-  const players = [...playerMap.values()];
+  const players = dedupeStatisticsPlayers([...playerMap.values()]);
   const totalGoals = scoredRows.reduce((sum, match) => sum + match.totalGoals, 0);
   const finishedGoals = finishedRows.reduce((sum, match) => sum + match.totalGoals, 0);
   const liveGoals = liveRows.reduce((sum, match) => sum + match.totalGoals, 0);
@@ -521,11 +497,11 @@ async function loadStatisticsUncached() {
   };
 }
 
-const loadLiveStatistics = unstable_cache(loadStatisticsUncached, ['statistics-page-v6-live'], {
+const loadLiveStatistics = unstable_cache(loadStatisticsUncached, ['statistics-page-v7-live'], {
   revalidate: LIVE_STATS_CACHE_SECONDS,
   tags: ['statistics-page', 'home-dashboard'],
 });
-const loadIdleStatistics = unstable_cache(loadStatisticsUncached, ['statistics-page-v6-idle'], {
+const loadIdleStatistics = unstable_cache(loadStatisticsUncached, ['statistics-page-v7-idle'], {
   revalidate: false,
   tags: ['statistics-page', 'home-dashboard'],
 });
